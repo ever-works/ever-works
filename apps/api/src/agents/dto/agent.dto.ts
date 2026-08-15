@@ -625,6 +625,29 @@ export class ListRunSessionsQueryDto {
 }
 
 /**
+ * Session detail (Feature K) — query for
+ * `GET /api/agents/runs/:runId/detail`. The cursor is the opaque
+ * `<epochMillis>_<uuid>` token the previous page's `nextCursor` carried;
+ * the format is validated at the edge so a garbage cursor is a 400, not
+ * a silently ignored restart.
+ */
+export class SessionDetailQueryDto {
+    @ApiProperty({ required: false, description: 'Opaque timeline cursor from `nextCursor`.' })
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{1,15}_[0-9a-fA-F-]{36}$/)
+    cursor?: string;
+
+    @ApiProperty({ required: false, minimum: 1, maximum: 200 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
+}
+
+/**
  * Run steering (Wave 4 M5) — payload for
  * `POST /api/agents/:id/runs/:runId/steer`.
  *

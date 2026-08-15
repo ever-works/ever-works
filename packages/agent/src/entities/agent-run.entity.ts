@@ -197,14 +197,27 @@ export class AgentRun {
     /** Per-run workspace audit (worktree-per-Task isolation):
      *  `{ provider, path?, baseSha, branchRef, reused }`. The Task row
      *  keeps the durable subset (branchRef/branchState/baseSha); this is
-     *  the run-scoped record for debugging and the run cockpit. */
+     *  the run-scoped record for debugging and the run cockpit.
+     *
+     *  Session detail (Feature K) — the provision fields are optional at
+     *  the TYPE level because `filesTouched` can be merged onto runs that
+     *  never provisioned an isolated workspace (heartbeat/chat runs whose
+     *  tool loop still edited files); the workspace provision path keeps
+     *  writing the full object. */
     @Column({ type: 'simple-json', nullable: true })
     workspaceMeta?: {
-        provider: string;
+        provider?: string;
         path?: string;
-        baseSha: string;
-        branchRef: string;
-        reused: boolean;
+        baseSha?: string;
+        branchRef?: string;
+        reused?: boolean;
+        /**
+         * Per-run touched-file list for the session-detail page, capped
+         * at 200 entries (`FILES_TOUCHED_CAP`). Collected from tool args
+         * that carry explicit paths (commitToRepo files, editAgentFile
+         * name) — `changedFilesCount` stays the workspace-diff rollup.
+         */
+        filesTouched?: string[];
     } | null;
 
     // ── Run cockpit telemetry (kanban run cockpit, Wave 2) ──────────

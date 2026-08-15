@@ -71,10 +71,14 @@ import {
     ListAgentsQueryDto,
     ListRunSessionsQueryDto,
     ResumeRunDto,
+    SessionDetailQueryDto,
     SteerRunDto,
     UpdateAgentDto,
     UpdateAgentGuardrailsDto,
 } from './dto/agent.dto';
+// Type-only (erased at compile time) so the spec-side jest.mock factories
+// for '@ever-works/agent/agents' never have to know about entity shapes.
+import type { AgentRun, AgentRunLog } from '@ever-works/agent/entities';
 
 /**
  * Agents/Skills/Tasks PR #1017 — Phase 3 API surface.
@@ -148,6 +152,82 @@ export function isSessionAttachable(run: {
 }): boolean {
     const live = run.status === 'queued' || run.status === 'running';
     return live && (run.terminalState === 'attached' || run.terminalState === 'starting');
+}
+
+// ── Session detail (Feature K) ─────────────────────────────────────
+// Step names the timeline/counts are composed from. Kept as local
+// literals (mirroring the step names `AgentRunService`'s capture writes —
+// see the reciprocal note in packages/agent/src/agents/run-capture.ts,
+// which documents them but exports no constant) rather than imported: five
+// spec files jest.mock '@ever-works/agent/agents' with explicit export
+// lists, and a runtime value import here would arrive as `undefined`
+// in every one of them.
+const SESSION_TIMELINE_STEPS = [
+    'assistant-message',
+    'user-message',
+    'tool-invocation',
+    'capture-truncated',
+] as const;
+const SESSION_MESSAGE_STEPS = ['assistant-message', 'user-message'] as const;
+
+/** One rendered row of the session-detail timeline. */
+export interface SessionTimelineEntry {
+    id: string;
+    kind: 'assistant-message' | 'user-message' | 'tool-call' | 'marker';
+    createdAt: string;
+    /** Message rows + marker rows: the (already redacted, capped) text. */
+    text: string | null;
+    toolName: string | null;
+    callId: string | null;
+    argsPreview: string | null;
+    resultPreview: string | null;
+    durationMs: number | null;
+    isError: boolean;
+    truncated: boolean;
+}
+
+function toSessionTimelineEntry(log: AgentRunLog): SessionTimelineEntry {
+    const md = (log.metadata ?? {}) as Record<string, unknown>;
+    const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
+    const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+    const isTool = log.step === 'tool-invocation';
+    return {
+        id: log.id,
+        kind: isTool
+            ? 'tool-call'
+            : log.step === 'assistant-message' || log.step === 'user-message'
+              ? log.step
+              : 'marker',
+        createdAt: log.createdAt.toISOString(),
+        text: isTool ? null : log.message,
+        toolName: isTool ? str(md.toolName) : null,
+        callId: isTool ? str(md.callId) : null,
+        argsPreview: isTool ? str(md.argsPreview) : null,
+        resultPreview: isTool ? str(md.resultPreview) : null,
+        durationMs: isTool ? num(md.durationMs) : null,
+        isError: isTool && log.level !== 'INFO',
+        truncated:
+            md.truncated === true || md.argsTruncated === true || md.resultTruncated === true,
+    };
+}
+
+/**
+ * Parse the `<epochMillis>_<uuid>` cursor the previous page returned.
+ * The DTO already regex-validated the shape; a still-unparsable value
+ * degrades to "first page" rather than erroring.
+ */
+function parseTimelineCursor(cursor?: string): { createdAt: Date; id: string } | undefined {
+    if (!cursor) return undefined;
+    const separator = cursor.indexOf('_');
+    if (separator <= 0) return undefined;
+    const ms = Number(cursor.slice(0, separator));
+    const id = cursor.slice(separator + 1);
+    if (!Number.isFinite(ms) || id.length === 0) return undefined;
+    return { createdAt: new Date(ms), id };
+}
+
+function timelineCursorOf(log: AgentRunLog): string {
+    return `${log.createdAt.getTime()}_${log.id}`;
 }
 
 @ApiTags('agents')
@@ -333,49 +413,157 @@ export class AgentsController {
             offset,
         );
         return {
-            data: rows.map((r) => ({
-                id: r.id,
-                agentId: r.agentId,
-                status: r.status,
-                triggerKind: r.triggerKind,
-                taskId: r.taskId ?? null,
-                workId: r.workId ?? null,
-                awaitingInput: r.awaitingInput ?? false,
-                queuedReason: r.queuedReason ?? null,
-                attentionReason: r.attentionReason ?? null,
-                attentionAt: r.attentionAt?.toISOString() ?? null,
-                runnerKind: r.runnerKind ?? null,
-                startedAt: r.startedAt?.toISOString() ?? null,
-                finishedAt: r.finishedAt?.toISOString() ?? null,
-                durationMs: r.durationMs ?? null,
-                summary: r.summary ?? null,
-                errorMessage: r.errorMessage ?? null,
-                // Telemetry (kanban run cockpit columns). `currentActivity`
-                // is plain text by contract — the UI must never render it
-                // as markup.
-                currentActivity: r.currentActivity ?? null,
-                totalTokens: r.totalTokens ?? null,
-                changedFilesCount: r.changedFilesCount ?? null,
-                costCents: r.costCents ?? null,
-                // Quality-gate columns. `resolvedChecks` is the dispatch-
-                // frozen definition set; `checkResults` carries per-check
-                // exit/duration/logTail for the Task-detail Checks section.
-                gateStatus: r.gateStatus ?? null,
-                gateAttempts: r.gateAttempts ?? 0,
-                resolvedChecks: r.resolvedChecks ?? null,
-                checkResults: r.checkResults ?? null,
-                // Streaming-terminal lifecycle columns.
-                persistent: r.persistent ?? false,
-                terminalState: r.terminalState ?? null,
-                terminalEndedReason: r.terminalEndedReason ?? null,
-                terminalProviderId: r.terminalProviderId ?? null,
-                // Attach-session action (Wave 4 M8) — the UI gates its
-                // terminal-icon deep link on this, never on `terminalState`
-                // alone (see isSessionAttachable above).
-                sessionAttachable: isSessionAttachable(r),
-                createdAt: r.createdAt.toISOString(),
-            })),
+            data: rows.map((r) => this.toSessionRow(r)),
             meta: { total, limit, offset },
+        };
+    }
+
+    /**
+     * The wire projection of one `agent_runs` row shared by the Sessions
+     * list and the session-detail endpoint — factored out (Feature K) so
+     * the two surfaces can never drift on a field. `currentActivity` is
+     * plain text by contract (the UI must never render it as markup);
+     * `sessionAttachable` is the server-computed attach gate (Wave 4 M8);
+     * the quality-gate columns carry the dispatch-frozen check set +
+     * per-check results for the Checks section.
+     */
+    private toSessionRow(r: AgentRun): {
+        id: string;
+        agentId: string;
+        status: string;
+        triggerKind: string;
+        taskId: string | null;
+        workId: string | null;
+        awaitingInput: boolean;
+        queuedReason: string | null;
+        attentionReason: string | null;
+        attentionAt: string | null;
+        runnerKind: string | null;
+        startedAt: string | null;
+        finishedAt: string | null;
+        durationMs: number | null;
+        summary: string | null;
+        errorMessage: string | null;
+        currentActivity: string | null;
+        totalTokens: number | null;
+        changedFilesCount: number | null;
+        costCents: number | null;
+        gateStatus: string | null;
+        gateAttempts: number;
+        resolvedChecks: TaskAcceptanceCheck[] | null;
+        checkResults: TaskCheckResult[] | null;
+        persistent: boolean;
+        terminalState: string | null;
+        terminalEndedReason: string | null;
+        terminalProviderId: string | null;
+        sessionAttachable: boolean;
+        createdAt: string;
+    } {
+        return {
+            id: r.id,
+            agentId: r.agentId,
+            status: r.status,
+            triggerKind: r.triggerKind,
+            taskId: r.taskId ?? null,
+            workId: r.workId ?? null,
+            awaitingInput: r.awaitingInput ?? false,
+            queuedReason: r.queuedReason ?? null,
+            attentionReason: r.attentionReason ?? null,
+            attentionAt: r.attentionAt?.toISOString() ?? null,
+            runnerKind: r.runnerKind ?? null,
+            startedAt: r.startedAt?.toISOString() ?? null,
+            finishedAt: r.finishedAt?.toISOString() ?? null,
+            durationMs: r.durationMs ?? null,
+            summary: r.summary ?? null,
+            errorMessage: r.errorMessage ?? null,
+            currentActivity: r.currentActivity ?? null,
+            totalTokens: r.totalTokens ?? null,
+            changedFilesCount: r.changedFilesCount ?? null,
+            costCents: r.costCents ?? null,
+            gateStatus: r.gateStatus ?? null,
+            gateAttempts: r.gateAttempts ?? 0,
+            resolvedChecks: r.resolvedChecks ?? null,
+            checkResults: r.checkResults ?? null,
+            persistent: r.persistent ?? false,
+            terminalState: r.terminalState ?? null,
+            terminalEndedReason: r.terminalEndedReason ?? null,
+            terminalProviderId: r.terminalProviderId ?? null,
+            sessionAttachable: isSessionAttachable(r),
+            createdAt: r.createdAt.toISOString(),
+        };
+    }
+
+    /**
+     * Session detail (Feature K) — the drill-in behind each Sessions row:
+     * the full session projection + message/tool-call/file counts + one
+     * cursor page of the captured timeline + the touched-file list.
+     *
+     * Addressed by runId ALONE (under the literal `runs` segment, declared
+     * before every `:id` route so it never reaches ParseUUIDPipe as an
+     * agent id) because the caller — /agents/sessions — holds run ids,
+     * not agent ids. Security: `findByIdAndUser` scopes by the acting
+     * user, so a cross-user runId 404s (architecture/security §9,
+     * no-existence-leak).
+     */
+    @Get('runs/:runId/detail')
+    @ApiOperation({
+        summary:
+            'Session detail — one run with counts, touched files and a cursor page of its captured timeline.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async getRunSessionDetail(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('runId', ParseUUIDPipe) runId: string,
+        @Query() query: SessionDetailQueryDto,
+    ): Promise<{
+        run: ReturnType<AgentsController['toSessionRow']> & {
+            chatMessageId: string | null;
+            memorySessionId: string | null;
+        };
+        counts: { messages: number; toolCalls: number; filesTouched: number };
+        /** Explicit paths when capture recorded them; may be empty while
+         *  `counts.filesTouched` still carries the workspace-diff rollup. */
+        filesTouched: string[];
+        timeline: { entries: SessionTimelineEntry[]; nextCursor: string | null; limit: number };
+    }> {
+        const run = await this.agentRuns.findByIdAndUser(runId, auth.userId);
+        if (!run) {
+            throw new NotFoundException(`AgentRun ${runId} not found.`);
+        }
+        const limit = query.limit ?? 100;
+        const after = parseTimelineCursor(query.cursor);
+        const [timelineRows, messages, toolCalls] = await Promise.all([
+            this.agentRunLogs.findTimelineByRun(runId, SESSION_TIMELINE_STEPS, limit, after),
+            this.agentRunLogs.countByRunSteps(runId, SESSION_MESSAGE_STEPS),
+            this.agentRunLogs.countByRunSteps(runId, ['tool-invocation']),
+        ]);
+        const filesTouched = (run.workspaceMeta?.filesTouched ?? []).filter(
+            (p): p is string => typeof p === 'string' && p.length > 0,
+        );
+        const last = timelineRows.length > 0 ? timelineRows[timelineRows.length - 1] : null;
+        return {
+            run: {
+                ...this.toSessionRow(run),
+                chatMessageId: run.chatMessageId ?? null,
+                memorySessionId: run.memorySessionId ?? null,
+            },
+            counts: {
+                messages,
+                toolCalls,
+                // Explicit capture wins; `changedFilesCount` (the workspace
+                // provider's diff rollup) is the fallback for runs whose
+                // loop never reported paths.
+                filesTouched:
+                    filesTouched.length > 0 ? filesTouched.length : (run.changedFilesCount ?? 0),
+            },
+            filesTouched,
+            timeline: {
+                entries: timelineRows.map((row) => toSessionTimelineEntry(row)),
+                // A full page means there MAY be more; the client stops on
+                // the first short page.
+                nextCursor: last && timelineRows.length === limit ? timelineCursorOf(last) : null,
+                limit,
+            },
         };
     }
 

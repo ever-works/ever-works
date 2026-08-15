@@ -77,6 +77,10 @@ const protectedEndpoints = [
     // Sessions list (Wave 4 M3) — literal `runs` segment, declared
     // before `:id` so it never reaches ParseUUIDPipe.
     '/api/agents/runs',
+    // Session detail (Feature K) — the drill-in behind a Sessions row.
+    // The guard runs before ParseUUIDPipe, so an unauthenticated call is
+    // 401 even though this uuid belongs to no run.
+    '/api/agents/runs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/detail',
     // Prebuilt agent templates (Wave 10) — the AGENTS-scoped catalog.
     // (`/api/agent-templates`, the repo-backed metadata catalog, is
     // @Public() by design and is asserted separately below.)
