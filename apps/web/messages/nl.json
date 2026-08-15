@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Nieuw wachtwoord",
                     "placeholder": "Voer uw nieuwe wachtwoord in",
-                    "helperText": "Moet minimaal 6 tekens bevatten met kleine letter en cijfer/special teken",
+                    "helperText": "Moet minimaal 8 tekens bevatten met kleine letter en cijfer/special teken",
                     "errors": {
-                        "minLength": "Wachtwoord moet minimaal 6 tekens bevatten",
+                        "minLength": "Wachtwoord moet minimaal 8 tekens bevatten",
                         "lowercase": "Wachtwoord moet minstens één kleine letter bevatten",
                         "numberOrSpecial": "Wachtwoord moet minstens één cijfer of speciaal teken bevatten",
                         "cannotStartWith": "Wachtwoord mag niet beginnen met een punt of nieuwe regel"

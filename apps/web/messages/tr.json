@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Yeni şifre",
                     "placeholder": "Yeni şifrenizi girin",
-                    "helperText": "En az 6 karakter, küçük harf ve rakam/özel karakter içermelidir",
+                    "helperText": "En az 8 karakter, küçük harf ve rakam/özel karakter içermelidir",
                     "errors": {
-                        "minLength": "Şifre en az 6 karakter olmalıdır",
+                        "minLength": "Şifre en az 8 karakter olmalıdır",
                         "lowercase": "Şifre en az bir küçük harf içermelidir",
                         "numberOrSpecial": "Şifre en az bir rakam veya özel karakter içermelidir",
                         "cannotStartWith": "Şifre nokta veya yeni satır ile başlayamaz"

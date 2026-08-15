@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Nova senha",
                     "placeholder": "Digite sua nova senha",
-                    "helperText": "Deve ter pelo menos 6 caracteres com minúscula e número/caractere especial",
+                    "helperText": "Deve ter pelo menos 8 caracteres com minúscula e número/caractere especial",
                     "errors": {
-                        "minLength": "Senha deve ter pelo menos 6 caracteres",
+                        "minLength": "Senha deve ter pelo menos 8 caracteres",
                         "lowercase": "Senha deve conter pelo menos uma letra minúscula",
                         "numberOrSpecial": "Senha deve conter pelo menos um número ou caractere especial",
                         "cannotStartWith": "Senha não pode começar com ponto ou nova linha"
