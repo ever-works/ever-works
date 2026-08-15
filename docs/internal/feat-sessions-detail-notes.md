@@ -96,14 +96,14 @@ column, so there is **no migration in this PR**.
 
 ## Tests
 
-| Command | Covers |
-| --- | --- |
-| `cd packages/agent && npx jest --testPathPattern='run-capture'` | preview build/redact/cap table; loop-level capture (previews, turn rows, cap + single marker, swallowed failures, filesTouched) |
-| `cd packages/agent && npx jest --testPathPattern='(agent-run-log.timeline\|agent-run.files-touched)'` | the three new repository methods (keyset cursor, empty-step short-circuit, merge/dedupe/cap) |
-| `cd apps/api && npx jest --testPathPattern='agents'` | detail composition, counts, pagination handshake, marker rows, cross-user 404 |
-| `cd apps/web && npx vitest run src/components/agents/SessionDetailClient.unit.spec.tsx` | chips/files/timeline render, append-not-replace pagination, live-follow + dedupe, mid-pagination guard, terminal run does not poll, steering + error surfacing |
-| `apps/web/e2e/flow-run-sessions-steering-contract.spec.ts` | API contract for the detail route (shape, 404 authz, 400 paging, 401) — needs a live stack |
-| `apps/web/e2e/api-public-contract.spec.ts` | the route is in the unauth-401 tripwire list |
+| Command                                                                                               | Covers                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cd packages/agent && npx jest --testPathPattern='run-capture'`                                       | preview build/redact/cap table; loop-level capture (previews, turn rows, cap + single marker, swallowed failures, filesTouched)                                |
+| `cd packages/agent && npx jest --testPathPattern='(agent-run-log.timeline\|agent-run.files-touched)'` | the three new repository methods (keyset cursor, empty-step short-circuit, merge/dedupe/cap)                                                                   |
+| `cd apps/api && npx jest --testPathPattern='agents'`                                                  | detail composition, counts, pagination handshake, marker rows, cross-user 404                                                                                  |
+| `cd apps/web && npx vitest run src/components/agents/SessionDetailClient.unit.spec.tsx`               | chips/files/timeline render, append-not-replace pagination, live-follow + dedupe, mid-pagination guard, terminal run does not poll, steering + error surfacing |
+| `apps/web/e2e/flow-run-sessions-steering-contract.spec.ts`                                            | API contract for the detail route (shape, 404 authz, 400 paging, 401) — needs a live stack                                                                     |
+| `apps/web/e2e/api-public-contract.spec.ts`                                                            | the route is in the unauth-401 tripwire list                                                                                                                   |
 
 Type-check + build: `packages/agent` (`tsc -p tsconfig.types.json`), `apps/api`
 (`tsc -p tsconfig.build.json`), `apps/web` (`tsc --noEmit`), and
