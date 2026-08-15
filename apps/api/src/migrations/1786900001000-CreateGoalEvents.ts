@@ -37,8 +37,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * Forward-only with an idempotent guard (house pattern, mirrors
  * 1784830000000-CreateWorkflowRuns).
  */
-export class CreateGoalEvents1785020000000 implements MigrationInterface {
-    name = 'CreateGoalEvents1785020000000';
+export class CreateGoalEvents1786900001000 implements MigrationInterface {
+    name = 'CreateGoalEvents1786900001000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (await queryRunner.hasTable('goal_events')) {

@@ -33,8 +33,8 @@ import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
  * with a `findColumnByName` check works identically on Postgres and
  * better-sqlite3, and re-running the migration is a no-op.
  */
-export class AddGoalOrchestration1785010000000 implements MigrationInterface {
-    name = 'AddGoalOrchestration1785010000000';
+export class AddGoalOrchestration1786900000000 implements MigrationInterface {
+    name = 'AddGoalOrchestration1786900000000';
 
     /**
      * `simple-json` maps to `text` on every driver this repo supports, so
@@ -65,7 +65,7 @@ export class AddGoalOrchestration1785010000000 implements MigrationInterface {
         const table = await queryRunner.getTable('goals');
         if (!table) return;
 
-        for (const column of AddGoalOrchestration1785010000000.COLUMNS) {
+        for (const column of AddGoalOrchestration1786900000000.COLUMNS) {
             if (!table.findColumnByName(column.name)) {
                 await queryRunner.query(
                     `ALTER TABLE "goals" ADD COLUMN "${column.name}" ${column.ddl}`,
@@ -99,7 +99,7 @@ export class AddGoalOrchestration1785010000000 implements MigrationInterface {
         // no column here is read by anything that predates it — so an
         // operator running the revert is choosing to remove the feature,
         // not corrupting rows something else still depends on.
-        for (const column of AddGoalOrchestration1785010000000.COLUMNS) {
+        for (const column of AddGoalOrchestration1786900000000.COLUMNS) {
             if (table.findColumnByName(column.name)) {
                 await queryRunner.query(`ALTER TABLE "goals" DROP COLUMN "${column.name}"`);
             }

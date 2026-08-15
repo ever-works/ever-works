@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { AddGoalOrchestration1785010000000 } from '../1785010000000-AddGoalOrchestration';
+import { AddGoalOrchestration1786900000000 } from '../1786900000000-AddGoalOrchestration';
 
 /**
  * Migration test for the additive `goals` autonomy columns.
@@ -17,9 +17,9 @@ import { AddGoalOrchestration1785010000000 } from '../1785010000000-AddGoalOrche
  *    metric-evaluation dispatcher keys on `status` and would change
  *    behaviour if `cancelled`/`stuck` appeared there.
  */
-describe('AddGoalOrchestration1785010000000', () => {
+describe('AddGoalOrchestration1786900000000', () => {
     let dataSource: DataSource;
-    const migration = new AddGoalOrchestration1785010000000();
+    const migration = new AddGoalOrchestration1786900000000();
 
     const ADDED_COLUMNS = [
         'dodCriteria',

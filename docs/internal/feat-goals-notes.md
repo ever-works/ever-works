@@ -107,7 +107,7 @@ loop could look busy forever without moving.
 
 ## Data model
 
-`goals` (additive, migration `1785010000000-AddGoalOrchestration`):
+`goals` (additive, migration `1786900000000-AddGoalOrchestration`):
 
 | column                                 | type              | note                                          |
 | -------------------------------------- | ----------------- | --------------------------------------------- |
@@ -128,7 +128,7 @@ loop could look busy forever without moving.
 Index `idx_goals_loop_status` backs the orchestrator due-scan (NULL never
 matches, so the cheap case is one indexed lookup returning zero rows).
 
-`goal_events` (new, migration `1785020000000-CreateGoalEvents`): `id`, `goalId`
+`goal_events` (new, migration `1786900001000-CreateGoalEvents`): `id`, `goalId`
 (FK CASCADE), `userId`, `kind`
 (`route|dispatch|complete|limit|nudge|control|dod`), `message` (text — the
 verbatim reasoning), `agentId?`, `taskId?` (raw uuids, **no FK**: a log line must

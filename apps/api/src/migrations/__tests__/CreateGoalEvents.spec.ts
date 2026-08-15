@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { CreateGoalEvents1785020000000 } from '../1785020000000-CreateGoalEvents';
+import { CreateGoalEvents1786900001000 } from '../1786900001000-CreateGoalEvents';
 
 /**
  * Migration test for the `goal_events` orchestrator log.
@@ -12,9 +12,9 @@ import { CreateGoalEvents1785020000000 } from '../1785020000000-CreateGoalEvents
  * `organizationId` on every insert, so ordinary rows carry both scope
  * columns and a copied XOR would abort the migration on real data.
  */
-describe('CreateGoalEvents1785020000000', () => {
+describe('CreateGoalEvents1786900001000', () => {
     let dataSource: DataSource;
-    const migration = new CreateGoalEvents1785020000000();
+    const migration = new CreateGoalEvents1786900001000();
 
     beforeEach(async () => {
         dataSource = new DataSource({
