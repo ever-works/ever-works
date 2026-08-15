@@ -29,8 +29,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * SQL: CI runs better-sqlite3, production runs Postgres. Forward-only
  * with idempotent guards (house pattern).
  */
-export class CreateTaskTemplates1785020000000 implements MigrationInterface {
-    name = 'CreateTaskTemplates1785020000000';
+export class CreateTaskTemplates1786860001000 implements MigrationInterface {
+    name = 'CreateTaskTemplates1786860001000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (!(await queryRunner.hasTable('task_templates'))) {

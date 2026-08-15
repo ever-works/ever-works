@@ -66,8 +66,8 @@ sections plus attachment roles.
 
 | Migration                                 | Change                                                                                                                     |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `1785010000000-AddTaskScheduleColumns.ts` | `tasks.scheduledAt`, `tasks.scheduleClaimedAt`, `tasks.recurrenceCron`, `idx_tasks_scheduled_due`, `task_attachments.role` |
-| `1785020000000-CreateTaskTemplates.ts`    | `task_templates` + `task_template_steps` (+ indexes + FKs, portable Table API)                                             |
+| `1786860000000-AddTaskScheduleColumns.ts` | `tasks.scheduledAt`, `tasks.scheduleClaimedAt`, `tasks.recurrenceCron`, `idx_tasks_scheduled_due`, `task_attachments.role` |
+| `1786860001000-CreateTaskTemplates.ts`    | `task_templates` + `task_template_steps` (+ indexes + FKs, portable Table API)                                             |
 
 Both are forward-only with per-step idempotent guards, and deliberately carry NO
 scope XOR CHECK (`ScopeStampingSubscriber` stamps `organizationId` on insert, so

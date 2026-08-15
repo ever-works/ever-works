@@ -24,8 +24,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Forward-only, idempotent per-step guards (house pattern, mirrors
  * 1784300000000-AddTaskPrStatusColumns).
  */
-export class AddTaskScheduleColumns1785010000000 implements MigrationInterface {
-    name = 'AddTaskScheduleColumns1785010000000';
+export class AddTaskScheduleColumns1786860000000 implements MigrationInterface {
+    name = 'AddTaskScheduleColumns1786860000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const tasks = await queryRunner.getTable('tasks');
