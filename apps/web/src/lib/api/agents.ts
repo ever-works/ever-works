@@ -99,6 +99,11 @@ export interface Agent {
     capabilities: string | null;
     aiProviderId: string | null;
     modelId: string | null;
+    /**
+     * Environments (Settings → Environments) — assigned runtime
+     * Environment id; null = platform default runtime.
+     */
+    environmentId: string | null;
     maxSkillContextTokens: number;
     status: AgentStatus;
     permissions: AgentPermissions;
@@ -188,6 +193,8 @@ export interface UpdateAgentInput {
     capabilities?: string | null;
     aiProviderId?: string | null;
     modelId?: string | null;
+    /** Environments — published Environment id; null clears to default. */
+    environmentId?: string | null;
     maxSkillContextTokens?: number;
     heartbeatCadence?: string | null;
     idleBehavior?: AgentIdleBehavior;

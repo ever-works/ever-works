@@ -48,6 +48,7 @@ import { WorkAgentModule } from './work-agent/work-agent.module';
 import { MissionsModule } from './missions/missions.module';
 import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
+import { EnvironmentsApiModule } from './environments/environments.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
@@ -178,6 +179,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // + AgentsController. Heartbeat dispatcher + run service land in
         // Phase 6/7.
         AgentsModule,
+        // Environments (Settings → Environments) — named, reusable
+        // runtime recipes (packages + networking) assigned per-Agent.
+        EnvironmentsApiModule,
         // Agent Action Approval Queue — human-in-the-loop gate for
         // side-effectful Agent actions. GET queue + approve/reject.
         AgentApprovalsModule,

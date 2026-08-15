@@ -10,6 +10,7 @@ import {
     HardDrive,
     Github,
     Bot,
+    Boxes,
     Cpu,
     Building2,
     CreditCard,
@@ -114,6 +115,15 @@ export function SettingsLayoutClient({
                     label: t('tabs.jobRuntime'),
                     icon: Cpu,
                     href: `${baseSettingsPath}/job-runtime`,
+                },
+                // Environments sit beside Job Runtime: both describe the
+                // sandbox an Agent's work runs in — packages and networking
+                // here, dispatch mechanics there.
+                {
+                    id: 'environments',
+                    label: t('tabs.environments'),
+                    icon: Boxes,
+                    href: `${baseSettingsPath}/environments`,
                 },
                 // Digest briefings — the personal cadence AND the org-scoped
                 // one live on one page, since they are two records of the

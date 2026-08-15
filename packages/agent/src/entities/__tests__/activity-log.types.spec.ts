@@ -120,7 +120,9 @@ describe('activity-log.types', () => {
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
             // +3 agent_collaborator_enabled / _disabled / _removed
             //    (Agent Collaborators allow-list edits) -> 126.
-            expect(literals).toHaveLength(126);
+            // +4 environment_created / _updated / _published / _deleted
+            //    (Settings -> Environments) -> 130.
+            expect(literals).toHaveLength(130);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

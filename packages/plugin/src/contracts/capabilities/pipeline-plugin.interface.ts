@@ -9,6 +9,7 @@ import type {
 } from '../../pipeline/generation-context.interface.js';
 import type { IBuiltInStepExecutor } from '../../pipeline/built-in-step-executor.interface.js';
 import type { StepExecutionContext } from '../../pipeline/step-execution-context.interface.js';
+import type { RuntimeEnvironmentData } from '../../pipeline/runtime-environment.js';
 import type { PipelineMetrics } from '../../pipeline/step-types.js';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
 
@@ -49,6 +50,21 @@ export interface PipelineExecutionOptions {
 	 * of its own.
 	 */
 	readonly memorySessionId?: string;
+	/**
+	 * Environments — id of the Agent this run executes on behalf of, when
+	 * the dispatching orchestrator knows it. The full-pipeline executor
+	 * uses it to resolve the Agent's assigned Environment
+	 * (`agents.environmentId` → `environments` row) into
+	 * `execContext.runtimeEnvironment`. Optional end-to-end; plain
+	 * Work-generation runs never set it.
+	 */
+	readonly agentId?: string;
+	/**
+	 * Environments — a pre-resolved runtime Environment. When set it wins
+	 * over `agentId` resolution (the caller already did the lookup) and is
+	 * forwarded verbatim to `StepExecutionContext.runtimeEnvironment`.
+	 */
+	readonly runtimeEnvironment?: RuntimeEnvironmentData;
 }
 
 /**

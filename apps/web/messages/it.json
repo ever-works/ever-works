@@ -2128,7 +2128,8 @@
                 "digest": "Digest",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "environments": "Environments"
             },
             "githubApp": {
                 "title": "Installazioni GitHub App",
@@ -2951,6 +2952,70 @@
                     "saveError": "Failed to save the digest settings",
                     "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
                     "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
+                }
+            },
+            "environments": {
+                "title": "Environments",
+                "subtitle": "Named, reusable runtime environments — packages and networking — you can assign to your Agents.",
+                "empty": "No environments yet. Create one to define the packages and networking your Agents run with.",
+                "editor": {
+                    "createTitle": "New environment",
+                    "editTitle": "Edit environment"
+                },
+                "table": {
+                    "name": "Name",
+                    "networking": "Networking",
+                    "status": "Status",
+                    "updated": "Updated"
+                },
+                "status": {
+                    "draft": "Draft",
+                    "published": "Published"
+                },
+                "networking": {
+                    "unrestricted": "Unrestricted",
+                    "limited": "Limited ({count} hosts)"
+                },
+                "networkingOption": {
+                    "unrestricted": "Unrestricted — the runtime may reach any host",
+                    "limited": "Limited — only the allowed hosts below are reachable"
+                },
+                "fields": {
+                    "name": "Name",
+                    "description": "Description",
+                    "availableInAllProjects": "Available in all projects",
+                    "availableInAllProjectsHelper": "Offer this environment everywhere Agents are assigned environments.",
+                    "pipPackages": "Python packages (pip)",
+                    "pipPackagesHelper": "One pip requirement specifier per line, e.g. pandas>=2.0,<3.0 (a specifier may itself contain a comma).",
+                    "npmPackages": "Node packages (npm)",
+                    "npmPackagesHelper": "One npm package spec per line, e.g. @scope/pkg@^1.2.0.",
+                    "networking": "Networking",
+                    "allowedHosts": "Allowed hosts",
+                    "allowedHostsHelper": "One host per line (or comma-separated). A single leading *. wildcard is allowed, e.g. *.example.com.",
+                    "allowPackageManagers": "Allow package managers",
+                    "allowPackageManagersHelper": "Keep package-manager registries reachable even with limited networking."
+                },
+                "actions": {
+                    "new": "New environment",
+                    "edit": "Edit",
+                    "delete": "Delete",
+                    "save": "Save draft",
+                    "publish": "Publish",
+                    "savePublish": "Save & publish",
+                    "cancel": "Cancel"
+                },
+                "messages": {
+                    "nameRequired": "Give the environment a name first.",
+                    "saveSuccess": "Environment saved",
+                    "publishSuccess": "Environment published",
+                    "deleteSuccess": "Environment deleted",
+                    "error": "Something went wrong. Please try again."
+                },
+                "delete": {
+                    "title": "Delete environment",
+                    "description": "Delete \"{name}\"? Agents must be unassigned from it first — deletion is refused while any Agent still uses it.",
+                    "cancel": "Cancel",
+                    "confirm": "Delete"
                 }
             }
         },

@@ -94,12 +94,22 @@ interface AgentSettingsClientProps {
      * affordance rather than blocking the page.
      */
     aiProviders?: Array<{ id: string; name: string; category?: string }>;
+    /**
+     * Environments (Settings → Environments) — the user's PUBLISHED
+     * Environments for the Runtime picker (the server enforces the
+     * published-only rule; this list is the matching UI filter). Empty
+     * when the API is unreachable — the picker still renders with
+     * "None (default)" plus the currently-assigned id, so a flaky call
+     * degrades the affordance rather than blocking the page.
+     */
+    environments?: Array<{ id: string; name: string }>;
 }
 
 export function AgentSettingsClient({
     agent: initialAgent,
     organization,
     aiProviders = [],
+    environments = [],
 }: AgentSettingsClientProps) {
     const router = useRouter();
     const aiProviderOptions = useMemo<SearchableSelectOption[]>(
@@ -111,6 +121,14 @@ export function AgentSettingsClient({
             })),
         [aiProviders],
     );
+    const environmentOptions = useMemo<SearchableSelectOption[]>(
+        () =>
+            environments.map((environment) => ({
+                value: environment.id,
+                label: environment.name,
+            })),
+        [environments],
+    );
     const [agent, setAgent] = useState(initialAgent);
     const [isSaving, startSaving] = useTransition();
     const [isChangingStatus, startChangingStatus] = useTransition();
@@ -119,6 +137,7 @@ export function AgentSettingsClient({
     const [capabilities, setCapabilities] = useState(agent.capabilities ?? '');
     const [aiProviderId, setAiProviderId] = useState(agent.aiProviderId ?? '');
     const [modelId, setModelId] = useState(agent.modelId ?? '');
+    const [environmentId, setEnvironmentId] = useState(agent.environmentId ?? '');
     const [heartbeatCadence, setHeartbeatCadence] = useState(agent.heartbeatCadence ?? 'manual');
     const [idleBehavior, setIdleBehavior] = useState<AgentIdleBehavior>(agent.idleBehavior);
     const [maxSkillContextTokens, setMaxSkillContextTokens] = useState(
@@ -205,6 +224,7 @@ export function AgentSettingsClient({
                     capabilities: capabilities.trim() ? capabilities.trim() : null,
                     aiProviderId: aiProviderId.trim() ? aiProviderId.trim() : null,
                     modelId: modelId.trim() ? modelId.trim() : null,
+                    environmentId: environmentId ? environmentId : null,
                     heartbeatCadence:
                         normalizedCadence.length === 0 || normalizedCadence === 'manual'
                             ? null
@@ -468,6 +488,19 @@ export function AgentSettingsClient({
                                 : 'Pick an AI provider first.'}
                         </p>
                     </div>
+                    {/* Environments — published Environments only (the
+                        server refuses drafts with a 422; this filter is
+                        the matching UI affordance). "None (default)"
+                        clears back to the platform default runtime. */}
+                    <SearchableSelect
+                        label="Environment"
+                        value={environmentId}
+                        onChange={setEnvironmentId}
+                        options={environmentOptions}
+                        emptyOptionLabel="None (default)"
+                        placeholder="None (default)"
+                        testId="agent-environment"
+                    />
                     <SearchableSelect
                         label="Heartbeat cadence"
                         value={heartbeatCadence}

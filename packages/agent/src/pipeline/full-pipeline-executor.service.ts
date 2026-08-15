@@ -14,7 +14,7 @@ import type {
 } from '@ever-works/plugin';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
 import type { KbContextBundleData } from '@ever-works/contracts';
-import type { IKbToolsFacade } from '@ever-works/plugin';
+import type { IKbToolsFacade, RuntimeEnvironmentData } from '@ever-works/plugin';
 import { buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import { PipelineEvents } from './step-pipeline-executor.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
@@ -24,6 +24,7 @@ import { KnowledgeBaseService } from '../services/knowledge-base.service';
 import { KbToolsFacadeAdapter } from '../services/kb-tools-facade.adapter';
 import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
 import { resolveMemoryRecall } from '../services/memory-recall';
+import { EnvironmentsService } from '../environments/environments.service';
 
 /**
  * Executor for self-managed pipeline plugins.
@@ -57,6 +58,12 @@ export class FullPipelineExecutorService {
         // isolated unit tests without the facades module still
         // construct — recall simply stays off.
         @Optional() private readonly agentMemoryFacade?: AgentMemoryFacadeService,
+        // Environments — resolves `options.agentId` →
+        // `agents.environmentId` → published `environments` row into the
+        // `execContext.runtimeEnvironment` carrier. Same optionality
+        // contract as the services above: absent = the carrier stays
+        // undefined and plugins behave exactly as before Environments.
+        @Optional() private readonly environmentsService?: EnvironmentsService,
     ) {}
 
     /**
@@ -162,6 +169,32 @@ export class FullPipelineExecutorService {
     }
 
     /**
+     * Environments — resolve the runtime Environment for this run, once,
+     * at dispatch. A pre-resolved `options.runtimeEnvironment` wins (the
+     * orchestrator already did the lookup); otherwise `options.agentId`
+     * is resolved through `EnvironmentsService` (agent →
+     * `agents.environmentId` → published row).
+     *
+     * FAILS CLOSED, deliberately. A missing Environment is a legitimate
+     * outcome — no agentId, no wired service, or an Agent with nothing
+     * assigned all return `undefined` without throwing, and the run
+     * proceeds exactly as before Environments existed. But a resolution
+     * that ERRORS tells us nothing about the Agent's assignment, and
+     * continuing would silently hand the run the consuming plugin's
+     * fallback egress posture (`CLAUDE_MANAGED_AGENT_EGRESS_HOSTS`, or
+     * `unrestricted`) in place of the Environment's restrictions. The
+     * error therefore propagates: `execute()` catches it and returns a
+     * failed PipelineResult.
+     */
+    private async resolveRuntimeEnvironment(
+        options?: PipelineExecutionOptions,
+    ): Promise<RuntimeEnvironmentData | undefined> {
+        if (options?.runtimeEnvironment) return options.runtimeEnvironment;
+        if (!options?.agentId || !this.environmentsService) return undefined;
+        return this.environmentsService.resolveRuntimeEnvironmentForAgent(options.agentId);
+    }
+
+    /**
      * Execute using a pipeline plugin
      */
     async execute(
@@ -213,6 +246,12 @@ export class FullPipelineExecutorService {
         const memoryRecall = await this.resolveMemoryRecallSafe(work, request, options);
 
         try {
+            // Environments — resolved INSIDE the try, unlike the
+            // fail-open carriers above: a resolution error must surface
+            // as a failed run rather than downgrade the run's egress
+            // posture (see `resolveRuntimeEnvironment`).
+            const runtimeEnvironment = await this.resolveRuntimeEnvironment(options);
+
             // Create execContext for the plugin to use facades
             const execContext = this.facadeService.createStepExecutionContext(
                 work,
@@ -223,6 +262,7 @@ export class FullPipelineExecutorService {
                 kbTools,
                 options?.memorySessionId,
                 memoryRecall,
+                runtimeEnvironment,
             );
 
             // Delegate to the plugin's execute method with execContext

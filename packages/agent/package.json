@@ -149,6 +149,10 @@
             "types": "./dist/agents/index.d.ts",
             "default": "./dist/agents/index.js"
         },
+        "./environments": {
+            "types": "./dist/environments/index.d.ts",
+            "default": "./dist/environments/index.js"
+        },
         "./campaigns": {
             "types": "./dist/campaigns/index.d.ts",
             "default": "./dist/campaigns/index.js"
@@ -240,11 +244,6 @@
             "optional": true
         },
         "mysql2": {
-            "optional": true
-        }
-    },
-    "peerDependenciesMeta": {
-        "pacote": {
             "optional": true
         }
     },
