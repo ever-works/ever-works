@@ -19,7 +19,7 @@ assumptions did not survive contact with the code, and the code won:
    (`FleetNodeLoadView`), which counts live job claims. Putting it on the
    heartbeat would have been a second, laggier source of truth: a node that
    finishes a job would have to wait for its next beat to look idle again. The
-   runner status projection therefore *derives* `busy` and deliberately keeps it
+   runner status projection therefore _derives_ `busy` and deliberately keeps it
    out of `FleetNodeStatus` — see the note on `FleetRunnerNodeView.busy`.
 
 2. **"daemon version" is missing.** It already exists as `fleet_nodes.version`.
@@ -46,10 +46,10 @@ skipped a real state.
 
 ### 1. Node telemetry (additive, backward-compatible)
 
-| Column | Type | Meaning |
-| --- | --- | --- |
-| `fleet_nodes.cliVersion` | `varchar(64)` | Agent CLI on the machine, e.g. `claude 1.4.2` |
-| `fleet_nodes.diskFreeBytes` | `bigint` | Free bytes on the node's workspace volume |
+| Column                      | Type          | Meaning                                       |
+| --------------------------- | ------------- | --------------------------------------------- |
+| `fleet_nodes.cliVersion`    | `varchar(64)` | Agent CLI on the machine, e.g. `claude 1.4.2` |
+| `fleet_nodes.diskFreeBytes` | `bigint`      | Free bytes on the node's workspace volume     |
 
 The compatibility contract is **asymmetric on purpose**:
 
@@ -97,11 +97,11 @@ Renders nothing until the account has ≥1 enrolled node.
 New table `fleet_execution_preferences` — one row per `(owner, scope)`, scope
 being `user` (account-wide, `scopeId IS NULL`), `work` or `goal`.
 
-| Mode | Behaviour when no runner is free |
-| --- | --- |
-| `local-wait` | Enqueued on the fleet anyway, stamped `waiting-for-runner`. Never falls back. |
-| `local-fallback` (default) | Runs in the cloud **and notifies**. |
-| `cloud` | Always the platform runtime; never notifies (the owner chose it). |
+| Mode                       | Behaviour when no runner is free                                              |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| `local-wait`               | Enqueued on the fleet anyway, stamped `waiting-for-runner`. Never falls back. |
+| `local-fallback` (default) | Runs in the cloud **and notifies**.                                           |
+| `cloud`                    | Always the platform runtime; never notifies (the owner chose it).             |
 
 Resolution is narrowest-wins (Work → Goal → account → default) and lives in
 `resolveFleetExecutionMode` in `@ever-works/contracts` as a **pure function**, so
@@ -171,12 +171,12 @@ Migration: `apps/api/src/migrations/1785100000000-FleetRunnerTelemetryAndRouting
 All owner-scoped behind the global auth guard and `FleetEnabledGuard`; the owner
 comes from the session and is never accepted from the caller.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/fleet/runner-status` | Pill payload (throttled 120/min) |
-| `GET` | `/api/fleet/execution-preferences` | All configured preference rows |
-| `PUT` | `/api/fleet/execution-preference` | Set one scope's mode |
-| `DELETE` | `/api/fleet/execution-preference?scopeType=&scopeId=` | Clear one scope (idempotent) |
+| Method   | Path                                                  | Purpose                          |
+| -------- | ----------------------------------------------------- | -------------------------------- |
+| `GET`    | `/api/fleet/runner-status`                            | Pill payload (throttled 120/min) |
+| `GET`    | `/api/fleet/execution-preferences`                    | All configured preference rows   |
+| `PUT`    | `/api/fleet/execution-preference`                     | Set one scope's mode             |
+| `DELETE` | `/api/fleet/execution-preference?scopeType=&scopeId=` | Clear one scope (idempotent)     |
 
 Existing `POST /api/fleet/enroll` and `POST /api/fleet/heartbeat` accept the two
 new optional self-description fields.
@@ -192,20 +192,20 @@ new optional self-description fields.
 
 ## Tests
 
-| Command | Covers |
-| --- | --- |
-| `cd packages/contracts && npx vitest run src/__tests__/fleet-execution-preference.spec.ts` | 16 — narrowest-wins resolution, the full `decideFleetRouting` matrix, pill summary |
-| `cd packages/agent && npx jest --testPathPattern='fleet-node-telemetry'` | 14 — heartbeat backward-compat (old payload), refuse-not-clamp, bigint normalization |
-| `cd packages/agent && npx jest --testPathPattern='fleet-execution-preference'` | 14 — scope/id validation, owner scoping, degradation |
-| `cd packages/agent && npx jest --testPathPattern='fleet-runner-fallback'` | 8 — notification producer, event key, dedup, sanitization |
-| `cd packages/agent && npx jest --testPathPattern='fleet'` | 61 — plus the pre-existing suites and the module pin |
-| `cd apps/api && npx jest --testPathPattern='fleet-run-routing'` | 15 — the routing matrix end-to-end through the dispatch seam |
-| `cd apps/api && npx jest --testPathPattern='fleet-runner-status'` | 6 — composition + degradation + availability |
-| `cd apps/api && npx jest --testPathPattern='fleet-runner-routes'` | 18 — endpoint authz scoping + DTO validation |
-| `cd apps/api && npx jest --testPathPattern='FleetRunnerTelemetryAndRouting'` | 6 — migration up/down/idempotency on better-sqlite3 |
-| `cd apps/node && npx vitest run src/core/telemetry-probe.spec.ts` | 24 — probes, parsing, never-fail-the-beat |
-| `cd apps/web && npx vitest run src/components/dashboard/runner-status.unit.spec.ts` | 9 — row state, byte + relative-time formatting |
-| `cd packages/plugins/job-runtime-node && npx vitest run` | 21 — existing suite, still green |
+| Command                                                                                    | Covers                                                                               |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `cd packages/contracts && npx vitest run src/__tests__/fleet-execution-preference.spec.ts` | 16 — narrowest-wins resolution, the full `decideFleetRouting` matrix, pill summary   |
+| `cd packages/agent && npx jest --testPathPattern='fleet-node-telemetry'`                   | 14 — heartbeat backward-compat (old payload), refuse-not-clamp, bigint normalization |
+| `cd packages/agent && npx jest --testPathPattern='fleet-execution-preference'`             | 14 — scope/id validation, owner scoping, degradation                                 |
+| `cd packages/agent && npx jest --testPathPattern='fleet-runner-fallback'`                  | 8 — notification producer, event key, dedup, sanitization                            |
+| `cd packages/agent && npx jest --testPathPattern='fleet'`                                  | 61 — plus the pre-existing suites and the module pin                                 |
+| `cd apps/api && npx jest --testPathPattern='fleet-run-routing'`                            | 15 — the routing matrix end-to-end through the dispatch seam                         |
+| `cd apps/api && npx jest --testPathPattern='fleet-runner-status'`                          | 6 — composition + degradation + availability                                         |
+| `cd apps/api && npx jest --testPathPattern='fleet-runner-routes'`                          | 18 — endpoint authz scoping + DTO validation                                         |
+| `cd apps/api && npx jest --testPathPattern='FleetRunnerTelemetryAndRouting'`               | 6 — migration up/down/idempotency on better-sqlite3                                  |
+| `cd apps/node && npx vitest run src/core/telemetry-probe.spec.ts`                          | 24 — probes, parsing, never-fail-the-beat                                            |
+| `cd apps/web && npx vitest run src/components/dashboard/runner-status.unit.spec.ts`        | 9 — row state, byte + relative-time formatting                                       |
+| `cd packages/plugins/job-runtime-node && npx vitest run`                                   | 21 — existing suite, still green                                                     |
 
 `apps/web/e2e/api-public-contract.spec.ts` gains `/api/fleet/runner-status` and
 `/api/fleet/execution-preferences` to the unauthenticated-401 matrix. The pill
@@ -252,7 +252,7 @@ unrelated feature PR.
 
 1. **Per-Work / per-Goal preference picker on the Work and Goal pages.** The API,
    the resolution rule and the router handle all three scopes today, and the
-   settings page lists + clears narrower overrides — but it cannot yet *create*
+   settings page lists + clears narrower overrides — but it cannot yet _create_
    one, because that is a choice a user makes from the Work they mean, not from a
    dropdown of every Work they own.
 2. **Surface `fleet_jobs.queuedReason` in the node detail drawer.** It is on the
