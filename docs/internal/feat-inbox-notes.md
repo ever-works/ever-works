@@ -14,7 +14,7 @@ nothing under that spec was touched.
 ## Data model
 
 `inbox_items` — `packages/agent/src/entities/inbox-item.entity.ts`, migration
-`apps/api/src/migrations/1785100000000-CreateInboxItems.ts`.
+`apps/api/src/migrations/1786870000000-CreateInboxItems.ts`.
 
 | column                                                                    | notes                                                              |
 | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |

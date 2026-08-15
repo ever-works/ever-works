@@ -109,7 +109,7 @@ const CORE_EVENTS: readonly CoreEventRow[] = [
         defaultChannels: ['in-app'],
     },
     // Inbox (operator message center). Seeded on Postgres by
-    // `1785100000000-CreateInboxItems` too; this list is what makes
+    // `1786870000000-CreateInboxItems` too; this list is what makes
     // them exist on SQLite / CI, where migrations do not run.
     {
         key: 'inbox_question',

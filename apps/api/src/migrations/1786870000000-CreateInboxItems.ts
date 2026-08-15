@@ -38,8 +38,8 @@ import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
  * never run the bootstrap. Forward-only + idempotent (`hasTable`
  * guards), house pattern per 1785000000000-CreateTermsAcceptance.
  */
-export class CreateInboxItems1785100000000 implements MigrationInterface {
-    name = 'CreateInboxItems1785100000000';
+export class CreateInboxItems1786870000000 implements MigrationInterface {
+    name = 'CreateInboxItems1786870000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (!(await queryRunner.hasTable('inbox_items'))) {

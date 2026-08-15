@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { CreateInboxItems1785100000000 } from '../1785100000000-CreateInboxItems';
+import { CreateInboxItems1786870000000 } from '../1786870000000-CreateInboxItems';
 
 /**
  * Migration test for the `inbox_items` table.
@@ -16,9 +16,9 @@ import { CreateInboxItems1785100000000 } from '../1785100000000-CreateInboxItems
  * an inbox item must outlive the run / escalation / proposal it
  * describes.
  */
-describe('CreateInboxItems1785100000000', () => {
+describe('CreateInboxItems1786870000000', () => {
     let dataSource: DataSource;
-    const migration = new CreateInboxItems1785100000000();
+    const migration = new CreateInboxItems1786870000000();
 
     beforeEach(async () => {
         dataSource = new DataSource({
