@@ -1147,7 +1147,7 @@
                 "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
                 "tools": {
                     "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
+                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: toggling a tool records an agent-level restriction — updating this agent's deny list, or its allow list when one is set — and a tool denied by a parent scope cannot be re-enabled from this page.",
                     "groupBuiltin": "Built-in tools",
                     "groupFacade": "Platform tools",
                     "groupDomain": "Domain tools",

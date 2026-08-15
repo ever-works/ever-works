@@ -903,7 +903,7 @@
                 "activity": "النشاط",
                 "instructions": "التعليمات",
                 "skills": "المهارات",
-                "capabilities": "Capabilities",
+                "capabilities": "القدرات",
                 "budgets": "الميزانيات",
                 "settings": "الإعدادات",
                 "terminal": "Terminal"
@@ -1091,42 +1091,42 @@
                 "error": "تعذر حذف الوكيل"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "القدرات",
+                "subtitle": "ما يستطيع هذا الوكيل فعله — الأدوات والمهارات وبرنامج التهيئة.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "أدوات الوكيل",
+                    "description": "صلاحية الوصول لكل أداة على حدة لهذا الوكيل. النطاق الأكثر تحديدًا لا يمكنه إلا تضييق ما تسمح به النطاقات الأعلى: تبديل أداة يسجّل تقييدًا على مستوى الوكيل — بتحديث قائمة الرفض الخاصة به، أو قائمة السماح إن كانت محددة — والأداة المرفوضة من نطاق أعلى لا يمكن تفعيلها مجددًا من هذه الصفحة.",
+                    "groupBuiltin": "الأدوات المدمجة",
+                    "groupFacade": "أدوات المنصة",
+                    "groupDomain": "أدوات المجال",
+                    "resetToInherited": "إعادة التعيين إلى الموروث",
+                    "inheritedDeny": "مرفوضة من {scope}",
+                    "permissionOff": "الإذن معطّل",
+                    "patternDeny": "مرفوضة بواسطة نمط على هذا الوكيل",
+                    "permissionHint": "يتطلب إذن \"{permission}\" — فعّله من الإعدادات.",
+                    "empty": "لا توجد أدوات متاحة."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "الأذونات",
+                    "description": "تظل مفاتيح القدرات قابلة للتعديل في الإعدادات؛ وتُعرض هنا للقراءة فقط.",
+                    "edit": "التعديل في الإعدادات"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "المهارات",
+                    "description": "المهارات المرتبطة مباشرة بهذا الوكيل. الارتباطات الموروثة تأتي من نطاق أعلى وتُدار هناك.",
+                    "attachPlaceholder": "إرفاق مهارة…",
+                    "installAndAttach": "تثبيت وإرفاق",
+                    "inherited": "موروثة",
+                    "empty": "لا توجد مهارات مرتبطة بعد."
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
-                    "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "title": "برنامج التهيئة",
+                    "helper": "يُنفَّذ عند بدء الجلسة أو مساحة العمل، حيث تدعم بيئة التشغيل ذلك.",
+                    "placeholder": "#!/bin/sh\n# الأوامر التي تُنفَّذ عند بدء الجلسة…",
+                    "save": "حفظ",
+                    "saved": "تم حفظ برنامج التهيئة",
+                    "bytes": "{used} / {max} كيلوبايت",
+                    "tooLong": "برنامج التهيئة يتجاوز 16 كيلوبايت."
                 }
             }
         },

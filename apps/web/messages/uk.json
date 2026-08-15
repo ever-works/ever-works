@@ -872,7 +872,7 @@
                 "activity": "Активність",
                 "instructions": "Інструкції",
                 "skills": "Навички",
-                "capabilities": "Capabilities",
+                "capabilities": "Можливості",
                 "budgets": "Бюджети",
                 "settings": "Налаштування",
                 "terminal": "Terminal"
@@ -1060,42 +1060,42 @@
                 "error": "Не вдалося видалити агента"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Можливості",
+                "subtitle": "Що вміє цей агент — інструменти, навички та стартовий скрипт.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Інструменти агента",
+                    "description": "Доступ до окремих інструментів для цього агента. Вужча область може лише обмежити те, що дозволяють вищі області: перемикання інструмента записує обмеження на рівні агента — оновлюючи його список заборон або список дозволів, якщо його задано, — а інструмент, заборонений вищою областю, не можна знову ввімкнути з цієї сторінки.",
+                    "groupBuiltin": "Вбудовані інструменти",
+                    "groupFacade": "Інструменти платформи",
+                    "groupDomain": "Доменні інструменти",
+                    "resetToInherited": "Скинути до успадкованого",
+                    "inheritedDeny": "Заборонено областю {scope}",
+                    "permissionOff": "Дозвіл вимкнено",
+                    "patternDeny": "Заборонено шаблоном цього агента",
+                    "permissionHint": "Потрібен дозвіл «{permission}» — увімкніть його в Налаштуваннях.",
+                    "empty": "Немає доступних інструментів."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Дозволи",
+                    "description": "Перемикачі можливостей залишаються редагованими в Налаштуваннях; тут вони показані лише для читання.",
+                    "edit": "Змінити в Налаштуваннях"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Навички",
+                    "description": "Навички, прив'язані безпосередньо до цього агента. Успадковані прив'язки походять із вищої області й керуються там.",
+                    "attachPlaceholder": "Прив'язати навичку…",
+                    "installAndAttach": "встановити та прив'язати",
+                    "inherited": "Успадковано",
+                    "empty": "Навички ще не прив'язані."
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
-                    "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "title": "Стартовий скрипт",
+                    "helper": "Виконується під час запуску сесії або робочого простору, якщо середовище виконання це підтримує.",
+                    "placeholder": "#!/bin/sh\n# команди, що виконуються на старті сесії…",
+                    "save": "Зберегти",
+                    "saved": "Стартовий скрипт збережено",
+                    "bytes": "{used} / {max} КБ",
+                    "tooLong": "Стартовий скрипт перевищує 16 КБ."
                 }
             }
         },

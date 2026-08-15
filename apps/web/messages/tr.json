@@ -872,7 +872,7 @@
                 "activity": "Aktivite",
                 "instructions": "Talimatlar",
                 "skills": "Yetenekler",
-                "capabilities": "Capabilities",
+                "capabilities": "Yetkinlikler",
                 "budgets": "Bütçeler",
                 "settings": "Ayarlar",
                 "terminal": "Terminal"
@@ -1060,42 +1060,42 @@
                 "error": "Ajan silinemedi"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Yetkinlikler",
+                "subtitle": "Bu ajanın neler yapabileceği: araçlar, yetenekler ve başlangıç betiği.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Ajan araçları",
+                    "description": "Bu ajan için araç bazında erişim. Daha özel bir kapsam, üst kapsamların izin verdiklerini yalnızca daraltabilir: bir aracı açıp kapatmak ajan düzeyinde bir kısıtlama kaydeder — bu ajanın reddetme listesini ya da tanımlıysa izin listesini günceller — ve üst bir kapsam tarafından reddedilen bir araç bu sayfadan yeniden etkinleştirilemez.",
+                    "groupBuiltin": "Yerleşik araçlar",
+                    "groupFacade": "Platform araçları",
+                    "groupDomain": "Alan araçları",
+                    "resetToInherited": "Devralınana sıfırla",
+                    "inheritedDeny": "{scope} tarafından reddedildi",
+                    "permissionOff": "İzin kapalı",
+                    "patternDeny": "Bu ajandaki bir desen tarafından reddedildi",
+                    "permissionHint": "“{permission}” iznini gerektirir — Ayarlar'dan etkinleştirin.",
+                    "empty": "Kullanılabilir araç yok."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "İzinler",
+                    "description": "Yetkinlik anahtarları Ayarlar'da düzenlenebilir; burada salt okunur gösterilir.",
+                    "edit": "Ayarlar'da düzenle"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Yetenekler",
+                    "description": "Doğrudan bu ajana bağlanan yetenekler. Devralınan bağlar üst bir kapsamdan gelir ve orada yönetilir.",
+                    "attachPlaceholder": "Bir yetenek ekle…",
+                    "installAndAttach": "kur ve ekle",
+                    "inherited": "Devralınan",
+                    "empty": "Henüz bağlı yetenek yok."
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Başlangıç betiği",
+                    "helper": "Çalışma zamanı desteklediğinde oturum/çalışma alanı başlatılırken çalışır.",
+                    "placeholder": "#!/bin/sh\n# bir oturum başladığında çalıştırılacak komutlar…",
+                    "save": "Kaydet",
+                    "saved": "Başlangıç betiği kaydedildi",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Başlangıç betiği 16 KB sınırını aşıyor."
                 }
             }
         },

@@ -872,7 +872,7 @@
                 "activity": "Activiteit",
                 "instructions": "Instructies",
                 "skills": "Vaardigheden",
-                "capabilities": "Capabilities",
+                "capabilities": "Mogelijkheden",
                 "budgets": "Budgetten",
                 "settings": "Instellingen",
                 "terminal": "Terminal"
@@ -1060,42 +1060,42 @@
                 "error": "Kan de agent niet verwijderen"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Mogelijkheden",
+                "subtitle": "Wat deze agent kan — tools, vaardigheden en opstartscript.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Agenttools",
+                    "description": "Toegang per tool voor deze agent. Een specifieker bereik kan alleen beperken wat de bovenliggende bereiken toestaan: het omzetten van een tool legt een beperking op agentniveau vast — de weigerlijst van deze agent wordt bijgewerkt, of zijn toestaanlijst als die is ingesteld — en een tool die door een bovenliggend bereik is geweigerd, kan op deze pagina niet opnieuw worden ingeschakeld.",
+                    "groupBuiltin": "Ingebouwde tools",
+                    "groupFacade": "Platformtools",
+                    "groupDomain": "Domeintools",
+                    "resetToInherited": "Terugzetten naar overgeërfd",
+                    "inheritedDeny": "Geweigerd door {scope}",
+                    "permissionOff": "Machtiging uit",
+                    "patternDeny": "Geweigerd door een patroon op deze agent",
+                    "permissionHint": "Vereist de machtiging ‘{permission}’ — schakel die in bij Instellingen.",
+                    "empty": "Geen tools beschikbaar."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Machtigingen",
+                    "description": "De schakelaars voor mogelijkheden blijven bewerkbaar in Instellingen; hier worden ze alleen-lezen getoond.",
+                    "edit": "Bewerken in Instellingen"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Vaardigheden",
+                    "description": "Vaardigheden die rechtstreeks aan deze agent zijn gekoppeld. Overgeërfde koppelingen komen uit een bovenliggend bereik en worden daar beheerd.",
+                    "attachPlaceholder": "Een vaardigheid koppelen…",
+                    "installAndAttach": "installeren & koppelen",
+                    "inherited": "Overgeërfd",
+                    "empty": "Nog geen vaardigheden gekoppeld."
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Initialisatiescript",
+                    "helper": "Wordt uitgevoerd bij het opstarten van de sessie of werkruimte, waar de runtime dit ondersteunt.",
+                    "placeholder": "#!/bin/sh\n# opdrachten die bij het starten van een sessie worden uitgevoerd…",
+                    "save": "Opslaan",
+                    "saved": "Initialisatiescript opgeslagen",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Het initialisatiescript is groter dan 16 KB."
                 }
             }
         },

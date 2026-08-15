@@ -57,7 +57,7 @@ module `AgentCapabilitiesApiModule` (registered in `api.module.ts`).
 
 One request answers the whole tab:
 
-```
+```text
 { agentId, initScript, permissions, tools[], grants, agentGrantRow }
 ```
 

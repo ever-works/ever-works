@@ -903,7 +903,7 @@
                 "activity": "Activité",
                 "instructions": "Instructions",
                 "skills": "Compétences",
-                "capabilities": "Capabilities",
+                "capabilities": "Capacités",
                 "budgets": "Budgets",
                 "settings": "Paramètres",
                 "terminal": "Terminal"
@@ -1091,42 +1091,42 @@
                 "error": "Impossible de supprimer l'agent"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Capacités",
+                "subtitle": "Ce que cet agent peut faire : outils, compétences et script de démarrage.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Outils de l'agent",
+                    "description": "Accès outil par outil pour cet agent. Une portée plus spécifique ne peut que restreindre ce que ses portées parentes autorisent : basculer un outil enregistre une restriction au niveau de l'agent — en mettant à jour sa liste de refus, ou sa liste d'autorisations lorsqu'elle existe — et un outil refusé par une portée parente ne peut pas être réactivé depuis cette page.",
+                    "groupBuiltin": "Outils intégrés",
+                    "groupFacade": "Outils de la plateforme",
+                    "groupDomain": "Outils métier",
+                    "resetToInherited": "Rétablir la valeur héritée",
+                    "inheritedDeny": "Refusé par {scope}",
+                    "permissionOff": "Autorisation désactivée",
+                    "patternDeny": "Refusé par un motif défini sur cet agent",
+                    "permissionHint": "Nécessite l'autorisation « {permission} » — activez-la dans les Paramètres.",
+                    "empty": "Aucun outil disponible."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Autorisations",
+                    "description": "Les interrupteurs de capacités restent modifiables dans les Paramètres ; ils sont affichés ici en lecture seule.",
+                    "edit": "Modifier dans les Paramètres"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Compétences",
+                    "description": "Compétences rattachées directement à cet agent. Les rattachements hérités proviennent d'une portée parente et se gèrent à ce niveau.",
+                    "attachPlaceholder": "Rattacher une compétence…",
+                    "installAndAttach": "installer et rattacher",
+                    "inherited": "Héritée",
+                    "empty": "Aucune compétence rattachée pour l'instant."
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
-                    "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "title": "Script d'initialisation",
+                    "helper": "S'exécute au démarrage de la session ou de l'espace de travail, lorsque l'environnement d'exécution le permet.",
+                    "placeholder": "#!/bin/sh\n# commandes à exécuter au démarrage d'une session…",
+                    "save": "Enregistrer",
+                    "saved": "Script d'initialisation enregistré",
+                    "bytes": "{used} / {max} Ko",
+                    "tooLong": "Le script d'initialisation dépasse 16 Ko."
                 }
             }
         },

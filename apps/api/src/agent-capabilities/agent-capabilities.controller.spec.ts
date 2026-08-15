@@ -8,6 +8,18 @@
 jest.mock('@ever-works/agent/agents', () => ({
     AgentsService: class {},
     buildAgentToolCatalog: jest.fn(),
+    // Mirrors `AGENT_PERMISSIONS_DEFAULT` in `entities/agent.entity.ts`
+    // (all-false) — the controller's fallback for a NULL permissions column.
+    AGENT_PERMISSIONS_DEFAULT: {
+        canCreateAgents: false,
+        canAssignTasks: false,
+        canEditSkills: false,
+        canEditAgentFiles: false,
+        canSpend: false,
+        canCommitToRepo: false,
+        canOpenPullRequests: false,
+        canCallExternalTools: false,
+    },
 }));
 jest.mock('@ever-works/agent/policy', () => {
     const { decideToolGrant } = jest.requireActual(
@@ -190,6 +202,31 @@ describe('AgentCapabilitiesController', () => {
         const { controller } = make();
         const payload = await controller.getCapabilities('agent-1', auth);
         expect(payload.agentGrantRow).toBeNull();
+    });
+
+    it('falls back to the platform defaults when the permissions column is NULL', async () => {
+        // `agents.permissions` is nullable; indexing it raised a TypeError and
+        // the payload contract declares a non-null Record. All-false matches
+        // how `resolveAllowedTools` reads the flags (`agent.permissions?.x`).
+        const getOne = jest.fn().mockResolvedValue({ ...AGENT, permissions: null });
+        const { controller } = make({ getOne });
+        const payload = await controller.getCapabilities('agent-1', auth);
+
+        expect(payload.permissions).toEqual({
+            canCreateAgents: false,
+            canAssignTasks: false,
+            canEditSkills: false,
+            canEditAgentFiles: false,
+            canSpend: false,
+            canCommitToRepo: false,
+            canOpenPullRequests: false,
+            canCallExternalTools: false,
+        });
+        // Every permission-gated tool reads as not permitted…
+        expect(payload.tools.find((t) => t.name === 'createTask')!.permissionEnabled).toBe(false);
+        expect(payload.tools.find((t) => t.name === 'commitToRepo')!.permissionEnabled).toBe(false);
+        // …while an ungated one is unaffected.
+        expect(payload.tools.find((t) => t.name === 'getSkillBody')!.permissionEnabled).toBe(true);
     });
 
     it('passes through initScript, permissions and the full grants chain', async () => {

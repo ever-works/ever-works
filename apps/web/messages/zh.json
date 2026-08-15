@@ -872,7 +872,7 @@
                 "activity": "活动",
                 "instructions": "指令",
                 "skills": "技能",
-                "capabilities": "Capabilities",
+                "capabilities": "能力",
                 "budgets": "预算",
                 "settings": "设置",
                 "terminal": "Terminal"
@@ -1060,42 +1060,42 @@
                 "error": "无法删除该代理"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "能力",
+                "subtitle": "此代理可以做什么——工具、技能和启动脚本。",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "代理工具",
+                    "description": "此代理的逐个工具访问权限。更具体的作用域只能收窄其上级作用域所允许的范围：切换某个工具会记录一条代理级限制——更新此代理的拒绝列表，或在已设置允许列表时更新该允许列表——并且被上级作用域拒绝的工具无法在本页面重新启用。",
+                    "groupBuiltin": "内置工具",
+                    "groupFacade": "平台工具",
+                    "groupDomain": "领域工具",
+                    "resetToInherited": "重置为继承",
+                    "inheritedDeny": "被 {scope} 拒绝",
+                    "permissionOff": "权限已关闭",
+                    "patternDeny": "被此代理上的某个模式拒绝",
+                    "permissionHint": "需要“{permission}”权限——请在设置中启用。",
+                    "empty": "没有可用的工具。"
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "权限",
+                    "description": "能力开关仍可在设置中编辑；此处仅以只读方式显示。",
+                    "edit": "在设置中编辑"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "技能",
+                    "description": "直接绑定到此代理的技能。继承的绑定来自上级作用域，需在该处管理。",
+                    "attachPlaceholder": "附加技能…",
+                    "installAndAttach": "安装并附加",
+                    "inherited": "继承",
+                    "empty": "尚未绑定任何技能。"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "初始化脚本",
+                    "helper": "在运行时支持的情况下，于会话/工作区启动时运行。",
+                    "placeholder": "#!/bin/sh\n# 会话启动时要执行的命令…",
+                    "save": "保存",
+                    "saved": "初始化脚本已保存",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "初始化脚本超过 16 KB。"
                 }
             }
         },

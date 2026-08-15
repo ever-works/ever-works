@@ -25,9 +25,13 @@ jest.mock('@ever-works/agent/validation', () => ({
     MergePolicyDto: class MergePolicyDto {},
 }));
 
+import { AGENT_INIT_SCRIPT_MAX_BYTES } from '@ever-works/contracts';
 import { UpdateAgentDto } from './agent.dto';
 
-const AGENT_INIT_SCRIPT_MAX_LENGTH = 16384;
+// Pin the boundary tests to the SHARED cap the DTO decorates with, so a
+// change to the contract constant moves these assertions with it instead
+// of silently unpinning them. `@ever-works/contracts` is not mocked here.
+const AGENT_INIT_SCRIPT_MAX_LENGTH = AGENT_INIT_SCRIPT_MAX_BYTES;
 
 async function errorsFor(body: Record<string, unknown>) {
     const dto = plainToInstance(UpdateAgentDto, body);

@@ -1,7 +1,11 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { AgentCapabilitiesPayload, AgentCapabilityToolRow } from '@ever-works/contracts';
-import { AgentsService, buildAgentToolCatalog } from '@ever-works/agent/agents';
+import {
+    AGENT_PERMISSIONS_DEFAULT,
+    AgentsService,
+    buildAgentToolCatalog,
+} from '@ever-works/agent/agents';
 import { ToolGrantService, decideToolGrant } from '@ever-works/agent/policy';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -56,7 +60,14 @@ export class AgentCapabilitiesController {
         const agentRow =
             storedRows.find((row) => row.scopeType === 'agent' && row.scopeId === id) ?? null;
 
-        const permissions = agent.permissions as unknown as Record<string, boolean>;
+        // `agents.permissions` is nullable in the DB, and the payload contract
+        // declares a non-null `Record<string, boolean>`. Fall back to the
+        // platform defaults (all-false) so a null row still renders the eight
+        // flags and matches how `resolveAllowedTools` reads them (`?.flag`,
+        // i.e. absent === not granted) instead of throwing a TypeError below.
+        const permissions = (agent.permissions ?? {
+            ...AGENT_PERMISSIONS_DEFAULT,
+        }) as unknown as Record<string, boolean>;
         const tools: AgentCapabilityToolRow[] = buildAgentToolCatalog().map((entry) => {
             const permissionEnabled = entry.gatedByPermission
                 ? Boolean(permissions[entry.gatedByPermission])

@@ -872,7 +872,7 @@
                 "activity": "Atividade",
                 "instructions": "Instruções",
                 "skills": "Habilidades",
-                "capabilities": "Capabilities",
+                "capabilities": "Capacidades",
                 "budgets": "Orçamentos",
                 "settings": "Configurações",
                 "terminal": "Terminal"
@@ -1060,42 +1060,42 @@
                 "error": "Não foi possível excluir o agente"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Capacidades",
+                "subtitle": "O que este agente pode fazer — ferramentas, habilidades e script de inicialização.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Ferramentas do agente",
+                    "description": "Acesso por ferramenta para este agente. Um escopo mais específico só pode restringir o que os escopos superiores permitem: alternar uma ferramenta registra uma restrição no nível do agente — atualizando a lista de negação deste agente ou a sua lista de permissões, quando houver uma — e uma ferramenta negada por um escopo superior não pode ser reativada nesta página.",
+                    "groupBuiltin": "Ferramentas integradas",
+                    "groupFacade": "Ferramentas da plataforma",
+                    "groupDomain": "Ferramentas de domínio",
+                    "resetToInherited": "Redefinir para herdado",
+                    "inheritedDeny": "Negada por {scope}",
+                    "permissionOff": "Permissão desativada",
+                    "patternDeny": "Negada por um padrão deste agente",
+                    "permissionHint": "Requer a permissão “{permission}” — ative-a em Configurações.",
+                    "empty": "Nenhuma ferramenta disponível."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Permissões",
+                    "description": "Os interruptores de capacidade continuam editáveis em Configurações; aqui são exibidos apenas para leitura.",
+                    "edit": "Editar em Configurações"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Habilidades",
+                    "description": "Habilidades vinculadas diretamente a este agente. Os vínculos herdados vêm de um escopo superior e são gerenciados lá.",
+                    "attachPlaceholder": "Anexar uma habilidade…",
+                    "installAndAttach": "instalar e anexar",
+                    "inherited": "Herdada",
+                    "empty": "Nenhuma habilidade vinculada ainda."
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Script de inicialização",
+                    "helper": "Executa na inicialização da sessão ou do espaço de trabalho, quando o runtime oferece suporte.",
+                    "placeholder": "#!/bin/sh\n# comandos a executar quando uma sessão iniciar…",
+                    "save": "Salvar",
+                    "saved": "Script de inicialização salvo",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "O script de inicialização excede 16 KB."
                 }
             }
         },

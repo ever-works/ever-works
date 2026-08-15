@@ -872,7 +872,7 @@
                 "activity": "Attività",
                 "instructions": "Istruzioni",
                 "skills": "Competenze",
-                "capabilities": "Capabilities",
+                "capabilities": "Capacità",
                 "budgets": "Budget",
                 "settings": "Impostazioni",
                 "terminal": "Terminal"
@@ -1060,42 +1060,42 @@
                 "error": "Impossibile eliminare l'agente"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Capacità",
+                "subtitle": "Cosa può fare questo agente: strumenti, competenze e script di avvio.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Strumenti dell'agente",
+                    "description": "Accesso per singolo strumento per questo agente. Un ambito più specifico può solo restringere ciò che consentono gli ambiti superiori: attivare o disattivare uno strumento registra una restrizione a livello di agente — aggiornando l'elenco dei divieti dell'agente, oppure il suo elenco di permessi se ne è impostato uno — e uno strumento vietato da un ambito superiore non può essere riabilitato da questa pagina.",
+                    "groupBuiltin": "Strumenti integrati",
+                    "groupFacade": "Strumenti della piattaforma",
+                    "groupDomain": "Strumenti di dominio",
+                    "resetToInherited": "Ripristina al valore ereditato",
+                    "inheritedDeny": "Vietato da {scope}",
+                    "permissionOff": "Autorizzazione disattivata",
+                    "patternDeny": "Vietato da un pattern su questo agente",
+                    "permissionHint": "Richiede l'autorizzazione «{permission}»: attivala in Impostazioni.",
+                    "empty": "Nessuno strumento disponibile."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Autorizzazioni",
+                    "description": "Gli interruttori delle capacità restano modificabili in Impostazioni; qui sono mostrati in sola lettura.",
+                    "edit": "Modifica in Impostazioni"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Competenze",
+                    "description": "Competenze associate direttamente a questo agente. Le associazioni ereditate provengono da un ambito superiore e si gestiscono lì.",
+                    "attachPlaceholder": "Associa una competenza…",
+                    "installAndAttach": "installa e associa",
+                    "inherited": "Ereditata",
+                    "empty": "Nessuna competenza ancora associata."
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Script di inizializzazione",
+                    "helper": "Viene eseguito all'avvio della sessione o dello spazio di lavoro, dove il runtime lo supporta.",
+                    "placeholder": "#!/bin/sh\n# comandi da eseguire all'avvio di una sessione…",
+                    "save": "Salva",
+                    "saved": "Script di inizializzazione salvato",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Lo script di inizializzazione supera i 16 KB."
                 }
             }
         },

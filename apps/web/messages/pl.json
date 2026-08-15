@@ -872,7 +872,7 @@
                 "activity": "Aktywność",
                 "instructions": "Instrukcje",
                 "skills": "Umiejętności",
-                "capabilities": "Capabilities",
+                "capabilities": "Możliwości",
                 "budgets": "Budżety",
                 "settings": "Ustawienia",
                 "terminal": "Terminal"
@@ -1060,42 +1060,42 @@
                 "error": "Nie udało się usunąć agenta"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Możliwości",
+                "subtitle": "Co potrafi ten agent — narzędzia, umiejętności i skrypt startowy.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Narzędzia agenta",
+                    "description": "Dostęp do poszczególnych narzędzi dla tego agenta. Bardziej szczegółowy zakres może jedynie zawęzić to, na co pozwalają zakresy nadrzędne: przełączenie narzędzia zapisuje ograniczenie na poziomie agenta — aktualizując jego listę zabronionych lub listę dozwolonych, jeśli została ustawiona — a narzędzia zabronionego przez zakres nadrzędny nie da się ponownie włączyć z tej strony.",
+                    "groupBuiltin": "Narzędzia wbudowane",
+                    "groupFacade": "Narzędzia platformy",
+                    "groupDomain": "Narzędzia dziedzinowe",
+                    "resetToInherited": "Przywróć wartość dziedziczoną",
+                    "inheritedDeny": "Zabronione przez {scope}",
+                    "permissionOff": "Uprawnienie wyłączone",
+                    "patternDeny": "Zabronione przez wzorzec tego agenta",
+                    "permissionHint": "Wymaga uprawnienia „{permission}” — włącz je w Ustawieniach.",
+                    "empty": "Brak dostępnych narzędzi."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Uprawnienia",
+                    "description": "Przełączniki możliwości pozostają edytowalne w Ustawieniach; tutaj są pokazane tylko do odczytu.",
+                    "edit": "Edytuj w Ustawieniach"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Umiejętności",
+                    "description": "Umiejętności przypisane bezpośrednio do tego agenta. Przypisania dziedziczone pochodzą z zakresu nadrzędnego i tam są zarządzane.",
+                    "attachPlaceholder": "Dołącz umiejętność…",
+                    "installAndAttach": "zainstaluj i dołącz",
+                    "inherited": "Dziedziczona",
+                    "empty": "Brak przypisanych umiejętności."
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Skrypt inicjujący",
+                    "helper": "Uruchamiany przy starcie sesji lub przestrzeni roboczej, jeśli środowisko uruchomieniowe to obsługuje.",
+                    "placeholder": "#!/bin/sh\n# polecenia uruchamiane przy starcie sesji…",
+                    "save": "Zapisz",
+                    "saved": "Skrypt inicjujący zapisany",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Skrypt inicjujący przekracza 16 KB."
                 }
             }
         },
