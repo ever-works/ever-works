@@ -114,6 +114,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
     'GoalMetricSample',
+    'GoalEvent',
     'MissionGoal',
     'MissionAttachment',
     'MissionWork',

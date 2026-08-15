@@ -157,6 +157,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_MCP_TOOL_SOURCE,
     AGENT_GIT_FACADE,
+    AGENT_RUN_CANCELLER,
 } from '@ever-works/agent/agents';
 import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
 import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
@@ -243,6 +244,19 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(provider).toBeDefined();
         expect(provider?.useExisting).toBe(McpToolSource);
         expect(meta('exports')).toContain(AGENT_MCP_TOOL_SOURCE);
+    /**
+     * Goals autonomy layer — `GoalOrchestratorService.cancelActiveRun` takes
+     * this token through `@Optional() @Inject()`. `@Global()` publishes only
+     * EXPORTED providers, so leaving it out of `exports` resolves it to
+     * `undefined` in production and the Goal loop's cancel/restart silently
+     * degrades to a DB-only cancel — the row reads `cancelled` while the
+     * Trigger.dev job keeps running and spending.
+     */
+    it('exports AGENT_RUN_CANCELLER so the Goal loop cancels the REMOTE run too', () => {
+        expect(
+            meta('providers').map((p: unknown) => (p as { provide?: unknown })?.provide),
+        ).toContain(AGENT_RUN_CANCELLER);
+        expect(meta('exports')).toContain(AGENT_RUN_CANCELLER);
     });
 
     it('binds all three Task membership repositories (the commentOnTask gate is fail-closed)', () => {

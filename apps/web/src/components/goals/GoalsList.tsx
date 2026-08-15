@@ -17,6 +17,13 @@ interface GoalsListProps {
     loadError?: string | null;
     filters?: {
         status?: GoalStatus;
+        /** True when the archived VIEW is showing (not a filter value). */
+        archived?: boolean;
+    };
+    /** Hrefs for the live/archived view toggle, built server-side. */
+    archiveHrefs?: {
+        live: string;
+        archived: string;
     };
     pagination?: {
         offset: number;
@@ -33,12 +40,19 @@ interface GoalsListProps {
  * the dedicated create form. Load failures are surfaced explicitly so
  * a flaky API doesn't masquerade as an empty Goal catalog.
  */
-export function GoalsList({ goals, loadError = null, filters, pagination }: GoalsListProps) {
+export function GoalsList({
+    goals,
+    loadError = null,
+    filters,
+    archiveHrefs,
+    pagination,
+}: GoalsListProps) {
     const t = useTranslations('dashboard.goalsPage');
     const [statusFilter, setStatusFilter] = useState(filters?.status ?? '');
     useEffect(() => {
         setStatusFilter(filters?.status ?? '');
     }, [filters?.status]);
+    const archived = filters?.archived === true;
 
     return (
         <div className="w-full">
@@ -55,7 +69,38 @@ export function GoalsList({ goals, loadError = null, filters, pagination }: Goal
                 }
             />
 
+            {archiveHrefs ? (
+                <nav
+                    aria-label={t('viewToggle.label')}
+                    className="mt-8 flex items-center gap-1 border-b border-border/60 dark:border-border-dark/60"
+                >
+                    <Link
+                        href={archiveHrefs.live}
+                        aria-current={archived ? undefined : 'page'}
+                        className={
+                            archived
+                                ? '-mb-px border-b-2 border-transparent px-3 py-2 text-xs font-medium text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark'
+                                : '-mb-px border-b-2 border-info px-3 py-2 text-xs font-medium text-info'
+                        }
+                    >
+                        {t('viewToggle.live')}
+                    </Link>
+                    <Link
+                        href={archiveHrefs.archived}
+                        aria-current={archived ? 'page' : undefined}
+                        className={
+                            archived
+                                ? '-mb-px border-b-2 border-info px-3 py-2 text-xs font-medium text-info'
+                                : '-mb-px border-b-2 border-transparent px-3 py-2 text-xs font-medium text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark'
+                        }
+                    >
+                        {t('viewToggle.archived')}
+                    </Link>
+                </nav>
+            ) : null}
+
             <form className="mb-5 mt-8 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
+                {archived ? <input type="hidden" name="archived" value="true" /> : null}
                 <div className="min-w-40">
                     <span className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1">
                         {t('filterBar.status')}
@@ -104,17 +149,19 @@ export function GoalsList({ goals, loadError = null, filters, pagination }: Goal
                             <Gauge className="w-4 h-4 text-info" />
                         </div>
                         <p className="text-sm font-medium text-text dark:text-text-dark">
-                            {t('empty.title')}
+                            {archived ? t('emptyArchived.title') : t('empty.title')}
                         </p>
                         <p className="mx-auto mt-1 max-w-2xl text-xs text-text-muted dark:text-text-muted-dark">
-                            {t('empty.subtitle')}
+                            {archived ? t('emptyArchived.subtitle') : t('empty.subtitle')}
                         </p>
-                        <div className="mt-4">
-                            <Button href="/goals/new" size="sm">
-                                <Plus className="w-4 h-4" />
-                                <span className="font-medium">{t('newGoal')}</span>
-                            </Button>
-                        </div>
+                        {!archived ? (
+                            <div className="mt-4">
+                                <Button href="/goals/new" size="sm">
+                                    <Plus className="w-4 h-4" />
+                                    <span className="font-medium">{t('newGoal')}</span>
+                                </Button>
+                            </div>
+                        ) : null}
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">

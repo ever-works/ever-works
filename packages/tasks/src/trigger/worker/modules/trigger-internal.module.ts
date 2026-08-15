@@ -9,7 +9,7 @@ import {
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
-import { GoalEvaluationService } from '@ever-works/agent/goals';
+import { GoalEvaluationService, GoalOrchestratorService } from '@ever-works/agent/goals';
 import {
     AgentEscalationService,
     AgentRunService,
@@ -104,6 +104,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: GoalEvaluationService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'GoalEvaluationService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Autonomy layer — the goal-advance-dispatcher cron resolves
+        // GoalOrchestratorService via this proxy. The real service lives in
+        // the API, where the Tasks runtime and the dispatch gate are bound;
+        // the worker only calls advanceDue() over the internal HTTP channel.
+        {
+            provide: GoalOrchestratorService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'GoalOrchestratorService'),
             inject: [TriggerInternalApiClient],
         },
         // Agents/Skills/Tasks PR #1017 — Phase 6. Per-Agent heartbeat
@@ -373,6 +383,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         MissionTickService,
         IdeaBuildExecutorService,
         GoalEvaluationService,
+        GoalOrchestratorService,
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
         AgentRunService,

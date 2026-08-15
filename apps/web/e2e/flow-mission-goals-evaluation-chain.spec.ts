@@ -145,6 +145,29 @@ const GOAL_DTO_KEYS = [
     'criteria',
     'constraints',
     'resolvedScore',
+    // Autonomy layer: a Goal also carries its Definition-of-Done checklist
+    // (plus the server-computed `dodSummary` rollup every surface renders),
+    // its per-Goal budgets/limits, and the execution-loop state. All are
+    // present on the DTO whether or not a given Goal ever started a loop —
+    // NULL / 0 on one that did not — so they belong in the pinned surface.
+    'dodCriteria',
+    'dodSummary',
+    'spendCapCents',
+    'spentCents',
+    'wallClockLimitHours',
+    'stuckThresholdIterations',
+    'sessionBudgetMinutes',
+    'gracePeriodMinutes',
+    'executionTarget',
+    'plannerModelHint',
+    'workerModelHint',
+    'iteration',
+    'lastProgressIteration',
+    'activeAgentId',
+    'assignedAgentId',
+    'loopStatus',
+    'loopStartedAt',
+    'archivedAt',
 ];
 
 async function createMission(

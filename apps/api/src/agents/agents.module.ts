@@ -889,6 +889,14 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
     ],
     exports: [
         AGENT_HEARTBEAT_TRIGGER,
+        // Goals autonomy layer — GoalOrchestratorService cancels the Goal's
+        // in-flight iteration run and needs the SAME remote cancel this
+        // module's own `cancelRun` endpoint uses. @Global() only publishes
+        // EXPORTED providers, so an unexported token resolves to `undefined`
+        // at the @Optional() consumer and the remote half silently degrades
+        // to a DB-only cancel (the exact failure agent-run-canceller.ts's
+        // docblock was written about).
+        AGENT_RUN_CANCELLER,
         AGENT_RUN_CHAT_BACK_POSTER,
         AGENT_RUN_TASK_FINISHER,
         AGENT_PLUGIN_TOOLS_FACADE,

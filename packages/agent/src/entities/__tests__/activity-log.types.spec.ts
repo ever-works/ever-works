@@ -132,6 +132,8 @@ describe('activity-log.types', () => {
             //    (repository registry, Feature G) -> 129.
             // +2 inbox_item_created / inbox_item_answered (Inbox operator
             //    message center) -> 125.
+            // +11 goal_* (Goals autonomy layer: loop lifecycle x5, iteration
+            //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 134.
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
