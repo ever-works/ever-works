@@ -20,8 +20,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * 1784800000000-AddTaskDelegationDepth). `text` is portable across
  * postgres + better-sqlite3.
  */
-export class AddAgentInitScript1785010000000 implements MigrationInterface {
-    name = 'AddAgentInitScript1785010000000';
+export class AddAgentInitScript1786880000000 implements MigrationInterface {
+    name = 'AddAgentInitScript1786880000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const table = await queryRunner.getTable('agents');

@@ -35,7 +35,7 @@ test seam.
 ### 2. `agents.initScript` (advisory v1)
 
 - Column: `agents.initScript text NULL` (`packages/agent/src/entities/agent.entity.ts`).
-- Migration: `apps/api/src/migrations/1785010000000-AddAgentInitScript.ts` —
+- Migration: `apps/api/src/migrations/1786880000000-AddAgentInitScript.ts` —
   additive, guarded, both `up` and `down`, nothing backfilled.
 - Write path: `AgentsService.update` → 16 KB **byte** cap + `assertNoSecrets`
   hard reject (same posture as the five canonical Agent files). Blank/`null`
