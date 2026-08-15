@@ -8,12 +8,24 @@ interface CleanupLogger {
 	warn(message: string): void;
 }
 
+export interface CleanupOptions {
+	/**
+	 * feat-cma-scale: when true (persistent control plane in use) the run's
+	 * session is ARCHIVED instead of deleted — sessions stay inspectable —
+	 * and the agent/environment are never touched (the run does not set
+	 * `createdAgentId` / `createdEnvironmentId` in that mode, so their
+	 * cleanup is naturally skipped as well).
+	 */
+	preserveControlPlane?: boolean;
+}
+
 export async function cleanupManagedAgentRun(
 	client: AnthropicManagedAgentsClient,
 	resources: ManagedAgentRunResources,
-	logger: CleanupLogger
+	logger: CleanupLogger,
+	options: CleanupOptions = {}
 ): Promise<void> {
-	await cleanupSession(client, resources.sessionId, logger);
+	await cleanupSession(client, resources.sessionId, logger, options.preserveControlPlane === true);
 	await cleanupUploadedFile(client, resources.uploadedFileId, logger);
 	for (const envFileId of resources.uploadedEnvFileIds ?? []) {
 		await cleanupUploadedFile(client, envFileId, logger);
@@ -25,7 +37,8 @@ export async function cleanupManagedAgentRun(
 async function cleanupSession(
 	client: AnthropicManagedAgentsClient,
 	sessionId: string | undefined,
-	logger: CleanupLogger
+	logger: CleanupLogger,
+	archiveInsteadOfDelete = false
 ): Promise<void> {
 	if (!sessionId) {
 		return;
@@ -47,7 +60,11 @@ async function cleanupSession(
 			}
 		}
 
-		await client.deleteSession(sessionId);
+		if (archiveInsteadOfDelete) {
+			await client.archiveSession(sessionId);
+		} else {
+			await client.deleteSession(sessionId);
+		}
 	} catch (error) {
 		logger.warn(`Claude Managed Agent cleanup could not delete session ${sessionId}: ${formatCleanupError(error)}`);
 
