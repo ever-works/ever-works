@@ -2570,6 +2570,15 @@
                     "enforceLabel": "Imposer cette valeur par défaut",
                     "enforceDescription": "Toujours pré-sélectionner ce pipeline, même lorsqu’un travail a son propre pipeline configuré. Vous pouvez toujours changer manuellement de pipeline dans le formulaire.",
                     "saveFailed": "Échec de la sauvegarde du pipeline par défaut"
+                },
+                "voiceDefault": {
+                    "title": "Fournisseur vocal",
+                    "description": "Le fournisseur qui transcrit la dictée vocale du micro du chat.",
+                    "autoLabel": "Automatique",
+                    "autoDescription": "Utiliser le fournisseur actif sur votre compte",
+                    "currentlyActive": "Actuellement utilisé",
+                    "noProviders": "Aucun de vos fournisseurs d'IA configurés ne prend en charge la transcription vocale.",
+                    "saveFailed": "Impossible d'enregistrer le fournisseur vocal"
                 }
             },
             "profile": {
@@ -6528,6 +6537,18 @@
                 "start": "Dicter",
                 "stop": "Arrêter l’enregistrement",
                 "transcribing": "Transcription…"
+            },
+            "model": {
+                "label": "Modèle",
+                "auto": "Par défaut du fournisseur",
+                "autoHint": "Utiliser le modèle configuré pour ce fournisseur",
+                "configured": "Configurés",
+                "all": "Tous les modèles",
+                "searchPlaceholder": "Rechercher des modèles...",
+                "loading": "Chargement des modèles...",
+                "loadError": "Impossible de charger les modèles",
+                "noModels": "Aucun modèle disponible",
+                "context": "contexte de {value}"
             }
         },
         "plugins": {

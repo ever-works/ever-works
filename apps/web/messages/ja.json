@@ -2502,6 +2502,15 @@
                     "enforceLabel": "このデフォルトを強制",
                     "enforceDescription": "ワークに独自のパイプラインが設定されていても、このパイプラインを常に事前選択します。フォームで手動でパイプラインを切り替えることは可能です。",
                     "saveFailed": "デフォルト パイプラインの保存に失敗しました"
+                },
+                "voiceDefault": {
+                    "title": "音声プロバイダー",
+                    "description": "チャットのマイクからの音声入力を文字起こしするプロバイダーです。",
+                    "autoLabel": "自動",
+                    "autoDescription": "アカウントで有効なプロバイダーを使用します",
+                    "currentlyActive": "現在使用中",
+                    "noProviders": "設定済みの AI プロバイダーはいずれも音声文字起こしに対応していません。",
+                    "saveFailed": "音声プロバイダーを保存できませんでした"
                 }
             },
             "profile": {
@@ -6461,6 +6470,18 @@
                 "start": "音声入力",
                 "stop": "録音を停止",
                 "transcribing": "文字起こし中…"
+            },
+            "model": {
+                "label": "モデル",
+                "auto": "プロバイダーの既定",
+                "autoHint": "このプロバイダーに設定されたモデルを使用します",
+                "configured": "設定済み",
+                "all": "すべてのモデル",
+                "searchPlaceholder": "モデルを検索...",
+                "loading": "モデルを読み込み中...",
+                "loadError": "モデルを読み込めませんでした",
+                "noModels": "利用できるモデルがありません",
+                "context": "コンテキスト {value}"
             }
         },
         "plugins": {

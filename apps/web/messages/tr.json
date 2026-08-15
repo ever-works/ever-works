@@ -2502,6 +2502,15 @@
                     "enforceLabel": "Bu varsayılanı zorunlu kıl",
                     "enforceDescription": "Bir işin kendi iş akışı yapılandırılmış olsa bile her zaman bu iş akışını önceden seç. Formda manuel olarak iş akışlarını değiştirebilirsiniz.",
                     "saveFailed": "Varsayılan iş akışı kaydedilemedi"
+                },
+                "voiceDefault": {
+                    "title": "Ses sağlayıcısı",
+                    "description": "Sohbet mikrofonundan gelen sesli dikteyi hangi sağlayıcının yazıya döktüğü.",
+                    "autoLabel": "Otomatik",
+                    "autoDescription": "Hesabınızda etkin olan sağlayıcıyı kullan",
+                    "currentlyActive": "Şu anda kullanılıyor",
+                    "noProviders": "Yapılandırılmış yapay zekâ sağlayıcılarınızın hiçbiri sesli yazıya dökmeyi desteklemiyor.",
+                    "saveFailed": "Ses sağlayıcısı kaydedilemedi"
                 }
             },
             "profile": {
@@ -6461,6 +6470,18 @@
                 "start": "Dikte et",
                 "stop": "Kaydı durdur",
                 "transcribing": "Yazıya dökülüyor…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Sağlayıcı varsayılanı",
+                "autoHint": "Bu sağlayıcı için yapılandırılmış modeli kullan",
+                "configured": "Yapılandırılmış",
+                "all": "Tüm modeller",
+                "searchPlaceholder": "Model ara...",
+                "loading": "Modeller yükleniyor...",
+                "loadError": "Modeller yüklenemedi",
+                "noModels": "Kullanılabilir model yok",
+                "context": "{value} bağlam"
             }
         },
         "plugins": {

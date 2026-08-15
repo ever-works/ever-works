@@ -2502,6 +2502,15 @@
                     "enforceLabel": "Wymuś ten domyślny",
                     "enforceDescription": "Zawsze wstępnie wybieraj ten potok, nawet gdy praca ma skonfigurowany własny potok. Nadal możesz ręcznie przełączać potoki w formularzu.",
                     "saveFailed": "Nie udało się zapisać domyślnego potoku"
+                },
+                "voiceDefault": {
+                    "title": "Dostawca głosu",
+                    "description": "Który dostawca transkrybuje dyktowanie głosowe z mikrofonu czatu.",
+                    "autoLabel": "Automatycznie",
+                    "autoDescription": "Użyj dostawcy aktywnego na Twoim koncie",
+                    "currentlyActive": "Obecnie używany",
+                    "noProviders": "Żaden ze skonfigurowanych dostawców AI nie obsługuje transkrypcji głosu.",
+                    "saveFailed": "Nie udało się zapisać dostawcy głosu"
                 }
             },
             "profile": {
@@ -6461,6 +6470,18 @@
                 "start": "Dyktuj",
                 "stop": "Zatrzymaj nagrywanie",
                 "transcribing": "Transkrypcja…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Domyślny dostawcy",
+                "autoHint": "Użyj modelu skonfigurowanego dla tego dostawcy",
+                "configured": "Skonfigurowane",
+                "all": "Wszystkie modele",
+                "searchPlaceholder": "Szukaj modeli...",
+                "loading": "Ładowanie modeli...",
+                "loadError": "Nie udało się załadować modeli",
+                "noModels": "Brak dostępnych modeli",
+                "context": "kontekst {value}"
             }
         },
         "plugins": {

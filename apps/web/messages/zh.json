@@ -2502,6 +2502,15 @@
                     "enforceLabel": "强制使用此默认值",
                     "enforceDescription": "即使作品有自己的管道配置，也始终预选此管道。您仍可在表单中手动切换管道。",
                     "saveFailed": "保存默认管道失败"
+                },
+                "voiceDefault": {
+                    "title": "语音提供商",
+                    "description": "由哪个提供商将聊天麦克风的语音口述转写为文字。",
+                    "autoLabel": "自动",
+                    "autoDescription": "使用你账户中处于启用状态的提供商",
+                    "currentlyActive": "当前使用中",
+                    "noProviders": "你已配置的 AI 提供商均不支持语音转写。",
+                    "saveFailed": "无法保存语音提供商"
                 }
             },
             "profile": {
@@ -6461,6 +6470,18 @@
                 "start": "语音输入",
                 "stop": "停止录音",
                 "transcribing": "转写中…"
+            },
+            "model": {
+                "label": "模型",
+                "auto": "提供商默认",
+                "autoHint": "使用为该提供商配置的模型",
+                "configured": "已配置",
+                "all": "全部模型",
+                "searchPlaceholder": "搜索模型...",
+                "loading": "正在加载模型...",
+                "loadError": "无法加载模型",
+                "noModels": "没有可用模型",
+                "context": "{value} 上下文"
             }
         },
         "plugins": {

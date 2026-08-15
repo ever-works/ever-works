@@ -2570,6 +2570,15 @@
                     "enforceLabel": "Diesen Standard durchsetzen",
                     "enforceDescription": "Diese Pipeline immer vorauswählen, auch wenn ein Werk eine eigene Pipeline konfiguriert hat. Sie können Pipelines weiterhin manuell im Formular wechseln.",
                     "saveFailed": "Fehler beim Speichern der Standard-Pipeline"
+                },
+                "voiceDefault": {
+                    "title": "Sprachanbieter",
+                    "description": "Welcher Anbieter die Sprachdiktate aus dem Chat-Mikrofon transkribiert.",
+                    "autoLabel": "Automatisch",
+                    "autoDescription": "Den für Ihr Konto aktiven Anbieter verwenden",
+                    "currentlyActive": "Derzeit verwendet",
+                    "noProviders": "Keiner Ihrer konfigurierten KI-Anbieter unterstützt Sprachtranskription.",
+                    "saveFailed": "Sprachanbieter konnte nicht gespeichert werden"
                 }
             },
             "profile": {
@@ -6528,6 +6537,18 @@
                 "start": "Diktieren",
                 "stop": "Aufnahme stoppen",
                 "transcribing": "Wird transkribiert…"
+            },
+            "model": {
+                "label": "Modell",
+                "auto": "Anbieter-Standard",
+                "autoHint": "Das für diesen Anbieter konfigurierte Modell verwenden",
+                "configured": "Konfiguriert",
+                "all": "Alle Modelle",
+                "searchPlaceholder": "Modelle suchen...",
+                "loading": "Modelle werden geladen...",
+                "loadError": "Modelle konnten nicht geladen werden",
+                "noModels": "Keine Modelle verfügbar",
+                "context": "{value} Kontext"
             }
         },
         "plugins": {

@@ -103,6 +103,33 @@ export class ConversationRepository {
         );
     }
 
+    /**
+     * Update the model a conversation is currently pinned to.
+     *
+     * Deliberately NARROWER than a general-purpose update: `providerId` is
+     * NOT settable here. A conversation records the provider it was STARTED
+     * with and that record is immutable (the PATCH DTO refuses the field
+     * outright — see `UpdateConversationDto`), because the provider is the
+     * thread's identity: switching it mid-thread would rewrite history for
+     * messages an entirely different vendor produced.
+     *
+     * The MODEL is not identity — it is a dial the user turns inside one
+     * thread ("same provider, think harder"), and the per-message `model`
+     * column keeps the audit trail of what actually served each turn. So
+     * this column tracks the CURRENT pin, and exists so re-opening a
+     * conversation restores the model the user last chose for it instead of
+     * silently falling back to whatever the browser last used.
+     *
+     * `null` clears the pin, which means "resolve the provider's configured
+     * default" — not "no model".
+     */
+    async updateModel(id: string, userId: string, model: string | null): Promise<void> {
+        // `null` (not `undefined`) is what makes TypeORM emit `SET model = NULL`;
+        // `undefined` is treated as "leave this column alone", which would make
+        // clearing the pin silently no-op.
+        await this.conversationRepo.update({ id, userId }, { model });
+    }
+
     async delete(id: string, userId: string): Promise<boolean> {
         const result = await this.conversationRepo.delete({ id, userId });
         return (result.affected ?? 0) > 0;
