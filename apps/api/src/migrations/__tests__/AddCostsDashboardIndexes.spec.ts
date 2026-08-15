@@ -1,5 +1,5 @@
 import { DataSource, Table } from 'typeorm';
-import { AddCostsDashboardIndexes1786910000000 } from './1786910000000-AddCostsDashboardIndexes';
+import { AddCostsDashboardIndexes1786910000000 } from '../1786910000000-AddCostsDashboardIndexes';
 
 /**
  * Executes the Costs-dashboard index migration against a real
@@ -15,6 +15,17 @@ import { AddCostsDashboardIndexes1786910000000 } from './1786910000000-AddCostsD
  *
  * better-sqlite3 is what CI and the e2e stack run, so a Postgres-only
  * construct in the migration would fail here.
+ *
+ * Lives in `__tests__/` (like every sibling migration spec) and NOT
+ * beside the migration: `nest build -b swc` emits `.spec.js` into `dist`
+ * as well, and the runtime migration glob is the FLAT
+ * `dist/migrations/*.js`. A spec compiled straight into that directory
+ * is loaded by `DataSource.initialize()` as if it were a migration,
+ * whose top-level `describe(...)` then throws `ReferenceError: describe
+ * is not defined` and crash-loops every API pod on boot. The nested
+ * directory keeps the compiled output at `dist/migrations/__tests__/`,
+ * one level below the glob. Pinned by
+ * `migrations-directory-contract.spec.ts`.
  */
 describe('AddCostsDashboardIndexes1786910000000', () => {
     let dataSource: DataSource;
