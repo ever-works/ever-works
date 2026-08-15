@@ -2113,11 +2113,11 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "environments": "Environments",
                 "digest": "Digest",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "environments": "Environments"
             },
             "githubApp": {
                 "title": "GitHub App インストール",
@@ -2906,6 +2906,42 @@
                     "noProvidersAvailable": "The operator has not enabled any job-runtime providers for tenant overlays. Switch to inherit mode or contact your operator."
                 }
             },
+            "digest": {
+                "title": "Digest",
+                "subtitle": "Scheduled activity briefings: agent runs, task movement, pull requests, connected-source events and goal progress, delivered on the cadence you choose. Your personal digest and your organization’s digest are separate settings — turning one on never changes the other.",
+                "scopes": {
+                    "personal": "Personal",
+                    "organization": "Organization"
+                },
+                "cadences": {
+                    "daily": "Daily",
+                    "weekly": "Weekly"
+                },
+                "fields": {
+                    "scopeLabel": "Scope",
+                    "scopeHelper": "Personal covers only your own activity. Organization covers everything happening across your organization. Both can be on at the same time.",
+                    "orgContext": "Editing the digest for {name}.",
+                    "enabledLabel": "Send me a personal digest",
+                    "enabledHelper": "Delivered in-app and to any notification channel you have connected. Quiet windows are skipped instead of sending an empty briefing.",
+                    "orgEnabledLabel": "Send an organization digest",
+                    "orgEnabledHelper": "One shared briefing covering the whole organization, delivered to the organization owner. Members keep receiving their own personal digests.",
+                    "cadenceLabel": "Cadence",
+                    "cadenceHelper": "Daily covers the last 24 hours; weekly covers the last 7 days.",
+                    "narrativeLabel": "Include an AI summary",
+                    "narrativeHelper": "Adds a short written summary on top of the counts. The counts are always computed exactly; if no AI provider is available the summary is skipped and the digest says so.",
+                    "lastRunAt": "Last sent {when}"
+                },
+                "actions": {
+                    "save": "Save",
+                    "saving": "Saving..."
+                },
+                "messages": {
+                    "saveSuccess": "Digest settings saved",
+                    "saveError": "Failed to save the digest settings",
+                    "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
+                    "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
+                }
+            },
             "environments": {
                 "title": "Environments",
                 "subtitle": "Named, reusable runtime environments — packages and networking — you can assign to your Agents.",
@@ -2968,42 +3004,6 @@
                     "description": "Delete \"{name}\"? Agents must be unassigned from it first — deletion is refused while any Agent still uses it.",
                     "cancel": "Cancel",
                     "confirm": "Delete"
-                }
-            },
-            "digest": {
-                "title": "Digest",
-                "subtitle": "Scheduled activity briefings: agent runs, task movement, pull requests, connected-source events and goal progress, delivered on the cadence you choose. Your personal digest and your organization’s digest are separate settings — turning one on never changes the other.",
-                "scopes": {
-                    "personal": "Personal",
-                    "organization": "Organization"
-                },
-                "cadences": {
-                    "daily": "Daily",
-                    "weekly": "Weekly"
-                },
-                "fields": {
-                    "scopeLabel": "Scope",
-                    "scopeHelper": "Personal covers only your own activity. Organization covers everything happening across your organization. Both can be on at the same time.",
-                    "orgContext": "Editing the digest for {name}.",
-                    "enabledLabel": "Send me a personal digest",
-                    "enabledHelper": "Delivered in-app and to any notification channel you have connected. Quiet windows are skipped instead of sending an empty briefing.",
-                    "orgEnabledLabel": "Send an organization digest",
-                    "orgEnabledHelper": "One shared briefing covering the whole organization, delivered to the organization owner. Members keep receiving their own personal digests.",
-                    "cadenceLabel": "Cadence",
-                    "cadenceHelper": "Daily covers the last 24 hours; weekly covers the last 7 days.",
-                    "narrativeLabel": "Include an AI summary",
-                    "narrativeHelper": "Adds a short written summary on top of the counts. The counts are always computed exactly; if no AI provider is available the summary is skipped and the digest says so.",
-                    "lastRunAt": "Last sent {when}"
-                },
-                "actions": {
-                    "save": "Save",
-                    "saving": "Saving..."
-                },
-                "messages": {
-                    "saveSuccess": "Digest settings saved",
-                    "saveError": "Failed to save the digest settings",
-                    "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
-                    "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
                 }
             }
         },
@@ -6981,7 +6981,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -7004,7 +7003,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -7014,8 +7012,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "有効なメールアドレスを入力するか、空欄のままにしてください。"
+                "participantEmailInvalid": "有効なメールアドレスを入力するか、空欄のままにしてください。",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -7026,17 +7024,15 @@
             "backToMeetings": "ミーティング一覧に戻る",
             "actions": {
                 "openRecording": "録画を開く",
+                "edit": "編集",
                 "delete": "削除",
                 "attachTranscript": "文字起こしを添付",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "変更を保存",
-                "edit": "編集",
                 "attaching": "添付しています…",
                 "editTranscript": "文字起こしを編集",
                 "cancelEdit": "編集をキャンセル",
                 "saveTranscript": "文字起こしを保存",
                 "savingTranscript": "保存しています…",
+                "save": "変更を保存",
                 "cancel": "キャンセル"
             },
             "sections": {
@@ -7046,10 +7042,10 @@
                 "edit": "ミーティングを編集"
             },
             "summary": {
-                "notGenerated": "この文字起こしに対する要約は生成されませんでした。AI プロバイダーを有効にし、文字起こしを添付し直してもう一度お試しください。",
-                "noTranscript": "文字起こしを添付すると要約を生成できます。",
                 "generating": "要約を生成しています…",
-                "generatingHint": "文字起こしを読み取り、要約を作成しています。通常は数秒かかります。"
+                "generatingHint": "文字起こしを読み取り、要約を作成しています。通常は数秒かかります。",
+                "notGenerated": "この文字起こしに対する要約は生成されませんでした。AI プロバイダーを有効にし、文字起こしを添付し直してもう一度お試しください。",
+                "noTranscript": "文字起こしを添付すると要約を生成できます。"
             },
             "transcript": {
                 "composerLabel": "文字起こしのテキスト",
@@ -7075,11 +7071,11 @@
             },
             "fields": {
                 "title": "タイトル",
+                "startedAt": "開始日時",
                 "endedAt": "終了日時",
                 "sourceUrl": "録画のリンク",
                 "work": "ワーク",
                 "workNone": "組織全体（ワークなし）",
-                "startedAt": "開始日時",
                 "participants": "参加者",
                 "participantName": "名前",
                 "participantEmail": "メールアドレス（任意）",
@@ -7089,25 +7085,22 @@
             },
             "errors": {
                 "titleRequired": "タイトルは必須です。",
+                "startedAtInvalid": "開始日時が有効な日付ではありません。",
                 "endedAtInvalid": "終了日時が有効な日付ではありません。",
                 "endedBeforeStarted": "終了日時を開始日時より前にすることはできません。",
-                "transcriptRequired": "文字起こしのテキストは必須です。",
-                "startedAtInvalid": "開始日時が有効な日付ではありません。",
                 "participantEmailInvalid": "有効なメールアドレスを入力するか、空欄のままにしてください。",
-                "participantDuplicate": "この参加者はすでにリストにあります。"
+                "participantDuplicate": "この参加者はすでにリストにあります。",
+                "transcriptRequired": "文字起こしのテキストは必須です。"
             },
             "toasts": {
                 "transcriptSaved": "文字起こしを添付しました",
                 "transcriptSummarized": "文字起こしを添付して要約しました",
                 "transcriptError": "文字起こしを添付できませんでした。",
                 "saved": "ミーティングを更新しました",
+                "participantAdded": "参加者を追加しました",
                 "saveError": "ミーティングを更新できませんでした。",
                 "deleted": "ミーティングを削除しました",
-                "deleteError": "ミーティングを削除できませんでした。",
-                "participantAdded": "参加者を追加しました"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "ミーティングを削除できませんでした。"
             },
             "deleteDialog": {
                 "title": "このミーティングを削除しますか？",
