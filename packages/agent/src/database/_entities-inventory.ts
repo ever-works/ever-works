@@ -137,6 +137,7 @@ import { FleetNode } from '../entities/fleet-node.entity';
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
 import { FleetJob } from '../entities/fleet-job.entity';
+import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
 import { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
@@ -343,6 +344,9 @@ export const ENTITIES = [
     // Inbox (operator message center) — messages addressed to the human:
     // blocking questions, approval requests, escalation mirrors, notices.
     InboxItem,
+    // Fleet local-runner routing — per Work / Goal / account preference
+    // for local-runner vs cloud execution.
+    FleetExecutionPreference,
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,

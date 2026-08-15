@@ -210,6 +210,9 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_REPOSITORIES: '/settings/repositories',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
+    // Fleet — enrolled local runners. The page has existed since Wave 12;
+    // it simply had no route constant, so every link to it was a literal.
+    DASHBOARD_SETTINGS_FLEET: '/settings/fleet',
     // Wave 13 — Billing + Usage & Credits pages (billing/usage PRD §2).
     DASHBOARD_SETTINGS_BILLING: '/settings/billing',
     // Payment-method management (billing PRD §3.3, audit B10 + B25).

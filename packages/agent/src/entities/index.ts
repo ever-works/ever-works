@@ -154,6 +154,9 @@ export * from './fleet-node.entity';
 export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
+// Fleet local-runner routing — per Work / Goal / account execution
+// preference (local runner vs cloud) read by the fleet run router.
+export * from './fleet-execution-preference.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
 // Agent Plugins MCP slice — external MCP server connections + per-agent

@@ -51,6 +51,7 @@ import { useWorkDetail } from '../works/detail/WorkDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 import { SidebarActivityIndicator } from './SidebarActivityIndicator';
 import { SidebarInboxBadge } from './SidebarInboxBadge';
+import { RunnerStatusPill } from './RunnerStatusPill';
 import { useMounted } from '@/lib/hooks/use-mounted';
 
 interface DashboardSidebarProps {
@@ -357,10 +358,18 @@ export function DashboardSidebar({
                     </ul>
                 </nav>
 
+                {/* Runner status — additive, above the user menu.
+                    Renders NOTHING until the account has at least one
+                    enrolled fleet node, so a user who will never enroll a
+                    local runner sees exactly the footer they saw before. */}
+                <div className={cn('mt-auto shrink-0 pt-2 pb-1', isCollapsed ? 'px-2' : 'px-4')}>
+                    <RunnerStatusPill isCollapsed={isCollapsed} onInteraction={onInteraction} />
+                </div>
+
                 {/* Bottom section: user menu */}
                 <div
                     className={cn(
-                        'mt-auto shrink-0 border-t h-16 border-border dark:border-border-dark z-999999',
+                        'shrink-0 border-t h-16 border-border dark:border-border-dark z-999999',
                         isCollapsed ? 'px-2' : 'px-4',
                     )}
                 >
