@@ -55,6 +55,18 @@ class CreateConversationDto {
     @IsString()
     @MaxLength(100)
     providerId?: string;
+
+    /**
+     * Model the thread starts pinned to. Optional and unvalidated against any
+     * catalogue on purpose — same posture as `providerId` above: the UI only
+     * OFFERS reachable models, but the record layer stays permissive so a
+     * self-hosted / custom model id is never rejected by the platform.
+     */
+    @ApiProperty({ required: false, maxLength: 100 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(100)
+    model?: string;
 }
 
 /**
@@ -62,12 +74,31 @@ class CreateConversationDto {
  *
  * Security: caps the title length so a megabyte-sized string can no longer
  * be persisted verbatim (DB / response bloat). Mirrors the Agent title cap.
+ *
+ * `providerId` is deliberately ABSENT from this whitelist. With the global
+ * ValidationPipe's `forbidNonWhitelisted`, sending it is a hard 400 rather
+ * than a silent drop — a conversation's provider is the thread's identity and
+ * is immutable after creation. `model` IS whitelisted because it is a dial
+ * inside one thread, not identity: the user re-points the same provider at a
+ * different model mid-conversation and the pin has to survive a reload.
  */
 class UpdateConversationDto {
-    @ApiProperty({ maxLength: 200 })
+    @ApiProperty({ required: false, maxLength: 200 })
+    @IsOptional()
     @IsString()
     @MaxLength(200)
-    title: string;
+    title?: string;
+
+    /**
+     * Empty string clears the pin back to "resolve the provider's configured
+     * default". `null` would be the more obvious signal, but the field is
+     * typed `string` so the whitelist keeps rejecting non-string payloads.
+     */
+    @ApiProperty({ required: false, maxLength: 100 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(100)
+    model?: string;
 }
 
 // Upper bound on messages accepted in a single append. Real clients send 1-2
@@ -175,6 +206,7 @@ export class ConversationController {
             userId: auth.userId,
             title: body.title,
             providerId: body.providerId,
+            model: body.model,
         });
     }
 
@@ -187,7 +219,7 @@ export class ConversationController {
     }
 
     @Patch(':id')
-    @ApiOperation({ summary: 'Update conversation title' })
+    @ApiOperation({ summary: 'Update conversation title and/or pinned model' })
     @HttpCode(204)
     async update(
         @CurrentUser() auth: AuthenticatedUser,
@@ -196,7 +228,16 @@ export class ConversationController {
     ) {
         const conversation = await this.repo.findById(id, auth.userId);
         if (!conversation) throw new NotFoundException();
-        await this.repo.updateTitle(id, auth.userId, body.title);
+        // Both fields are optional, so each write is guarded independently —
+        // a model-only PATCH must not blank the title, and a title-only PATCH
+        // (the long-standing shape every existing caller sends) must not clear
+        // the model pin.
+        if (body.title !== undefined) {
+            await this.repo.updateTitle(id, auth.userId, body.title);
+        }
+        if (body.model !== undefined) {
+            await this.repo.updateModel(id, auth.userId, body.model === '' ? null : body.model);
+        }
     }
 
     @Post(':id/messages')

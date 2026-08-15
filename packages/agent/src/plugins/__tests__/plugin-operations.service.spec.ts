@@ -115,12 +115,25 @@ describe('PluginOperationsService', () => {
                 },
                 {
                     provide: getRepositoryToken(UserPluginEntity),
-                    useValue: {
-                        findOne: jest.fn().mockResolvedValue(null),
-                        find: jest.fn().mockResolvedValue([]),
-                        save: jest.fn().mockImplementation((entity) => entity),
-                        create: jest.fn().mockImplementation((data) => data),
-                    },
+                    useValue: (() => {
+                        const repo: Record<string, unknown> = {
+                            findOne: jest.fn().mockResolvedValue(null),
+                            find: jest.fn().mockResolvedValue([]),
+                            save: jest.fn().mockImplementation((entity) => entity),
+                            create: jest.fn().mockImplementation((data) => data),
+                        };
+                        // `setGlobalVoiceDefault` runs its clear-and-set inside
+                        // `manager.transaction`. Execute the callback inline
+                        // against this very mock so the transaction-scoped
+                        // repository is the same object every assertion here
+                        // already inspects.
+                        repo.manager = {
+                            transaction: jest.fn((cb: (m: unknown) => Promise<unknown>) =>
+                                cb({ getRepository: () => repo }),
+                            ),
+                        };
+                        return repo;
+                    })(),
                 },
                 {
                     provide: getRepositoryToken(WorkPluginEntity),
@@ -2271,6 +2284,138 @@ describe('PluginOperationsService', () => {
             await expect(
                 service.getPluginDeviceAuthStatus('test-plugin', 'user-1'),
             ).rejects.toThrow(BadRequestException);
+        });
+    });
+
+    describe('setGlobalVoiceDefault', () => {
+        /** An AI provider that really can transcribe. */
+        const createVoicePlugin = (): IPlugin =>
+            ({
+                ...createMockPlugin(),
+                capabilities: ['ai-provider'],
+                transcribe: jest.fn().mockResolvedValue({ text: 'hi' }),
+            }) as unknown as IPlugin;
+
+        /**
+         * A stand-in for the registry's lazy plugin stub. Its proxy answers
+         * EVERY unknown property with a forwarding function — including
+         * `transcribe` — which is exactly why probing the stub instead of the
+         * materialized instance is unsound.
+         */
+        const createLazyStub = (real: IPlugin): IPlugin => {
+            const stub = {
+                id: 'test-plugin',
+                name: 'Test Plugin',
+                version: '1.0.0',
+                category: 'utility',
+                capabilities: ['ai-provider'],
+                __materialize: jest.fn().mockResolvedValue(real),
+            };
+            return new Proxy(stub, {
+                get(target, prop, receiver) {
+                    if (prop in target) return Reflect.get(target, prop, receiver);
+                    if (typeof prop === 'symbol' || prop === 'then') return undefined;
+                    return () => Promise.resolve(undefined);
+                },
+            }) as unknown as IPlugin;
+        };
+
+        const registered = (plugin: IPlugin): RegisteredPlugin => ({
+            ...createRegisteredPlugin(plugin),
+        });
+
+        beforeEach(() => {
+            (pluginRepository.findOne as jest.Mock).mockResolvedValue({ id: 'entity-1' });
+        });
+
+        it('accepts a provider that really implements transcribe', async () => {
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(
+                registered(createVoicePlugin()),
+            );
+
+            await service.setGlobalVoiceDefault('user-1', 'test-plugin');
+
+            expect(userPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    metadata: expect.objectContaining({ isGlobalVoiceDefault: true }),
+                }),
+            );
+        });
+
+        it('rejects a lazy provider whose real instance has no transcribe', async () => {
+            // The whole point of the fix: the stub duck-types as
+            // transcription-capable, so only materializing catches this.
+            const realWithoutTranscribe = {
+                ...createMockPlugin(),
+                capabilities: ['ai-provider'],
+            } as unknown as IPlugin;
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(
+                registered(createLazyStub(realWithoutTranscribe)),
+            );
+
+            await expect(service.setGlobalVoiceDefault('user-1', 'test-plugin')).rejects.toThrow(
+                BadRequestException,
+            );
+        });
+
+        it('accepts a lazy provider whose real instance does implement transcribe', async () => {
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(
+                registered(createLazyStub(createVoicePlugin())),
+            );
+
+            await expect(
+                service.setGlobalVoiceDefault('user-1', 'test-plugin'),
+            ).resolves.toBeUndefined();
+        });
+
+        it('leaves the existing default intact when the new plugin is invalid', async () => {
+            // Regression: validation used to run AFTER the clear loop, so a
+            // rejected request still wiped the working setting.
+            (userPluginRepository.find as jest.Mock).mockResolvedValue([
+                { userId: 'user-1', pluginId: 'groq', metadata: { isGlobalVoiceDefault: true } },
+            ]);
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(undefined);
+
+            await expect(service.setGlobalVoiceDefault('user-1', 'nope')).rejects.toThrow(
+                NotFoundException,
+            );
+            expect(userPluginRepository.save).not.toHaveBeenCalled();
+        });
+
+        it('rejects a non-AI plugin without clearing the existing default', async () => {
+            (userPluginRepository.find as jest.Mock).mockResolvedValue([
+                { userId: 'user-1', pluginId: 'groq', metadata: { isGlobalVoiceDefault: true } },
+            ]);
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(
+                registered(createMockPlugin()),
+            );
+
+            await expect(service.setGlobalVoiceDefault('user-1', 'test-plugin')).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(userPluginRepository.save).not.toHaveBeenCalled();
+        });
+
+        it('clears the flag when passed null', async () => {
+            (userPluginRepository.find as jest.Mock).mockResolvedValue([
+                { userId: 'user-1', pluginId: 'groq', metadata: { isGlobalVoiceDefault: true } },
+            ]);
+
+            await service.setGlobalVoiceDefault('user-1', null);
+
+            expect(userPluginRepository.save).toHaveBeenCalledWith(
+                expect.objectContaining({ metadata: {} }),
+            );
+        });
+
+        it('performs the clear-and-set inside a single transaction', async () => {
+            jest.spyOn(pluginRegistryService, 'get').mockReturnValue(
+                registered(createVoicePlugin()),
+            );
+
+            await service.setGlobalVoiceDefault('user-1', 'test-plugin');
+
+            expect(userPluginRepository.manager.transaction).toHaveBeenCalledTimes(1);
         });
     });
 

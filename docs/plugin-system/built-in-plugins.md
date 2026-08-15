@@ -7,7 +7,7 @@ sidebar_position: 5
 
 # Built-in Plugins
 
-The platform ships with 64 plugins across the AI provider, search, content extraction, screenshot, git, deployment, pipeline, data source, storage, and utility categories. This page documents each plugin, its configuration, and environment variables.
+The platform ships with 102 plugins across the AI provider, search, content extraction, screenshot, git, deployment, pipeline, data source, storage, and utility categories. This page documents the most widely used ones, with configuration and environment variables for each.
 
 ## EW-693 — Core vs distributable
 
@@ -19,13 +19,19 @@ the npm registry under `@ever-works/*`, installable at runtime when
 plugin's manifest (`everworks.plugin.distribution`); when absent, the
 default is `core` for `systemPlugin: true` and `registry` otherwise.
 
-**Core (10):** `agent-pipeline`, `comparison-generator`, `github`,
-`k8s`, `local-content-extractor`, `local-fs`, `openrouter`,
-`standard-pipeline`, `tavily`, `vercel`. These are bundled in every
-image. `local-fs` is the default boot-storage so the API can serve
-without any distributable storage plugin enabled (FR-4).
+**Core (27):** `agent-pipeline`, `comparison-generator`, `github`,
+`job-runtime-bullmq`, `job-runtime-inngest`, `job-runtime-node`,
+`job-runtime-pgboss`, `job-runtime-temporal`, `job-runtime-trigger`,
+`k8s`, `local-content-extractor`, `local-fs`, `local-workspace`,
+`openrouter`, `pgvector`, `postgres-db`, `sandbox-workspace`,
+`secret-store-aws-sm`, `secret-store-azure-kv`, `secret-store-doppler`,
+`secret-store-gcp-sm`, `secret-store-infisical`, `secret-store-k8s`,
+`secret-store-vault`, `standard-pipeline`, `tavily`, `vercel`. These
+are bundled in every image. `local-fs` is the default boot-storage so
+the API can serve without any distributable storage plugin enabled
+(FR-4).
 
-**Distributable (54):** every other plugin under `packages/plugins/*`.
+**Distributable (75):** every other plugin under `packages/plugins/*`.
 In `bundled` mode these still ship in the image (so a fresh deploy
 behaves byte-for-byte the same as pre-EW-693); in `dynamic` mode they
 are stripped from the image and pulled from `@ever-works/<id>-plugin`
@@ -918,6 +924,19 @@ Pipeline plugin that executes Composio tools during work generation. Gives Ever 
 | Capabilities       | `pipeline`, `form-schema-provider` |
 
 See [Composio Plugin](./composio-plugin.md) for setup. Refer to `packages/plugins/composio/src/` for the current settings schema.
+
+### Activepieces Automation
+
+Pipeline plugin that delegates work generation to Activepieces flows. It triggers a flow webhook at the execute stage and collects structured items from the flow's Return Response action — an AI-first, open-source alternative to Make.com and Zapier that you can self-host or run on Activepieces Cloud.
+
+| Field              | Value                              |
+| ------------------ | ---------------------------------- |
+| Plugin ID          | `activepieces`                     |
+| Configuration Mode | `user-required`                    |
+| Auto Enable        | No                                 |
+| Capabilities       | `pipeline`, `form-schema-provider` |
+
+See [Activepieces Plugin](./activepieces-plugin.md) for setup. Refer to `packages/plugins/activepieces/src/` for the current settings schema.
 
 ## Prompt Management
 

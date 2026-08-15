@@ -1,11 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2, Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { Select } from '@/components/ui/select';
-import { buildDictationProviderIcons, DICTATION_AUTO_ICON_KEY } from './dictation-provider-icons';
 
 /**
  * Push-to-talk dictation for the chat composer.
@@ -25,49 +23,31 @@ import { buildDictationProviderIcons, DICTATION_AUTO_ICON_KEY } from './dictatio
  * Transcribed text is handed to the caller to APPEND, never sent on its
  * own. Dictation that auto-sends turns a misheard word into a message
  * the user never chose to write.
+ *
+ * WHICH provider transcribes is deliberately NOT chosen here. It used to
+ * be a picker in this toolbar, which put a provider-brand chip inches
+ * from the chat PROVIDER chip in the header — two controls that looked
+ * identical and meant completely different things, so "Mistral" beside
+ * the composer read as "Mistral is answering me" when it only meant
+ * "Mistral transcribes my voice". Swapping speech vendors is a rare,
+ * account-level decision, so it lives in Settings → Plugins → AI
+ * Providers, and this request omits `providerId` entirely: the server
+ * resolves the account's saved voice provider, then the scope-active
+ * plugin, then the platform default.
  */
 
 type State = 'idle' | 'recording' | 'transcribing';
 
-interface TranscriptionProvider {
-    readonly id: string;
-    readonly name: string;
-    readonly isActive: boolean;
-}
-
-/** Per-browser preference. The durable per-account choice is which
- *  plugin the account activates; this only overrides it for one user. */
-const PROVIDER_STORAGE_KEY = 'ever-works.dictation.providerId';
-
 export function ChatDictation({
     onText,
     disabled,
-    pickerOnly,
 }: {
     readonly onText: (text: string) => void;
     readonly disabled?: boolean;
-    /**
-     * Render the provider picker WITHOUT this component's own mic button.
-     *
-     * For composers that supply their own mic and drive a different engine
-     * behind it — the chat composer dictates through the Web Speech API
-     * where the browser has it. The choice made here is still remembered
-     * per browser, so it applies the moment the upload path is the one
-     * that runs.
-     */
-    readonly pickerOnly?: boolean;
 }) {
     const t = useTranslations('dashboard.aiChat.dictation');
     const [state, setState] = useState<State>('idle');
     const [unsupported, setUnsupported] = useState(false);
-    const [providers, setProviders] = useState<TranscriptionProvider[]>([]);
-    // The user's explicit pick. `null` means "no opinion", which is the
-    // meaningful default: the request omits providerId entirely and the
-    // server falls through to whichever plugin is activated for the
-    // scope. Sending the active provider's id explicitly would look
-    // identical but silently pin it, so an operator later switching the
-    // activated plugin would not reach this user.
-    const [providerId, setProviderId] = useState<string | null>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const streamRef = useRef<MediaStream | null>(null);
@@ -86,32 +66,6 @@ export function ChatDictation({
     // as the app still listening.
     useEffect(() => stopTracks, [stopTracks]);
 
-    useEffect(() => {
-        let cancelled = false;
-        void (async () => {
-            try {
-                const res = await fetch('/api/transcription/providers', {
-                    headers: { Accept: 'application/json' },
-                    cache: 'no-store',
-                });
-                if (!res.ok || cancelled) return;
-                const body = (await res.json()) as { providers?: TranscriptionProvider[] };
-                if (cancelled) return;
-                const list = body.providers ?? [];
-                setProviders(list);
-                // Restore a previous pick only if that plugin is still
-                // available — an operator may have disabled it since.
-                const stored = window.localStorage.getItem(PROVIDER_STORAGE_KEY);
-                if (stored && list.some((p) => p.id === stored)) setProviderId(stored);
-            } catch {
-                // No picker; dictation still works on the active plugin.
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
     const transcribe = useCallback(
         async (blob: Blob) => {
             const generation = generationRef.current;
@@ -119,7 +73,9 @@ export function ChatDictation({
             try {
                 const form = new FormData();
                 form.append('file', blob, 'dictation.webm');
-                if (providerId) form.append('providerId', providerId);
+                // No `providerId`: selection is the server's job now, and
+                // sending one from here would PIN it, silently outranking the
+                // account's own Settings choice.
                 const res = await fetch('/api/transcription', { method: 'POST', body: form });
                 if (res.status === 503) {
                     // No provider configured in this deployment — retire
@@ -138,7 +94,7 @@ export function ChatDictation({
                 setState('idle');
             }
         },
-        [onText, providerId],
+        [onText],
     );
 
     const start = useCallback(async () => {
@@ -206,12 +162,6 @@ export function ChatDictation({
         if (disabled && state !== 'idle') cancel();
     }, [disabled, state, cancel]);
 
-    // Built from the live list so a provider with no drawn brand mark still
-    // gets a monogram — `Select` skips the icon column entirely on a miss,
-    // which would leave that one row's label out of line with the others.
-    // Above the `unsupported` bail so the hook order never changes.
-    const providerIcons = useMemo(() => buildDictationProviderIcons(providers), [providers]);
-
     if (unsupported) return null;
 
     const label =
@@ -221,47 +171,8 @@ export function ChatDictation({
               ? t('transcribing')
               : t('start');
 
-    // Only offer a picker when there is something to pick BETWEEN.
-    // A select showing one option is pure noise in a composer toolbar.
-    const picker =
-        providers.length > 1 ? (
-            <Select
-                size="xs"
-                aria-label={t('provider')}
-                data-testid="chat-dictation-provider"
-                value={providerId ?? ''}
-                disabled={disabled || state !== 'idle'}
-                onValueChange={(value) => {
-                    const next = value || null;
-                    setProviderId(next);
-                    if (next) window.localStorage.setItem(PROVIDER_STORAGE_KEY, next);
-                    else window.localStorage.removeItem(PROVIDER_STORAGE_KEY);
-                }}
-                iconMap={providerIcons}
-                // `size="xs"` is the smallest the shared Select offers (h-8
-                // text-xs) and is set on its trigger, which `className` — the
-                // container — cannot reach. Reach the trigger directly so the
-                // picker matches the 10px composer hint beside it instead of
-                // towering over the 28px mic button.
-                className="w-28 shrink-0 [&>button]:h-7 [&>button]:text-[10px]"
-            >
-                {/* Empty value = defer to the activated plugin. */}
-                <option value="" data-icon={DICTATION_AUTO_ICON_KEY}>
-                    {t('providerAuto')}
-                </option>
-                {providers.map((p) => (
-                    <option key={p.id} value={p.id} data-icon={p.id}>
-                        {p.name}
-                    </option>
-                ))}
-            </Select>
-        ) : null;
-
-    if (pickerOnly) return picker;
-
     return (
         <>
-            {picker}
             <button
                 type="button"
                 aria-label={label}

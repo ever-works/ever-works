@@ -18,15 +18,16 @@ import { clearTaskRecurringAction, setTaskRecurringAction } from '@/app/actions/
  *
  *   - Inactive (`task.isRecurring=false`): "Make recurring" CTA
  *     opens a frequency picker (Daily / Weekly / Monthly / Custom
- *     RRULE) + optional end date / max occurrences.
+ *     RRULE / Cron) + optional end date / max occurrences.
  *   - Active: shows the current RRULE + nextOccurrenceAt + occurrence
  *     counter, with a "Stop recurring" button that demotes the
  *     template back to a plain Task.
  *
  * The picker emits an RRULE string per RFC 5545 (`FREQ=DAILY` /
- * `FREQ=WEEKLY` / `FREQ=MONTHLY` / custom). `TasksService.setRecurring`
- * validates the rule + computes the first `nextOccurrenceAt`; rules
- * with no future occurrences are rejected with a clear error.
+ * `FREQ=WEEKLY` / `FREQ=MONTHLY` / custom) or a 5-field cron
+ * expression. `TasksService.setRecurring` validates the rule + computes
+ * the first `nextOccurrenceAt`; rules with no future occurrences are
+ * rejected with a clear error.
  */
 
 /* The right rail is one visual system: every section is the same neutral
@@ -42,7 +43,7 @@ const FIELD_LABEL_CLASS = 'block text-[10px] uppercase tracking-wide text-text-m
 /** Pulls the shared `Input` down to the height/type scale of `Select size="xs"`. */
 const FIELD_CLASS = 'h-8 px-2 py-0 text-xs';
 
-type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
+type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM' | 'CRON';
 
 export function TaskRecurringSection({ task }: { task: Task }) {
     if (task.isRecurring) {
@@ -112,9 +113,11 @@ function ActivePanel({ task }: { task: Task }) {
                 {t('section')}
             </h2>
             <dl className="space-y-3">
-                <RecurrenceRow label={t('rule')}>
+                {/* Cron and RRULE are stored in separate columns (XOR), so the
+                    row names whichever dialect this template actually uses. */}
+                <RecurrenceRow label={task.recurrenceCron ? t('cron') : t('rule')}>
                     <span className="text-xs font-mono break-all text-text dark:text-text-dark">
-                        {task.recurrenceRule ?? '—'}
+                        {task.recurrenceCron ?? task.recurrenceRule ?? '—'}
                     </span>
                 </RecurrenceRow>
                 {task.recurrenceTimezone && (
@@ -195,6 +198,9 @@ function InactivePanel({ task }: { task: Task }) {
     const [open, setOpen] = useState(false);
     const [frequency, setFrequency] = useState<Frequency>('WEEKLY');
     const [customRule, setCustomRule] = useState('FREQ=WEEKLY;BYDAY=MO');
+    // Schedule-modes upgrade — cron cadence alternative (XOR with the
+    // RRULE server-side; this picker only ever sends one of the two).
+    const [cronExpr, setCronExpr] = useState('0 9 * * 1');
     const [endsAt, setEndsAt] = useState('');
     const [maxOccurrences, setMaxOccurrences] = useState('');
     // FU-7 — friendly RRULE controls. Defaults match the original
@@ -208,6 +214,7 @@ function InactivePanel({ task }: { task: Task }) {
     const [error, setError] = useState<string | null>(null);
 
     const ruleString = useMemo(() => {
+        if (frequency === 'CRON') return cronExpr.trim();
         if (frequency === 'CUSTOM') return customRule.trim();
         const parts: string[] = [`FREQ=${frequency}`];
         // Parse HH:MM → BYHOUR + BYMINUTE. Skip when blank.
@@ -225,12 +232,16 @@ function InactivePanel({ task }: { task: Task }) {
             parts.push(`BYMONTHDAY=${d}`);
         }
         return parts.join(';');
-    }, [frequency, customRule, timeOfDay, daysOfWeek, dayOfMonth]);
+    }, [frequency, customRule, cronExpr, timeOfDay, daysOfWeek, dayOfMonth]);
 
     const isValidRule = useMemo(() => {
         // Lightweight client-side check — fully validated server-side
-        // via the `rrule` package on `TasksService.setRecurring`.
+        // (RRULE via the `rrule` package, cron via parseCron) on
+        // `TasksService.setRecurring`.
         if (!ruleString) return false;
+        if (frequency === 'CRON') {
+            return ruleString.split(/\s+/).length === 5;
+        }
         if (!/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY|HOURLY|MINUTELY|SECONDLY)/.test(ruleString)) {
             return false;
         }
@@ -248,8 +259,10 @@ function InactivePanel({ task }: { task: Task }) {
         if (!isValidRule) {
             setError(
                 frequency === 'WEEKLY' && daysOfWeek.length === 0
-                    ? t('pickWeekday')
-                    : t('ruleRequired'),
+                    ? t('errorPickWeekday')
+                    : frequency === 'CRON'
+                      ? t('errorInvalidCron')
+                      : t('errorInvalidRule'),
             );
             return;
         }
@@ -257,9 +270,17 @@ function InactivePanel({ task }: { task: Task }) {
         startTransition(() => {
             void (async () => {
                 try {
+                    // XOR on the wire: the cron dialect goes in
+                    // `recurrenceCron`, everything else is an RRULE.
+                    // Sending both is a 400 by service validation.
                     await setTaskRecurringAction(task.id, {
-                        recurrenceRule: ruleString,
-                        recurrenceTimezone: timezone || undefined,
+                        recurrenceRule: frequency === 'CRON' ? undefined : ruleString,
+                        recurrenceCron: frequency === 'CRON' ? ruleString : undefined,
+                        // Cron expressions are evaluated in UTC by
+                        // `computeNextCronFire`; stamping the browser zone
+                        // would render a next-fire time in a zone the
+                        // dispatcher never used.
+                        recurrenceTimezone: frequency === 'CRON' ? 'UTC' : timezone || undefined,
                         recurrenceEndsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
                         recurrenceMaxOccurrences:
                             maxOccurrences.trim().length > 0
@@ -280,6 +301,7 @@ function InactivePanel({ task }: { task: Task }) {
         WEEKLY: t('weekly'),
         MONTHLY: t('monthly'),
         CUSTOM: t('custom'),
+        CRON: t('cron'),
     };
 
     if (!open) {
@@ -342,7 +364,29 @@ function InactivePanel({ task }: { task: Task }) {
                         />
                     </Field>
                 )}
-                {frequency !== 'CUSTOM' && (
+                {frequency === 'CRON' && (
+                    <Field
+                        htmlFor="task-recurring-cron"
+                        label={t('cron')}
+                        className="@md/main:col-span-2"
+                    >
+                        <Input
+                            id="task-recurring-cron"
+                            type="text"
+                            value={cronExpr}
+                            onChange={(e) => setCronExpr(e.target.value)}
+                            placeholder="0 9 * * 1"
+                            disabled={pending}
+                            variant="form"
+                            className={`${FIELD_CLASS} font-mono`}
+                            data-testid="task-recurring-cron"
+                        />
+                        <p className="mt-1 text-[10px] leading-relaxed text-text-muted dark:text-text-muted-dark">
+                            {t('cronHint')}
+                        </p>
+                    </Field>
+                )}
+                {frequency !== 'CUSTOM' && frequency !== 'CRON' && (
                     <Field htmlFor="task-recurring-time" label={t('timeOfDay')}>
                         <Input
                             id="task-recurring-time"
@@ -396,7 +440,7 @@ function InactivePanel({ task }: { task: Task }) {
                         />
                     </Field>
                 )}
-                {frequency !== 'CUSTOM' && (
+                {frequency !== 'CUSTOM' && frequency !== 'CRON' && (
                     <Field htmlFor="task-recurring-timezone" label={t('timezone')}>
                         <Input
                             id="task-recurring-timezone"
