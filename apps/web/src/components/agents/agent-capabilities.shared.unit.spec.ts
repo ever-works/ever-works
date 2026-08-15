@@ -4,7 +4,11 @@ import type {
     AgentStoredToolGrant,
     ToolGrantChainEntry,
 } from '@ever-works/contracts';
-import { composeGrantForToggle, toolToggleState } from './agent-capabilities.shared';
+import {
+    composeGrantForToggle,
+    repoIsReadOnly,
+    toolToggleState,
+} from './agent-capabilities.shared';
 
 /**
  * Capabilities tab — tool-switch policy.
@@ -231,5 +235,26 @@ describe('composeGrantForToggle', () => {
         composeGrantForToggle(tool(), stored, false);
         expect(stored.allow).toEqual(['createTask']);
         expect(stored.deny).toEqual(['x']);
+    });
+});
+
+describe('repoIsReadOnly', () => {
+    it('locks Work-derived rows — their attachment follows the Work', () => {
+        expect(repoIsReadOnly({ sourceType: 'work', readonly: false })).toBe(true);
+    });
+
+    it('locks rows the registry marks readonly whatever their source', () => {
+        expect(repoIsReadOnly({ sourceType: 'manual', readonly: true })).toBe(true);
+    });
+
+    /**
+     * The tempting `sourceType !== 'manual'` would silently lock every
+     * GitHub-App import — ordinary registry rows the user owns, still
+     * toggleable from the Settings card.
+     */
+    it('leaves manual AND github-app rows toggleable', () => {
+        expect(repoIsReadOnly({ sourceType: 'manual', readonly: false })).toBe(false);
+        expect(repoIsReadOnly({ sourceType: 'github-app', readonly: false })).toBe(false);
+        expect(repoIsReadOnly({ sourceType: 'github-app' })).toBe(false);
     });
 });
