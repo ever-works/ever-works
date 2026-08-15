@@ -85,6 +85,7 @@
             },
             "magicLink": {
                 "subtitle": "Nous vous enverrons un lien unique pour vous connecter. Aucun mot de passe requis.",
+                "worksWhenUnverified": "Opening the link proves you own the address, so this works even if you haven't confirmed your email yet.",
                 "form": {
                     "submit": "Envoyer le lien",
                     "submitting": "Envoi en cours..."
@@ -101,6 +102,7 @@
                     "title": "Connexion en cours",
                     "loading": "Vérification de votre lien...",
                     "errorTitle": "Ce lien ne peut pas être utilisé",
+                    "errorSubtitle": "We couldn't sign you in with that link.",
                     "errorBody": "Votre lien est invalide ou expiré. Les liens magiques sont à usage unique et restent valides pendant 15 minutes.",
                     "requestNewLink": "Envoyer un nouveau lien",
                     "missingToken": "Ce lien ne contient pas de jeton. Demandez-en un nouveau pour continuer."
@@ -613,6 +615,7 @@
             "emailVerification": {
                 "title": "Vérifiez votre email",
                 "description": "Nous avons envoyé un lien de vérification à votre adresse email. Veuillez vérifier votre boîte de réception et votre dossier spam.",
+                "pendingDescription": "You can keep using your account now, but you'll need to confirm this address before you can sign in again. We've emailed you a link — check your inbox and spam folder, or resend it from Profile settings.",
                 "action": "Renvoyer l'email"
             },
             "verified": {
