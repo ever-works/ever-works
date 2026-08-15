@@ -6,6 +6,7 @@ import { TasksTabsNav } from '@/components/tasks/TasksTabsNav';
 import { TaskTriggersClient } from '@/components/tasks/TaskTriggersClient';
 import { inboundTriggersAPI } from '@/lib/api/inbound-triggers';
 import { agentsAPI } from '@/lib/api/agents';
+import { resolvePublicApiBaseUrl } from '@/lib/fleet-flags';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.taskTriggers');
@@ -34,7 +35,11 @@ export default async function TaskTriggersPage() {
         <div className="w-full">
             <PageHeader icon={Zap} title={t('title')} subtitle={t('subtitle')} tone="task" />
             <TasksTabsNav active="triggers" />
-            <TaskTriggersClient initialTriggers={triggers} agents={agents} />
+            <TaskTriggersClient
+                initialTriggers={triggers}
+                agents={agents}
+                apiBaseUrl={resolvePublicApiBaseUrl()}
+            />
         </div>
     );
 }

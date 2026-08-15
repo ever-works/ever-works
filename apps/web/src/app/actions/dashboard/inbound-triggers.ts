@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation';
 import {
     inboundTriggersAPI,
     type CreateInboundTriggerInput,
+    type FireNowInboundTriggerResult,
+    type InboundTriggerFireView,
     type InboundTriggerView,
     type InboundTriggerWithSecret,
     type TestFireInboundTriggerResult,
@@ -31,6 +33,7 @@ async function requireAuth() {
 function revalidateTriggerSurfaces() {
     revalidatePath('/[locale]/(dashboard)/activity', 'page');
     revalidatePath('/[locale]/(dashboard)/tasks/triggers', 'page');
+    revalidatePath('/[locale]/(dashboard)/tasks/triggers/[id]', 'page');
 }
 
 type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
@@ -85,6 +88,35 @@ export async function testFireInboundTriggerAction(
         return { success: true, data };
     } catch (error) {
         return toError(error, 'Failed to test-fire trigger');
+    }
+}
+
+/**
+ * A REAL fire (counters bump, agent dispatched when autoStart is
+ * 'always') — distinct from `testFireInboundTriggerAction`, which only
+ * rehearses. Both trigger surfaces and the fire log are revalidated.
+ */
+export async function fireNowInboundTriggerAction(
+    id: string,
+): Promise<ActionResult<FireNowInboundTriggerResult>> {
+    await requireAuth();
+    try {
+        const data = await inboundTriggersAPI.fireNow(id);
+        revalidateTriggerSurfaces();
+        return { success: true, data };
+    } catch (error) {
+        return toError(error, 'Failed to fire trigger');
+    }
+}
+
+export async function listInboundTriggerFiresAction(
+    id: string,
+): Promise<ActionResult<InboundTriggerFireView[]>> {
+    await requireAuth();
+    try {
+        return { success: true, data: await inboundTriggersAPI.listFires(id) };
+    } catch (error) {
+        return toError(error, 'Failed to load recent fires');
     }
 }
 

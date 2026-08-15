@@ -22,6 +22,33 @@ export interface InboundTriggerEventMatcher {
     workId?: string;
 }
 
+/** What a fire produces — locked when the trigger is created. */
+export type InboundTriggerMode = 'single-task' | 'template';
+
+/** Whether the first Task of a fire is dispatched or parked in the backlog. */
+export type InboundTriggerAutoStart = 'always' | 'manual';
+
+/** One declared payload variable; `required` ones gate the fire. */
+export interface InboundTriggerVariable {
+    key: string;
+    label?: string;
+    required: boolean;
+}
+
+export type InboundTriggerFireOrigin = 'webhook' | 'event' | 'manual' | 'test';
+
+export type InboundTriggerFireStatus = 'running' | 'done' | 'failed' | 'refused';
+
+/** One row of a trigger's recent-fires log. */
+export interface InboundTriggerFireView {
+    id: string;
+    origin: InboundTriggerFireOrigin;
+    status: InboundTriggerFireStatus;
+    reason: string | null;
+    taskId: string | null;
+    firedAt: string;
+}
+
 export interface InboundTriggerView {
     id: string;
     name: string;
@@ -35,6 +62,14 @@ export interface InboundTriggerView {
     taskDescriptionTemplate: string | null;
     /** Reserved task-template linkage (slug) — resolved lazily at fire time. */
     taskTemplateSlug: string | null;
+    /** What a fire produces — locked at create time. */
+    mode: InboundTriggerMode;
+    /** 'single-task' instructions; the payload is appended in a <webhook_body> block. */
+    agentPrompt: string | null;
+    showOnBoard: boolean;
+    replayWindowSec: number;
+    autoStart: InboundTriggerAutoStart;
+    defaultVariables: InboundTriggerVariable[] | null;
     /** ISO 8601, or null when the trigger never fired. */
     lastFiredAt: string | null;
     fireCount: number;
@@ -54,6 +89,13 @@ export interface CreateInboundTriggerInput {
     taskTitleTemplate?: string;
     taskDescriptionTemplate?: string;
     taskTemplateSlug?: string;
+    /** Locked after create — omit to keep the 'single-task' default. */
+    mode?: InboundTriggerMode;
+    agentPrompt?: string;
+    showOnBoard?: boolean;
+    replayWindowSec?: number;
+    autoStart?: InboundTriggerAutoStart;
+    defaultVariables?: { key: string; label?: string; required?: boolean }[];
 }
 
 export interface UpdateInboundTriggerInput {
@@ -64,6 +106,12 @@ export interface UpdateInboundTriggerInput {
     taskTitleTemplate?: string | null;
     taskDescriptionTemplate?: string | null;
     taskTemplateSlug?: string | null;
+    agentPrompt?: string | null;
+    showOnBoard?: boolean;
+    replayWindowSec?: number;
+    autoStart?: InboundTriggerAutoStart;
+    defaultVariables?: { key: string; label?: string; required?: boolean }[] | null;
+    // `mode` is intentionally absent — the API rejects it (locked at create).
 }
 
 export interface TestFireInboundTriggerResult {
@@ -72,6 +120,9 @@ export interface TestFireInboundTriggerResult {
     taskSlug: string;
     taskTitle: string;
 }
+
+/** 'Fire now' — an owner-initiated REAL fire (counters bump, autoStart honoured). */
+export type FireNowInboundTriggerResult = TestFireInboundTriggerResult;
 
 /** The RAW signing secret is present ONLY in create + rotate responses. */
 export interface InboundTriggerWithSecret {
@@ -103,6 +154,23 @@ export const inboundTriggersAPI = {
         return serverFetch<TestFireInboundTriggerResult>(`/inbound-triggers/${id}/test-fire`, {
             method: 'POST',
         });
+    },
+
+    fireNow: async (id: string): Promise<FireNowInboundTriggerResult> => {
+        return serverFetch<FireNowInboundTriggerResult>(`/inbound-triggers/${id}/fire-now`, {
+            method: 'POST',
+        });
+    },
+
+    listFires: async (id: string): Promise<InboundTriggerFireView[]> => {
+        const res = await serverFetch<{ fires: InboundTriggerFireView[] }>(
+            `/inbound-triggers/${id}/fires`,
+        );
+        return res.fires;
+    },
+
+    getOne: async (id: string): Promise<InboundTriggerView> => {
+        return serverFetch<InboundTriggerView>(`/inbound-triggers/${id}`);
     },
 
     rotateSecret: async (id: string): Promise<InboundTriggerWithSecret> => {

@@ -678,7 +678,20 @@
                 "agentNone": "No agent",
                 "agentUnknown": "This agent is not in your current list — it may have been removed.",
                 "enabled": "Enabled",
-                "enabledHint": "Disabled triggers ignore events and reject webhook calls."
+                "enabledHint": "Disabled triggers ignore events and reject webhook calls.",
+                "mode": "Mode",
+                "modeImmutable": "The mode can't be changed after creation.",
+                "agentPrompt": "Agent instructions",
+                "agentPromptPlaceholder": "What should the agent do with each delivery?",
+                "agentPromptHint": "Instructions for the agent. The webhook body is appended in <webhook_body> tags.",
+                "variables": "Expected variables",
+                "variablesPlaceholder": "repo*\nbranch | Branch name",
+                "variablesHint": "One per line: key, or key* when required. A delivery missing a required key is refused. Add a label after |.",
+                "autoStart": "First task",
+                "replayWindow": "Replay window (seconds)",
+                "replayWindowHint": "Repeat deliveries inside this window are ignored.",
+                "showOnBoard": "Show on task board",
+                "showOnBoardHint": "The first task of each fire appears on the Kanban board."
             },
             "actions": {
                 "menu": "Trigger actions",
@@ -688,7 +701,8 @@
                 "delete": "Delete",
                 "cancel": "Cancel",
                 "create": "Create",
-                "save": "Save"
+                "save": "Save",
+                "fireNow": "Fire now"
             },
             "reveal": {
                 "title": "Trigger secret",
@@ -710,7 +724,45 @@
                 "rotated": "Secret rotated",
                 "rotateFailed": "Could not rotate the secret",
                 "testFired": "Test task created: {title}",
-                "testFireFailed": "Could not test-fire the trigger"
+                "testFireFailed": "Could not test-fire the trigger",
+                "fired": "Trigger fired: {title}",
+                "fireFailed": "Could not fire the trigger"
+            },
+            "autoStart": {
+                "always": "Start automatically",
+                "manual": "Leave in backlog"
+            },
+            "detail": {
+                "title": "Trigger",
+                "fireNow": "Fire now",
+                "pause": "Pause",
+                "resume": "Resume",
+                "fireSummary": "{count} fires · {mode} mode",
+                "webhookTitle": "Webhook",
+                "webhookUrl": "Webhook URL",
+                "copy": "Copy",
+                "copyFailed": "Could not copy to clipboard",
+                "curlTitle": "Signed curl example",
+                "copyCurl": "Copy example",
+                "curlHint": "The signed timestamp must be within {window} seconds.",
+                "rotate": "Rotate secret",
+                "rotateHint": "The current secret stops working after a 24-hour grace period.",
+                "rotateConfirm": "Rotate the signing secret? The old one keeps working for 24 hours, then stops.",
+                "secretWarning": "Copy the new secret now — you won't be able to see it again.",
+                "recentFires": "Recent fires",
+                "noFires": "This trigger hasn't fired yet.",
+                "fireStatus": {
+                    "running": "Running",
+                    "done": "Done",
+                    "failed": "Failed",
+                    "refused": "Refused"
+                },
+                "fireOrigin": {
+                    "webhook": "Webhook",
+                    "event": "Platform event",
+                    "manual": "Manual",
+                    "test": "Test"
+                }
             }
         },
         "title": "Dashboard",

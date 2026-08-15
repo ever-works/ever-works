@@ -10,6 +10,7 @@ import {
     Loader2,
     MoreHorizontal,
     Pencil,
+    Play,
     Plus,
     RefreshCw,
     Trash2,
@@ -35,8 +36,11 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 import {
     createInboundTriggerAction,
+    fireNowInboundTriggerAction,
     updateInboundTriggerAction,
     pauseInboundTriggerAction,
     resumeInboundTriggerAction,
@@ -46,8 +50,11 @@ import {
 } from '@/app/actions/dashboard/inbound-triggers';
 import type {
     CreateInboundTriggerInput,
+    InboundTriggerAutoStart,
     InboundTriggerEventMatcher,
+    InboundTriggerMode,
     InboundTriggerSourceType,
+    InboundTriggerVariable,
     InboundTriggerView,
     InboundTriggerWithSecret,
     UpdateInboundTriggerInput,
@@ -62,6 +69,13 @@ export interface AgentOption {
 interface TaskTriggersClientProps {
     initialTriggers: InboundTriggerView[];
     agents: AgentOption[];
+    /**
+     * Origin external senders POST to. Resolved server-side because the
+     * API is frequently NOT on the web app's own origin — deriving the
+     * webhook URL from `window.location` would hand the user a URL that
+     * 404s in every split-origin deployment.
+     */
+    apiBaseUrl: string;
 }
 
 interface TriggerFormState {
@@ -71,10 +85,17 @@ interface TriggerFormState {
     matcherSource: string;
     matcherKind: string;
     matcherWorkId: string;
+    mode: InboundTriggerMode;
+    agentPrompt: string;
     taskTitleTemplate: string;
     taskDescriptionTemplate: string;
     taskTemplateSlug: string;
     targetAgentId: string;
+    autoStart: InboundTriggerAutoStart;
+    showOnBoard: boolean;
+    replayWindowSec: number;
+    /** Free-text variable editor: one `key` or `key*` (required) per line. */
+    variables: string;
     enabled: boolean;
 }
 
@@ -85,12 +106,50 @@ const EMPTY_FORM: TriggerFormState = {
     matcherSource: '',
     matcherKind: '',
     matcherWorkId: '',
+    mode: 'single-task',
+    agentPrompt: '',
     taskTitleTemplate: '',
     taskDescriptionTemplate: '',
     taskTemplateSlug: '',
     targetAgentId: '',
+    autoStart: 'always',
+    showOnBoard: false,
+    replayWindowSec: 300,
+    variables: '',
     enabled: true,
 };
+
+/**
+ * Variable editor grammar: one entry per line, `key` (optional) or
+ * `key*` (required), with an optional ` | label` suffix. Kept textual on
+ * purpose — a row-builder UI for at most a handful of keys costs more
+ * than it earns, and this round-trips losslessly against
+ * `serializeVariables`.
+ */
+function parseVariables(text: string): { key: string; label?: string; required?: boolean }[] {
+    const parsed: { key: string; label?: string; required?: boolean }[] = [];
+    for (const rawLine of text.split('\n')) {
+        const line = rawLine.trim();
+        if (!line) continue;
+        const [rawKey, ...labelParts] = line.split('|');
+        let key = rawKey.trim();
+        const required = key.endsWith('*');
+        if (required) key = key.slice(0, -1).trim();
+        if (!key) continue;
+        const label = labelParts.join('|').trim();
+        const entry: { key: string; label?: string; required?: boolean } = { key, required };
+        if (label) entry.label = label;
+        parsed.push(entry);
+    }
+    return parsed;
+}
+
+function serializeVariables(variables: InboundTriggerVariable[] | null): string {
+    if (!variables || variables.length === 0) return '';
+    return variables
+        .map((v) => `${v.key}${v.required ? '*' : ''}${v.label ? ` | ${v.label}` : ''}`)
+        .join('\n');
+}
 
 function formToMatcher(form: TriggerFormState): InboundTriggerEventMatcher | undefined {
     if (form.sourceType !== 'event') return undefined;
@@ -109,22 +168,33 @@ function formFromTrigger(row: InboundTriggerView): TriggerFormState {
         matcherSource: row.eventMatcher?.source ?? '',
         matcherKind: row.eventMatcher?.kind ?? '',
         matcherWorkId: row.eventMatcher?.workId ?? '',
+        mode: row.mode,
+        agentPrompt: row.agentPrompt ?? '',
         taskTitleTemplate: row.taskTitleTemplate ?? '',
         taskDescriptionTemplate: row.taskDescriptionTemplate ?? '',
         taskTemplateSlug: row.taskTemplateSlug ?? '',
         targetAgentId: row.targetAgentId ?? '',
+        autoStart: row.autoStart,
+        showOnBoard: row.showOnBoard,
+        replayWindowSec: row.replayWindowSec,
+        variables: serializeVariables(row.defaultVariables),
         enabled: row.status === 'active',
     };
 }
 
 /**
  * Task Triggers — the Triggers tab on the Tasks surface. Rows per the
- * design: Name (+description), Mode badge (Template when a template
- * slug is linked, Task otherwise), Target, Enabled toggle, Last fired,
- * Fires count, and a row menu (test-fire / edit / rotate / delete).
- * The webhook secret is revealed exactly once after create/rotate.
+ * design: Name (links to the trigger detail page) + description, Mode
+ * badge (Template / Task, from the trigger's locked `mode`), Target,
+ * Enabled toggle, Last fired, Fires count, and a row menu (fire now /
+ * test-fire / edit / rotate / delete). The webhook secret is revealed
+ * exactly once after create/rotate.
  */
-export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClientProps) {
+export function TaskTriggersClient({
+    initialTriggers,
+    agents,
+    apiBaseUrl,
+}: TaskTriggersClientProps) {
     const t = useTranslations('dashboard.taskTriggers');
     const [triggers, setTriggers] = useState<InboundTriggerView[]>(initialTriggers);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -163,7 +233,12 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
         !form.matcherKind.trim() &&
         !form.matcherWorkId.trim();
 
-    const canSubmit = form.name.trim().length > 0 && !eventNeedsMatcher && !isSubmitting;
+    // Template mode is locked at create time and needs its slug up front —
+    // the API refuses the pair otherwise, so block the button instead.
+    const templateNeedsSlug = form.mode === 'template' && !form.taskTemplateSlug.trim();
+
+    const canSubmit =
+        form.name.trim().length > 0 && !eventNeedsMatcher && !templateNeedsSlug && !isSubmitting;
 
     const handleSubmit = async () => {
         if (!canSubmit) return;
@@ -176,15 +251,18 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                 taskDescriptionTemplate: form.taskDescriptionTemplate.trim() || null,
                 taskTemplateSlug: form.taskTemplateSlug.trim() || null,
                 targetAgentId: form.targetAgentId || null,
+                agentPrompt: form.agentPrompt.trim() || null,
+                autoStart: form.autoStart,
+                showOnBoard: form.showOnBoard,
+                replayWindowSec: form.replayWindowSec,
+                defaultVariables: parseVariables(form.variables),
             };
             const matcher = formToMatcher(form);
             if (editing.sourceType === 'event' && matcher) input.eventMatcher = matcher;
             const res = await updateInboundTriggerAction(editing.id, input);
             setIsSubmitting(false);
             if (res.success) {
-                setTriggers((prev) =>
-                    prev.map((row) => (row.id === editing.id ? res.data : row)),
-                );
+                setTriggers((prev) => prev.map((row) => (row.id === editing.id ? res.data : row)));
                 setDialogOpen(false);
                 toast.success(t('toast.updated'));
             } else {
@@ -196,7 +274,14 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
         const input: CreateInboundTriggerInput = {
             name: form.name.trim(),
             sourceType: form.sourceType,
+            mode: form.mode,
+            autoStart: form.autoStart,
+            showOnBoard: form.showOnBoard,
+            replayWindowSec: form.replayWindowSec,
         };
+        const variables = parseVariables(form.variables);
+        if (variables.length > 0) input.defaultVariables = variables;
+        if (form.agentPrompt.trim()) input.agentPrompt = form.agentPrompt.trim();
         if (form.description.trim()) input.description = form.description.trim();
         if (form.taskTitleTemplate.trim()) input.taskTitleTemplate = form.taskTitleTemplate.trim();
         if (form.taskDescriptionTemplate.trim()) {
@@ -256,6 +341,30 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
         }
     };
 
+    const handleFireNow = async (row: InboundTriggerView) => {
+        if (busyId) return;
+        setBusyId(row.id);
+        const res = await fireNowInboundTriggerAction(row.id);
+        setBusyId(null);
+        if (res.success) {
+            // A real fire moved the counters — reflect them without a reload.
+            setTriggers((prev) =>
+                prev.map((r) =>
+                    r.id === row.id
+                        ? {
+                              ...r,
+                              fireCount: r.fireCount + 1,
+                              lastFiredAt: new Date().toISOString(),
+                          }
+                        : r,
+                ),
+            );
+            toast.success(t('toast.fired', { title: res.data.taskTitle }));
+        } else {
+            toast.error(res.error || t('toast.fireFailed'));
+        }
+    };
+
     const handleRotate = async (row: InboundTriggerView) => {
         if (busyId) return;
         setBusyId(row.id);
@@ -289,9 +398,7 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
     return (
         <div data-testid="task-triggers">
             <div className="mb-4 flex items-center justify-between gap-3">
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {t('lead')}
-                </p>
+                <p className="text-xs text-text-muted dark:text-text-muted-dark">{t('lead')}</p>
                 <Button size="sm" onClick={openCreate} data-testid="task-triggers-new">
                     <Plus className="mr-1 h-4 w-4" />
                     {t('new')}
@@ -334,9 +441,13 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                                             ) : (
                                                 <Webhook className="h-3.5 w-3.5 shrink-0 text-text-muted dark:text-text-muted-dark" />
                                             )}
-                                            <span className="font-medium text-text dark:text-text-dark">
+                                            <Link
+                                                href={ROUTES.DASHBOARD_TASK_TRIGGER(row.id)}
+                                                className="font-medium text-text hover:underline dark:text-text-dark"
+                                                data-testid={`task-trigger-link-${row.id}`}
+                                            >
                                                 {row.name}
-                                            </span>
+                                            </Link>
                                         </div>
                                         {row.description ? (
                                             <p className="mt-0.5 max-w-72 truncate text-xs text-text-muted dark:text-text-muted-dark">
@@ -347,12 +458,12 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                                     <td className="px-4 py-3">
                                         <span
                                             className={`rounded-full px-2 py-0.5 text-xs ${
-                                                row.taskTemplateSlug
+                                                row.mode === 'template'
                                                     ? 'bg-primary-500/10 text-primary-600 dark:text-primary-400'
                                                     : 'bg-surface-secondary text-text-secondary dark:bg-surface-secondary-dark dark:text-text-secondary-dark'
                                             }`}
                                         >
-                                            {row.taskTemplateSlug
+                                            {row.mode === 'template'
                                                 ? t('mode.template')
                                                 : t('mode.task')}
                                         </span>
@@ -400,6 +511,12 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuItem
+                                                    onClick={() => handleFireNow(row)}
+                                                >
+                                                    <Play className="mr-2 h-4 w-4" />
+                                                    {t('actions.fireNow')}
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
                                                     onClick={() => handleTestFire(row)}
                                                 >
                                                     <FlaskConical className="mr-2 h-4 w-4" />
@@ -418,9 +535,7 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                                                     </DropdownMenuItem>
                                                 ) : null}
                                                 <DropdownMenuSeparator />
-                                                <DropdownMenuItem
-                                                    onClick={() => handleDelete(row)}
-                                                >
+                                                <DropdownMenuItem onClick={() => handleDelete(row)}>
                                                     <Trash2 className="mr-2 h-4 w-4 text-danger" />
                                                     {t('actions.delete')}
                                                 </DropdownMenuItem>
@@ -508,9 +623,7 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                                 <div className="grid gap-2 sm:grid-cols-2">
                                     <Input
                                         value={form.matcherSource}
-                                        onChange={(e) =>
-                                            patch({ matcherSource: e.target.value })
-                                        }
+                                        onChange={(e) => patch({ matcherSource: e.target.value })}
                                         maxLength={100}
                                         placeholder={t('form.matcherSourcePlaceholder')}
                                         data-testid="task-trigger-form-matcher-source"
@@ -537,6 +650,46 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                         ) : null}
                         <div>
                             <label className="mb-1 block text-sm font-medium text-text-primary dark:text-text-primary-dark">
+                                {t('form.mode')}
+                            </label>
+                            {editing ? (
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {form.mode === 'template' ? t('mode.template') : t('mode.task')}{' '}
+                                    · {t('form.modeImmutable')}
+                                </p>
+                            ) : (
+                                <Select
+                                    value={form.mode}
+                                    onValueChange={(value) =>
+                                        patch({ mode: value as InboundTriggerMode })
+                                    }
+                                    data-testid="task-trigger-form-mode"
+                                >
+                                    <option value="single-task">{t('mode.task')}</option>
+                                    <option value="template">{t('mode.template')}</option>
+                                </Select>
+                            )}
+                        </div>
+                        {form.mode === 'single-task' ? (
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-text-primary dark:text-text-primary-dark">
+                                    {t('form.agentPrompt')}
+                                </label>
+                                <Textarea
+                                    value={form.agentPrompt}
+                                    onChange={(e) => patch({ agentPrompt: e.target.value })}
+                                    maxLength={8000}
+                                    rows={4}
+                                    placeholder={t('form.agentPromptPlaceholder')}
+                                    data-testid="task-trigger-form-prompt"
+                                />
+                                <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('form.agentPromptHint')}
+                                </p>
+                            </div>
+                        ) : null}
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-text-primary dark:text-text-primary-dark">
                                 {t('form.taskTitle')}
                             </label>
                             <Input
@@ -555,9 +708,7 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                             </label>
                             <Textarea
                                 value={form.taskDescriptionTemplate}
-                                onChange={(e) =>
-                                    patch({ taskDescriptionTemplate: e.target.value })
-                                }
+                                onChange={(e) => patch({ taskDescriptionTemplate: e.target.value })}
                                 maxLength={4000}
                                 rows={3}
                                 placeholder={t('form.taskDescriptionPlaceholder')}
@@ -594,13 +745,71 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                                     </option>
                                 ))}
                             </Select>
-                            {form.targetAgentId &&
-                            !agentNames.has(form.targetAgentId) ? (
+                            {form.targetAgentId && !agentNames.has(form.targetAgentId) ? (
                                 <p className="mt-1 text-xs text-warning">
                                     {t('form.agentUnknown')}
                                 </p>
                             ) : null}
                         </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-medium text-text-primary dark:text-text-primary-dark">
+                                {t('form.variables')}
+                            </label>
+                            <Textarea
+                                value={form.variables}
+                                onChange={(e) => patch({ variables: e.target.value })}
+                                rows={3}
+                                placeholder={t('form.variablesPlaceholder')}
+                                data-testid="task-trigger-form-variables"
+                            />
+                            <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('form.variablesHint')}
+                            </p>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-text-primary dark:text-text-primary-dark">
+                                    {t('form.autoStart')}
+                                </label>
+                                <Select
+                                    value={form.autoStart}
+                                    onValueChange={(value) =>
+                                        patch({ autoStart: value as InboundTriggerAutoStart })
+                                    }
+                                    data-testid="task-trigger-form-autostart"
+                                >
+                                    <option value="always">{t('autoStart.always')}</option>
+                                    <option value="manual">{t('autoStart.manual')}</option>
+                                </Select>
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-sm font-medium text-text-primary dark:text-text-primary-dark">
+                                    {t('form.replayWindow')}
+                                </label>
+                                <Input
+                                    type="number"
+                                    min={10}
+                                    max={86400}
+                                    value={String(form.replayWindowSec)}
+                                    onChange={(e) =>
+                                        patch({
+                                            replayWindowSec: Number(e.target.value) || 300,
+                                        })
+                                    }
+                                    data-testid="task-trigger-form-replay-window"
+                                />
+                                <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('form.replayWindowHint')}
+                                </p>
+                            </div>
+                        </div>
+                        <Switch
+                            checked={form.showOnBoard}
+                            onChange={(checked) => patch({ showOnBoard: checked })}
+                            label={t('form.showOnBoard')}
+                            helperText={t('form.showOnBoardHint')}
+                            data-testid="task-trigger-form-show-on-board"
+                        />
                         {!editing ? (
                             <Switch
                                 checked={form.enabled}
@@ -633,25 +842,29 @@ export function TaskTriggersClient({ initialTriggers, agents }: TaskTriggersClie
                 </DialogContent>
             </Dialog>
 
-            <TriggerSecretReveal reveal={reveal} onClose={() => setReveal(null)} />
+            <TriggerSecretReveal
+                reveal={reveal}
+                apiBaseUrl={apiBaseUrl}
+                onClose={() => setReveal(null)}
+            />
         </div>
     );
 }
 
 interface TriggerSecretRevealProps {
     reveal: InboundTriggerWithSecret | null;
+    apiBaseUrl: string;
     onClose: () => void;
 }
 
 /** One-time signed-URL + secret reveal after webhook create / rotate. */
-function TriggerSecretReveal({ reveal, onClose }: TriggerSecretRevealProps) {
+function TriggerSecretReveal({ reveal, apiBaseUrl, onClose }: TriggerSecretRevealProps) {
     const t = useTranslations('dashboard.taskTriggers.reveal');
     const [copied, setCopied] = useState<string | null>(null);
 
     if (!reveal) return null;
 
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const url = `${origin}/api/inbound-triggers/${reveal.trigger.id}/fire`;
+    const url = `${apiBaseUrl}/api/inbound-triggers/${reveal.trigger.id}/fire`;
 
     const copy = async (value: string, key: string) => {
         try {
