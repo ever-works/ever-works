@@ -171,6 +171,18 @@ describe('MemoryFilesController', () => {
             expect(result.folderId).toBe('f-1');
         });
 
+        it('reports the file as unfiled when the folder link could not be written', async () => {
+            // `UploadsService` records the ownership row best-effort, so a
+            // swallowed failure there leaves nothing to file. Echoing the
+            // requested folder here would tell the client the file is in a
+            // folder it is not in (and not in the Files area at all).
+            userUploads.setFolderBySha256.mockResolvedValue(false);
+
+            const result = await controller.upload(auth, file, { folderId: 'f-1' });
+
+            expect(result.folderId).toBeNull();
+        });
+
         it('leaves an upload unfiled when no folder is given', async () => {
             const result = await controller.upload(auth, file, {});
 

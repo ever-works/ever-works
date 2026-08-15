@@ -7,6 +7,7 @@ import {
     Header,
     HttpCode,
     HttpStatus,
+    Logger,
     NotFoundException,
     Param,
     ParseUUIDPipe,
@@ -80,6 +81,8 @@ const ACTIVE_MIMES = new Set([
 @ApiBearerAuth('JWT-auth')
 @Controller('api/memory/files')
 export class MemoryFilesController {
+    private readonly logger = new Logger(MemoryFilesController.name);
+
     constructor(
         private readonly foldersService: MemoryFoldersService,
         private readonly filesService: MemoryFilesService,
@@ -149,10 +152,29 @@ export class MemoryFilesController {
             await this.foldersService.requireOwned(auth.userId, body.folderId);
         }
         const result = await this.uploads.saveFile(auth.userId, file);
+        // `UploadsService` records the `user_uploads` ownership row on a
+        // best-effort path (it swallows its own failures), so the filing
+        // update can legitimately match zero rows. Report what actually
+        // happened instead of echoing the requested folder: a response
+        // claiming `folderId` for a file that is not in the folder — and
+        // not in the Files area at all — is indistinguishable from
+        // success to every client.
+        let filedInto: string | null = null;
         if (body.folderId) {
-            await this.userUploads.setFolderBySha256(auth.userId, result.hash, body.folderId);
+            const filed = await this.userUploads.setFolderBySha256(
+                auth.userId,
+                result.hash,
+                body.folderId,
+            );
+            if (filed) {
+                filedInto = body.folderId;
+            } else {
+                this.logger.warn(
+                    `Upload ${result.hash.slice(0, 12)}… could not be filed into folder ${body.folderId}: no upload row to update`,
+                );
+            }
         }
-        return { ...result, folderId: body.folderId ?? null };
+        return { ...result, folderId: filedInto };
     }
 
     @Post('folders')
