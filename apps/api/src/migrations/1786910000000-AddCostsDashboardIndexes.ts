@@ -26,8 +26,8 @@ import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
  * a re-run on a partially-migrated database is a no-op rather than an
  * abort.
  */
-export class AddCostsDashboardIndexes1785010000000 implements MigrationInterface {
-    name = 'AddCostsDashboardIndexes1785010000000';
+export class AddCostsDashboardIndexes1786910000000 implements MigrationInterface {
+    name = 'AddCostsDashboardIndexes1786910000000';
 
     private static readonly INDEXES: ReadonlyArray<{
         table: string;
@@ -52,7 +52,7 @@ export class AddCostsDashboardIndexes1785010000000 implements MigrationInterface
     ];
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        for (const index of AddCostsDashboardIndexes1785010000000.INDEXES) {
+        for (const index of AddCostsDashboardIndexes1786910000000.INDEXES) {
             if (!(await queryRunner.hasTable(index.table))) {
                 continue;
             }
@@ -68,7 +68,7 @@ export class AddCostsDashboardIndexes1785010000000 implements MigrationInterface
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        for (const index of AddCostsDashboardIndexes1785010000000.INDEXES) {
+        for (const index of AddCostsDashboardIndexes1786910000000.INDEXES) {
             if (!(await queryRunner.hasTable(index.table))) {
                 continue;
             }

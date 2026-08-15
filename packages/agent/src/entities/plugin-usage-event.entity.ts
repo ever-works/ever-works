@@ -52,7 +52,7 @@ export enum PluginUsageCapability {
 // group one user's events inside a date window. `(userId, occurredAt)`
 // above narrows the window; leading with the grouping column lets the
 // planner satisfy the GROUP BY from the index instead of sorting the
-// window. Migration: `AddCostsDashboardIndexes1785010000000`.
+// window. Migration: `AddCostsDashboardIndexes1786910000000`.
 @Index('idx_plugin_usage_events_user_agent_occurred', ['userId', 'agentId', 'occurredAt'])
 @Index('idx_plugin_usage_events_user_model_occurred', ['userId', 'modelId', 'occurredAt'])
 @Entity({ name: 'plugin_usage_events' })

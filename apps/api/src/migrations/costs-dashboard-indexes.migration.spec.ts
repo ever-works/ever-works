@@ -1,5 +1,5 @@
 import { DataSource, Table } from 'typeorm';
-import { AddCostsDashboardIndexes1785010000000 } from './1785010000000-AddCostsDashboardIndexes';
+import { AddCostsDashboardIndexes1786910000000 } from './1786910000000-AddCostsDashboardIndexes';
 
 /**
  * Executes the Costs-dashboard index migration against a real
@@ -16,7 +16,7 @@ import { AddCostsDashboardIndexes1785010000000 } from './1785010000000-AddCostsD
  * better-sqlite3 is what CI and the e2e stack run, so a Postgres-only
  * construct in the migration would fail here.
  */
-describe('AddCostsDashboardIndexes1785010000000', () => {
+describe('AddCostsDashboardIndexes1786910000000', () => {
     let dataSource: DataSource;
 
     const EXPECTED = [
@@ -79,7 +79,7 @@ describe('AddCostsDashboardIndexes1785010000000', () => {
     it('creates all three indexes on the expected columns', async () => {
         await createTables();
         const runner = dataSource.createQueryRunner();
-        await new AddCostsDashboardIndexes1785010000000().up(runner);
+        await new AddCostsDashboardIndexes1786910000000().up(runner);
 
         const usageIndexes = await runner.getTable('plugin_usage_events');
         const runIndexes = await runner.getTable('agent_runs');
@@ -101,7 +101,7 @@ describe('AddCostsDashboardIndexes1785010000000', () => {
 
     it('is idempotent — a second `up` is a no-op, not a duplicate-name error', async () => {
         await createTables();
-        const migration = new AddCostsDashboardIndexes1785010000000();
+        const migration = new AddCostsDashboardIndexes1786910000000();
 
         const first = dataSource.createQueryRunner();
         await migration.up(first);
@@ -121,14 +121,14 @@ describe('AddCostsDashboardIndexes1785010000000', () => {
         // No `createTables()` — a fresh database mid-bootstrap.
         const runner = dataSource.createQueryRunner();
         await expect(
-            new AddCostsDashboardIndexes1785010000000().up(runner),
+            new AddCostsDashboardIndexes1786910000000().up(runner),
         ).resolves.toBeUndefined();
         await runner.release();
     });
 
     it('down removes exactly what up added, and tolerates a missing index', async () => {
         await createTables();
-        const migration = new AddCostsDashboardIndexes1785010000000();
+        const migration = new AddCostsDashboardIndexes1786910000000();
 
         const up = dataSource.createQueryRunner();
         await migration.up(up);

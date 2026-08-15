@@ -62,7 +62,7 @@ So the column is absent from the API and the UI, and the UI states why
 | `plugin_usage_events` | `idx_plugin_usage_events_user_model_occurred (userId, modelId, occurredAt)` | per-model rollup                                                                                                     |
 | `agent_runs`          | `idx_agent_runs_user_created (userId, createdAt)`                           | run counts, top-runs — `agent_runs` had **no** user-keyed index at all, so `listSessionsForUser` was a full scan too |
 
-Migration: `apps/api/src/migrations/1785010000000-AddCostsDashboardIndexes.ts`
+Migration: `apps/api/src/migrations/1786910000000-AddCostsDashboardIndexes.ts`
 (portable `TableIndex` DDL, idempotent in both directions, skips tables that do
 not exist yet). Matching `@Index()` declarations were added to
 `plugin-usage-event.entity.ts` and `agent-run.entity.ts`.

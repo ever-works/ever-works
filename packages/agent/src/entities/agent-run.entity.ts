@@ -50,7 +50,7 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 // cost" aggregations both scan one user's runs inside a date window.
 // Before this index the only user-keyed access path was a full scan;
 // `listSessionsForUser` filters on the same leading column.
-// Migration: `AddCostsDashboardIndexes1785010000000`.
+// Migration: `AddCostsDashboardIndexes1786910000000`.
 @Index('idx_agent_runs_user_created', ['userId', 'createdAt'])
 export class AgentRun {
     @PrimaryGeneratedColumn('uuid')
