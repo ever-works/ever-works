@@ -6,11 +6,7 @@ export * from './skill-files.service';
 export * from './skill-invocation';
 export { Skill, type SkillOwnerType, type SkillFrontmatter } from '../entities/skill.entity';
 export { SkillBinding, type SkillBindingTargetType } from '../entities/skill-binding.entity';
-export {
-    SkillFile,
-    SKILL_FILE_KINDS,
-    type SkillFileKind,
-} from '../entities/skill-file.entity';
+export { SkillFile, SKILL_FILE_KINDS, type SkillFileKind } from '../entities/skill-file.entity';
 export { SkillRepository, type ListSkillsFilter } from '../database/repositories/skill.repository';
 export { SkillFileRepository } from '../database/repositories/skill-file.repository';
 export {

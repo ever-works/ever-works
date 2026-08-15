@@ -158,7 +158,13 @@ export class AgentsSkillsTasksImportService {
                         }
                     }
                     if (skill.files?.length) {
-                        await this.restoreSkillFiles(userId, created.id, skill.slug, skill.files, summary);
+                        await this.restoreSkillFiles(
+                            userId,
+                            created.id,
+                            skill.slug,
+                            skill.files,
+                            summary,
+                        );
                     }
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err);

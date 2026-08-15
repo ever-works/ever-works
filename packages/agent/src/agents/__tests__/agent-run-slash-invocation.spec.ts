@@ -171,7 +171,7 @@ describe('AgentRunService — slash invocation (invocation slugs)', () => {
         );
     });
 
-    it('attaches the invoked skill\'s file manifest when it carries files', async () => {
+    it("attaches the invoked skill's file manifest when it carries files", async () => {
         skillFiles.findBySkillIds.mockResolvedValue([
             { skillId: 'sk-plan', filename: 'template.md', kind: 'reference', sizeBytes: 512 },
         ]);

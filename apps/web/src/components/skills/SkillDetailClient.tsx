@@ -317,13 +317,7 @@ const KIND_BADGE_CLASS: Record<SkillFileKind, string> = {
  * the `/api/skills/:id/files` proxy route; the kind defaults by
  * extension and can be overridden with the picker before upload.
  */
-function FilesSection({
-    skillId,
-    initialFiles,
-}: {
-    skillId: string;
-    initialFiles: SkillFile[];
-}) {
+function FilesSection({ skillId, initialFiles }: { skillId: string; initialFiles: SkillFile[] }) {
     const t = useTranslations('dashboard.skillsPage.detail.files');
     const [files, setFiles] = useState(initialFiles);
     const [kindOverride, setKindOverride] = useState<'' | SkillFileKind>('');
@@ -354,9 +348,7 @@ function FilesSection({
                     | null;
                 if (!res.ok) {
                     const message =
-                        body && typeof body.message === 'string'
-                            ? body.message
-                            : t('uploadFailed');
+                        body && typeof body.message === 'string' ? body.message : t('uploadFailed');
                     throw new Error(message);
                 }
                 setFiles((prev) => [...prev, body as SkillFile]);

@@ -125,7 +125,9 @@ export class SkillsController {
     // NOTE: declared BEFORE `:id` so the literal segment wins route
     // matching (`:id` runs ParseUUIDPipe and would 400 on "invocable").
     @Get('invocable')
-    @ApiOperation({ summary: 'List my skills that carry an invocation slug (composer autocomplete).' })
+    @ApiOperation({
+        summary: 'List my skills that carry an invocation slug (composer autocomplete).',
+    })
     @HttpCode(HttpStatus.OK)
     async invocable(@CurrentUser() auth: AuthenticatedUser) {
         const rows = await this.service.listInvocable(auth.userId);
@@ -304,7 +306,7 @@ export class SkillsController {
     }
 
     @Get(':id/files')
-    @ApiOperation({ summary: 'List a Skill\'s companion files.' })
+    @ApiOperation({ summary: "List a Skill's companion files." })
     @HttpCode(HttpStatus.OK)
     async listFiles(
         @CurrentUser() auth: AuthenticatedUser,
@@ -315,7 +317,7 @@ export class SkillsController {
 
     @Get(':id/files/:fileId/content')
     @ApiOperation({
-        summary: 'Fetch a text companion file\'s content (owner-gated; binary files are refused).',
+        summary: "Fetch a text companion file's content (owner-gated; binary files are refused).",
     })
     @HttpCode(HttpStatus.OK)
     @Header('Content-Type', 'text/plain; charset=utf-8')
@@ -346,7 +348,9 @@ export class SkillsController {
     }
 
     @Delete(':id/files/:fileId')
-    @ApiOperation({ summary: 'Remove a companion file from a Skill (bytes stay in the uploads spine).' })
+    @ApiOperation({
+        summary: 'Remove a companion file from a Skill (bytes stay in the uploads spine).',
+    })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async removeFile(

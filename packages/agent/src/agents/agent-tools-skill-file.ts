@@ -35,7 +35,9 @@ export interface SkillFileContentReadInput {
  * an upload the user owns, or a structured error.
  */
 export interface SkillFileContentReader {
-    readTextContent(input: SkillFileContentReadInput): Promise<{ content: string } | { error: string }>;
+    readTextContent(
+        input: SkillFileContentReadInput,
+    ): Promise<{ content: string } | { error: string }>;
 }
 
 export interface GetSkillFileToolArgs {

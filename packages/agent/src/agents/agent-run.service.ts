@@ -1703,7 +1703,10 @@ export class AgentRunService {
         // Skill files feature — attach the per-skill companion-file
         // manifest (one batched query). Best-effort: a failed lookup
         // degrades to "no manifest", never to a failed run.
-        let filesBySkillId = new Map<string, Array<{ filename: string; kind: string; sizeBytes: number }>>();
+        let filesBySkillId = new Map<
+            string,
+            Array<{ filename: string; kind: string; sizeBytes: number }>
+        >();
         if (this.skillFiles && active.length > 0) {
             try {
                 const fileRows = await this.skillFiles.findBySkillIds(

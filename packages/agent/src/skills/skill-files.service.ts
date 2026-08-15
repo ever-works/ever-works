@@ -100,9 +100,7 @@ export class SkillFilesService {
             throw new BadRequestException('filename must be a plain name without path segments.');
         }
         if (input.kind !== undefined && !SKILL_FILE_KINDS.includes(input.kind)) {
-            throw new BadRequestException(
-                `kind must be one of: ${SKILL_FILE_KINDS.join(', ')}.`,
-            );
+            throw new BadRequestException(`kind must be one of: ${SKILL_FILE_KINDS.join(', ')}.`);
         }
         if (!Number.isFinite(input.sizeBytes) || input.sizeBytes <= 0) {
             throw new BadRequestException('sizeBytes must be a positive integer.');
@@ -120,15 +118,9 @@ export class SkillFilesService {
             );
         }
 
-        const duplicate = await this.files.findBySkillAndFilename(
-            input.skillId,
-            filename,
-            userId,
-        );
+        const duplicate = await this.files.findBySkillAndFilename(input.skillId, filename, userId);
         if (duplicate) {
-            throw new ConflictException(
-                `A file named "${filename}" already exists on this skill.`,
-            );
+            throw new ConflictException(`A file named "${filename}" already exists on this skill.`);
         }
 
         // Same scanner the skill BODY writes run — a companion file is

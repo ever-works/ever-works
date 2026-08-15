@@ -22,9 +22,7 @@ describe('AddSkillInvocationSlugAndSkillFiles1785010000000', () => {
             synchronize: false,
         });
         await dataSource.initialize();
-        await dataSource.query(
-            `CREATE TABLE "users" ("id" varchar PRIMARY KEY NOT NULL)`,
-        );
+        await dataSource.query(`CREATE TABLE "users" ("id" varchar PRIMARY KEY NOT NULL)`);
         await dataSource.query(
             `CREATE TABLE "skills" ("id" varchar PRIMARY KEY NOT NULL, "userId" varchar NOT NULL, "slug" varchar NOT NULL)`,
         );

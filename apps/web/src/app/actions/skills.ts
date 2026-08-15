@@ -72,7 +72,12 @@ export async function updateSkillAction(
     body: Partial<
         Pick<
             Skill,
-            'title' | 'description' | 'instructionsMd' | 'frontmatter' | 'version' | 'invocationSlug'
+            | 'title'
+            | 'description'
+            | 'instructionsMd'
+            | 'frontmatter'
+            | 'version'
+            | 'invocationSlug'
         >
     >,
 ): Promise<Skill> {

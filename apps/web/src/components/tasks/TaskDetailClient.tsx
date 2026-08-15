@@ -29,10 +29,7 @@ import { AgentSelect } from './AgentSelect';
 // messages run through `AgentRunService` with kind='chat', which is
 // where a leading `/<invocation-slug>` is resolved server-side; the
 // popup is the discovery affordance for it.
-import {
-    SlashCommandPopup,
-    useSlashCommands,
-} from '@/components/skills/SlashCommandAutocomplete';
+import { SlashCommandPopup, useSlashCommands } from '@/components/skills/SlashCommandAutocomplete';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.

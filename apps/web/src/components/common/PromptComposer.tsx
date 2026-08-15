@@ -26,10 +26,7 @@ import {
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils/cn';
 import { uploadFile, UploadError } from '@/lib/api/uploads';
-import {
-    SlashCommandPopup,
-    useSlashCommands,
-} from '@/components/skills/SlashCommandAutocomplete';
+import { SlashCommandPopup, useSlashCommands } from '@/components/skills/SlashCommandAutocomplete';
 import { AttachmentStrip } from './composer/AttachmentStrip';
 import { AttachmentPreview } from './composer/AttachmentPreview';
 import { VoiceBar } from './composer/VoiceBar';

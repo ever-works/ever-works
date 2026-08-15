@@ -88,7 +88,10 @@ export class SkillRepository {
     }
 
     /** The user's skill carrying this invocation slug, else null. */
-    async findByUserAndInvocationSlug(userId: string, invocationSlug: string): Promise<Skill | null> {
+    async findByUserAndInvocationSlug(
+        userId: string,
+        invocationSlug: string,
+    ): Promise<Skill | null> {
         return this.repository.findOne({ where: { userId, invocationSlug } });
     }
 

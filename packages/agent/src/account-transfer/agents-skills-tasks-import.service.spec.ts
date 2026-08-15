@@ -297,7 +297,11 @@ describe('AgentsSkillsTasksImportService — skill invocationSlug + files round-
 
     it('pre-feature payloads (no invocationSlug, no files) import untouched', async () => {
         const { svc, skillsService, skillFilesService } = makeSvc();
-        const summary = await svc.importTail('u1', { skills: [skillEntry()] }, { importSkills: true });
+        const summary = await svc.importTail(
+            'u1',
+            { skills: [skillEntry()] },
+            { importSkills: true },
+        );
         expect(summary.skills.imported).toBe(1);
         expect(skillsService.update).not.toHaveBeenCalled();
         expect(skillFilesService.add).not.toHaveBeenCalled();

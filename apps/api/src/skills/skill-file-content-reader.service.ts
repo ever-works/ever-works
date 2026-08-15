@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { UserUploadRepository } from '@ever-works/agent/database';
-import type {
-    SkillFileContentReadInput,
-    SkillFileContentReader,
-} from '@ever-works/agent/agents';
+import type { SkillFileContentReadInput, SkillFileContentReader } from '@ever-works/agent/agents';
 import { MAX_SKILL_FILE_BYTES } from '@ever-works/agent/skills';
 import { UploadsService } from '../uploads/uploads.service';
 

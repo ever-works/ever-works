@@ -143,7 +143,8 @@ export class CreateSkillDto {
     version?: string;
 
     @ApiPropertyOptional({
-        description: 'Slash command that invokes this skill (e.g. "plan" or "/plan"). Unique per account.',
+        description:
+            'Slash command that invokes this skill (e.g. "plan" or "/plan"). Unique per account.',
         nullable: true,
     })
     @IsOptional()
