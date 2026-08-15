@@ -200,7 +200,8 @@
                     "text": "Ik ga akkoord met de",
                     "termsLink": "Gebruiksvoorwaarden",
                     "and": "en",
-                    "privacyLink": "Privacybeleid"
+                    "privacyLink": "Privacybeleid",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "Account Aanmaken",
                 "submitting": "Aan het aanmaken van account..."

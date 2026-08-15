@@ -200,7 +200,8 @@
                     "text": "Я согласен с",
                     "termsLink": "Условиями использования",
                     "and": "и",
-                    "privacyLink": "Политикой конфиденциальности"
+                    "privacyLink": "Политикой конфиденциальности",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "Создать аккаунт",
                 "submitting": "Создание аккаунта..."

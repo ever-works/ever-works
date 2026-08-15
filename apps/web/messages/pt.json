@@ -200,7 +200,8 @@
                     "text": "Eu concordo com os",
                     "termsLink": "Termos de Serviço",
                     "and": "e",
-                    "privacyLink": "Política de Privacidade"
+                    "privacyLink": "Política de Privacidade",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "Criar conta",
                 "submitting": "Criando conta..."

@@ -200,7 +200,8 @@
                     "text": "Zgadzam się na",
                     "termsLink": "Regulamin",
                     "and": "i",
-                    "privacyLink": "Politykę prywatności"
+                    "privacyLink": "Politykę prywatności",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "Utwórz konto",
                 "submitting": "Tworzenie konta..."
