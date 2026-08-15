@@ -254,11 +254,18 @@ export class SkillsController {
             );
         }
 
-        // The uploads spine accepts a fixed mime allow-list; browsers
+        // The uploads spine accepts a FIXED mime allow-list; browsers
         // report code files (.py/.sh/.toml/…) with exotic or empty
-        // mimes. Coerce anything unknown-but-UTF-8 to text/plain so a
-        // script upload doesn't bounce off the spine's allow-list —
-        // the display filename (and kind) keep the real identity.
+        // mimes. Coerce anything the spine would reject — but whose bytes
+        // are valid UTF-8 — to text/plain so a script upload doesn't
+        // bounce off that allow-list; the display filename (and kind)
+        // keep the real identity.
+        //
+        // The predicate MUST be the spine's own `acceptsSaveFileMime`,
+        // not "does it start with text/". Chrome/Firefox report `.py` as
+        // `text/x-python`, which is text-like by that looser test yet is
+        // NOT in the spine's `TEXT_LIKE_MIMES` map — leaving it uncoerced
+        // made every script upload 400 with `MimeNotAllowed`.
         const declared = (file.mimetype || '').toLowerCase();
         let effectiveMime = declared;
         let textContent: string | undefined;
@@ -267,22 +274,8 @@ export class SkillsController {
         } catch {
             textContent = undefined;
         }
-        if ((!declared || !isTextLikeMime(declared)) && textContent !== undefined) {
-            // UTF-8 body with a non-text (or missing) declared mime —
-            // store as plain text unless the mime is a known binary the
-            // spine accepts as-is (png/pdf/zip/…).
-            const spineBinary = [
-                'image/png',
-                'image/jpeg',
-                'image/gif',
-                'image/webp',
-                'application/pdf',
-                'application/zip',
-                'application/gzip',
-            ];
-            if (!spineBinary.includes(declared)) {
-                effectiveMime = 'text/plain';
-            }
+        if (textContent !== undefined && !this.uploads.acceptsSaveFileMime(declared)) {
+            effectiveMime = 'text/plain';
         }
 
         const stored = await this.uploads.saveFile(auth.userId, {
