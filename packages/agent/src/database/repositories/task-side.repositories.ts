@@ -251,6 +251,19 @@ export class TaskAttachmentRepository {
     async findByTaskId(taskId: string): Promise<TaskAttachment[]> {
         return this.repo.find({ where: { taskId } });
     }
+    /**
+     * Memory Files provenance — every Task edge referencing any of the
+     * given `work_knowledge_uploads` ids, in ONE query (no N+1). Used to
+     * batch-map "which Task attached this original" onto the unified
+     * /memory Files rows.
+     */
+    async findByUploadIds(uploadIds: string[]): Promise<TaskAttachment[]> {
+        if (uploadIds.length === 0) return [];
+        return this.repo
+            .createQueryBuilder('attachment')
+            .where('attachment.uploadId IN (:...uploadIds)', { uploadIds })
+            .getMany();
+    }
     async add(taskId: string, uploadId: string): Promise<TaskAttachment> {
         const entity = this.repo.create({ taskId, uploadId });
         return this.repo.save(entity);

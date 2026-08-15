@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@src/database/database.module';
+import { AgentRun } from '@src/entities/agent-run.entity';
+import { AgentRunRepository } from '@src/database/repositories/agent-run.repository';
 import { NotificationsModule } from '@src/notifications/notifications.module';
 import { SubscriptionService } from './subscription.service';
 import { UsageLedgerService } from './usage-ledger.service';
@@ -13,6 +16,7 @@ import { CreditLedgerService } from './credits/credit-ledger.service';
 import { EntitlementsService } from './credits/entitlements.service';
 import { RunCostSettlementService } from './credits/run-cost-settlement.service';
 import { UsageSummaryService } from './credits/usage-summary.service';
+import { CostsSummaryService } from './credits/costs-summary.service';
 
 @Module({
     imports: [
@@ -20,6 +24,15 @@ import { UsageSummaryService } from './credits/usage-summary.service';
         // Wave 9 M2 — RunCostSettlementService emits the balance-exhausted
         // notification through the existing NotificationService.
         NotificationsModule,
+        // Costs dashboard — `AgentRunRepository` is not in the
+        // `_repository-inventory` DatabaseModule exports (it is owned by
+        // AgentsModule), so it is provided locally here. Same pattern,
+        // and same reason, as `TerminalTranscriptModule`: importing
+        // AgentsModule for two read-only aggregations would drag the
+        // whole agent runtime into this module's graph. The local
+        // instance never writes a terminal transition, so it never
+        // exercises the RUN_COST_SETTLER hook.
+        TypeOrmModule.forFeature([AgentRun]),
     ],
     providers: [
         SubscriptionService,
@@ -35,6 +48,11 @@ import { UsageSummaryService } from './credits/usage-summary.service';
         // Account-wide usage aggregations behind
         // `GET /api/credits/usage-summary` (Wave 13 Billing/Usage UI).
         UsageSummaryService,
+        // Costs dashboard — the `GET /api/usage/costs/*` aggregations
+        // (spend by day/agent/model + top runs). Read-only; derived from
+        // the same metering rows the usage summary reads.
+        AgentRunRepository,
+        CostsSummaryService,
         // The money path (billing PRD B5) — checkout, webhook, invoices,
         // auto-recharge. Additive beside the read-only credits surface.
         BillingService,
@@ -71,6 +89,7 @@ import { UsageSummaryService } from './credits/usage-summary.service';
         EntitlementsService,
         RunCostSettlementService,
         UsageSummaryService,
+        CostsSummaryService,
         BillingService,
         AutoRechargeService,
         PlanSubscriptionService,

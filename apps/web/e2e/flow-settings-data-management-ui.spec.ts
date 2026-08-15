@@ -427,7 +427,11 @@ test.describe('flow: data-management UI — the import card + auth gate (export 
         }).toPass({ timeout: 20_000 });
 
         // The hidden file input only accepts .json (the restore contract).
-        const fileInput = page.locator('input[type="file"]');
+        // Scoped to #main-content: since 8d251a90 the chat composer mounts a
+        // SECOND hidden input[type=file] (its attachment picker) on every
+        // dashboard page, outside the page content — the page-wide locator
+        // counted 2 and this assertion failed on every run.
+        const fileInput = page.locator('#main-content input[type="file"]');
         await expect(fileInput, 'a file input is mounted').toHaveCount(1);
         await expect(fileInput, 'file input is .json-scoped').toHaveAttribute('accept', '.json');
 
@@ -489,8 +493,10 @@ test.describe('flow: data-management UI — the import card + auth gate (export 
         }).toPass({ timeout: 20_000 });
 
         // Set the hidden file input to the export bytes (named .json so the
-        // client's extension guard passes).
-        const fileInput = page.locator('input[type="file"]');
+        // client's extension guard passes). #main-content scoping for the same
+        // reason as Flow 10 — the chat composer's attachment input would make
+        // setInputFiles a strict-mode violation.
+        const fileInput = page.locator('#main-content input[type="file"]');
         await fileInput.setInputFiles({
             name: `account-export-${stamp}.json`,
             mimeType: 'application/json',

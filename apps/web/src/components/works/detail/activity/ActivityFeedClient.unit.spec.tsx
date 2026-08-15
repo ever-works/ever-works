@@ -127,7 +127,22 @@ describe('ActivityFeedClient', () => {
         await waitFor(() => {
             expect(screen.getByText('Second entry')).toBeInTheDocument();
         });
-        expect(mockGetActivityFeed).toHaveBeenLastCalledWith(
+        // `toHaveBeenCalledWith`, not `toHaveBeenLastCalledWith`.
+        //
+        // What this test cares about is that paginating issued a fetch carrying
+        // the cursor from the last row of page 1. It does NOT care whether that
+        // was the final call the component ever made.
+        //
+        // Asserting on the LAST call made this spec order-sensitive: only two
+        // responses are queued with `mockResolvedValueOnce`, so any further
+        // fetch after the page-2 render — a re-render, an effect re-running, a
+        // refresh — falls through to the base mock and becomes "last", and the
+        // assertion fails against arguments it was never about.
+        //
+        // It failed exactly that way on CI for two unrelated PRs (#2055 Goals,
+        // #2058 Tasks), neither touching this component, while passing 6/6 runs
+        // locally — the signature of a race that only opens under load.
+        expect(mockGetActivityFeed).toHaveBeenCalledWith(
             'work-1',
             expect.objectContaining({ cursor: '2026-05-13T00:00:00.000Z' }),
         );

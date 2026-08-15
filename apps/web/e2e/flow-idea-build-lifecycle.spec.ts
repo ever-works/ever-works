@@ -627,7 +627,15 @@ test.describe('Idea build lifecycle (seeded user UI)', () => {
         // must be driven by opening the trigger and clicking the option row,
         // then submitting the native GET form. Narrowing to "Accepted" keeps
         // the terminal Idea visible and confirms the filter surface works.
-        const statusTrigger = page.locator('form button[aria-haspopup="listbox"]');
+        // Since a350801a (2026-07-29) the chat composer's voice-provider picker
+        // (data-testid="chat-dictation-provider") is a SECOND
+        // form>button[aria-haspopup=listbox] on this page — and the chat panel
+        // mounts before page content, so the bare selector strict-mode-failed
+        // (first attempt clicked the wrong trigger, retry surfaced the
+        // 2-element violation). Exclude it explicitly.
+        const statusTrigger = page.locator(
+            'form button[aria-haspopup="listbox"]:not([data-testid="chat-dictation-provider"])',
+        );
         await expect(statusTrigger).toBeVisible({ timeout: 30_000 });
 
         const applyStatus = async (label: string) => {

@@ -128,6 +128,59 @@ silently cap future upgrades and accumulate maintenance debt.
   via direct version bumps in their `package.json`, not via the
   root override block.
 
+### When there is no patched version at all
+
+An override can only move a dependency to a version that exists. Some
+advisories are published with `"patched_versions": "<0.0.0"` — upstream
+has shipped **no** fix. No override can clear those, and the CI
+`dependency-audit` gate (`pnpm audit --prod --audit-level=high`) hard-fails
+on them like any other high.
+
+For that case only, list the advisory in `pnpm.auditConfig.ignoreGhsas` in
+the root `package.json`. The bar is both of:
+
+1. `patched_versions` is `<0.0.0` (or the only "fix" is a major bump that
+   breaks the consumer — see "When NOT to use overrides"), **and**
+2. The vulnerable code path is not reachable with attacker-controlled
+   input in our usage.
+
+Current entries. The first two are `image-size`, reached via
+`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`; the third is
+`extract-zip`, reached via `packages/plugins/opencode`:
+
+| GHSA                  | Issue                                          | Why it's ignored                                                                                                  |
+| --------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)     | Runs only while **building** the docs site, over images committed to this repo                                    |
+| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS) | Same path — no request-time, attacker-supplied image ever reaches it                                              |
+| `GHSA-jmr9-qjv8-65gv` | `extract-zip` unvalidated symlink traversal    | No fix exists (2.0.1 is both the latest release and the vulnerable one) and the call site is hardened — see below |
+
+**On `GHSA-jmr9-qjv8-65gv` specifically.** The only consumer is
+`packages/plugins/opencode/src/utils/binary-manager.ts`, which downloads an
+OpenCode release archive and unpacks the binary. Three things make the
+vulnerable path unreachable in our usage:
+
+1. The archive is fetched from a pinned GitHub release and its **sha256 is
+   verified** against the release's published checksum before extraction, so
+   the bytes are not attacker-controlled without compromising the release
+   itself.
+2. `onEntry` rejects any entry whose resolved destination escapes the
+   extraction root (the zip-slip guard, which predates this advisory).
+3. `onEntry` now **refuses symlink entries outright**. That is the advisory's
+   actual vector — an entry name can be perfectly benign while its link target
+   points outside the tree, so the path check alone does not cover it. An
+   OpenCode archive is a binary plus data files and never legitimately
+   contains a symlink.
+
+**Re-check trigger:** drop this entry the moment `extract-zip` publishes a
+release above 2.0.1, or if the plugin ever extracts an archive whose source is
+not checksum-pinned. Review at the next dependency sweep and no later than
+**2027-02-15**.
+
+Ignores are a bigger hammer than overrides: they silence the advisory
+everywhere in the workspace, including a future path where the package
+_is_ reachable. Re-check them on every sweep and drop each entry the
+moment upstream publishes a fix (then patch it with a normal override).
+
 ## Implementation
 
 The whole mechanism is a single block in the root `package.json` —

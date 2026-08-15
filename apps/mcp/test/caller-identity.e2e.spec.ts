@@ -163,7 +163,32 @@ describe('caller identity reaches the upstream API (HTTP transport)', () => {
 		app = await NestFactory.create(AppModule, { logger: false });
 		await app.listen(0, '127.0.0.1');
 		baseUrl = await app.getUrl();
-	});
+		// Per-hook timeout, deliberately larger than the 30 s global in
+		// vitest.config.ts.
+		//
+		// This hook is not a unit-spec cold import — it boots a whole Nest
+		// application: dynamic import of `@nestjs/core` + `app.module.js`,
+		// `NestFactory.create` (provider graph, plugin discovery, OpenAPI spec
+		// parsing from SPEC_FIXTURE), then a real listen. Locally that is ~5 s;
+		// under the concurrent turbo test load on a self-hosted runner it drifts
+		// past 30 s often enough to flake CI.
+		//
+		// The cost is not a slow test, it is an UNRELIABLE SIGNAL: on 2026-08-13
+		// the SAME commit (005a3e17) reported `lint-and-test` PASS on the push
+		// run and FAIL on the pull_request run, with this hook the only failure —
+		// so "is this branch green?" came down to which run you happened to read.
+		//
+		// Raising the number is the right fix HERE, unlike the usual case: there
+		// is nothing to poll for. The hook awaits one bounded bootstrap, so a
+		// genuine hang still fails — just later — while ordinary CI-load slowness
+		// stops producing a red build. Applied per-hook so the 30 s global still
+		// makes a hang anywhere else fail fast.
+		//
+		// vitest.config.ts already made this same trade once (5 s -> 30 s, "CI-load
+		// resilience … cold `await import()` … under the concurrent turbo test
+		// load"). This hook simply does much more work than the specs that
+		// motivated it.
+	}, 120_000);
 
 	afterAll(async () => {
 		await app?.close();

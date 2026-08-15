@@ -32,6 +32,9 @@ import {
     AGENT_ACTION_PROPOSAL_ACTION_TYPES,
     type AgentActionProposalActionType,
 } from '@ever-works/agent/agent-approvals';
+// Capabilities tab — the one init-script size cap, shared with the
+// service-side byte check.
+import { AGENT_INIT_SCRIPT_MAX_BYTES } from '@ever-works/contracts';
 // Entity-free validation subpath on purpose — see the docstring on
 // `@ever-works/agent/validation`.
 import { MergePolicyDto } from '@ever-works/agent/validation';
@@ -405,6 +408,28 @@ export class UpdateAgentDto {
     @ValidateNested()
     @Type(() => MergePolicyDto)
     mergePolicy?: MergePolicyDto | null;
+
+    /**
+     * Capabilities tab — per-Agent init script (advisory v1: stored now,
+     * consumed at session/workspace bootstrap where the runtime supports
+     * it). `null` clears it.
+     *
+     * The cap here counts CHARACTERS (class-validator's only length rule)
+     * and is a cheap front gate; `AgentsService.update` re-enforces the
+     * same number as BYTES — the authoritative check, since that is what
+     * the column stores — plus a hard-reject secret scan. Sharing the one
+     * constant keeps the two from drifting apart.
+     */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        maxLength: AGENT_INIT_SCRIPT_MAX_BYTES,
+        description: 'Init script run at session/workspace bootstrap where supported; null clears',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(AGENT_INIT_SCRIPT_MAX_BYTES)
+    initScript?: string | null;
 }
 
 /**
@@ -478,6 +503,15 @@ export class ListAgentsQueryDto {
     @IsOptional()
     @IsUUID()
     assignedWorkId?: string;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'Agents ASSIGNED to this Idea (their `targets` include it), as opposed to `ideaId`, which matches Agents pinned to the Idea by scope.',
+    })
+    @IsOptional()
+    @IsUUID()
+    assignedIdeaId?: string;
 
     @ApiProperty({ required: false, maxLength: 80 })
     @IsOptional()
@@ -588,6 +622,29 @@ export class ListRunSessionsQueryDto {
     @IsInt()
     @Min(0)
     offset?: number;
+}
+
+/**
+ * Session detail (Feature K) — query for
+ * `GET /api/agents/runs/:runId/detail`. The cursor is the opaque
+ * `<epochMillis>_<uuid>` token the previous page's `nextCursor` carried;
+ * the format is validated at the edge so a garbage cursor is a 400, not
+ * a silently ignored restart.
+ */
+export class SessionDetailQueryDto {
+    @ApiProperty({ required: false, description: 'Opaque timeline cursor from `nextCursor`.' })
+    @IsOptional()
+    @IsString()
+    @Matches(/^\d{1,15}_[0-9a-fA-F-]{36}$/)
+    cursor?: string;
+
+    @ApiProperty({ required: false, minimum: 1, maximum: 200 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
 }
 
 /**

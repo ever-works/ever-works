@@ -4,6 +4,7 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     HttpStatus,
     NotFoundException,
@@ -12,14 +13,26 @@ import {
     Patch,
     Post,
     Query,
+    UploadedFile,
+    UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { SkillRepository, SkillsService, type ListSkillsFilter } from '@ever-works/agent/skills';
+import {
+    MAX_SKILL_FILE_BYTES,
+    SkillFilesService,
+    SkillRepository,
+    SkillsService,
+    type ListSkillsFilter,
+} from '@ever-works/agent/skills';
+import { isTextLikeMime } from '@ever-works/agent/agents';
 import { SkillsFacadeService } from '@ever-works/agent/facades';
 import type { SkillCatalogEntry, SkillCatalogListResult } from '@ever-works/plugin';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { UploadsService } from '../uploads/uploads.service';
+import { SkillFileContentReaderService } from './skill-file-content-reader.service';
 import {
     CreateSkillBindingDto,
     CreateSkillDto,
@@ -27,6 +40,7 @@ import {
     ListSkillCatalogQueryDto,
     ListSkillsQueryDto,
     UpdateSkillDto,
+    UploadSkillFileDto,
 } from './dto/skill.dto';
 
 /**
@@ -51,6 +65,9 @@ export class SkillsController {
         private readonly skills: SkillRepository,
         private readonly facade: SkillsFacadeService,
         private readonly service: SkillsService,
+        private readonly files: SkillFilesService,
+        private readonly uploads: UploadsService,
+        private readonly fileContent: SkillFileContentReaderService,
     ) {}
 
     @Get('catalog')
@@ -105,6 +122,26 @@ export class SkillsController {
         return { data: rows, meta: { total, limit: filter.limit, offset: filter.offset } };
     }
 
+    // NOTE: declared BEFORE `:id` so the literal segment wins route
+    // matching (`:id` runs ParseUUIDPipe and would 400 on "invocable").
+    @Get('invocable')
+    @ApiOperation({
+        summary: 'List my skills that carry an invocation slug (composer autocomplete).',
+    })
+    @HttpCode(HttpStatus.OK)
+    async invocable(@CurrentUser() auth: AuthenticatedUser) {
+        const rows = await this.service.listInvocable(auth.userId);
+        return {
+            data: rows.map((skill) => ({
+                id: skill.id,
+                title: skill.title,
+                slug: skill.slug,
+                invocationSlug: skill.invocationSlug,
+                description: skill.description,
+            })),
+        };
+    }
+
     @Get(':id')
     @ApiOperation({ summary: 'Get one Skill.' })
     @HttpCode(HttpStatus.OK)
@@ -138,6 +175,7 @@ export class SkillsController {
                 : undefined,
             slug: body.slug,
             version: body.version,
+            invocationSlug: body.invocationSlug,
         });
     }
 
@@ -156,6 +194,7 @@ export class SkillsController {
             instructionsMd: body.instructionsMd,
             frontmatter: body.frontmatter as any,
             version: body.version,
+            invocationSlug: body.invocationSlug,
         });
     }
 
@@ -185,6 +224,134 @@ export class SkillsController {
             ownerId: body.ownerId,
             entry: found.entry,
         });
+    }
+
+    // ── Skill files (companion files over the uploads spine) ────────
+
+    @Post(':id/files')
+    @ApiOperation({
+        summary:
+            'Upload a companion file (script/reference/config/asset) for a Skill. Multipart field "file"; optional "kind" (defaults by extension). 2 MB cap, 20 files per skill.',
+    })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_SKILL_FILE_BYTES } }))
+    async uploadFile(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body() body: UploadSkillFileDto,
+    ) {
+        if (!file || !file.buffer || file.buffer.length === 0) {
+            throw new BadRequestException("Multipart field 'file' is required.");
+        }
+        // Ownership FIRST — a cross-user skill id must 404 before any
+        // bytes are stored (no existence leak, no orphan writes).
+        await this.service.getOne(auth.userId, id);
+        if (file.size > MAX_SKILL_FILE_BYTES) {
+            throw new BadRequestException(
+                `Skill files are capped at ${MAX_SKILL_FILE_BYTES / (1024 * 1024)} MB.`,
+            );
+        }
+
+        // The uploads spine accepts a FIXED mime allow-list; browsers
+        // report code files (.py/.sh/.toml/…) with exotic or empty
+        // mimes. Coerce anything the spine would reject — but whose bytes
+        // are valid UTF-8 — to text/plain so a script upload doesn't
+        // bounce off that allow-list; the display filename (and kind)
+        // keep the real identity.
+        //
+        // The predicate MUST be the spine's own `acceptsSaveFileMime`,
+        // not "does it start with text/". Chrome/Firefox report `.py` as
+        // `text/x-python`, which is text-like by that looser test yet is
+        // NOT in the spine's `TEXT_LIKE_MIMES` map — leaving it uncoerced
+        // made every script upload 400 with `MimeNotAllowed`.
+        const declared = (file.mimetype || '').toLowerCase();
+        let effectiveMime = declared;
+        let textContent: string | undefined;
+        try {
+            textContent = new TextDecoder('utf-8', { fatal: true }).decode(file.buffer);
+        } catch {
+            textContent = undefined;
+        }
+        if (textContent !== undefined && !this.uploads.acceptsSaveFileMime(declared)) {
+            effectiveMime = 'text/plain';
+        }
+
+        const stored = await this.uploads.saveFile(auth.userId, {
+            buffer: file.buffer,
+            mimetype: effectiveMime,
+            size: file.size,
+            originalname: file.originalname,
+        });
+
+        return this.files.add(auth.userId, {
+            skillId: id,
+            uploadId: stored.hash,
+            filename: file.originalname,
+            kind: body.kind,
+            sizeBytes: file.size,
+            mime: effectiveMime,
+            // Text uploads are secret-scanned with the same scanner
+            // skill bodies use (inside SkillFilesService.add).
+            textContent: isTextLikeMime(effectiveMime) ? textContent : undefined,
+        });
+    }
+
+    @Get(':id/files')
+    @ApiOperation({ summary: "List a Skill's companion files." })
+    @HttpCode(HttpStatus.OK)
+    async listFiles(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.files.list(auth.userId, id);
+    }
+
+    @Get(':id/files/:fileId/content')
+    @ApiOperation({
+        summary: "Fetch a text companion file's content (owner-gated; binary files are refused).",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Header('Content-Type', 'text/plain; charset=utf-8')
+    // Security: never let a stored file render in the browser context.
+    @Header('Content-Disposition', 'attachment')
+    @Header('X-Content-Type-Options', 'nosniff')
+    async fileContentEndpoint(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('fileId', ParseUUIDPipe) fileId: string,
+    ): Promise<string> {
+        const file = await this.files.getOne(auth.userId, id, fileId);
+        if (!isTextLikeMime(file.mime)) {
+            throw new BadRequestException(
+                `File "${file.filename}" is binary (${file.mime}) — content retrieval supports text files only.`,
+            );
+        }
+        const result = await this.fileContent.readTextContent({
+            userId: auth.userId,
+            uploadId: file.uploadId,
+            mime: file.mime,
+            filename: file.filename,
+        });
+        if ('error' in result) {
+            throw new NotFoundException(result.error);
+        }
+        return result.content;
+    }
+
+    @Delete(':id/files/:fileId')
+    @ApiOperation({
+        summary: 'Remove a companion file from a Skill (bytes stay in the uploads spine).',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async removeFile(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('fileId', ParseUUIDPipe) fileId: string,
+    ): Promise<{ deleted: true }> {
+        return this.files.remove(auth.userId, id, fileId);
     }
 
     // ── Phase 9 — Bindings CRUD ──────────────────────────────────

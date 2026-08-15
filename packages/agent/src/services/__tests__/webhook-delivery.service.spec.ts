@@ -301,22 +301,37 @@ describe('WebhookDeliveryService.deliver', () => {
         expect(client.post).not.toHaveBeenCalled();
     });
 
-    it('records a non-zero durationMs on successful delivery', async () => {
-        const client: WebhookHttpClient = {
-            post: jest.fn().mockImplementation(async () => {
-                await new Promise((resolve) => setTimeout(resolve, 5));
-                return { status: 200 };
-            }),
-        };
-        const svc = new WebhookDeliveryService(client);
-        const result = await svc.deliver({
-            url: 'https://hooks.example.com/p',
-            secret: 's',
-            event: 'x',
-            payload: {},
-        });
-        expect(result.ok).toBe(true);
-        expect(typeof result.durationMs).toBe('number');
-        expect(result.durationMs!).toBeGreaterThanOrEqual(0);
+    it('records the measured durationMs on successful delivery', async () => {
+        // This asserted `durationMs >= 0` under the title "records a non-zero
+        // durationMs" — satisfied by 0, and by any number at all, so it could
+        // not fail and did not check what it claimed. The weakening was not
+        // careless: the service measures with Date.now(), whose granularity is
+        // ~15ms on Windows, so the old 5ms mocked sleep genuinely could measure
+        // 0 and a `> 0` assertion would flake.
+        //
+        // So drive the clock instead of racing it. Deterministic on any machine
+        // under any load, and it pins the actual arithmetic (end - start)
+        // rather than settling for "is a number".
+        const nowSpy = jest.spyOn(Date, 'now');
+        const ticks = [1_000, 1_042];
+        let tick = 0;
+        nowSpy.mockImplementation(() => ticks[Math.min(tick++, ticks.length - 1)]);
+
+        try {
+            const client: WebhookHttpClient = {
+                post: jest.fn().mockImplementation(async () => ({ status: 200 })),
+            };
+            const svc = new WebhookDeliveryService(client);
+            const result = await svc.deliver({
+                url: 'https://hooks.example.com/p',
+                secret: 's',
+                event: 'x',
+                payload: {},
+            });
+            expect(result.ok).toBe(true);
+            expect(result.durationMs).toBe(42);
+        } finally {
+            nowSpy.mockRestore();
+        }
     });
 });

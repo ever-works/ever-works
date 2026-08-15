@@ -41,6 +41,7 @@ export interface SkillFrontmatter {
 @Index('uq_skills_owner_slug', ['ownerType', 'ownerId', 'slug'], { unique: true })
 @Index('idx_skills_owner', ['ownerType', 'ownerId'])
 @Index('idx_skills_user', ['userId'])
+@Index('idx_skills_user_invocation', ['userId', 'invocationSlug'])
 export class Skill {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -60,6 +61,16 @@ export class Skill {
 
     @Column({ type: 'varchar', length: 80 })
     slug: string;
+
+    /**
+     * Optional user-facing slash command (`/plan`) that resolves this
+     * Skill from a chat/task message. Normalized `^[a-z0-9][a-z0-9-]*$`,
+     * unique per userId — uniqueness is enforced in `SkillsService`
+     * (409 with the conflicting skill named) rather than by a DB
+     * constraint so the error can carry the conflicting title.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    invocationSlug?: string | null;
 
     @Column({ type: 'varchar', length: 120 })
     title: string;

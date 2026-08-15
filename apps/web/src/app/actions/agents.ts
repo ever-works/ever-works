@@ -256,6 +256,65 @@ export async function unassignAgentFromWorkAction(agentId: string, workId: strin
     return agent;
 }
 
+/**
+ * Candidates for the Idea rail's "Assign existing Agent" picker — the
+ * Idea mirror of `listAssignableWorkAgentsAction`, and deliberately the
+ * same posture: scope is NOT filtered (Agents are created from wherever
+ * the operator happened to be, so a scope filter hides most of the
+ * roster), and what IS excluded is only what could never be a valid
+ * pick — Agents already assigned to this Idea, Agents pinned here by
+ * scope (they are on the Idea already), and archived Agents.
+ */
+export async function listAssignableIdeaAgentsAction(
+    ideaId: string,
+    search?: string,
+): Promise<AgentAssignCandidate[]> {
+    await ensureAuth();
+    const trimmed = search?.trim();
+    const [candidates, assigned] = await Promise.all([
+        agentsAPI.list({
+            limit: WORK_AGENT_CANDIDATE_LIMIT,
+            ...(trimmed ? { search: trimmed } : {}),
+        }),
+        agentsAPI.list({ assignedIdeaId: ideaId, limit: WORK_AGENT_CANDIDATE_LIMIT }),
+    ]);
+    const taken = new Set((assigned.data ?? []).map((agent) => agent.id));
+    return (candidates.data ?? [])
+        .filter(
+            (agent) =>
+                agent.status !== 'archived' &&
+                !taken.has(agent.id) &&
+                !(agent.scope === 'idea' && agent.ideaId === ideaId),
+        )
+        .map((agent) => ({
+            id: agent.id,
+            name: agent.name,
+            slug: agent.slug,
+            title: agent.title,
+            status: agent.status,
+        }));
+}
+
+/**
+ * Put an existing Agent on this Idea / take it back off. Both are
+ * idempotent server-side, so a double-click can't 409.
+ */
+export async function assignAgentToIdeaAction(agentId: string, ideaId: string): Promise<Agent> {
+    await ensureAuth();
+    const agent = await agentsAPI.addTarget(agentId, { type: 'idea', id: ideaId });
+    revalidatePath(`/ideas/${ideaId}`, 'layout');
+    revalidatePath(`/agents/${agentId}`);
+    return agent;
+}
+
+export async function unassignAgentFromIdeaAction(agentId: string, ideaId: string): Promise<Agent> {
+    await ensureAuth();
+    const agent = await agentsAPI.removeTarget(agentId, { type: 'idea', id: ideaId });
+    revalidatePath(`/ideas/${ideaId}`, 'layout');
+    revalidatePath(`/agents/${agentId}`);
+    return agent;
+}
+
 export async function listAgentRunsAction(
     id: string,
     opts: { limit?: number; offset?: number } = {},
@@ -356,4 +415,17 @@ export async function detachAgentAttachmentAction(agentId: string, attachmentId:
 export async function listRunSessionsAction(query: ListRunSessionsQuery = {}) {
     await ensureAuth();
     return agentsAPI.listSessions(query);
+}
+
+/**
+ * Session detail (Feature K) — read used by the detail page's refresh
+ * button, live-follow poll and timeline pagination. No revalidatePath —
+ * a poll, not a mutation (same posture as `listRunSessionsAction`).
+ */
+export async function getRunSessionDetailAction(
+    runId: string,
+    query: { cursor?: string; limit?: number } = {},
+) {
+    await ensureAuth();
+    return agentsAPI.getSessionDetail(runId, query);
 }

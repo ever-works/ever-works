@@ -150,9 +150,26 @@ test.describe('Agent lifecycle — status state machine', () => {
         // --- The /agents catalog card also carries the live status badge. ---
         // AgentCard renders an i18n status label ("Draft"/"Active"/"Paused").
         await page.goto('/agents', { waitUntil: 'domcontentloaded' });
-        const card = page
-            .locator('a', { has: page.getByRole('heading', { name, level: 3 }) })
-            .first();
+
+        // The card's <Link> is a full-bleed OVERLAY anchor — `absolute inset-0`
+        // with NO children (AgentCard.tsx:61-65). The card's text is a SIBLING
+        // of that anchor, not a descendant. So the old locator here,
+        //
+        //     page.locator('a', { has: getByRole('heading', { name, level: 3 }) })
+        //
+        // could never match, and failed with "element(s) not found" whether or
+        // not the card rendered — which reads exactly like a missing card.
+        //
+        // The card root became an overlay in commit 1a5e0144 (2026-08-09,
+        // PR #1994): "a button nested in an anchor is invalid markup and
+        // swallows keyboard activation". Deliberate a11y fix, no user-visible
+        // change. This spec predates it (last touched 2026-07-21), which is why
+        // it went red without anything breaking for users.
+        //
+        // Anchor to the href — the one thing that identifies THIS agent's card
+        // unambiguously — then step up to the card root that holds both the
+        // anchor and the content.
+        const card = page.locator(`a[href$="/agents/${agent.id}"]`).locator('xpath=..');
         await expect(card).toBeVisible({ timeout: 30_000 });
         // The paused card shows the "Paused" badge (i18n label) and not "Draft".
         await expect(card.getByText(/^Paused$/i)).toBeVisible({ timeout: 30_000 });

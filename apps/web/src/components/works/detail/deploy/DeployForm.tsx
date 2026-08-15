@@ -339,14 +339,25 @@ function UpdateWebsiteRepository({ work }: DeployFormProps) {
                     </h3>
                     <p className="text-text-secondary dark:text-text-secondary-dark mb-4">
                         {t('form.updateRepository.description')}{' '}
-                        <Link
-                            href={repoLinks?.websiteRepo || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:text-primary-hover"
-                        >
-                            {t('form.updateRepository.websiteRepository')}
-                        </Link>
+                        {/* EW-037: `|| '#'` made an unknown repository look like
+                            a working link. `repoLinks.websiteRepo` is
+                            `undefined` when the real name cannot be known
+                            (managed storage uses collision-suffixed names), so
+                            fall back to plain text rather than a dead click. */}
+                        {repoLinks?.websiteRepo ? (
+                            <Link
+                                href={repoLinks.websiteRepo}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-primary hover:text-primary-hover"
+                            >
+                                {t('form.updateRepository.websiteRepository')}
+                            </Link>
+                        ) : (
+                            <span className="text-text-secondary dark:text-text-secondary-dark">
+                                {t('form.updateRepository.websiteRepository')}
+                            </span>
+                        )}
                     </p>
 
                     <Button

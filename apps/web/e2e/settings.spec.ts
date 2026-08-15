@@ -35,7 +35,7 @@ test.describe('Settings navigation', () => {
         await expect(page).toHaveURL(/\/settings/);
 
         // Profile form should have username input
-        const usernameInput = page.locator('input').first();
+        const usernameInput = page.locator('#main-content input').first();
         await expect(usernameInput).toBeVisible({ timeout: 10_000 });
     });
 
@@ -88,7 +88,7 @@ test.describe('Profile settings', () => {
         await page.goto('/en/settings');
 
         // Username input should have a value (the current user's username)
-        const usernameInput = page.locator('input').first();
+        const usernameInput = page.locator('#main-content input').first();
         await expect(usernameInput).toBeVisible({ timeout: 10_000 });
         await expect(usernameInput).not.toHaveValue('');
     });
