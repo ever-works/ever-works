@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { goalsAPI, type GoalMetricSample } from '@/lib/api/goals';
+import { goalsAPI, type GoalEvent, type GoalMetricSample, type GoalSession } from '@/lib/api/goals';
 import { GoalDetailClient } from '@/components/goals';
 
 /**
@@ -31,7 +31,15 @@ export default async function GoalDetailPage({ params }: { params: Params }) {
         notFound();
     }
 
-    const samples: GoalMetricSample[] = await goalsAPI.samples(id, 200).catch(() => []);
+    // Every secondary fetch degrades to an empty tab rather than a 404:
+    // the orchestrator log and the session list are supporting evidence,
+    // and losing one of them must not take the whole Goal page down.
+    const [samples, events, sessions]: [GoalMetricSample[], GoalEvent[], GoalSession[]] =
+        await Promise.all([
+            goalsAPI.samples(id, 200).catch(() => []),
+            goalsAPI.events(id, 200).catch(() => []),
+            goalsAPI.sessions(id).catch(() => []),
+        ]);
 
-    return <GoalDetailClient goal={goal} samples={samples} />;
+    return <GoalDetailClient goal={goal} samples={samples} events={events} sessions={sessions} />;
 }
