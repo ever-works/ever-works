@@ -255,6 +255,57 @@ describe('ClaudeManagedAgentPlugin — persistent control plane (default)', () =
 		});
 	});
 
+	it('passes the per-session budget cap on the single-session path', async () => {
+		primeSingleSessionRun();
+		const plugin = new ClaudeManagedAgentPlugin();
+		const { context } = createContextStub({ apiKey: 'sk-test' });
+		await plugin.onLoad(context);
+
+		const result = await plugin.execute(
+			WORK,
+			{ prompt: 'generate', config: { per_session_budget_usd: 12 } } as never,
+			EXISTING,
+			execOptions()
+		);
+
+		expect(result.success).toBe(true);
+		expect(sdkMocks.sessionsCreate.mock.calls[0][0].budget).toEqual({
+			type: 'limit',
+			max_list_cost: { amount: '1200', currency: 'USD' }
+		});
+	});
+
+	// Regression: `cache_read_input_tokens` / `cache_creation_input_tokens` are
+	// billed input tokens reported OUTSIDE `input_tokens`. Counting only
+	// input+output made the single-session path under-report the rollup by
+	// orders of magnitude (agent sessions re-read a big cached prefix per turn).
+	it('counts cached input tokens in the usage that reaches the platform seam', async () => {
+		primeSingleSessionRun();
+		sdkMocks.sessionsRetrieve.mockResolvedValue({
+			id: 'session_1',
+			status: 'idle',
+			usage: {
+				input_tokens: 120,
+				output_tokens: 80,
+				cache_creation_input_tokens: 5000,
+				cache_read_input_tokens: 300000,
+				list_cost: { amount: '250', currency: 'USD' }
+			}
+		});
+
+		const plugin = new ClaudeManagedAgentPlugin();
+		const { context } = createContextStub({ apiKey: 'sk-test' });
+		await plugin.onLoad(context);
+
+		const result = await plugin.execute(WORK, { prompt: 'generate', config: {} } as never, EXISTING, execOptions());
+
+		expect(result.success).toBe(true);
+		expect(extractUsageLikePlatform(result.metrics as ManagedAgentPipelineMetrics)).toEqual({
+			total_tokens_used: 305200,
+			total_cost: 2.5
+		});
+	});
+
 	it('registers the fan-out service as a custom capability on load', async () => {
 		const plugin = new ClaudeManagedAgentPlugin();
 		const { context, registerCustomCapability, registry } = createContextStub({ apiKey: 'sk-test' });
@@ -326,6 +377,38 @@ describe('ClaudeManagedAgentPlugin — ephemeral fallback (reuseControlPlane: fa
 		expect(sdkMocks.environmentsDelete).toHaveBeenCalledWith('env_1');
 		expect(sdkMocks.agentsArchive).toHaveBeenCalledWith('agent_1');
 		expect(sdkMocks.filesDelete).toHaveBeenCalled();
+	});
+
+	// Regression: the ephemeral branch built its environment inline and never
+	// consulted execContext.runtimeEnvironment, so an explicitly limited egress
+	// policy was silently downgraded to the env-var default (unrestricted)
+	// whenever "Reuse Control Plane" was off. Networking is a security control:
+	// both modes must honor it.
+	it('honors the runtime environment networking policy in ephemeral mode', async () => {
+		primeSingleSessionRun();
+		const plugin = new ClaudeManagedAgentPlugin();
+		const { context } = createContextStub({ apiKey: 'sk-test', reuseControlPlane: false });
+		await plugin.onLoad(context);
+
+		const options = execOptions() as { execContext: Record<string, unknown> };
+		options.execContext.runtimeEnvironment = {
+			networking: { type: 'limited', allowedHosts: ['api.example.com'], allowPackageManagers: true }
+		};
+
+		const result = await plugin.execute(
+			WORK,
+			{ prompt: 'generate', config: {} } as never,
+			EXISTING,
+			options as never
+		);
+
+		expect(result.success).toBe(true);
+		expect(sdkMocks.environmentsCreate.mock.calls[0][0].config.networking).toEqual({
+			type: 'limited',
+			allowed_hosts: ['api.example.com'],
+			allow_package_managers: true,
+			allow_mcp_servers: false
+		});
 	});
 });
 

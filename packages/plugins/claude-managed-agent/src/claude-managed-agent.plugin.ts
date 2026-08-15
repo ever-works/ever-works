@@ -55,7 +55,7 @@ import {
 	WORKSPACE_SEED_MANIFEST_MOUNT_PATH
 } from './types.js';
 import { createCmaSdkClient, resolveUserScopedSettings } from './utils/cma-sdk.js';
-import { ensureControlPlane } from './utils/control-plane.js';
+import { ensureControlPlane, resolveNetworking } from './utils/control-plane.js';
 import { runManagedSessions } from './utils/fan-out.js';
 import { cleanupManagedAgentRun } from './utils/managed-agents-cleanup.js';
 import { AnthropicManagedAgentsClient } from './utils/managed-agents-client.js';
@@ -80,7 +80,7 @@ import {
 } from './utils/prompt-builder.js';
 import { extractAgentTranscript, normalizeOutputs, parseStructuredOutput } from './utils/result-parser.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
-import { buildManagedAgentMetrics } from './utils/usage-metrics.js';
+import { buildManagedAgentMetrics, toManagedSessionTokenUsage } from './utils/usage-metrics.js';
 import { buildWorkspaceSeedManifest } from './utils/workspace-seed.js';
 
 // Security: runtime bounds for `target_items`, mirroring the form-level
@@ -467,8 +467,12 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			// recall ride on the session so agent versions never churn per run.
 			let sessionAgentOverrides: { system?: string; model?: string } | undefined;
 
+			// Resolved for BOTH modes: the networking policy is a security
+			// control, so an ephemeral (reuseControlPlane === false) run must
+			// honor it exactly like the persistent one.
+			const runtimeEnvironment = this.getRuntimeEnvironment(execContext);
+
 			if (reuseControlPlane) {
-				const runtimeEnvironment = this.getRuntimeEnvironment(execContext);
 				const controlPlane = await ensureControlPlane(
 					client,
 					this.context,
@@ -499,7 +503,8 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 				environmentId = (
 					await client.createEnvironment({
-						name: `Ever Works Environment: ${work.slug}`
+						name: `Ever Works Environment: ${work.slug}`,
+						networking: resolveNetworking(runtimeEnvironment)
 					})
 				).id;
 				runResources.createdEnvironmentId = environmentId;
@@ -681,13 +686,11 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 									id: 'session-1',
 									status: 'completed',
 									sessionId: session.id,
-									tokens: {
-										inputTokens: finalSession.usage.input_tokens ?? 0,
-										outputTokens: finalSession.usage.output_tokens ?? 0,
-										totalTokens:
-											(finalSession.usage.input_tokens ?? 0) +
-											(finalSession.usage.output_tokens ?? 0)
-									},
+									// Shared seam with the fan-out path so both agree on
+									// what `totalTokens` counts — including the cache
+									// token classes the API reports outside
+									// `input_tokens`.
+									tokens: toManagedSessionTokenUsage(finalSession.usage),
 									costUsd: finalSession.usage.list_cost_usd
 								}
 							]
