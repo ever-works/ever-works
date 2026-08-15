@@ -59,12 +59,20 @@ export class InboundTriggerFireRepository {
             if (windowMs === undefined || age <= windowMs) {
                 return { fire: existing, won: false };
             }
-            existing.origin = origin;
-            existing.status = 'running';
-            existing.reason = null;
-            existing.taskId = null;
-            existing.firedAt = new Date();
-            return { fire: await this.repository.save(existing), won: true };
+            // Explicit UPDATE rather than save(): `firedAt` is a
+            // @CreateDateColumn, and entity-persistence treats those as
+            // insert-only — a re-claim that failed to move the timestamp
+            // would leave the window anchored on the ORIGINAL delivery
+            // and let later duplicates through.
+            const reclaimed: Partial<InboundTriggerFire> = {
+                origin,
+                status: 'running',
+                reason: null,
+                taskId: null,
+                firedAt: new Date(),
+            };
+            await this.repository.update(existing.id, reclaimed);
+            return { fire: Object.assign(existing, reclaimed), won: true };
         }
         try {
             const fire = await this.repository.save(
