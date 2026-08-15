@@ -1260,6 +1260,34 @@
                     "inherited": "Inherited",
                     "empty": "No skills bound yet."
                 },
+                "mcp": {
+                    "title": "MCP Connections",
+                    "description": "Which MCP connections this agent can use. Tenant-wide connections are inherited unless this agent overrides them.",
+                    "inherited": "Inherited from tenant",
+                    "overridden": "Override",
+                    "connectionDisabled": "Connection disabled",
+                    "revert": "Reset to inherited",
+                    "manage": "Manage MCP servers",
+                    "empty": "No MCP connections configured. Add one under Settings → Connections."
+                },
+                "repositories": {
+                    "title": "Repositories",
+                    "description": "Repositories from your registry this agent can work in. Repositories derived from a Work are managed with that Work and shown read-only here.",
+                    "source": "From {source}",
+                    "attached": "Attached",
+                    "notAttached": "Not attached",
+                    "manage": "Manage repositories",
+                    "empty": "No repositories in your registry yet.",
+                    "toggleError": "Failed to update repository attachment"
+                },
+                "environment": {
+                    "title": "Environment",
+                    "description": "The runtime recipe this agent runs in. Only published environments can be assigned.",
+                    "none": "None (default)",
+                    "manage": "Manage environments",
+                    "empty": "No published environments yet. Create one under Settings → Environments.",
+                    "saved": "Environment updated"
+                },
                 "initScript": {
                     "title": "Init Script",
                     "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
