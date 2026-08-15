@@ -155,6 +155,8 @@ export const ROUTES = {
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
     DASHBOARD_AGENTS: '/agents',
     DASHBOARD_AGENT_SESSIONS: '/agents/sessions',
+    // Session detail (Feature K) — drill-in for one run.
+    DASHBOARD_AGENT_SESSION: (runId: string) => `/agents/sessions/${runId}`,
     DASHBOARD_AGENTS_ARCHIVED: '/agents/archived',
     DASHBOARD_AGENT_NEW: '/agents/new',
     DASHBOARD_AGENT: (id: string) => `/agents/${id}`,
@@ -163,6 +165,8 @@ export const ROUTES = {
     DASHBOARD_AGENT_TERMINAL: (id: string) => `/agents/${id}/terminal`,
     DASHBOARD_AGENT_INSTRUCTIONS: (id: string) => `/agents/${id}/instructions`,
     DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
+    // Capabilities tab — unified tools / skills / init-script surface.
+    DASHBOARD_AGENT_CAPABILITIES: (id: string) => `/agents/${id}/capabilities`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
@@ -176,6 +180,8 @@ export const ROUTES = {
     // Tasks
     DASHBOARD_TASKS: '/tasks',
     DASHBOARD_TASK_NEW: '/tasks/new',
+    DASHBOARD_TASK_TRIGGERS: '/tasks/triggers',
+    DASHBOARD_TASK_TRIGGER: (id: string) => `/tasks/triggers/${id}`,
     DASHBOARD_TASK: (id: string) => `/tasks/${id}`,
     // Phase 18.6 — Tasks templates browser (ADR-010 scaffold).
     DASHBOARD_TASK_TEMPLATES: '/tasks/templates',
@@ -195,11 +201,17 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_GITHUB_APP: '/settings/github-app',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
+    // Fleet — enrolled local runners. The page has existed since Wave 12;
+    // it simply had no route constant, so every link to it was a literal.
+    DASHBOARD_SETTINGS_FLEET: '/settings/fleet',
     // Wave 13 — Billing + Usage & Credits pages (billing/usage PRD §2).
     DASHBOARD_SETTINGS_BILLING: '/settings/billing',
     // Payment-method management (billing PRD §3.3, audit B10 + B25).
     DASHBOARD_SETTINGS_PAYMENT_METHOD: '/settings/billing/payment-method',
     DASHBOARD_USAGE: '/settings/usage',
+    // Costs dashboard — a tab of the Usage & Credits page, not its own
+    // route, so the settings nav keeps ONE entry for the whole surface.
+    DASHBOARD_USAGE_COSTS: '/settings/usage?tab=costs',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,
     // Profile (alias of settings — `/profile` redirects to `/settings`)

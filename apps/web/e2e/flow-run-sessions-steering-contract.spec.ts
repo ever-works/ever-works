@@ -23,6 +23,11 @@ import {
  *        limit(1..200) / offset(>=0). Declared BEFORE `:id`, so the
  *        literal `runs` segment never reaches ParseUUIDPipe.
  *        → 200 { data: [...], meta: { total, limit, offset } }
+ *   GET  /api/agents/runs/:runId/detail    Session detail (Feature K) —
+ *        one run's composed drill-in: the same row projection + counts +
+ *        filesTouched + a cursor page of the captured timeline. Also
+ *        under the literal `runs` segment; a foreign runId 404s.
+ *        → 200 { run, counts, filesTouched, timeline }
  *   GET  /api/works/:id/runs-summary       → 200 { running, queued,
  *        awaiting, failedLast24h }; the Work is ownership-gated first.
  *   POST /api/agents/:id/runs/:runId/steer      200 injected|new-run
@@ -161,6 +166,79 @@ test.describe('GET /api/agents/runs — the Sessions list', () => {
 
     test('anonymous → 401', async ({ request }) => {
         const res = await request.get(`${API_BASE}/api/agents/runs`);
+        expect(res.status()).toBe(401);
+    });
+});
+
+test.describe('GET /api/agents/runs/:runId/detail — the session drill-in', () => {
+    test('composes run + counts + filesTouched + timeline for an owned run', async ({
+        request,
+    }) => {
+        const u = await registerUserViaAPI(request);
+        const { runId } = await seedRun(request, u);
+        test.skip(!runId, 'this environment produced no run to drill into');
+
+        const res = await get(request, u.access_token, `/api/agents/runs/${runId}/detail`);
+        expect(res.status(), `detail body=${await res.text().catch(() => '')}`).toBe(200);
+        const body = await res.json();
+
+        expect(body.run.id).toBe(runId);
+        // The detail projection is the Sessions-list row plus two ids —
+        // one shared builder, so a field can never drift between them.
+        expect(body.run).toHaveProperty('sessionAttachable');
+        expect(body.run).toHaveProperty('chatMessageId');
+        for (const key of ['messages', 'toolCalls', 'filesTouched']) {
+            expect(typeof body.counts[key], `counts.${key}`).toBe('number');
+        }
+        expect(Array.isArray(body.filesTouched)).toBe(true);
+        expect(Array.isArray(body.timeline.entries)).toBe(true);
+        expect(typeof body.timeline.limit).toBe('number');
+        // A short first page has no further pages.
+        if (body.timeline.entries.length < body.timeline.limit) {
+            expect(body.timeline.nextCursor).toBeNull();
+        }
+    });
+
+    test('authz: another user’s run 404s exactly like an unknown one (no existence leak)', async ({
+        request,
+    }) => {
+        const owner = await registerUserViaAPI(request);
+        const stranger = await registerUserViaAPI(request);
+        const { runId } = await seedRun(request, owner);
+        test.skip(!runId, 'this environment produced no run to drill into');
+
+        const cross = await get(request, stranger.access_token, `/api/agents/runs/${runId}/detail`);
+        expect(cross.status(), 'a foreign run is indistinguishable from a missing one').toBe(404);
+        const unknown = await get(
+            request,
+            stranger.access_token,
+            `/api/agents/runs/${UNKNOWN_UUID}/detail`,
+        );
+        expect(unknown.status()).toBe(404);
+    });
+
+    test('rejects out-of-contract paging (bad cursor / limit) and a malformed runId', async ({
+        request,
+    }) => {
+        const u = await registerUserViaAPI(request);
+        const base = `/api/agents/runs/${UNKNOWN_UUID}/detail`;
+
+        for (const [query, field] of [
+            ['cursor=not-a-cursor', 'cursor'],
+            ['limit=201', 'limit'],
+            ['limit=0', 'limit'],
+        ] as Array<[string, string]>) {
+            const res = await get(request, u.access_token, `${base}?${query}`);
+            expect(res.status(), `?${query}`).toBe(400);
+            expect(errText(await res.json()), `?${query} message`).toContain(field);
+        }
+
+        const malformed = await get(request, u.access_token, '/api/agents/runs/not-a-uuid/detail');
+        expect(malformed.status()).toBe(400);
+    });
+
+    test('anonymous → 401', async ({ request }) => {
+        const res = await request.get(`${API_BASE}/api/agents/runs/${UNKNOWN_UUID}/detail`);
         expect(res.status()).toBe(401);
     });
 });

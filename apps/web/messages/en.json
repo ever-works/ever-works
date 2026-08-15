@@ -111,7 +111,7 @@
             "title": "Forgot your password?",
             "subtitle": "No worries, we'll send you reset instructions",
             "successTitle": "Check your email",
-            "successSubtitle": "We've sent you password reset instructions",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "Email address",
@@ -121,8 +121,8 @@
                 "submitting": "Sending..."
             },
             "success": {
-                "title": "Email sent successfully",
-                "message": "We've sent password reset instructions to {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "If you don't see the email, check your spam folder."
             },
             "errors": {
@@ -143,9 +143,9 @@
                 "password": {
                     "label": "New password",
                     "placeholder": "Enter your new password",
-                    "helperText": "Must be at least 6 characters with lowercase and number/special character",
+                    "helperText": "Must be at least 8 characters with lowercase and number/special character",
                     "errors": {
-                        "minLength": "Password must be at least 6 characters",
+                        "minLength": "Password must be at least 8 characters",
                         "lowercase": "Password must contain at least one lowercase letter",
                         "numberOrSpecial": "Password must contain at least one number or special character",
                         "cannotStartWith": "Password cannot start with a dot or newline"
@@ -200,7 +200,8 @@
                     "text": "I agree to the",
                     "termsLink": "Terms of Service",
                     "and": "and",
-                    "privacyLink": "Privacy Policy"
+                    "privacyLink": "Privacy Policy",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "Create account",
                 "submitting": "Creating account..."
@@ -618,6 +619,154 @@
                 "copyFailed": "Could not copy to clipboard"
             }
         },
+        "taskTriggers": {
+            "title": "Task Triggers",
+            "subtitle": "Rules that fire on webhooks or platform events and create Tasks.",
+            "lead": "Triggers create Tasks automatically when a signed webhook arrives or an ingested platform event matches.",
+            "new": "New Trigger",
+            "empty": "No triggers yet. Create one to spawn Tasks from webhooks or platform events.",
+            "neverFired": "Never",
+            "confirmDelete": "Delete this trigger? Its webhook URL stops working immediately and this can't be undone.",
+            "createTitle": "New Trigger",
+            "createDescription": "Choose what fires the trigger and what Task it creates.",
+            "editTitle": "Edit Trigger",
+            "editDescription": "Update the trigger's rule and the Task it creates.",
+            "tabs": {
+                "tasks": "Tasks",
+                "triggers": "Triggers"
+            },
+            "columns": {
+                "name": "Name",
+                "mode": "Mode",
+                "target": "Target",
+                "status": "Enabled",
+                "lastFired": "Last Fired",
+                "fires": "Fires"
+            },
+            "mode": {
+                "template": "Template",
+                "task": "Task"
+            },
+            "target": {
+                "default": "Default task title"
+            },
+            "source": {
+                "webhook": "Webhook (signed URL)",
+                "event": "Platform event"
+            },
+            "form": {
+                "name": "Name",
+                "namePlaceholder": "Deploy notifications",
+                "description": "Description",
+                "descriptionPlaceholder": "What fires this trigger?",
+                "source": "Source",
+                "sourceImmutable": "The source can't be changed after creation.",
+                "webhookHint": "You'll get a signed webhook URL and secret after creating.",
+                "matcherTitle": "Event matcher (at least one field)",
+                "matcherSourcePlaceholder": "Source, e.g. slack-connector or github*",
+                "matcherKindPlaceholder": "Kind, e.g. github.push or github.*",
+                "matcherWorkIdPlaceholder": "Work ID (optional, exact match)",
+                "matcherHint": "source and kind allow a trailing * wildcard; all filled fields must match.",
+                "taskTitle": "Task title template",
+                "taskTitlePlaceholder": "Trigger: {name}",
+                "templateHint": "Placeholders: {{trigger.name}}, {{event.kind}}, {{event.title}}, {{event.payload.<key>}} …",
+                "taskDescription": "Task description template",
+                "taskDescriptionPlaceholder": "Optional. Same placeholders as the title; empty keeps the payload dump.",
+                "templateSlug": "Task template slug",
+                "templateSlugPlaceholder": "e.g. bug-triage (optional)",
+                "templateSlugHint": "Links a task template by slug once templates are available; resolved when the trigger fires.",
+                "agent": "Assign agent",
+                "agentNone": "No agent",
+                "agentUnknown": "This agent is not in your current list — it may have been removed.",
+                "enabled": "Enabled",
+                "enabledHint": "Disabled triggers ignore events and reject webhook calls.",
+                "mode": "Mode",
+                "modeImmutable": "The mode can't be changed after creation.",
+                "agentPrompt": "Agent instructions",
+                "agentPromptPlaceholder": "What should the agent do with each delivery?",
+                "agentPromptHint": "Instructions for the agent. The webhook body is appended in <webhook_body> tags.",
+                "variables": "Expected variables",
+                "variablesPlaceholder": "repo*\nbranch | Branch name",
+                "variablesHint": "One per line: key, or key* when required. A delivery missing a required key is refused. Add a label after |.",
+                "autoStart": "First task",
+                "replayWindow": "Replay window (seconds)",
+                "replayWindowHint": "Repeat deliveries inside this window are ignored.",
+                "showOnBoard": "Show on task board",
+                "showOnBoardHint": "The first task of each fire appears on the Kanban board."
+            },
+            "actions": {
+                "menu": "Trigger actions",
+                "testFire": "Test fire",
+                "edit": "Edit",
+                "rotate": "Rotate secret",
+                "delete": "Delete",
+                "cancel": "Cancel",
+                "create": "Create",
+                "save": "Save",
+                "fireNow": "Fire now"
+            },
+            "reveal": {
+                "title": "Trigger secret",
+                "warning": "Copy the secret now — you won't be able to see it again.",
+                "url": "Webhook URL",
+                "secret": "Signing secret",
+                "copy": "Copy",
+                "copyFailed": "Could not copy to clipboard",
+                "done": "Done"
+            },
+            "toast": {
+                "created": "Trigger created",
+                "createFailed": "Could not create the trigger",
+                "updated": "Trigger updated",
+                "updateFailed": "Could not update the trigger",
+                "toggleFailed": "Could not update the trigger",
+                "deleted": "Trigger deleted",
+                "deleteFailed": "Could not delete the trigger",
+                "rotated": "Secret rotated",
+                "rotateFailed": "Could not rotate the secret",
+                "testFired": "Test task created: {title}",
+                "testFireFailed": "Could not test-fire the trigger",
+                "fired": "Trigger fired: {title}",
+                "fireFailed": "Could not fire the trigger"
+            },
+            "autoStart": {
+                "always": "Start automatically",
+                "manual": "Leave in backlog"
+            },
+            "detail": {
+                "title": "Trigger",
+                "fireNow": "Fire now",
+                "pause": "Pause",
+                "resume": "Resume",
+                "fireSummary": "{count} fires · {mode} mode",
+                "webhookTitle": "Webhook",
+                "webhookUrl": "Webhook URL",
+                "copy": "Copy",
+                "copyFailed": "Could not copy to clipboard",
+                "curlTitle": "Signed curl example",
+                "copyCurl": "Copy example",
+                "curlHint": "The signed timestamp must be within {window} seconds.",
+                "rotate": "Rotate secret",
+                "rotateHint": "The current secret stops working after a 24-hour grace period.",
+                "rotateConfirm": "Rotate the signing secret? The old one keeps working for 24 hours, then stops.",
+                "secretWarning": "Copy the new secret now — you won't be able to see it again.",
+                "recentFires": "Recent fires",
+                "noFires": "This trigger hasn't fired yet.",
+                "viewTask": "View task",
+                "fireStatus": {
+                    "running": "Running",
+                    "done": "Done",
+                    "failed": "Failed",
+                    "refused": "Refused"
+                },
+                "fireOrigin": {
+                    "webhook": "Webhook",
+                    "event": "Platform event",
+                    "manual": "Manual",
+                    "test": "Test"
+                }
+            }
+        },
         "title": "Dashboard",
         "approvals": {
             "header": {
@@ -829,6 +978,62 @@
             }
         },
         "memoryPage": {
+            "files": {
+                "title": "Files",
+                "subtitle": "All your files — chat uploads and knowledge originals — organized into folders. Folders can be Global or private to one agent.",
+                "scopeAll": "All",
+                "scopeGlobal": "Global",
+                "scopeAgents": "Agents",
+                "newFolder": "New folder",
+                "upload": "Upload",
+                "folderExists": "A folder with that name already exists here.",
+                "folderCreateFailed": "Couldn't create the folder — try again.",
+                "uploadFailed": "Upload failed",
+                "moveFailed": "Couldn't move the file — try again.",
+                "deleteRecursiveConfirm": "This folder isn't empty. Delete its subfolders and unfile its files? (No file bytes are deleted.)",
+                "deleteFailed": "Couldn't delete the folder — try again.",
+                "syncNotConfigured": "This folder has no sync repository configured.",
+                "syncFailed": "Sync failed — try again.",
+                "syncDone": "Synced: {committed} committed, {skipped} skipped",
+                "dismiss": "Dismiss",
+                "folderNamePlaceholder": "Folder name",
+                "create": "Create",
+                "cancel": "Cancel",
+                "root": "All files",
+                "empty": "Nothing here yet. Upload a file or create a folder.",
+                "columnName": "Name",
+                "columnSize": "Size",
+                "columnModified": "Modified",
+                "columnActions": "Actions",
+                "fileCount": "{count, plural, =0 {empty} one {# file} other {# files}}",
+                "agentBadge": "Agent",
+                "syncNow": "Sync now",
+                "deleteFolder": "Delete folder",
+                "moveTo": "Move to folder",
+                "rootOption": "— No folder —",
+                "download": "Download",
+                "provenanceTask": "Task",
+                "provenanceMission": "Mission",
+                "provenanceIdea": "Idea",
+                "provenanceAgent": "Agent",
+                "provenanceWork": "Work",
+                "provenanceChat": "Chat",
+                "searchPlaceholder": "Search all files",
+                "emptySearch": "No files match your search.",
+                "preview": "Preview",
+                "previewTitle": "File preview",
+                "previewClose": "Close preview",
+                "previewUnsupported": "No inline preview for this file type — download it to view.",
+                "previewFailed": "Couldn't load the preview.",
+                "configureSync": "Configure git sync",
+                "syncOwnerPlaceholder": "Repository owner",
+                "syncRepoPlaceholder": "Repository name",
+                "syncBranchPlaceholder": "Branch (optional)",
+                "syncDirPrefixPlaceholder": "Folder in repo (optional)",
+                "save": "Save",
+                "removeSync": "Remove sync target",
+                "syncSaveFailed": "Couldn't save the sync target — try again."
+            },
             "consolidation": {
                 "action": "Consolidate",
                 "title": "Consolidate memory",
@@ -988,6 +1193,7 @@
                 "activity": "Activity",
                 "instructions": "Instructions",
                 "skills": "Skills",
+                "capabilities": "Capabilities",
                 "budgets": "Budgets",
                 "settings": "Settings",
                 "terminal": "Terminal"
@@ -1107,7 +1313,42 @@
                 "groupByWork": "Group by Work",
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
-                "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+                "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue.",
+                "detail": {
+                    "title": "Session detail",
+                    "backToSessions": "Back to sessions",
+                    "refresh": "Refresh",
+                    "openTerminal": "Open terminal",
+                    "viewTask": "View task",
+                    "viewTaskNamed": "Task: {title}",
+                    "messagesChip": "{count} messages",
+                    "toolCallsChip": "{count} tool calls",
+                    "filesChip": "{count} files",
+                    "filesTouched": "Files touched",
+                    "filesCountOnly": "{count} files changed (paths were not recorded for this run)",
+                    "timeline": "Timeline",
+                    "emptyTimeline": "No timeline entries were captured for this run yet.",
+                    "loadMore": "Load more entries",
+                    "captureTruncated": "Older entries were omitted — the capture cap for this run was reached.",
+                    "roleUser": "You",
+                    "roleAgent": "Agent",
+                    "unknownTool": "tool",
+                    "toolError": "error",
+                    "toolArgs": "Arguments",
+                    "toolResult": "Result",
+                    "noPreview": "No preview was captured for this call.",
+                    "previewTruncated": "Preview truncated",
+                    "callId": "Call ID",
+                    "chatMessage": "Chat message",
+                    "memorySession": "Memory session",
+                    "steerPlaceholder": "Send a message to this run…",
+                    "steerSend": "Send",
+                    "steerQueued": "Message queued — it will be injected into the live run.",
+                    "steerNewRun": "This run already finished — start a new run to continue.",
+                    "interrupt": "Interrupt",
+                    "cancel": "Cancel",
+                    "runBy": "Run by {agent}"
+                }
             },
             "archived": {
                 "title": "Archived agents",
@@ -1140,6 +1381,45 @@
                 "confirm": "Delete permanently",
                 "success": "{name} deleted",
                 "error": "Could not delete agent"
+            },
+            "capabilities": {
+                "title": "Capabilities",
+                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "tools": {
+                    "title": "Agent tools",
+                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: toggling a tool records an agent-level restriction — updating this agent's deny list, or its allow list when one is set — and a tool denied by a parent scope cannot be re-enabled from this page.",
+                    "groupBuiltin": "Built-in tools",
+                    "groupFacade": "Platform tools",
+                    "groupDomain": "Domain tools",
+                    "resetToInherited": "Reset to inherited",
+                    "inheritedDeny": "Denied by {scope}",
+                    "permissionOff": "Permission off",
+                    "patternDeny": "Denied by a pattern on this agent",
+                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
+                    "empty": "No tools available."
+                },
+                "permissions": {
+                    "title": "Permissions",
+                    "description": "The capability switches stay editable in Settings; shown here read-only.",
+                    "edit": "Edit in Settings"
+                },
+                "skills": {
+                    "title": "Skills",
+                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
+                    "attachPlaceholder": "Attach a skill…",
+                    "installAndAttach": "install & attach",
+                    "inherited": "Inherited",
+                    "empty": "No skills bound yet."
+                },
+                "initScript": {
+                    "title": "Init Script",
+                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
+                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
+                    "save": "Save",
+                    "saved": "Init script saved",
+                    "bytes": "{used} / {max} KB",
+                    "tooLong": "Init script exceeds 16 KB."
+                }
             }
         },
         "tasksPage": {
@@ -1526,7 +1806,35 @@
                 "mission": "Mission",
                 "idea": "Idea",
                 "work": "Work",
-                "tenant": "Workspace"
+                "tenant": "Workspace",
+                "invocation": {
+                    "title": "Invocation Slug",
+                    "helper": "Give this skill a slash command. Typing it at the start of a chat message injects the skill's full instructions into that turn.",
+                    "placeholder": "plan",
+                    "save": "Save",
+                    "saving": "Saving…",
+                    "savedNote": "Saved",
+                    "saveFailed": "Save failed"
+                },
+                "files": {
+                    "title": "Files",
+                    "helper": "Companion files the model can read on demand — scripts, reference docs, and configs. Scripts are read-only: they are never executed.",
+                    "empty": "No files yet — upload scripts, references, or configs below.",
+                    "upload": "Upload file",
+                    "uploading": "Uploading…",
+                    "uploadFailed": "Upload failed",
+                    "deleteFailed": "Remove failed",
+                    "remove": "Remove file",
+                    "kindLabel": "Kind",
+                    "kindAuto": "Auto (by extension)",
+                    "limits": "Max 2 MB per file, 20 files per skill",
+                    "kind": {
+                        "script": "Script",
+                        "reference": "Reference",
+                        "config": "Config",
+                        "asset": "Asset"
+                    }
+                }
             },
             "newPage": {
                 "title": "New Skill",
@@ -1563,7 +1871,10 @@
                 "creating": "Creating...",
                 "titleRequired": "Title is required.",
                 "parentRequired": "Pick a parent for this scope.",
-                "createFailed": "Failed to create Skill"
+                "createFailed": "Failed to create Skill",
+                "invocationLabel": "Invocation Slug (optional)",
+                "invocationPlaceholder": "plan",
+                "invocationHint": "A slash command like /plan that injects this skill into a chat message."
             }
         },
         "templatesPage": {
@@ -2459,6 +2770,15 @@
                     "enforceLabel": "Enforce this default",
                     "enforceDescription": "Always pre-select this pipeline, even when a Work has its own pipeline configured. You can still switch pipelines manually in the form.",
                     "saveFailed": "Failed to save pipeline default"
+                },
+                "voiceDefault": {
+                    "title": "Voice provider",
+                    "description": "Which provider transcribes voice dictation from the chat microphone.",
+                    "autoLabel": "Automatic",
+                    "autoDescription": "Use whichever provider is active for your account",
+                    "currentlyActive": "Currently used",
+                    "noProviders": "None of your configured AI providers support voice transcription.",
+                    "saveFailed": "Could not save the voice provider"
                 }
             },
             "profile": {
@@ -2626,7 +2946,10 @@
                     "platform": "Platform",
                     "capabilities": "Capabilities",
                     "lastSeen": "Last seen",
-                    "load": "Load"
+                    "load": "Load",
+                    "cliVersion": "Agent CLI",
+                    "diskFree": "Disk free",
+                    "cliNotInstalled": "Not installed"
                 },
                 "empty": {
                     "title": "No nodes enrolled yet",
@@ -2750,6 +3073,35 @@
                     "attempts": "{count} attempts",
                     "loading": "Loading history…",
                     "unavailable": "Job history is unavailable right now. The node itself is fine."
+                },
+                "routing": {
+                    "title": "Execution routing",
+                    "description": "Choose where runs execute when you have local runners enrolled. A Work or Goal can override this; the narrowest setting wins.",
+                    "accountLabel": "Default for this account",
+                    "saved": "Execution routing saved",
+                    "cleared": "Override cleared",
+                    "clear": "Clear override",
+                    "overridesTitle": "Overrides",
+                    "overridesEmpty": "No Work or Goal overrides the account default.",
+                    "scopes": {
+                        "work": "Work",
+                        "goal": "Goal",
+                        "user": "Account"
+                    },
+                    "modes": {
+                        "local-wait": {
+                            "label": "Local runner (wait for a free slot)",
+                            "helper": "Always runs on your fleet. If every runner is busy or offline the run waits in the queue instead of moving to the cloud."
+                        },
+                        "local-fallback": {
+                            "label": "Local runner (cloud fallback allowed)",
+                            "helper": "Prefers your fleet, but runs in the cloud when no runner can take the work. You get a notification when that happens."
+                        },
+                        "cloud": {
+                            "label": "Cloud",
+                            "helper": "Always uses the platform runtime, even when a local runner is free."
+                        }
+                    }
                 }
             },
             "jobRuntime": {
@@ -3023,6 +3375,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "digest": {
@@ -3059,6 +3416,63 @@
                     "saveError": "Failed to save the digest settings",
                     "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
                     "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6709,6 +7123,18 @@
                 "start": "Dictate",
                 "stop": "Stop recording",
                 "transcribing": "Transcribing…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Provider default",
+                "autoHint": "Use the model configured for this provider",
+                "configured": "Configured",
+                "all": "All models",
+                "searchPlaceholder": "Search models...",
+                "loading": "Loading models...",
+                "loadError": "Could not load models",
+                "noModels": "No models available",
+                "context": "{value} context"
             }
         },
         "plugins": {
@@ -7303,6 +7729,44 @@
             "message": "Agent runs cannot execute on this install until a job runtime (e.g. Trigger.dev credentials) is set up.",
             "docsLink": "Setup guide",
             "dismiss": "Dismiss"
+        },
+        "runner": {
+            "label": "Runner",
+            "ariaLabel": "Local runners: {online} of {total} online",
+            "count": "{online} of {total} online",
+            "popoverTitle": "Local runners",
+            "refreshNow": "Refresh now",
+            "refreshCaption": "Refreshes every {seconds}s",
+            "manage": "Manage runners",
+            "staleWarning": "Could not refresh — showing the last known status.",
+            "loadUnavailable": "Job activity is temporarily unavailable.",
+            "summary": {
+                "online": "Running",
+                "busy": "Busy",
+                "offline": "Offline",
+                "none": "None"
+            },
+            "nodeState": {
+                "online": "Online",
+                "busy": "Busy",
+                "offline": "Offline",
+                "paused": "Paused",
+                "disabled": "Disabled",
+                "enrolling": "Enrolling"
+            },
+            "fields": {
+                "lastSeen": "Last heartbeat",
+                "daemonVersion": "Daemon",
+                "cliVersion": "Agent CLI",
+                "diskFree": "Disk free",
+                "notInstalled": "Not installed"
+            },
+            "relative": {
+                "second": "{value}s ago",
+                "minute": "{value}m ago",
+                "hour": "{value}h ago",
+                "day": "{value}d ago"
+            }
         }
     },
     "layout": {

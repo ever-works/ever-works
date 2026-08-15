@@ -114,9 +114,11 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 126.
             // +11 goal_* (Goals autonomy layer: loop lifecycle x5, iteration
-            //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 134.
-            expect(literals).toHaveLength(134);
+            //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 137.
+            expect(literals).toHaveLength(137);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

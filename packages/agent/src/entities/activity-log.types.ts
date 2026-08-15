@@ -118,6 +118,14 @@ export enum ActivityActionType {
     // upload-extraction event shape; transcription is "extraction for media".
     KB_UPLOAD_TRANSCRIBED = 'kb_upload_transcribed',
     KB_UPLOAD_TRANSCRIPTION_FAILED = 'kb_upload_transcription_failed',
+    // Memory Files (/memory Files area) — the user-visible folder-tree
+    // state changes. `details` carries `{ folderId, path }` plus
+    // `{ ownerAgentId }` on create, `{ deletedFolders, unlinkedFiles }`
+    // on delete (files are only UNFILED — bytes are never destroyed),
+    // and `{ committed, skipped, failed, commitSha }` on a manual sync.
+    MEMORY_FOLDER_CREATED = 'memory_folder_created',
+    MEMORY_FOLDER_DELETED = 'memory_folder_deleted',
+    MEMORY_FOLDER_SYNCED = 'memory_folder_synced',
     // EW-643 Phase 3 slice 4b — wikilink rename rewriter. Fires when a
     // KB document is renamed and the rewriter sweeps the rest of the
     // Work's docs replacing `[[oldPath]]` with `[[newPath]]`. Details

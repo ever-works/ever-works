@@ -22,6 +22,18 @@ export interface FleetJobEnqueueRequest {
 	requiredCapabilities?: string[];
 	maxAttempts?: number;
 	idempotencyKey?: string | null;
+	/**
+	 * Why this job is queued with nothing able to run it yet — today only
+	 * `waiting-for-runner`, stamped by the platform's fleet run router
+	 * when a `local-wait` run is accepted while every runner is busy or
+	 * offline. Cleared server-side by the lease CAS.
+	 *
+	 * Carried through the port (rather than being a platform-only
+	 * concern) because the dispatcher is the ONLY thing that writes the
+	 * row: a field the factory does not forward is a field that silently
+	 * never reaches the database.
+	 */
+	queuedReason?: string | null;
 }
 
 /**

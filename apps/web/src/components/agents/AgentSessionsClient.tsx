@@ -102,100 +102,112 @@ function SessionRow({
 
     return (
         <li
-            className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-4 py-3"
+            className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-4 py-3 hover:border-border dark:hover:border-border-dark transition-colors"
             data-testid="agent-session-row"
             data-session-status={session.status}
         >
             <div className="flex items-center gap-3 min-w-0">
-                {/* Status pill */}
-                <span
-                    className={cn(
-                        'inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded shrink-0',
-                        tone,
-                    )}
-                    data-testid="agent-session-status"
+                {/* Session detail (Feature K) — the row body links to the
+                    drill-in page. The Attach link stays a SIBLING (outside
+                    this Link) so the two targets never nest. */}
+                <Link
+                    href={ROUTES.DASHBOARD_AGENT_SESSION(session.id)}
+                    className="flex items-center gap-3 min-w-0 flex-1"
+                    data-testid="agent-session-detail-link"
                 >
-                    <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', dot)} aria-hidden />
-                    <span className="font-medium uppercase tracking-wide">{statusLabel}</span>
-                </span>
-                {session.awaitingInput && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 shrink-0">
-                        {t('awaitingInput')}
+                    {/* Status pill */}
+                    <span
+                        className={cn(
+                            'inline-flex items-center gap-1.5 text-[10px] px-1.5 py-0.5 rounded shrink-0',
+                            tone,
+                        )}
+                        data-testid="agent-session-status"
+                    >
+                        <span
+                            className={cn('w-1.5 h-1.5 rounded-full shrink-0', dot)}
+                            aria-hidden
+                        />
+                        <span className="font-medium uppercase tracking-wide">{statusLabel}</span>
                     </span>
-                )}
-                {/* State-aware sweeper (Wave 4 M6) - the PLATFORM flagged
+                    {session.awaitingInput && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 shrink-0">
+                            {t('awaitingInput')}
+                        </span>
+                    )}
+                    {/* State-aware sweeper (Wave 4 M6) - the PLATFORM flagged
                     this run (queued too long / parked while stale), as
                     opposed to the agent asking a question. Rendered as the
                     raw machine token, the same fallback the unknown-
                     queuedReason branch above already uses, so a token added
                     server-side surfaces immediately instead of rendering
                     blank until 20 locale files catch up. */}
-                {session.attentionReason && (
+                    {session.attentionReason && (
+                        <span
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 shrink-0"
+                            data-testid="agent-session-attention"
+                        >
+                            {session.attentionReason}
+                        </span>
+                    )}
+
+                    {/* Agent + Work */}
+                    <span className="text-xs font-medium text-text dark:text-text-dark truncate shrink-0 max-w-40">
+                        {agentName}
+                    </span>
+                    {workName && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark truncate shrink-0 max-w-40">
+                            {workName}
+                        </span>
+                    )}
+
+                    {/* Current activity — plain text by contract, never markup. */}
                     <span
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 shrink-0"
-                        data-testid="agent-session-attention"
+                        className="text-xs text-text-secondary dark:text-text-secondary-dark truncate flex-1 min-w-0"
+                        title={session.currentActivity ?? undefined}
                     >
-                        {session.attentionReason}
+                        {session.currentActivity ?? session.summary ?? ''}
                     </span>
-                )}
 
-                {/* Agent + Work */}
-                <span className="text-xs font-medium text-text dark:text-text-dark truncate shrink-0 max-w-40">
-                    {agentName}
-                </span>
-                {workName && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark truncate shrink-0 max-w-40">
-                        {workName}
+                    {/* Gate chip */}
+                    {session.gateStatus && (
+                        <GateChip
+                            status={session.gateStatus}
+                            failedCount={countFailedRequired(
+                                session.resolvedChecks,
+                                session.checkResults,
+                            )}
+                            className="shrink-0"
+                        />
+                    )}
+
+                    {/* Tokens + cost */}
+                    {session.totalTokens != null && (
+                        <span
+                            className="text-[10px] font-mono text-text-muted shrink-0"
+                            title={t('tokens', { count: session.totalTokens })}
+                        >
+                            {formatCompactTokens(session.totalTokens)}
+                        </span>
+                    )}
+                    {session.costCents != null && (
+                        <span className="text-[10px] font-mono text-text-muted shrink-0">
+                            ${(session.costCents / 100).toFixed(2)}
+                        </span>
+                    )}
+
+                    {/* Started + duration */}
+                    <span className="text-[10px] text-text-muted shrink-0 tabular-nums">
+                        {session.startedAt
+                            ? new Date(session.startedAt).toLocaleString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                              })
+                            : t('notStarted')}
+                        {durationMs != null && ` · ${formatDuration(durationMs)}`}
                     </span>
-                )}
-
-                {/* Current activity — plain text by contract, never markup. */}
-                <span
-                    className="text-xs text-text-secondary dark:text-text-secondary-dark truncate flex-1 min-w-0"
-                    title={session.currentActivity ?? undefined}
-                >
-                    {session.currentActivity ?? session.summary ?? ''}
-                </span>
-
-                {/* Gate chip */}
-                {session.gateStatus && (
-                    <GateChip
-                        status={session.gateStatus}
-                        failedCount={countFailedRequired(
-                            session.resolvedChecks,
-                            session.checkResults,
-                        )}
-                        className="shrink-0"
-                    />
-                )}
-
-                {/* Tokens + cost */}
-                {session.totalTokens != null && (
-                    <span
-                        className="text-[10px] font-mono text-text-muted shrink-0"
-                        title={t('tokens', { count: session.totalTokens })}
-                    >
-                        {formatCompactTokens(session.totalTokens)}
-                    </span>
-                )}
-                {session.costCents != null && (
-                    <span className="text-[10px] font-mono text-text-muted shrink-0">
-                        ${(session.costCents / 100).toFixed(2)}
-                    </span>
-                )}
-
-                {/* Started + duration */}
-                <span className="text-[10px] text-text-muted shrink-0 tabular-nums">
-                    {session.startedAt
-                        ? new Date(session.startedAt).toLocaleString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                          })
-                        : t('notStarted')}
-                    {durationMs != null && ` · ${formatDuration(durationMs)}`}
-                </span>
+                </Link>
 
                 {/* Attach → the run's terminal tab (streaming-terminal M7).
                     Gated on the server-computed `sessionAttachable` (Wave 4
