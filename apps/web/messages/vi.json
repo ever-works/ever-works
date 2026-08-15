@@ -200,7 +200,8 @@
                     "text": "Tôi đồng ý với",
                     "termsLink": "Điều khoản Dịch vụ",
                     "and": "và",
-                    "privacyLink": "Chính sách Bảo mật"
+                    "privacyLink": "Chính sách Bảo mật",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "Tạo tài khoản",
                 "submitting": "Đang tạo tài khoản..."

@@ -200,7 +200,8 @@
                     "text": "أوافق على",
                     "termsLink": "شروط الخدمة",
                     "and": "و",
-                    "privacyLink": "سياسة الخصوصية"
+                    "privacyLink": "سياسة الخصوصية",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "إنشاء الحساب",
                 "submitting": "جاري إنشاء الحساب..."

@@ -200,7 +200,8 @@
                     "text": "אני מסכים ל",
                     "termsLink": "תנאי השירות",
                     "and": "ו",
-                    "privacyLink": "מדיניות הפרטיות"
+                    "privacyLink": "מדיניות הפרטיות",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "צור חשבון",
                 "submitting": "יוצר חשבון..."

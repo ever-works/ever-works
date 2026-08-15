@@ -200,7 +200,8 @@
                     "text": "ฉันยอมรับ",
                     "termsLink": "เงื่อนไขการให้บริการ",
                     "and": "และ",
-                    "privacyLink": "นโยบายความเป็นส่วนตัว"
+                    "privacyLink": "นโยบายความเป็นส่วนตัว",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "สร้างบัญชี",
                 "submitting": "กำลังสร้างบัญชี..."

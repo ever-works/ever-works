@@ -200,7 +200,8 @@
                     "text": "मैं सहमत हूं",
                     "termsLink": "सेवा की शर्तें",
                     "and": "और",
-                    "privacyLink": "गोपनीयता नीति"
+                    "privacyLink": "गोपनीयता नीति",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "खाता बनाएं",
                 "submitting": "खाता बनाया जा रहा है..."

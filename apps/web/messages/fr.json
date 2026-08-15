@@ -200,7 +200,8 @@
                     "text": "J'accepte les",
                     "termsLink": "Conditions d'utilisation",
                     "and": "et",
-                    "privacyLink": "Politique de confidentialité"
+                    "privacyLink": "Politique de confidentialité",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "Créer un compte",
                 "submitting": "Création du compte en cours..."

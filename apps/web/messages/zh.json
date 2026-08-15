@@ -200,7 +200,8 @@
                     "text": "我同意",
                     "termsLink": "服务条款",
                     "and": "和",
-                    "privacyLink": "隐私政策"
+                    "privacyLink": "隐私政策",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "创建帐户",
                 "submitting": "正在创建帐户..."

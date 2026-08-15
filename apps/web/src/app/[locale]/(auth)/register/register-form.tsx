@@ -219,7 +219,20 @@ export default function RegisterForm({
                             </div>
                         </div>
 
-                        <SocialLoginButtons providers={availableSocialProviders} />
+                        {/*
+                         * Gated on the SAME condition as Create account. These
+                         * buttons sit inside this form but are type="button",
+                         * so they never triggered the required checkbox's
+                         * validation and never reached handleSubmit — a click
+                         * created a real account with consent unticked, and
+                         * with the documents unloaded even though the email
+                         * path refuses in that state.
+                         */}
+                        <SocialLoginButtons
+                            providers={availableSocialProviders}
+                            disabled={!formData.acceptedTerms || termsUnavailable}
+                            disabledReason={t('form.terms.required')}
+                        />
                     </>
                 )}
 
