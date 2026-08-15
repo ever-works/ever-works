@@ -301,6 +301,7 @@ export class Task {
      */
     @PortableDateColumn({ nullable: true })
     scheduleClaimedAt?: Date | null;
+
     /**
      * Keep this Task off the Kanban board and the default Task lists.
      *

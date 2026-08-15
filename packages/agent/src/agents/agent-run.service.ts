@@ -8,6 +8,9 @@ import {
     SkillBindingRepository,
     type ResolvedSkill,
 } from '../database/repositories/skill-binding.repository';
+import { SkillRepository } from '../database/repositories/skill.repository';
+import { SkillFileRepository } from '../database/repositories/skill-file.repository';
+import { buildInvokedSkillBlock, parseSlashInvocation } from '../skills/skill-invocation';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import {
@@ -220,6 +223,13 @@ export class AgentRunService {
         @Optional()
         @Inject(TOOL_GRANT_ENFORCER)
         private readonly toolGrants?: ToolGrantEnforcer,
+        // Skill files + invocation slugs. Trailing + `@Optional()` so every
+        // existing positional constructor call keeps working. `skillRepo`
+        // backs the `/slug` slash-invocation lookup on chat runs;
+        // `skillFiles` backs the per-skill `files:` manifest in the
+        // ACTIVE SKILLS block. Both resolve via the SkillsModule import.
+        @Optional() private readonly skillRepo?: SkillRepository,
+        @Optional() private readonly skillFiles?: SkillFileRepository,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -423,6 +433,82 @@ export class AgentRunService {
                         },
                     })
                     .catch(() => undefined);
+            }
+        }
+
+        // 3c. Invocation slugs (slash commands) — when a chat message
+        // starts with `/<known-invocation-slug>` (word-boundary), the
+        // user's skill is resolved and its FULL body is injected into
+        // this turn, system-side (a forced getSkillBody). The original
+        // message is left untouched; unknown `/foo` stays plain text.
+        // Appended AFTER assembly for the same reasons as the vision
+        // block above (recipe untouched, tail-first truncation keeps
+        // appended segments stable). Best-effort: a failed lookup logs
+        // WARN and the run continues without the injection.
+        if (context.kind === 'chat' && this.skillRepo && context.immediateInput) {
+            const requestedSlug = parseSlashInvocation(context.immediateInput);
+            if (requestedSlug) {
+                try {
+                    const invoked = await this.skillRepo.findByUserAndInvocationSlug(
+                        context.userId,
+                        requestedSlug,
+                    );
+                    if (invoked && invoked.invocationSlug) {
+                        let invokedFiles:
+                            | Array<{ filename: string; kind: string; sizeBytes: number }>
+                            | undefined;
+                        if (this.skillFiles) {
+                            invokedFiles = (
+                                await this.skillFiles
+                                    .findBySkillIds([invoked.id], context.userId)
+                                    .catch(() => [])
+                            ).map((f) => ({
+                                filename: f.filename,
+                                kind: f.kind,
+                                sizeBytes: f.sizeBytes,
+                            }));
+                            if (invokedFiles.length === 0) invokedFiles = undefined;
+                        }
+                        const block = buildInvokedSkillBlock({
+                            slug: invoked.slug,
+                            invocationSlug: invoked.invocationSlug,
+                            title: invoked.title,
+                            version: invoked.version,
+                            instructionsMd: invoked.instructionsMd,
+                            files: invokedFiles,
+                        });
+                        prompt.systemMessage = `${prompt.systemMessage}\n\n${block}`;
+                        prompt.totalSystemTokens = estimateTokens(prompt.systemMessage);
+                        await this.runLogs
+                            .append({
+                                runId: context.runId,
+                                level: 'INFO',
+                                step: 'skill-invocation',
+                                message: `Slash command "/${invoked.invocationSlug}" injected skill "${invoked.slug}" into this turn.`,
+                                metadata: {
+                                    skillSlug: invoked.slug,
+                                    invocationSlug: invoked.invocationSlug,
+                                    bodyTokens: estimateTokens(invoked.instructionsMd),
+                                },
+                            })
+                            .catch(() => undefined);
+                        void this.logActivity({
+                            userId: agent.userId,
+                            agentId: agent.id,
+                            actionType: ActivityActionType.SKILL_INVOKED,
+                            details: {
+                                skillSlug: invoked.slug,
+                                invocationSlug: invoked.invocationSlug,
+                                via: 'slash-command',
+                                runId: context.runId,
+                            },
+                        });
+                    }
+                } catch (err) {
+                    this.logger.warn(
+                        `Slash-invocation lookup failed for run ${context.runId} (message continues as plain text): ${err}`,
+                    );
+                }
             }
         }
 
@@ -1753,7 +1839,14 @@ export class AgentRunService {
     private async resolveSkillsForRun(
         agent: Agent,
         runId?: string,
-    ): Promise<Array<{ slug: string; body: string; priority: number }>> {
+    ): Promise<
+        Array<{
+            slug: string;
+            body: string;
+            priority: number;
+            files?: Array<{ filename: string; kind: string; sizeBytes: number }>;
+        }>
+    > {
         if (!this.skillBindings) return [];
         const rows: ResolvedSkill[] = await this.skillBindings.resolveActive({
             userId: agent.userId,
@@ -1764,6 +1857,7 @@ export class AgentRunService {
             forAgentRun: true,
         });
         const candidates = rows.map(({ binding, skill }) => ({
+            skillId: skill.id,
             slug: skill.slug,
             body: skill.instructionsMd,
             priority: binding.priority,
@@ -1788,7 +1882,40 @@ export class AgentRunService {
                 .catch(() => undefined);
         }
 
-        return active.map(({ slug, body, priority }) => ({ slug, body, priority }));
+        // Skill files feature — attach the per-skill companion-file
+        // manifest (one batched query). Best-effort: a failed lookup
+        // degrades to "no manifest", never to a failed run.
+        let filesBySkillId = new Map<
+            string,
+            Array<{ filename: string; kind: string; sizeBytes: number }>
+        >();
+        if (this.skillFiles && active.length > 0) {
+            try {
+                const fileRows = await this.skillFiles.findBySkillIds(
+                    active.map((entry) => entry.skillId),
+                    agent.userId,
+                );
+                filesBySkillId = fileRows.reduce((map, file) => {
+                    const list = map.get(file.skillId) ?? [];
+                    list.push({
+                        filename: file.filename,
+                        kind: file.kind,
+                        sizeBytes: file.sizeBytes,
+                    });
+                    map.set(file.skillId, list);
+                    return map;
+                }, filesBySkillId);
+            } catch (err) {
+                this.logger.warn(
+                    `Skill-file manifest lookup failed for agent ${agent.id}; skills inject without manifests: ${err}`,
+                );
+            }
+        }
+
+        return active.map(({ skillId, slug, body, priority }) => {
+            const files = filesBySkillId.get(skillId);
+            return files ? { slug, body, priority, files } : { slug, body, priority };
+        });
     }
 
     /**
@@ -1827,11 +1954,11 @@ export class AgentRunService {
      * Token-count uses the same char/4 v1 estimator as PromptAssembler
      * so the upstream cap math stays consistent.
      */
-    private selectSkillsWithinBudget(
-        resolved: Array<{ slug: string; body: string; priority: number }>,
+    private selectSkillsWithinBudget<T extends { slug: string; body: string; priority: number }>(
+        resolved: T[],
         capTokens: number,
         runId: string,
-    ): Array<{ slug: string; body: string; priority: number }> {
+    ): T[] {
         if (resolved.length === 0) return [];
         const sorted = [...resolved].sort((a, b) => a.priority - b.priority);
         const kept: typeof sorted = [];

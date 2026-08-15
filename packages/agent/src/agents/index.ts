@@ -68,6 +68,7 @@ export * from './agent-email-facade';
 export * from './agent-notify-channel-facade';
 export * from './agent-plugin-tools-facade';
 export * from './agent-tools-skill';
+export * from './agent-tools-skill-file';
 export * from './agent-tool.service';
 // Capabilities tab — the static tool catalog, derived from the same
 // assembly `resolveAllowedTools` runs (never hand-maintained).

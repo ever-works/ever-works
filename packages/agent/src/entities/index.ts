@@ -66,6 +66,7 @@ export * from './agent-collaborator.entity';
 export * from './agent-membership.entity';
 export * from './skill.entity';
 export * from './skill-binding.entity';
+export * from './skill-file.entity';
 export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';

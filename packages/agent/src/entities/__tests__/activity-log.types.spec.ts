@@ -142,6 +142,15 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 126.
+            // The Agent Workbench integration branch then landed the rest of
+            // its 14 feature slices (capabilities, collaborators, environments,
+            // skills, MCP, repos, inbox, sessions, task triggers, goals,
+            // costs, fleet) on top. `memory_folder_*` arrived on BOTH routes
+            // — via #2081 straight to develop and via this branch — so it is
+            // shared, not additive. Counted from the merged enum rather than
+            // derived: 157.
             expect(literals).toHaveLength(157);
         });
 

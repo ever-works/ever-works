@@ -138,6 +138,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Skills family (PR #1019) ──
     'Skill',
     'SkillBinding',
+    'SkillFile',
     // ───────────────────────────
     'SubscriptionPlan',
     // Tasks family (PR #1019) ──

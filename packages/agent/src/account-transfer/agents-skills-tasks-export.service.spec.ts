@@ -10,6 +10,7 @@ function makeSvc(over: any = {}) {
     const reviewers = { findByTaskId: jest.fn().mockResolvedValue([]) };
     const approvers = { findByTaskId: jest.fn().mockResolvedValue([]) };
     const chat = { findByTaskId: jest.fn().mockResolvedValue([]) };
+    const skillFiles = { findBySkillId: jest.fn().mockResolvedValue([]) };
     const deps = {
         agents,
         agentExport,
@@ -20,6 +21,7 @@ function makeSvc(over: any = {}) {
         reviewers,
         approvers,
         chat,
+        skillFiles,
         ...over,
     };
     const svc = new AgentsSkillsTasksExportService(
@@ -32,6 +34,7 @@ function makeSvc(over: any = {}) {
         deps.reviewers,
         deps.approvers,
         deps.chat,
+        deps.skillFiles,
     );
     return { svc, ...deps };
 }
@@ -112,6 +115,79 @@ describe('AgentsSkillsTasksExportService.exportTail', () => {
         const bindingsOut = tail.skills![0].bindings;
         expect(bindingsOut[0].targetSlug).toBeNull();
         expect(bindingsOut[1].targetSlug).toBe('agent-a');
+    });
+
+    it('exports invocationSlug + companion-file metadata on each skill (skill files feature)', async () => {
+        const { svc, skills, skillFiles } = makeSvc();
+        skills.findByUserIdFiltered.mockResolvedValueOnce({
+            rows: [
+                {
+                    id: 's1',
+                    ownerType: 'tenant',
+                    ownerId: 'u1',
+                    slug: 'cron',
+                    title: 'Cron',
+                    description: 'd',
+                    frontmatter: { name: 'cron', description: 'd' },
+                    instructionsMd: '# UTC',
+                    sourceCatalogSlug: null,
+                    sourceCatalogVersion: null,
+                    version: '1.0.0',
+                    invocationSlug: 'cron',
+                },
+            ],
+            total: 1,
+        });
+        skillFiles.findBySkillId.mockResolvedValueOnce([
+            {
+                uploadId: 'a'.repeat(64),
+                filename: 'tz.md',
+                kind: 'reference',
+                sizeBytes: 128,
+                mime: 'text/markdown',
+                // Extra row-only columns must NOT leak into the envelope.
+                id: 'f1',
+                skillId: 's1',
+                userId: 'u1',
+            },
+        ]);
+        const tail = await svc.exportTail('u1', { includeSkills: true });
+        expect(tail.skills![0].invocationSlug).toBe('cron');
+        expect(tail.skills![0].files).toEqual([
+            {
+                uploadId: 'a'.repeat(64),
+                filename: 'tz.md',
+                kind: 'reference',
+                sizeBytes: 128,
+                mime: 'text/markdown',
+            },
+        ]);
+        expect(skillFiles.findBySkillId).toHaveBeenCalledWith('s1', 'u1');
+    });
+
+    it('exports skills without files/invocationSlug as null/[] (older rows)', async () => {
+        const { svc, skills } = makeSvc();
+        skills.findByUserIdFiltered.mockResolvedValueOnce({
+            rows: [
+                {
+                    id: 's1',
+                    ownerType: 'tenant',
+                    ownerId: 'u1',
+                    slug: 'plain',
+                    title: 'Plain',
+                    description: 'd',
+                    frontmatter: {},
+                    instructionsMd: 'x',
+                    sourceCatalogSlug: null,
+                    sourceCatalogVersion: null,
+                    version: '1.0.0',
+                },
+            ],
+            total: 1,
+        });
+        const tail = await svc.exportTail('u1', { includeSkills: true });
+        expect(tail.skills![0].invocationSlug).toBeNull();
+        expect(tail.skills![0].files).toEqual([]);
     });
 
     it('exports Tasks and rewrites parentTaskId → parentTaskSlug', async () => {
