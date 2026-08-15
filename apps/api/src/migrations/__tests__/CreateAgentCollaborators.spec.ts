@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { CreateAgentCollaborators1785010000000 } from '../1785010000000-CreateAgentCollaborators';
+import { CreateAgentCollaborators1786800000000 } from '../1786800000000-CreateAgentCollaborators';
 
 /**
  * Migration test for the `agent_collaborators` table.
@@ -8,9 +8,9 @@ import { CreateAgentCollaborators1785010000000 } from '../1785010000000-CreateAg
  * run sqlite while production runs Postgres, so passing here is what
  * proves the portable Table API usage actually is portable.
  */
-describe('CreateAgentCollaborators1785010000000', () => {
+describe('CreateAgentCollaborators1786800000000', () => {
     let dataSource: DataSource;
-    const migration = new CreateAgentCollaborators1785010000000();
+    const migration = new CreateAgentCollaborators1786800000000();
 
     beforeEach(async () => {
         dataSource = new DataSource({

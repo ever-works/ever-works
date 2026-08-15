@@ -21,7 +21,7 @@ any future caller), because enforcement lives in the single runner choke point.
   `collaboratorAgentId`; index on `userId`.
 - Registered in `entities/index.ts`, `database/_entities-inventory.ts`,
   `database/_entity-names.ts` (drift specs stay green).
-- **Migration** `apps/api/src/migrations/1785010000000-CreateAgentCollaborators.ts` —
+- **Migration** `apps/api/src/migrations/1786800000000-CreateAgentCollaborators.ts` —
   portable Table API, idempotent guard, FKs to `agents.id` CASCADE on BOTH ends
   (guarded on `hasTable('agents')`), spec at
   `apps/api/src/migrations/__tests__/CreateAgentCollaborators.spec.ts`.

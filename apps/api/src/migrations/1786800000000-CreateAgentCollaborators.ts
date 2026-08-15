@@ -43,8 +43,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * with an idempotent guard (house pattern, mirrors
  * 1785000000000-CreateTermsAcceptance).
  */
-export class CreateAgentCollaborators1785010000000 implements MigrationInterface {
-    name = 'CreateAgentCollaborators1785010000000';
+export class CreateAgentCollaborators1786800000000 implements MigrationInterface {
+    name = 'CreateAgentCollaborators1786800000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (await queryRunner.hasTable('agent_collaborators')) {
