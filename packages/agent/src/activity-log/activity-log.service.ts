@@ -355,6 +355,21 @@ export class ActivityLogService {
         return this.repository.findAgentEvents(options);
     }
 
+    /**
+     * Tasks upgrades — the per-Task activity feed. User-scoped; matches
+     * rows stamped with `details.resourceType`/`details.resourceId` by
+     * the task-domain writers.
+     */
+    async findResourceEvents(options: {
+        userId: string;
+        resourceType: string;
+        resourceId: string;
+        limit?: number;
+        offset?: number;
+    }): Promise<{ activities: ActivityLog[]; total: number }> {
+        return this.repository.findResourceEvents(options);
+    }
+
     async countRunning(userId: string): Promise<number> {
         return this.repository.countByStatus(userId, 'in_progress' as ActivityStatus);
     }

@@ -138,6 +138,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TaskRelation',
     'TaskReviewRejection',
     'TaskReviewer',
+    // Tasks upgrades — workflow templates (parent + steps).
+    'TaskTemplate',
+    'TaskTemplateStep',
     'TaskWatcher',
     // ──────────────────────────
     // Teams & Prebuilt Companies (teams-and-companies spec §2) ──

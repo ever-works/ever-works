@@ -13,7 +13,10 @@ export type TaskNotificationEvent =
     | 'task_status_changed'
     | 'task_blocked'
     | 'task_due_soon'
-    | 'task_recurrence_fired';
+    | 'task_recurrence_fired'
+    // Schedule modes — a scheduled/recurring dispatch found NO resolvable
+    // agent; the task is waiting for a human instead of silently skipped.
+    | 'task_run_no_agent';
 
 export interface TaskNotificationContext {
     taskId: string;
@@ -37,6 +40,7 @@ const TYPE_BY_EVENT: Record<TaskNotificationEvent, NotificationType> = {
     task_blocked: NotificationType.WARNING,
     task_due_soon: NotificationType.WARNING,
     task_recurrence_fired: NotificationType.INFO,
+    task_run_no_agent: NotificationType.WARNING,
 };
 
 /**
@@ -154,6 +158,8 @@ export class TaskNotificationService {
                 return `${ctx.taskSlug} due soon`;
             case 'task_recurrence_fired':
                 return `New recurrence: ${ctx.taskSlug}`;
+            case 'task_run_no_agent':
+                return `${ctx.taskSlug} needs an agent`;
         }
     }
 
@@ -176,6 +182,8 @@ export class TaskNotificationService {
                 return `"${ctx.taskTitle}" is due soon.`;
             case 'task_recurrence_fired':
                 return `A new instance of recurring Task "${ctx.taskTitle}" was created.`;
+            case 'task_run_no_agent':
+                return `Scheduled Task "${ctx.taskTitle}" fired but has no Agent to run it — assign one to dispatch it.`;
         }
     }
 }

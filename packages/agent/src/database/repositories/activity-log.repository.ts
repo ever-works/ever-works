@@ -153,6 +153,41 @@ export class ActivityLogRepository {
         return { activities, total };
     }
 
+    /**
+     * Tasks upgrades — the per-Task activity feed. Task-domain writers
+     * (`TasksService.logActivity`) stamp `details.resourceType='task'` +
+     * `details.resourceId=<taskId>`; like {@link findAgentEvents} this
+     * matches the serialized JSON fragments (portable LIKE on the
+     * `simple-json` text column), scoped by userId so the scan stays
+     * small and owner-bounded.
+     */
+    async findResourceEvents(options: {
+        userId: string;
+        resourceType: string;
+        resourceId: string;
+        limit?: number;
+        offset?: number;
+    }): Promise<{ activities: ActivityLog[]; total: number }> {
+        const limit = Math.min(options.limit ?? 25, 100);
+        const offset = options.offset ?? 0;
+        // Escape LIKE wildcards in both needles (see findAgentEvents).
+        const escape = (value: string) => value.replace(/[\\%_]/g, '\\$&');
+        const [activities, total] = await this.repository
+            .createQueryBuilder('activity')
+            .where('activity.userId = :userId', { userId: options.userId })
+            .andWhere("activity.details LIKE :typeNeedle ESCAPE '\\'", {
+                typeNeedle: `%"resourceType":"${escape(options.resourceType)}"%`,
+            })
+            .andWhere("activity.details LIKE :idNeedle ESCAPE '\\'", {
+                idNeedle: `%"resourceId":"${escape(options.resourceId)}"%`,
+            })
+            .orderBy('activity.createdAt', 'DESC')
+            .take(limit)
+            .skip(offset)
+            .getManyAndCount();
+        return { activities, total };
+    }
+
     async findLatestByUserWorkActionStatus(params: {
         userId: string;
         workId: string;

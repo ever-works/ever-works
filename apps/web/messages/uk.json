@@ -1293,7 +1293,22 @@
                 "acceptanceChecks": "Acceptance checks",
                 "acceptanceChecksHint": "Commands that must exit 0 before this Task's agent work can open a pull request. Leave empty to inherit the Work's default checks.",
                 "maxGateAttempts": "Max gate attempts",
-                "maxGateAttemptsInherit": "Inherit from Work"
+                "maxGateAttemptsInherit": "Inherit from Work",
+                "modeLabel": "What to create",
+                "modeBlank": "Blank task",
+                "modeTemplate": "From template",
+                "template": "Workflow template",
+                "templateOption": "{name} — {steps} steps",
+                "templatesEmpty": "No workflow templates available",
+                "templatesLoadError": "Failed to load workflow templates",
+                "templateRequired": "Pick a workflow template first.",
+                "branchName": "Branch name (optional)",
+                "branchNamePlaceholder": "feat/my-feature",
+                "willCreate": "Will create a parent Task plus {steps} sub-tasks:",
+                "stepApproval": "approval",
+                "featureName": "Feature name",
+                "featureDescription": "Feature description",
+                "createFromTemplate": "Create workflow"
             },
             "detail": {
                 "moveTo": "Перемістити до",
@@ -1362,7 +1377,10 @@
                     "resumeDispatched": "Resumed — a new run is picking up the same session.",
                     "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
                     "genericError": "That run control could not be applied."
-                }
+                },
+                "attachmentAttachAs": "Attach as",
+                "attachmentRoleInitial": "Input",
+                "attachmentRoleResult": "Result"
             },
             "recurring": {
                 "section": "Повторюване розкладання",
@@ -1376,7 +1394,12 @@
                 "dayOfWeek": "День тижня",
                 "dayOfMonth": "День місяця",
                 "timezone": "Часовий пояс",
-                "save": "Зберегти розклад"
+                "save": "Зберегти розклад",
+                "cron": "Cron expression",
+                "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
+                "errorPickWeekday": "Pick at least one weekday.",
+                "errorInvalidRule": "A valid recurrence rule is required.",
+                "errorInvalidCron": "A cron expression needs exactly 5 fields."
             },
             "status": {
                 "backlog": "Чернетки",
@@ -1481,6 +1504,52 @@
                     "typecheck": "Type check",
                     "custom": "Custom"
                 }
+            },
+            "schedule": {
+                "section": "Schedule",
+                "modeOnce": "Run once",
+                "modeScheduled": "Scheduled",
+                "modeRecurring": "Recurring",
+                "onceHint": "This Task runs when it is dispatched — there is no schedule.",
+                "scheduledHint": "Run this Task once, automatically, at the time you pick.",
+                "recurringHint": "Spawn a fresh instance of this Task on a repeating cadence.",
+                "runAt": "Run at",
+                "save": "Schedule",
+                "unschedule": "Remove schedule",
+                "scheduleError": "Failed to schedule this Task",
+                "unscheduleError": "Failed to remove the schedule",
+                "errorInvalidDate": "Pick a valid date and time.",
+                "errorPastDate": "Pick a time in the future.",
+                "armedFor": "Armed for {at}",
+                "firedAt": "Dispatched at {at}",
+                "stillScheduled": "Still scheduled for {at}",
+                "recurringConflict": "This Task is a recurring template. Stop the recurrence before scheduling a one-shot run."
+            },
+            "subtasks": {
+                "section": "Sub-tasks",
+                "empty": "No sub-tasks yet.",
+                "add": "Add",
+                "addPlaceholder": "Add a sub-task…",
+                "addError": "Failed to add the sub-task",
+                "approvalPending": "Approval",
+                "approvalCleared": "Approved",
+                "approvalCount": "{approved} of {total} approvers signed off"
+            },
+            "activity": {
+                "section": "Activity",
+                "empty": "No activity recorded for this Task yet.",
+                "viewRuns": "View runs",
+                "truncated": "Showing {shown} of {total} entries"
+            },
+            "templates": {
+                "workflowsSection": "My workflows",
+                "workflowsEmpty": "No workflow templates yet.",
+                "useInNewTask": "Use in a new Task",
+                "stepCount": "{count} steps",
+                "delete": "Delete template",
+                "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
+                "deleteError": "Failed to delete the template",
+                "requiresApproval": "Requires approval"
             }
         },
         "skillsPage": {
