@@ -102,14 +102,16 @@ describe('taxonomy-watcher', () => {
 					JSON.stringify({ name: 'A', category: 'Cat' }),
 					'utf-8'
 				);
-				await sleep(200);
+				// Both waits expect a callback to FIRE, so poll for it rather than
+				// hoping a fixed sleep outlasts fs-watch latency.
+				await waitUntil(() => onNewItem.mock.calls.length >= 1);
 
 				await writeFile(
 					join(workspacePath, 'item-b.json'),
 					JSON.stringify({ name: 'B', category: 'Cat' }),
 					'utf-8'
 				);
-				await sleep(200);
+				await waitUntil(() => onNewItem.mock.calls.length >= 2);
 
 				expect(onNewItem).toHaveBeenCalledTimes(2);
 				expect(onNewItem).toHaveBeenNthCalledWith(1, 1, 'item-a.json');
@@ -145,7 +147,7 @@ describe('taxonomy-watcher', () => {
 					JSON.stringify({ name: 'New', category: 'Test' }),
 					'utf-8'
 				);
-				await sleep(200);
+				await waitUntil(() => onNewItem.mock.calls.length >= 1);
 
 				expect(onNewItem).toHaveBeenCalledTimes(1);
 				expect(onNewItem).toHaveBeenCalledWith(1, 'new-item.json');
@@ -203,6 +205,27 @@ describe('taxonomy-watcher', () => {
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll `check` until it returns true, or give up after `timeoutMs`.
+ *
+ * fs-watch latency is unbounded under CI load, so "write a file, sleep a fixed
+ * 200ms, then assert the watcher already reacted" is a race — it fails on a
+ * loaded runner while passing every time locally. Every wait that expects
+ * something to HAPPEN polls for it instead.
+ *
+ * Note the asymmetry: a wait that asserts something did NOT happen cannot be
+ * polled (there is no state to converge on), so those keep their fixed sleep.
+ * Returns rather than throws — the caller's own assertion should produce the
+ * failure message, not this helper.
+ */
+async function waitUntil(check: () => boolean | Promise<boolean>, timeoutMs = 6000): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		if (await check()) return;
+		await sleep(50);
+	}
 }
 
 /**

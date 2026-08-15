@@ -83,12 +83,13 @@ interface CatalogResponse {
 /**
  * Mirror of `computeStepList` in useOnboardingFlow.ts. Base flow is always
  * welcome → ai-choice → storage-choice → db-choice → deploy-choice →
- * plugins-catalog → create-work (7 steps). Per-provider config steps are
- * inserted ONLY for a non-default choice in the ai/storage/deploy buckets.
- * The db bucket adds a bare db-choice step with NO config sub-step (even for
- * the non-default `custom` choice — its connection details are entered on the
- * Deploy page after creation, not in the wizard). With all defaults that is
- * exactly 7 steps; with all BYOK + a self-hosted deploy it is 10.
+ * desktop-choice → profile → communication → plugins-catalog → create-work
+ * (10 steps). Per-provider config steps are inserted ONLY for a non-default
+ * choice in the ai/storage/deploy buckets. The db bucket adds a bare
+ * db-choice step with NO config sub-step (even for the non-default `custom`
+ * choice — its connection details are entered on the Deploy page after
+ * creation, not in the wizard). With all defaults that is exactly 10 steps;
+ * with all BYOK + a self-hosted deploy it is 13.
  */
 function computeStepIds(state: Pick<WizardStateV2, 'ai' | 'storage' | 'deploy'>): string[] {
     const ids: string[] = ['welcome', 'ai-choice'];
@@ -100,6 +101,12 @@ function computeStepIds(state: Pick<WizardStateV2, 'ai' | 'storage' | 'deploy'>)
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         ids.push(`deploy-config:${state.deploy.choice}`);
     }
+    // A8 (786b7157) added the UNCONDITIONAL `desktop-choice` step between the
+    // deploy config and profile. This mirror was synced to Wave 11 and never
+    // resynced for A8, which made the Help drawer's derived x/N badge one
+    // greater than every assertion below — the class of drift the lockstep
+    // comment warns about, happening anyway.
+    ids.push('desktop-choice');
     // Wave 11 added two always-shown, always-skippable steps between the
     // provider choices and the catalog: `profile` ("what do you do" — roles +
     // team size) and `communication` (connect chat workspaces). Mirrors
@@ -162,7 +169,7 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
         expect(pristine.state.skippedSteps).toEqual([]);
         expect(pristine.state.pluginsReviewed).toBe(false);
 
-        // With all defaults the wizard renders exactly the 7 base steps —
+        // With all defaults the wizard renders exactly the 10 base steps —
         // no config sub-steps because every ai/storage/deploy bucket is the
         // Ever Works default, and db-choice is always a bare step.
         expect(computeStepIds(pristine.state)).toEqual([
@@ -171,6 +178,7 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
             'storage-choice',
             'db-choice',
             'deploy-choice',
+            'desktop-choice',
             'profile',
             'communication',
             'plugins-catalog',
@@ -217,10 +225,10 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
         expect(afterAi.state.deploy.choice).toBe('ever-works');
 
         // The derived step list now includes an ai-config step → 10 steps
-        // (the 9 base steps + the inserted ai-config sub-step).
+        // (the 10 base steps + the inserted ai-config sub-step).
         const stepsAfterAi = computeStepIds(afterAi.state);
         expect(stepsAfterAi).toContain(`ai-config:${byokAi}`);
-        expect(stepsAfterAi).toHaveLength(10);
+        expect(stepsAfterAi).toHaveLength(11);
 
         // Step — pick a non-default storage + deploy that each add a config
         // sub-step, advance lastStep, and skip the plugins step.
@@ -253,6 +261,7 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
             'db-choice',
             'deploy-choice',
             'deploy-config:vercel',
+            'desktop-choice',
             'profile',
             'communication',
             'plugins-catalog',
@@ -408,10 +417,10 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
         // Badge label maths: currentStep = min(lastStep + 1, totalSteps),
         // totalSteps = derived step count. All defaults → 9 steps (welcome,
         // ai-choice, storage-choice, db-choice, deploy-choice, profile,
-        // communication, plugins-catalog, create-work), lastStep 4 → "5/9".
+        // communication, plugins-catalog, create-work), lastStep 4 → "5/10".
         const totalSteps = computeStepIds(after.state).length;
         const currentStep = Math.min(after.state.lastStep + 1, totalSteps);
-        expect(totalSteps).toBe(9);
+        expect(totalSteps).toBe(10);
         expect(currentStep).toBe(5);
     });
 
