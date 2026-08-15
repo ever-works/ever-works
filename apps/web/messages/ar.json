@@ -2193,10 +2193,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "تثبيتات تطبيق GitHub",
@@ -6983,7 +6983,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -7006,7 +7005,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -7016,8 +7014,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "أدخل بريدًا إلكترونيًا صالحًا أو اتركه فارغًا."
+                "participantEmailInvalid": "أدخل بريدًا إلكترونيًا صالحًا أو اتركه فارغًا.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -7028,17 +7026,15 @@
             "backToMeetings": "العودة إلى الاجتماعات",
             "actions": {
                 "openRecording": "فتح التسجيل",
+                "edit": "تعديل",
                 "delete": "حذف",
                 "attachTranscript": "إرفاق النص",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "حفظ التغييرات",
-                "edit": "تعديل",
                 "attaching": "جارٍ الإرفاق…",
                 "editTranscript": "تعديل النص",
                 "cancelEdit": "إلغاء التعديل",
                 "saveTranscript": "حفظ النص",
                 "savingTranscript": "جارٍ الحفظ…",
+                "save": "حفظ التغييرات",
                 "cancel": "إلغاء"
             },
             "sections": {
@@ -7048,10 +7044,10 @@
                 "edit": "تعديل الاجتماع"
             },
             "summary": {
-                "notGenerated": "لم يتم إنشاء ملخص لهذا النص. فعّل مزوّد ذكاء اصطناعي وأعد إرفاق النص للمحاولة مرة أخرى.",
-                "noTranscript": "أرفق نصًا مدوّنًا لإنشاء ملخص.",
                 "generating": "جارٍ إنشاء الملخص…",
-                "generatingHint": "نقرأ النص ونكتب الملخص — يستغرق ذلك عادةً بضع ثوانٍ."
+                "generatingHint": "نقرأ النص ونكتب الملخص — يستغرق ذلك عادةً بضع ثوانٍ.",
+                "notGenerated": "لم يتم إنشاء ملخص لهذا النص. فعّل مزوّد ذكاء اصطناعي وأعد إرفاق النص للمحاولة مرة أخرى.",
+                "noTranscript": "أرفق نصًا مدوّنًا لإنشاء ملخص."
             },
             "transcript": {
                 "composerLabel": "نص الاجتماع المدوّن",
@@ -7077,11 +7073,11 @@
             },
             "fields": {
                 "title": "العنوان",
+                "startedAt": "وقت البدء",
                 "endedAt": "وقت الانتهاء",
                 "sourceUrl": "رابط التسجيل",
                 "work": "العمل",
                 "workNone": "على مستوى المؤسسة (بدون عمل)",
-                "startedAt": "وقت البدء",
                 "participants": "المشاركون",
                 "participantName": "الاسم",
                 "participantEmail": "البريد الإلكتروني (اختياري)",
@@ -7091,25 +7087,22 @@
             },
             "errors": {
                 "titleRequired": "العنوان مطلوب.",
+                "startedAtInvalid": "وقت البدء ليس تاريخًا صالحًا.",
                 "endedAtInvalid": "وقت الانتهاء ليس تاريخًا صالحًا.",
                 "endedBeforeStarted": "لا يمكن أن يسبق وقت الانتهاء وقت البدء.",
-                "transcriptRequired": "النص المدوّن مطلوب.",
-                "startedAtInvalid": "وقت البدء ليس تاريخًا صالحًا.",
                 "participantEmailInvalid": "أدخل بريدًا إلكترونيًا صالحًا أو اتركه فارغًا.",
-                "participantDuplicate": "هذا الشخص موجود بالفعل في القائمة."
+                "participantDuplicate": "هذا الشخص موجود بالفعل في القائمة.",
+                "transcriptRequired": "النص المدوّن مطلوب."
             },
             "toasts": {
                 "transcriptSaved": "تم إرفاق النص المدوّن",
                 "transcriptSummarized": "تم إرفاق النص المدوّن وتلخيصه",
                 "transcriptError": "تعذّر إرفاق النص المدوّن.",
                 "saved": "تم تحديث الاجتماع",
+                "participantAdded": "تمت إضافة المشارك",
                 "saveError": "تعذّر تحديث الاجتماع.",
                 "deleted": "تم حذف الاجتماع",
-                "deleteError": "تعذّر حذف الاجتماع.",
-                "participantAdded": "تمت إضافة المشارك"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "تعذّر حذف الاجتماع."
             },
             "deleteDialog": {
                 "title": "حذف هذا الاجتماع؟",

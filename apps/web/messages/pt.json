@@ -2125,10 +2125,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "Instalações do GitHub App",
@@ -6953,7 +6953,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6976,7 +6975,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6986,8 +6984,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "Informe um e-mail válido ou deixe em branco."
+                "participantEmailInvalid": "Informe um e-mail válido ou deixe em branco.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -6998,17 +6996,15 @@
             "backToMeetings": "Voltar para Reuniões",
             "actions": {
                 "openRecording": "Abrir a gravação",
+                "edit": "Editar",
                 "delete": "Excluir",
                 "attachTranscript": "Anexar transcrição",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Salvar alterações",
-                "edit": "Editar",
                 "attaching": "Anexando…",
                 "editTranscript": "Editar a transcrição",
                 "cancelEdit": "Cancelar a edição",
                 "saveTranscript": "Salvar a transcrição",
                 "savingTranscript": "Salvando…",
+                "save": "Salvar alterações",
                 "cancel": "Cancelar"
             },
             "sections": {
@@ -7018,10 +7014,10 @@
                 "edit": "Editar a reunião"
             },
             "summary": {
-                "notGenerated": "Nenhum resumo foi gerado para esta transcrição. Ative um provedor de IA e anexe a transcrição novamente para tentar de novo.",
-                "noTranscript": "Anexe uma transcrição para gerar um resumo.",
                 "generating": "Gerando o resumo…",
-                "generatingHint": "Estamos lendo a transcrição e escrevendo o resumo — normalmente leva alguns segundos."
+                "generatingHint": "Estamos lendo a transcrição e escrevendo o resumo — normalmente leva alguns segundos.",
+                "notGenerated": "Nenhum resumo foi gerado para esta transcrição. Ative um provedor de IA e anexe a transcrição novamente para tentar de novo.",
+                "noTranscript": "Anexe uma transcrição para gerar um resumo."
             },
             "transcript": {
                 "composerLabel": "Texto da transcrição",
@@ -7047,11 +7043,11 @@
             },
             "fields": {
                 "title": "Título",
+                "startedAt": "Início",
                 "endedAt": "Fim",
                 "sourceUrl": "Link da gravação",
                 "work": "Trabalho",
                 "workNone": "Toda a organização (sem Trabalho)",
-                "startedAt": "Início",
                 "participants": "Participantes",
                 "participantName": "Nome",
                 "participantEmail": "E-mail (opcional)",
@@ -7061,25 +7057,22 @@
             },
             "errors": {
                 "titleRequired": "O título é obrigatório.",
+                "startedAtInvalid": "A hora de início não é uma data válida.",
                 "endedAtInvalid": "A hora de término não é uma data válida.",
                 "endedBeforeStarted": "A hora de término não pode ser anterior à de início.",
-                "transcriptRequired": "O texto da transcrição é obrigatório.",
-                "startedAtInvalid": "A hora de início não é uma data válida.",
                 "participantEmailInvalid": "Informe um e-mail válido ou deixe em branco.",
-                "participantDuplicate": "Essa pessoa já está na lista."
+                "participantDuplicate": "Essa pessoa já está na lista.",
+                "transcriptRequired": "O texto da transcrição é obrigatório."
             },
             "toasts": {
                 "transcriptSaved": "Transcrição anexada",
                 "transcriptSummarized": "Transcrição anexada e resumida",
                 "transcriptError": "Não foi possível anexar a transcrição.",
                 "saved": "Reunião atualizada",
+                "participantAdded": "Participante adicionado",
                 "saveError": "Não foi possível atualizar a reunião.",
                 "deleted": "Reunião excluída",
-                "deleteError": "Não foi possível excluir a reunião.",
-                "participantAdded": "Participante adicionado"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "Não foi possível excluir a reunião."
             },
             "deleteDialog": {
                 "title": "Excluir esta reunião?",

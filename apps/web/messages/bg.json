@@ -2193,10 +2193,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "Инсталации на GitHub App",
@@ -6983,7 +6983,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -7006,7 +7005,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -7016,8 +7014,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "Въведете валиден имейл адрес или оставете полето празно."
+                "participantEmailInvalid": "Въведете валиден имейл адрес или оставете полето празно.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -7028,17 +7026,15 @@
             "backToMeetings": "Обратно към срещите",
             "actions": {
                 "openRecording": "Отваряне на записа",
+                "edit": "Редактиране",
                 "delete": "Изтриване",
                 "attachTranscript": "Прикачване на стенограма",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Запазване на промените",
-                "edit": "Редактиране",
                 "attaching": "Прикачване…",
                 "editTranscript": "Редактиране на стенограмата",
                 "cancelEdit": "Отказ на редакцията",
                 "saveTranscript": "Запазване на стенограмата",
                 "savingTranscript": "Запазване…",
+                "save": "Запазване на промените",
                 "cancel": "Отказ"
             },
             "sections": {
@@ -7048,10 +7044,10 @@
                 "edit": "Редактиране на срещата"
             },
             "summary": {
-                "notGenerated": "За тази стенограма не беше генерирано обобщение. Активирайте доставчик на ИИ и прикачете стенограмата отново, за да опитате пак.",
-                "noTranscript": "Прикачете стенограма, за да генерирате обобщение.",
                 "generating": "Обобщението се генерира…",
-                "generatingHint": "Четем стенограмата и пишем резюмето — обикновено отнема няколко секунди."
+                "generatingHint": "Четем стенограмата и пишем резюмето — обикновено отнема няколко секунди.",
+                "notGenerated": "За тази стенограма не беше генерирано обобщение. Активирайте доставчик на ИИ и прикачете стенограмата отново, за да опитате пак.",
+                "noTranscript": "Прикачете стенограма, за да генерирате обобщение."
             },
             "transcript": {
                 "composerLabel": "Текст на стенограмата",
@@ -7077,11 +7073,11 @@
             },
             "fields": {
                 "title": "Заглавие",
+                "startedAt": "Начало",
                 "endedAt": "Край",
                 "sourceUrl": "Връзка към записа",
                 "work": "Работа",
                 "workNone": "За цялата организация (без Работа)",
-                "startedAt": "Начало",
                 "participants": "Участници",
                 "participantName": "Име",
                 "participantEmail": "Имейл (по избор)",
@@ -7091,25 +7087,22 @@
             },
             "errors": {
                 "titleRequired": "Заглавието е задължително.",
+                "startedAtInvalid": "Началният час не е валидна дата.",
                 "endedAtInvalid": "Крайният час не е валидна дата.",
                 "endedBeforeStarted": "Крайният час не може да е преди началния.",
-                "transcriptRequired": "Текстът на стенограмата е задължителен.",
-                "startedAtInvalid": "Началният час не е валидна дата.",
                 "participantEmailInvalid": "Въведете валиден имейл адрес или оставете полето празно.",
-                "participantDuplicate": "Този човек вече е в списъка."
+                "participantDuplicate": "Този човек вече е в списъка.",
+                "transcriptRequired": "Текстът на стенограмата е задължителен."
             },
             "toasts": {
                 "transcriptSaved": "Стенограмата е прикачена",
                 "transcriptSummarized": "Стенограмата е прикачена и обобщена",
                 "transcriptError": "Стенограмата не можа да бъде прикачена.",
                 "saved": "Срещата е актуализирана",
+                "participantAdded": "Участникът е добавен",
                 "saveError": "Срещата не можа да бъде актуализирана.",
                 "deleted": "Срещата е изтрита",
-                "deleteError": "Срещата не можа да бъде изтрита.",
-                "participantAdded": "Участникът е добавен"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "Срещата не можа да бъде изтрита."
             },
             "deleteDialog": {
                 "title": "Да се изтрие ли тази среща?",

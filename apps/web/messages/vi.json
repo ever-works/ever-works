@@ -2125,10 +2125,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "Cài đặt Ứng dụng GitHub",
@@ -6953,7 +6953,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6976,7 +6975,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6986,8 +6984,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "Nhập địa chỉ email hợp lệ, hoặc để trống."
+                "participantEmailInvalid": "Nhập địa chỉ email hợp lệ, hoặc để trống.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -6998,17 +6996,15 @@
             "backToMeetings": "Quay lại Cuộc họp",
             "actions": {
                 "openRecording": "Mở bản ghi hình",
+                "edit": "Chỉnh sửa",
                 "delete": "Xóa",
                 "attachTranscript": "Đính kèm bản ghi",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Lưu thay đổi",
-                "edit": "Chỉnh sửa",
                 "attaching": "Đang đính kèm…",
                 "editTranscript": "Chỉnh sửa bản ghi",
                 "cancelEdit": "Hủy chỉnh sửa",
                 "saveTranscript": "Lưu bản ghi",
                 "savingTranscript": "Đang lưu…",
+                "save": "Lưu thay đổi",
                 "cancel": "Hủy"
             },
             "sections": {
@@ -7018,10 +7014,10 @@
                 "edit": "Chỉnh sửa cuộc họp"
             },
             "summary": {
-                "notGenerated": "Không có bản tóm tắt nào được tạo cho bản ghi này. Hãy bật một nhà cung cấp AI và đính kèm lại bản ghi để thử lại.",
-                "noTranscript": "Đính kèm bản ghi để tạo bản tóm tắt.",
                 "generating": "Đang tạo bản tóm tắt…",
-                "generatingHint": "Đang đọc bản ghi và viết bản tóm tắt — việc này thường mất vài giây."
+                "generatingHint": "Đang đọc bản ghi và viết bản tóm tắt — việc này thường mất vài giây.",
+                "notGenerated": "Không có bản tóm tắt nào được tạo cho bản ghi này. Hãy bật một nhà cung cấp AI và đính kèm lại bản ghi để thử lại.",
+                "noTranscript": "Đính kèm bản ghi để tạo bản tóm tắt."
             },
             "transcript": {
                 "composerLabel": "Nội dung bản ghi",
@@ -7047,11 +7043,11 @@
             },
             "fields": {
                 "title": "Tiêu đề",
+                "startedAt": "Bắt đầu",
                 "endedAt": "Kết thúc",
                 "sourceUrl": "Liên kết bản ghi hình",
                 "work": "Công việc",
                 "workNone": "Toàn tổ chức (không có Công việc)",
-                "startedAt": "Bắt đầu",
                 "participants": "Người tham dự",
                 "participantName": "Tên",
                 "participantEmail": "Email (tùy chọn)",
@@ -7061,25 +7057,22 @@
             },
             "errors": {
                 "titleRequired": "Tiêu đề là bắt buộc.",
+                "startedAtInvalid": "Thời gian bắt đầu không phải là ngày hợp lệ.",
                 "endedAtInvalid": "Thời gian kết thúc không phải là ngày hợp lệ.",
                 "endedBeforeStarted": "Thời gian kết thúc không thể trước thời gian bắt đầu.",
-                "transcriptRequired": "Nội dung bản ghi là bắt buộc.",
-                "startedAtInvalid": "Thời gian bắt đầu không phải là ngày hợp lệ.",
                 "participantEmailInvalid": "Nhập địa chỉ email hợp lệ, hoặc để trống.",
-                "participantDuplicate": "Người này đã có trong danh sách."
+                "participantDuplicate": "Người này đã có trong danh sách.",
+                "transcriptRequired": "Nội dung bản ghi là bắt buộc."
             },
             "toasts": {
                 "transcriptSaved": "Đã đính kèm bản ghi",
                 "transcriptSummarized": "Đã đính kèm và tóm tắt bản ghi",
                 "transcriptError": "Không thể đính kèm bản ghi.",
                 "saved": "Đã cập nhật cuộc họp",
+                "participantAdded": "Đã thêm người tham dự",
                 "saveError": "Không thể cập nhật cuộc họp.",
                 "deleted": "Đã xóa cuộc họp",
-                "deleteError": "Không thể xóa cuộc họp.",
-                "participantAdded": "Đã thêm người tham dự"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "Không thể xóa cuộc họp."
             },
             "deleteDialog": {
                 "title": "Xóa cuộc họp này?",

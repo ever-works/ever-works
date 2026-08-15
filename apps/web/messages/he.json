@@ -2193,10 +2193,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "התקנות GitHub App",
@@ -6983,7 +6983,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -7006,7 +7005,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -7016,8 +7014,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "הזינו כתובת אימייל תקינה או השאירו ריק."
+                "participantEmailInvalid": "הזינו כתובת אימייל תקינה או השאירו ריק.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -7028,17 +7026,15 @@
             "backToMeetings": "חזרה לפגישות",
             "actions": {
                 "openRecording": "פתיחת ההקלטה",
+                "edit": "עריכה",
                 "delete": "מחיקה",
                 "attachTranscript": "צירוף תמליל",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "שמירת השינויים",
-                "edit": "עריכה",
                 "attaching": "מצרפים…",
                 "editTranscript": "עריכת התמליל",
                 "cancelEdit": "ביטול העריכה",
                 "saveTranscript": "שמירת התמליל",
                 "savingTranscript": "שומרים…",
+                "save": "שמירת השינויים",
                 "cancel": "ביטול"
             },
             "sections": {
@@ -7048,10 +7044,10 @@
                 "edit": "עריכת הפגישה"
             },
             "summary": {
-                "notGenerated": "לא נוצר סיכום עבור התמליל הזה. הפעילו ספק בינה מלאכותית וצרפו את התמליל מחדש כדי לנסות שוב.",
-                "noTranscript": "צרפו תמליל כדי ליצור סיכום.",
                 "generating": "יוצרים סיכום…",
-                "generatingHint": "קוראים את התמליל וכותבים את הסיכום — זה נמשך בדרך כלל כמה שניות."
+                "generatingHint": "קוראים את התמליל וכותבים את הסיכום — זה נמשך בדרך כלל כמה שניות.",
+                "notGenerated": "לא נוצר סיכום עבור התמליל הזה. הפעילו ספק בינה מלאכותית וצרפו את התמליל מחדש כדי לנסות שוב.",
+                "noTranscript": "צרפו תמליל כדי ליצור סיכום."
             },
             "transcript": {
                 "composerLabel": "טקסט התמליל",
@@ -7077,11 +7073,11 @@
             },
             "fields": {
                 "title": "כותרת",
+                "startedAt": "שעת התחלה",
                 "endedAt": "שעת סיום",
                 "sourceUrl": "קישור להקלטה",
                 "work": "עבודה",
                 "workNone": "כלל־ארגוני (ללא עבודה)",
-                "startedAt": "שעת התחלה",
                 "participants": "משתתפים",
                 "participantName": "שם",
                 "participantEmail": "אימייל (אופציונלי)",
@@ -7091,25 +7087,22 @@
             },
             "errors": {
                 "titleRequired": "חובה להזין כותרת.",
+                "startedAtInvalid": "שעת ההתחלה אינה תאריך תקין.",
                 "endedAtInvalid": "שעת הסיום אינה תאריך תקין.",
                 "endedBeforeStarted": "שעת הסיום לא יכולה להקדים את שעת ההתחלה.",
-                "transcriptRequired": "חובה להזין את טקסט התמליל.",
-                "startedAtInvalid": "שעת ההתחלה אינה תאריך תקין.",
                 "participantEmailInvalid": "הזינו כתובת אימייל תקינה או השאירו ריק.",
-                "participantDuplicate": "האדם הזה כבר ברשימה."
+                "participantDuplicate": "האדם הזה כבר ברשימה.",
+                "transcriptRequired": "חובה להזין את טקסט התמליל."
             },
             "toasts": {
                 "transcriptSaved": "התמליל צורף",
                 "transcriptSummarized": "התמליל צורף וסוכם",
                 "transcriptError": "לא ניתן היה לצרף את התמליל.",
                 "saved": "הפגישה עודכנה",
+                "participantAdded": "המשתתף נוסף",
                 "saveError": "לא ניתן היה לעדכן את הפגישה.",
                 "deleted": "הפגישה נמחקה",
-                "deleteError": "לא ניתן היה למחוק את הפגישה.",
-                "participantAdded": "המשתתף נוסף"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "לא ניתן היה למחוק את הפגישה."
             },
             "deleteDialog": {
                 "title": "למחוק את הפגישה הזו?",

@@ -2125,10 +2125,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "GitHub ऐप इंस्टॉलेशन",
@@ -6953,7 +6953,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6976,7 +6975,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6986,8 +6984,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "मान्य ईमेल पता दर्ज करें, या इसे खाली छोड़ें।"
+                "participantEmailInvalid": "मान्य ईमेल पता दर्ज करें, या इसे खाली छोड़ें।",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -6998,17 +6996,15 @@
             "backToMeetings": "मीटिंग पर वापस जाएँ",
             "actions": {
                 "openRecording": "रिकॉर्डिंग खोलें",
+                "edit": "संपादित करें",
                 "delete": "हटाएँ",
                 "attachTranscript": "ट्रांसक्रिप्ट जोड़ें",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "बदलाव सहेजें",
-                "edit": "संपादित करें",
                 "attaching": "जोड़ा जा रहा है…",
                 "editTranscript": "ट्रांसक्रिप्ट संपादित करें",
                 "cancelEdit": "संपादन रद्द करें",
                 "saveTranscript": "ट्रांसक्रिप्ट सहेजें",
                 "savingTranscript": "सहेजा जा रहा है…",
+                "save": "बदलाव सहेजें",
                 "cancel": "रद्द करें"
             },
             "sections": {
@@ -7018,10 +7014,10 @@
                 "edit": "मीटिंग संपादित करें"
             },
             "summary": {
-                "notGenerated": "इस ट्रांसक्रिप्ट के लिए कोई सारांश तैयार नहीं हुआ। कोई AI प्रदाता सक्षम करें और दोबारा कोशिश करने के लिए ट्रांसक्रिप्ट फिर से जोड़ें।",
-                "noTranscript": "सारांश तैयार करने के लिए ट्रांसक्रिप्ट जोड़ें।",
                 "generating": "सारांश तैयार किया जा रहा है…",
-                "generatingHint": "ट्रांसक्रिप्ट पढ़ा जा रहा है और सारांश लिखा जा रहा है — इसमें आम तौर पर कुछ सेकंड लगते हैं।"
+                "generatingHint": "ट्रांसक्रिप्ट पढ़ा जा रहा है और सारांश लिखा जा रहा है — इसमें आम तौर पर कुछ सेकंड लगते हैं।",
+                "notGenerated": "इस ट्रांसक्रिप्ट के लिए कोई सारांश तैयार नहीं हुआ। कोई AI प्रदाता सक्षम करें और दोबारा कोशिश करने के लिए ट्रांसक्रिप्ट फिर से जोड़ें।",
+                "noTranscript": "सारांश तैयार करने के लिए ट्रांसक्रिप्ट जोड़ें।"
             },
             "transcript": {
                 "composerLabel": "ट्रांसक्रिप्ट का पाठ",
@@ -7047,11 +7043,11 @@
             },
             "fields": {
                 "title": "शीर्षक",
+                "startedAt": "प्रारंभ समय",
                 "endedAt": "समाप्ति समय",
                 "sourceUrl": "रिकॉर्डिंग लिंक",
                 "work": "कार्य",
                 "workNone": "पूरे संगठन में (कोई कार्य नहीं)",
-                "startedAt": "प्रारंभ समय",
                 "participants": "प्रतिभागी",
                 "participantName": "नाम",
                 "participantEmail": "ईमेल (वैकल्पिक)",
@@ -7061,25 +7057,22 @@
             },
             "errors": {
                 "titleRequired": "शीर्षक आवश्यक है।",
+                "startedAtInvalid": "प्रारंभ समय एक मान्य दिनांक नहीं है।",
                 "endedAtInvalid": "समाप्ति समय एक मान्य दिनांक नहीं है।",
                 "endedBeforeStarted": "समाप्ति समय प्रारंभ समय से पहले नहीं हो सकता।",
-                "transcriptRequired": "ट्रांसक्रिप्ट का पाठ आवश्यक है।",
-                "startedAtInvalid": "प्रारंभ समय एक मान्य दिनांक नहीं है।",
                 "participantEmailInvalid": "मान्य ईमेल पता दर्ज करें, या इसे खाली छोड़ें।",
-                "participantDuplicate": "यह व्यक्ति पहले से सूची में है।"
+                "participantDuplicate": "यह व्यक्ति पहले से सूची में है।",
+                "transcriptRequired": "ट्रांसक्रिप्ट का पाठ आवश्यक है।"
             },
             "toasts": {
                 "transcriptSaved": "ट्रांसक्रिप्ट जोड़ा गया",
                 "transcriptSummarized": "ट्रांसक्रिप्ट जोड़ा गया और सारांश बनाया गया",
                 "transcriptError": "ट्रांसक्रिप्ट नहीं जोड़ा जा सका।",
                 "saved": "मीटिंग अपडेट हुई",
+                "participantAdded": "प्रतिभागी जोड़ा गया",
                 "saveError": "मीटिंग अपडेट नहीं हो सकी।",
                 "deleted": "मीटिंग हटाई गई",
-                "deleteError": "मीटिंग हटाई नहीं जा सकी।",
-                "participantAdded": "प्रतिभागी जोड़ा गया"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "मीटिंग हटाई नहीं जा सकी।"
             },
             "deleteDialog": {
                 "title": "इस मीटिंग को हटाएँ?",

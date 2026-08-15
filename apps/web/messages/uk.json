@@ -2125,10 +2125,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "Інсталяції GitHub App",
@@ -6953,7 +6953,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6976,7 +6975,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6986,8 +6984,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "Введіть коректну адресу ел. пошти або залиште поле порожнім."
+                "participantEmailInvalid": "Введіть коректну адресу ел. пошти або залиште поле порожнім.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -6998,17 +6996,15 @@
             "backToMeetings": "Назад до зустрічей",
             "actions": {
                 "openRecording": "Відкрити запис",
+                "edit": "Редагувати",
                 "delete": "Видалити",
                 "attachTranscript": "Прикріпити транскрипцію",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Зберегти зміни",
-                "edit": "Редагувати",
                 "attaching": "Прикріплюємо…",
                 "editTranscript": "Редагувати транскрипцію",
                 "cancelEdit": "Скасувати редагування",
                 "saveTranscript": "Зберегти транскрипцію",
                 "savingTranscript": "Зберігаємо…",
+                "save": "Зберегти зміни",
                 "cancel": "Скасувати"
             },
             "sections": {
@@ -7018,10 +7014,10 @@
                 "edit": "Редагування зустрічі"
             },
             "summary": {
-                "notGenerated": "Для цієї транскрипції стислий виклад не створено. Увімкніть постачальника ШІ та прикріпіть транскрипцію ще раз, щоб спробувати знову.",
-                "noTranscript": "Прикріпіть транскрипцію, щоб створити стислий виклад.",
                 "generating": "Створюємо стислий виклад…",
-                "generatingHint": "Читаємо транскрипцію та пишемо стислий виклад — зазвичай це триває кілька секунд."
+                "generatingHint": "Читаємо транскрипцію та пишемо стислий виклад — зазвичай це триває кілька секунд.",
+                "notGenerated": "Для цієї транскрипції стислий виклад не створено. Увімкніть постачальника ШІ та прикріпіть транскрипцію ще раз, щоб спробувати знову.",
+                "noTranscript": "Прикріпіть транскрипцію, щоб створити стислий виклад."
             },
             "transcript": {
                 "composerLabel": "Текст транскрипції",
@@ -7047,11 +7043,11 @@
             },
             "fields": {
                 "title": "Назва",
+                "startedAt": "Початок",
                 "endedAt": "Завершення",
                 "sourceUrl": "Посилання на запис",
                 "work": "Робота",
                 "workNone": "Уся організація (без Роботи)",
-                "startedAt": "Початок",
                 "participants": "Учасники",
                 "participantName": "Ім’я",
                 "participantEmail": "Ел. пошта (необов’язково)",
@@ -7061,25 +7057,22 @@
             },
             "errors": {
                 "titleRequired": "Назва обов’язкова.",
+                "startedAtInvalid": "Час початку не є дійсною датою.",
                 "endedAtInvalid": "Час завершення не є дійсною датою.",
                 "endedBeforeStarted": "Час завершення не може бути раніше за час початку.",
-                "transcriptRequired": "Текст транскрипції обов’язковий.",
-                "startedAtInvalid": "Час початку не є дійсною датою.",
                 "participantEmailInvalid": "Введіть коректну адресу ел. пошти або залиште поле порожнім.",
-                "participantDuplicate": "Ця людина вже є у списку."
+                "participantDuplicate": "Ця людина вже є у списку.",
+                "transcriptRequired": "Текст транскрипції обов’язковий."
             },
             "toasts": {
                 "transcriptSaved": "Транскрипцію прикріплено",
                 "transcriptSummarized": "Транскрипцію прикріплено та стисло переказано",
                 "transcriptError": "Не вдалося прикріпити транскрипцію.",
                 "saved": "Зустріч оновлено",
+                "participantAdded": "Учасника додано",
                 "saveError": "Не вдалося оновити зустріч.",
                 "deleted": "Зустріч видалено",
-                "deleteError": "Не вдалося видалити зустріч.",
-                "participantAdded": "Учасника додано"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "Не вдалося видалити зустріч."
             },
             "deleteDialog": {
                 "title": "Видалити цю зустріч?",

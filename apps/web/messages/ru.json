@@ -2125,10 +2125,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "Установки GitHub App",
@@ -6953,7 +6953,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6976,7 +6975,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6986,8 +6984,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "Введите корректный адрес эл. почты или оставьте поле пустым."
+                "participantEmailInvalid": "Введите корректный адрес эл. почты или оставьте поле пустым.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -6998,17 +6996,15 @@
             "backToMeetings": "Назад к встречам",
             "actions": {
                 "openRecording": "Открыть запись",
+                "edit": "Изменить",
                 "delete": "Удалить",
                 "attachTranscript": "Прикрепить расшифровку",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Сохранить изменения",
-                "edit": "Изменить",
                 "attaching": "Прикрепляем…",
                 "editTranscript": "Редактировать расшифровку",
                 "cancelEdit": "Отменить редактирование",
                 "saveTranscript": "Сохранить расшифровку",
                 "savingTranscript": "Сохраняем…",
+                "save": "Сохранить изменения",
                 "cancel": "Отмена"
             },
             "sections": {
@@ -7018,10 +7014,10 @@
                 "edit": "Редактирование встречи"
             },
             "summary": {
-                "notGenerated": "Для этой расшифровки краткое содержание не создано. Включите провайдера ИИ и прикрепите расшифровку заново, чтобы попробовать ещё раз.",
-                "noTranscript": "Прикрепите расшифровку, чтобы создать краткое содержание.",
                 "generating": "Создаём краткое содержание…",
-                "generatingHint": "Читаем расшифровку и пишем краткое содержание — обычно это занимает несколько секунд."
+                "generatingHint": "Читаем расшифровку и пишем краткое содержание — обычно это занимает несколько секунд.",
+                "notGenerated": "Для этой расшифровки краткое содержание не создано. Включите провайдера ИИ и прикрепите расшифровку заново, чтобы попробовать ещё раз.",
+                "noTranscript": "Прикрепите расшифровку, чтобы создать краткое содержание."
             },
             "transcript": {
                 "composerLabel": "Текст расшифровки",
@@ -7047,11 +7043,11 @@
             },
             "fields": {
                 "title": "Название",
+                "startedAt": "Начало",
                 "endedAt": "Окончание",
                 "sourceUrl": "Ссылка на запись",
                 "work": "Работа",
                 "workNone": "Вся организация (без Работы)",
-                "startedAt": "Начало",
                 "participants": "Участники",
                 "participantName": "Имя",
                 "participantEmail": "Эл. почта (необязательно)",
@@ -7061,25 +7057,22 @@
             },
             "errors": {
                 "titleRequired": "Название обязательно.",
+                "startedAtInvalid": "Время начала не является допустимой датой.",
                 "endedAtInvalid": "Время окончания не является допустимой датой.",
                 "endedBeforeStarted": "Время окончания не может быть раньше времени начала.",
-                "transcriptRequired": "Текст расшифровки обязателен.",
-                "startedAtInvalid": "Время начала не является допустимой датой.",
                 "participantEmailInvalid": "Введите корректный адрес эл. почты или оставьте поле пустым.",
-                "participantDuplicate": "Этот человек уже есть в списке."
+                "participantDuplicate": "Этот человек уже есть в списке.",
+                "transcriptRequired": "Текст расшифровки обязателен."
             },
             "toasts": {
                 "transcriptSaved": "Расшифровка прикреплена",
                 "transcriptSummarized": "Расшифровка прикреплена, краткое содержание создано",
                 "transcriptError": "Не удалось прикрепить расшифровку.",
                 "saved": "Встреча обновлена",
+                "participantAdded": "Участник добавлен",
                 "saveError": "Не удалось обновить встречу.",
                 "deleted": "Встреча удалена",
-                "deleteError": "Не удалось удалить встречу.",
-                "participantAdded": "Участник добавлен"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "Не удалось удалить встречу."
             },
             "deleteDialog": {
                 "title": "Удалить эту встречу?",

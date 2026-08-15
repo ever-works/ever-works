@@ -2125,10 +2125,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "digest": "Digest",
-                "connections": "Connections",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "GitHub App インストール",
@@ -6953,7 +6953,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6976,7 +6975,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6986,8 +6984,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again.",
-                "participantEmailInvalid": "有効なメールアドレスを入力するか、空欄のままにしてください。"
+                "participantEmailInvalid": "有効なメールアドレスを入力するか、空欄のままにしてください。",
+                "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -6998,17 +6996,15 @@
             "backToMeetings": "ミーティング一覧に戻る",
             "actions": {
                 "openRecording": "録画を開く",
+                "edit": "編集",
                 "delete": "削除",
                 "attachTranscript": "文字起こしを添付",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "変更を保存",
-                "edit": "編集",
                 "attaching": "添付しています…",
                 "editTranscript": "文字起こしを編集",
                 "cancelEdit": "編集をキャンセル",
                 "saveTranscript": "文字起こしを保存",
                 "savingTranscript": "保存しています…",
+                "save": "変更を保存",
                 "cancel": "キャンセル"
             },
             "sections": {
@@ -7018,10 +7014,10 @@
                 "edit": "ミーティングを編集"
             },
             "summary": {
-                "notGenerated": "この文字起こしに対する要約は生成されませんでした。AI プロバイダーを有効にし、文字起こしを添付し直してもう一度お試しください。",
-                "noTranscript": "文字起こしを添付すると要約を生成できます。",
                 "generating": "要約を生成しています…",
-                "generatingHint": "文字起こしを読み取り、要約を作成しています。通常は数秒かかります。"
+                "generatingHint": "文字起こしを読み取り、要約を作成しています。通常は数秒かかります。",
+                "notGenerated": "この文字起こしに対する要約は生成されませんでした。AI プロバイダーを有効にし、文字起こしを添付し直してもう一度お試しください。",
+                "noTranscript": "文字起こしを添付すると要約を生成できます。"
             },
             "transcript": {
                 "composerLabel": "文字起こしのテキスト",
@@ -7047,11 +7043,11 @@
             },
             "fields": {
                 "title": "タイトル",
+                "startedAt": "開始日時",
                 "endedAt": "終了日時",
                 "sourceUrl": "録画のリンク",
                 "work": "ワーク",
                 "workNone": "組織全体（ワークなし）",
-                "startedAt": "開始日時",
                 "participants": "参加者",
                 "participantName": "名前",
                 "participantEmail": "メールアドレス（任意）",
@@ -7061,25 +7057,22 @@
             },
             "errors": {
                 "titleRequired": "タイトルは必須です。",
+                "startedAtInvalid": "開始日時が有効な日付ではありません。",
                 "endedAtInvalid": "終了日時が有効な日付ではありません。",
                 "endedBeforeStarted": "終了日時を開始日時より前にすることはできません。",
-                "transcriptRequired": "文字起こしのテキストは必須です。",
-                "startedAtInvalid": "開始日時が有効な日付ではありません。",
                 "participantEmailInvalid": "有効なメールアドレスを入力するか、空欄のままにしてください。",
-                "participantDuplicate": "この参加者はすでにリストにあります。"
+                "participantDuplicate": "この参加者はすでにリストにあります。",
+                "transcriptRequired": "文字起こしのテキストは必須です。"
             },
             "toasts": {
                 "transcriptSaved": "文字起こしを添付しました",
                 "transcriptSummarized": "文字起こしを添付して要約しました",
                 "transcriptError": "文字起こしを添付できませんでした。",
                 "saved": "ミーティングを更新しました",
+                "participantAdded": "参加者を追加しました",
                 "saveError": "ミーティングを更新できませんでした。",
                 "deleted": "ミーティングを削除しました",
-                "deleteError": "ミーティングを削除できませんでした。",
-                "participantAdded": "参加者を追加しました"
-            },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+                "deleteError": "ミーティングを削除できませんでした。"
             },
             "deleteDialog": {
                 "title": "このミーティングを削除しますか？",
