@@ -52,6 +52,7 @@ import { EnvironmentsApiModule } from './environments/environments.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
 import { McpConnectionsModule } from './mcp-connections/mcp-connections.module';
+import { RepoConnectionsModule } from './repo-connections/repo-connections.module';
 import { TasksModule } from './tasks/tasks.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
@@ -193,6 +194,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Agent Plugins MCP slice — manual external MCP connections +
         // per-agent bindings (docs/specs/features/agent-plugins §2.3).
         McpConnectionsModule,
+        // Repository registry (Feature G) — Settings → Repositories CRUD,
+        // GitHub-App import, and the Agent ↔ repo attachment surface.
+        RepoConnectionsModule,
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,

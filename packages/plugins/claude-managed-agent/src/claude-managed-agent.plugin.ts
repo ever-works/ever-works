@@ -42,6 +42,7 @@ import {
 } from './types.js';
 import { cleanupManagedAgentRun } from './utils/managed-agents-cleanup.js';
 import { AnthropicManagedAgentsClient } from './utils/managed-agents-client.js';
+import { buildSessionResources, type UploadedAttachedEnvFile } from './utils/session-resources.js';
 import {
 	buildCancelledResult,
 	buildErrorResult,
@@ -328,17 +329,43 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 			await this.beginStep('run-managed-session', onProgress, 20);
 
+			// Repository registry (Feature G) — mount the run agent's attached
+			// registry repos alongside the primary workspace. Env files are
+			// uploaded per run and mounted under each repo's directory. With
+			// no attachments (the default) the resource list is byte-identical
+			// to what this plugin has always sent.
+			const attachedRepos = options?.attachedRepos ?? [];
+			const uploadedEnvFiles: UploadedAttachedEnvFile[] = [];
+			for (const attachedRepo of attachedRepos) {
+				for (const envFile of attachedRepo.envFiles ?? []) {
+					const uploadedEnvFile = await client.uploadTextFile(
+						envFile.path.split('/').pop() || '.env',
+						envFile.content,
+						'text/plain'
+					);
+					runResources.uploadedEnvFileIds = runResources.uploadedEnvFileIds ?? [];
+					runResources.uploadedEnvFileIds.push(uploadedEnvFile.id);
+					uploadedEnvFiles.push({
+						fileId: uploadedEnvFile.id,
+						mountDir: attachedRepo.mountDir,
+						path: envFile.path
+					});
+				}
+			}
+
 			const session = await client.createSession({
 				agentId,
 				environmentId,
 				title: `Ever Works: ${work.name}`,
-				resources: [
-					{
-						type: 'file',
-						file_id: uploadedSeedManifest.id,
-						mount_path: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
-					}
-				]
+				resources: buildSessionResources({
+					workspacePath: DEFAULT_WORKSPACE_PATH,
+					seedManifest: {
+						fileId: uploadedSeedManifest.id,
+						mountPath: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
+					},
+					attachedRepos,
+					uploadedEnvFiles
+				})
 			});
 			runResources.sessionId = session.id;
 

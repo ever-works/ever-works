@@ -7,6 +7,8 @@ import {
     AgentSettingsClient,
     type AgentSettingsOrganization,
 } from '@/components/agents/AgentSettingsClient';
+import { AgentReposCard } from '@/components/agents/AgentReposCard';
+import { repoConnectionsAPI } from '@/lib/api/repo-connections';
 import type { Agent } from '@/lib/api/agents';
 import type { Team } from '@/lib/api/teams';
 
@@ -64,6 +66,11 @@ export default async function AgentSettingsPage({ params }: { params: Promise<{ 
         };
     }
 
+    // Repository registry (Feature G) — attachable registry repos for the
+    // "Repositories" card. Defensive: a flaky registry API never 500s the
+    // settings page, the card just renders empty.
+    const agentRepos = await repoConnectionsAPI.listForAgent(id).catch(() => []);
+
     return (
         <AgentSettingsClient
             agent={agent}
@@ -71,5 +78,13 @@ export default async function AgentSettingsPage({ params }: { params: Promise<{ 
             aiProviders={aiProviders}
             environments={environments}
         />
+        <div className="space-y-6">
+            <AgentSettingsClient
+                agent={agent}
+                organization={organization}
+                aiProviders={aiProviders}
+            />
+            <AgentReposCard agentId={id} repos={agentRepos} />
+        </div>
     );
 }

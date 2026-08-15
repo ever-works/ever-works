@@ -139,6 +139,9 @@ import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
 import { Environment } from '../entities/environment.entity';
 import { MemoryFolder } from '../entities/memory-folder.entity';
+// Repository registry (Feature G)
+import { RepoConnection } from '../entities/repo-connection.entity';
+import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 
 import {
     PluginEntity,
@@ -344,4 +347,8 @@ export const ENTITIES = [
     Environment,
     // Memory Files — user-defined folders organizing uploads on /memory.
     MemoryFolder,
+    // Repository registry (Feature G) — account-level repo records plus
+    // the Agent → repo grant edge rows.
+    RepoConnection,
+    AgentRepoAttachment,
 ];

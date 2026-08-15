@@ -127,6 +127,9 @@ describe('activity-log.types', () => {
             // +5 mcp_connection_created / mcp_connection_updated /
             //    mcp_connection_deleted / mcp_connection_tested /
             //    mcp_binding_updated (agent-plugins MCP slice) -> 128.
+            // +6 repo_connection_created / _updated / _deleted / _imported and
+            //    repo_attached_to_agent / repo_detached_from_agent
+            //    (repository registry, Feature G) -> 129.
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

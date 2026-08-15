@@ -162,3 +162,6 @@ export * from './workflow-run.entity';
 export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
+// Repository registry (Feature G) — account-level repo records + agent grants.
+export * from './repo-connection.entity';
+export * from './agent-repo-attachment.entity';

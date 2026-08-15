@@ -15,6 +15,9 @@ export async function cleanupManagedAgentRun(
 ): Promise<void> {
 	await cleanupSession(client, resources.sessionId, logger);
 	await cleanupUploadedFile(client, resources.uploadedFileId, logger);
+	for (const envFileId of resources.uploadedEnvFileIds ?? []) {
+		await cleanupUploadedFile(client, envFileId, logger);
+	}
 	await cleanupEnvironment(client, resources.createdEnvironmentId, logger);
 	await cleanupAgent(client, resources.createdAgentId, logger);
 }
