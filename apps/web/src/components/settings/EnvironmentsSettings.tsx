@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { AlertTriangle, Boxes, Pencil, Plus, Trash2, UploadCloud, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,78 +16,18 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import type { Environment, EnvironmentNetworkingMode } from '@/lib/api/environments';
+import type { Environment } from '@/lib/api/environments';
 import {
     createEnvironmentAction,
     deleteEnvironmentAction,
     publishEnvironmentAction,
     updateEnvironmentAction,
 } from '@/app/actions/settings/environments';
+import { buildPayload, EMPTY_EDITOR, toEditorState, type EditorState } from './environments-editor';
 
-interface EnvironmentsSettingsProps {
+export interface EnvironmentsSettingsProps {
     initialEnvironments: Environment[];
     loadError: string | null;
-}
-
-interface EditorState {
-    /** null = creating a new Environment. */
-    id: string | null;
-    name: string;
-    description: string;
-    availableInAllProjects: boolean;
-    pipPackages: string;
-    npmPackages: string;
-    networkingMode: EnvironmentNetworkingMode;
-    allowedHosts: string;
-    allowPackageManagers: boolean;
-}
-
-const EMPTY_EDITOR: EditorState = {
-    id: null,
-    name: '',
-    description: '',
-    availableInAllProjects: true,
-    pipPackages: '',
-    npmPackages: '',
-    networkingMode: 'unrestricted',
-    allowedHosts: '',
-    allowPackageManagers: true,
-};
-
-function toEditorState(environment: Environment): EditorState {
-    return {
-        id: environment.id,
-        name: environment.name,
-        description: environment.description ?? '',
-        availableInAllProjects: environment.availableInAllProjects,
-        pipPackages: environment.pipPackages.join(', '),
-        npmPackages: environment.npmPackages.join(', '),
-        networkingMode: environment.networkingMode,
-        allowedHosts: (environment.allowedHosts ?? []).join('\n'),
-        allowPackageManagers: environment.allowPackageManagers,
-    };
-}
-
-/** Comma-separated text input → trimmed, non-empty entries. */
-function splitList(raw: string, separator: RegExp): string[] {
-    return raw
-        .split(separator)
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-}
-
-function formatTimestamp(value: string): string {
-    try {
-        return new Date(value).toLocaleString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    } catch {
-        return value;
-    }
 }
 
 /**
@@ -101,6 +41,10 @@ export function EnvironmentsSettings({
     loadError,
 }: EnvironmentsSettingsProps) {
     const t = useTranslations('dashboard.settings.environments');
+    // next-intl formatter, not `toLocaleString(undefined, …)`: the latter
+    // resolves to the SERVER locale during SSR and to the browser locale
+    // after hydration, so the two passes can disagree.
+    const format = useFormatter();
     const [environments, setEnvironments] = useState<Environment[]>(initialEnvironments);
     const [editor, setEditor] = useState<EditorState | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Environment | null>(null);
@@ -115,21 +59,6 @@ export function EnvironmentsSettings({
             return next;
         });
     };
-
-    const buildPayload = (state: EditorState) => ({
-        name: state.name.trim(),
-        // Explicit `null`, not `undefined`: an omitted key leaves the
-        // stored description alone, so emptying the field would silently
-        // fail to clear it.
-        description: state.description.trim() || null,
-        pipPackages: splitList(state.pipPackages, /[,\n]/),
-        npmPackages: splitList(state.npmPackages, /[,\n]/),
-        networkingMode: state.networkingMode,
-        allowedHosts:
-            state.networkingMode === 'limited' ? splitList(state.allowedHosts, /[,\n]/) : undefined,
-        allowPackageManagers: state.allowPackageManagers,
-        availableInAllProjects: state.availableInAllProjects,
-    });
 
     const save = (state: EditorState, publishAfterSave: boolean) => {
         if (!state.name.trim()) {
@@ -160,6 +89,24 @@ export function EnvironmentsSettings({
             toast.success(
                 publishAfterSave ? t('messages.publishSuccess') : t('messages.saveSuccess'),
             );
+        });
+    };
+
+    /**
+     * Row-level publish — promotes in place. Deliberately does NOT go
+     * through `save()`: a publish is not an edit, so re-serializing the
+     * row's packages/hosts/description back through the editor shape
+     * would rewrite stored values nobody touched.
+     */
+    const publishRow = (environment: Environment) => {
+        startTransition(async () => {
+            const published = await publishEnvironmentAction(environment.id);
+            if (!published.success) {
+                toast.error(published.error || t('messages.error'));
+                return;
+            }
+            upsertRow(published.data);
+            toast.success(t('messages.publishSuccess'));
         });
     };
 
@@ -266,7 +213,13 @@ export function EnvironmentsSettings({
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
-                                        {formatTimestamp(environment.updatedAt)}
+                                        {format.dateTime(new Date(environment.updatedAt), {
+                                            year: 'numeric',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                        })}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-end gap-1.5">
@@ -276,9 +229,7 @@ export function EnvironmentsSettings({
                                                     size="sm"
                                                     className="gap-1.5 px-2.5 py-1 text-xs"
                                                     disabled={isPending}
-                                                    onClick={() =>
-                                                        save(toEditorState(environment), true)
-                                                    }
+                                                    onClick={() => publishRow(environment)}
                                                     data-testid={`environment-publish-${environment.slug}`}
                                                 >
                                                     <UploadCloud className="w-3.5 h-3.5" />
@@ -360,25 +311,30 @@ export function EnvironmentsSettings({
                                     }
                                 />
                             </div>
-                            <Input
+                            {/* Textarea, one spec per line — a single pip
+                                specifier may itself contain a comma
+                                (`pandas>=2.0,<3.0`). */}
+                            <Textarea
                                 label={t('fields.pipPackages')}
+                                rows={3}
                                 value={editor.pipPackages}
                                 onChange={(e) =>
                                     setEditor({ ...editor, pipPackages: e.target.value })
                                 }
-                                placeholder="pandas==2.2.0, requests"
+                                placeholder={'pandas>=2.0,<3.0\nrequests'}
                                 data-testid="environment-pip-packages"
                             />
                             <p className="-mt-3 text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('fields.pipPackagesHelper')}
                             </p>
-                            <Input
+                            <Textarea
                                 label={t('fields.npmPackages')}
+                                rows={3}
                                 value={editor.npmPackages}
                                 onChange={(e) =>
                                     setEditor({ ...editor, npmPackages: e.target.value })
                                 }
-                                placeholder="typescript, @scope/pkg@^1.2.0"
+                                placeholder={'typescript\n@scope/pkg@^1.2.0'}
                                 data-testid="environment-npm-packages"
                             />
                             <p className="-mt-3 text-xs text-text-muted dark:text-text-muted-dark">
