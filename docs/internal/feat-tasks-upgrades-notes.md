@@ -132,10 +132,17 @@ now assert that message, and the first also pins the both-dialects rejection.
 
 ## Known issues / follow-ups
 
-- `apps/api` type-check reports 4 pre-existing, environment-level module
-  resolution errors unrelated to this branch (`@ever-works/k8s-plugin` in
-  `deploy.e2e.spec.ts`; `@src/*` aliases resolved from `packages/agent` sources).
-  They reproduce without these changes once workspace packages are built.
+- A bare `cd apps/api && npx tsc -p tsconfig.json --noEmit` reports 4
+  pre-existing, environment-level module-resolution errors unrelated to this
+  branch (`@ever-works/k8s-plugin` in `deploy.e2e.spec.ts`; `@src/*` aliases
+  resolved from `packages/agent` sources). The packaged build is clean —
+  `npx turbo build --filter=@ever-works/agent --filter=ever-works-api` is green
+  end to end (`TSC Found 0 issues`), which is what CI runs.
+- `apps/api`'s Jest suite was not run to completion here: it takes >10 min per
+  invocation on this machine. The one spec that constructs `TasksController`
+  positionally (`tasks.controller.pr-insights.spec.ts`) was run on its own and
+  exits 0 — the new `@Optional()` constructor parameter is appended last, so
+  positional fixtures keep compiling.
 - No new Playwright specs for the new endpoints (`:id/schedule`,
   `:id/subtasks`, `:id/activity`, `api/task-templates`): they need a live
   API + DB, which this session had no stack for. A
