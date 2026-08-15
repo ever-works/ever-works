@@ -25,8 +25,8 @@ true, tenantId?, organizationId?, timestamps`. Registered in
 - **`agents.environmentId uuid NULL`** — FK ON DELETE SET NULL
   (belt-and-braces; the service refuses deletion first).
 - **Migrations** (portable Table API, idempotent guards, both `up`/`down`):
-    - `apps/api/src/migrations/1785010000000-CreateEnvironments.ts`
-    - `apps/api/src/migrations/1785020000000-AddAgentEnvironmentId.ts`
+    - `apps/api/src/migrations/1786810000000-CreateEnvironments.ts`
+    - `apps/api/src/migrations/1786810001000-AddAgentEnvironmentId.ts`
 
 ## Server rules
 

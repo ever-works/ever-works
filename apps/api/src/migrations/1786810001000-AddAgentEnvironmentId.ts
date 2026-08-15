@@ -21,8 +21,8 @@ import { MigrationInterface, QueryRunner, TableForeignKey } from 'typeorm';
  * Forward-only, idempotent per-step guards (house pattern, mirrors
  * 1784800000000-AddTaskDelegationDepth).
  */
-export class AddAgentEnvironmentId1785020000000 implements MigrationInterface {
-    name = 'AddAgentEnvironmentId1785020000000';
+export class AddAgentEnvironmentId1786810001000 implements MigrationInterface {
+    name = 'AddAgentEnvironmentId1786810001000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const table = await queryRunner.getTable('agents');

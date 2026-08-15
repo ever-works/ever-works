@@ -42,7 +42,7 @@ export type EnvironmentStatus = 'draft' | 'published';
  *
  * No `@ManyToOne` relations declared here (EW-654 no-cycle rule) — the
  * `userId` FK + ON DELETE CASCADE is enforced at the DB level by
- * migration `1785010000000-CreateEnvironments`. Tier A/C scope columns
+ * migration `1786810000000-CreateEnvironments`. Tier A/C scope columns
  * (`tenantId`, `organizationId`) follow the EW-651 convention: both NULL
  * until the owning user creates their first Organization.
  */

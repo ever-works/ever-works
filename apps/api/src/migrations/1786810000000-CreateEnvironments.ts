@@ -31,8 +31,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  *
  * Forward-only with an idempotent guard (house pattern).
  */
-export class CreateEnvironments1785010000000 implements MigrationInterface {
-    name = 'CreateEnvironments1785010000000';
+export class CreateEnvironments1786810000000 implements MigrationInterface {
+    name = 'CreateEnvironments1786810000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (await queryRunner.hasTable('environments')) {
@@ -115,7 +115,7 @@ export class CreateEnvironments1785010000000 implements MigrationInterface {
         // Destroys user-authored Environments — acceptable only because
         // it removes the feature wholesale; an operator running it is
         // choosing that. `agents.environmentId` values pointing here are
-        // cleared by reverting 1785020000000-AddAgentEnvironmentId first
+        // cleared by reverting 1786810001000-AddAgentEnvironmentId first
         // (TypeORM reverts newest-first, so ordering holds).
         if (await queryRunner.hasTable('environments')) {
             await queryRunner.dropTable('environments');
