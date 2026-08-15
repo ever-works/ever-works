@@ -208,6 +208,10 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_GITHUB_APP: '/settings/github-app',
     // Repository registry (Feature G) — Settings → Repositories.
     DASHBOARD_SETTINGS_REPOSITORIES: '/settings/repositories',
+    // Environments (Settings → Environments) — named runtime recipes
+    // assigned per-Agent. The page has existed since the Environments
+    // feature landed; it simply had no route constant.
+    DASHBOARD_SETTINGS_ENVIRONMENTS: '/settings/environments',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
     // Fleet — enrolled local runners. The page has existed since Wave 12;

@@ -23,6 +23,12 @@ const bindSkillToAgentAction = vi.fn();
 const installAndBindSkillAction = vi.fn();
 const unbindSkillFromAgentAction = vi.fn();
 const listAgentSkillsAction = vi.fn();
+const updateAgentAction = vi.fn();
+const listAgentMcpServersAction = vi.fn();
+const setAgentMcpBindingAction = vi.fn();
+const clearAgentMcpBindingAction = vi.fn();
+const setAgentRepoAttachment = vi.fn();
+const removeAgentRepoAttachment = vi.fn();
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
 
@@ -51,6 +57,16 @@ vi.mock('@/app/actions/agent-capabilities', () => ({
 }));
 vi.mock('@/app/actions/agents', () => ({
     listAgentSkillsAction: (...args: unknown[]) => listAgentSkillsAction(...args),
+    updateAgentAction: (...args: unknown[]) => updateAgentAction(...args),
+}));
+vi.mock('@/app/actions/mcp-connections', () => ({
+    listAgentMcpServersAction: (...args: unknown[]) => listAgentMcpServersAction(...args),
+    setAgentMcpBindingAction: (...args: unknown[]) => setAgentMcpBindingAction(...args),
+    clearAgentMcpBindingAction: (...args: unknown[]) => clearAgentMcpBindingAction(...args),
+}));
+vi.mock('@/app/actions/repo-connections', () => ({
+    setAgentRepoAttachment: (...args: unknown[]) => setAgentRepoAttachment(...args),
+    removeAgentRepoAttachment: (...args: unknown[]) => removeAgentRepoAttachment(...args),
 }));
 
 const AGENT_ID = 'agent-1';
@@ -143,15 +159,64 @@ function payload(over: Partial<AgentCapabilitiesPayload> = {}): AgentCapabilitie
     };
 }
 
-function renderTab(over: Partial<AgentCapabilitiesPayload> = {}, boundSkills: unknown[] = []) {
+/** MCP row as `GET /api/agents/:id/mcp-servers` returns it. */
+function mcpRow(over: Record<string, unknown> = {}) {
+    const { connection, ...rest } = over as {
+        connection?: Record<string, unknown>;
+    } & Record<string, unknown>;
+    return {
+        connection: {
+            id: 'conn-1',
+            name: 'linear',
+            url: 'https://mcp.linear.app/sse',
+            transport: 'sse',
+            enabled: true,
+            ...connection,
+        },
+        effectiveEnabled: true,
+        bindingSource: 'agent',
+        inheritedFromTenant: false,
+        ...rest,
+    };
+}
+
+/** Registry repo as `GET /api/agents/:id/repos` returns it. */
+function repoRow(over: Record<string, unknown> = {}) {
+    return {
+        id: 'repo-1',
+        name: 'ever-works',
+        url: 'https://github.com/ever-works/ever-works',
+        sourceType: 'manual',
+        readonly: false,
+        attached: true,
+        attachmentEnabled: true,
+        ...over,
+    };
+}
+
+interface ExtraProps {
+    initialMcpServers?: unknown[];
+    initialRepos?: unknown[];
+    environments?: Array<{ id: string; name: string }>;
+    environmentId?: string | null;
+}
+
+function renderTab(
+    over: Partial<AgentCapabilitiesPayload> = {},
+    boundSkills: unknown[] = [],
+    extra: ExtraProps = {},
+) {
     const caps = payload(over);
     render(
         <AgentCapabilitiesClient
-            agent={agent()}
+            agent={{ ...agent(), environmentId: extra.environmentId ?? null } as Agent}
             initialCapabilities={caps}
             initialBoundSkills={boundSkills as never}
             installedSkills={[]}
             catalogSkills={[]}
+            initialMcpServers={(extra.initialMcpServers ?? []) as never}
+            initialRepos={(extra.initialRepos ?? []) as never}
+            environments={extra.environments ?? []}
         />,
     );
     return caps;
@@ -160,6 +225,7 @@ function renderTab(over: Partial<AgentCapabilitiesPayload> = {}, boundSkills: un
 beforeEach(() => {
     vi.clearAllMocks();
     listAgentSkillsAction.mockResolvedValue({ data: [] });
+    listAgentMcpServersAction.mockResolvedValue({ data: [] });
 });
 
 describe('AgentCapabilitiesClient — tools section', () => {
@@ -497,6 +563,254 @@ describe('AgentCapabilitiesClient — skills section', () => {
         );
         await waitFor(() =>
             expect(screen.queryByTestId('capabilities-skill-code-review')).toBeNull(),
+        );
+    });
+});
+
+/**
+ * The three sections consolidated from the parallel branches. Each is a
+ * SECOND view over the same endpoint the standalone surface still uses,
+ * so what these pin is the state mapping (enabled / disabled / inherited
+ * / read-only) and the exact action call — not new server behaviour.
+ */
+describe('AgentCapabilitiesClient — MCP connections section', () => {
+    it('reflects the effective state per connection', () => {
+        renderTab({}, [], {
+            initialMcpServers: [
+                mcpRow(),
+                mcpRow({
+                    connection: { id: 'conn-2', name: 'notion' },
+                    effectiveEnabled: false,
+                    bindingSource: 'none',
+                }),
+            ],
+        });
+
+        expect(screen.getByTestId('capabilities-mcp-switch-linear')).toHaveAttribute(
+            'aria-checked',
+            'true',
+        );
+        expect(screen.getByTestId('capabilities-mcp-switch-notion')).toHaveAttribute(
+            'aria-checked',
+            'false',
+        );
+    });
+
+    it('badges a tenant-supplied binding as inherited and offers no revert for it', () => {
+        renderTab({}, [], {
+            initialMcpServers: [
+                mcpRow({ bindingSource: 'tenant', inheritedFromTenant: true }),
+                mcpRow({ connection: { id: 'conn-2', name: 'notion' } }),
+            ],
+        });
+
+        expect(screen.getByTestId('capabilities-mcp-inherited-linear')).toBeInTheDocument();
+        // Revert only removes an AGENT override; there is none to remove.
+        expect(screen.queryByTestId('capabilities-mcp-revert-linear')).toBeNull();
+        expect(screen.getByTestId('capabilities-mcp-revert-notion')).toBeInTheDocument();
+    });
+
+    it('locks the switch when the connection itself is disabled workspace-wide', () => {
+        renderTab({}, [], {
+            initialMcpServers: [
+                mcpRow({ connection: { enabled: false }, effectiveEnabled: false }),
+            ],
+        });
+        expect(screen.getByTestId('capabilities-mcp-switch-linear')).toBeDisabled();
+    });
+
+    /**
+     * `effectiveEnabled` is derived server-side from the agent override on
+     * top of the tenant binding, so the component must adopt the RE-READ
+     * list rather than flipping the row it clicked.
+     */
+    it('writes an agent override and re-renders from the re-read list', async () => {
+        const user = userEvent.setup();
+        setAgentMcpBindingAction.mockResolvedValue({});
+        listAgentMcpServersAction.mockResolvedValue({
+            data: [mcpRow({ effectiveEnabled: false })],
+        });
+        renderTab({}, [], { initialMcpServers: [mcpRow()] });
+
+        await user.click(screen.getByTestId('capabilities-mcp-switch-linear'));
+
+        await waitFor(() =>
+            expect(setAgentMcpBindingAction).toHaveBeenCalledWith(AGENT_ID, 'conn-1', false),
+        );
+        await waitFor(() =>
+            expect(screen.getByTestId('capabilities-mcp-switch-linear')).toHaveAttribute(
+                'aria-checked',
+                'false',
+            ),
+        );
+    });
+
+    it('reverting clears the agent override so the tenant binding decides again', async () => {
+        const user = userEvent.setup();
+        clearAgentMcpBindingAction.mockResolvedValue({});
+        listAgentMcpServersAction.mockResolvedValue({
+            data: [mcpRow({ bindingSource: 'tenant', inheritedFromTenant: true })],
+        });
+        renderTab({}, [], { initialMcpServers: [mcpRow()] });
+
+        await user.click(screen.getByTestId('capabilities-mcp-revert-linear'));
+
+        await waitFor(() =>
+            expect(clearAgentMcpBindingAction).toHaveBeenCalledWith(AGENT_ID, 'conn-1'),
+        );
+        await waitFor(() =>
+            expect(screen.getByTestId('capabilities-mcp-inherited-linear')).toBeInTheDocument(),
+        );
+    });
+});
+
+describe('AgentCapabilitiesClient — repositories section', () => {
+    it('renders manual repos as toggles reflecting the attachment', () => {
+        renderTab({}, [], {
+            initialRepos: [
+                repoRow(),
+                repoRow({ id: 'repo-2', name: 'docs', attached: false, attachmentEnabled: false }),
+            ],
+        });
+
+        expect(screen.getByTestId('capabilities-repo-switch-ever-works')).toHaveAttribute(
+            'aria-checked',
+            'true',
+        );
+        expect(screen.getByTestId('capabilities-repo-switch-docs')).toHaveAttribute(
+            'aria-checked',
+            'false',
+        );
+    });
+
+    it('renders a Work-derived repo READ-ONLY with its source badge', () => {
+        renderTab({}, [], {
+            initialRepos: [
+                repoRow({ id: 'repo-3', name: 'from-work', sourceType: 'work' }),
+                repoRow(),
+            ],
+        });
+
+        expect(screen.queryByTestId('capabilities-repo-switch-from-work')).toBeNull();
+        expect(screen.getByTestId('capabilities-repo-source-from-work')).toHaveTextContent(
+            'repositories.source:work',
+        );
+        // A GitHub-App / manual row next to it stays toggleable.
+        expect(screen.getByTestId('capabilities-repo-switch-ever-works')).toBeInTheDocument();
+    });
+
+    it('also renders an explicitly readonly registry row without a switch', () => {
+        renderTab({}, [], {
+            initialRepos: [repoRow({ id: 'repo-4', name: 'locked', readonly: true })],
+        });
+        expect(screen.queryByTestId('capabilities-repo-switch-locked')).toBeNull();
+        expect(screen.getByTestId('capabilities-repo-source-locked')).toBeInTheDocument();
+    });
+
+    it('attaches and detaches through the repo endpoints', async () => {
+        const user = userEvent.setup();
+        setAgentRepoAttachment.mockResolvedValue({ success: true, data: {}, error: null });
+        removeAgentRepoAttachment.mockResolvedValue({ success: true, data: {}, error: null });
+        renderTab({}, [], {
+            initialRepos: [
+                repoRow({ id: 'repo-2', name: 'docs', attached: false, attachmentEnabled: false }),
+            ],
+        });
+
+        await user.click(screen.getByTestId('capabilities-repo-switch-docs'));
+        await waitFor(() =>
+            expect(setAgentRepoAttachment).toHaveBeenCalledWith(AGENT_ID, 'repo-2', true),
+        );
+        await waitFor(() =>
+            expect(screen.getByTestId('capabilities-repo-switch-docs')).toHaveAttribute(
+                'aria-checked',
+                'true',
+            ),
+        );
+
+        await user.click(screen.getByTestId('capabilities-repo-switch-docs'));
+        await waitFor(() =>
+            expect(removeAgentRepoAttachment).toHaveBeenCalledWith(AGENT_ID, 'repo-2'),
+        );
+    });
+
+    it('surfaces a failed attachment as a toast and leaves the switch alone', async () => {
+        const user = userEvent.setup();
+        setAgentRepoAttachment.mockResolvedValue({
+            success: false,
+            data: null,
+            error: 'Repository is disabled',
+        });
+        renderTab({}, [], {
+            initialRepos: [
+                repoRow({ id: 'repo-2', name: 'docs', attached: false, attachmentEnabled: false }),
+            ],
+        });
+
+        await user.click(screen.getByTestId('capabilities-repo-switch-docs'));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith('Repository is disabled'));
+        expect(screen.getByTestId('capabilities-repo-switch-docs')).toHaveAttribute(
+            'aria-checked',
+            'false',
+        );
+    });
+});
+
+describe('AgentCapabilitiesClient — environment section', () => {
+    const environments = [
+        { id: 'env-1', name: 'Node 22 sandbox' },
+        { id: 'env-2', name: 'Python ML' },
+    ];
+
+    it('shows the assigned environment and assigns the picked one', async () => {
+        const user = userEvent.setup();
+        updateAgentAction.mockResolvedValue({ ...agent(), environmentId: 'env-2' });
+        renderTab({}, [], { environments, environmentId: 'env-1' });
+
+        const trigger = screen.getByTestId('capabilities-environment-trigger');
+        expect(trigger).toHaveTextContent('Node 22 sandbox');
+
+        await user.click(trigger);
+        await user.click(screen.getByRole('option', { name: /Python ML/ }));
+
+        await waitFor(() =>
+            expect(updateAgentAction).toHaveBeenCalledWith(AGENT_ID, { environmentId: 'env-2' }),
+        );
+    });
+
+    /**
+     * The column is nullable and the picker's "None" is the empty string:
+     * sending `''` would be a value the API rejects rather than a clear.
+     */
+    it('CLEARS the assignment with null when "None" is picked', async () => {
+        const user = userEvent.setup();
+        updateAgentAction.mockResolvedValue({ ...agent(), environmentId: null });
+        renderTab({}, [], { environments, environmentId: 'env-1' });
+
+        await user.click(screen.getByTestId('capabilities-environment-trigger'));
+        await user.click(screen.getByText('environment.none'));
+
+        await waitFor(() =>
+            expect(updateAgentAction).toHaveBeenCalledWith(AGENT_ID, { environmentId: null }),
+        );
+    });
+
+    it('restores the previous selection when the assignment is rejected', async () => {
+        const user = userEvent.setup();
+        updateAgentAction.mockRejectedValue(new Error('Environment is not published'));
+        renderTab({}, [], { environments, environmentId: 'env-1' });
+
+        await user.click(screen.getByTestId('capabilities-environment-trigger'));
+        await user.click(screen.getByRole('option', { name: /Python ML/ }));
+
+        await waitFor(() =>
+            expect(toastError).toHaveBeenCalledWith('Environment is not published'),
+        );
+        await waitFor(() =>
+            expect(screen.getByTestId('capabilities-environment-trigger')).toHaveTextContent(
+                'Node 22 sandbox',
+            ),
         );
     });
 });
