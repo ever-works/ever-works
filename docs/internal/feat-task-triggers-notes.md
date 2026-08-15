@@ -16,18 +16,18 @@ adds no scheduling.
 
 `inbound_triggers` (extended, all additive with behaviour-preserving defaults):
 
-| column | type | meaning |
-| --- | --- | --- |
-| `sourceType` | varchar(16) `'webhook'`\|`'event'` | what fires it; `'webhook'` default |
-| `eventMatcher` | simple-json | `{source?, kind?, workId?}`, trailing-`*` wildcards on source/kind |
-| `taskDescriptionTemplate` | text | `{{…}}` description template |
-| `taskTemplateSlug` | varchar(80) | RESERVED feature-I linkage (string slug, never a FK) |
-| `mode` | varchar(16) `'single-task'`\|`'template'` | what a fire produces — **locked at create** |
-| `agentPrompt` | text | `'single-task'` instructions; payload appended in `<webhook_body>` |
-| `showOnBoard` | boolean (false) | primary Task of a fire appears on the Kanban |
-| `replayWindowSec` | int (300) | timestamp freshness AND duplicate-delivery window |
-| `autoStart` | varchar(16) `'always'`\|`'manual'` | dispatch the first Task, or leave it in the backlog |
-| `defaultVariables` | simple-json | `[{key, label?, required}]` payload contract |
+| column                    | type                                      | meaning                                                            |
+| ------------------------- | ----------------------------------------- | ------------------------------------------------------------------ |
+| `sourceType`              | varchar(16) `'webhook'`\|`'event'`        | what fires it; `'webhook'` default                                 |
+| `eventMatcher`            | simple-json                               | `{source?, kind?, workId?}`, trailing-`*` wildcards on source/kind |
+| `taskDescriptionTemplate` | text                                      | `{{…}}` description template                                       |
+| `taskTemplateSlug`        | varchar(80)                               | RESERVED feature-I linkage (string slug, never a FK)               |
+| `mode`                    | varchar(16) `'single-task'`\|`'template'` | what a fire produces — **locked at create**                        |
+| `agentPrompt`             | text                                      | `'single-task'` instructions; payload appended in `<webhook_body>` |
+| `showOnBoard`             | boolean (false)                           | primary Task of a fire appears on the Kanban                       |
+| `replayWindowSec`         | int (300)                                 | timestamp freshness AND duplicate-delivery window                  |
+| `autoStart`               | varchar(16) `'always'`\|`'manual'`        | dispatch the first Task, or leave it in the backlog                |
+| `defaultVariables`        | simple-json                               | `[{key, label?, required}]` payload contract                       |
 
 `inbound_trigger_fires` (new) — both the idempotency ledger AND the "recent
 fires" log: `triggerId`, `dedupeKey` (UNIQUE with triggerId), `origin`
@@ -107,6 +107,7 @@ cd apps/web      && npx tsc -p tsconfig.json --noEmit
 
 New/updated specs: `inbound-triggers-modes.spec.ts` (modes, variable contract,
 board visibility, auto-start, replay window, fire-now, fire log),
+`inbound-trigger-fire.repository.spec.ts` (the claim contract),
 `trigger-prompt.spec.ts`, `trigger-variables.spec.ts`,
 `inbound-triggers-events.spec.ts` (updated for the ledger contract),
 `task.repository.spec.ts` (board visibility),
@@ -129,6 +130,10 @@ board visibility, auto-start, replay window, fire-now, fire log),
 - **Template mode degrades, it does not refuse.** With feature I unmerged there
   is no `TASK_TEMPLATE_LOOKUP` provider, so a template-mode trigger falls back to
   its own title/description templates instead of failing every fire.
+- **`firedAt` is reset through an explicit UPDATE**, not `save()`: it is a
+  `@CreateDateColumn`, which entity persistence treats as insert-only, and a
+  re-claim that failed to move it would leave the replay window anchored on the
+  original delivery.
 - **The `1786600000000` migration was edited in place** (`eventId` → `dedupeKey`,
   plus the log columns) rather than patched by a follow-up migration. It is
   branch-local and has never been applied anywhere, so this yields the correct
