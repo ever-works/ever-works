@@ -27,8 +27,8 @@ import { MigrationInterface, QueryRunner, Table, TableColumn, TableIndex } from 
  * e2e stack run better-sqlite3 while production runs Postgres. Forward-only
  * with idempotent guards (house pattern, mirrors 1785000000000-CreateTermsAcceptance).
  */
-export class AddSkillInvocationSlugAndSkillFiles1785010000000 implements MigrationInterface {
-    name = 'AddSkillInvocationSlugAndSkillFiles1785010000000';
+export class AddSkillInvocationSlugAndSkillFiles1786820000000 implements MigrationInterface {
+    name = 'AddSkillInvocationSlugAndSkillFiles1786820000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (!(await queryRunner.hasColumn('skills', 'invocationSlug'))) {

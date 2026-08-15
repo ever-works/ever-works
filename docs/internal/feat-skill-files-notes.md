@@ -45,7 +45,7 @@ Indexes: `uq_skill_files_skill_filename` (unique `skillId,filename`), `idx_skill
 Storage plugin), content-addressed by sha256. Deleting a `skill_files` row therefore removes the
 _reference_, never the bytes (which may be shared with other references).
 
-Migration: `apps/api/src/migrations/1785010000000-AddSkillInvocationSlugAndSkillFiles.ts` — one
+Migration: `apps/api/src/migrations/1786820000000-AddSkillInvocationSlugAndSkillFiles.ts` — one
 nullable column + one table, both behind `hasColumn` / `hasTable` guards, written with the portable
 `Table`/`TableColumn` API so it runs on Postgres and better-sqlite3 alike. Nothing to backfill.
 

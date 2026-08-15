@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { AddSkillInvocationSlugAndSkillFiles1785010000000 } from '../1785010000000-AddSkillInvocationSlugAndSkillFiles';
+import { AddSkillInvocationSlugAndSkillFiles1786820000000 } from '../1786820000000-AddSkillInvocationSlugAndSkillFiles';
 
 /**
  * Skills — invocation slugs + companion files. Runs on the in-memory
@@ -10,9 +10,9 @@ import { AddSkillInvocationSlugAndSkillFiles1785010000000 } from '../17850100000
  * The `skills` / `users` stubs mirror the minimum shape the migration
  * touches (the real tables exist by this point in the chain).
  */
-describe('AddSkillInvocationSlugAndSkillFiles1785010000000', () => {
+describe('AddSkillInvocationSlugAndSkillFiles1786820000000', () => {
     let dataSource: DataSource;
-    const migration = new AddSkillInvocationSlugAndSkillFiles1785010000000();
+    const migration = new AddSkillInvocationSlugAndSkillFiles1786820000000();
 
     beforeEach(async () => {
         dataSource = new DataSource({
