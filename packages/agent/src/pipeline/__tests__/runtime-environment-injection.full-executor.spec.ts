@@ -1,18 +1,24 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Logger } from '@nestjs/common';
+import { Logger, type Provider } from '@nestjs/common';
 
 import { FullPipelineExecutorService } from '../full-pipeline-executor.service';
 import { PipelineFacadeService } from '../pipeline-facade.service';
 import { PluginContextFactoryService } from '../../plugins/services/plugin-context-factory.service';
 import { EnvironmentsService } from '../../environments/environments.service';
+import { makePipelineResult } from './fixtures';
 
 import type {
     ExistingItems,
     GenerationRequest,
+    IAiFacade,
+    IContentExtractorFacade,
     IPipelinePlugin,
+    IScreenshotFacade,
+    ISearchFacade,
     PipelineExecutionOptions,
     PipelineResult,
+    PipelineStepDefinition,
     RuntimeEnvironmentData,
     StepExecutionContext,
     WorkReference,
@@ -53,6 +59,10 @@ const RUNTIME_ENVIRONMENT: RuntimeEnvironmentData = {
     allowPackageManagers: true,
 };
 
+const STEP_DEFINITIONS: readonly PipelineStepDefinition[] = [
+    { id: 's1', name: 'Only Step', position: { type: 'first' } },
+];
+
 function makeCapturingPlugin(): {
     plugin: IPipelinePlugin;
     captured: { execContexts: StepExecutionContext[] };
@@ -62,12 +72,12 @@ function makeCapturingPlugin(): {
         id: 'mock-self-managed',
         name: 'Mock Self-Managed Pipeline',
         version: '1.0.0',
-        category: 'pipeline' as any,
+        category: 'pipeline',
         capabilities: ['pipeline'],
-        settingsSchema: { type: 'object', properties: {} } as any,
+        settingsSchema: { type: 'object', properties: {} },
         onLoad: async () => undefined,
         onUnload: async () => undefined,
-        getStepDefinitions: () => [{ id: 's1' } as any],
+        getStepDefinitions: () => STEP_DEFINITIONS,
         execute: jest
             .fn()
             .mockImplementation(
@@ -78,23 +88,23 @@ function makeCapturingPlugin(): {
                     options?: PipelineExecutionOptions,
                 ): Promise<PipelineResult> => {
                     if (options?.execContext) captured.execContexts.push(options.execContext);
-                    return Promise.resolve({
-                        success: true,
-                        outputs: {
-                            items: [],
-                            categories: [],
-                            tags: [],
-                            collections: [],
-                            brands: [],
-                        },
-                        duration: 0,
-                        stepsCompleted: 1,
-                        totalSteps: 1,
-                    } as PipelineResult);
+                    return Promise.resolve(
+                        makePipelineResult({ stepsCompleted: 1, totalSteps: 1 }),
+                    );
                 },
             ),
     };
     return { plugin, captured };
+}
+
+/**
+ * The capturing plugin only inspects `execContext.runtimeEnvironment`, so the
+ * facades on the stub context are never called. This keeps them typed against
+ * the real contracts (rather than `any`) without hand-writing every facade
+ * method, so a change to `StepExecutionContext` still breaks compilation here.
+ */
+function stubFacade<T>(): T {
+    return {} as unknown as T;
 }
 
 async function buildHarness(resolveForAgent: jest.Mock | undefined): Promise<{
@@ -112,26 +122,25 @@ async function buildHarness(resolveForAgent: jest.Mock | undefined): Promise<{
                 _memorySessionId: string | undefined,
                 _memoryRecall: string | undefined,
                 runtimeEnvironment: RuntimeEnvironmentData | undefined,
-            ): StepExecutionContext =>
-                ({
-                    aiFacade: {} as any,
-                    searchFacade: {} as any,
-                    screenshotFacade: {} as any,
-                    contentExtractorFacade: {} as any,
-                    logger: {
-                        log: () => undefined,
-                        debug: () => undefined,
-                        warn: () => undefined,
-                        error: () => undefined,
-                    },
-                    work,
-                    user: work.user,
-                    runtimeEnvironment,
-                }) as StepExecutionContext,
+            ): StepExecutionContext => ({
+                aiFacade: stubFacade<IAiFacade>(),
+                searchFacade: stubFacade<ISearchFacade>(),
+                screenshotFacade: stubFacade<IScreenshotFacade>(),
+                contentExtractorFacade: stubFacade<IContentExtractorFacade>(),
+                logger: {
+                    log: () => undefined,
+                    debug: () => undefined,
+                    warn: () => undefined,
+                    error: () => undefined,
+                },
+                work,
+                user: work.user,
+                runtimeEnvironment,
+            }),
         ),
     };
 
-    const providers: any[] = [
+    const providers: Provider[] = [
         { provide: EventEmitter2, useValue: { emit: jest.fn(), on: jest.fn(), off: jest.fn() } },
         { provide: PipelineFacadeService, useValue: facadeServiceStub },
         {
