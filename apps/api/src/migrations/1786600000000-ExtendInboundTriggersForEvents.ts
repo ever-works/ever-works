@@ -24,14 +24,15 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  *
  * ## 2. New table `inbound_trigger_fires`
  *
- * The idempotency ledger of the event-firing path: one row per
- * (trigger, event) fire, UNIQUE on that pair. The ingest drain retries
- * batches after partial failures, so the same event is offered to the
- * same trigger repeatedly — the insert-if-new claim on this index is
- * what makes "one event fires a trigger once" true across retries and
- * process crashes. `eventId` is deliberately NOT a FK to
- * `ingested_events` (the ledger must outlive event-row pruning);
- * `triggerId` cascades with its trigger.
+ * Both the idempotency ledger of the delivery paths AND the "recent
+ * fires" log on the trigger detail page: one row per fire, UNIQUE on
+ * `(triggerId, dedupeKey)`. The ingest drain retries batches after
+ * partial failures, so the same event is offered to the same trigger
+ * repeatedly — the insert-if-new claim on this index is what makes "one
+ * event fires a trigger once" true across retries and process crashes.
+ * `dedupeKey` is deliberately NOT a FK to `ingested_events` (the ledger
+ * must outlive event-row pruning, and webhook/manual fires key on a
+ * delivery id instead); `triggerId` cascades with its trigger.
  *
  * Entity: `packages/agent/src/entities/inbound-trigger-fire.entity.ts`.
  *
@@ -81,8 +82,22 @@ export class ExtendInboundTriggersForEvents1786600000000 implements MigrationInt
                             default: 'uuid_generate_v4()',
                         },
                         { name: 'triggerId', type: 'uuid' },
-                        // ingested_events.id as identity, not a FK — see header.
-                        { name: 'eventId', type: 'varchar', length: '80' },
+                        // Delivery identity (ingested_events.id, `wh:<delivery>`,
+                        // or a random manual/test key) — not a FK, see header.
+                        { name: 'dedupeKey', type: 'varchar', length: '120' },
+                        {
+                            name: 'origin',
+                            type: 'varchar',
+                            length: '16',
+                            default: "'event'",
+                        },
+                        {
+                            name: 'status',
+                            type: 'varchar',
+                            length: '16',
+                            default: "'running'",
+                        },
+                        { name: 'reason', type: 'text', isNullable: true },
                         { name: 'taskId', type: 'uuid', isNullable: true },
                         { name: 'firedAt', type: 'timestamp', default: 'now()' },
                     ],
@@ -95,7 +110,7 @@ export class ExtendInboundTriggersForEvents1786600000000 implements MigrationInt
                 'inbound_trigger_fires',
                 new TableIndex({
                     name: 'idx_inbound_trigger_fires_dedupe',
-                    columnNames: ['triggerId', 'eventId'],
+                    columnNames: ['triggerId', 'dedupeKey'],
                     isUnique: true,
                 }),
             );
@@ -136,9 +151,7 @@ export class ExtendInboundTriggersForEvents1786600000000 implements MigrationInt
             'sourceType',
         ]) {
             if (triggers.findColumnByName(column)) {
-                await queryRunner.query(
-                    `ALTER TABLE "inbound_triggers" DROP COLUMN "${column}"`,
-                );
+                await queryRunner.query(`ALTER TABLE "inbound_triggers" DROP COLUMN "${column}"`);
             }
         }
     }

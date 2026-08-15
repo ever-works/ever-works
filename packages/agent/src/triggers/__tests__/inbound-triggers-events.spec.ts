@@ -88,18 +88,32 @@ function makeAgents(known: string[] = ['agent-1']) {
     };
 }
 
-/** In-memory (triggerId, eventId) claim ledger with the repository contract. */
+/** In-memory (triggerId, dedupeKey) claim ledger with the repository contract. */
 function makeFires() {
-    const claims = new Set<string>();
+    const rows = new Map<string, { id: string; taskId: string | null; firedAt: Date }>();
+    let seq = 0;
     return {
-        _claims: claims,
-        claim: jest.fn(async (triggerId: string, eventId: string) => {
-            const key = `${triggerId}|${eventId}`;
-            if (claims.has(key)) return false;
-            claims.add(key);
-            return true;
-        }),
-        attachTask: jest.fn(async () => undefined),
+        _rows: rows,
+        claim: jest.fn(
+            async (triggerId: string, dedupeKey: string, origin: string, windowMs?: number) => {
+                const key = `${triggerId}|${dedupeKey}`;
+                const existing = rows.get(key);
+                if (existing) {
+                    const age = Date.now() - existing.firedAt.getTime();
+                    if (windowMs === undefined || age <= windowMs) {
+                        return { fire: { ...existing, origin }, won: false };
+                    }
+                    const reclaimed = { ...existing, taskId: null, firedAt: new Date() };
+                    rows.set(key, reclaimed);
+                    return { fire: { ...reclaimed, origin }, won: true };
+                }
+                const fire = { id: `fire-${++seq}`, taskId: null, firedAt: new Date() };
+                rows.set(key, fire);
+                return { fire: { ...fire, origin }, won: true };
+            },
+        ),
+        complete: jest.fn(async () => undefined),
+        listRecent: jest.fn(async () => []),
     };
 }
 
@@ -122,6 +136,7 @@ function makeEvent(overrides: Partial<IngestedEvent> = {}): IngestedEvent {
         processedAt: null,
         dedupeKey: 'dedupe-1',
         createdAt: new Date('2026-08-14T12:00:01.000Z'),
+        ...overrides,
     } as IngestedEvent;
 }
 
@@ -266,7 +281,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
 
             const result = await service.fireForEvent(makeEvent());
 
-            expect(result).toEqual({ fired: 1, deduped: 0, failed: 0 });
+            expect(result).toEqual({ fired: 1, deduped: 0, failed: 0, refused: 0 });
             expect(tasks.create).toHaveBeenCalledWith(
                 'user-1',
                 expect.objectContaining({
@@ -277,7 +292,8 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             const row = repo._rows.get(trigger.id) as InboundTrigger;
             expect(row.fireCount).toBe(1);
             expect(row.lastFiredAt).toBeInstanceOf(Date);
-            expect(fires!.attachTask).toHaveBeenCalledWith(trigger.id, 'event-1', 'task-1');
+            expect(fires!.claim).toHaveBeenCalledWith(trigger.id, 'event-1', 'event');
+            expect(fires!.complete).toHaveBeenCalledWith('fire-1', 'done', { taskId: 'task-1' });
         });
 
         it('is idempotent per (trigger, event): the second offer dedupes, no second task', async () => {
@@ -291,7 +307,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             const second = await service.fireForEvent(makeEvent());
 
             expect(first.fired).toBe(1);
-            expect(second).toEqual({ fired: 0, deduped: 1, failed: 0 });
+            expect(second).toEqual({ fired: 0, deduped: 1, failed: 0, refused: 0 });
             expect(tasks.create).toHaveBeenCalledTimes(1);
             expect((repo._rows.get(trigger.id) as InboundTrigger).fireCount).toBe(1);
         });
@@ -320,7 +336,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             await service.create(SCOPE, { name: 'Webhook', taskTitleTemplate: 'W' });
 
             const result = await service.fireForEvent(makeEvent());
-            expect(result).toEqual({ fired: 0, deduped: 0, failed: 0 });
+            expect(result).toEqual({ fired: 0, deduped: 0, failed: 0, refused: 0 });
             expect(tasks.create).not.toHaveBeenCalled();
         });
 
@@ -329,9 +345,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             await service.create(SCOPE, { name: 'Mine', ...MATCH_ALL_GITHUB });
 
             const foreign = await service.fireForEvent(makeEvent({ userId: 'user-2' }));
-            const otherOrg = await service.fireForEvent(
-                makeEvent({ organizationId: 'org-1' }),
-            );
+            const otherOrg = await service.fireForEvent(makeEvent({ organizationId: 'org-1' }));
             expect(foreign.fired).toBe(0);
             expect(otherOrg.fired).toBe(0);
             expect(tasks.create).not.toHaveBeenCalled();
@@ -381,7 +395,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             const { service, tasks } = makeService({ fires: null });
             await service.create(SCOPE, { name: 'Pushes', ...MATCH_ALL_GITHUB });
             const result = await service.fireForEvent(makeEvent());
-            expect(result).toEqual({ fired: 0, deduped: 0, failed: 0 });
+            expect(result).toEqual({ fired: 0, deduped: 0, failed: 0, refused: 0 });
             expect(tasks.create).not.toHaveBeenCalled();
         });
 
@@ -483,14 +497,15 @@ describe('InboundTriggersService — event-sourced triggers', () => {
 
 describe('TriggerEventFiringService', () => {
     it('registers a wildcard processor that forwards drained events to fireForEvent', async () => {
-        const registered: { kinds: readonly string[]; process: (e: IngestedEvent) => Promise<void> }[] = [];
+        const registered: {
+            kinds: readonly string[];
+            process: (e: IngestedEvent) => Promise<void>;
+        }[] = [];
         const eventIngest = {
-            registerKindProcessor: jest.fn((p: (typeof registered)[number]) =>
-                registered.push(p),
-            ),
+            registerKindProcessor: jest.fn((p: (typeof registered)[number]) => registered.push(p)),
         };
         const triggers = {
-            fireForEvent: jest.fn(async () => ({ fired: 1, deduped: 0, failed: 0 })),
+            fireForEvent: jest.fn(async () => ({ fired: 1, deduped: 0, failed: 0, refused: 0 })),
         };
 
         const bridge = new TriggerEventFiringService(triggers as never, eventIngest as never);

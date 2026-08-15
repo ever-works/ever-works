@@ -25,6 +25,36 @@ export type InboundTriggerStatus = 'active' | 'paused';
 export type InboundTriggerSourceType = 'webhook' | 'event';
 
 /**
+ * What a fire PRODUCES — locked at create time (see the `mode` column):
+ *  - `'single-task'` — one Task built from `agentPrompt`, with the
+ *    delivery payload appended in a neutralized `<webhook_body>` block.
+ *  - `'template'` — the Task is built from the `taskTemplateSlug`
+ *    linkage (the Template-DAG mode; resolved lazily, see that column).
+ */
+export type InboundTriggerMode = 'single-task' | 'template';
+
+/**
+ * Whether the first Task a fire produces is dispatched immediately
+ * (`'always'`, the default) or parked in the backlog for a human to
+ * start (`'manual'`).
+ */
+export type InboundTriggerAutoStart = 'always' | 'manual';
+
+/**
+ * One value the trigger expects to find in the delivery payload's top
+ * level. `required` variables that are missing REFUSE the fire (the
+ * reason is written to the fire log); optional ones are advisory and
+ * exist so the UI can label the payload contract.
+ */
+export interface InboundTriggerVariable {
+    /** Top-level payload key — `[A-Za-z0-9_-]{1,64}`. */
+    key: string;
+    /** Human label for the UI; falls back to `key`. */
+    label?: string;
+    required: boolean;
+}
+
+/**
  * Matcher an `'event'`-sourced trigger applies to each ingested event.
  * Keys are whitelisted (nothing else is ever consulted): `source` and
  * `kind` support a trailing-`*` wildcard (`github.*`) or a lone `*`;
@@ -137,6 +167,53 @@ export class InboundTrigger {
      */
     @Column({ type: 'text', nullable: true })
     taskDescriptionTemplate: string | null;
+
+    /**
+     * What a fire produces — IMMUTABLE after create (a trigger that
+     * changed shape mid-life would silently rewrite what every future
+     * delivery does). `'template'` requires `taskTemplateSlug`.
+     */
+    @Column({ type: 'varchar', length: 16, default: 'single-task' })
+    mode: InboundTriggerMode;
+
+    /**
+     * `'single-task'` mode instructions for the agent. The delivery
+     * payload is appended to this prompt inside a neutralized
+     * `<webhook_body>` block (see `triggers/trigger-prompt.ts`) — the
+     * payload is DATA, never instructions.
+     */
+    @Column({ type: 'text', nullable: true })
+    agentPrompt: string | null;
+
+    /**
+     * When true the primary Task a fire produces shows on the Kanban
+     * board; when false it is created with `tasks.hiddenFromBoard` set
+     * so automated noise stays out of the human board. Child tasks are
+     * never surfaced by this flag.
+     */
+    @Column({ type: 'boolean', default: false })
+    showOnBoard: boolean;
+
+    /**
+     * Per-trigger replay window in SECONDS. Governs both webhook-path
+     * gates: how stale `x-everworks-timestamp` may be, and how long a
+     * repeated delivery id is treated as a duplicate. Clamped to
+     * `MIN/MAX_REPLAY_WINDOW_SEC` at write time.
+     */
+    @Column({ type: 'int', default: 300 })
+    replayWindowSec: number;
+
+    /** `'always'` dispatches the first Task; `'manual'` leaves it in the backlog. */
+    @Column({ type: 'varchar', length: 16, default: 'always' })
+    autoStart: InboundTriggerAutoStart;
+
+    /**
+     * Payload contract — `[{key, label?, required}]`. A fire whose
+     * payload is missing a `required` key is REFUSED and the reason is
+     * recorded in the fire log. See {@link InboundTriggerVariable}.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    defaultVariables: InboundTriggerVariable[] | null;
 
     /**
      * RESERVED linkage to `task_templates` (feature I, parallel branch)

@@ -10,20 +10,29 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import {
     InboundTrigger,
     type InboundTriggerEventMatcher,
+    type InboundTriggerMode,
+    type InboundTriggerVariable,
 } from '../entities/inbound-trigger.entity';
+import type {
+    InboundTriggerFire,
+    InboundTriggerFireOrigin,
+} from '../entities/inbound-trigger-fire.entity';
 import type { IngestedEvent } from '../entities/ingested-event.entity';
 import { WebhookSubscriptionSecretService } from '../services/webhook-subscription-secret.service';
 import { TasksService } from '../tasks-domain/tasks.service';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import {
+    DEFAULT_REPLAY_WINDOW_SEC,
     DEFAULT_TASK_TITLE_TEMPLATE,
     MAX_FIRE_PAYLOAD_BYTES,
+    MAX_REPLAY_WINDOW_SEC,
     MAX_TASK_DESCRIPTION_TEMPLATE_LENGTH,
-    REPLAY_WINDOW_MS,
+    MIN_REPLAY_WINDOW_SEC,
+    RECENT_FIRES_LIMIT,
     ROTATION_GRACE_MS,
     TASK_TEMPLATE_SLUG_RE,
     TRIGGER_TEST_LABEL,
@@ -31,6 +40,8 @@ import {
     type FireForEventResult,
     type FireInboundTriggerInput,
     type FireInboundTriggerResult,
+    type FireNowInboundTriggerResult,
+    type InboundTriggerFireView,
     type InboundTriggerScope,
     type InboundTriggerView,
     type TestFireInboundTriggerResult,
@@ -43,6 +54,13 @@ import {
     type TriggerTemplateEvent,
 } from './trigger-template';
 import { InboundTriggerFireRepository } from './inbound-trigger-fire.repository';
+import { MAX_AGENT_PROMPT_LENGTH, buildSingleTaskPrompt } from './trigger-prompt';
+import {
+    TriggerVariablesError,
+    describeMissingVariables,
+    findMissingRequiredVariables,
+    normalizeDefaultVariables,
+} from './trigger-variables';
 import {
     TASK_TEMPLATE_LOOKUP,
     type ResolvedTaskTemplate,
@@ -51,6 +69,15 @@ import {
 
 /** Task titles are capped at 200 by TasksService.assertTitle — clamp rendered templates. */
 const MAX_TASK_TITLE_LENGTH = 200;
+
+/**
+ * A fire the trigger's OWN contract rejected (a required payload
+ * variable was missing). Distinct from a failure: nothing broke, the
+ * rule said no. It extends `BadRequestException` so the webhook path
+ * answers a signed-but-incomplete delivery with a 400 carrying the
+ * reason, while the ingest path counts it separately from real errors.
+ */
+export class FireRefusedError extends BadRequestException {}
 
 /** Shape check for `eventMatcher.workId` (any RFC-4122 version). */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -79,15 +106,17 @@ function toIso(value: Date | null | undefined): string | null {
  * cutover.
  *
  * `fire()` is the unauthenticated delivery path: it verifies
- *   (a) the timestamp header is within REPLAY_WINDOW_MS of now,
+ *   (a) the timestamp header is within the trigger's `replayWindowSec`,
  *   (b) hex HMAC-SHA256 over `${timestamp}.${rawBody}` matches the
  *       signature header under the current secret OR (within grace) the
- *       previous one — timing-safe comparison, and
- *   (c) the trigger is active,
- * then spawns a Task titled from `taskTitleTemplate` carrying the JSON
- * payload, assigned to `targetAgentId` when set, and bumps
- * `fireCount` / `lastFiredAt`. All verification failures surface as a
- * constant-shape 401 (no detail leak); unknown ids 404; paused 409.
+ *       previous one — timing-safe comparison,
+ *   (c) the trigger is active, and
+ *   (d) the delivery is not a duplicate of one already claimed inside
+ *       that same window,
+ * then runs {@link executeFire}. All verification failures surface as a
+ * constant-shape 401 (no detail leak); unknown ids 404; paused 409; an
+ * oversized/non-JSON payload, or one missing a required declared
+ * variable, 400.
  */
 @Injectable()
 export class InboundTriggersService {
@@ -148,6 +177,17 @@ export class InboundTriggersService {
         this.assertTemplateValid('taskTitleTemplate', input.taskTitleTemplate);
         this.assertTemplateValid('taskDescriptionTemplate', input.taskDescriptionTemplate);
         this.assertTemplateSlugValid(input.taskTemplateSlug);
+        const mode: InboundTriggerMode = input.mode ?? 'single-task';
+        // Mode is locked from here on, so the linkage it depends on has to
+        // be present NOW — a template-mode trigger with no slug would
+        // refuse every fire for the rest of its life.
+        if (mode === 'template' && !input.taskTemplateSlug) {
+            throw new BadRequestException(
+                'Template-mode triggers need a taskTemplateSlug (mode is locked after create).',
+            );
+        }
+        this.assertAgentPromptValid(input.agentPrompt);
+        const defaultVariables = this.normalizeVariables(input.defaultVariables);
 
         const { raw, encrypted } = this.secrets.generateSecret();
         const row = await this.repo.save(
@@ -166,6 +206,12 @@ export class InboundTriggersService {
                 taskTitleTemplate: input.taskTitleTemplate ?? null,
                 taskDescriptionTemplate: input.taskDescriptionTemplate ?? null,
                 taskTemplateSlug: input.taskTemplateSlug ?? null,
+                mode,
+                agentPrompt: input.agentPrompt ?? null,
+                showOnBoard: input.showOnBoard ?? false,
+                replayWindowSec: this.clampReplayWindow(input.replayWindowSec),
+                autoStart: input.autoStart ?? 'always',
+                defaultVariables,
                 lastFiredAt: null,
                 fireCount: 0,
                 // Stamp the active Organization explicitly (mirrors what
@@ -209,7 +255,30 @@ export class InboundTriggersService {
         }
         if (input.taskTemplateSlug !== undefined) {
             this.assertTemplateSlugValid(input.taskTemplateSlug);
+            // Mode is immutable, so clearing the slug a template-mode
+            // trigger fires from would strand it with nothing to build.
+            if (!input.taskTemplateSlug && row.mode === 'template') {
+                throw new BadRequestException(
+                    'A template-mode trigger cannot clear its taskTemplateSlug.',
+                );
+            }
             row.taskTemplateSlug = input.taskTemplateSlug;
+        }
+        if (input.agentPrompt !== undefined) {
+            this.assertAgentPromptValid(input.agentPrompt);
+            row.agentPrompt = input.agentPrompt;
+        }
+        if (input.showOnBoard !== undefined) {
+            row.showOnBoard = input.showOnBoard;
+        }
+        if (input.replayWindowSec !== undefined) {
+            row.replayWindowSec = this.clampReplayWindow(input.replayWindowSec);
+        }
+        if (input.autoStart !== undefined) {
+            row.autoStart = input.autoStart;
+        }
+        if (input.defaultVariables !== undefined) {
+            row.defaultVariables = this.normalizeVariables(input.defaultVariables);
         }
         if (input.eventMatcher !== undefined) {
             if (row.sourceType !== 'event') {
@@ -276,8 +345,9 @@ export class InboundTriggersService {
         }
 
         const now = Date.now();
+        const replayWindowMs = this.replayWindowMs(row);
         const timestampMs = this.parseTimestamp(input.timestampHeader);
-        if (timestampMs === null || Math.abs(now - timestampMs) > REPLAY_WINDOW_MS) {
+        if (timestampMs === null || Math.abs(now - timestampMs) > replayWindowMs) {
             throw this.unauthorized();
         }
 
@@ -323,27 +393,59 @@ export class InboundTriggersService {
             occurredAt: new Date(),
             payload: this.parsePayloadObject(input.rawBody),
         };
-        const resolved = await this.resolveTemplateSlug(row);
-        const task = await this.tasks.create(row.userId, {
-            title: this.renderTaskTitle(row, webhookEvent, resolved),
-            description:
-                this.renderTaskDescription(row, webhookEvent, resolved) ??
-                this.buildTaskDescription(row, input.rawBody),
-            createdByType: 'user',
-            createdById: row.userId,
-        });
+        // Replay/duplicate suppression: a retry of the SAME delivery
+        // inside the trigger's window returns the original fire's Task
+        // instead of creating a second one. The sender's delivery id is
+        // preferred; without one the signature stands in — a byte-identical
+        // replay signs identically, distinct deliveries do not.
+        const dedupeKey = this.webhookDedupeKey(input.deliveryHeader, providedHex);
+        const claim = this.fires
+            ? await this.fires.claim(row.id, dedupeKey, 'webhook', replayWindowMs)
+            : null;
+        if (claim && !claim.won) {
+            return { ok: true, taskId: claim.fire.taskId, taskSlug: null, duplicate: true };
+        }
 
-        await this.tryAssignAgent(row, task.id);
-
-        // Single atomic row update — bumping the counter and stamping
-        // lastFiredAt together avoids a torn write if the process dies between
-        // two separate calls. The raw `"fireCount" + 1` increments in-place.
-        await this.repo.update(row.id, {
-            fireCount: () => '"fireCount" + 1',
-            lastFiredAt: new Date(),
+        const task = await this.executeFire(row, {
+            fire: claim?.fire ?? null,
+            event: webhookEvent,
+            fallbackDescription: () => this.buildTaskDescription(row, input.rawBody),
         });
 
         return { ok: true, taskId: task.id, taskSlug: task.slug };
+    }
+
+    /**
+     * Owner-initiated real fire ("Fire now"): builds a sample payload
+     * that SATISFIES the trigger's own declared contract and then runs
+     * the exact production fire path — counters bump, `autoStart` is
+     * honoured, the fire is logged.
+     */
+    async fireNow(scope: InboundTriggerScope, id: string): Promise<FireNowInboundTriggerResult> {
+        const row = await this.findOwn(scope, id);
+        if (row.status !== 'active') {
+            throw new ConflictException('Inbound trigger is paused');
+        }
+        const sample = this.buildSampleEvent(row);
+        // Manual fires never dedupe against each other — each press of the
+        // button is a distinct delivery by definition.
+        const claim = this.fires
+            ? await this.fires.claim(row.id, `manual:${randomUUID()}`, 'manual')
+            : null;
+        const task = await this.executeFire(row, {
+            fire: claim?.fire ?? null,
+            event: sample,
+            fallbackDescription: () => this.buildEventTaskDescription(row, sample),
+        });
+        return { ok: true, taskId: task.id, taskSlug: task.slug, taskTitle: task.title };
+    }
+
+    /** Most recent fires for one trigger (ownership-gated), newest first. */
+    async listFires(scope: InboundTriggerScope, id: string): Promise<InboundTriggerFireView[]> {
+        const row = await this.findOwn(scope, id);
+        if (!this.fires) return [];
+        const rows = await this.fires.listRecent(row.id, RECENT_FIRES_LIMIT);
+        return rows.map((fire) => this.toFireView(fire));
     }
 
     /**
@@ -374,7 +476,7 @@ export class InboundTriggersService {
      * null-personal), mirroring every other Tier A read.
      */
     async fireForEvent(event: IngestedEvent): Promise<FireForEventResult> {
-        const result: FireForEventResult = { fired: 0, deduped: 0, failed: 0 };
+        const result: FireForEventResult = { fired: 0, deduped: 0, failed: 0, refused: 0 };
         if (!this.fires) {
             // Ledger not bound (bare fixture) — refuse to fire without
             // the idempotency guarantee rather than double-firing.
@@ -393,17 +495,33 @@ export class InboundTriggersService {
         for (const row of rows) {
             if (!matchesEvent(row.eventMatcher, event)) continue;
             try {
-                const won = await this.fires.claim(row.id, event.id);
-                if (!won) {
+                // Permanent claim (no window): one ingested event fires a
+                // trigger once, no matter how often the drain retries.
+                const claim = await this.fires.claim(row.id, event.id, 'event');
+                if (!claim.won) {
                     result.deduped += 1;
                     continue;
                 }
-                const taskId = await this.fireTriggerForEvent(row, event);
-                await this.fires.attachTask(row.id, event.id, taskId).catch(() => undefined);
+                const templateEvent = this.toTemplateEvent(event);
+                await this.executeFire(row, {
+                    fire: claim.fire,
+                    event: templateEvent,
+                    workId: event.workId ?? null,
+                    fallbackDescription: () => this.buildEventTaskDescription(row, templateEvent),
+                });
                 result.fired += 1;
             } catch (error) {
-                result.failed += 1;
                 const message = error instanceof Error ? error.message : String(error);
+                if (error instanceof FireRefusedError) {
+                    // The trigger's own contract said no — already recorded
+                    // in the fire log with its reason, nothing to alarm on.
+                    result.refused += 1;
+                    this.logger.debug(
+                        `Event trigger ${row.id} refused ingested event ${event.id}: ${message}`,
+                    );
+                    continue;
+                }
+                result.failed += 1;
                 this.logger.warn(
                     `Event trigger ${row.id} failed for ingested event ${event.id} (${event.kind}): ${message}`,
                 );
@@ -419,44 +537,189 @@ export class InboundTriggersService {
      * but does NOT dispatch a run, bump `fireCount`, or stamp
      * `lastFiredAt` (rehearsals must not look like production fires).
      */
-    async testFire(
-        scope: InboundTriggerScope,
-        id: string,
-    ): Promise<TestFireInboundTriggerResult> {
+    async testFire(scope: InboundTriggerScope, id: string): Promise<TestFireInboundTriggerResult> {
         const row = await this.findOwn(scope, id);
         const sample = this.buildSampleEvent(row);
         const resolved = await this.resolveTemplateSlug(row);
         const title = this.renderTaskTitle(row, sample, resolved);
-        const description =
-            this.renderTaskDescription(row, sample, resolved) ??
-            [
-                `Test fire of trigger "${row.name}" (${row.id}) at ${new Date().toISOString()}.`,
-                '',
-                'Sample event:',
-                '```json',
-                JSON.stringify(
-                    { source: sample.source, kind: sample.kind, payload: sample.payload },
-                    null,
-                    2,
-                ),
-                '```',
-            ].join('\n');
+        const description = this.buildFireDescription(
+            row,
+            sample,
+            resolved,
+            sample.payload ?? {},
+            () =>
+                [
+                    `Test fire of trigger "${row.name}" (${row.id}) at ${new Date().toISOString()}.`,
+                    '',
+                    'Sample event:',
+                    '```json',
+                    JSON.stringify(
+                        { source: sample.source, kind: sample.kind, payload: sample.payload },
+                        null,
+                        2,
+                    ),
+                    '```',
+                ].join('\n'),
+        );
         const task = await this.tasks.create(row.userId, {
             title,
             description,
             labels: [TRIGGER_TEST_LABEL],
+            hiddenFromBoard: !row.showOnBoard,
             createdByType: 'user',
             createdById: row.userId,
         });
         await this.tryAssignAgent(row, task.id);
+        // Rehearsals appear in the fire log (that is where the owner looks
+        // to see what happened) but never dedupe against anything and never
+        // move the counters.
+        if (this.fires) {
+            const claim = await this.fires
+                .claim(row.id, `test:${randomUUID()}`, 'test')
+                .catch(() => null);
+            await this.closeFire(claim?.fire ?? null, 'done', { taskId: task.id });
+        }
         return { ok: true, taskId: task.id, taskSlug: task.slug, taskTitle: title };
     }
 
     // ── internals ──────────────────────────────────────────────────────
 
-    /** One won claim → Task + assignment + gated dispatch + counters. Returns the task id. */
-    private async fireTriggerForEvent(row: InboundTrigger, event: IngestedEvent): Promise<string> {
-        const templateEvent: TriggerTemplateEvent = {
+    /**
+     * THE fire. Every delivery path (signed webhook, ingest event,
+     * "Fire now") funnels through here so they cannot drift apart:
+     *
+     *   1. the declared payload contract gates the fire — a missing
+     *      required variable REFUSES it, with the reason written to the
+     *      fire log rather than silently handing an agent half a payload;
+     *   2. the Task body comes from the trigger's mode — `'single-task'`
+     *      wraps the owner's prompt around the payload in a neutralized
+     *      `<webhook_body>` block, `'template'` renders the resolved
+     *      template (degrading to the trigger's own templates while the
+     *      `task_templates` lookup is unbound);
+     *   3. `showOnBoard` decides whether the Task reaches the Kanban;
+     *   4. `autoStart` decides whether the target agent is dispatched
+     *      through the gated `runTask` path, or the Task waits in the
+     *      backlog for a human;
+     *   5. counters bump atomically and the ledger row is closed with the
+     *      outcome the detail page renders.
+     *
+     * Dispatch failures are best-effort by design: a credits gate or an
+     * in-flight valve refusing the run must not undo work that was
+     * legitimately created.
+     */
+    private async executeFire(
+        row: InboundTrigger,
+        ctx: {
+            /** Ledger row to close out; null when no ledger is bound. */
+            fire: InboundTriggerFire | null;
+            event: TriggerTemplateEvent;
+            /** Description when neither a template nor a prompt applies. */
+            fallbackDescription: () => string;
+            workId?: string | null;
+        },
+    ): Promise<{ id: string; slug: string; title: string }> {
+        const payload = ctx.event.payload ?? {};
+        const missing = findMissingRequiredVariables(row.defaultVariables, payload);
+        if (missing.length > 0) {
+            const reason = describeMissingVariables(missing);
+            await this.closeFire(ctx.fire, 'refused', { reason });
+            throw new FireRefusedError(reason);
+        }
+
+        const resolved = await this.resolveTemplateSlug(row);
+        const title = this.renderTaskTitle(row, ctx.event, resolved);
+        const description = this.buildFireDescription(
+            row,
+            ctx.event,
+            resolved,
+            payload,
+            ctx.fallbackDescription,
+        );
+
+        let task: { id: string; slug: string; title: string };
+        try {
+            task = await this.tasks.create(row.userId, {
+                title,
+                description,
+                workId: ctx.workId ?? null,
+                // Automated work stays off the human board unless the
+                // trigger's owner opted it in.
+                hiddenFromBoard: !row.showOnBoard,
+                createdByType: 'user',
+                createdById: row.userId,
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            await this.closeFire(ctx.fire, 'failed', { reason: message });
+            throw error;
+        }
+
+        await this.tryAssignAgent(row, task.id);
+
+        let dispatched = false;
+        if (row.targetAgentId && row.autoStart !== 'manual') {
+            try {
+                await this.tasks.runTask(row.userId, task.id, { agentId: row.targetAgentId });
+                dispatched = true;
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                this.logger.warn(
+                    `Trigger ${row.id}: dispatch of task ${task.id} to agent ${row.targetAgentId} was refused: ${message}`,
+                );
+            }
+        }
+
+        // Single atomic row update — bumping the counter and stamping
+        // lastFiredAt together avoids a torn write if the process dies
+        // between two separate calls. `"fireCount" + 1` increments in-place.
+        await this.repo.update(row.id, {
+            fireCount: () => '"fireCount" + 1',
+            lastFiredAt: new Date(),
+        });
+        await this.closeFire(ctx.fire, dispatched ? 'running' : 'done', { taskId: task.id });
+        return task;
+    }
+
+    /**
+     * Task body for one fire, in precedence order:
+     *  - `'single-task'` mode with a prompt → the prompt plus the payload
+     *    in a neutralized `<webhook_body>` block (the founder-specified
+     *    shape); the payload is DATA, never instructions;
+     *  - an explicit description template (the trigger's own, or the one
+     *    a resolved `taskTemplateSlug` supplies) → rendered;
+     *  - otherwise the path's provenance-first fallback.
+     */
+    private buildFireDescription(
+        row: InboundTrigger,
+        event: TriggerTemplateEvent,
+        resolved: ResolvedTaskTemplate | null,
+        payload: Record<string, unknown>,
+        fallback: () => string,
+    ): string {
+        if (row.mode === 'single-task' && (row.agentPrompt ?? '').trim().length > 0) {
+            return buildSingleTaskPrompt(row.agentPrompt, payload);
+        }
+        return this.renderTaskDescription(row, event, resolved) ?? fallback();
+    }
+
+    /** Ledger close-out is provenance, never load-bearing — a failure here must not undo a fire. */
+    private async closeFire(
+        fire: InboundTriggerFire | null,
+        status: 'running' | 'done' | 'failed' | 'refused',
+        patch: { taskId?: string | null; reason?: string | null },
+    ): Promise<void> {
+        if (!fire || !this.fires) return;
+        try {
+            await this.fires.complete(fire.id, status, patch);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(`Could not record fire ${fire.id} as ${status}: ${message}`);
+        }
+    }
+
+    /** `ingested_events` row → the projection templates and prompts read. */
+    private toTemplateEvent(event: IngestedEvent): TriggerTemplateEvent {
+        return {
             id: event.id,
             source: event.source,
             kind: event.kind,
@@ -469,48 +732,23 @@ export class InboundTriggersService {
             workId: event.workId ?? null,
             payload: event.payload ?? {},
         };
-        const resolved = await this.resolveTemplateSlug(row);
-        const task = await this.tasks.create(row.userId, {
-            title: this.renderTaskTitle(row, templateEvent, resolved),
-            description:
-                this.renderTaskDescription(row, templateEvent, resolved) ??
-                this.buildEventTaskDescription(row, event),
-            workId: event.workId ?? null,
-            createdByType: 'user',
-            createdById: row.userId,
-        });
-
-        await this.tryAssignAgent(row, task.id);
-
-        // Dispatch through the SAME gated path the board uses (credits
-        // precheck, in-flight valve). Best-effort: a gate refusal (no
-        // credits, run already in flight) must not undo the fire.
-        if (row.targetAgentId) {
-            try {
-                await this.tasks.runTask(row.userId, task.id, { agentId: row.targetAgentId });
-            } catch (error) {
-                const message = error instanceof Error ? error.message : String(error);
-                this.logger.warn(
-                    `Event trigger ${row.id}: dispatch of task ${task.id} to agent ${row.targetAgentId} was refused: ${message}`,
-                );
-            }
-        }
-
-        // Same atomic bump as the webhook path — counter and timestamp
-        // move together, incremented in-place.
-        await this.repo.update(row.id, {
-            fireCount: () => '"fireCount" + 1',
-            lastFiredAt: new Date(),
-        });
-        return task.id;
     }
 
-    /** A representative event for `testFire`, derived from the matcher when present. */
+    /**
+     * A representative event for `testFire` / `fireNow`, derived from the
+     * matcher when present. The payload carries every declared variable
+     * so a rehearsal exercises the real path instead of tripping the
+     * trigger's own required-variable gate.
+     */
     private buildSampleEvent(row: InboundTrigger): TriggerTemplateEvent {
         const stripWildcard = (value: string | undefined, fallback: string): string => {
             if (!value || value === '*') return fallback;
             return value.endsWith('*') ? `${value.slice(0, -1)}sample` : value;
         };
+        const payload: Record<string, unknown> = { sample: true };
+        for (const variable of row.defaultVariables ?? []) {
+            payload[variable.key] = `sample-${variable.key}`;
+        }
         return {
             id: `test-${row.id}`,
             source: stripWildcard(row.eventMatcher?.source, 'test'),
@@ -522,19 +760,23 @@ export class InboundTriggersService {
             subjectExternalId: null,
             occurredAt: new Date(),
             workId: row.eventMatcher?.workId ?? null,
-            payload: { sample: true },
+            payload,
         };
     }
 
     /** Default description for event-sourced fires with no template — provenance-first. */
-    private buildEventTaskDescription(row: InboundTrigger, event: IngestedEvent): string {
+    private buildEventTaskDescription(row: InboundTrigger, event: TriggerTemplateEvent): string {
+        const occurredAt =
+            event.occurredAt instanceof Date
+                ? event.occurredAt.toISOString()
+                : (event.occurredAt ?? new Date().toISOString());
         const lines = [
             `Fired by event trigger "${row.name}" (${row.id}) for ${event.source}/${event.kind}.`,
             '',
             ...(event.title ? [`Event: ${event.title}`] : []),
             ...(event.actorName ? [`Actor: ${event.actorName}`] : []),
             ...(event.sourceUrl ? [`Source: ${event.sourceUrl}`] : []),
-            `Occurred at: ${event.occurredAt.toISOString()}`,
+            `Occurred at: ${occurredAt}`,
             '',
             'Payload:',
             '```json',
@@ -752,6 +994,60 @@ export class InboundTriggersService {
         }
     }
 
+    /** Effective replay/timestamp window for a row (older rows have no column value). */
+    private replayWindowMs(row: InboundTrigger): number {
+        const seconds = this.clampReplayWindow(row.replayWindowSec);
+        return seconds * 1000;
+    }
+
+    private clampReplayWindow(seconds: number | null | undefined): number {
+        if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+            return DEFAULT_REPLAY_WINDOW_SEC;
+        }
+        return Math.min(
+            MAX_REPLAY_WINDOW_SEC,
+            Math.max(MIN_REPLAY_WINDOW_SEC, Math.trunc(seconds)),
+        );
+    }
+
+    /**
+     * Delivery identity for the webhook path: the sender's own delivery
+     * id when supplied, else the request signature — which is a hash
+     * over `${timestamp}.${body}`, so a byte-identical replay collides
+     * and two genuinely different deliveries never do.
+     */
+    private webhookDedupeKey(deliveryHeader: string | undefined, signatureHex: string): string {
+        const supplied = (deliveryHeader ?? '').trim();
+        if (supplied.length > 0) {
+            // Prefix-separated so a sender cannot forge a collision with
+            // some other trigger's signature-derived key.
+            return `wh:id:${supplied.slice(0, 100)}`;
+        }
+        return `wh:sig:${signatureHex.slice(0, 64)}`;
+    }
+
+    private normalizeVariables(
+        input: readonly Partial<InboundTriggerVariable>[] | null | undefined,
+    ): InboundTriggerVariable[] | null {
+        try {
+            return normalizeDefaultVariables(input);
+        } catch (error) {
+            if (error instanceof TriggerVariablesError) {
+                throw new BadRequestException(error.message);
+            }
+            throw error;
+        }
+    }
+
+    private assertAgentPromptValid(prompt: string | null | undefined): void {
+        if (prompt === null || prompt === undefined) return;
+        if (prompt.length > MAX_AGENT_PROMPT_LENGTH) {
+            throw new BadRequestException(
+                `agentPrompt must be at most ${MAX_AGENT_PROMPT_LENGTH} characters.`,
+            );
+        }
+    }
+
     private assertTemplateSlugValid(slug: string | null | undefined): void {
         if (slug === null || slug === undefined) return;
         if (!TASK_TEMPLATE_SLUG_RE.test(slug)) {
@@ -787,11 +1083,28 @@ export class InboundTriggersService {
             taskTitleTemplate: row.taskTitleTemplate ?? null,
             taskDescriptionTemplate: row.taskDescriptionTemplate ?? null,
             taskTemplateSlug: row.taskTemplateSlug ?? null,
+            mode: row.mode ?? 'single-task',
+            agentPrompt: row.agentPrompt ?? null,
+            showOnBoard: row.showOnBoard === true,
+            replayWindowSec: this.clampReplayWindow(row.replayWindowSec),
+            autoStart: row.autoStart ?? 'always',
+            defaultVariables: row.defaultVariables ?? null,
             lastFiredAt: toIso(row.lastFiredAt),
             fireCount: row.fireCount,
             rotatedAt: toIso(row.rotatedAt),
             createdAt: toIso(row.createdAt) ?? '',
             updatedAt: toIso(row.updatedAt) ?? '',
+        };
+    }
+
+    private toFireView(fire: InboundTriggerFire): InboundTriggerFireView {
+        return {
+            id: fire.id,
+            origin: fire.origin ?? 'event',
+            status: fire.status ?? 'done',
+            reason: fire.reason ?? null,
+            taskId: fire.taskId ?? null,
+            firedAt: toIso(fire.firedAt) ?? '',
         };
     }
 }

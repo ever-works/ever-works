@@ -47,10 +47,10 @@ export class TriggerEventFiringService implements OnModuleInit {
     }
 
     private async process(event: IngestedEvent): Promise<void> {
-        const { fired, deduped, failed } = await this.triggers.fireForEvent(event);
-        if (fired > 0 || deduped > 0 || failed > 0) {
+        const { fired, deduped, failed, refused } = await this.triggers.fireForEvent(event);
+        if (fired > 0 || deduped > 0 || failed > 0 || refused > 0) {
             this.logger.log(
-                `Event ${event.id} (${event.kind}): ${fired} trigger(s) fired, ${deduped} deduped, ${failed} failed.`,
+                `Event ${event.id} (${event.kind}): ${fired} trigger(s) fired, ${deduped} deduped, ${refused} refused, ${failed} failed.`,
             );
         }
     }
