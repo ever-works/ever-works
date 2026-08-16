@@ -142,6 +142,11 @@ export interface EntityAttachmentRow {
     readonly sizeBytes?: number | null;
     /** API-routed serve URL — makes the tile openable after a refresh. */
     readonly url?: string | null;
+    /**
+     * Optional role chip rendered on the tile corner (Tasks upgrades —
+     * `initial` vs `result` attachments). Absent = no chip.
+     */
+    readonly badge?: string | null;
 }
 
 export interface EntityAttachmentsSectionProps<TRow extends EntityAttachmentRow> {
@@ -427,6 +432,16 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                                     >
                                         {PreviewInner}
                                     </div>
+                                )}
+
+                                {/* Role chip (Tasks upgrades) — corner badge. */}
+                                {r.badge && (
+                                    <span
+                                        className="absolute top-1.5 left-1.5 z-10 rounded bg-card/90 dark:bg-card-primary-dark/90 border border-border/60 dark:border-border-dark/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-text-secondary dark:text-text-secondary-dark"
+                                        data-testid={testId ? `${testId}-badge` : undefined}
+                                    >
+                                        {r.badge}
+                                    </span>
                                 )}
 
                                 {/* Footer — filename + meta */}

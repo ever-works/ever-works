@@ -134,6 +134,35 @@
                 "link": "サインアップ"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "パスワードをリセット",
             "subtitle": "新しいパスワードを以下に入力",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "パスワードのリセットに失敗しました。もう一度お試しください、または新しいリセットリンクをリクエストしてください。",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "無効なリセットリンク",
                 "invalidLink": "無効なリセットリンク",
                 "missingTokenMessage": "パスワードリセットリンクが無効または不完全です。新しいパスワードリセットをリクエストしてください。",
@@ -181,7 +214,8 @@
             "form": {
                 "name": {
                     "label": "フルネーム",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "メールアドレス",
@@ -190,7 +224,7 @@
                 "password": {
                     "label": "パスワード",
                     "placeholder": "強力なパスワードを作成",
-                    "hint": "最低8文字必要です"
+                    "hint": "最低8文字で、小文字と数字/特殊文字を含む必要があります"
                 },
                 "confirmPassword": {
                     "label": "パスワードを確認",
@@ -219,7 +253,12 @@
                 "passwordsDoNotMatch": "パスワードが一致しません",
                 "passwordTooShort": "パスワードは最低8文字必要です",
                 "generic": "エラーが発生しました。もう一度お試しください。",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -598,6 +637,64 @@
                 "error": "問題が発生しました。もう一度お試しください。"
             }
         },
+        "inbox": {
+            "title": "Inbox",
+            "subtitle": "Questions, approvals and notices your agents and works sent you.",
+            "unreadCount": "{count} unread",
+            "unreadDot": "Unread",
+            "tabs": {
+                "active": "Active",
+                "archived": "Archived"
+            },
+            "kind": {
+                "question": "Question",
+                "approval": "Approval",
+                "escalation": "Escalation",
+                "notice": "Notice"
+            },
+            "empty": {
+                "active": "Nothing is waiting on you.",
+                "archived": "No archived messages."
+            },
+            "rowMenu": {
+                "label": "Message actions",
+                "markRead": "Mark as read",
+                "markUnread": "Mark as unread",
+                "archive": "Archive",
+                "unarchive": "Move to Active",
+                "delete": "Delete"
+            },
+            "detail": {
+                "none": "Select a message to read it.",
+                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
+                "yourReply": "Your reply",
+                "noReplyText": "No reply text was recorded."
+            },
+            "reply": {
+                "chooseOption": "Choose an answer",
+                "other": "Other (write your own)",
+                "recommended": "Recommended",
+                "placeholder": "Write your reply…",
+                "send": "Send Reply",
+                "hint": "Your reply goes straight back to the agent.",
+                "needsAnswer": "Pick an option or write a reply first."
+            },
+            "routed": {
+                "steered": "Reply delivered — the running agent picked it up.",
+                "resumed": "Reply delivered — a new run is answering it.",
+                "approved": "Approved.",
+                "rejected": "Rejected.",
+                "escalationResolved": "Escalation resolved.",
+                "alreadyDecided": "This was already decided elsewhere.",
+                "recorded": "Reply recorded."
+            },
+            "toast": {
+                "archived": "Message archived.",
+                "unarchived": "Message moved back to Active.",
+                "deleted": "Message deleted.",
+                "error": "Something went wrong. Please try again."
+            }
+        },
         "title": "ダッシュボード",
         "connectGithub": {
             "title": "GitHub アカウントを接続",
@@ -932,7 +1029,8 @@
                 "capabilities": "機能",
                 "budgets": "予算",
                 "settings": "設定",
-                "terminal": "Terminal"
+                "terminal": "Terminal",
+                "collaborators": "Collaborators"
             },
             "newDialog": {
                 "title": "新しいエージェント",
@@ -1151,6 +1249,16 @@
                 "success": "{name} を削除しました",
                 "error": "エージェントを削除できませんでした"
             },
+            "collaborators": {
+                "title": "Collaborator Agents",
+                "description": "Select which agents this agent can spawn as collaborators for subtasks. Delegations to agents that are not enabled here are refused.",
+                "empty": "No other agents yet. Create another agent to enable it as a collaborator.",
+                "enabledCount": "{count} enabled",
+                "noTitle": "No role set",
+                "toggleFailed": "Could not update collaborator",
+                "reset": "Clear rule",
+                "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
+            },
             "capabilities": {
                 "title": "機能",
                 "subtitle": "このエージェントにできること — ツール、スキル、初期化スクリプト。",
@@ -1282,7 +1390,22 @@
                 "acceptanceChecks": "Acceptance checks",
                 "acceptanceChecksHint": "Commands that must exit 0 before this Task's agent work can open a pull request. Leave empty to inherit the Work's default checks.",
                 "maxGateAttempts": "Max gate attempts",
-                "maxGateAttemptsInherit": "Inherit from Work"
+                "maxGateAttemptsInherit": "Inherit from Work",
+                "modeLabel": "What to create",
+                "modeBlank": "Blank task",
+                "modeTemplate": "From template",
+                "template": "Workflow template",
+                "templateOption": "{name} — {steps} steps",
+                "templatesEmpty": "No workflow templates available",
+                "templatesLoadError": "Failed to load workflow templates",
+                "templateRequired": "Pick a workflow template first.",
+                "branchName": "Branch name (optional)",
+                "branchNamePlaceholder": "feat/my-feature",
+                "willCreate": "Will create a parent Task plus {steps} sub-tasks:",
+                "stepApproval": "approval",
+                "featureName": "Feature name",
+                "featureDescription": "Feature description",
+                "createFromTemplate": "Create workflow"
             },
             "detail": {
                 "moveTo": "移動先",
@@ -1351,7 +1474,20 @@
                     "resumeDispatched": "Resumed — a new run is picking up the same session.",
                     "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
                     "genericError": "That run control could not be applied."
-                }
+                },
+                "attachmentAttachAs": "Attach as",
+                "attachmentRoleInitial": "Input",
+                "attachmentRoleResult": "Result",
+                "missionNone": "ミッションなし",
+                "missionPlaceholder": "ミッションを選択…",
+                "missionUpdateError": "ミッションの更新に失敗しました",
+                "ideaNone": "アイデアなし",
+                "ideaPlaceholder": "アイデアを選択…",
+                "ideaUpdateError": "アイデアの更新に失敗しました",
+                "openWork": "この Work を開く",
+                "openMission": "このミッションを開く",
+                "openIdea": "このアイデアを開く",
+                "openAgent": "このエージェントを開く"
             },
             "recurring": {
                 "section": "定期的なスケジュール",
@@ -1365,7 +1501,26 @@
                 "dayOfWeek": "曜日",
                 "dayOfMonth": "日",
                 "timezone": "タイムゾーン",
-                "save": "スケジュールを保存"
+                "save": "スケジュールを保存",
+                "cron": "Cron expression",
+                "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
+                "errorPickWeekday": "Pick at least one weekday.",
+                "errorInvalidRule": "A valid recurrence rule is required.",
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "頻度",
+                "endsAt": "終了（任意）",
+                "maxOccurrences": "最大実行回数（任意）",
+                "rulePreview": "ルールのプレビュー",
+                "ruleInvalid": "無効",
+                "cancel": "キャンセル",
+                "inactiveHint": "このタスクは繰り返しません。定期テンプレートに昇格すると、スケジュールに従って新しいインスタンスが作成されます。",
+                "rule": "ルール",
+                "nextAt": "次回",
+                "ends": "終了",
+                "max": "最大",
+                "stopConfirm": "繰り返しスケジュールを停止しますか？既存のインスタンスは残り、新しいものは作成されません。",
+                "stopError": "繰り返しスケジュールを停止できませんでした",
+                "saveError": "スケジュールを保存できませんでした"
             },
             "status": {
                 "backlog": "バックログ",
@@ -1470,6 +1625,52 @@
                     "typecheck": "Type check",
                     "custom": "Custom"
                 }
+            },
+            "schedule": {
+                "section": "Schedule",
+                "modeOnce": "Run once",
+                "modeScheduled": "Scheduled",
+                "modeRecurring": "Recurring",
+                "onceHint": "This Task runs when it is dispatched — there is no schedule.",
+                "scheduledHint": "Run this Task once, automatically, at the time you pick.",
+                "recurringHint": "Spawn a fresh instance of this Task on a repeating cadence.",
+                "runAt": "Run at",
+                "save": "Schedule",
+                "unschedule": "Remove schedule",
+                "scheduleError": "Failed to schedule this Task",
+                "unscheduleError": "Failed to remove the schedule",
+                "errorInvalidDate": "Pick a valid date and time.",
+                "errorPastDate": "Pick a time in the future.",
+                "armedFor": "Armed for {at}",
+                "firedAt": "Dispatched at {at}",
+                "stillScheduled": "Still scheduled for {at}",
+                "recurringConflict": "This Task is a recurring template. Stop the recurrence before scheduling a one-shot run."
+            },
+            "subtasks": {
+                "section": "Sub-tasks",
+                "empty": "No sub-tasks yet.",
+                "add": "Add",
+                "addPlaceholder": "Add a sub-task…",
+                "addError": "Failed to add the sub-task",
+                "approvalPending": "Approval",
+                "approvalCleared": "Approved",
+                "approvalCount": "{approved} of {total} approvers signed off"
+            },
+            "activity": {
+                "section": "Activity",
+                "empty": "No activity recorded for this Task yet.",
+                "viewRuns": "View runs",
+                "truncated": "Showing {shown} of {total} entries"
+            },
+            "templates": {
+                "workflowsSection": "My workflows",
+                "workflowsEmpty": "No workflow templates yet.",
+                "useInNewTask": "Use in a new Task",
+                "stepCount": "{count} steps",
+                "delete": "Delete template",
+                "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
+                "deleteError": "Failed to delete the template",
+                "requiresApproval": "Requires approval"
             }
         },
         "skillsPage": {
@@ -6509,8 +6710,10 @@
             "newWork": "新規ワーク",
             "new": "新規",
             "activityIndicator": "ワーク生成中",
+            "inboxUnread": "{count} unread messages",
             "navigation": {
                 "dashboard": "ダッシュボード",
+                "inbox": "Inbox",
                 "activity": "アクティビティ",
                 "missions": "Missions",
                 "goals": "Goals",
@@ -7827,6 +8030,7 @@
             "signIn": "サインイン",
             "createAccount": "アカウント作成",
             "forgotPassword": "パスワードをお忘れですか",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "パスワードをリセット",
             "authError": "認証エラー",
             "dashboard": "ダッシュボード",
@@ -7868,6 +8072,7 @@
             "unsupportedProvider": "サポートされていないプロバイダー",
             "providerConnectFailed": "プロバイダーの接続に失敗しました",
             "forgotPasswordFailed": "パスワードリセットメールの送信に失敗しました",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "パスワードのリセットに失敗しました",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
@@ -8008,6 +8213,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

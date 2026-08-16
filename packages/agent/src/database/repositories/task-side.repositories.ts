@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { In, LessThan, Repository } from 'typeorm';
 import { TaskAssignee } from '../../entities/task-assignee.entity';
 import { TaskReviewer } from '../../entities/task-reviewer.entity';
 import { TaskApprover } from '../../entities/task-approver.entity';
@@ -28,6 +28,15 @@ export class TaskAssigneeRepository {
     }
     async findAgentAssignees(taskId: string): Promise<TaskAssignee[]> {
         return this.repo.find({ where: { taskId, assigneeType: 'agent' } });
+    }
+    /**
+     * Tasks upgrades — batch lookup for the sub-tasks projection. ONE
+     * IN query instead of a per-row fetch; callers group by `taskId`.
+     * Security: `taskIds` must already be owner-scoped by the caller.
+     */
+    async findByTaskIds(taskIds: string[]): Promise<TaskAssignee[]> {
+        if (taskIds.length === 0) return [];
+        return this.repo.find({ where: { taskId: In(taskIds) } });
     }
     async add(
         taskId: string,
@@ -95,6 +104,12 @@ export class TaskApproverRepository {
 
     async findByTaskId(taskId: string): Promise<TaskApprover[]> {
         return this.repo.find({ where: { taskId } });
+    }
+    /** Tasks upgrades — batch lookup for the sub-tasks projection
+     *  (approval badge per row). Owner-scoping is the caller's job. */
+    async findByTaskIds(taskIds: string[]): Promise<TaskApprover[]> {
+        if (taskIds.length === 0) return [];
+        return this.repo.find({ where: { taskId: In(taskIds) } });
     }
     async add(
         taskId: string,
@@ -264,8 +279,12 @@ export class TaskAttachmentRepository {
             .where('attachment.uploadId IN (:...uploadIds)', { uploadIds })
             .getMany();
     }
-    async add(taskId: string, uploadId: string): Promise<TaskAttachment> {
-        const entity = this.repo.create({ taskId, uploadId });
+    async add(
+        taskId: string,
+        uploadId: string,
+        role: 'initial' | 'result' = 'initial',
+    ): Promise<TaskAttachment> {
+        const entity = this.repo.create({ taskId, uploadId, role });
         return this.repo.save(entity);
     }
     // Security (IDOR): optional `taskId` scopes the delete (see

@@ -207,6 +207,15 @@ export enum ActivityActionType {
     AGENT_BUDGET_EXCEEDED = 'agent_budget_exceeded',
     AGENT_EXPORTED = 'agent_exported',
     AGENT_IMPORTED = 'agent_imported',
+    // Agent Collaborators — edits to the per-agent sub-agent delegation
+    // allow-list. These are security-relevant: enabling a collaborator
+    // widens which agents this one may spawn, so the trail records the
+    // pair (details.collaboratorAgentId) alongside the parent agent.
+    // Additive members only — `activity_log.actionType` is a plain
+    // varchar, so no migration.
+    AGENT_COLLABORATOR_ENABLED = 'agent_collaborator_enabled',
+    AGENT_COLLABORATOR_DISABLED = 'agent_collaborator_disabled',
+    AGENT_COLLABORATOR_REMOVED = 'agent_collaborator_removed',
     SKILL_INSTALLED = 'skill_installed',
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',
@@ -267,6 +276,14 @@ export enum ActivityActionType {
     GIT_PUSHED = 'git_pushed',
     GIT_COMMITTED = 'git_committed',
     GIT_MERGED = 'git_merged',
+
+    // Inbox (operator message center) — one row when a message lands in
+    // the human's inbox and one when they answer it, so "what did the
+    // agent ask, and what did I decide?" shows in the Activity feed
+    // next to the run that asked. Additive members — storage is a plain
+    // varchar, so no migration is needed.
+    INBOX_ITEM_CREATED = 'inbox_item_created',
+    INBOX_ITEM_ANSWERED = 'inbox_item_answered',
 }
 
 export enum ActivityStatus {

@@ -79,6 +79,7 @@ import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
+import { AgentCollaborator } from '../entities/agent-collaborator.entity';
 import { Team } from '../entities/team.entity';
 import { TeamMember } from '../entities/team-member.entity';
 import { TeamResource } from '../entities/team-resource.entity';
@@ -96,6 +97,8 @@ import { TaskChatMessage } from '../entities/task-chat-message.entity';
 import { TaskAttachment } from '../entities/task-attachment.entity';
 import { TaskWatcher } from '../entities/task-watcher.entity';
 import { TaskKbMention } from '../entities/task-kb-mention.entity';
+import { TaskTemplate } from '../entities/task-template.entity';
+import { TaskTemplateStep } from '../entities/task-template-step.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
 import { MissionWork } from '../entities/mission-work.entity';
@@ -124,6 +127,7 @@ import { InboundTriggerFire } from '../entities/inbound-trigger-fire.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
+import { InboxItem } from '../entities/inbox-item.entity';
 import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
@@ -214,6 +218,8 @@ export const ENTITIES = [
     AgentEscalation,
     AgentBudget,
     AgentMembership,
+    // Agent Collaborators — per-agent sub-agent delegation allow-list.
+    AgentCollaborator,
     AgentAttachment,
     // Teams & Prebuilt Companies (teams-and-companies spec §2)
     Team,
@@ -236,6 +242,9 @@ export const ENTITIES = [
     TaskAttachment,
     TaskWatcher,
     TaskKbMention,
+    // Tasks upgrades — workflow templates (parent + steps).
+    TaskTemplate,
+    TaskTemplateStep,
     UserTaskCounter,
     // PR #1044 — Mission/Idea attachment edge tables
     MissionAttachment,
@@ -328,6 +337,9 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Inbox (operator message center) — messages addressed to the human:
+    // blocking questions, approval requests, escalation mirrors, notices.
+    InboxItem,
     // Fleet local-runner routing — per Work / Goal / account preference
     // for local-runner vs cloud execution.
     FleetExecutionPreference,

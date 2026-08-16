@@ -134,6 +134,35 @@
                 "link": "Iscriviti"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "Resetta la tua password",
             "subtitle": "Inserisci la tua nuova password qui sotto",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "Impossibile resettare la password. Riprova o richiedi un nuovo link di reset.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "Link di reset non valido",
                 "invalidLink": "Link di Reset Non Valido",
                 "missingTokenMessage": "Il link di reset password non è valido o incompleto. Richiedi un nuovo reset password.",
@@ -181,7 +214,8 @@
             "form": {
                 "name": {
                     "label": "Nome completo",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Indirizzo email",
@@ -190,7 +224,7 @@
                 "password": {
                     "label": "Password",
                     "placeholder": "Crea una password forte",
-                    "hint": "Deve essere di almeno 8 caratteri"
+                    "hint": "Deve essere di almeno 8 caratteri con minuscole e numero/carattere speciale"
                 },
                 "confirmPassword": {
                     "label": "Conferma password",
@@ -219,7 +253,12 @@
                 "passwordsDoNotMatch": "Le password non corrispondono",
                 "passwordTooShort": "La password deve essere di almeno 8 caratteri",
                 "generic": "Si è verificato un errore. Riprova.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -598,6 +637,64 @@
                 "error": "Qualcosa è andato storto. Riprova."
             }
         },
+        "inbox": {
+            "title": "Inbox",
+            "subtitle": "Questions, approvals and notices your agents and works sent you.",
+            "unreadCount": "{count} unread",
+            "unreadDot": "Unread",
+            "tabs": {
+                "active": "Active",
+                "archived": "Archived"
+            },
+            "kind": {
+                "question": "Question",
+                "approval": "Approval",
+                "escalation": "Escalation",
+                "notice": "Notice"
+            },
+            "empty": {
+                "active": "Nothing is waiting on you.",
+                "archived": "No archived messages."
+            },
+            "rowMenu": {
+                "label": "Message actions",
+                "markRead": "Mark as read",
+                "markUnread": "Mark as unread",
+                "archive": "Archive",
+                "unarchive": "Move to Active",
+                "delete": "Delete"
+            },
+            "detail": {
+                "none": "Select a message to read it.",
+                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
+                "yourReply": "Your reply",
+                "noReplyText": "No reply text was recorded."
+            },
+            "reply": {
+                "chooseOption": "Choose an answer",
+                "other": "Other (write your own)",
+                "recommended": "Recommended",
+                "placeholder": "Write your reply…",
+                "send": "Send Reply",
+                "hint": "Your reply goes straight back to the agent.",
+                "needsAnswer": "Pick an option or write a reply first."
+            },
+            "routed": {
+                "steered": "Reply delivered — the running agent picked it up.",
+                "resumed": "Reply delivered — a new run is answering it.",
+                "approved": "Approved.",
+                "rejected": "Rejected.",
+                "escalationResolved": "Escalation resolved.",
+                "alreadyDecided": "This was already decided elsewhere.",
+                "recorded": "Reply recorded."
+            },
+            "toast": {
+                "archived": "Message archived.",
+                "unarchived": "Message moved back to Active.",
+                "deleted": "Message deleted.",
+                "error": "Something went wrong. Please try again."
+            }
+        },
         "title": "Cruscotto",
         "connectGithub": {
             "title": "Collega il tuo account GitHub",
@@ -932,7 +1029,8 @@
                 "capabilities": "Capacità",
                 "budgets": "Budget",
                 "settings": "Impostazioni",
-                "terminal": "Terminal"
+                "terminal": "Terminal",
+                "collaborators": "Collaborators"
             },
             "newDialog": {
                 "title": "Nuovo Agente",
@@ -1151,6 +1249,16 @@
                 "success": "{name} eliminato",
                 "error": "Impossibile eliminare l'agente"
             },
+            "collaborators": {
+                "title": "Collaborator Agents",
+                "description": "Select which agents this agent can spawn as collaborators for subtasks. Delegations to agents that are not enabled here are refused.",
+                "empty": "No other agents yet. Create another agent to enable it as a collaborator.",
+                "enabledCount": "{count} enabled",
+                "noTitle": "No role set",
+                "toggleFailed": "Could not update collaborator",
+                "reset": "Clear rule",
+                "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
+            },
             "capabilities": {
                 "title": "Capacità",
                 "subtitle": "Cosa può fare questo agente: strumenti, competenze e script di avvio.",
@@ -1282,7 +1390,22 @@
                 "acceptanceChecks": "Acceptance checks",
                 "acceptanceChecksHint": "Commands that must exit 0 before this Task's agent work can open a pull request. Leave empty to inherit the Work's default checks.",
                 "maxGateAttempts": "Max gate attempts",
-                "maxGateAttemptsInherit": "Inherit from Work"
+                "maxGateAttemptsInherit": "Inherit from Work",
+                "modeLabel": "What to create",
+                "modeBlank": "Blank task",
+                "modeTemplate": "From template",
+                "template": "Workflow template",
+                "templateOption": "{name} — {steps} steps",
+                "templatesEmpty": "No workflow templates available",
+                "templatesLoadError": "Failed to load workflow templates",
+                "templateRequired": "Pick a workflow template first.",
+                "branchName": "Branch name (optional)",
+                "branchNamePlaceholder": "feat/my-feature",
+                "willCreate": "Will create a parent Task plus {steps} sub-tasks:",
+                "stepApproval": "approval",
+                "featureName": "Feature name",
+                "featureDescription": "Feature description",
+                "createFromTemplate": "Create workflow"
             },
             "detail": {
                 "moveTo": "Sposta in",
@@ -1351,7 +1474,20 @@
                     "resumeDispatched": "Resumed — a new run is picking up the same session.",
                     "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
                     "genericError": "That run control could not be applied."
-                }
+                },
+                "attachmentAttachAs": "Attach as",
+                "attachmentRoleInitial": "Input",
+                "attachmentRoleResult": "Result",
+                "missionNone": "Nessuna Missione",
+                "missionPlaceholder": "Seleziona una Missione…",
+                "missionUpdateError": "Impossibile aggiornare la Missione",
+                "ideaNone": "Nessuna Idea",
+                "ideaPlaceholder": "Seleziona un’Idea…",
+                "ideaUpdateError": "Impossibile aggiornare l’Idea",
+                "openWork": "Apri questo Work",
+                "openMission": "Apri questa Missione",
+                "openIdea": "Apri questa Idea",
+                "openAgent": "Apri questo Agente"
             },
             "recurring": {
                 "section": "Programma ricorrente",
@@ -1365,7 +1501,26 @@
                 "dayOfWeek": "Giorno della settimana",
                 "dayOfMonth": "Giorno del mese",
                 "timezone": "Fuso orario",
-                "save": "Salva programma"
+                "save": "Salva programma",
+                "cron": "Cron expression",
+                "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
+                "errorPickWeekday": "Pick at least one weekday.",
+                "errorInvalidRule": "A valid recurrence rule is required.",
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frequenza",
+                "endsAt": "Fine (facoltativo)",
+                "maxOccurrences": "Occorrenze max (facoltativo)",
+                "rulePreview": "Anteprima della regola",
+                "ruleInvalid": "non valida",
+                "cancel": "Annulla",
+                "inactiveHint": "Questa attività non si ripete. Promuovila a modello ricorrente per generare nuove istanze secondo un programma.",
+                "rule": "Regola",
+                "nextAt": "Prossima il",
+                "ends": "Fine",
+                "max": "Max",
+                "stopConfirm": "Interrompere il programma ricorrente? Le istanze esistenti restano; non ne verranno create di nuove.",
+                "stopError": "Impossibile interrompere il programma ricorrente",
+                "saveError": "Impossibile salvare il programma"
             },
             "status": {
                 "backlog": "Backlog",
@@ -1470,6 +1625,52 @@
                     "typecheck": "Type check",
                     "custom": "Custom"
                 }
+            },
+            "schedule": {
+                "section": "Schedule",
+                "modeOnce": "Run once",
+                "modeScheduled": "Scheduled",
+                "modeRecurring": "Recurring",
+                "onceHint": "This Task runs when it is dispatched — there is no schedule.",
+                "scheduledHint": "Run this Task once, automatically, at the time you pick.",
+                "recurringHint": "Spawn a fresh instance of this Task on a repeating cadence.",
+                "runAt": "Run at",
+                "save": "Schedule",
+                "unschedule": "Remove schedule",
+                "scheduleError": "Failed to schedule this Task",
+                "unscheduleError": "Failed to remove the schedule",
+                "errorInvalidDate": "Pick a valid date and time.",
+                "errorPastDate": "Pick a time in the future.",
+                "armedFor": "Armed for {at}",
+                "firedAt": "Dispatched at {at}",
+                "stillScheduled": "Still scheduled for {at}",
+                "recurringConflict": "This Task is a recurring template. Stop the recurrence before scheduling a one-shot run."
+            },
+            "subtasks": {
+                "section": "Sub-tasks",
+                "empty": "No sub-tasks yet.",
+                "add": "Add",
+                "addPlaceholder": "Add a sub-task…",
+                "addError": "Failed to add the sub-task",
+                "approvalPending": "Approval",
+                "approvalCleared": "Approved",
+                "approvalCount": "{approved} of {total} approvers signed off"
+            },
+            "activity": {
+                "section": "Activity",
+                "empty": "No activity recorded for this Task yet.",
+                "viewRuns": "View runs",
+                "truncated": "Showing {shown} of {total} entries"
+            },
+            "templates": {
+                "workflowsSection": "My workflows",
+                "workflowsEmpty": "No workflow templates yet.",
+                "useInNewTask": "Use in a new Task",
+                "stepCount": "{count} steps",
+                "delete": "Delete template",
+                "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
+                "deleteError": "Failed to delete the template",
+                "requiresApproval": "Requires approval"
             }
         },
         "skillsPage": {
@@ -6509,8 +6710,10 @@
             "newWork": "Nuova Lavori",
             "new": "Nuovo",
             "activityIndicator": "Generazione lavori",
+            "inboxUnread": "{count} unread messages",
             "navigation": {
                 "dashboard": "Dashboard",
+                "inbox": "Inbox",
                 "activity": "Attività",
                 "missions": "Missions",
                 "goals": "Goals",
@@ -7827,6 +8030,7 @@
             "signIn": "Accedi",
             "createAccount": "Crea account",
             "forgotPassword": "Password dimenticata",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "Reimposta password",
             "authError": "Errore di autenticazione",
             "dashboard": "Dashboard",
@@ -7868,6 +8072,7 @@
             "unsupportedProvider": "Provider non supportato",
             "providerConnectFailed": "Connessione provider fallita",
             "forgotPasswordFailed": "Impossibile inviare email di reset password",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "Impossibile resettare la password",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
@@ -8008,6 +8213,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

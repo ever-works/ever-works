@@ -1,9 +1,17 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { Agent } from '../entities/agent.entity';
-import { AgentScope, AGENT_PERMISSIONS_DEFAULT } from '../entities/agent.entity';
+import { AgentScope, AgentStatus, AGENT_PERMISSIONS_DEFAULT } from '../entities/agent.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
+import { AgentCollaboratorRepository } from '../database/repositories/agent-collaborator.repository';
 import { AgentFileService } from './agent-file.service';
 import { AgentsService } from './agents.service';
+// Agent Collaborators — delegateToAgent drives the SAME delegation path
+// as the workflow `agent.delegate` node (validate + narrow in the
+// service, dispatch through the api-bound runner). Value import is safe:
+// both files live in this `agents/` folder and the service's own imports
+// are contracts + its port only.
+import { SubAgentDelegationService } from './sub-agent-delegation.service';
 import { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 import { SkillRepository } from '../database/repositories/skill.repository';
 import { createGetSkillBodyTool } from './agent-tools-skill';
@@ -54,6 +62,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
+import { buildInboxTools } from '../inbox/agent-inbox-tools';
 import { buildWorkflowTools } from './agent-workflow-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
@@ -76,7 +85,11 @@ import {
     checkToolCredentialsAvailable,
     requiredCredentialsForTool,
 } from '../policy/tool-credentials';
-import type { ToolGrantDecision } from '@ever-works/contracts';
+import type {
+    SubAgentDelegationResult,
+    SubAgentScope,
+    ToolGrantDecision,
+} from '@ever-works/contracts';
 // Security: lexical SSRF guard reused by the model-controlled URL tools
 // (screenshot / extractContent). Blocks non-HTTP(S) schemes, literal
 // private/loopback/link-local IPs, and cloud-metadata hostnames before
@@ -199,6 +212,15 @@ export class AgentToolService {
         @Optional()
         @Inject(CREDENTIAL_RESOLVER)
         private readonly credentials?: CredentialResolver,
+        // Agent Collaborators — delegateToAgent. Both APPENDED + @Optional()
+        // so every positional constructor call in the unit tests keeps
+        // compiling, and a runtime without them simply never exposes the
+        // tool (the model sees nothing that would fail).
+        // NOTE: these keep positions 13/14 because `agent-tool-delegate.spec.ts`
+        // constructs the service positionally through this slot. Nest resolves
+        // every param below by type/token, so ordering is a test-only concern.
+        @Optional() private readonly delegation?: SubAgentDelegationService,
+        @Optional() private readonly collaborators?: AgentCollaboratorRepository,
         // Skill files feature — companion-file rows + the uploads-spine
         // content reader (bound API-side). APPENDED LAST + @Optional() so
         // every existing positional constructor call keeps working;
@@ -208,6 +230,19 @@ export class AgentToolService {
         @Inject(SKILL_FILE_CONTENT_READER)
         private readonly skillFileReader?: SkillFileContentReader,
     ) {}
+
+    /**
+     * Agent Collaborators — delegations issued per run, feeding the
+     * contract's sibling fan-out cap (without a count the `>= maxSiblings`
+     * check compares against 0 and can never fire). Bounded copy of
+     * `WorkflowNodeRunnerService.countDelegation`: this service is a
+     * long-lived singleton, so the oldest runs are evicted past the cap —
+     * an evicted run under-counts rather than over-refusing.
+     */
+    private readonly delegationsByRun = new Map<string, number>();
+    private static readonly MAX_TRACKED_DELEGATION_RUNS = 500;
+    /** Bound the parent's wait on one delegated child (mirrors the graph node). */
+    private static readonly DELEGATE_TOOL_BUDGET_MS = 5 * 60_000;
 
     /**
      * Build the descriptor list for one Agent run. Caller filters
@@ -277,6 +312,17 @@ export class AgentToolService {
         // createSubAgent — gated by permissions.canCreateAgents.
         if (agent.permissions?.canCreateAgents) {
             tools.push(this.buildCreateSubAgentTool(agent));
+        }
+
+        // Agent Collaborators — delegateToAgent. Gated on canAssignTasks
+        // (delegating raises a child Task + run — the same capability the
+        // task tools and run_workflow_graph are gated on) + both backing
+        // services being bound. The runner enforces the collaborator
+        // allow-list server-side; the invoke-time pre-check here only
+        // exists to hand the model an actionable error naming the enabled
+        // collaborators instead of a bare refusal.
+        if (agent.permissions?.canAssignTasks && this.delegation && this.collaborators) {
+            tools.push(this.buildDelegateToAgentTool(agent, runContext));
         }
 
         // Phase 16.6 — commitToRepo. Gated by permissions.canCommitToRepo
@@ -460,6 +506,29 @@ export class AgentToolService {
             const browser = sources.browser;
             add('browser', () =>
                 buildBrowserTools({ userId: agent.userId, facade: browser.facade }),
+            );
+        }
+
+        // Inbox (operator message center) — the `ask_human` blocking
+        // question. Ungated by agent permissions on purpose: asking the
+        // owner is always safe (it grants nothing and touches nothing),
+        // so EVERY agent may raise its hand. The run/agent links are
+        // bound here from the run context — never model-supplied.
+        if (sources.inbox) {
+            const inbox = sources.inbox;
+            add('inbox', () =>
+                buildInboxTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    // `'no-run'` is the sentinel the default runContext
+                    // uses; passing it through would park a run that
+                    // cannot exist.
+                    agentRunId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: inbox.service,
+                }),
             );
         }
 
@@ -821,6 +890,234 @@ export class AgentToolService {
                 }
             },
         };
+    }
+
+    /**
+     * Agent Collaborators — delegateToAgent.
+     *
+     * Hands an objective to ANOTHER of the owner's agents as a bounded
+     * sub-agent delegation, through the exact same path the workflow
+     * `agent.delegate` node takes: `SubAgentDelegationService.delegate`
+     * validates + narrows (depth cap, fan-out cap, scope intersection)
+     * and the api-bound runner creates the child Task + run and enforces
+     * the collaborator allow-list.
+     *
+     * The parent scope handed to `limits` is the parent's OWN resolved
+     * tool set (computed lazily at invoke time — eager resolution would
+     * recurse, we are inside that very resolution when the descriptor is
+     * built), so the child's privilege can only shrink.
+     *
+     * Divergence from the original brief, documented: the descriptor
+     * DESCRIPTION cannot enumerate the enabled collaborators because
+     * `resolveAllowedTools` is synchronous by contract (no I/O). The
+     * roster is surfaced at invoke time instead: any call with an
+     * unknown / not-enabled / missing target errors with the current
+     * enabled-collaborator list (name + slug) so the model can
+     * self-correct on the next call.
+     */
+    private buildDelegateToAgentTool(
+        agent: Agent,
+        runContext: { runId: string },
+    ): AgentToolDescriptor<
+        {
+            targetAgentId?: string;
+            targetAgentSlug?: string;
+            objective: string;
+            context?: Record<string, unknown>;
+        },
+        SubAgentDelegationResult
+    > {
+        return {
+            name: 'delegateToAgent',
+            description:
+                "Delegate a sub-task to another of your owner's agents and wait for its result. Target by targetAgentId or targetAgentSlug. Only agents enabled as COLLABORATORS of this agent (Agents → Collaborators tab) can be targeted; calling with an unknown target returns the list of enabled collaborators. The child runs under a scope no wider than yours, capped in depth and fan-out, and the call returns its typed result (completed | failed | refused | escalated) with a summary.",
+            parameters: {
+                type: 'object',
+                properties: {
+                    targetAgentId: {
+                        type: 'string',
+                        description: 'Agent id to delegate to. Provide this OR targetAgentSlug.',
+                    },
+                    targetAgentSlug: {
+                        type: 'string',
+                        description: 'Agent slug to delegate to. Provide this OR targetAgentId.',
+                    },
+                    objective: {
+                        type: 'string',
+                        description:
+                            'What the child agent must accomplish, in prose. ≤ 2000 chars.',
+                    },
+                    context: {
+                        type: 'object',
+                        description:
+                            "Optional structured inputs handed to the child. Serialized into the child's brief (truncated past ~4000 characters), so put already-gathered context here rather than restating it in the objective.",
+                    },
+                },
+                required: ['objective'],
+            },
+            invoke: async (args) => {
+                if (!args?.objective || args.objective.trim().length === 0) {
+                    return { error: 'objective is required.' };
+                }
+                if (!this.delegation || !this.collaborators) {
+                    return { error: 'delegateToAgent: delegation is not wired in this runtime.' };
+                }
+                const wantedId = args.targetAgentId?.trim();
+                const wantedSlug = args.targetAgentSlug?.trim();
+                if (!wantedId && !wantedSlug) {
+                    return {
+                        error: `Provide targetAgentId or targetAgentSlug. ${await this.describeEnabledCollaborators(agent)}`,
+                    };
+                }
+                try {
+                    const target = await this.resolveDelegationTarget(agent, wantedId, wantedSlug);
+                    if ('error' in target) return target;
+
+                    const parentScope: SubAgentScope = {
+                        // The parent's REAL resolved tool set — lazy for the
+                        // same recursion reason as the workflow tools.
+                        allowedTools: this.resolveAllowedTools(agent).map((tool) => tool.name),
+                        workId: agent.workId ?? null,
+                        organizationId: agent.organizationId ?? null,
+                        networkAccess: Boolean(agent.permissions?.canCallExternalTools),
+                    };
+                    const runId = runContext.runId !== 'no-run' ? runContext.runId : null;
+                    return await this.delegation.delegate(
+                        {
+                            delegationId: randomUUID(),
+                            parentAgentId: agent.id,
+                            parentRunId: runId,
+                            parentTaskId: null,
+                            // Advisory floor — the delegation service raises it
+                            // to the server-derived depth from the Task chain.
+                            depth: 0,
+                            objective: args.objective.trim(),
+                            inputs: args.context,
+                            scope: {
+                                // "Everything the parent had" — narrowed against
+                                // parentScope by the delegation service.
+                                allowedTools: ['*'],
+                                workId: agent.workId ?? null,
+                                organizationId: agent.organizationId ?? null,
+                                networkAccess: parentScope.networkAccess,
+                            },
+                            budget: {
+                                maxDurationMs: AgentToolService.DELEGATE_TOOL_BUDGET_MS,
+                            },
+                            childAgentId: target.id,
+                        },
+                        {
+                            parentScope,
+                            siblingCount: this.countDelegation(runId ?? agent.id),
+                        },
+                    );
+                } catch (err) {
+                    return { error: err instanceof Error ? err.message : String(err) };
+                }
+            },
+        };
+    }
+
+    /**
+     * Resolve the delegation target among SELF + the parent's ENABLED
+     * collaborators — never the whole agent table, so a hallucinated or
+     * injected id cannot even be probed (no existence leak) and slug
+     * resolution is unambiguous within the small candidate set.
+     */
+    private async resolveDelegationTarget(
+        agent: Agent,
+        wantedId: string | undefined,
+        wantedSlug: string | undefined,
+    ): Promise<{ id: string } | { error: string }> {
+        if (wantedId === agent.id || (wantedSlug && wantedSlug === agent.slug)) {
+            return { id: agent.id };
+        }
+        const candidates = await this.loadEnabledCollaboratorAgents(agent);
+        const match = wantedId
+            ? candidates.find((candidate) => candidate.id === wantedId)
+            : candidates.find((candidate) => candidate.slug === wantedSlug);
+        if (!match) {
+            const roster =
+                candidates.length === 0
+                    ? 'No collaborators are enabled for this agent — ask the owner to enable some under Agents → Collaborators.'
+                    : `Enabled collaborators: ${candidates
+                          .map((candidate) => `${candidate.name} (${candidate.slug})`)
+                          .join(', ')}.`;
+            return {
+                error: `delegateToAgent: ${
+                    wantedId ? `agent ${wantedId}` : `agent with slug "${wantedSlug}"`
+                } is not an enabled collaborator of this agent. ${roster}`,
+            };
+        }
+        return { id: match.id };
+    }
+
+    private async describeEnabledCollaborators(agent: Agent): Promise<string> {
+        try {
+            const candidates = await this.loadEnabledCollaboratorAgents(agent);
+            if (candidates.length === 0) {
+                return 'No collaborators are enabled for this agent.';
+            }
+            const names = candidates.map((row) => `${row.name} (${row.slug})`);
+            return `Enabled collaborators: ${names.join(', ')}.`;
+        } catch {
+            return '';
+        }
+    }
+
+    /**
+     * The parent's enabled collaborators, as the agent rows the owner
+     * actually still has.
+     *
+     * Two filters, both load-bearing:
+     *
+     *  - owner-scoped load, so a stale or poisoned rule naming someone
+     *    else's agent resolves to nothing; and
+     *  - ARCHIVED rows dropped, because an archived agent is retired
+     *    (terminal status, and `unarchive` lands on PAUSED precisely so a
+     *    restored agent does not start running by itself). The rule row
+     *    outlives the archive, so without this the model would be offered
+     *    — and would name — an agent the owner has already retired. The
+     *    delegation runner refuses it server-side either way; dropping it
+     *    here keeps the roster honest instead of advertising a target
+     *    every call would bounce off.
+     */
+    private async loadEnabledCollaboratorAgents(agent: Agent): Promise<Agent[]> {
+        const enabled = await this.collaborators!.listEnabledForAgent(agent.id);
+        if (enabled.length === 0) return [];
+        const rows = await Promise.all(
+            enabled.map((rule) => this.loadOwnedAgent(rule.collaboratorAgentId, agent.userId)),
+        );
+        return rows.filter(
+            (row): row is Agent => row !== null && row.status !== AgentStatus.ARCHIVED,
+        );
+    }
+
+    /**
+     * Owner-scoped agent load with the same mock-harness tolerance as
+     * `buildMessageAgentTool`: `findByIdAndUser` is always present on the
+     * real repository; unit harnesses that stub only `findById` still get
+     * the ownership check applied on the returned row.
+     */
+    private async loadOwnedAgent(id: string, userId: string): Promise<Agent | null> {
+        if (typeof this.agents.findByIdAndUser === 'function') {
+            return this.agents.findByIdAndUser(id, userId);
+        }
+        const row = await this.agents.findById(id);
+        return row && row.userId === userId ? row : null;
+    }
+
+    /** Bounded per-run delegation counter — see the field's doc comment. */
+    private countDelegation(key: string): number {
+        const previous = this.delegationsByRun.get(key) ?? 0;
+        this.delegationsByRun.delete(key);
+        this.delegationsByRun.set(key, previous + 1);
+        while (this.delegationsByRun.size > AgentToolService.MAX_TRACKED_DELEGATION_RUNS) {
+            const oldest = this.delegationsByRun.keys().next();
+            if (oldest.done) break;
+            this.delegationsByRun.delete(oldest.value);
+        }
+        return previous;
     }
 
     private buildCommitToRepoTool(

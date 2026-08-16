@@ -103,6 +103,10 @@ jest.mock('@ever-works/agent/skills', () => ({
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogModule: class ActivityLogModule {},
 }));
+jest.mock('@ever-works/agent/inbox', () => ({
+    InboxModule: class InboxModule {},
+    InboxService: class InboxService {},
+}));
 jest.mock('@ever-works/trigger-tasks', () => ({
     TriggerModule: class TriggerModule {},
     TriggerService: class TriggerService {},
@@ -117,6 +121,11 @@ jest.mock('../email/email.module', () => ({ EmailModule: class EmailModule {} })
 jest.mock('../email/email.service', () => ({ EmailService: class EmailService {} }));
 jest.mock('../auth/auth.module', () => ({ AuthModule: class AuthModule {} }));
 jest.mock('./agents.controller', () => ({ AgentsController: class AgentsController {} }));
+// Agent Collaborators — same stub posture as the sibling controllers so
+// the decorator-metadata assertions never drag the DTO/entity graph in.
+jest.mock('./agent-collaborators.controller', () => ({
+    AgentCollaboratorsController: class AgentCollaboratorsController {},
+}));
 jest.mock('./agent-templates.controller', () => ({
     AgentTemplatesController: class AgentTemplatesController {},
 }));
@@ -149,6 +158,7 @@ import {
     AGENT_RUN_CANCELLER,
 } from '@ever-works/agent/agents';
 import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
+import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
 import { PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkRepository } from '@ever-works/agent/database';
 
@@ -174,6 +184,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(imports).toContain(FleetModule);
         expect(imports).toContain(PrReviewModule);
         expect(imports).toContain(PolicyModule);
+        expect(imports).toContain(AgentInboxModule);
     });
 
     it('binds AGENT_DOMAIN_TOOL_SOURCES — without it every domain tool is dead code', () => {
@@ -204,6 +215,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             // Judgment layer G5 — the workflow-graph tools. This binding is
             // what gives `WorkflowGraphExecutorService` a production caller.
             WorkflowGraphExecutorService,
+            // Inbox (operator message center) — the `ask_human` tool.
+            InboxService,
         ]);
     });
 
@@ -270,6 +283,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'toolGrants',
             // Judgment layer G5 — workflow graphs.
             'workflow',
+            // Inbox (operator message center) — the `ask_human` tool.
+            'inbox',
         ]);
     });
 });

@@ -72,7 +72,9 @@ export function toWorkerStatusView(state: WorkerLoopState | null | undefined): W
 		activeJobCount: state.activeJobIds.length,
 		completed: state.completed,
 		failed: state.failed,
-		throttleReason: state.throttleReason
+		// `WorkerLoopState.throttleReason` is optional; the renderer-facing
+		// view models "not throttled" as an explicit null, never `undefined`.
+		throttleReason: state.throttleReason ?? null
 	};
 }
 
