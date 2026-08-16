@@ -24,8 +24,9 @@ import { StatusPill } from '@/components/work-agent';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+// Runtime value from the client-safe module — see GoalLimitsDialog.tsx.
+import { MAX_NUDGE_CHARS } from '@/lib/api/goals.shared';
 import {
-    MAX_NUDGE_CHARS,
     type Goal,
     type GoalEvent,
     type GoalMetricSample,
