@@ -126,6 +126,7 @@ import { InboundTriggerFire } from '../entities/inbound-trigger-fire.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
+import { InboxItem } from '../entities/inbox-item.entity';
 import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
@@ -333,6 +334,9 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Inbox (operator message center) — messages addressed to the human:
+    // blocking questions, approval requests, escalation mirrors, notices.
+    InboxItem,
     // Fleet local-runner routing — per Work / Goal / account preference
     // for local-runner vs cloud execution.
     FleetExecutionPreference,

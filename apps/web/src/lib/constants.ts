@@ -108,6 +108,11 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
+    // Inbox (operator message center) — messages addressed to the human:
+    // blocking agent questions, approval requests, escalations, notices.
+    // `?view=archived` switches tabs; `?id=` deep-links one message (the
+    // target of every inbox notification's "Open inbox" action).
+    DASHBOARD_INBOX: '/inbox',
     // Phase 6.5 PR CC2 — unified "+ New" page. Single entry point for
     // creating Missions, Ideas, and Works of every flavor (Website,
     // Landing Page, Blog, Directory, Awesome Repo). Phase 6.5 PR DD

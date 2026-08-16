@@ -118,11 +118,15 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            // +2 inbox_item_created / inbox_item_answered (Inbox operator
+            //    message center) -> 125.
             // +3 memory_folder_created / _deleted / _synced (Memory Files —
-            //    the /memory Files area folder tree) -> 126.
+            //    the /memory Files area folder tree) -> 128 after the
+            //    Inbox and Memory Files trains merged together.
             // +3 agent_collaborator_enabled / _disabled / _removed
-            //    (Agent Collaborators allow-list edits) -> 129.
-            expect(literals).toHaveLength(129);
+            //    (Agent Collaborators allow-list edits) -> 131 after the
+            //    Inbox train merged develop's Agent Collaborators work.
+            expect(literals).toHaveLength(131);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
