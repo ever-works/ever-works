@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "Tam ad",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "E-posta adresi",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "Şifre",
                     "placeholder": "Güçlü bir şifre oluşturun",
-                    "hint": "En az 8 karakter olmalıdır"
+                    "hint": "En az 8 karakter, küçük harf ve rakam/özel karakter içermelidir"
                 },
                 "confirmPassword": {
                     "label": "Şifreyi onaylayın",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "Şifreler eşleşmiyor",
                 "passwordTooShort": "Şifre en az 8 karakter olmalıdır",
                 "generic": "Bir hata oluştu. Lütfen tekrar deneyin.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7933,6 +7939,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "ชื่อเต็ม",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "ที่อยู่อีเมล",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "รหัสผ่าน",
                     "placeholder": "สร้างรหัสผ่านที่แข็งแกร่ง",
-                    "hint": "ต้องมีอย่างน้อย 8 ตัวอักษร"
+                    "hint": "ต้องมีอย่างน้อย 8 ตัวอักษร พร้อมตัวพิมพ์เล็กและตัวเลข/อักขระพิเศษ"
                 },
                 "confirmPassword": {
                     "label": "ยืนยันรหัสผ่าน",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "รหัสผ่านไม่ตรงกัน",
                 "passwordTooShort": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
                 "generic": "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7933,6 +7939,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

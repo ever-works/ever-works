@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "Nama lengkap",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Alamat email",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "Kata sandi",
                     "placeholder": "Buat kata sandi yang kuat",
-                    "hint": "Harus minimal 8 karakter"
+                    "hint": "Harus minimal 8 karakter dengan huruf kecil dan angka/karakter khusus"
                 },
                 "confirmPassword": {
                     "label": "Konfirmasi kata sandi",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "Kata sandi tidak cocok",
                 "passwordTooShort": "Kata sandi harus minimal 8 karakter",
                 "generic": "Terjadi kesalahan. Harap coba lagi.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7933,6 +7939,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

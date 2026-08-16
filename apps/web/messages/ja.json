@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "フルネーム",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "メールアドレス",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "パスワード",
                     "placeholder": "強力なパスワードを作成",
-                    "hint": "最低8文字必要です"
+                    "hint": "最低8文字で、小文字と数字/特殊文字を含む必要があります"
                 },
                 "confirmPassword": {
                     "label": "パスワードを確認",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "パスワードが一致しません",
                 "passwordTooShort": "パスワードは最低8文字必要です",
                 "generic": "エラーが発生しました。もう一度お試しください。",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7933,6 +7939,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

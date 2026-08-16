@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "पूरा नाम",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "ईमेल पता",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "पासवर्ड",
                     "placeholder": "एक मजबूत पासवर्ड बनाएं",
-                    "hint": "कम से कम 8 अक्षरों का होना चाहिए"
+                    "hint": "कम से कम 8 अक्षरों का होना चाहिए जिसमें लोअरकेस और संख्या/विशेष चिह्न शामिल हो"
                 },
                 "confirmPassword": {
                     "label": "पासवर्ड确认 करें",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "पासवर्ड मेल नहीं खाते",
                 "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
                 "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7933,6 +7939,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

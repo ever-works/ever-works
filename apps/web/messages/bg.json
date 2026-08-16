@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "Пълно име",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Имейл адрес",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "Парола",
                     "placeholder": "Създайте силна парола",
-                    "hint": "Трябва да е поне 8 символа"
+                    "hint": "Трябва да е поне 8 символа с малка буква и число/специален символ"
                 },
                 "confirmPassword": {
                     "label": "Потвърдете паролата",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "Паролите не съвпадат",
                 "passwordTooShort": "Паролата трябва да е поне 8 символа",
                 "generic": "Грешка. Моля, опитайте отново.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7932,6 +7938,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

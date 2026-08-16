@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "Họ và tên",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Địa chỉ email",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "Mật khẩu",
                     "placeholder": "Tạo mật khẩu mạnh",
-                    "hint": "Phải có ít nhất 8 ký tự"
+                    "hint": "Phải có ít nhất 8 ký tự với chữ thường và số/ký tự đặc biệt"
                 },
                 "confirmPassword": {
                     "label": "Xác nhận mật khẩu",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "Mật khẩu không khớp",
                 "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
                 "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7933,6 +7939,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },
