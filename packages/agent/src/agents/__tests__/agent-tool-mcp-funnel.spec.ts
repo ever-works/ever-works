@@ -99,6 +99,14 @@ function makeSvc(
         undefined,
         over.toolGrants,
         over.credentials,
+        // 🛑 Positions 13/14 are Collaborators' `delegation` / `collaborators`,
+        // which reached develop before this branch did. `mcpTools` therefore
+        // moved from index 13 to 15 in the merge, and these two placeholders
+        // are what keep this positional construction pointing at the right
+        // parameter. Without them `over.mcpTools` lands in `delegation` and
+        // every MCP descriptor assertion below fails for the wrong reason.
+        undefined,
+        undefined,
         over.mcpTools,
     );
 }

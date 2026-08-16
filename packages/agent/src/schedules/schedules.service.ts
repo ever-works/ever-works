@@ -160,8 +160,15 @@ export class SchedulesService {
                     ownerId: task.id,
                     ownerName: task.title,
                     ownerLink: `/tasks/${task.id}`,
-                    cadenceRaw: task.recurrenceRule ?? null,
-                    cadenceHuman: describeRrule(task.recurrenceRule),
+                    // Schedule-modes upgrade: a recurring Task carries
+                    // EITHER an RRULE or a 5-field cron (XOR, enforced by
+                    // `TasksService.setRecurring`). Reading only
+                    // `recurrenceRule` rendered a cron-cadence Task with a
+                    // blank cadence on this page.
+                    cadenceRaw: task.recurrenceCron ?? task.recurrenceRule ?? null,
+                    cadenceHuman: task.recurrenceCron
+                        ? describeCron(task.recurrenceCron)
+                        : describeRrule(task.recurrenceRule),
                     nextRunAt: ended ? null : toIso(task.nextOccurrenceAt),
                     lastRunAt: null,
                     lastRunStatus: null,

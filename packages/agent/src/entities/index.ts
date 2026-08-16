@@ -62,6 +62,7 @@ export * from './agent-run.entity';
 export * from './agent-escalation.entity';
 export * from './agent-run-log.entity';
 export * from './agent-budget.entity';
+export * from './agent-collaborator.entity';
 export * from './agent-membership.entity';
 export * from './skill.entity';
 export * from './skill-binding.entity';
@@ -77,6 +78,8 @@ export * from './task-chat-message.entity';
 export * from './task-attachment.entity';
 export * from './task-watcher.entity';
 export * from './task-kb-mention.entity';
+export * from './task-template.entity';
+export * from './task-template-step.entity';
 export * from './user-task-counter.entity';
 export * from './mission-attachment.entity';
 export * from './mission-work.entity';
@@ -103,6 +106,7 @@ export * from './organization-onboarding-profile.entity';
 // Goals & Metrics (PR-8) — measurable targets + samples + Mission link
 export * from './goal.entity';
 export * from './goal-metric-sample.entity';
+export * from './goal-event.entity';
 export * from './mission-goal.entity';
 
 // Composio triggers (EW-684 PR-D)
@@ -131,6 +135,8 @@ export * from './ingested-event.entity';
 export * from './ingest-cursor.entity';
 // Inbound receivers — external workspace/installation → platform user binding
 export * from './ingest-install-binding.entity';
+// Inbox (operator message center) — messages addressed to the human
+export * from './inbox-item.entity';
 // Event-ingest spine — external tracker issue → platform Task mapping
 export * from './external-issue-link.entity';
 // Meetings v1 (Wave 8, feature a) — captured meetings with transcripts
@@ -162,5 +168,8 @@ export * from './workflow.entity';
 // One execution of a saved graph — what makes running a workflow leave a
 // trace instead of vanishing into a chat tool's return value.
 export * from './workflow-run.entity';
+// Repository registry (Feature G) — account-level repo records + agent grants.
+export * from './repo-connection.entity';
+export * from './agent-repo-attachment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';

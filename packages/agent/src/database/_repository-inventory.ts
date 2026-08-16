@@ -32,6 +32,7 @@
 import type { Type } from '@nestjs/common';
 import { ActivityLogRepository } from './repositories/activity-log.repository';
 import { AgentEmailAssignmentRepository } from './repositories/agent-email-assignment.repository';
+import { AgentRepoAttachmentRepository } from './repositories/agent-repo-attachment.repository';
 import { ApiKeyRepository } from './repositories/api-key.repository';
 import { AuthAccountRepository } from './repositories/auth-account.repository';
 import { BillingProfileRepository } from './repositories/billing-profile.repository';
@@ -55,6 +56,7 @@ import { OrganizationRepository } from './repositories/organization.repository';
 import { PlanEntitlementRepository } from './repositories/plan-entitlement.repository';
 import { PluginUsageRepository } from './repositories/plugin-usage.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
+import { RepoConnectionRepository } from './repositories/repo-connection.repository';
 import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
 import { TemplateCustomizationRepository } from './repositories/template-customization.repository';
 import { TemplateRepository } from './repositories/template.repository';
@@ -84,6 +86,7 @@ import { WorkScheduleRepository } from './repositories/work-schedule.repository'
 export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     ActivityLogRepository,
     AgentEmailAssignmentRepository,
+    AgentRepoAttachmentRepository,
     ApiKeyRepository,
     AuthAccountRepository,
     BillingProfileRepository,
@@ -107,6 +110,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     PlanEntitlementRepository,
     PluginUsageRepository,
     RefreshTokenRepository,
+    RepoConnectionRepository,
     SubscriptionPlanRepository,
     TemplateCustomizationRepository,
     TemplateRepository,

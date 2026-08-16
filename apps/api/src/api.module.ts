@@ -51,7 +51,9 @@ import { AgentsModule } from './agents/agents.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
 import { McpConnectionsModule } from './mcp-connections/mcp-connections.module';
+import { RepoConnectionsModule } from './repo-connections/repo-connections.module';
 import { TasksModule } from './tasks/tasks.module';
+import { TaskTemplatesModule } from './task-templates/task-templates.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { TeamsModule } from './teams/teams.module';
@@ -65,6 +67,7 @@ import { ToolGrantsApiModule } from './tool-grants/tool-grants.module';
 import { AgentCapabilitiesApiModule } from './agent-capabilities/agent-capabilities.module';
 import { DigestApiModule } from './digest/digest.module';
 import { EscalationsApiModule } from './escalations/escalations.module';
+import { InboxApiModule } from './inbox/inbox.module';
 import { PrReviewApiModule } from './pr-review/pr-review.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
@@ -190,9 +193,14 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Agent Plugins MCP slice — manual external MCP connections +
         // per-agent bindings (docs/specs/features/agent-plugins §2.3).
         McpConnectionsModule,
+        // Repository registry (Feature G) — Settings → Repositories CRUD,
+        // GitHub-App import, and the Agent ↔ repo attachment surface.
+        RepoConnectionsModule,
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,
+        // Tasks upgrades — workflow Task Templates (CRUD + instantiate).
+        TaskTemplatesModule,
         // Saved workflow graphs (judgment layer G5) — the persistence and
         // CRUD surface for graphs the executor could already run but
         // nothing could keep.
@@ -250,6 +258,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // that made escalations reachable without already knowing which
         // Task to open.
         EscalationsApiModule,
+        // Inbox (operator message center) — /api/inbox over the
+        // agent-side InboxModule, plus the @Global() INBOX_PRODUCER
+        // binding that makes escalations / pending proposals / budget
+        // alerts mirror into the human's inbox.
+        InboxApiModule,
         // AI PR review (Wave 7) — POST /api/pr-review owner-scoped
         // trigger over the agent-side PrReviewModule, the third REST
         // operation the web tool registry was missing. Refuses any

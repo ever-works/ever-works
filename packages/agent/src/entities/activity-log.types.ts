@@ -156,6 +156,30 @@ export enum ActivityActionType {
     MISSION_FAILED = 'mission_failed',
     MISSION_DELETED = 'mission_deleted',
     MISSION_TICK_CAPPED = 'mission_tick_capped',
+    // Autonomy layer — Goal execution loop. Additive members only
+    // (activity_log.actionType is a plain varchar, so no migration):
+    //   - GOAL_LOOP_STARTED / _PAUSED / _RESUMED / _CANCELLED are the
+    //     operator control actions on the iteration loop.
+    //   - GOAL_ITERATION_DISPATCHED fires once per routed iteration and
+    //     carries `{ iteration, agentId, taskId, reasonCode }` so "who
+    //     decided this run should happen?" is answerable.
+    //   - GOAL_LIMIT_TRIPPED records a budget / wall-clock / stuck ceiling
+    //     stopping the loop; `details` carries the reason code.
+    //   - GOAL_DOD_UPDATED covers every Definition-of-Done write,
+    //     including waivers (which carry the operator's note).
+    //   - GOAL_ARCHIVED / _UNARCHIVED are the catalog-visibility actions.
+    GOAL_LOOP_STARTED = 'goal_loop_started',
+    GOAL_LOOP_PAUSED = 'goal_loop_paused',
+    GOAL_LOOP_RESUMED = 'goal_loop_resumed',
+    GOAL_LOOP_CANCELLED = 'goal_loop_cancelled',
+    GOAL_LOOP_COMPLETED = 'goal_loop_completed',
+    GOAL_ITERATION_DISPATCHED = 'goal_iteration_dispatched',
+    GOAL_ITERATION_NUDGED = 'goal_iteration_nudged',
+    GOAL_LIMIT_TRIPPED = 'goal_limit_tripped',
+    GOAL_DOD_UPDATED = 'goal_dod_updated',
+    GOAL_ARCHIVED = 'goal_archived',
+    GOAL_UNARCHIVED = 'goal_unarchived',
+
     // PR-3 — Idea (WorkProposal) lifecycle
     IDEA_GENERATED = 'idea_generated',
     IDEA_DISMISSED = 'idea_dismissed',
@@ -183,10 +207,27 @@ export enum ActivityActionType {
     AGENT_BUDGET_EXCEEDED = 'agent_budget_exceeded',
     AGENT_EXPORTED = 'agent_exported',
     AGENT_IMPORTED = 'agent_imported',
+    // Agent Collaborators — edits to the per-agent sub-agent delegation
+    // allow-list. These are security-relevant: enabling a collaborator
+    // widens which agents this one may spawn, so the trail records the
+    // pair (details.collaboratorAgentId) alongside the parent agent.
+    // Additive members only — `activity_log.actionType` is a plain
+    // varchar, so no migration.
+    AGENT_COLLABORATOR_ENABLED = 'agent_collaborator_enabled',
+    AGENT_COLLABORATOR_DISABLED = 'agent_collaborator_disabled',
+    AGENT_COLLABORATOR_REMOVED = 'agent_collaborator_removed',
     SKILL_INSTALLED = 'skill_installed',
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',
     SKILL_FILE_EDITED = 'skill_file_edited',
+    // Repository registry (Feature G) — Settings → Repositories rows +
+    // the Agent ↔ repo grant edge. Additive entries only (NN #20).
+    REPO_CONNECTION_CREATED = 'repo_connection_created',
+    REPO_CONNECTION_UPDATED = 'repo_connection_updated',
+    REPO_CONNECTION_DELETED = 'repo_connection_deleted',
+    REPO_CONNECTION_IMPORTED = 'repo_connection_imported',
+    REPO_ATTACHED_TO_AGENT = 'repo_attached_to_agent',
+    REPO_DETACHED_FROM_AGENT = 'repo_detached_from_agent',
     TASK_CREATED = 'task_created',
     TASK_UPDATED = 'task_updated',
     TASK_DELETED = 'task_deleted',
@@ -254,6 +295,13 @@ export enum ActivityActionType {
     MCP_CONNECTION_DELETED = 'mcp_connection_deleted',
     MCP_CONNECTION_TESTED = 'mcp_connection_tested',
     MCP_BINDING_UPDATED = 'mcp_binding_updated',
+    // Inbox (operator message center) — one row when a message lands in
+    // the human's inbox and one when they answer it, so "what did the
+    // agent ask, and what did I decide?" shows in the Activity feed
+    // next to the run that asked. Additive members — storage is a plain
+    // varchar, so no migration is needed.
+    INBOX_ITEM_CREATED = 'inbox_item_created',
+    INBOX_ITEM_ANSWERED = 'inbox_item_answered',
 }
 
 export enum ActivityStatus {

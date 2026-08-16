@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ConnectionStatusView } from './ipc-contract';
+import { IDLE_WORKER_STATUS } from './ipc-contract';
 import { describeStatus, formatSince, isLive, statusTone } from './status-label';
 
 function status(overrides: Partial<ConnectionStatusView> = {}): ConnectionStatusView {
@@ -10,6 +11,9 @@ function status(overrides: Partial<ConnectionStatusView> = {}): ConnectionStatus
 		nextAttemptInMs: null,
 		lastError: null,
 		platformStatus: null,
+		// `worker` is required on the view (A18). A status with no worker
+		// loop running is the idle worker, not a missing field.
+		worker: { ...IDLE_WORKER_STATUS },
 		...overrides
 	};
 }

@@ -94,11 +94,27 @@ export interface ManagedAgentsSession {
 	usage?: ManagedAgentsUsage;
 }
 
-export interface ManagedAgentsSessionResource {
+export interface ManagedAgentsSessionFileResource {
 	type: 'file';
 	file_id: string;
 	mount_path?: string;
 }
+
+/**
+ * Repository registry (Feature G) — a git repository mounted into the
+ * managed session's workspace. Emitted for each of the run agent's
+ * attached registry repos (`PipelineExecutionOptions.attachedRepos`).
+ */
+export interface ManagedAgentsSessionGithubRepositoryResource {
+	type: 'github_repository';
+	url: string;
+	branch?: string;
+	mount_path?: string;
+}
+
+export type ManagedAgentsSessionResource =
+	| ManagedAgentsSessionFileResource
+	| ManagedAgentsSessionGithubRepositoryResource;
 
 export interface ManagedAgentOperationSummary {
 	created_files?: string[];
@@ -227,6 +243,8 @@ export interface WorkspaceSeedManifest {
 export interface ManagedAgentRunResources {
 	sessionId?: string;
 	uploadedFileId?: string;
+	/** Env files of attached registry repos, uploaded per run (Feature G). */
+	uploadedEnvFileIds?: string[];
 	createdAgentId?: string;
 	createdEnvironmentId?: string;
 }
