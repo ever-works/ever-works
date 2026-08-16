@@ -391,8 +391,18 @@ describe('ClaudeManagedAgentPlugin — ephemeral fallback (reuseControlPlane: fa
 		await plugin.onLoad(context);
 
 		const options = execOptions() as { execContext: Record<string, unknown> };
+		// Flat `RuntimeEnvironmentData` — the shipped platform contract. (This
+		// fixture used to build a nested `{ networking: { … } }` object, the
+		// plugin's own pre-contract guess, which never matched real data.)
 		options.execContext.runtimeEnvironment = {
-			networking: { type: 'limited', allowedHosts: ['api.example.com'], allowPackageManagers: true }
+			id: 'env-1',
+			name: 'Limited Egress',
+			slug: 'limited-egress',
+			pipPackages: [],
+			npmPackages: [],
+			networkingMode: 'limited',
+			allowedHosts: ['api.example.com'],
+			allowPackageManagers: true
 		};
 
 		const result = await plugin.execute(

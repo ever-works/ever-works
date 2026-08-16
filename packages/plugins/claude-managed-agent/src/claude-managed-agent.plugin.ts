@@ -16,7 +16,8 @@ import type {
 	PluginContext,
 	PluginHealthCheck,
 	PluginManifest,
-	ValidationResult
+	ValidationResult,
+	RuntimeEnvironmentData
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
 
@@ -41,7 +42,11 @@ import {
 	DEFAULT_WORKSPACE_PATH,
 	type ManagedAgentFanOutCapability,
 	type ManagedAgentRunResources,
-	type ManagedRuntimeEnvironment,
+	// `ManagedAgentsSessionResource` is used by the run-resources type below.
+	// develop also imported `ManagedRuntimeEnvironment` here, but this branch's
+	// resolver is typed against the pipeline's flat `RuntimeEnvironmentData`
+	// instead, so that symbol has no remaining use and is deliberately omitted.
+	type ManagedAgentsSessionResource,
 	type ManagedSessionRunResult,
 	MAX_VARIANT_SESSIONS,
 	MIN_VARIANT_SESSIONS,
@@ -59,6 +64,7 @@ import { ensureControlPlane, resolveNetworking } from './utils/control-plane.js'
 import { runManagedSessions } from './utils/fan-out.js';
 import { cleanupManagedAgentRun } from './utils/managed-agents-cleanup.js';
 import { AnthropicManagedAgentsClient } from './utils/managed-agents-client.js';
+import { buildSessionResources, type UploadedAttachedEnvFile } from './utils/session-resources.js';
 import {
 	buildCancelledResult,
 	buildErrorResult,
@@ -79,6 +85,7 @@ import {
 	buildWorkspaceSeedPrompt
 } from './utils/prompt-builder.js';
 import { extractAgentTranscript, normalizeOutputs, parseStructuredOutput } from './utils/result-parser.js';
+import { buildPackageBootstrapPrompt } from './utils/runtime-environment.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import { buildManagedAgentMetrics, toManagedSessionTokenUsage } from './utils/usage-metrics.js';
 import { buildWorkspaceSeedManifest } from './utils/workspace-seed.js';
@@ -516,6 +523,44 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				return this.toCancelledResult(startTime).result;
 			}
 
+			// Repository registry (Feature G) — mount the run agent's attached
+			// registry repos alongside the primary workspace. Env files are
+			// uploaded per run and mounted under each repo's directory. With
+			// no attachments (the default) the resource list is byte-identical
+			// to what this plugin has always sent.
+			//
+			// Resolved BEFORE the fan-out branch so the variant sessions
+			// (feat-cma-scale) mount the same repos as the single-session
+			// path — attachments must not depend on `variantSessions`.
+			const attachedRepos = options?.attachedRepos ?? [];
+			const uploadedEnvFiles: UploadedAttachedEnvFile[] = [];
+			for (const attachedRepo of attachedRepos) {
+				for (const envFile of attachedRepo.envFiles ?? []) {
+					const uploadedEnvFile = await client.uploadTextFile(
+						envFile.path.split('/').pop() || '.env',
+						envFile.content,
+						'text/plain'
+					);
+					runResources.uploadedEnvFileIds = runResources.uploadedEnvFileIds ?? [];
+					runResources.uploadedEnvFileIds.push(uploadedEnvFile.id);
+					uploadedEnvFiles.push({
+						fileId: uploadedEnvFile.id,
+						mountDir: attachedRepo.mountDir,
+						path: envFile.path
+					});
+				}
+			}
+
+			const sessionResources = buildSessionResources({
+				workspacePath: DEFAULT_WORKSPACE_PATH,
+				seedManifest: {
+					fileId: uploadedSeedManifest.id,
+					mountPath: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
+				},
+				attachedRepos,
+				uploadedEnvFiles
+			});
+
 			if (variantSessions > 1) {
 				return await this.executeVariantSessions({
 					client,
@@ -534,7 +579,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 					agentId,
 					environmentId,
 					sessionAgentOverrides,
-					uploadedSeedFileId: uploadedSeedManifest.id,
+					sessionResources,
 					workspaceSeedManifest,
 					logger,
 					userId
@@ -545,21 +590,43 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 			await this.beginStep('run-managed-session', onProgress, 20);
 
+			// The repo-attachment block that used to sit here is GONE on
+			// purpose. Both sides of this merge carry the Feature G work, so
+			// the auto-merge produced it twice in one scope — `attachedRepos`
+			// and `uploadedEnvFiles` were declared at ~535 and again here,
+			// which is a redeclaration error, and it would have uploaded every
+			// attached repo's env files twice per run. The surviving copy is
+			// develop's, hoisted above the `variantSessions > 1` branch so
+			// variant runs get the same resources.
 			const session = await client.createSession({
 				agentId,
 				environmentId,
 				title: `Ever Works: ${work.name}`,
-				resources: [
-					{
-						type: 'file',
-						file_id: uploadedSeedManifest.id,
-						mount_path: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
-					}
-				],
+				resources: sessionResources,
 				budgetUsd: perSessionBudgetUsd,
 				agentOverrides: sessionAgentOverrides
 			});
 			runResources.sessionId = session.id;
+
+			// Environments — install the Environment's pip/npm packages as
+			// the FIRST session step, before the workspace seed and the
+			// main generation prompt. The bootstrap prompt is composed
+			// exclusively from re-validated package specs
+			// (`buildPackageBootstrapPrompt` — see its security note); its
+			// events land before the seed-idle snapshot below, so they are
+			// naturally excluded from generation-output parsing.
+			// getRuntimeEnvironment() returns `| null` (this plugin's local shape);
+			// the shared contract helper takes `| undefined`. Same object either
+			// way — only the absent-value convention differs between branches.
+			const bootstrapPrompt = buildPackageBootstrapPrompt(runtimeEnvironment ?? undefined);
+			if (bootstrapPrompt) {
+				await client.sendUserMessage(session.id, bootstrapPrompt);
+				await client.waitForSessionIdle(session.id, {
+					maxPollAttempts: getNumericSetting(settings.maxPollAttempts, DEFAULT_MAX_POLL_ATTEMPTS),
+					pollIntervalMs: getNumericSetting(settings.pollIntervalMs, DEFAULT_POLL_INTERVAL_MS),
+					signal: abortController.signal
+				});
+			}
 
 			await client.sendUserMessage(session.id, buildWorkspaceSeedPrompt(workspaceSeedManifest));
 
@@ -741,7 +808,13 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 		agentId: string;
 		environmentId: string;
 		sessionAgentOverrides: { system?: string; model?: string } | undefined;
-		uploadedSeedFileId: string;
+		/**
+		 * Resources every variant session mounts: the seed manifest plus the
+		 * run agent's attached registry repos + their env files (Feature G).
+		 * Built once by the caller so fan-out and single-session runs mount
+		 * an identical workspace.
+		 */
+		sessionResources: ManagedAgentsSessionResource[];
 		workspaceSeedManifest: ReturnType<typeof buildWorkspaceSeedManifest>;
 		logger: { log(m: string): void; warn(m: string): void; error(m: string): void };
 		userId: string;
@@ -763,7 +836,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			agentId,
 			environmentId,
 			sessionAgentOverrides,
-			uploadedSeedFileId,
+			sessionResources,
 			workspaceSeedManifest,
 			logger,
 			userId
@@ -791,13 +864,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			agentId,
 			environmentId,
 			perSessionBudgetUsd,
-			resources: [
-				{
-					type: 'file',
-					file_id: uploadedSeedFileId,
-					mount_path: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
-				}
-			],
+			resources: sessionResources,
 			pollIntervalMs: getNumericSetting(settings.pollIntervalMs, DEFAULT_POLL_INTERVAL_MS),
 			maxPollAttempts: getNumericSetting(settings.maxPollAttempts, DEFAULT_MAX_POLL_ATTEMPTS),
 			agentOverrides: sessionAgentOverrides,
@@ -1045,7 +1112,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 	 * (parallel branch). Read defensively — absent or malformed values fall
 	 * back to the env-var driven networking policy.
 	 */
-	private getRuntimeEnvironment(execContext: unknown): ManagedRuntimeEnvironment | null {
+	private getRuntimeEnvironment(execContext: unknown): RuntimeEnvironmentData | null {
 		if (!execContext || typeof execContext !== 'object') {
 			return null;
 		}
@@ -1055,7 +1122,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			return null;
 		}
 
-		return candidate as ManagedRuntimeEnvironment;
+		return candidate as RuntimeEnvironmentData;
 	}
 }
 

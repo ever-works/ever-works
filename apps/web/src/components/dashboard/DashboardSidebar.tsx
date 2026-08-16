@@ -33,6 +33,7 @@ import {
     CreditCard,
     BarChart3,
     Video,
+    Inbox,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,7 @@ import { WorkspaceSwitcher } from '../layout/WorkspaceSwitcher';
 import { useWorkDetail } from '../works/detail/WorkDetailContext';
 import { ChatPanelExpandButton } from '@/components/ai/ChatPanel';
 import { SidebarActivityIndicator } from './SidebarActivityIndicator';
+import { SidebarInboxBadge } from './SidebarInboxBadge';
 import { RunnerStatusPill } from './RunnerStatusPill';
 import { useMounted } from '@/lib/hooks/use-mounted';
 
@@ -114,6 +116,15 @@ export function DashboardSidebar({
 
     const navigation = [
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
+        // Inbox (operator message center) — the one surface carrying
+        // messages ADDRESSED TO the human: blocking agent questions
+        // (a run is parked until the reply), approval requests,
+        // escalations and notices. Deliberately the first item after
+        // the dashboard, and the documented exception to the
+        // sidebar-restraint rule: an item that can be blocking work
+        // right now has to be one click away, and it is the only nav
+        // entry carrying an unread badge.
+        { name: t('navigation.inbox'), href: ROUTES.DASHBOARD_INBOX, icon: Inbox },
         // Phase 6 PR Q — Missions catalog. Sits ABOVE Ideas + Works
         // to match the spec §5.1 stats-tile order (Missions → Ideas
         // → Works), reading the same direction as the dashboard
@@ -334,6 +345,9 @@ export function DashboardSidebar({
                                             <div className="absolute -top-3 -right-0.5">
                                                 {item.href === ROUTES.DASHBOARD_WORKS && (
                                                     <SidebarActivityIndicator />
+                                                )}
+                                                {item.href === ROUTES.DASHBOARD_INBOX && (
+                                                    <SidebarInboxBadge />
                                                 )}
                                             </div>
                                         </Link>

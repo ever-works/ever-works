@@ -9,12 +9,43 @@ import type {
 } from '../../pipeline/generation-context.interface.js';
 import type { IBuiltInStepExecutor } from '../../pipeline/built-in-step-executor.interface.js';
 import type { StepExecutionContext } from '../../pipeline/step-execution-context.interface.js';
+import type { RuntimeEnvironmentData } from '../../pipeline/runtime-environment.js';
 import type { PipelineMetrics } from '../../pipeline/step-types.js';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
 
 // ============================================================================
 // Shared Pipeline Types
 // ============================================================================
+
+/**
+ * One seed env file carried alongside an attached repository. Contents
+ * are secrets in transit — never log them and never echo them back in
+ * results; executors write them into the session/workspace only.
+ */
+export interface AttachedRepoEnvFile {
+	readonly path: string;
+	readonly content: string;
+}
+
+/**
+ * A registry repository attached to the executing agent (repository
+ * registry, Feature G). Resolved by the orchestrator from the agent's
+ * enabled repo attachments and handed to self-managed pipeline plugins
+ * so they can mount the repo alongside the primary workspace (e.g. a
+ * Claude Managed Agents `github_repository` session resource).
+ */
+export interface AttachedRepoResource {
+	/** Registry row id, for logging/telemetry correlation. */
+	readonly repoConnectionId?: string;
+	/** Clone URL (https or ssh). Token-free — auth is resolved separately. */
+	readonly url: string;
+	/** Branch to check out; omitted → provider default. */
+	readonly branch?: string;
+	/** Directory name the repo mounts under (single path segment). */
+	readonly mountDir: string;
+	/** Seed .env files to place under the mount dir. */
+	readonly envFiles?: readonly AttachedRepoEnvFile[];
+}
 
 /**
  * Pipeline execution options
@@ -49,6 +80,30 @@ export interface PipelineExecutionOptions {
 	 * of its own.
 	 */
 	readonly memorySessionId?: string;
+	/**
+	 * Environments — id of the Agent this run executes on behalf of, when
+	 * the dispatching orchestrator knows it. The full-pipeline executor
+	 * uses it to resolve the Agent's assigned Environment
+	 * (`agents.environmentId` → `environments` row) into
+	 * `execContext.runtimeEnvironment`. Optional end-to-end; plain
+	 * Work-generation runs never set it.
+	 */
+	readonly agentId?: string;
+	/**
+	 * Environments — a pre-resolved runtime Environment. When set it wins
+	 * over `agentId` resolution (the caller already did the lookup) and is
+	 * forwarded verbatim to `StepExecutionContext.runtimeEnvironment`.
+	 */
+	readonly runtimeEnvironment?: RuntimeEnvironmentData;
+	/**
+	 * Repository registry (Feature G) — repos attached to the executing
+	 * agent, resolved at dispatch. Optional carrier (same posture as
+	 * `memorySessionId`): absent on plain Work-generation runs, older
+	 * orchestrators, and agents without attachments — plugins treat
+	 * `undefined`/empty as "mount nothing extra", keeping existing
+	 * session payloads byte-identical.
+	 */
+	readonly attachedRepos?: readonly AttachedRepoResource[];
 }
 
 /**

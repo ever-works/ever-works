@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { COMPANY_OWNER_WEBSITE } from '@/lib/constants';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { SocialLoginButtons } from '@/components/auth/social-login';
 import { register as registerAction } from '@/app/actions/auth';
+import { PASSWORD_RULES, VALIDATION_RULES } from '@/app/actions/validation';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
@@ -29,7 +30,14 @@ export default function RegisterForm({
     termsDocuments,
 }: RegisterFormProps) {
     const t = useTranslations('auth.register');
+    // The rules this form has to state are already written, and already
+    // translated into all 21 locales, under `validation.auth` — they are the
+    // very strings the server action returns when it rejects. Reusing them
+    // keeps the message a user reads BEFORE submit identical to the one they
+    // would otherwise have read after.
+    const tv = useTranslations('validation.auth');
     const [isPending, startTransition] = useTransition();
+    const router = useRouter();
 
     const [formData, setFormData] = useState({
         name: '',
@@ -44,11 +52,61 @@ export default function RegisterForm({
         acceptedTerms: false,
     });
 
-    const [error, setError] = useState('');
+    /**
+     * Errors keyed by the field they belong to.
+     *
+     * This used to be a single `error` string rendered as a banner above the
+     * form. Every rule the server enforced and the page did not — lowercase,
+     * number-or-special, no leading dot, the name minimum — arrived as that
+     * banner, detached from the input that caused it, after a round trip. The
+     * sibling reset-password form already keys its errors by field; this
+     * matches it.
+     */
+    const [errors, setErrors] = useState<{
+        name?: string;
+        password?: string;
+        confirmPassword?: string;
+        general?: string;
+    }>({});
 
     // Nothing to pin an acceptance to means nothing truthful to record, so the
     // form refuses rather than registering silently.
     const termsUnavailable = termsDocuments.length === 0;
+
+    // EW-075: that refusal was correct and completely silent. With the corpus
+    // unloaded the checkbox, Create account and every social button went
+    // disabled, nothing said why, and there was no way forward short of
+    // reloading the page by hand — a signup that looks broken rather than
+    // temporarily unavailable. `router.refresh()` re-runs the server component
+    // that fetches the corpus, so a transient upstream failure is retryable in
+    // place; a persistent one at least explains itself.
+    const [isRetrying, startRetry] = useTransition();
+    const retryTerms = () => startRetry(() => router.refresh());
+
+    /**
+     * The password rules the server action will apply, in the order it applies
+     * them, each paired with the message it would have returned.
+     *
+     * The regexes are imported rather than restated: the whole defect class
+     * here (EW-073, EW-076) is a client that disagrees with the server about
+     * what a valid password is, and a second copy of `/[\d\W_]/` in this file
+     * would be the next instance of it.
+     */
+    const passwordError = (password: string): string | undefined => {
+        if (password.length < PASSWORD_RULES.MIN_LENGTH) {
+            return t('errors.passwordTooShort');
+        }
+        if (!PASSWORD_RULES.LOWERCASE.test(password)) {
+            return tv('password.lowercase');
+        }
+        if (!PASSWORD_RULES.NUMBER_OR_SPECIAL.test(password)) {
+            return tv('password.numberOrSpecial');
+        }
+        if (!PASSWORD_RULES.NOT_STARTING_WITH_DOT_OR_NEWLINE.test(password)) {
+            return tv('password.cannotStartWith');
+        }
+        return undefined;
+    };
 
     /**
      * Where to send someone who wants to READ what they are accepting.
@@ -66,21 +124,37 @@ export default function RegisterForm({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
+        setErrors({});
 
-        // Validation
-        if (formData.password !== formData.confirmPassword) {
-            setError(t('errors.passwordsDoNotMatch'));
+        // EW-074: the minimum was enforced but never shown. A two-character
+        // entry was accepted by the page, posted, and came back as "Username
+        // must contain at least 3 characters" — a rule about a field this form
+        // does not display. It is checked here now, against the same constant
+        // the action uses, and reported against the field actually filled in.
+        if (formData.name.trim().length < VALIDATION_RULES.USERNAME_MIN_LENGTH) {
+            setErrors({
+                name: tv('name.minLength', { length: VALIDATION_RULES.USERNAME_MIN_LENGTH }),
+            });
             return;
         }
 
-        if (formData.password.length < 8) {
-            setError(t('errors.passwordTooShort'));
+        if (formData.password !== formData.confirmPassword) {
+            setErrors({ confirmPassword: t('errors.passwordsDoNotMatch') });
+            return;
+        }
+
+        // EW-073: only the length was checked here, so a 10-character
+        // ALL-UPPERCASE password satisfied every rule the page stated and every
+        // rule the page enforced, and was still rejected by the action. All
+        // four rules run now, and the failing one is named against the field.
+        const invalidPassword = passwordError(formData.password);
+        if (invalidPassword) {
+            setErrors({ password: invalidPassword });
             return;
         }
 
         if (!formData.acceptedTerms || termsUnavailable) {
-            setError(t('errors.termsNotAccepted'));
+            setErrors({ general: t('errors.termsNotAccepted') });
             return;
         }
 
@@ -101,7 +175,7 @@ export default function RegisterForm({
             );
 
             if (response && !response.success) {
-                setError(response.error || t('errors.generic'));
+                setErrors({ general: response.error || t('errors.generic') });
             }
         });
     };
@@ -116,9 +190,41 @@ export default function RegisterForm({
         >
             <ThemeToggle variant="fixed" />
             <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
+                {errors.general && (
                     <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
-                        {error}
+                        {errors.general}
+                    </div>
+                )}
+
+                {/*
+                 * EW-075: say why the form is inert, and offer the way out.
+                 * Without this the page is a set of disabled controls with no
+                 * explanation — indistinguishable from a broken build, and with
+                 * nothing to click that would ever change it.
+                 */}
+                {termsUnavailable && (
+                    <div
+                        role="alert"
+                        className="bg-warning/10 border border-warning/20 px-4 py-3 rounded-lg text-sm space-y-3"
+                    >
+                        <div>
+                            <p className="font-medium text-text dark:text-text-dark">
+                                {t('errors.termsUnavailable.title')}
+                            </p>
+                            <p className="mt-1 text-text-secondary dark:text-text-secondary-dark">
+                                {t('errors.termsUnavailable.message')}
+                            </p>
+                        </div>
+
+                        <Button
+                            type="button"
+                            onClick={retryTerms}
+                            loading={isRetrying}
+                            disabled={isRetrying}
+                            size="sm"
+                        >
+                            {t('errors.termsUnavailable.retry')}
+                        </Button>
                     </div>
                 )}
 
@@ -129,7 +235,17 @@ export default function RegisterForm({
                         name="name"
                         placeholder={t('form.name.placeholder')}
                         value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        onChange={(e) => {
+                            setFormData({ ...formData, name: e.target.value });
+                            setErrors((prev) => ({ ...prev, name: undefined }));
+                        }}
+                        error={errors.name}
+                        // EW-074: the 3-character minimum was undisclosed. It is
+                        // the API's `@MinLength(3)` on `username`, so it is
+                        // stated from the same constant the checks read.
+                        helperText={t('form.name.hint', {
+                            length: VALIDATION_RULES.USERNAME_MIN_LENGTH,
+                        })}
                         required
                         disabled={isPending}
                         className="text-sm shadow-sm"
@@ -153,7 +269,16 @@ export default function RegisterForm({
                         label={t('form.password.label')}
                         placeholder={t('form.password.placeholder')}
                         value={formData.password}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        onChange={(e) => {
+                            setFormData({ ...formData, password: e.target.value });
+                            setErrors((prev) => ({ ...prev, password: undefined }));
+                        }}
+                        error={errors.password}
+                        // EW-073: this said only "Must be at least 8
+                        // characters" while three further rules were being
+                        // enforced. It now carries the sibling reset flow's
+                        // wording, which already states all of them and is
+                        // already translated into all 21 locales.
                         helperText={t('form.password.hint')}
                         required
                         disabled={isPending}
@@ -166,9 +291,11 @@ export default function RegisterForm({
                         label={t('form.confirmPassword.label')}
                         placeholder={t('form.confirmPassword.placeholder')}
                         value={formData.confirmPassword}
-                        onChange={(e) =>
-                            setFormData({ ...formData, confirmPassword: e.target.value })
-                        }
+                        onChange={(e) => {
+                            setFormData({ ...formData, confirmPassword: e.target.value });
+                            setErrors((prev) => ({ ...prev, confirmPassword: undefined }));
+                        }}
+                        error={errors.confirmPassword}
                         required
                         disabled={isPending}
                         className="text-sm shadow-sm"

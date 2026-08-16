@@ -74,6 +74,8 @@ export * from './agent-tool.service';
 // assembly `resolveAllowedTools` runs (never hand-maintained).
 export * from './agent-tool-catalog';
 export * from './agent-domain-tool-sources';
+// Agent Plugins MCP slice — the optional MCP tool-source seam (T26).
+export * from './agent-mcp-tool-source';
 export * from './budget-period';
 export * from './guardrails';
 export * from './heartbeat-cron';
@@ -103,6 +105,10 @@ export {
     AgentMembership,
     type AgentMembershipTargetType,
 } from '../entities/agent-membership.entity';
+// Agent Collaborators — entity + repository re-exported for the api-side
+// collaborators controller and the delegation runner's allow-list check.
+export { AgentCollaborator } from '../entities/agent-collaborator.entity';
+export { AgentCollaboratorRepository } from '../database/repositories/agent-collaborator.repository';
 // FU-2 — re-export the repositories that the api-side controller
 // reaches for directly (run-history pagination, cancel, skill rollup,
 // budget rollup). Mirrors the same pattern as `AgentFileService` etc.
