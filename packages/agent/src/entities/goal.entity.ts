@@ -193,6 +193,89 @@ export interface GoalResolvedScore {
 }
 
 /**
+ * Autonomy layer — one Definition-of-Done criterion.
+ *
+ * A DoD criterion is a PROSE statement of completion ("the pricing page
+ * ships with three tiers"), deliberately unlike {@link GoalCriterion},
+ * which is a machine-read metric threshold. The two coexist: the metric
+ * layer answers "is the number there?", the DoD layer answers "did we do
+ * the things?", and the orchestrator loop stops when every DoD criterion
+ * is closed (`done` or `waived`).
+ *
+ * `waived` is a first-class terminal state, not a synonym for done: an
+ * operator who decides a criterion no longer applies must be able to say
+ * so without lying about having satisfied it. `note` records why.
+ */
+export type GoalDoDStatus = 'open' | 'done' | 'waived';
+
+export const GOAL_DOD_STATUSES: readonly GoalDoDStatus[] = ['open', 'done', 'waived'];
+
+/**
+ * Who authored a criterion. `planner` entries are produced by a planning
+ * run and are inert until an operator approves them — the platform must
+ * never let a model silently rewrite its own finish line.
+ */
+export type GoalDoDSource = 'operator' | 'planner';
+
+export const GOAL_DOD_SOURCES: readonly GoalDoDSource[] = ['operator', 'planner'];
+
+export interface GoalDoDCriterion {
+    /** Stable slug, unique within the Goal. Also the patch key. */
+    id: string;
+    /** The completion statement, in the operator's own words. */
+    text: string;
+    status: GoalDoDStatus;
+    /** Link or short note evidencing a `done` criterion. */
+    evidence?: string | null;
+    /** Why a criterion was waived (or any operator annotation). */
+    note?: string | null;
+    /** Omitted reads as `operator` — every hand-authored criterion. */
+    source?: GoalDoDSource;
+    /**
+     * Awaiting operator approval. Set on planner-authored criteria; a
+     * proposed criterion is EXCLUDED from the completion rollup, so a
+     * planning run cannot extend (or satisfy) the finish line on its own.
+     */
+    proposed?: boolean;
+    /** ISO timestamp of the last status/evidence write. */
+    updatedAt?: string;
+}
+
+/**
+ * Autonomy layer — state of the per-Goal execution LOOP.
+ *
+ * Deliberately a SEPARATE column from {@link GoalStatus} rather than new
+ * members on it. `GoalStatus` drives the metric-evaluation dispatcher
+ * (`status = 'active' AND nextCheckAt <= now`), the activate/pause state
+ * machine, and the `/api/me/goals?status=` filter, all of which are pinned
+ * by e2e specs. Adding `cancelled`/`stuck` there would silently widen
+ * those contracts; a Goal can perfectly well be metric-ACTIVE while its
+ * iteration loop is paused, so the two axes are genuinely independent.
+ *
+ * NULL = the loop was never started, which is every Goal predating this
+ * column and every Goal an operator never asked to run autonomously.
+ */
+export type GoalLoopStatus = 'running' | 'paused' | 'done' | 'cancelled' | 'stuck';
+
+export const GOAL_LOOP_STATUSES: readonly GoalLoopStatus[] = [
+    'running',
+    'paused',
+    'done',
+    'cancelled',
+    'stuck',
+];
+
+/**
+ * Advisory routing hint for where iterations should execute. ADVISORY is
+ * the operative word: dispatch honours the platform's own job-runtime
+ * resolution, and this records the operator's intent + is carried on the
+ * dispatch event so a mismatch is visible rather than silent.
+ */
+export type GoalExecutionTarget = 'cloud' | 'local-runner';
+
+export const GOAL_EXECUTION_TARGETS: readonly GoalExecutionTarget[] = ['cloud', 'local-runner'];
+
+/**
  * A measurable target — "income >= $1000/month via Stripe" — evaluated
  * automatically against real business metrics (Goals & Metrics spec
  * FR-9..FR-14; domain-model review §23.4).
@@ -216,6 +299,10 @@ export interface GoalResolvedScore {
 @Entity({ name: 'goals' })
 @Index('idx_goals_user_status', ['userId', 'status'])
 @Index('idx_goals_status_next_check', ['status', 'nextCheckAt'])
+// Autonomy layer — the orchestrator's due-scan predicate. NULL loopStatus
+// (every Goal that never started a loop) is excluded by the equality, so
+// the cron's cheap case stays one indexed lookup returning zero rows.
+@Index('idx_goals_loop_status', ['loopStatus'])
 export class Goal {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -332,6 +419,115 @@ export class Goal {
      */
     @Column({ type: 'simple-json', nullable: true })
     resolvedScore?: GoalResolvedScore | null;
+
+    // ── Autonomy layer — Definition of Done, budgets, iteration loop ──
+    // Every column below is additive and NULL/0 on every pre-existing
+    // row, which reads as "no DoD, no limits, loop never started" — i.e.
+    // exactly the metric-only Goal this entity already described.
+
+    /**
+     * Ordered Definition-of-Done checklist. NULL/empty = the Goal is
+     * judged purely by its metric target, unchanged. Stored `simple-json`
+     * like `criteria`/`constraints`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    dodCriteria?: GoalDoDCriterion[] | null;
+
+    /**
+     * Hard spend ceiling for the whole Goal, in CENTS.
+     *
+     * Cents, not dollars, because `agent_runs.costCents` — the only thing
+     * that ever adds to `spentCents` — is already cents. A float-dollars
+     * column would need a lossy conversion on every rollup, which is how
+     * budget ceilings end up off by a penny and then off by a dollar.
+     * NULL = uncapped.
+     */
+    @Column({ type: 'int', nullable: true })
+    spendCapCents?: number | null;
+
+    /**
+     * Rolled-up spend of every run linked to this Goal's iterations, in
+     * cents. A DENORM refreshed by `GoalOrchestratorService.rollupSpend`
+     * on every advance/limit read — not a running counter incremented on
+     * the side, because a counter that misses one terminal run under-
+     * reports forever and a budget that under-reports is not a budget.
+     */
+    @Column({ type: 'int', default: 0 })
+    spentCents: number;
+
+    /** Wall-clock ceiling measured from `loopStartedAt`. NULL = none. */
+    @Column({ type: 'int', nullable: true })
+    wallClockLimitHours?: number | null;
+
+    /**
+     * Iterations allowed to pass with NO DoD progress before the loop is
+     * declared stuck. NULL = never auto-stuck.
+     */
+    @Column({ type: 'int', nullable: true })
+    stuckThresholdIterations?: number | null;
+
+    /** Advisory per-session runtime budget handed to the routed agent. */
+    @Column({ type: 'int', nullable: true })
+    sessionBudgetMinutes?: number | null;
+
+    /**
+     * Grace period after a limit trips before the loop actually pauses —
+     * lets an in-flight session land instead of being cut mid-write.
+     */
+    @Column({ type: 'int', nullable: true })
+    gracePeriodMinutes?: number | null;
+
+    /** `cloud` | `local-runner` — advisory routing hint. NULL = platform default. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    executionTarget?: GoalExecutionTarget | null;
+
+    /** Free-string model hint for planning runs (no allow-list by design). */
+    @Column({ type: 'varchar', length: 120, nullable: true })
+    plannerModelHint?: string | null;
+
+    /** Free-string model hint for worker (iteration) runs. */
+    @Column({ type: 'varchar', length: 120, nullable: true })
+    workerModelHint?: string | null;
+
+    /** How many iterations the loop has dispatched. Monotonic. */
+    @Column({ type: 'int', default: 0 })
+    iteration: number;
+
+    /**
+     * Iteration number at which the DoD rollup last CHANGED. Stuck
+     * detection is `iteration - lastProgressIteration >=
+     * stuckThresholdIterations`, so it measures iterations without
+     * progress rather than iterations in total.
+     */
+    @Column({ type: 'int', default: 0 })
+    lastProgressIteration: number;
+
+    /** Agent the current iteration was routed to. NULL between iterations. */
+    @Column({ type: 'uuid', nullable: true })
+    activeAgentId?: string | null;
+
+    /**
+     * Operator-pinned agent. When set, routing ALWAYS chooses it and the
+     * round-robin never runs — the explicit rule beats the heuristic.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    assignedAgentId?: string | null;
+
+    /** See {@link GoalLoopStatus}. NULL = loop never started. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    loopStatus?: GoalLoopStatus | null;
+
+    /** When the loop last entered `running`. Anchors the wall-clock limit. */
+    @PortableDateColumn({ nullable: true })
+    loopStartedAt?: Date | null;
+
+    /**
+     * Archive marker. Archived Goals are hidden from the default catalog
+     * and never advanced by the orchestrator, but are NOT deleted — the
+     * observation history and orchestrator log stay readable.
+     */
+    @PortableDateColumn({ nullable: true })
+    archivedAt?: Date | null;
 
     // Tier A scope columns (EW-655 pattern) — nullable until the lazy
     // Organization backfill, no @ManyToOne to avoid the entities

@@ -66,6 +66,7 @@ import { ToolGrantsApiModule } from './tool-grants/tool-grants.module';
 import { AgentCapabilitiesApiModule } from './agent-capabilities/agent-capabilities.module';
 import { DigestApiModule } from './digest/digest.module';
 import { EscalationsApiModule } from './escalations/escalations.module';
+import { InboxApiModule } from './inbox/inbox.module';
 import { PrReviewApiModule } from './pr-review/pr-review.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
@@ -253,6 +254,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // that made escalations reachable without already knowing which
         // Task to open.
         EscalationsApiModule,
+        // Inbox (operator message center) — /api/inbox over the
+        // agent-side InboxModule, plus the @Global() INBOX_PRODUCER
+        // binding that makes escalations / pending proposals / budget
+        // alerts mirror into the human's inbox.
+        InboxApiModule,
         // AI PR review (Wave 7) — POST /api/pr-review owner-scoped
         // trigger over the agent-side PrReviewModule, the third REST
         // operation the web tool registry was missing. Refuses any

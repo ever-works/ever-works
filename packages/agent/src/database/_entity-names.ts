@@ -88,6 +88,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'InboundTrigger',
     // Task Triggers — per-(trigger, event) fire ledger (ingest idempotency)
     'InboundTriggerFire',
+    // Inbox (operator message center) — messages addressed to the human
+    'InboxItem',
     // Event-ingest pull path (Wave 8) — per-(user, plugin) pull cursors
     'IngestCursor',
     // Inbound receivers — workspace/installation → platform user binding
@@ -107,6 +109,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
     'GoalMetricSample',
+    'GoalEvent',
     'MissionGoal',
     'MissionAttachment',
     'MissionWork',

@@ -103,6 +103,10 @@ jest.mock('@ever-works/agent/skills', () => ({
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogModule: class ActivityLogModule {},
 }));
+jest.mock('@ever-works/agent/inbox', () => ({
+    InboxModule: class InboxModule {},
+    InboxService: class InboxService {},
+}));
 jest.mock('@ever-works/trigger-tasks', () => ({
     TriggerModule: class TriggerModule {},
     TriggerService: class TriggerService {},
@@ -151,8 +155,10 @@ import {
     WorkflowGraphExecutorService,
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_GIT_FACADE,
+    AGENT_RUN_CANCELLER,
 } from '@ever-works/agent/agents';
 import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
+import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
 import { PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkRepository } from '@ever-works/agent/database';
 
@@ -178,6 +184,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(imports).toContain(FleetModule);
         expect(imports).toContain(PrReviewModule);
         expect(imports).toContain(PolicyModule);
+        expect(imports).toContain(AgentInboxModule);
     });
 
     it('binds AGENT_DOMAIN_TOOL_SOURCES — without it every domain tool is dead code', () => {
@@ -208,6 +215,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             // Judgment layer G5 — the workflow-graph tools. This binding is
             // what gives `WorkflowGraphExecutorService` a production caller.
             WorkflowGraphExecutorService,
+            // Inbox (operator message center) — the `ask_human` tool.
+            InboxService,
         ]);
     });
 
@@ -218,6 +227,21 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
 
     it('exports the token so the agent-side @Optional() injection resolves', () => {
         expect(meta('exports')).toContain(AGENT_DOMAIN_TOOL_SOURCES);
+    });
+
+    /**
+     * Goals autonomy layer — `GoalOrchestratorService.cancelActiveRun` takes
+     * this token through `@Optional() @Inject()`. `@Global()` publishes only
+     * EXPORTED providers, so leaving it out of `exports` resolves it to
+     * `undefined` in production and the Goal loop's cancel/restart silently
+     * degrades to a DB-only cancel — the row reads `cancelled` while the
+     * Trigger.dev job keeps running and spending.
+     */
+    it('exports AGENT_RUN_CANCELLER so the Goal loop cancels the REMOTE run too', () => {
+        expect(
+            meta('providers').map((p: unknown) => (p as { provide?: unknown })?.provide),
+        ).toContain(AGENT_RUN_CANCELLER);
+        expect(meta('exports')).toContain(AGENT_RUN_CANCELLER);
     });
 
     it('binds + exports SKILL_FILE_CONTENT_READER — without it getSkillFile refuses every read', () => {
@@ -259,6 +283,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'toolGrants',
             // Judgment layer G5 — workflow graphs.
             'workflow',
+            // Inbox (operator message center) — the `ask_human` tool.
+            'inbox',
         ]);
     });
 });

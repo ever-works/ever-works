@@ -72,9 +72,8 @@ export function toWorkerStatusView(state: WorkerLoopState | null | undefined): W
 		activeJobCount: state.activeJobIds.length,
 		completed: state.completed,
 		failed: state.failed,
-		// `WorkerLoopState.throttleReason` is optional; the renderer view
-		// keeps it required-but-nullable so the status window never has to
-		// distinguish "absent" from "not throttled".
+		// `WorkerLoopState.throttleReason` is optional; the renderer-facing
+		// view models "not throttled" as an explicit null, never `undefined`.
 		throttleReason: state.throttleReason ?? null
 	};
 }

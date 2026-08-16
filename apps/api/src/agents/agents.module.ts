@@ -104,6 +104,11 @@ import {
 // `PluginUsageRepository`.
 import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { DatabaseModule } from '@ever-works/agent/database';
+// Inbox (operator message center) — InboxService backs the `ask_human`
+// domain tool source below. The agent-side InboxModule imports the
+// agent-side AgentsModule / AgentApprovalsModule / NotificationsModule
+// (never anything api-side), so no cycle is introduced.
+import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
 // ActivityLogService is injected @Optional() into AgentsController for
 // the lifecycle trail (AGENT_PAUSED / AGENT_RESUMED / run-triggered /
 // run-cancelled / task-assigned) and the GET :id/events feed. Without
@@ -179,6 +184,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         FleetModule,
         PrReviewModule,
         PolicyModule,
+        AgentInboxModule,
         // Skill files — supplies SkillFileContentReaderService for the
         // SKILL_FILE_CONTENT_READER binding below. api SkillsModule
         // imports nothing api-side beyond UploadsModule/AuthModule, so
@@ -766,6 +772,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 AgentEscalationService,
                 ToolGrantService,
                 WorkflowGraphExecutorService,
+                InboxService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -785,6 +792,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 escalationService: AgentEscalationService,
                 toolGrants: ToolGrantService,
                 workflowExecutor: WorkflowGraphExecutorService,
+                inboxService: InboxService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -868,6 +876,12 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 // `buildDomainTools`, and the tool schema has no parameter
                 // that could carry one.
                 workflow: { executor: workflowExecutor },
+                // Inbox (operator message center) — the `ask_human`
+                // blocking-question tool, available to every agent (no
+                // permission gate: asking is always safe). Only
+                // `askHuman` is carried, so the reply router and list
+                // surface are unreachable from the model.
+                inbox: { service: inboxService },
             }),
         },
         // Skill files — expose the uploads-spine reader to the agent-side
@@ -878,6 +892,14 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
     exports: [
         SKILL_FILE_CONTENT_READER,
         AGENT_HEARTBEAT_TRIGGER,
+        // Goals autonomy layer — GoalOrchestratorService cancels the Goal's
+        // in-flight iteration run and needs the SAME remote cancel this
+        // module's own `cancelRun` endpoint uses. @Global() only publishes
+        // EXPORTED providers, so an unexported token resolves to `undefined`
+        // at the @Optional() consumer and the remote half silently degrades
+        // to a DB-only cancel (the exact failure agent-run-canceller.ts's
+        // docblock was written about).
+        AGENT_RUN_CANCELLER,
         AGENT_RUN_CHAT_BACK_POSTER,
         AGENT_RUN_TASK_FINISHER,
         AGENT_PLUGIN_TOOLS_FACADE,

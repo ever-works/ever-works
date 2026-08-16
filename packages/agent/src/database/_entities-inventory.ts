@@ -68,6 +68,7 @@ import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-c
 import { Mission } from '../entities/mission.entity';
 import { Goal } from '../entities/goal.entity';
 import { GoalMetricSample } from '../entities/goal-metric-sample.entity';
+import { GoalEvent } from '../entities/goal-event.entity';
 import { MissionGoal } from '../entities/mission-goal.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { Organization } from '../entities/organization.entity';
@@ -126,6 +127,7 @@ import { InboundTriggerFire } from '../entities/inbound-trigger-fire.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
+import { InboxItem } from '../entities/inbox-item.entity';
 import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
@@ -203,6 +205,8 @@ export const ENTITIES = [
     // EntityMetadataNotFoundError → unmapped 500 on every query).
     Goal,
     GoalMetricSample,
+    // Autonomy layer — append-only orchestrator log.
+    GoalEvent,
     MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
@@ -336,6 +340,9 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Inbox (operator message center) — messages addressed to the human:
+    // blocking questions, approval requests, escalation mirrors, notices.
+    InboxItem,
     // Fleet local-runner routing — per Work / Goal / account preference
     // for local-runner vs cloud execution.
     FleetExecutionPreference,

@@ -66,6 +66,19 @@ export interface VerifyEmailDto {
     token: string;
 }
 
+/**
+ * EW-070 — body of the SIGNED-OUT verification resend.
+ *
+ * Distinct from `sendVerification()` below, which posts to the
+ * session-guarded `/auth/send-verification`. An unverified account cannot
+ * obtain a session (login answers 403), so that route is unreachable exactly
+ * when a resend is needed.
+ */
+export interface ResendVerificationDto {
+    email: string;
+    emailVerificationCallbackUrl?: string;
+}
+
 export interface ForgotPasswordDto {
     email: string;
     resetPasswordCallbackUrl?: string;
@@ -255,6 +268,20 @@ export const authAPI = {
         return serverMutation<MessageResponse>({
             endpoint: '/auth/send-verification',
             data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * EW-070 — public resend. Always resolves with the same message whether or
+     * not the address has an account here, so callers must not branch on the
+     * body: there is nothing in it to branch on.
+     */
+    resendVerification: async (data: ResendVerificationDto) => {
+        return serverMutation<MessageResponse>({
+            endpoint: '/auth/resend-verification',
+            data,
             method: 'POST',
             wrapInData: false,
         });

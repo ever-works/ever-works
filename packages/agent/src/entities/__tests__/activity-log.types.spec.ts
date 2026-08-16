@@ -118,14 +118,27 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            // +2 inbox_item_created / inbox_item_answered (Inbox operator
+            //    message center) -> 125.
             // +3 memory_folder_created / _deleted / _synced (Memory Files —
-            //    the /memory Files area folder tree) -> 126.
+            //    the /memory Files area folder tree) -> 128 after the
+            //    Inbox and Memory Files trains merged together.
             // +3 agent_collaborator_enabled / _disabled / _removed
-            //    (Agent Collaborators allow-list edits) -> 129.
+            //    (Agent Collaborators allow-list edits) -> 131 after the
+            //    Inbox train merged develop's Agent Collaborators work.
+            // +11 goal_* (Goals autonomy layer: loop lifecycle x5, iteration
+            //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 142.
             // +6 repo_connection_created / _updated / _deleted / _imported and
             //    repo_attached_to_agent / repo_detached_from_agent
-            //    (repository registry, Feature G) -> 135.
-            expect(literals).toHaveLength(135);
+            //    (repository registry, Feature G) -> 148.
+            //
+            // 🛑 148 is COUNTED from the merged enum, never added up from the
+            // comments above. Every feature branch budgets from its own base
+            // (this one said 135, develop said 142), so after a merge neither
+            // side's number is right and the arithmetic silently drifts. Scope
+            // the count to ActivityActionType — the file also declares
+            // ActivityStatus, and including it inflates the total by 5.
+            expect(literals).toHaveLength(148);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

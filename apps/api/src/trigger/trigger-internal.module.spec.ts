@@ -46,6 +46,9 @@ jest.mock('@ever-works/agent/missions', () => ({
 jest.mock('@ever-works/agent/goals', () => ({
     GoalsModule: class GoalsModule {},
     GoalEvaluationService: class GoalEvaluationService {},
+    // Autonomy layer — the controller also injects the orchestrator for the
+    // goal-advance-dispatcher cron, so the stub has to carry it too.
+    GoalOrchestratorService: class GoalOrchestratorService {},
 }));
 // Same class of breakage, different chain: work-agent.module -> database.module
 // -> database.config, which imports `@src/config`. The controller spec already

@@ -134,6 +134,35 @@
                 "link": "Cadastrar"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "Redefinir sua senha",
             "subtitle": "Digite sua nova senha abaixo",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "Falha ao redefinir senha. Tente novamente ou solicite um novo link de redefinição.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "Link de redefinição inválido",
                 "invalidLink": "Link de Redefinição Inválido",
                 "missingTokenMessage": "O link de redefinição de senha é inválido ou incompleto. Solicite uma nova redefinição de senha.",
@@ -181,7 +214,8 @@
             "form": {
                 "name": {
                     "label": "Nome completo",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Endereço de e-mail",
@@ -190,7 +224,7 @@
                 "password": {
                     "label": "Senha",
                     "placeholder": "Crie uma senha forte",
-                    "hint": "Deve ter pelo menos 8 caracteres"
+                    "hint": "Deve ter pelo menos 8 caracteres com minúscula e número/caractere especial"
                 },
                 "confirmPassword": {
                     "label": "Confirmar senha",
@@ -219,7 +253,12 @@
                 "passwordsDoNotMatch": "Senhas não coincidem",
                 "passwordTooShort": "Senha deve ter pelo menos 8 caracteres",
                 "generic": "Ocorreu um erro. Tente novamente.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -596,6 +635,64 @@
                 "bulkApproved": "{count} ações aprovadas",
                 "bulkApprovedSkipped": "{approved} ações aprovadas, {skipped} já decididas",
                 "error": "Algo deu errado. Tente novamente."
+            }
+        },
+        "inbox": {
+            "title": "Inbox",
+            "subtitle": "Questions, approvals and notices your agents and works sent you.",
+            "unreadCount": "{count} unread",
+            "unreadDot": "Unread",
+            "tabs": {
+                "active": "Active",
+                "archived": "Archived"
+            },
+            "kind": {
+                "question": "Question",
+                "approval": "Approval",
+                "escalation": "Escalation",
+                "notice": "Notice"
+            },
+            "empty": {
+                "active": "Nothing is waiting on you.",
+                "archived": "No archived messages."
+            },
+            "rowMenu": {
+                "label": "Message actions",
+                "markRead": "Mark as read",
+                "markUnread": "Mark as unread",
+                "archive": "Archive",
+                "unarchive": "Move to Active",
+                "delete": "Delete"
+            },
+            "detail": {
+                "none": "Select a message to read it.",
+                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
+                "yourReply": "Your reply",
+                "noReplyText": "No reply text was recorded."
+            },
+            "reply": {
+                "chooseOption": "Choose an answer",
+                "other": "Other (write your own)",
+                "recommended": "Recommended",
+                "placeholder": "Write your reply…",
+                "send": "Send Reply",
+                "hint": "Your reply goes straight back to the agent.",
+                "needsAnswer": "Pick an option or write a reply first."
+            },
+            "routed": {
+                "steered": "Reply delivered — the running agent picked it up.",
+                "resumed": "Reply delivered — a new run is answering it.",
+                "approved": "Approved.",
+                "rejected": "Rejected.",
+                "escalationResolved": "Escalation resolved.",
+                "alreadyDecided": "This was already decided elsewhere.",
+                "recorded": "Reply recorded."
+            },
+            "toast": {
+                "archived": "Message archived.",
+                "unarchived": "Message moved back to Active.",
+                "deleted": "Message deleted.",
+                "error": "Something went wrong. Please try again."
             }
         },
         "title": "Painel",
@@ -1380,7 +1477,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Sem Missão",
+                "missionPlaceholder": "Selecione uma Missão…",
+                "missionUpdateError": "Falha ao atualizar a Missão",
+                "ideaNone": "Sem Ideia",
+                "ideaPlaceholder": "Selecione uma Ideia…",
+                "ideaUpdateError": "Falha ao atualizar a Ideia",
+                "openWork": "Abrir este Work",
+                "openMission": "Abrir esta Missão",
+                "openIdea": "Abrir esta Ideia",
+                "openAgent": "Abrir este Agente"
             },
             "recurring": {
                 "section": "Agenda recorrente",
@@ -1399,7 +1506,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frequência",
+                "endsAt": "Termina (opcional)",
+                "maxOccurrences": "Máx. de ocorrências (opcional)",
+                "rulePreview": "Pré-visualização da regra",
+                "ruleInvalid": "inválida",
+                "cancel": "Cancelar",
+                "inactiveHint": "Esta tarefa não se repete. Promova-a a um modelo recorrente para gerar novas instâncias conforme uma agenda.",
+                "rule": "Regra",
+                "nextAt": "Próxima em",
+                "ends": "Termina",
+                "max": "Máx.",
+                "stopConfirm": "Parar a agenda recorrente? As instâncias existentes permanecem; nenhuma nova será criada.",
+                "stopError": "Não foi possível parar a agenda recorrente",
+                "saveError": "Não foi possível salvar a agenda"
             },
             "status": {
                 "backlog": "Backlog",
@@ -6355,6 +6476,15 @@
                     "total": "Total",
                     "point": "Point-in-time"
                 }
+            },
+            "viewToggle": {
+                "label": "Goal catalog view",
+                "live": "Active",
+                "archived": "Archived"
+            },
+            "emptyArchived": {
+                "title": "No archived Goals",
+                "subtitle": "Goals you archive are hidden from the catalog but keep their history, and can be restored anytime."
             }
         },
         "goalNew": {
@@ -6416,12 +6546,15 @@
                 "evaluateNow": "Evaluate now",
                 "activate": "Activate",
                 "pause": "Pause",
-                "delete": "Delete"
+                "delete": "Delete",
+                "archive": "Archive",
+                "unarchive": "Unarchive"
             },
             "sections": {
                 "progress": "Progress",
                 "details": "Details",
-                "outcome": "Outcome"
+                "outcome": "Outcome",
+                "limits": "Budget & limits"
             },
             "progress": {
                 "current": "Current",
@@ -6472,10 +6605,177 @@
                 "outcomeSaved": "Outcome updated",
                 "outcomeError": "Couldn't update the outcome.",
                 "deleted": "Goal deleted",
-                "deleteError": "Couldn't delete the Goal."
+                "deleteError": "Couldn't delete the Goal.",
+                "loopStarted": "Loop started",
+                "loopPaused": "Loop paused",
+                "loopCancelled": "Loop cancelled",
+                "advanced": "Orchestrator ran",
+                "restarted": "Session restarted",
+                "nudged": "Nudge delivered",
+                "archived": "Goal archived",
+                "unarchived": "Goal restored",
+                "loopError": "Couldn't run that loop action."
             },
             "confirm": {
-                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone.",
+                "cancelLoop": "Cancel this Goal loop? The in-flight session is cancelled too. The Goal itself and its history are kept."
+            },
+            "tabs": {
+                "label": "Goal detail sections",
+                "dod": "Definition of Done",
+                "progress": "Progress log",
+                "sessions": "Sessions",
+                "orchestrator": "Orchestrator",
+                "results": "Results"
+            },
+            "loop": {
+                "archived": "Archived",
+                "iteration": "Iteration {n}",
+                "spent": "Spent {spent} of {cap}",
+                "uncapped": "No limit",
+                "nudgeLabel": "Steer the running session",
+                "nudgePlaceholder": "Focus on the pricing page copy first…",
+                "sendNudge": "Send nudge",
+                "cancelNudge": "Cancel",
+                "statuses": {
+                    "running": "Loop running",
+                    "paused": "Loop paused",
+                    "done": "Loop done",
+                    "cancelled": "Loop cancelled",
+                    "stuck": "Loop stuck"
+                },
+                "actions": {
+                    "start": "Start loop",
+                    "advance": "Advance now",
+                    "nudge": "Nudge",
+                    "pause": "Pause loop",
+                    "restart": "Restart session",
+                    "cancel": "Cancel loop",
+                    "adjustLimits": "Adjust limits"
+                }
+            },
+            "dod": {
+                "title": "Definition of Done",
+                "hint": "The checklist that decides when this Goal is finished. The orchestrator stops the loop once every criterion is done or waived.",
+                "rollup": "{done} done · {waived} waived · {open} open",
+                "rollupProposed": "{count} awaiting approval",
+                "empty": "No criteria yet. Add the first one to tell the orchestrator what finished looks like.",
+                "add": "Add",
+                "addLabel": "New criterion",
+                "addPlaceholder": "Pricing page ships with three tiers",
+                "atCap": "This Goal has reached the maximum of {max} criteria.",
+                "approve": "Approve",
+                "approveAll": "Approve all",
+                "proposalBanner": "A planning run proposed {count} criteria. They do not count toward completion until you approve them.",
+                "markDone": "Mark done",
+                "waive": "Waive",
+                "reopen": "Reopen",
+                "remove": "Remove",
+                "confirmRemove": "Remove this criterion from the Definition of Done?",
+                "confirmWaive": "Waive it",
+                "cancel": "Cancel",
+                "waiveNotePlaceholder": "Why does this no longer apply?",
+                "awaitingApproval": "awaiting approval",
+                "evidenceLabel": "Evidence",
+                "noteLabel": "Note",
+                "statuses": {
+                    "open": "Open",
+                    "done": "Done",
+                    "waived": "Waived"
+                },
+                "bySource": {
+                    "planner": "proposed by a planning run"
+                },
+                "toasts": {
+                    "added": "Criterion added",
+                    "removed": "Criterion removed",
+                    "statusSaved": "Criterion updated",
+                    "waived": "Criterion waived",
+                    "approved": "Criteria approved",
+                    "error": "Couldn't update the Definition of Done."
+                }
+            },
+            "limits": {
+                "title": "Adjust limits",
+                "description": "Budgets and routing hints for this Goal. Leave a field empty to remove that ceiling entirely.",
+                "save": "Save limits",
+                "cancel": "Cancel",
+                "clearHint": "An empty field means \"no limit\". Changes apply to the next iteration.",
+                "spentToDate": "Spent to date",
+                "fields": {
+                    "spendCap": "Spend cap (USD)",
+                    "spendCapHelp": "Total spend across every iteration of this Goal.",
+                    "wallClock": "Wall-clock limit (hours)",
+                    "wallClockHelp": "Measured from when the loop first started.",
+                    "stuckThreshold": "Stuck after (iterations)",
+                    "stuckThresholdHelp": "Iterations with no Definition-of-Done progress before the loop stops.",
+                    "sessionBudget": "Session budget (minutes)",
+                    "sessionBudgetHelp": "Advisory runtime budget handed to the routed agent.",
+                    "gracePeriod": "Grace period (minutes)",
+                    "gracePeriodHelp": "Extra time a running session gets after the wall-clock limit, so it can land.",
+                    "executionTarget": "Execution target",
+                    "executionTargetDefault": "Platform default",
+                    "executionTargetHelp": "Advisory hint recorded on every dispatch.",
+                    "plannerModel": "Planner model hint",
+                    "plannerModelHelp": "Free text; passed through to planning runs.",
+                    "workerModel": "Worker model hint",
+                    "workerModelHelp": "Free text; passed through to iteration runs.",
+                    "assignedAgent": "Pinned agent",
+                    "assignedAgentNone": "No pin (round-robin)",
+                    "assignedAgentHelp": "Routing always picks this agent. Without a pin the router round-robins over the agents that have already worked this Goal — so a brand-new Goal needs one before the loop can start work."
+                },
+                "executionTargets": {
+                    "cloud": "Cloud",
+                    "local-runner": "Local runner"
+                },
+                "errors": {
+                    "spendCap": "Spend cap must be a non-negative amount."
+                },
+                "toasts": {
+                    "saved": "Limits saved",
+                    "error": "Couldn't save the limits."
+                }
+            },
+            "orchestrator": {
+                "empty": "No routing decisions yet",
+                "emptyHint": "Once the loop runs, every routing decision, dispatch, nudge and limit lands here with the reasoning behind it.",
+                "iteration": "iteration {n}",
+                "openTask": "Open session task",
+                "kinds": {
+                    "route": "Route",
+                    "dispatch": "Dispatch",
+                    "complete": "Complete",
+                    "limit": "Limit",
+                    "nudge": "Nudge",
+                    "control": "Control",
+                    "dod": "DoD"
+                }
+            },
+            "sessions": {
+                "empty": "No sessions yet",
+                "emptyHint": "Each loop iteration creates a session task assigned to the routed agent. They appear here.",
+                "columns": {
+                    "iteration": "Iteration",
+                    "task": "Session task",
+                    "runStatus": "Run",
+                    "started": "Started",
+                    "duration": "Duration",
+                    "cost": "Cost"
+                },
+                "runStatuses": {
+                    "queued": "Queued",
+                    "running": "Running",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                }
+            },
+            "results": {
+                "title": "Latest session summary",
+                "titleWithIteration": "Latest session summary — iteration {n}",
+                "empty": "No session summary yet",
+                "emptyHint": "The summary of the most recent finished session appears here.",
+                "cost": "Cost"
             }
         },
         "sidebar": {
@@ -6484,8 +6784,10 @@
             "newWork": "Novo Trabalho",
             "new": "Novo",
             "activityIndicator": "Trabalho gerando",
+            "inboxUnread": "{count} unread messages",
             "navigation": {
                 "dashboard": "Painel",
+                "inbox": "Inbox",
                 "activity": "Atividade",
                 "missions": "Missions",
                 "goals": "Goals",
@@ -7802,6 +8104,7 @@
             "signIn": "Entrar",
             "createAccount": "Criar Conta",
             "forgotPassword": "Esqueceu a Senha",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "Redefinir Senha",
             "authError": "Erro de Autenticação",
             "dashboard": "Painel",
@@ -7843,6 +8146,7 @@
             "unsupportedProvider": "Provedor não suportado",
             "providerConnectFailed": "Falha ao conectar provedor",
             "forgotPasswordFailed": "Falha ao enviar e-mail de redefinição de senha",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "Falha ao redefinir senha",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
@@ -7983,6 +8287,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

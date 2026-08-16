@@ -106,6 +106,7 @@ export * from './organization-onboarding-profile.entity';
 // Goals & Metrics (PR-8) — measurable targets + samples + Mission link
 export * from './goal.entity';
 export * from './goal-metric-sample.entity';
+export * from './goal-event.entity';
 export * from './mission-goal.entity';
 
 // Composio triggers (EW-684 PR-D)
@@ -134,6 +135,8 @@ export * from './ingested-event.entity';
 export * from './ingest-cursor.entity';
 // Inbound receivers — external workspace/installation → platform user binding
 export * from './ingest-install-binding.entity';
+// Inbox (operator message center) — messages addressed to the human
+export * from './inbox-item.entity';
 // Event-ingest spine — external tracker issue → platform Task mapping
 export * from './external-issue-link.entity';
 // Meetings v1 (Wave 8, feature a) — captured meetings with transcripts
