@@ -134,6 +134,35 @@
                 "link": "Sign up"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "Reset your password",
             "subtitle": "Enter your new password below",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "Failed to reset password. Please try again or request a new reset link.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "Invalid reset link",
                 "invalidLink": "Invalid Reset Link",
                 "missingTokenMessage": "The password reset link is invalid or incomplete. Please request a new password reset.",
@@ -181,7 +214,8 @@
             "form": {
                 "name": {
                     "label": "Full name",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Email address",
@@ -190,7 +224,7 @@
                 "password": {
                     "label": "Password",
                     "placeholder": "Create a strong password",
-                    "hint": "Must be at least 8 characters"
+                    "hint": "Must be at least 8 characters with lowercase and number/special character"
                 },
                 "confirmPassword": {
                     "label": "Confirm password",
@@ -219,7 +253,12 @@
                 "passwordsDoNotMatch": "Passwords do not match",
                 "passwordTooShort": "Password must be at least 8 characters",
                 "generic": "An error occurred. Please try again.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -1677,7 +1716,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "No Mission",
+                "missionPlaceholder": "Select a Mission…",
+                "missionUpdateError": "Failed to update Mission",
+                "ideaNone": "No Idea",
+                "ideaPlaceholder": "Select an Idea…",
+                "ideaUpdateError": "Failed to update Idea",
+                "openWork": "Open this Work",
+                "openMission": "Open this Mission",
+                "openIdea": "Open this Idea",
+                "openAgent": "Open this Agent"
             },
             "recurring": {
                 "section": "Recurring schedule",
@@ -1696,7 +1745,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frequency",
+                "endsAt": "Ends (optional)",
+                "maxOccurrences": "Max occurrences (optional)",
+                "rulePreview": "Rule preview",
+                "ruleInvalid": "invalid",
+                "cancel": "Cancel",
+                "inactiveHint": "This Task does not repeat. Promote it to a recurring template to spawn fresh instances on a schedule.",
+                "rule": "Rule",
+                "nextAt": "Next at",
+                "ends": "Ends",
+                "max": "Max",
+                "stopConfirm": "Stop the recurring schedule? Existing instances stay; no new ones spawn.",
+                "stopError": "Failed to stop the recurring schedule",
+                "saveError": "Failed to save the schedule"
             },
             "branch": {
                 "section": "Branch",
@@ -7793,6 +7856,7 @@
             "signIn": "Sign In",
             "createAccount": "Create Account",
             "forgotPassword": "Forgot Password",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "Reset Password",
             "authError": "Authentication Error",
             "dashboard": "Dashboard",
@@ -7834,6 +7898,7 @@
             "unsupportedProvider": "Unsupported provider",
             "providerConnectFailed": "Failed to connect provider",
             "forgotPasswordFailed": "Failed to send password reset email",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "Failed to reset password",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
@@ -7974,6 +8039,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

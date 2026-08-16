@@ -134,6 +134,35 @@
                 "link": "S'inscrire"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "Réinitialiser votre mot de passe",
             "subtitle": "Saisissez votre nouveau mot de passe ci-dessous",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "Échec de la réinitialisation du mot de passe. Veuillez réessayer ou demander un nouveau lien de réinitialisation.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "Lien de réinitialisation invalide",
                 "invalidLink": "Lien de réinitialisation invalide",
                 "missingTokenMessage": "Le lien de réinitialisation du mot de passe est invalide ou incomplet. Veuillez demander une nouvelle réinitialisation du mot de passe.",
@@ -181,7 +214,8 @@
             "form": {
                 "name": {
                     "label": "Nom complet",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Adresse e-mail",
@@ -190,7 +224,7 @@
                 "password": {
                     "label": "Mot de passe",
                     "placeholder": "Créez un mot de passe fort",
-                    "hint": "Doit comporter au moins 8 caractères"
+                    "hint": "Doit comporter au moins 8 caractères avec une minuscule et un chiffre/caractère spécial"
                 },
                 "confirmPassword": {
                     "label": "Confirmer le mot de passe",
@@ -219,7 +253,12 @@
                 "passwordsDoNotMatch": "Les mots de passe ne correspondent pas",
                 "passwordTooShort": "Le mot de passe doit comporter au moins 8 caractères",
                 "generic": "Une erreur s'est produite. Veuillez réessayer.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -1469,7 +1508,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Aucune Mission",
+                "missionPlaceholder": "Sélectionner une Mission…",
+                "missionUpdateError": "Échec de la mise à jour de la Mission",
+                "ideaNone": "Aucune Idée",
+                "ideaPlaceholder": "Sélectionner une Idée…",
+                "ideaUpdateError": "Échec de la mise à jour de l’Idée",
+                "openWork": "Ouvrir ce Work",
+                "openMission": "Ouvrir cette Mission",
+                "openIdea": "Ouvrir cette Idée",
+                "openAgent": "Ouvrir cet Agent"
             },
             "recurring": {
                 "section": "Calendrier récurrent",
@@ -1488,7 +1537,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Fréquence",
+                "endsAt": "Fin (facultatif)",
+                "maxOccurrences": "Occurrences max. (facultatif)",
+                "rulePreview": "Aperçu de la règle",
+                "ruleInvalid": "non valide",
+                "cancel": "Annuler",
+                "inactiveHint": "Cette tâche ne se répète pas. Promouvez-la en modèle récurrent pour générer de nouvelles instances selon un calendrier.",
+                "rule": "Règle",
+                "nextAt": "Prochaine le",
+                "ends": "Fin",
+                "max": "Max",
+                "stopConfirm": "Arrêter le calendrier récurrent ? Les instances existantes sont conservées ; aucune nouvelle ne sera créée.",
+                "stopError": "Impossible d'arrêter le calendrier récurrent",
+                "saveError": "Impossible d'enregistrer le calendrier"
             },
             "status": {
                 "backlog": "En attente",
@@ -7787,6 +7850,7 @@
             "signIn": "Se connecter",
             "createAccount": "Créer un compte",
             "forgotPassword": "Mot de passe oublié",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "Réinitialiser le mot de passe",
             "authError": "Erreur d'authentification",
             "dashboard": "Tableau de bord",
@@ -7828,6 +7892,7 @@
             "unsupportedProvider": "Fournisseur non pris en charge",
             "providerConnectFailed": "Échec de la connexion du fournisseur",
             "forgotPasswordFailed": "Échec de l'envoi de l'e-mail de réinitialisation du mot de passe",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
             "magicLinkFailed": "Échec de l'envoi du lien magique",
             "magicLinkInvalid": "Lien magique invalide ou expiré"
@@ -7968,6 +8033,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

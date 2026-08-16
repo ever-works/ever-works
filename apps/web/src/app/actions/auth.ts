@@ -3,12 +3,13 @@
 import { z } from 'zod';
 import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { ALLOWED_REDIRECT_URLS, ROUTES, withAppUrl } from '@/lib/constants';
-import { VALIDATION_RULES } from './validation';
+import { PASSWORD_RULES, VALIDATION_RULES } from './validation';
 import { authAPI, AuthResponse, type TermsAcceptanceClaim } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
+import { classifyResetPasswordError, resetLinkIsDead } from '@/lib/auth/reset-password-error';
 import { OAuthProvider } from '@/lib/api/enums';
 
 // Security: `isValidRedirectUrl` only validates URL *syntax* — it accepts any
@@ -193,19 +194,44 @@ export async function register(
     });
 
     const registerSchema = z.object({
+        // EW-074: this value is posted as `username`, but the ONLY place a
+        // person ever sees it is the signup field labelled "Full name" — that
+        // form has no username field at all. It used to fail with
+        // `username.minLength` ("Username must contain at least 3 characters"),
+        // naming a field the form does not have, which reads as a bug in the
+        // page rather than as something the user can act on. `name.minLength`
+        // names what is actually on screen. The rule itself is unchanged, and
+        // the form now states it beside the field and checks it before submit.
+        //
+        // The 3-character floor is the API's (`RegisterDto.username`,
+        // `@MinLength(3)` in apps/api/src/auth/dto/auth.dto.ts), and it does
+        // exclude ordinary two-character CJK names — 山田 is a real full name —
+        // in an app that ships ja/ko/zh. That is a genuine defect, but it
+        // cannot be fixed from this file: lowering the web minimum alone would
+        // only move the rejection from an instant client-side message to an
+        // opaque 400 from the API. It has to change in the DTO first (and in
+        // the `dto.spec.ts` cases that pin it), so it is deliberately left at 3
+        // here rather than split the client and the server apart.
+        //
+        // `.trim()` so the client and this schema agree on what "3 characters"
+        // means. The form checks the trimmed length — `"  ab  "` is a
+        // two-character name however it is padded — and without the same
+        // treatment here the client would be the stricter of the two, which is
+        // the exact failure mode EW-076 is about, only in the other field.
         username: z
             .string()
+            .trim()
             .min(
                 VALIDATION_RULES.USERNAME_MIN_LENGTH,
-                t('username.minLength', { length: VALIDATION_RULES.USERNAME_MIN_LENGTH }),
+                t('name.minLength', { length: VALIDATION_RULES.USERNAME_MIN_LENGTH }),
             ),
         email: z.string().email(t('email.invalid')),
         password: z
             .string()
-            .min(8, t('password.minLength', { length: 8 }))
-            .regex(/[a-z]/, t('password.lowercase'))
-            .regex(/(\d|\W)/, t('password.numberOrSpecial'))
-            .regex(/^[^.\n]/, t('password.cannotStartWith')),
+            .min(PASSWORD_RULES.MIN_LENGTH, t('password.minLength', { length: 8 }))
+            .regex(PASSWORD_RULES.LOWERCASE, t('password.lowercase'))
+            .regex(PASSWORD_RULES.NUMBER_OR_SPECIAL, t('password.numberOrSpecial'))
+            .regex(PASSWORD_RULES.NOT_STARTING_WITH_DOT_OR_NEWLINE, t('password.cannotStartWith')),
         terms: z.array(termsClaimSchema).min(1, t('terms.required')),
     });
 
@@ -313,6 +339,58 @@ export async function connectProvider(providerId: OAuthProvider) {
     }
 }
 
+// =====================
+// Email verification
+// =====================
+
+/**
+ * EW-070 — request a fresh verification email while SIGNED OUT.
+ *
+ * The authenticated sibling lives in `actions/settings.ts` and calls
+ * `getAuthFromCookie()` first, so it is useless to the people who need it
+ * most: an unverified account cannot log in (the API answers 403), which means
+ * it can never obtain the session that action requires. Combined with the two
+ * "Resend Verification Email" buttons on /auth/error being `href="/"`, a user
+ * whose verification mail was lost had no path back at all.
+ *
+ * The API answers 200 with one fixed message for every outcome — unknown
+ * address, already verified, deactivated, or genuinely mailed — so this action
+ * deliberately does NOT inspect the body. There is nothing in it to inspect,
+ * and inventing a distinction here would undo the anti-enumeration property
+ * the server is careful to hold.
+ */
+export async function requestVerificationEmail(email: string) {
+    const t = await getTranslations('validation.auth');
+
+    const emailSchema = z.string().email(t('email.invalid'));
+    const validation = emailSchema.safeParse(email);
+    if (!validation.success) {
+        return {
+            success: false,
+            error: validation.error.errors[0].message,
+        };
+    }
+
+    try {
+        await authAPI.resendVerification({
+            email: validation.data,
+            emailVerificationCallbackUrl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error(error);
+        const errorT = await getTranslations('api.errors');
+
+        // Security: return a generic translated message; never forward the raw
+        // upstream `error.message` to the client (it can leak infra detail).
+        return {
+            success: false,
+            error: errorT('resendVerificationFailed'),
+        };
+    }
+}
+
 // =================
 // Password Reset
 // =================
@@ -360,12 +438,15 @@ export async function resetPassword(token: string, newPassword: string) {
     // Validation
     const resetSchema = z.object({
         token: z.string().min(1, 'Token is required'),
+        // Same shared rules as `register` above. EW-076's underscore gap was
+        // copy-pasted into this schema too, so a password the API accepts was
+        // rejected here as well.
         password: z
             .string()
-            .min(8, t('password.minLength', { length: 8 }))
-            .regex(/[a-z]/, t('password.lowercase'))
-            .regex(/(\d|\W)/, t('password.numberOrSpecial'))
-            .regex(/^[^.\n]/, t('password.cannotStartWith')),
+            .min(PASSWORD_RULES.MIN_LENGTH, t('password.minLength', { length: 8 }))
+            .regex(PASSWORD_RULES.LOWERCASE, t('password.lowercase'))
+            .regex(PASSWORD_RULES.NUMBER_OR_SPECIAL, t('password.numberOrSpecial'))
+            .regex(PASSWORD_RULES.NOT_STARTING_WITH_DOT_OR_NEWLINE, t('password.cannotStartWith')),
     });
 
     const validation = resetSchema.safeParse({ token, password: newPassword });
@@ -383,13 +464,27 @@ export async function resetPassword(token: string, newPassword: string) {
         });
     } catch (error) {
         console.error(error);
-        const errorT = await getTranslations('api.errors');
+        const tReset = await getTranslations('auth.resetPassword.errors');
 
-        // Security: return a generic translated message; never forward the raw
-        // upstream `error.message` to the client (it can leak infra detail).
+        // EW-082: every rejection here used to collapse into one string,
+        // "Failed to reset password" — which leaves the user unable to tell
+        // "your link is dead, get a new one" apart from "the server hiccuped,
+        // press the button again". Those need opposite responses, and guessing
+        // wrong costs an already locked-out user another round trip through
+        // their inbox.
+        //
+        // Security: still no raw upstream `error.message` reaches the client —
+        // every branch returns a translated constant. The classification reads
+        // the upstream error; it never forwards it.
+        const reason = classifyResetPasswordError(error);
+
         return {
             success: false,
-            error: errorT('resetPasswordFailed'),
+            error: tReset(reason),
+            // Lets the form offer "Request a new link" for exactly the two
+            // reasons where a new link is the fix, and stay quiet otherwise.
+            reason,
+            linkIsDead: resetLinkIsDead(reason),
         };
     }
 

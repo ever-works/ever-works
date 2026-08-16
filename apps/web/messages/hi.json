@@ -134,6 +134,35 @@
                 "link": "साइन अप"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "अपना पासवर्ड रीसेट करें",
             "subtitle": "नीचे अपना नया पासवर्ड दर्ज करें",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "पासवर्ड रीसेट करने में विफल। कृपया पुनः प्रयास करें या नया रीसेट लिंक अनुरोध करें।",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "अमान्य रीसेट लिंक",
                 "invalidLink": "अमान्य रीसेट लिंक",
                 "missingTokenMessage": "पासवर्ड रीसेट लिंक अमान्य या अपूर्ण है। कृपया नया पासवर्ड रीसेट अनुरोध करें।",
@@ -181,7 +214,8 @@
             "form": {
                 "name": {
                     "label": "पूरा नाम",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "ईमेल पता",
@@ -190,7 +224,7 @@
                 "password": {
                     "label": "पासवर्ड",
                     "placeholder": "एक मजबूत पासवर्ड बनाएं",
-                    "hint": "कम से कम 8 अक्षरों का होना चाहिए"
+                    "hint": "कम से कम 8 अक्षरों का होना चाहिए जिसमें लोअरकेस और संख्या/विशेष चिह्न शामिल हो"
                 },
                 "confirmPassword": {
                     "label": "पासवर्ड确认 करें",
@@ -219,7 +253,12 @@
                 "passwordsDoNotMatch": "पासवर्ड मेल नहीं खाते",
                 "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
                 "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -1438,7 +1477,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "कोई मिशन नहीं",
+                "missionPlaceholder": "कोई मिशन चुनें…",
+                "missionUpdateError": "मिशन अपडेट करने में विफल",
+                "ideaNone": "कोई विचार नहीं",
+                "ideaPlaceholder": "कोई विचार चुनें…",
+                "ideaUpdateError": "विचार अपडेट करने में विफल",
+                "openWork": "यह Work खोलें",
+                "openMission": "यह मिशन खोलें",
+                "openIdea": "यह विचार खोलें",
+                "openAgent": "यह एजेंट खोलें"
             },
             "recurring": {
                 "section": "पुनरावर्ती अनुसूची",
@@ -1457,7 +1506,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "आवृत्ति",
+                "endsAt": "समाप्ति (वैकल्पिक)",
+                "maxOccurrences": "अधिकतम पुनरावृत्तियाँ (वैकल्पिक)",
+                "rulePreview": "नियम पूर्वावलोकन",
+                "ruleInvalid": "अमान्य",
+                "cancel": "रद्द करें",
+                "inactiveHint": "यह कार्य दोहराया नहीं जाता। इसे पुनरावर्ती टेम्पलेट में बदलें ताकि अनुसूची के अनुसार नए इंस्टेंस बनें।",
+                "rule": "नियम",
+                "nextAt": "अगला",
+                "ends": "समाप्त",
+                "max": "अधिकतम",
+                "stopConfirm": "पुनरावर्ती अनुसूची रोकें? मौजूदा इंस्टेंस बने रहेंगे; नए नहीं बनाए जाएंगे।",
+                "stopError": "पुनरावर्ती अनुसूची रोकी नहीं जा सकी",
+                "saveError": "अनुसूची सहेजी नहीं जा सकी"
             },
             "status": {
                 "backlog": "बैकलॉग",
@@ -7788,6 +7851,7 @@
             "signIn": "साइन इन करें",
             "createAccount": "खाता बनाएं",
             "forgotPassword": "पासवर्ड भूल गए",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "पासवर्ड रीसेट करें",
             "authError": "प्रमाणीकरण त्रुटि",
             "dashboard": "डैशबोर्ड",
@@ -7829,6 +7893,7 @@
             "unsupportedProvider": "असमर्थित प्रदाता",
             "providerConnectFailed": "प्रदाता से कनेक्ट करने में विफल",
             "forgotPasswordFailed": "पासवर्ड रीसेट ईमेल भेजने में विफल",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "पासवर्ड रीसेट करने में विफल",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
@@ -7969,6 +8034,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

@@ -134,6 +134,35 @@
                 "link": "Зареєструватися"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "Скинути пароль",
             "subtitle": "Введіть новий пароль нижче",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "Не вдалося скинути пароль. Спробуйте знову або запросіть нове посилання.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "Недійсне посилання скидання",
                 "invalidLink": "Недійсне посилання для скидання",
                 "missingTokenMessage": "Посилання для скидання пароля недійсне або неповне. Запросіть нове скидання пароля.",
@@ -181,7 +214,8 @@
             "form": {
                 "name": {
                     "label": "Повне ім'я",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Адреса електронної пошти",
@@ -190,7 +224,7 @@
                 "password": {
                     "label": "Пароль",
                     "placeholder": "Створіть надійний пароль",
-                    "hint": "Має бути щонайменше 8 символів"
+                    "hint": "Має бути щонайменше 8 символів з маленькою літерою та цифрою/спеціальним символом"
                 },
                 "confirmPassword": {
                     "label": "Підтвердити пароль",
@@ -219,7 +253,12 @@
                 "passwordsDoNotMatch": "Паролі не співпадають",
                 "passwordTooShort": "Пароль має бути щонайменше 8 символів",
                 "generic": "Сталася помилка. Спробуйте знову.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -1438,7 +1477,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Без місії",
+                "missionPlaceholder": "Виберіть Місію…",
+                "missionUpdateError": "Не вдалося оновити Місію",
+                "ideaNone": "Без ідеї",
+                "ideaPlaceholder": "Виберіть Ідею…",
+                "ideaUpdateError": "Не вдалося оновити Ідею",
+                "openWork": "Відкрити цей Work",
+                "openMission": "Відкрити цю Місію",
+                "openIdea": "Відкрити цю Ідею",
+                "openAgent": "Відкрити цього Агента"
             },
             "recurring": {
                 "section": "Повторюване розкладання",
@@ -1457,7 +1506,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Частота",
+                "endsAt": "Завершення (необов’язково)",
+                "maxOccurrences": "Макс. повторень (необов’язково)",
+                "rulePreview": "Попередній перегляд правила",
+                "ruleInvalid": "недійсне",
+                "cancel": "Скасувати",
+                "inactiveHint": "Це завдання не повторюється. Підвищте його до повторюваного шаблону, щоб створювати нові екземпляри за розкладом.",
+                "rule": "Правило",
+                "nextAt": "Наступне",
+                "ends": "Завершення",
+                "max": "Макс.",
+                "stopConfirm": "Зупинити повторюваний розклад? Наявні екземпляри залишаться; нові не створюватимуться.",
+                "stopError": "Не вдалося зупинити повторюваний розклад",
+                "saveError": "Не вдалося зберегти розклад"
             },
             "status": {
                 "backlog": "Чернетки",
@@ -7788,6 +7851,7 @@
             "signIn": "Увійти",
             "createAccount": "Створити обліковий запис",
             "forgotPassword": "Забули пароль?",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "Скинути пароль",
             "authError": "Помилка автентифікації",
             "dashboard": "Панель приладів",
@@ -7829,6 +7893,7 @@
             "unsupportedProvider": "Непідтримуваний постачальник",
             "providerConnectFailed": "Не вдалося підключити постачальника",
             "forgotPasswordFailed": "Не вдалося надіслати email для скидання пароля",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "Не вдалося скинути пароль",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
@@ -7969,6 +8034,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

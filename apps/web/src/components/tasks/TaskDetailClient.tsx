@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowLeft, Loader2, Pencil } from 'lucide-react';
+import { ArrowLeft, ArrowUpRight, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -35,6 +35,8 @@ import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 import { TaskDeleteButton } from './TaskDeleteButton';
 import { WorkSelect } from './WorkSelect';
 import { AgentSelect } from './AgentSelect';
+import { MissionSelect } from './MissionSelect';
+import { IdeaSelect } from './IdeaSelect';
 // Skills feature — invocation slugs. Task chat is the surface whose
 // messages run through `AgentRunService` with kind='chat', which is
 // where a leading `/<invocation-slug>` is resolved server-side; the
@@ -170,6 +172,14 @@ export function TaskDetailClient({
     const [agentId, setAgentId] = useState<string | null>(task.agentId ?? null);
     const [pendingAgent, startAgent] = useTransition();
     const [agentError, setAgentError] = useState<string | null>(null);
+    // Same `?? null` reason as `agentId`: the API omits owner columns it
+    // never set, so an unscoped Task arrives with these absent, not null.
+    const [missionId, setMissionId] = useState<string | null>(task.missionId ?? null);
+    const [pendingMission, startMission] = useTransition();
+    const [missionError, setMissionError] = useState<string | null>(null);
+    const [ideaId, setIdeaId] = useState<string | null>(task.ideaId ?? null);
+    const [pendingIdea, startIdea] = useTransition();
+    const [ideaError, setIdeaError] = useState<string | null>(null);
     const router = useRouter();
     // Re-litigation guard (memory upgrades M6). Bumped after a
     // description save so the conflict check re-runs against the new
@@ -271,18 +281,49 @@ export function TaskDetailClient({
         });
     };
 
+    // Mission and Idea are re-filed exactly like Work: one owner column
+    // each, `null` to detach. Ownership is NON-exclusive on the API side
+    // (`TASK_OWNER_KEYS`), so setting one never clears the others — which
+    // is why these are three independent rows and not one "scope" picker.
+    const handleMissionChange = (next: string) => {
+        const nextMissionId = next || null;
+        if (nextMissionId === missionId) return;
+        setMissionError(null);
+        startMission(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, { missionId: nextMissionId });
+                    setMissionId(updated.missionId ?? null);
+                    router.refresh();
+                } catch (err) {
+                    setMissionError(err instanceof Error ? err.message : t('missionUpdateError'));
+                }
+            })();
+        });
+    };
+
+    const handleIdeaChange = (next: string) => {
+        const nextIdeaId = next || null;
+        if (nextIdeaId === ideaId) return;
+        setIdeaError(null);
+        startIdea(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, { ideaId: nextIdeaId });
+                    setIdeaId(updated.ideaId ?? null);
+                    router.refresh();
+                } catch (err) {
+                    setIdeaError(err instanceof Error ? err.message : t('ideaUpdateError'));
+                }
+            })();
+        });
+    };
+
     // Statuses reachable from the current one — drives which workflow
     // buttons are clickable vs. shown disabled.
     const allowedNext = new Set(NEXT_STATUS[currentStatus] ?? []);
     const labels = task.labels ?? [];
     const priority = TASK_PRIORITY_PRESENTATION[task.priority];
-    // Work is no longer folded in here — it has its own editable row
-    // below. This stays as the read-only Mission/Idea association.
-    const scope = task.missionId
-        ? { label: t('scopeMission'), id: task.missionId }
-        : task.ideaId
-          ? { label: t('scopeIdea'), id: task.ideaId }
-          : null;
 
     return (
         <div className="max-w-screen-xl mx-auto p-6">
@@ -607,52 +648,78 @@ export function TaskDetailClient({
                                     <span className="text-xs text-text-muted">—</span>
                                 )}
                             </DetailRow>
-                            <DetailRow label={t('scopeWork')}>
-                                <div className="space-y-1">
-                                    <WorkSelect
-                                        value={workId ?? ''}
-                                        onValueChange={handleWorkChange}
-                                        disabled={pendingWork}
-                                        size="xs"
-                                        noneLabel={t('workNone')}
-                                        placeholder={t('workPlaceholder')}
-                                        testId="task-detail-work"
-                                    />
-                                    {workError && (
-                                        <p className="text-[11px] text-danger" role="alert">
-                                            {workError}
-                                        </p>
-                                    )}
-                                </div>
-                            </DetailRow>
-                            <DetailRow label={t('agent')}>
-                                <div className="space-y-1">
-                                    <AgentSelect
-                                        value={agentId ?? ''}
-                                        onValueChange={handleAgentChange}
-                                        disabled={pendingAgent}
-                                        size="xs"
-                                        noneLabel={t('agentNone')}
-                                        placeholder={t('agentPlaceholder')}
-                                        testId="task-detail-agent"
-                                    />
-                                    {agentError && (
-                                        <p className="text-[11px] text-danger" role="alert">
-                                            {agentError}
-                                        </p>
-                                    )}
-                                </div>
-                            </DetailRow>
-                            {scope && (
-                                <DetailRow label={t('scope')}>
-                                    <span className="inline-flex items-center gap-1.5 text-xs text-text-secondary">
-                                        {scope.label}
-                                        <span className="font-mono text-text-muted">
-                                            {scope.id.slice(0, 8)}…
-                                        </span>
-                                    </span>
-                                </DetailRow>
-                            )}
+                            {/* Work / Mission / Idea are the three SCOPE owners and
+                                sit together; Agent (who works it) follows. All
+                                four are independent columns — picking one never
+                                clears another. */}
+                            <AssignmentRow
+                                label={t('scopeWork')}
+                                href={workId ? ROUTES.DASHBOARD_WORK(workId) : null}
+                                openLabel={t('openWork')}
+                                error={workError}
+                                testId="task-detail-work-open"
+                            >
+                                <WorkSelect
+                                    value={workId ?? ''}
+                                    onValueChange={handleWorkChange}
+                                    disabled={pendingWork}
+                                    size="xs"
+                                    noneLabel={t('workNone')}
+                                    placeholder={t('workPlaceholder')}
+                                    testId="task-detail-work"
+                                />
+                            </AssignmentRow>
+                            <AssignmentRow
+                                label={t('scopeMission')}
+                                href={missionId ? ROUTES.DASHBOARD_MISSION(missionId) : null}
+                                openLabel={t('openMission')}
+                                error={missionError}
+                                testId="task-detail-mission-open"
+                            >
+                                <MissionSelect
+                                    value={missionId ?? ''}
+                                    onValueChange={handleMissionChange}
+                                    disabled={pendingMission}
+                                    size="xs"
+                                    noneLabel={t('missionNone')}
+                                    placeholder={t('missionPlaceholder')}
+                                    testId="task-detail-mission"
+                                />
+                            </AssignmentRow>
+                            <AssignmentRow
+                                label={t('scopeIdea')}
+                                href={ideaId ? ROUTES.DASHBOARD_IDEA(ideaId) : null}
+                                openLabel={t('openIdea')}
+                                error={ideaError}
+                                testId="task-detail-idea-open"
+                            >
+                                <IdeaSelect
+                                    value={ideaId ?? ''}
+                                    onValueChange={handleIdeaChange}
+                                    disabled={pendingIdea}
+                                    size="xs"
+                                    noneLabel={t('ideaNone')}
+                                    placeholder={t('ideaPlaceholder')}
+                                    testId="task-detail-idea"
+                                />
+                            </AssignmentRow>
+                            <AssignmentRow
+                                label={t('agent')}
+                                href={agentId ? ROUTES.DASHBOARD_AGENT(agentId) : null}
+                                openLabel={t('openAgent')}
+                                error={agentError}
+                                testId="task-detail-agent-open"
+                            >
+                                <AgentSelect
+                                    value={agentId ?? ''}
+                                    onValueChange={handleAgentChange}
+                                    disabled={pendingAgent}
+                                    size="xs"
+                                    noneLabel={t('agentNone')}
+                                    placeholder={t('agentPlaceholder')}
+                                    testId="task-detail-agent"
+                                />
+                            </AssignmentRow>
                             <DetailRow label={t('created')}>
                                 <span className="text-xs text-text-secondary">
                                     {formatDate(task.createdAt)}
@@ -685,5 +752,68 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
             <dt className="text-xs text-text-muted pt-0.5">{label}</dt>
             <dd className="min-w-0">{children}</dd>
         </div>
+    );
+}
+
+/**
+ * A Details row whose value is an ASSIGNMENT — Work, Mission, Idea or
+ * Agent. The picker changes what the Task is filed under; the arrow next
+ * to it goes and looks at the thing itself, which the picker alone can
+ * never do (it shows a name, not what that name refers to).
+ *
+ * The arrow appears only when something IS assigned: there is nothing to
+ * open otherwise, and a permanently-visible dead control in a four-row
+ * stack reads as broken rather than empty.
+ *
+ * `error` is the row's UPDATE failure. Each picker renders its own LOAD
+ * failure internally — the two are different problems (this assignment
+ * would not save vs. the list could not be fetched) and are reported
+ * separately on purpose.
+ */
+export function AssignmentRow({
+    label,
+    href,
+    openLabel,
+    error,
+    testId,
+    children,
+}: {
+    label: string;
+    href: string | null;
+    openLabel: string;
+    error: string | null;
+    testId?: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <DetailRow label={label}>
+            <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                    {/* min-w-0 so a long name truncates inside the picker
+                        instead of pushing the arrow out of the rail. */}
+                    <div className="min-w-0 flex-1">{children}</div>
+                    {href && (
+                        <Link
+                            href={href}
+                            aria-label={openLabel}
+                            title={openLabel}
+                            data-testid={testId}
+                            className="grid size-6 shrink-0 place-items-center rounded text-text-muted hover:text-text dark:hover:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                        >
+                            {/* `dir="rtl"` is set on <html> for ar/he
+                                (RTL_LOCALES), where an arrow pointing
+                                right points back INTO the text. Mirror
+                                it so "away" stays away. */}
+                            <ArrowUpRight className="size-3.5 rtl:-scale-x-100" aria-hidden />
+                        </Link>
+                    )}
+                </div>
+                {error && (
+                    <p className="text-[11px] text-danger" role="alert">
+                        {error}
+                    </p>
+                )}
+            </div>
+        </DetailRow>
     );
 }

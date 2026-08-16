@@ -10,6 +10,20 @@ export const COMPANY_OWNER_WEBSITE =
     'https://ever.works';
 
 /**
+ * Where "Contact Support" actually goes.
+ *
+ * The auth error page linked to `/support`, which has no route in this app —
+ * and unknown routes here answer HTTP 200 with a generic page rather than a
+ * 404, so the dead link looked fine to anyone checking it by status code. The
+ * one person guaranteed to click it is someone locked out of their account,
+ * for whom a page that silently goes nowhere is the end of the road.
+ *
+ * Env-overridable so a self-hosted operator can point it at their own desk.
+ */
+export const SUPPORT_EMAIL =
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL || process.env.SUPPORT_EMAIL || 'ever@ever.co';
+
+/**
  * Locales written right-to-left.
  *
  * `<html dir>` was never set, so Arabic and Hebrew rendered left-to-right —
@@ -234,6 +248,12 @@ export const ROUTES = {
     AUTH_EMAIL_CONFIRMATION: '/email-confirmation',
     AUTH_RESET_PASSWORD: '/reset-password',
     AUTH_FORGOT_PASSWORD: '/forgot-password',
+    // EW-070 — the signed-out way back in for a user whose verification email
+    // never arrived. Reached while UNAUTHENTICATED and unverifiable (login
+    // answers 403 for an unverified address), so it MUST be in PUBLIC_ROUTES.
+    // The two "Resend Verification Email" buttons on /auth/error point here;
+    // they used to point at `/`, which resent nothing.
+    AUTH_RESEND_VERIFICATION: '/resend-verification',
     // Magic-link token-landing page. Reached while still UNAUTHENTICATED
     // (the redeem happens client-side after the page renders), so it must
     // be in PUBLIC_ROUTES — otherwise the proxy auth gate bounces it to
@@ -273,6 +293,10 @@ export const PUBLIC_ROUTES = [
     ROUTES.AUTH_EMAIL_CONFIRMATION,
     ROUTES.AUTH_RESET_PASSWORD,
     ROUTES.AUTH_FORGOT_PASSWORD,
+    // EW-070 — must render for signed-out users; an unverified account cannot
+    // get a session, so gating this page would recreate the lockout it exists
+    // to break.
+    ROUTES.AUTH_RESEND_VERIFICATION,
     // Token-landing page — must render for unauthenticated users so the
     // client-side redeem can set the session cookie (mirrors the other
     // token-landing pages above).

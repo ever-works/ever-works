@@ -134,6 +134,35 @@
                 "link": "Regístrate"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "Restablece tu contraseña",
             "subtitle": "Ingresa tu nueva contraseña a continuación",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "Error al restablecer la contraseña. Inténtalo de nuevo o solicita un nuevo enlace de restablecimiento.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "Enlace de restablecimiento inválido",
                 "invalidLink": "Enlace de Restablecimiento Inválido",
                 "missingTokenMessage": "El enlace de restablecimiento de contraseña es inválido o incompleto. Solicita un nuevo restablecimiento de contraseña.",
@@ -181,7 +214,8 @@
             "form": {
                 "name": {
                     "label": "Nombre completo",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Dirección de email",
@@ -190,7 +224,7 @@
                 "password": {
                     "label": "Contraseña",
                     "placeholder": "Crea una contraseña segura",
-                    "hint": "Debe tener al menos 8 caracteres"
+                    "hint": "Debe tener al menos 8 caracteres con minúscula y número/carácter especial"
                 },
                 "confirmPassword": {
                     "label": "Confirmar contraseña",
@@ -219,7 +253,12 @@
                 "passwordsDoNotMatch": "Las contraseñas no coinciden",
                 "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
                 "generic": "Ocurrió un error. Inténtalo de nuevo.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -1469,7 +1508,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Sin Misión",
+                "missionPlaceholder": "Selecciona una Misión…",
+                "missionUpdateError": "No se pudo actualizar la Misión",
+                "ideaNone": "Sin Idea",
+                "ideaPlaceholder": "Selecciona una Idea…",
+                "ideaUpdateError": "No se pudo actualizar la Idea",
+                "openWork": "Abrir este Work",
+                "openMission": "Abrir esta Misión",
+                "openIdea": "Abrir esta Idea",
+                "openAgent": "Abrir este Agente"
             },
             "recurring": {
                 "section": "Programación recurrente",
@@ -1488,7 +1537,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frecuencia",
+                "endsAt": "Finaliza (opcional)",
+                "maxOccurrences": "Máx. repeticiones (opcional)",
+                "rulePreview": "Vista previa de la regla",
+                "ruleInvalid": "no válida",
+                "cancel": "Cancelar",
+                "inactiveHint": "Esta tarea no se repite. Promuévela a plantilla recurrente para generar nuevas instancias según una programación.",
+                "rule": "Regla",
+                "nextAt": "Siguiente el",
+                "ends": "Finaliza",
+                "max": "Máx.",
+                "stopConfirm": "¿Detener la programación recurrente? Las instancias existentes se mantienen; no se crearán nuevas.",
+                "stopError": "No se pudo detener la programación recurrente",
+                "saveError": "No se pudo guardar la programación"
             },
             "status": {
                 "backlog": "Pendiente",
@@ -7787,6 +7850,7 @@
             "signIn": "Iniciar sesión",
             "createAccount": "Crear cuenta",
             "forgotPassword": "Olvidé mi contraseña",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "Restablecer contraseña",
             "authError": "Error de autenticación",
             "dashboard": "Panel",
@@ -7828,6 +7892,7 @@
             "unsupportedProvider": "Proveedor no compatible",
             "providerConnectFailed": "Fallo al conectar proveedor",
             "forgotPasswordFailed": "Fallo al enviar correo de restablecimiento de contraseña",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "Fallo al restablecer contraseña",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
@@ -7968,6 +8033,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },
