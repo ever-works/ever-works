@@ -126,7 +126,13 @@ describe('activity-log.types', () => {
             // +3 agent_collaborator_enabled / _disabled / _removed
             //    (Agent Collaborators allow-list edits) -> 131 after the
             //    Inbox train merged develop's Agent Collaborators work.
-            expect(literals).toHaveLength(131);
+            // +11 goal_* (Goals autonomy layer: loop lifecycle x5, iteration
+            //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 142.
+            // 142 is COUNTED from the merged enum, not added up from the two
+            // sides' comments: each branch budgeted from its own base (137 and
+            // 131), so neither number is right after the merge. Scope the count
+            // to ActivityActionType — this file also declares ActivityStatus.
+            expect(literals).toHaveLength(142);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

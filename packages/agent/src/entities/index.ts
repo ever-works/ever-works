@@ -106,6 +106,7 @@ export * from './organization-onboarding-profile.entity';
 // Goals & Metrics (PR-8) — measurable targets + samples + Mission link
 export * from './goal.entity';
 export * from './goal-metric-sample.entity';
+export * from './goal-event.entity';
 export * from './mission-goal.entity';
 
 // Composio triggers (EW-684 PR-D)
