@@ -455,4 +455,3 @@ export async function getRunSessionDetailAction(
     await ensureAuth();
     return agentsAPI.getSessionDetail(runId, query);
 }
-
