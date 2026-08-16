@@ -58,7 +58,6 @@ import type {
     RunResumeResponse,
     AgentCollaboratorCandidate,
     SessionDetailQuery,
-    AgentCollaboratorCandidate,
 } from './agents.shared';
 
 export interface AgentPermissions {
