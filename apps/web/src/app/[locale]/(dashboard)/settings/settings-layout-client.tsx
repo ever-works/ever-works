@@ -11,6 +11,7 @@ import {
     Github,
     FolderGit2,
     Bot,
+    Boxes,
     Cpu,
     Plug,
     Building2,
@@ -124,6 +125,15 @@ export function SettingsLayoutClient({
                     label: t('tabs.jobRuntime'),
                     icon: Cpu,
                     href: `${baseSettingsPath}/job-runtime`,
+                },
+                // Environments sit beside Job Runtime: both describe the
+                // sandbox an Agent's work runs in — packages and networking
+                // here, dispatch mechanics there.
+                {
+                    id: 'environments',
+                    label: t('tabs.environments'),
+                    icon: Boxes,
+                    href: `${baseSettingsPath}/environments`,
                 },
                 // MCP Connections — external MCP servers agents can consume
                 // (agent-plugins spec 2.3; manual connections in v1).

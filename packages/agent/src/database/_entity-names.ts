@@ -75,6 +75,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'CreditLedgerEntry',
     'EmailConversation',
     'EmailMessage',
+    // Environments (Settings → Environments) — named, reusable runtime
+    // recipes (packages + networking) assigned per-Agent.
+    'Environment',
     // Event-ingest spine — external tracker issue → platform Task mapping
     'ExternalIssueLink',
     // Fleet local-runner routing — local-vs-cloud execution preference

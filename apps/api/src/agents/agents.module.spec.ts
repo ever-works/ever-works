@@ -38,6 +38,7 @@ jest.mock('@ever-works/agent/agents', () => ({
     AGENT_DOMAIN_TOOL_SOURCES: 'AGENT_DOMAIN_TOOL_SOURCES',
     // Agent Plugins MCP slice (T26) — the MCP tool-source seam.
     AGENT_MCP_TOOL_SOURCE: 'AGENT_MCP_TOOL_SOURCE',
+    // Skill files (#2080) — the uploads-spine content-reader seam.
     SKILL_FILE_CONTENT_READER: 'SKILL_FILE_CONTENT_READER',
 }));
 jest.mock('@ever-works/agent/mcp', () => ({

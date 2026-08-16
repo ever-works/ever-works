@@ -71,3 +71,5 @@ export * from './memory-folders.service';
 export * from './memory-files.service';
 export * from './memory-folder-sync.service';
 export * from './memory-files.module';
+// Repository registry (Feature G) — registry CRUD + agent grants + resolver.
+export * from './repo-registry.service';

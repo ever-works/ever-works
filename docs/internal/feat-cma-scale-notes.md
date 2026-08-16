@@ -192,9 +192,16 @@ budget cap on the single-session path.
 2. **Session runtime cost.** `usage.list_cost` covers model tokens; the $0.08/hour session
    runtime charge is not broken out by the API response the plugin sees, so `totalCost`
    under-reports wall-clock-heavy runs.
-3. **`runtimeEnvironment` producer.** The plugin reads the object defensively; nothing sets
-   it yet. When the Environments branch lands, verify the field name and shape against
-   `resolveNetworking()` and add an integration-level assertion.
+3. ~~**`runtimeEnvironment` producer.**~~ RESOLVED at integration. The Environments branch
+   shipped `RuntimeEnvironmentData` (`@ever-works/plugin`), whose networking fields are
+   FLAT (`networkingMode`, `allowedHosts`, `allowPackageManagers`). This plugin's local
+   `ManagedRuntimeEnvironment` guess had a NESTED `networking` object, so it never matched
+   real data and every configured Environment silently fell back to the env-var policy.
+   The local type is deleted; `resolveNetworking()` now delegates to
+   `resolveEnvironmentNetworking()` and both share `ManagedEnvironmentNetworking` as the
+   single output type (the legacy `{type:'allowlist', hosts}` variant, unverifiable against
+   the pinned SDK, is retired). Integration-level assertions live in
+   `claude-managed-agent.plugin.runtime-environment.spec.ts`.
 4. **Fan-out concurrency is not exposed on the generation form.** Variant runs use the
    default of 5; only the programmatic `runSessions()` caller can tune it.
 5. **No SSE consumption.** Sessions are still polled to idle. If the events stream gains

@@ -140,14 +140,18 @@ describe('activity-log.types', () => {
             //    (repository registry, Feature G) -> 148.
             // +5 mcp_connection_created / _updated / _deleted / _tested and
             //    mcp_binding_updated (agent-plugins MCP slice) -> 153.
+            // +4 environment_created / _updated / _published / _deleted
+            //    (Settings → Environments, via the Agent Workbench branch) -> 157.
+            //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
+            //    develop and this branch — so it is shared, not additive.
             //
-            // 🛑 153 is COUNTED from the merged enum, never added up from the
+            // 🛑 157 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
-            // (this one said 131, develop was already at 148), so after a merge
-            // neither side's number is right and the arithmetic silently drifts.
+            // (this one said 157, develop was at 153), so after a merge neither
+            // side's number is reliable and the arithmetic silently drifts.
             // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(153);
+            expect(literals).toHaveLength(157);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

@@ -129,6 +129,12 @@ export class AnthropicManagedAgentsClient {
 		/** Per-session model/system overrides (no agent version churn). */
 		agentOverrides?: { system?: string; model?: string };
 	}): Promise<ManagedAgentsSession> {
+		// Cast mirrors the `networking` precedent above: the pinned SDK's
+		// session-create params may lag the API's resource union (the
+		// `github_repository` variant, Feature G). Narrow once the SDK
+		// types catch up.
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const sessionResources: any = input.resources;
 		const hasOverrides =
 			input.agentOverrides &&
 			(input.agentOverrides.system !== undefined || input.agentOverrides.model !== undefined);
@@ -151,6 +157,8 @@ export class AnthropicManagedAgentsClient {
 				: input.agentId,
 			environment_id: input.environmentId,
 			title: input.title,
+			// `resources` is the locally-narrowed `const resources: any` declared
+			// above; this branch's `sessionResources` name does not exist here.
 			...(input.resources?.length ? { resources } : {}),
 			...(typeof input.budgetUsd === 'number' && input.budgetUsd > 0
 				? { budget: buildBudgetLimit(input.budgetUsd) }

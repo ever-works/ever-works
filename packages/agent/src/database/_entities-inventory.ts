@@ -144,10 +144,11 @@ import { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
+import { Environment } from '../entities/environment.entity';
+import { MemoryFolder } from '../entities/memory-folder.entity';
 // Repository registry (Feature G)
 import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
-import { MemoryFolder } from '../entities/memory-folder.entity';
 
 import {
     PluginEntity,
@@ -361,10 +362,13 @@ export const ENTITIES = [
     // One execution of a saved graph. The row is created `queued` by the
     // API and finished by the `workflow-run` Trigger.dev task.
     WorkflowRun,
+    // Environments (Settings → Environments) — named, reusable runtime
+    // recipes (packages + networking) assigned per-Agent.
+    Environment,
+    // Memory Files — user-defined folders organizing uploads on /memory.
+    MemoryFolder,
     // Repository registry (Feature G) — account-level repo records plus
     // the Agent → repo grant edge rows.
     RepoConnection,
     AgentRepoAttachment,
-    // Memory Files — user-defined folders organizing uploads on /memory.
-    MemoryFolder,
 ];

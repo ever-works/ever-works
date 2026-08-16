@@ -637,6 +637,64 @@
                 "error": "문제가 발생했습니다. 다시 시도해 주세요."
             }
         },
+        "inbox": {
+            "title": "Inbox",
+            "subtitle": "Questions, approvals and notices your agents and works sent you.",
+            "unreadCount": "{count} unread",
+            "unreadDot": "Unread",
+            "tabs": {
+                "active": "Active",
+                "archived": "Archived"
+            },
+            "kind": {
+                "question": "Question",
+                "approval": "Approval",
+                "escalation": "Escalation",
+                "notice": "Notice"
+            },
+            "empty": {
+                "active": "Nothing is waiting on you.",
+                "archived": "No archived messages."
+            },
+            "rowMenu": {
+                "label": "Message actions",
+                "markRead": "Mark as read",
+                "markUnread": "Mark as unread",
+                "archive": "Archive",
+                "unarchive": "Move to Active",
+                "delete": "Delete"
+            },
+            "detail": {
+                "none": "Select a message to read it.",
+                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
+                "yourReply": "Your reply",
+                "noReplyText": "No reply text was recorded."
+            },
+            "reply": {
+                "chooseOption": "Choose an answer",
+                "other": "Other (write your own)",
+                "recommended": "Recommended",
+                "placeholder": "Write your reply…",
+                "send": "Send Reply",
+                "hint": "Your reply goes straight back to the agent.",
+                "needsAnswer": "Pick an option or write a reply first."
+            },
+            "routed": {
+                "steered": "Reply delivered — the running agent picked it up.",
+                "resumed": "Reply delivered — a new run is answering it.",
+                "approved": "Approved.",
+                "rejected": "Rejected.",
+                "escalationResolved": "Escalation resolved.",
+                "alreadyDecided": "This was already decided elsewhere.",
+                "recorded": "Reply recorded."
+            },
+            "toast": {
+                "archived": "Message archived.",
+                "unarchived": "Message moved back to Active.",
+                "deleted": "Message deleted.",
+                "error": "Something went wrong. Please try again."
+            }
+        },
         "title": "대시보드",
         "connectGithub": {
             "title": "GitHub 계정 연결",
@@ -968,12 +1026,12 @@
                 "activity": "활동",
                 "instructions": "지시사항",
                 "skills": "기술",
-                "capabilities": "기능",
                 "budgets": "예산",
                 "settings": "설정",
                 "terminal": "Terminal",
+                "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "collaborators": "Collaborators"
+                "capabilities": "기능"
             },
             "newDialog": {
                 "title": "새 에이전트",
@@ -1192,6 +1250,26 @@
                 "success": "{name}이(가) 삭제되었습니다",
                 "error": "에이전트를 삭제할 수 없습니다"
             },
+            "collaborators": {
+                "title": "Collaborator Agents",
+                "description": "Select which agents this agent can spawn as collaborators for subtasks. Delegations to agents that are not enabled here are refused.",
+                "empty": "No other agents yet. Create another agent to enable it as a collaborator.",
+                "enabledCount": "{count} enabled",
+                "noTitle": "No role set",
+                "toggleFailed": "Could not update collaborator",
+                "reset": "Clear rule",
+                "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
+            },
+            "mcpServers": {
+                "title": "MCP Servers",
+                "subtitle": "Choose which MCP connections this agent can use. Tenant-wide connections are inherited unless overridden here.",
+                "activeCount": "{count} active",
+                "empty": "No MCP connections configured. Add one under Settings → Connections.",
+                "inherited": "Inherited",
+                "overridden": "Override",
+                "connectionDisabled": "Connection disabled",
+                "revert": "Revert"
+            },
             "capabilities": {
                 "title": "기능",
                 "subtitle": "이 에이전트가 할 수 있는 일 — 도구, 기술, 초기화 스크립트.",
@@ -1221,6 +1299,34 @@
                     "inherited": "상속됨",
                     "empty": "아직 연결된 기술이 없습니다."
                 },
+                "mcp": {
+                    "title": "MCP Connections",
+                    "description": "Which MCP connections this agent can use. Tenant-wide connections are inherited unless this agent overrides them.",
+                    "inherited": "Inherited from tenant",
+                    "overridden": "Override",
+                    "connectionDisabled": "Connection disabled",
+                    "revert": "Reset to inherited",
+                    "manage": "Manage MCP servers",
+                    "empty": "No MCP connections configured. Add one under Settings → Connections."
+                },
+                "repositories": {
+                    "title": "Repositories",
+                    "description": "Repositories from your registry this agent can work in. Repositories derived from a Work are managed with that Work and shown read-only here.",
+                    "source": "From {source}",
+                    "attached": "Attached",
+                    "notAttached": "Not attached",
+                    "manage": "Manage repositories",
+                    "empty": "No repositories in your registry yet.",
+                    "toggleError": "Failed to update repository attachment"
+                },
+                "environment": {
+                    "title": "Environment",
+                    "description": "The runtime recipe this agent runs in. Only published environments can be assigned.",
+                    "none": "None (default)",
+                    "manage": "Manage environments",
+                    "empty": "No published environments yet. Create one under Settings → Environments.",
+                    "saved": "Environment updated"
+                },
                 "initScript": {
                     "title": "초기화 스크립트",
                     "helper": "런타임이 지원하는 경우 세션/작업 공간이 시작될 때 실행됩니다.",
@@ -1230,26 +1336,6 @@
                     "bytes": "{used} / {max} KB",
                     "tooLong": "초기화 스크립트가 16KB를 초과합니다."
                 }
-            },
-            "mcpServers": {
-                "title": "MCP Servers",
-                "subtitle": "Choose which MCP connections this agent can use. Tenant-wide connections are inherited unless overridden here.",
-                "activeCount": "{count} active",
-                "empty": "No MCP connections configured. Add one under Settings → Connections.",
-                "inherited": "Inherited",
-                "overridden": "Override",
-                "connectionDisabled": "Connection disabled",
-                "revert": "Revert"
-            },
-            "collaborators": {
-                "title": "Collaborator Agents",
-                "description": "Select which agents this agent can spawn as collaborators for subtasks. Delegations to agents that are not enabled here are refused.",
-                "empty": "No other agents yet. Create another agent to enable it as a collaborator.",
-                "enabledCount": "{count} enabled",
-                "noTitle": "No role set",
-                "toggleFailed": "Could not update collaborator",
-                "reset": "Clear rule",
-                "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
             }
         },
         "tasksPage": {
@@ -2434,6 +2520,7 @@
                 "notifications": "Notifications",
                 "channels": "Channels",
                 "emails": "Email Addresses",
+                "environments": "Environments",
                 "connections": "Connections",
                 "repositories": "Repositories"
             },
@@ -3306,61 +3393,68 @@
                     "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
                 }
             },
-            "costs": {
-                "title": "Costs",
-                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
-                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
-                "loading": "Loading…",
-                "empty": "No spend in this window.",
-                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
-                "window": {
-                    "label": "Reporting window",
-                    "days": "{days}d"
+            "environments": {
+                "title": "Environments",
+                "subtitle": "Named, reusable runtime environments — packages and networking — you can assign to your Agents.",
+                "empty": "No environments yet. Create one to define the packages and networking your Agents run with.",
+                "editor": {
+                    "createTitle": "New environment",
+                    "editTitle": "Edit environment"
                 },
-                "tiles": {
-                    "total": "Total spend",
-                    "runs": "Agent runs",
-                    "avgPerRun": "Average per run"
+                "table": {
+                    "name": "Name",
+                    "networking": "Networking",
+                    "status": "Status",
+                    "updated": "Updated"
                 },
-                "panels": {
-                    "daily": "Spend per day, by agent",
-                    "byAgent": "By agent",
-                    "byModel": "By model",
-                    "topRuns": "Most expensive runs"
+                "status": {
+                    "draft": "Draft",
+                    "published": "Published"
                 },
-                "series": {
-                    "other": "Other agents",
-                    "unattributed": "Unattributed",
-                    "unknownAgent": "Deleted agent",
-                    "noModel": "No model"
+                "networking": {
+                    "unrestricted": "Unrestricted",
+                    "limited": "Limited ({count} hosts)"
                 },
-                "byAgent": {
-                    "colAgent": "Agent",
-                    "colCost": "Cost",
-                    "colRuns": "Runs",
-                    "colAvg": "Avg / run"
+                "networkingOption": {
+                    "unrestricted": "Unrestricted — the runtime may reach any host",
+                    "limited": "Limited — only the allowed hosts below are reachable"
                 },
-                "topRuns": {
-                    "colCost": "Cost",
-                    "colAgent": "Agent",
-                    "colTask": "Task",
-                    "colModel": "Model",
-                    "colStarted": "Started",
-                    "colStatus": "Status",
-                    "noTask": "{trigger} run",
-                    "runHint": "Run {runId}",
-                    "empty": "No runs with settled cost in this window.",
-                    "status": {
-                        "queued": "Queued",
-                        "running": "Running",
-                        "completed": "Completed",
-                        "failed": "Failed",
-                        "cancelled": "Cancelled"
-                    }
+                "fields": {
+                    "name": "Name",
+                    "description": "Description",
+                    "availableInAllProjects": "Available in all projects",
+                    "availableInAllProjectsHelper": "Offer this environment everywhere Agents are assigned environments.",
+                    "pipPackages": "Python packages (pip)",
+                    "pipPackagesHelper": "One pip requirement specifier per line, e.g. pandas>=2.0,<3.0 (a specifier may itself contain a comma).",
+                    "npmPackages": "Node packages (npm)",
+                    "npmPackagesHelper": "One npm package spec per line, e.g. @scope/pkg@^1.2.0.",
+                    "networking": "Networking",
+                    "allowedHosts": "Allowed hosts",
+                    "allowedHostsHelper": "One host per line (or comma-separated). A single leading *. wildcard is allowed, e.g. *.example.com.",
+                    "allowPackageManagers": "Allow package managers",
+                    "allowPackageManagersHelper": "Keep package-manager registries reachable even with limited networking."
                 },
-                "byModel": {
-                    "units": "{units} units",
-                    "total": "{total} across all models in this window"
+                "actions": {
+                    "new": "New environment",
+                    "edit": "Edit",
+                    "delete": "Delete",
+                    "save": "Save draft",
+                    "publish": "Publish",
+                    "savePublish": "Save & publish",
+                    "cancel": "Cancel"
+                },
+                "messages": {
+                    "nameRequired": "Give the environment a name first.",
+                    "saveSuccess": "Environment saved",
+                    "publishSuccess": "Environment published",
+                    "deleteSuccess": "Environment deleted",
+                    "error": "Something went wrong. Please try again."
+                },
+                "delete": {
+                    "title": "Delete environment",
+                    "description": "Delete \"{name}\"? Agents must be unassigned from it first — deletion is refused while any Agent still uses it.",
+                    "cancel": "Cancel",
+                    "confirm": "Delete"
                 }
             },
             "connections": {
@@ -3459,6 +3553,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6763,8 +6914,10 @@
             "newWork": "새 워크",
             "new": "새로",
             "activityIndicator": "워크 생성 중",
+            "inboxUnread": "{count} unread messages",
             "navigation": {
                 "dashboard": "대시보드",
+                "inbox": "Inbox",
                 "activity": "활동",
                 "missions": "Missions",
                 "goals": "Goals",
@@ -6778,8 +6931,7 @@
                 "templates": "템플릿",
                 "settings": "설정",
                 "teams": "팀",
-                "meetings": "Meetings",
-                "inbox": "Inbox"
+                "meetings": "Meetings"
             },
             "tooltips": {
                 "expandSidebar": "사이드바 확장",
@@ -6794,8 +6946,7 @@
                 "usageCredits": "Usage & Credits"
             },
             "signOut": "로그아웃",
-            "signingOut": "로그아웃 중...",
-            "inboxUnread": "{count} unread messages"
+            "signingOut": "로그아웃 중..."
         },
         "dangerZone": {
             "title": "위험 영역",
@@ -8017,64 +8168,6 @@
                 "minute": "{value}m ago",
                 "hour": "{value}h ago",
                 "day": "{value}d ago"
-            }
-        },
-        "inbox": {
-            "title": "Inbox",
-            "subtitle": "Questions, approvals and notices your agents and works sent you.",
-            "unreadCount": "{count} unread",
-            "unreadDot": "Unread",
-            "tabs": {
-                "active": "Active",
-                "archived": "Archived"
-            },
-            "kind": {
-                "question": "Question",
-                "approval": "Approval",
-                "escalation": "Escalation",
-                "notice": "Notice"
-            },
-            "empty": {
-                "active": "Nothing is waiting on you.",
-                "archived": "No archived messages."
-            },
-            "rowMenu": {
-                "label": "Message actions",
-                "markRead": "Mark as read",
-                "markUnread": "Mark as unread",
-                "archive": "Archive",
-                "unarchive": "Move to Active",
-                "delete": "Delete"
-            },
-            "detail": {
-                "none": "Select a message to read it.",
-                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
-                "yourReply": "Your reply",
-                "noReplyText": "No reply text was recorded."
-            },
-            "reply": {
-                "chooseOption": "Choose an answer",
-                "other": "Other (write your own)",
-                "recommended": "Recommended",
-                "placeholder": "Write your reply…",
-                "send": "Send Reply",
-                "hint": "Your reply goes straight back to the agent.",
-                "needsAnswer": "Pick an option or write a reply first."
-            },
-            "routed": {
-                "steered": "Reply delivered — the running agent picked it up.",
-                "resumed": "Reply delivered — a new run is answering it.",
-                "approved": "Approved.",
-                "rejected": "Rejected.",
-                "escalationResolved": "Escalation resolved.",
-                "alreadyDecided": "This was already decided elsewhere.",
-                "recorded": "Reply recorded."
-            },
-            "toast": {
-                "archived": "Message archived.",
-                "unarchived": "Message moved back to Active.",
-                "deleted": "Message deleted.",
-                "error": "Something went wrong. Please try again."
             }
         }
     },

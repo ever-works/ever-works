@@ -26,6 +26,7 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
         capabilities: null,
         aiProviderId: null,
         modelId: null,
+        environmentId: null,
         maxSkillContextTokens: 4000,
         status: 'draft',
         permissions: {

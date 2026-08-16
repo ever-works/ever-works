@@ -59,6 +59,7 @@ export * from './repositories/agent-collaborator.repository';
 // Agents/Skills/Tasks PR #1017 — Phase 8. Skill catalog repositories.
 export * from './repositories/skill.repository';
 export * from './repositories/skill-binding.repository';
+// Skill companion files (#2080) — per-skill uploaded file records.
 export * from './repositories/skill-file.repository';
 // Agent Plugins MCP slice — feature-owned repositories, wired by McpModule.
 export * from './repositories/mcp-server-connection.repository';
@@ -88,3 +89,6 @@ export * from './repositories/repo-connection.repository';
 export * from './repositories/agent-repo-attachment.repository';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './repositories/memory-folder.repository';
+// Repository registry (Feature G) — repo connections + agent grants.
+export * from './repositories/repo-connection.repository';
+export * from './repositories/agent-repo-attachment.repository';
