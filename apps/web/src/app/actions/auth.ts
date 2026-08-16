@@ -9,6 +9,7 @@ import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
+import { classifyResetPasswordError, resetLinkIsDead } from '@/lib/auth/reset-password-error';
 import { OAuthProvider } from '@/lib/api/enums';
 
 // Security: `isValidRedirectUrl` only validates URL *syntax* — it accepts any
@@ -338,6 +339,58 @@ export async function connectProvider(providerId: OAuthProvider) {
     }
 }
 
+// =====================
+// Email verification
+// =====================
+
+/**
+ * EW-070 — request a fresh verification email while SIGNED OUT.
+ *
+ * The authenticated sibling lives in `actions/settings.ts` and calls
+ * `getAuthFromCookie()` first, so it is useless to the people who need it
+ * most: an unverified account cannot log in (the API answers 403), which means
+ * it can never obtain the session that action requires. Combined with the two
+ * "Resend Verification Email" buttons on /auth/error being `href="/"`, a user
+ * whose verification mail was lost had no path back at all.
+ *
+ * The API answers 200 with one fixed message for every outcome — unknown
+ * address, already verified, deactivated, or genuinely mailed — so this action
+ * deliberately does NOT inspect the body. There is nothing in it to inspect,
+ * and inventing a distinction here would undo the anti-enumeration property
+ * the server is careful to hold.
+ */
+export async function requestVerificationEmail(email: string) {
+    const t = await getTranslations('validation.auth');
+
+    const emailSchema = z.string().email(t('email.invalid'));
+    const validation = emailSchema.safeParse(email);
+    if (!validation.success) {
+        return {
+            success: false,
+            error: validation.error.errors[0].message,
+        };
+    }
+
+    try {
+        await authAPI.resendVerification({
+            email: validation.data,
+            emailVerificationCallbackUrl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error(error);
+        const errorT = await getTranslations('api.errors');
+
+        // Security: return a generic translated message; never forward the raw
+        // upstream `error.message` to the client (it can leak infra detail).
+        return {
+            success: false,
+            error: errorT('resendVerificationFailed'),
+        };
+    }
+}
+
 // =================
 // Password Reset
 // =================
@@ -411,13 +464,27 @@ export async function resetPassword(token: string, newPassword: string) {
         });
     } catch (error) {
         console.error(error);
-        const errorT = await getTranslations('api.errors');
+        const tReset = await getTranslations('auth.resetPassword.errors');
 
-        // Security: return a generic translated message; never forward the raw
-        // upstream `error.message` to the client (it can leak infra detail).
+        // EW-082: every rejection here used to collapse into one string,
+        // "Failed to reset password" — which leaves the user unable to tell
+        // "your link is dead, get a new one" apart from "the server hiccuped,
+        // press the button again". Those need opposite responses, and guessing
+        // wrong costs an already locked-out user another round trip through
+        // their inbox.
+        //
+        // Security: still no raw upstream `error.message` reaches the client —
+        // every branch returns a translated constant. The classification reads
+        // the upstream error; it never forwards it.
+        const reason = classifyResetPasswordError(error);
+
         return {
             success: false,
-            error: errorT('resetPasswordFailed'),
+            error: tReset(reason),
+            // Lets the form offer "Request a new link" for exactly the two
+            // reasons where a new link is the fix, and stay quiet otherwise.
+            reason,
+            linkIsDead: resetLinkIsDead(reason),
         };
     }
 

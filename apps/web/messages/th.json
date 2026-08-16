@@ -134,6 +134,35 @@
                 "link": "สมัครสมาชิก"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "รีเซ็ตรหัสผ่านของคุณ",
             "subtitle": "ป้อนรหัสผ่านใหม่ด้านล่าง",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "ไม่สามารถรีเซ็ตรหัสผ่านได้ กรุณาลองอีกครั้งหรือขอ ลิงก์รีเซ็ตใหม่",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "ลิงก์รีเซ็ตไม่ถูกต้อง",
                 "invalidLink": "ลิงก์รีเซ็ตไม่ถูกต้อง",
                 "missingTokenMessage": "ลิงก์รีเซ็ตรหัสผ่านไม่ถูกต้องหรือไม่สมบูรณ์ กรุณาขอรีเซ็ตรหัสผ่านใหม่",
@@ -7758,6 +7791,7 @@
             "signIn": "เข้าสู่ระบบ",
             "createAccount": "สร้างบัญชี",
             "forgotPassword": "ลืมรหัสผ่าน",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "ตั้งรหัสผ่านใหม่",
             "authError": "ข้อผิดพลาดการรับรองตัวตน",
             "dashboard": "แดชบอร์ด",
@@ -7799,6 +7833,7 @@
             "unsupportedProvider": "ผู้ให้บริการที่ไม่รองรับ",
             "providerConnectFailed": "เชื่อมต่อผู้ให้บริการล้มเหลว",
             "forgotPasswordFailed": "ส่งอีเมลตั้งรหัสผ่านใหม่ล้มเหลว",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "ตั้งรหัสผ่านใหม่ล้มเหลว",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
