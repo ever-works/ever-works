@@ -1411,7 +1411,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Без мисия",
+                "missionPlaceholder": "Изберете мисия…",
+                "missionUpdateError": "Неуспешно обновяване на мисията",
+                "ideaNone": "Без идея",
+                "ideaPlaceholder": "Изберете идея…",
+                "ideaUpdateError": "Неуспешно обновяване на идеята",
+                "openWork": "Отваряне на този Work",
+                "openMission": "Отваряне на тази мисия",
+                "openIdea": "Отваряне на тази идея",
+                "openAgent": "Отваряне на този Агент"
             },
             "recurring": {
                 "section": "Повтарящ се график",
@@ -1430,7 +1440,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Честота",
+                "endsAt": "Край (по избор)",
+                "maxOccurrences": "Максимум повторения (по избор)",
+                "rulePreview": "Преглед на правилото",
+                "ruleInvalid": "невалидно",
+                "cancel": "Отказ",
+                "inactiveHint": "Тази задача не се повтаря. Повишете я до повтарящ се шаблон, за да създава нови копия по график.",
+                "rule": "Правило",
+                "nextAt": "Следващо на",
+                "ends": "Край",
+                "max": "Максимум",
+                "stopConfirm": "Да се спре ли повтарящият се график? Съществуващите копия остават; нови няма да се създават.",
+                "stopError": "Повтарящият се график не можа да бъде спрян",
+                "saveError": "Графикът не можа да бъде запазен"
             },
             "status": {
                 "backlog": "Беклог",

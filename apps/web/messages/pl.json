@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Brak Misji",
+                "missionPlaceholder": "Wybierz Misję…",
+                "missionUpdateError": "Nie udało się zaktualizować Misji",
+                "ideaNone": "Brak Pomysłu",
+                "ideaPlaceholder": "Wybierz Pomysł…",
+                "ideaUpdateError": "Nie udało się zaktualizować Pomysłu",
+                "openWork": "Otwórz ten Work",
+                "openMission": "Otwórz tę Misję",
+                "openIdea": "Otwórz ten Pomysł",
+                "openAgent": "Otwórz tego Agenta"
             },
             "recurring": {
                 "section": "Cykliczne harmonogramy",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Częstotliwość",
+                "endsAt": "Koniec (opcjonalnie)",
+                "maxOccurrences": "Maks. wystąpień (opcjonalnie)",
+                "rulePreview": "Podgląd reguły",
+                "ruleInvalid": "nieprawidłowa",
+                "cancel": "Anuluj",
+                "inactiveHint": "To zadanie się nie powtarza. Awansuj je do szablonu cyklicznego, aby tworzyć nowe wystąpienia według harmonogramu.",
+                "rule": "Reguła",
+                "nextAt": "Następne o",
+                "ends": "Koniec",
+                "max": "Maks.",
+                "stopConfirm": "Zatrzymać harmonogram cykliczny? Istniejące wystąpienia pozostaną; nowe nie będą tworzone.",
+                "stopError": "Nie udało się zatrzymać harmonogramu cyklicznego",
+                "saveError": "Nie udało się zapisać harmonogramu"
             },
             "status": {
                 "backlog": "Backlog",

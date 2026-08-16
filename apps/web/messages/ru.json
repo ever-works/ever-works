@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Без миссии",
+                "missionPlaceholder": "Выберите Миссию…",
+                "missionUpdateError": "Не удалось обновить Миссию",
+                "ideaNone": "Без идеи",
+                "ideaPlaceholder": "Выберите Идею…",
+                "ideaUpdateError": "Не удалось обновить Идею",
+                "openWork": "Открыть этот Work",
+                "openMission": "Открыть эту Миссию",
+                "openIdea": "Открыть эту Идею",
+                "openAgent": "Открыть этого Агента"
             },
             "recurring": {
                 "section": "Повторяющееся расписание",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Частота",
+                "endsAt": "Окончание (необязательно)",
+                "maxOccurrences": "Макс. повторений (необязательно)",
+                "rulePreview": "Предпросмотр правила",
+                "ruleInvalid": "недопустимо",
+                "cancel": "Отмена",
+                "inactiveHint": "Эта задача не повторяется. Повысьте её до повторяющегося шаблона, чтобы создавать новые экземпляры по расписанию.",
+                "rule": "Правило",
+                "nextAt": "Следующее",
+                "ends": "Окончание",
+                "max": "Макс.",
+                "stopConfirm": "Остановить повторяющееся расписание? Существующие экземпляры сохранятся; новые создаваться не будут.",
+                "stopError": "Не удалось остановить повторяющееся расписание",
+                "saveError": "Не удалось сохранить расписание"
             },
             "status": {
                 "backlog": "Бэклог",

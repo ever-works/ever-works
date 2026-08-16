@@ -1411,7 +1411,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "ללא משימה",
+                "missionPlaceholder": "בחר משימה…",
+                "missionUpdateError": "עדכון המשימה נכשל",
+                "ideaNone": "ללא רעיון",
+                "ideaPlaceholder": "בחר רעיון…",
+                "ideaUpdateError": "עדכון הרעיון נכשל",
+                "openWork": "פתח את ה-Work הזה",
+                "openMission": "פתח את המשימה הזו",
+                "openIdea": "פתח את הרעיון הזה",
+                "openAgent": "פתח את הסוכן הזה"
             },
             "recurring": {
                 "section": "תדירות חוזרת",
@@ -1430,7 +1440,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "תדירות",
+                "endsAt": "סיום (אופציונלי)",
+                "maxOccurrences": "מספר מופעים מרבי (אופציונלי)",
+                "rulePreview": "תצוגה מקדימה של הכלל",
+                "ruleInvalid": "לא תקין",
+                "cancel": "ביטול",
+                "inactiveHint": "משימה זו אינה חוזרת. קדם אותה לתבנית חוזרת כדי ליצור מופעים חדשים לפי לוח זמנים.",
+                "rule": "כלל",
+                "nextAt": "הבא ב־",
+                "ends": "מסתיים",
+                "max": "מרבי",
+                "stopConfirm": "לעצור את לוח הזמנים החוזר? המופעים הקיימים יישארו; לא ייווצרו חדשים.",
+                "stopError": "לא ניתן היה לעצור את לוח הזמנים החוזר",
+                "saveError": "לא ניתן היה לשמור את לוח הזמנים"
             },
             "status": {
                 "backlog": "תור המתנה",

@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "ไม่มีภารกิจ",
+                "missionPlaceholder": "เลือกภารกิจ…",
+                "missionUpdateError": "อัปเดตภารกิจไม่สำเร็จ",
+                "ideaNone": "ไม่มีความคิด",
+                "ideaPlaceholder": "เลือกความคิด…",
+                "ideaUpdateError": "อัปเดตความคิดไม่สำเร็จ",
+                "openWork": "เปิด Work นี้",
+                "openMission": "เปิดภารกิจนี้",
+                "openIdea": "เปิดความคิดนี้",
+                "openAgent": "เปิดเอเจนต์นี้"
             },
             "recurring": {
                 "section": "กำหนดการทำซ้ำ",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "ความถี่",
+                "endsAt": "สิ้นสุด (ไม่บังคับ)",
+                "maxOccurrences": "จำนวนครั้งสูงสุด (ไม่บังคับ)",
+                "rulePreview": "ตัวอย่างกฎ",
+                "ruleInvalid": "ไม่ถูกต้อง",
+                "cancel": "ยกเลิก",
+                "inactiveHint": "งานนี้ไม่ทำซ้ำ เลื่อนขั้นเป็นเทมเพลตที่ทำซ้ำเพื่อสร้างอินสแตนซ์ใหม่ตามกำหนดการ",
+                "rule": "กฎ",
+                "nextAt": "ครั้งถัดไป",
+                "ends": "สิ้นสุด",
+                "max": "สูงสุด",
+                "stopConfirm": "หยุดกำหนดการทำซ้ำหรือไม่? อินสแตนซ์ที่มีอยู่จะยังคงอยู่ และจะไม่มีการสร้างใหม่",
+                "stopError": "ไม่สามารถหยุดกำหนดการทำซ้ำได้",
+                "saveError": "ไม่สามารถบันทึกกำหนดการได้"
             },
             "status": {
                 "backlog": "งานที่รอดำเนินการ",

@@ -1411,7 +1411,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Aucune Mission",
+                "missionPlaceholder": "Sélectionner une Mission…",
+                "missionUpdateError": "Échec de la mise à jour de la Mission",
+                "ideaNone": "Aucune Idée",
+                "ideaPlaceholder": "Sélectionner une Idée…",
+                "ideaUpdateError": "Échec de la mise à jour de l’Idée",
+                "openWork": "Ouvrir ce Work",
+                "openMission": "Ouvrir cette Mission",
+                "openIdea": "Ouvrir cette Idée",
+                "openAgent": "Ouvrir cet Agent"
             },
             "recurring": {
                 "section": "Calendrier récurrent",
@@ -1430,7 +1440,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Fréquence",
+                "endsAt": "Fin (facultatif)",
+                "maxOccurrences": "Occurrences max. (facultatif)",
+                "rulePreview": "Aperçu de la règle",
+                "ruleInvalid": "non valide",
+                "cancel": "Annuler",
+                "inactiveHint": "Cette tâche ne se répète pas. Promouvez-la en modèle récurrent pour générer de nouvelles instances selon un calendrier.",
+                "rule": "Règle",
+                "nextAt": "Prochaine le",
+                "ends": "Fin",
+                "max": "Max",
+                "stopConfirm": "Arrêter le calendrier récurrent ? Les instances existantes sont conservées ; aucune nouvelle ne sera créée.",
+                "stopError": "Impossible d'arrêter le calendrier récurrent",
+                "saveError": "Impossible d'enregistrer le calendrier"
             },
             "status": {
                 "backlog": "En attente",

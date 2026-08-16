@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "कोई मिशन नहीं",
+                "missionPlaceholder": "कोई मिशन चुनें…",
+                "missionUpdateError": "मिशन अपडेट करने में विफल",
+                "ideaNone": "कोई विचार नहीं",
+                "ideaPlaceholder": "कोई विचार चुनें…",
+                "ideaUpdateError": "विचार अपडेट करने में विफल",
+                "openWork": "यह Work खोलें",
+                "openMission": "यह मिशन खोलें",
+                "openIdea": "यह विचार खोलें",
+                "openAgent": "यह एजेंट खोलें"
             },
             "recurring": {
                 "section": "पुनरावर्ती अनुसूची",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "आवृत्ति",
+                "endsAt": "समाप्ति (वैकल्पिक)",
+                "maxOccurrences": "अधिकतम पुनरावृत्तियाँ (वैकल्पिक)",
+                "rulePreview": "नियम पूर्वावलोकन",
+                "ruleInvalid": "अमान्य",
+                "cancel": "रद्द करें",
+                "inactiveHint": "यह कार्य दोहराया नहीं जाता। इसे पुनरावर्ती टेम्पलेट में बदलें ताकि अनुसूची के अनुसार नए इंस्टेंस बनें।",
+                "rule": "नियम",
+                "nextAt": "अगला",
+                "ends": "समाप्त",
+                "max": "अधिकतम",
+                "stopConfirm": "पुनरावर्ती अनुसूची रोकें? मौजूदा इंस्टेंस बने रहेंगे; नए नहीं बनाए जाएंगे।",
+                "stopError": "पुनरावर्ती अनुसूची रोकी नहीं जा सकी",
+                "saveError": "अनुसूची सहेजी नहीं जा सकी"
             },
             "status": {
                 "backlog": "बैकलॉग",

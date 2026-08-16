@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Geen Missie",
+                "missionPlaceholder": "Selecteer een Missie…",
+                "missionUpdateError": "Bijwerken van Missie mislukt",
+                "ideaNone": "Geen Idee",
+                "ideaPlaceholder": "Selecteer een Idee…",
+                "ideaUpdateError": "Bijwerken van Idee mislukt",
+                "openWork": "Dit Work openen",
+                "openMission": "Deze Missie openen",
+                "openIdea": "Dit Idee openen",
+                "openAgent": "Deze Agent openen"
             },
             "recurring": {
                 "section": "Terugkerend schema",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frequentie",
+                "endsAt": "Einde (optioneel)",
+                "maxOccurrences": "Max. herhalingen (optioneel)",
+                "rulePreview": "Voorbeeld van regel",
+                "ruleInvalid": "ongeldig",
+                "cancel": "Annuleren",
+                "inactiveHint": "Deze taak wordt niet herhaald. Promoveer haar tot een terugkerend sjabloon om volgens een schema nieuwe exemplaren aan te maken.",
+                "rule": "Regel",
+                "nextAt": "Volgende op",
+                "ends": "Eindigt",
+                "max": "Max.",
+                "stopConfirm": "Het terugkerende schema stoppen? Bestaande exemplaren blijven bestaan; er worden geen nieuwe aangemaakt.",
+                "stopError": "Het terugkerende schema kon niet worden gestopt",
+                "saveError": "Het schema kon niet worden opgeslagen"
             },
             "status": {
                 "backlog": "Backlog",

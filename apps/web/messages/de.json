@@ -1411,7 +1411,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Keine Mission",
+                "missionPlaceholder": "Mission auswählen…",
+                "missionUpdateError": "Mission konnte nicht aktualisiert werden",
+                "ideaNone": "Keine Idee",
+                "ideaPlaceholder": "Idee auswählen…",
+                "ideaUpdateError": "Idee konnte nicht aktualisiert werden",
+                "openWork": "Dieses Work öffnen",
+                "openMission": "Diese Mission öffnen",
+                "openIdea": "Diese Idee öffnen",
+                "openAgent": "Diesen Agent öffnen"
             },
             "recurring": {
                 "section": "Wiederkehrender Zeitplan",
@@ -1430,7 +1440,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Häufigkeit",
+                "endsAt": "Ende (optional)",
+                "maxOccurrences": "Max. Wiederholungen (optional)",
+                "rulePreview": "Regelvorschau",
+                "ruleInvalid": "ungültig",
+                "cancel": "Abbrechen",
+                "inactiveHint": "Diese Aufgabe wiederholt sich nicht. Stufen Sie sie zu einer wiederkehrenden Vorlage hoch, um nach Zeitplan neue Instanzen zu erzeugen.",
+                "rule": "Regel",
+                "nextAt": "Nächste am",
+                "ends": "Endet",
+                "max": "Max.",
+                "stopConfirm": "Wiederkehrenden Zeitplan beenden? Bestehende Instanzen bleiben erhalten; es werden keine neuen erzeugt.",
+                "stopError": "Wiederkehrender Zeitplan konnte nicht beendet werden",
+                "saveError": "Zeitplan konnte nicht gespeichert werden"
             },
             "status": {
                 "backlog": "Backlog",

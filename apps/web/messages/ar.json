@@ -1411,7 +1411,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "بدون مهمة",
+                "missionPlaceholder": "اختر مهمة…",
+                "missionUpdateError": "تعذّر تحديث المهمة",
+                "ideaNone": "بدون فكرة",
+                "ideaPlaceholder": "اختر فكرة…",
+                "ideaUpdateError": "تعذّر تحديث الفكرة",
+                "openWork": "فتح هذا الـ Work",
+                "openMission": "فتح هذه المهمة",
+                "openIdea": "فتح هذه الفكرة",
+                "openAgent": "فتح هذا الوكيل"
             },
             "recurring": {
                 "section": "جدول متكرر",
@@ -1430,7 +1440,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "التكرار",
+                "endsAt": "الانتهاء (اختياري)",
+                "maxOccurrences": "الحد الأقصى للتكرارات (اختياري)",
+                "rulePreview": "معاينة القاعدة",
+                "ruleInvalid": "غير صالحة",
+                "cancel": "إلغاء",
+                "inactiveHint": "هذه المهمة لا تتكرر. رقّها إلى قالب متكرر لإنشاء نسخ جديدة وفق جدول.",
+                "rule": "القاعدة",
+                "nextAt": "التالي في",
+                "ends": "ينتهي",
+                "max": "الحد الأقصى",
+                "stopConfirm": "إيقاف الجدول المتكرر؟ تبقى النسخ الحالية ولن تُنشأ نسخ جديدة.",
+                "stopError": "تعذّر إيقاف الجدول المتكرر",
+                "saveError": "تعذّر حفظ الجدول"
             },
             "status": {
                 "backlog": "قائمة الانتظار",

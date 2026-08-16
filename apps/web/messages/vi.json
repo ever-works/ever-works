@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Không có Nhiệm vụ",
+                "missionPlaceholder": "Chọn một Nhiệm vụ…",
+                "missionUpdateError": "Không thể cập nhật Nhiệm vụ",
+                "ideaNone": "Không có Ý tưởng",
+                "ideaPlaceholder": "Chọn một Ý tưởng…",
+                "ideaUpdateError": "Không thể cập nhật Ý tưởng",
+                "openWork": "Mở Work này",
+                "openMission": "Mở Nhiệm vụ này",
+                "openIdea": "Mở Ý tưởng này",
+                "openAgent": "Mở Agent này"
             },
             "recurring": {
                 "section": "Lên lịch định kỳ",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Tần suất",
+                "endsAt": "Kết thúc (tùy chọn)",
+                "maxOccurrences": "Số lần tối đa (tùy chọn)",
+                "rulePreview": "Xem trước quy tắc",
+                "ruleInvalid": "không hợp lệ",
+                "cancel": "Hủy",
+                "inactiveHint": "Nhiệm vụ này không lặp lại. Nâng cấp thành mẫu định kỳ để tạo các phiên bản mới theo lịch.",
+                "rule": "Quy tắc",
+                "nextAt": "Kế tiếp lúc",
+                "ends": "Kết thúc",
+                "max": "Tối đa",
+                "stopConfirm": "Dừng lịch định kỳ? Các phiên bản hiện có vẫn giữ nguyên; sẽ không tạo phiên bản mới.",
+                "stopError": "Không thể dừng lịch định kỳ",
+                "saveError": "Không thể lưu lịch"
             },
             "status": {
                 "backlog": "Hàng đợi",

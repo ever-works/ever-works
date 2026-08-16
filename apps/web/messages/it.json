@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Nessuna Missione",
+                "missionPlaceholder": "Seleziona una Missione…",
+                "missionUpdateError": "Impossibile aggiornare la Missione",
+                "ideaNone": "Nessuna Idea",
+                "ideaPlaceholder": "Seleziona un’Idea…",
+                "ideaUpdateError": "Impossibile aggiornare l’Idea",
+                "openWork": "Apri questo Work",
+                "openMission": "Apri questa Missione",
+                "openIdea": "Apri questa Idea",
+                "openAgent": "Apri questo Agente"
             },
             "recurring": {
                 "section": "Programma ricorrente",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frequenza",
+                "endsAt": "Fine (facoltativo)",
+                "maxOccurrences": "Occorrenze max (facoltativo)",
+                "rulePreview": "Anteprima della regola",
+                "ruleInvalid": "non valida",
+                "cancel": "Annulla",
+                "inactiveHint": "Questa attività non si ripete. Promuovila a modello ricorrente per generare nuove istanze secondo un programma.",
+                "rule": "Regola",
+                "nextAt": "Prossima il",
+                "ends": "Fine",
+                "max": "Max",
+                "stopConfirm": "Interrompere il programma ricorrente? Le istanze esistenti restano; non ne verranno create di nuove.",
+                "stopError": "Impossibile interrompere il programma ricorrente",
+                "saveError": "Impossibile salvare il programma"
             },
             "status": {
                 "backlog": "Backlog",

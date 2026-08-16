@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Без місії",
+                "missionPlaceholder": "Виберіть Місію…",
+                "missionUpdateError": "Не вдалося оновити Місію",
+                "ideaNone": "Без ідеї",
+                "ideaPlaceholder": "Виберіть Ідею…",
+                "ideaUpdateError": "Не вдалося оновити Ідею",
+                "openWork": "Відкрити цей Work",
+                "openMission": "Відкрити цю Місію",
+                "openIdea": "Відкрити цю Ідею",
+                "openAgent": "Відкрити цього Агента"
             },
             "recurring": {
                 "section": "Повторюване розкладання",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Частота",
+                "endsAt": "Завершення (необов’язково)",
+                "maxOccurrences": "Макс. повторень (необов’язково)",
+                "rulePreview": "Попередній перегляд правила",
+                "ruleInvalid": "недійсне",
+                "cancel": "Скасувати",
+                "inactiveHint": "Це завдання не повторюється. Підвищте його до повторюваного шаблону, щоб створювати нові екземпляри за розкладом.",
+                "rule": "Правило",
+                "nextAt": "Наступне",
+                "ends": "Завершення",
+                "max": "Макс.",
+                "stopConfirm": "Зупинити повторюваний розклад? Наявні екземпляри залишаться; нові не створюватимуться.",
+                "stopError": "Не вдалося зупинити повторюваний розклад",
+                "saveError": "Не вдалося зберегти розклад"
             },
             "status": {
                 "backlog": "Чернетки",

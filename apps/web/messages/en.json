@@ -1619,7 +1619,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "No Mission",
+                "missionPlaceholder": "Select a Mission…",
+                "missionUpdateError": "Failed to update Mission",
+                "ideaNone": "No Idea",
+                "ideaPlaceholder": "Select an Idea…",
+                "ideaUpdateError": "Failed to update Idea",
+                "openWork": "Open this Work",
+                "openMission": "Open this Mission",
+                "openIdea": "Open this Idea",
+                "openAgent": "Open this Agent"
             },
             "recurring": {
                 "section": "Recurring schedule",
@@ -1638,7 +1648,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frequency",
+                "endsAt": "Ends (optional)",
+                "maxOccurrences": "Max occurrences (optional)",
+                "rulePreview": "Rule preview",
+                "ruleInvalid": "invalid",
+                "cancel": "Cancel",
+                "inactiveHint": "This Task does not repeat. Promote it to a recurring template to spawn fresh instances on a schedule.",
+                "rule": "Rule",
+                "nextAt": "Next at",
+                "ends": "Ends",
+                "max": "Max",
+                "stopConfirm": "Stop the recurring schedule? Existing instances stay; no new ones spawn.",
+                "stopError": "Failed to stop the recurring schedule",
+                "saveError": "Failed to save the schedule"
             },
             "branch": {
                 "section": "Branch",

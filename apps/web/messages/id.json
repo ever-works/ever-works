@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Tanpa Misi",
+                "missionPlaceholder": "Pilih sebuah Misi…",
+                "missionUpdateError": "Gagal memperbarui Misi",
+                "ideaNone": "Tanpa Ide",
+                "ideaPlaceholder": "Pilih sebuah Ide…",
+                "ideaUpdateError": "Gagal memperbarui Ide",
+                "openWork": "Buka Work ini",
+                "openMission": "Buka Misi ini",
+                "openIdea": "Buka Ide ini",
+                "openAgent": "Buka Agen ini"
             },
             "recurring": {
                 "section": "Jadwal berulang",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frekuensi",
+                "endsAt": "Berakhir (opsional)",
+                "maxOccurrences": "Maks. kemunculan (opsional)",
+                "rulePreview": "Pratinjau aturan",
+                "ruleInvalid": "tidak valid",
+                "cancel": "Batal",
+                "inactiveHint": "Tugas ini tidak berulang. Naikkan menjadi templat berulang untuk membuat instance baru sesuai jadwal.",
+                "rule": "Aturan",
+                "nextAt": "Berikutnya pada",
+                "ends": "Berakhir",
+                "max": "Maks.",
+                "stopConfirm": "Hentikan jadwal berulang? Instance yang ada tetap ada; tidak ada yang baru dibuat.",
+                "stopError": "Gagal menghentikan jadwal berulang",
+                "saveError": "Gagal menyimpan jadwal"
             },
             "status": {
                 "backlog": "Daftar tunggu",

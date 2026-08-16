@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Sem Missão",
+                "missionPlaceholder": "Selecione uma Missão…",
+                "missionUpdateError": "Falha ao atualizar a Missão",
+                "ideaNone": "Sem Ideia",
+                "ideaPlaceholder": "Selecione uma Ideia…",
+                "ideaUpdateError": "Falha ao atualizar a Ideia",
+                "openWork": "Abrir este Work",
+                "openMission": "Abrir esta Missão",
+                "openIdea": "Abrir esta Ideia",
+                "openAgent": "Abrir este Agente"
             },
             "recurring": {
                 "section": "Agenda recorrente",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frequência",
+                "endsAt": "Termina (opcional)",
+                "maxOccurrences": "Máx. de ocorrências (opcional)",
+                "rulePreview": "Pré-visualização da regra",
+                "ruleInvalid": "inválida",
+                "cancel": "Cancelar",
+                "inactiveHint": "Esta tarefa não se repete. Promova-a a um modelo recorrente para gerar novas instâncias conforme uma agenda.",
+                "rule": "Regra",
+                "nextAt": "Próxima em",
+                "ends": "Termina",
+                "max": "Máx.",
+                "stopConfirm": "Parar a agenda recorrente? As instâncias existentes permanecem; nenhuma nova será criada.",
+                "stopError": "Não foi possível parar a agenda recorrente",
+                "saveError": "Não foi possível salvar a agenda"
             },
             "status": {
                 "backlog": "Backlog",

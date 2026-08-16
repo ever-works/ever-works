@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "ミッションなし",
+                "missionPlaceholder": "ミッションを選択…",
+                "missionUpdateError": "ミッションの更新に失敗しました",
+                "ideaNone": "アイデアなし",
+                "ideaPlaceholder": "アイデアを選択…",
+                "ideaUpdateError": "アイデアの更新に失敗しました",
+                "openWork": "この Work を開く",
+                "openMission": "このミッションを開く",
+                "openIdea": "このアイデアを開く",
+                "openAgent": "このエージェントを開く"
             },
             "recurring": {
                 "section": "定期的なスケジュール",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "頻度",
+                "endsAt": "終了（任意）",
+                "maxOccurrences": "最大実行回数（任意）",
+                "rulePreview": "ルールのプレビュー",
+                "ruleInvalid": "無効",
+                "cancel": "キャンセル",
+                "inactiveHint": "このタスクは繰り返しません。定期テンプレートに昇格すると、スケジュールに従って新しいインスタンスが作成されます。",
+                "rule": "ルール",
+                "nextAt": "次回",
+                "ends": "終了",
+                "max": "最大",
+                "stopConfirm": "繰り返しスケジュールを停止しますか？既存のインスタンスは残り、新しいものは作成されません。",
+                "stopError": "繰り返しスケジュールを停止できませんでした",
+                "saveError": "スケジュールを保存できませんでした"
             },
             "status": {
                 "backlog": "バックログ",

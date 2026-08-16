@@ -1380,7 +1380,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "임무 없음",
+                "missionPlaceholder": "임무 선택…",
+                "missionUpdateError": "임무를 업데이트하지 못했습니다",
+                "ideaNone": "아이디어 없음",
+                "ideaPlaceholder": "아이디어 선택…",
+                "ideaUpdateError": "아이디어를 업데이트하지 못했습니다",
+                "openWork": "이 Work 열기",
+                "openMission": "이 임무 열기",
+                "openIdea": "이 아이디어 열기",
+                "openAgent": "이 에이전트 열기"
             },
             "recurring": {
                 "section": "반복 일정",
@@ -1399,7 +1409,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "빈도",
+                "endsAt": "종료 (선택 사항)",
+                "maxOccurrences": "최대 반복 횟수 (선택 사항)",
+                "rulePreview": "규칙 미리보기",
+                "ruleInvalid": "유효하지 않음",
+                "cancel": "취소",
+                "inactiveHint": "이 작업은 반복되지 않습니다. 반복 템플릿으로 승격하면 일정에 따라 새 인스턴스가 생성됩니다.",
+                "rule": "규칙",
+                "nextAt": "다음 실행",
+                "ends": "종료",
+                "max": "최대",
+                "stopConfirm": "반복 일정을 중지할까요? 기존 인스턴스는 유지되며 새 인스턴스는 생성되지 않습니다.",
+                "stopError": "반복 일정을 중지하지 못했습니다",
+                "saveError": "일정을 저장하지 못했습니다"
             },
             "status": {
                 "backlog": "대기열",
