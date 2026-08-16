@@ -249,6 +249,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(provider).toBeDefined();
         expect(provider?.useExisting).toBe(McpToolSource);
         expect(meta('exports')).toContain(AGENT_MCP_TOOL_SOURCE);
+    });
+
     /**
      * Goals autonomy layer — `GoalOrchestratorService.cancelActiveRun` takes
      * this token through `@Optional() @Inject()`. `@Global()` publishes only
