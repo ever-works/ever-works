@@ -40,6 +40,8 @@ export function AgentDetailTabs({ agentId }: { agentId: string }) {
             key: 'mcp-servers',
             href: ROUTES.DASHBOARD_AGENT_MCP_SERVERS(agentId),
             label: t('mcpServers'),
+        },
+        {
             key: 'collaborators',
             href: ROUTES.DASHBOARD_AGENT_COLLABORATORS(agentId),
             label: t('collaborators'),
