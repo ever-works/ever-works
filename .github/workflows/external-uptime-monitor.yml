@@ -95,11 +95,23 @@ jobs:
           # Recorded in every alert so a future reader can tell "GitHub's egress
           # was blocked / geo-routed" apart from "our platform is down", and can
           # correlate against Cloudflare logs.
-          EGRESS_IP="$(curl -s --max-time 10 https://api.ipify.org || true)"
+          # AWS first, Cloudflare-fronted sources only as fallbacks: this field's whole job is to
+          # stay readable DURING a Cloudflare event, which is the incident class this workflow
+          # exists for. (api.ipify.org answers `Server: cloudflare` and was observed returning a
+          # 520 while this was written — exactly the moment the field matters most.)
+          EGRESS_IP="$(curl -s --max-time 10 https://checkip.amazonaws.com || true)"
           if [ -z "${EGRESS_IP}" ]; then
-            EGRESS_IP="$(curl -s --max-time 10 https://checkip.amazonaws.com | tr -d '[:space:]' || true)"
+            EGRESS_IP="$(curl -s --max-time 10 https://api.ipify.org || true)"
           fi
-          [ -z "${EGRESS_IP}" ] && EGRESS_IP="(unknown)"
+          # This value is written to $GITHUB_OUTPUT, where an embedded newline (a CDN error page, a
+          # captive portal, a truncated response) would inject extra key=value records or break the
+          # parse outright. That fails THIS step -- and because every later `if:` carries an
+          # implicit success(), the monitor would then go SILENT rather than loud, in exactly the
+          # scenario it exists for. Accept something that looks like an address, or nothing.
+          EGRESS_IP="$(printf '%s' "${EGRESS_IP}" | tr -d '[:space:]')"
+          case "${EGRESS_IP}" in
+            ''|*[!0-9a-fA-F.:]*) EGRESS_IP='(unknown)' ;;
+          esac
           echo "Runner public egress IP: ${EGRESS_IP}"
 
           # --- Targets ------------------------------------------------------
@@ -230,6 +242,32 @@ jobs:
             fi
           done
 
+          # --- Control: is the VANTAGE POINT itself healthy? -----------------
+          # All 9 targets share one apex domain, one DNS provider and one CDN, so a correlated
+          # fault at any of those -- or a degraded GitHub egress region -- produces a 9/9 red
+          # report and files an issue saying "Ever Works is unreachable". That is this monitor
+          # reproducing the very false alarm it was built to eliminate, just from the other side.
+          #
+          # 🛑 The control must NOT be Cloudflare-fronted (every target is behind Cloudflare, so a
+          # Cloudflare-wide event must not take the control down with them), and NOT GitHub-hosted
+          # (same provider as the runner, and unauthenticated api.github.com is capped at 60 req/hr
+          # per egress IP -- runners share NAT pools and it returns 403 on ordinary runs).
+          # checkip.amazonaws.com is AWS, unmetered, and answers 200 with a ~14-byte body.
+          #
+          # 🛑 It only ANNOTATES the verdict. It must never suppress it: a monitor that a control
+          # can silence is worse than no monitor at all, so the `exit 1` below stays unconditional.
+          CONTROL_URL='https://checkip.amazonaws.com'
+          CONTROL_NOTE=""
+          if [ "${OVERALL_OK}" -eq 0 ]; then
+            probe_once "${CONTROL_URL}"
+            read -r C_CODE C_DNS C_CONN C_TLS C_TTFB C_TOTAL C_SIZE <<< "${W}"
+            if [ "${CURL_RC}" -ne 0 ] || [ "${C_CODE}" != "200" ]; then
+              CONTROL_NOTE="> ⚠️ **VANTAGE POINT SUSPECT** — the unrelated control target \`${CONTROL_URL}\` ALSO failed (HTTP ${C_CODE}, curl exit ${CURL_RC}). This runner's own egress is degraded, so treat the failures above as UNCONFIRMED until a second vantage point agrees."
+            else
+              CONTROL_NOTE="> ✅ Control target \`${CONTROL_URL}\` (**not** an Ever Works service) answered HTTP 200 from this runner, so the vantage point is healthy and the failures above are real."
+            fi
+          fi
+
           # --- Build the report --------------------------------------------
           {
             if [ "${OVERALL_OK}" -eq 1 ]; then
@@ -254,6 +292,10 @@ jobs:
             echo "- Checked at: \`$(date -u '+%Y-%m-%dT%H:%M:%SZ')\` (UTC)"
             echo "- Each target was retried up to 3× spaced 15s; a surface is only reported DOWN after 3 consecutive failures."
             echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            if [ -n "${CONTROL_NOTE}" ]; then
+              echo
+              echo "${CONTROL_NOTE}"
+            fi
             echo
             echo "> **Reading this:** if these probes are GREEN while the in-cluster probes"
             echo "> (Uptime Kuma / VictoriaMetrics) are RED, the platform is fine and the fault"
@@ -296,9 +338,21 @@ jobs:
 
           # Reuse the single open alert issue. Issue spam is the #1 reason
           # monitors like this get muted, so we NEVER open a second one.
-          EXISTING="$(gh issue list --label "${ALERT_LABEL}" --state open --limit 1 \
-                        --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          #
+          # 🛑 `|| true` here would collapse "the API errored" and "there is no open alert" into
+          # the same empty string, so a transient rate-limit DURING a real incident would open a
+          # brand-new duplicate issue every 15 minutes — precisely the spam this design exists to
+          # prevent. Distinguish command failure from an empty result and fail loudly instead of
+          # guessing. (Same class of bug Greptile found on the sibling ever-gauzy PR.)
+          if ! EXISTING="$(gh issue list --label "${ALERT_LABEL}" --state open --limit 1 \
+                             --json number --jq '.[0].number // empty')"; then
+            echo "::error::Could not query existing ${ALERT_LABEL} issues. Refusing to create one, as it would likely be a duplicate."
+            exit 1
+          fi
           if [ -z "${EXISTING}" ]; then
+            # Fallback for the case where a previous run created the issue but could not label it.
+            # A search-index miss is tolerable here; a hard failure is not, because reaching this
+            # line already means the labelled lookup succeeded and found nothing.
             EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE}\" in:title" --limit 1 \
                           --json number --jq '.[0].number // empty' 2>/dev/null || true)"
           fi
@@ -310,9 +364,17 @@ jobs:
             printf '\n%s\n' "${MARK}" >> "${REPORT_PATH}"
             if ! gh issue create --title "${ALERT_TITLE}" \
                                  --label "${ALERT_LABEL}" \
+                                 --assignee evereq \
                                  --body-file "${REPORT_PATH}"; then
-              # Labels can fail on a repo where the token cannot create them.
-              gh issue create --title "${ALERT_TITLE}" --body-file "${REPORT_PATH}"
+              # Labels/assignees can fail on a repo where the token cannot set them. Retry bare so
+              # the alert still lands...
+              NEW_URL="$(gh issue create --title "${ALERT_TITLE}" --body-file "${REPORT_PATH}")"
+              echo "${NEW_URL}"
+              # ...but then try hard to attach the label anyway. Without it the primary dedup
+              # lookup above (which filters by label) misses this issue on every later run, and
+              # the only thing standing between us and a duplicate is GitHub's eventually-
+              # consistent search index.
+              gh issue edit "${NEW_URL##*/}" --add-label "${ALERT_LABEL}" >/dev/null 2>&1 || true
             fi
             exit 0
           fi
@@ -321,13 +383,22 @@ jobs:
 
           # Only add a comment when something actually changed, or once an hour.
           # Without this, a multi-hour outage produces a comment every 15 min.
-          LAST_AT="$(gh issue view "${EXISTING}" --json comments \
-                       --jq '.comments[-1].createdAt // empty' 2>/dev/null || true)"
-          LAST_BODY="$(gh issue view "${EXISTING}" --json comments \
-                         --jq '.comments[-1].body // empty' 2>/dev/null || true)"
+          #
+          # Fall back to the ISSUE BODY when there are no comments yet. On the very first repeat
+          # of an outage the comments array is empty, so `.comments[-1]` yielded nothing, the
+          # freshness guard short-circuited, and the monitor posted a redundant full report 15
+          # minutes after opening the issue — the throttle only started working from the third
+          # cycle. The fingerprint marker is written into the body at creation, so the body is
+          # simply the zeroth comment.
+          LAST_AT="$(gh issue view "${EXISTING}" --json createdAt,comments \
+                       --jq '.comments[-1].createdAt // .createdAt // empty' 2>/dev/null || true)"
+          LAST_BODY="$(gh issue view "${EXISTING}" --json body,comments \
+                         --jq '.comments[-1].body // .body // empty' 2>/dev/null || true)"
 
           SHOULD_COMMENT=1
-          if [ -n "${LAST_AT}" ] && printf '%s' "${LAST_BODY}" | grep -qF -- "${MARK}"; then
+          # No pipe in a decision: under `pipefail` a SIGPIPE'd producer can make an already-
+          # matched grep report failure, which would defeat the throttle exactly when it matters.
+          if [ -n "${LAST_AT}" ] && grep -qF -- "${MARK}" <<< "${LAST_BODY}"; then
             LAST_EPOCH="$(date -u -d "${LAST_AT}" +%s 2>/dev/null || echo 0)"
             NOW_EPOCH="$(date -u +%s)"
             AGE=$(( NOW_EPOCH - LAST_EPOCH ))
