@@ -45,7 +45,6 @@ export {
     type AgentRunTimelineEntry,
     type AgentRunTimelineEntryKind,
     type SessionDetailQuery,
-    type AgentCollaboratorCandidate,
 } from './agents.shared';
 import type {
     AgentGuardrails,
