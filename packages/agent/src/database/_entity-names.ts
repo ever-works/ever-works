@@ -49,9 +49,14 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentActionProposal',
     'AgentAttachment',
     'AgentBudget',
+    'AgentCollaborator',
     'AgentEmailAssignment',
     'AgentEscalation',
+    // Agent Plugins MCP slice — per-agent/tenant MCP server bindings.
+    'AgentMcpServerBinding',
     'AgentMembership',
+    // Repository registry (Feature G) — Agent → repo grant edge rows.
+    'AgentRepoAttachment',
     'AgentRun',
     'AgentRunLog',
     // ───────────────────────────────
@@ -75,6 +80,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'Environment',
     // Event-ingest spine — external tracker issue → platform Task mapping
     'ExternalIssueLink',
+    // Fleet local-runner routing — local-vs-cloud execution preference
+    'FleetExecutionPreference',
     // Fleet job runtime (Desktop PRD M4) — lease-able work for nodes
     'FleetJob',
     // Fleet (Wave 12, slice 1) — enrolled execution nodes w/ heartbeat
@@ -84,6 +91,10 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppUserLink',
     // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
     'InboundTrigger',
+    // Task Triggers — per-(trigger, event) fire ledger (ingest idempotency)
+    'InboundTriggerFire',
+    // Inbox (operator message center) — messages addressed to the human
+    'InboxItem',
     // Event-ingest pull path (Wave 8) — per-(user, plugin) pull cursors
     'IngestCursor',
     // Inbound receivers — workspace/installation → platform user binding
@@ -95,12 +106,17 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Invoice mirror (billing PRD §3.5) — provider invoices/receipts,
     // written only by the signature-verified webhook
     'Invoice',
+    // Agent Plugins MCP slice — manual external MCP server registry.
+    'McpServerConnection',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
+    // Memory Files — user-defined folders organizing uploads on /memory
+    'MemoryFolder',
     'Mission',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
     'GoalMetricSample',
+    'GoalEvent',
     'MissionGoal',
     'MissionAttachment',
     'MissionWork',
@@ -117,9 +133,12 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'PlanEntitlement',
     'PluginUsageEvent',
     'RefreshToken',
+    // Repository registry (Feature G) — account-level repo records.
+    'RepoConnection',
     // Skills family (PR #1019) ──
     'Skill',
     'SkillBinding',
+    'SkillFile',
     // ───────────────────────────
     'SubscriptionPlan',
     // Tasks family (PR #1019) ──
@@ -133,6 +152,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TaskRelation',
     'TaskReviewRejection',
     'TaskReviewer',
+    // Tasks upgrades — workflow templates (parent + steps).
+    'TaskTemplate',
+    'TaskTemplateStep',
     'TaskWatcher',
     // ──────────────────────────
     // Teams & Prebuilt Companies (teams-and-companies spec §2) ──

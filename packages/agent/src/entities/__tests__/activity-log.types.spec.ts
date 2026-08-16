@@ -73,6 +73,17 @@ describe('activity-log.types', () => {
             ['GIT_PUSHED', 'git_pushed'],
             ['GIT_COMMITTED', 'git_committed'],
             ['GIT_MERGED', 'git_merged'],
+            // MCP connections (agent-plugins MCP slice, plan §2.4) — manual
+            // connection lifecycle + per-agent binding changes.
+            ['MCP_CONNECTION_CREATED', 'mcp_connection_created'],
+            ['MCP_CONNECTION_UPDATED', 'mcp_connection_updated'],
+            ['MCP_CONNECTION_DELETED', 'mcp_connection_deleted'],
+            ['MCP_CONNECTION_TESTED', 'mcp_connection_tested'],
+            ['MCP_BINDING_UPDATED', 'mcp_binding_updated'],
+            // Agent Collaborators — sub-agent delegation allow-list edits.
+            ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
+            ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
+            ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -114,10 +125,33 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
-            // +4 environment_created / environment_updated /
-            //    environment_published / environment_deleted
-            //    (Settings → Environments, #2079) -> 127.
-            expect(literals).toHaveLength(127);
+            // +2 inbox_item_created / inbox_item_answered (Inbox operator
+            //    message center) -> 125.
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 128 after the
+            //    Inbox and Memory Files trains merged together.
+            // +3 agent_collaborator_enabled / _disabled / _removed
+            //    (Agent Collaborators allow-list edits) -> 131 after the
+            //    Inbox train merged develop's Agent Collaborators work.
+            // +11 goal_* (Goals autonomy layer: loop lifecycle x5, iteration
+            //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 142.
+            // +6 repo_connection_created / _updated / _deleted / _imported and
+            //    repo_attached_to_agent / repo_detached_from_agent
+            //    (repository registry, Feature G) -> 148.
+            // +5 mcp_connection_created / _updated / _deleted / _tested and
+            //    mcp_binding_updated (agent-plugins MCP slice) -> 153.
+            // +4 environment_created / _updated / _published / _deleted
+            //    (Settings → Environments, via the Agent Workbench branch) -> 157.
+            //    `memory_folder_*` arrived on BOTH routes — #2081 straight to
+            //    develop and this branch — so it is shared, not additive.
+            //
+            // 🛑 157 is COUNTED from the merged enum, never added up from the
+            // comments above. Every feature branch budgets from its own base
+            // (this one said 157, develop was at 153), so after a merge neither
+            // side's number is reliable and the arithmetic silently drifts.
+            // Scope the count to ActivityActionType — the file also declares
+            // ActivityStatus, and including it inflates the total by 5.
+            expect(literals).toHaveLength(157);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

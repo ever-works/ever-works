@@ -10,14 +10,19 @@ import { TaskChatMessage } from '../entities/task-chat-message.entity';
 import { TaskAttachment } from '../entities/task-attachment.entity';
 import { TaskWatcher } from '../entities/task-watcher.entity';
 import { TaskKbMention } from '../entities/task-kb-mention.entity';
+import { TaskTemplate } from '../entities/task-template.entity';
+import { TaskTemplateStep } from '../entities/task-template-step.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
+import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { Work } from '../entities/work.entity';
 import { Mission } from '../entities/mission.entity';
 import { Team } from '../entities/team.entity';
 import { Goal } from '../entities/goal.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
+import { TaskTemplateRepository } from '../database/repositories/task-template.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
@@ -35,6 +40,7 @@ import {
 } from '../database/repositories/task-side.repositories';
 import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
+import { TaskTemplatesService } from './task-templates.service';
 import { TaskChatService } from './task-chat.service';
 import { TaskGateRunnerService } from './task-gate-runner.service';
 import { TaskGateJudgeService } from './task-gate-judge.service';
@@ -71,6 +77,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
             TaskAttachment,
             TaskWatcher,
             TaskKbMention,
+            // Tasks upgrades — workflow templates. ALSO registered in
+            // `_entities-inventory.ts` (no autoLoadEntities in this repo).
+            TaskTemplate,
+            TaskTemplateStep,
             UserTaskCounter,
             WorkKnowledgeUpload,
             Work,
@@ -83,6 +93,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
             // entity throws EntityMetadataNotFoundError on first query.
             Team,
             Goal,
+            // Repository registry (Feature G) — TaskWorkspaceService reads
+            // the run agent's repo attachments for the advisory
+            // `attachedRepos` provision-spec field. RepoConnection itself
+            // needs no forFeature here: the relation loads through the
+            // DataSource metadata (both entities are in ENTITIES).
+            AgentRepoAttachment,
         ]),
         ActivityLogModule,
         // Phase 15 — TaskTransitionService + TaskChatService consume
@@ -102,6 +118,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ],
     providers: [
         TaskRepository,
+        AgentRepoAttachmentRepository,
         TaskAssigneeRepository,
         TaskReviewerRepository,
         TaskApproverRepository,
@@ -115,8 +132,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
         WorkKnowledgeUploadRepository,
         WorkRepository,
         WorkProposalRepository,
+        // Tasks upgrades — workflow-template store + CRUD/instantiation.
+        TaskTemplateRepository,
         TaskTransitionService,
         TasksService,
+        TaskTemplatesService,
         TaskChatService,
         TaskRecurrenceDispatcherService,
         TaskNotificationService,
@@ -160,8 +180,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
         WorkKnowledgeUploadRepository,
         WorkRepository,
         WorkProposalRepository,
+        TaskTemplateRepository,
         TaskTransitionService,
         TasksService,
+        TaskTemplatesService,
         TaskChatService,
         TaskRecurrenceDispatcherService,
         TaskNotificationService,

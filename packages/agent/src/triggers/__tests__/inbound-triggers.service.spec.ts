@@ -69,6 +69,9 @@ function makeTasks() {
             title: input.title,
         })),
         addAssignee: jest.fn(async () => ({ id: 'assignee-1' })),
+        // autoStart defaults to 'always', so a trigger with a target agent
+        // dispatches through the gated path on EVERY delivery path now.
+        runTask: jest.fn(async () => ({ taskId: 'task-1', agentId: 'agent-1' })),
     };
 }
 

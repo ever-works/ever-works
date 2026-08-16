@@ -25,6 +25,7 @@ export * from './mission-tick.task';
 export * from './idea-build-execute.task';
 // Goals & Metrics PR-8 — per-minute Goal evaluation dispatcher.
 export * from './goal-evaluate-dispatcher.task';
+export * from './goal-advance-dispatcher.task';
 export * from './agent-heartbeat-dispatcher.task';
 export * from './agent-heartbeat.task';
 export * from './agent-task-execute.task';

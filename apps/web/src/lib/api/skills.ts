@@ -18,12 +18,36 @@ export interface SkillFrontmatter {
     [key: string]: unknown;
 }
 
+export type SkillFileKind = 'script' | 'reference' | 'asset' | 'config';
+
+export interface SkillFile {
+    id: string;
+    skillId: string;
+    userId: string;
+    uploadId: string;
+    filename: string;
+    kind: SkillFileKind;
+    sizeBytes: number;
+    mime: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface InvocableSkill {
+    id: string;
+    title: string;
+    slug: string;
+    invocationSlug: string;
+    description: string;
+}
+
 export interface Skill {
     id: string;
     userId: string;
     ownerType: SkillOwnerType;
     ownerId: string;
     slug: string;
+    invocationSlug?: string | null;
     title: string;
     description: string;
     frontmatter: SkillFrontmatter;
@@ -128,6 +152,7 @@ export const skillsAPI = {
         instructionsMd: string;
         frontmatter?: SkillFrontmatter;
         slug?: string;
+        invocationSlug?: string | null;
     }) {
         return serverMutation<Skill>({
             endpoint: '/skills',
@@ -140,7 +165,15 @@ export const skillsAPI = {
     async update(
         id: string,
         body: Partial<
-            Pick<Skill, 'title' | 'description' | 'instructionsMd' | 'frontmatter' | 'version'>
+            Pick<
+                Skill,
+                | 'title'
+                | 'description'
+                | 'instructionsMd'
+                | 'frontmatter'
+                | 'version'
+                | 'invocationSlug'
+            >
         >,
     ) {
         return serverMutation<Skill>({
@@ -189,5 +222,24 @@ export const skillsAPI = {
             method: 'DELETE',
             wrapInData: false,
         });
+    },
+
+    // ── Skill files (companion files) ────────────────────────────
+
+    async listFiles(skillId: string) {
+        return serverFetch<SkillFile[]>(`/skills/${skillId}/files`, { method: 'GET' });
+    },
+
+    async deleteFile(skillId: string, fileId: string) {
+        return serverMutation<{ deleted: true }>({
+            endpoint: `/skills/${skillId}/files/${fileId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    async listInvocable() {
+        return serverFetch<{ data: InvocableSkill[] }>('/skills/invocable', { method: 'GET' });
     },
 };

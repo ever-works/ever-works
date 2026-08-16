@@ -29,7 +29,12 @@ import { CaptchaVerifierService } from '../services/captcha-verifier.service';
 import { ZeroFrictionFunnelService } from '@ever-works/agent/services';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { RegisterDto, LoginDto, UpdatePasswordDto, ClaimAccountDto } from '../dto/auth.dto';
-import { VerifyEmailDto, ForgotPasswordDto, ResetPasswordDto } from '../dto/email-verification.dto';
+import {
+    VerifyEmailDto,
+    ForgotPasswordDto,
+    ResetPasswordDto,
+    ResendVerificationDto,
+} from '../dto/email-verification.dto';
 import { RequestMagicLinkDto, RedeemMagicLinkDto } from '../dto/magic-link.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { CreateAnonymousDto } from '../dto/anonymous.dto';
@@ -552,6 +557,46 @@ export class AuthController {
     @ApiResponse({ status: 200, description: 'Verification email sent' })
     async sendVerification(@Request() req) {
         return this.authService.sendVerificationEmail(req.user.userId);
+    }
+
+    /**
+     * EW-070 — the signed-out way back in.
+     *
+     * `send-verification` above requires a session, and an unverified account
+     * cannot get one (login answers 403). Without a public counterpart, a
+     * user whose verification mail was lost is locked out permanently. This
+     * is that counterpart.
+     *
+     * The response is deliberately uninformative: identical 200 body whether
+     * the address is unknown, already verified, deactivated, or was really
+     * just mailed. See `AuthService.resendVerificationEmail` for the full
+     * property list.
+     */
+    @Public()
+    // Security: this route causes mail to be sent to an attacker-chosen
+    // address, so it needs the tightest cap in the file. Keyed on the
+    // configured `long` tier — a `default`-keyed override binds to no real
+    // throttler and is silently ignored, leaving only the loose 1000/min
+    // global cap (the same trap documented on register/forgot-password).
+    // Env-tunable so the e2e suite, which drives every spec from one source
+    // IP, can raise it — mirroring REGISTER_THROTTLE_LIMIT.
+    @Throttle({
+        long: {
+            limit: Number(process.env.RESEND_VERIFICATION_THROTTLE_LIMIT ?? 5),
+            ttl: Number(process.env.RESEND_VERIFICATION_THROTTLE_TTL_MS ?? 60_000),
+        },
+    })
+    @Post('resend-verification')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Resend verification email (public)',
+        description:
+            'Request a fresh email-verification link without being signed in. Always returns the same 200 body regardless of whether the address exists, is already verified, or was mailed.',
+    })
+    @ApiResponse({ status: 200, description: 'Verification email sent if applicable' })
+    @ApiResponse({ status: 429, description: 'Too many requests' })
+    async resendVerification(@Body() resendVerificationDto: ResendVerificationDto) {
+        return this.authService.resendVerificationEmail(resendVerificationDto);
     }
 
     @Public()

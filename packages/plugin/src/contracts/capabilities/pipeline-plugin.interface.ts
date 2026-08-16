@@ -18,6 +18,36 @@ import type { GenerationStepLog } from '@ever-works/contracts/api';
 // ============================================================================
 
 /**
+ * One seed env file carried alongside an attached repository. Contents
+ * are secrets in transit — never log them and never echo them back in
+ * results; executors write them into the session/workspace only.
+ */
+export interface AttachedRepoEnvFile {
+	readonly path: string;
+	readonly content: string;
+}
+
+/**
+ * A registry repository attached to the executing agent (repository
+ * registry, Feature G). Resolved by the orchestrator from the agent's
+ * enabled repo attachments and handed to self-managed pipeline plugins
+ * so they can mount the repo alongside the primary workspace (e.g. a
+ * Claude Managed Agents `github_repository` session resource).
+ */
+export interface AttachedRepoResource {
+	/** Registry row id, for logging/telemetry correlation. */
+	readonly repoConnectionId?: string;
+	/** Clone URL (https or ssh). Token-free — auth is resolved separately. */
+	readonly url: string;
+	/** Branch to check out; omitted → provider default. */
+	readonly branch?: string;
+	/** Directory name the repo mounts under (single path segment). */
+	readonly mountDir: string;
+	/** Seed .env files to place under the mount dir. */
+	readonly envFiles?: readonly AttachedRepoEnvFile[];
+}
+
+/**
  * Pipeline execution options
  */
 export interface PipelineExecutionOptions {
@@ -65,6 +95,15 @@ export interface PipelineExecutionOptions {
 	 * forwarded verbatim to `StepExecutionContext.runtimeEnvironment`.
 	 */
 	readonly runtimeEnvironment?: RuntimeEnvironmentData;
+	/**
+	 * Repository registry (Feature G) — repos attached to the executing
+	 * agent, resolved at dispatch. Optional carrier (same posture as
+	 * `memorySessionId`): absent on plain Work-generation runs, older
+	 * orchestrators, and agents without attachments — plugins treat
+	 * `undefined`/empty as "mount nothing extra", keeping existing
+	 * session payloads byte-identical.
+	 */
+	readonly attachedRepos?: readonly AttachedRepoResource[];
 }
 
 /**

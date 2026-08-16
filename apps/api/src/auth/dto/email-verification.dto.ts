@@ -8,6 +8,14 @@ export class VerifyEmailDto {
     token: string;
 }
 
+/**
+ * EW-070 — body of the SIGNED-OUT verification resend.
+ *
+ * The class existed since the first auth commit but nothing ever imported it:
+ * there was no public resend route, so a user whose verification mail never
+ * arrived had no way back in (login 403s, and the authenticated
+ * `POST /auth/send-verification` needs the session they cannot get).
+ */
 export class ResendVerificationDto {
     @ApiProperty({
         description: 'Email address to resend verification to',
@@ -16,6 +24,14 @@ export class ResendVerificationDto {
     @IsEmail()
     @IsNotEmpty()
     email: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Callback URL the verification link should point at. Host-validated against ALLOWED_CALLBACK_HOSTS; anything else falls back to the platform default.',
+    })
+    @IsString()
+    @IsOptional()
+    emailVerificationCallbackUrl?: string;
 }
 
 export class ForgotPasswordDto {

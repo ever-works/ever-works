@@ -544,6 +544,70 @@ export class NotificationService {
         });
     }
 
+    /**
+     * Fleet local-runner fallback — a run that PREFERRED the owner's own
+     * machine was handed to the platform runtime instead.
+     *
+     * Why this is a notification and not just a log line: the whole point
+     * of choosing a local runner is that WHERE a run executes is
+     * load-bearing (the checkout, the credentials, the GPU live there).
+     * A silent relocation is therefore not a graceful degradation, it is
+     * a changed outcome the owner has to be able to see — and the reason
+     * ("your laptop was busy" vs "you have no runner enrolled") is what
+     * tells them whether to wait, enrol another machine, or switch the
+     * Work to `local-wait`.
+     *
+     * Dedup key is per (task, reason), so a Task retried in a loop while
+     * a laptop is closed produces one notification rather than one per
+     * attempt — but a DIFFERENT reason still gets through, because
+     * "busy" becoming "offline" is news.
+     */
+    async notifyFleetRunnerFallback(args: {
+        userId: string;
+        taskId?: string | null;
+        /** Machine token: `no-runners` | `runners-offline` | `runners-busy`. */
+        reason: string;
+        /** Enrolled runners at decision time (0 when none). */
+        runnerCount: number;
+    }): Promise<void> {
+        const safeReason = this.sanitizeLabel(args.reason);
+        const detail =
+            args.reason === 'no-runners'
+                ? 'no local runner is enrolled'
+                : args.reason === 'runners-offline'
+                  ? 'your local runner is offline'
+                  : 'your local runner was busy';
+        const title = 'Local runner fallback → cloud';
+        const message =
+            `A run that preferred your local runner ran in the cloud instead because ${detail}. ` +
+            'Set the Work to "Local runner (wait for a free slot)" if it must run on your machine.';
+        const actionUrl = '/settings/fleet';
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.AGENT,
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'View fleet',
+            metadata: {
+                taskId: args.taskId ?? null,
+                reason: safeReason,
+                runnerCount: args.runnerCount,
+            },
+            deduplicationKey: `fleet_runner_fallback_${args.taskId ?? 'unknown'}_${safeReason}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'fleet_runner_fallback',
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'View fleet',
+            urgent: false,
+        });
+    }
+
     async notifyGitAuthExpired(userId: string, provider: string): Promise<void> {
         await this.create({
             userId,
@@ -661,6 +725,67 @@ export class NotificationService {
             actionUrl,
             actionLabel: 'Review memory',
             urgent: false,
+        });
+    }
+
+    /**
+     * Inbox (operator message center) — bell row + channel fanout for a
+     * freshly-created inbox item, so the message reaches the human on
+     * every channel they enabled (quiet hours / mutes are applied by the
+     * fanout listener downstream, like every other producer here).
+     *
+     * One notification per item (`inbox_item_<id>` dedup key), so a
+     * retried producer cannot ring twice. `question` items are urgent by
+     * definition: a run is parked until the reply.
+     *
+     * The action URL carries `?id=` — the inbox page reads it and opens
+     * THAT message. A bare `/inbox` link opens whatever happens to be
+     * newest, so on a busy inbox the notification about item A lands the
+     * human on item B; the deep-link plumbing exists on the page for
+     * exactly this producer.
+     */
+    async notifyInboxItem(args: {
+        userId: string;
+        itemId: string;
+        kind: 'question' | 'approval' | 'escalation' | 'notice';
+        title: string;
+        message: string;
+    }): Promise<void> {
+        const eventKeyByKind: Record<typeof args.kind, string> = {
+            question: 'inbox_question',
+            approval: 'inbox_approval_requested',
+            escalation: 'inbox_escalation',
+            notice: 'inbox_notice',
+        };
+        const urgent = args.kind === 'question';
+        // Title/body originate from agents and system producers, but an
+        // askHuman question is MODEL-authored — same sanitizer posture as
+        // every other interpolated value in this file.
+        const safeTitle = this.sanitizeLabel(args.title);
+        const safeMessage = sanitizeDescription(args.message, 500);
+        // The id is a generated uuid, but it is interpolated into a URL —
+        // encode it rather than trusting the shape of a value that reaches
+        // here through a producer input.
+        const actionUrl = `/inbox?id=${encodeURIComponent(args.itemId)}`;
+        await this.create({
+            userId: args.userId,
+            type: urgent ? NotificationType.WARNING : NotificationType.INFO,
+            category: NotificationCategory.AGENT,
+            title: safeTitle,
+            message: safeMessage,
+            actionUrl,
+            actionLabel: 'Open inbox',
+            metadata: { inboxItemId: args.itemId, kind: args.kind },
+            deduplicationKey: `inbox_item_${args.itemId}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: eventKeyByKind[args.kind],
+            title: safeTitle,
+            message: safeMessage,
+            actionUrl,
+            actionLabel: 'Open inbox',
+            urgent,
         });
     }
 

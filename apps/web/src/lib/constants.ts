@@ -10,6 +10,20 @@ export const COMPANY_OWNER_WEBSITE =
     'https://ever.works';
 
 /**
+ * Where "Contact Support" actually goes.
+ *
+ * The auth error page linked to `/support`, which has no route in this app —
+ * and unknown routes here answer HTTP 200 with a generic page rather than a
+ * 404, so the dead link looked fine to anyone checking it by status code. The
+ * one person guaranteed to click it is someone locked out of their account,
+ * for whom a page that silently goes nowhere is the end of the road.
+ *
+ * Env-overridable so a self-hosted operator can point it at their own desk.
+ */
+export const SUPPORT_EMAIL =
+    process.env.NEXT_PUBLIC_SUPPORT_EMAIL || process.env.SUPPORT_EMAIL || 'ever@ever.co';
+
+/**
  * Locales written right-to-left.
  *
  * `<html dir>` was never set, so Arabic and Hebrew rendered left-to-right —
@@ -94,6 +108,11 @@ export const ROUTES = {
     // Dashboard routes (these are under (dashboard) route group)
     DASHBOARD: '/',
     DASHBOARD_ACTIVITY: '/activity',
+    // Inbox (operator message center) — messages addressed to the human:
+    // blocking agent questions, approval requests, escalations, notices.
+    // `?view=archived` switches tabs; `?id=` deep-links one message (the
+    // target of every inbox notification's "Open inbox" action).
+    DASHBOARD_INBOX: '/inbox',
     // Phase 6.5 PR CC2 — unified "+ New" page. Single entry point for
     // creating Missions, Ideas, and Works of every flavor (Website,
     // Landing Page, Blog, Directory, Awesome Repo). Phase 6.5 PR DD
@@ -155,6 +174,8 @@ export const ROUTES = {
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
     DASHBOARD_AGENTS: '/agents',
     DASHBOARD_AGENT_SESSIONS: '/agents/sessions',
+    // Session detail (Feature K) — drill-in for one run.
+    DASHBOARD_AGENT_SESSION: (runId: string) => `/agents/sessions/${runId}`,
     DASHBOARD_AGENTS_ARCHIVED: '/agents/archived',
     DASHBOARD_AGENT_NEW: '/agents/new',
     DASHBOARD_AGENT: (id: string) => `/agents/${id}`,
@@ -163,6 +184,10 @@ export const ROUTES = {
     DASHBOARD_AGENT_TERMINAL: (id: string) => `/agents/${id}/terminal`,
     DASHBOARD_AGENT_INSTRUCTIONS: (id: string) => `/agents/${id}/instructions`,
     DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
+    DASHBOARD_AGENT_MCP_SERVERS: (id: string) => `/agents/${id}/mcp-servers`,
+    // Capabilities tab — unified tools / skills / init-script surface.
+    DASHBOARD_AGENT_CAPABILITIES: (id: string) => `/agents/${id}/capabilities`,
+    DASHBOARD_AGENT_COLLABORATORS: (id: string) => `/agents/${id}/collaborators`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
@@ -176,6 +201,8 @@ export const ROUTES = {
     // Tasks
     DASHBOARD_TASKS: '/tasks',
     DASHBOARD_TASK_NEW: '/tasks/new',
+    DASHBOARD_TASK_TRIGGERS: '/tasks/triggers',
+    DASHBOARD_TASK_TRIGGER: (id: string) => `/tasks/triggers/${id}`,
     DASHBOARD_TASK: (id: string) => `/tasks/${id}`,
     // Phase 18.6 — Tasks templates browser (ADR-010 scaffold).
     DASHBOARD_TASK_TEMPLATES: '/tasks/templates',
@@ -193,13 +220,25 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
     DASHBOARD_SETTINGS_DATA: '/settings/data',
     DASHBOARD_SETTINGS_GITHUB_APP: '/settings/github-app',
+    // Repository registry (Feature G) — Settings → Repositories.
+    DASHBOARD_SETTINGS_REPOSITORIES: '/settings/repositories',
+    // Environments (Settings → Environments) — named runtime recipes
+    // assigned per-Agent. The page has existed since the Environments
+    // feature landed; it simply had no route constant.
+    DASHBOARD_SETTINGS_ENVIRONMENTS: '/settings/environments',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
+    // Fleet — enrolled local runners. The page has existed since Wave 12;
+    // it simply had no route constant, so every link to it was a literal.
+    DASHBOARD_SETTINGS_FLEET: '/settings/fleet',
     // Wave 13 — Billing + Usage & Credits pages (billing/usage PRD §2).
     DASHBOARD_SETTINGS_BILLING: '/settings/billing',
     // Payment-method management (billing PRD §3.3, audit B10 + B25).
     DASHBOARD_SETTINGS_PAYMENT_METHOD: '/settings/billing/payment-method',
     DASHBOARD_USAGE: '/settings/usage',
+    // Costs dashboard — a tab of the Usage & Credits page, not its own
+    // route, so the settings nav keeps ONE entry for the whole surface.
+    DASHBOARD_USAGE_COSTS: '/settings/usage?tab=costs',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,
     // Profile (alias of settings — `/profile` redirects to `/settings`)
@@ -216,6 +255,12 @@ export const ROUTES = {
     AUTH_EMAIL_CONFIRMATION: '/email-confirmation',
     AUTH_RESET_PASSWORD: '/reset-password',
     AUTH_FORGOT_PASSWORD: '/forgot-password',
+    // EW-070 — the signed-out way back in for a user whose verification email
+    // never arrived. Reached while UNAUTHENTICATED and unverifiable (login
+    // answers 403 for an unverified address), so it MUST be in PUBLIC_ROUTES.
+    // The two "Resend Verification Email" buttons on /auth/error point here;
+    // they used to point at `/`, which resent nothing.
+    AUTH_RESEND_VERIFICATION: '/resend-verification',
     // Magic-link token-landing page. Reached while still UNAUTHENTICATED
     // (the redeem happens client-side after the page renders), so it must
     // be in PUBLIC_ROUTES — otherwise the proxy auth gate bounces it to
@@ -255,6 +300,10 @@ export const PUBLIC_ROUTES = [
     ROUTES.AUTH_EMAIL_CONFIRMATION,
     ROUTES.AUTH_RESET_PASSWORD,
     ROUTES.AUTH_FORGOT_PASSWORD,
+    // EW-070 — must render for signed-out users; an unverified account cannot
+    // get a session, so gating this page would recreate the lockout it exists
+    // to break.
+    ROUTES.AUTH_RESEND_VERIFICATION,
     // Token-landing page — must render for unauthenticated users so the
     // client-side redeem can set the session cookie (mirrors the other
     // token-landing pages above).

@@ -37,7 +37,8 @@ describe('resolveEnvironmentNetworking', () => {
 		expect(networking).toEqual({
 			type: 'limited',
 			allowed_hosts: ['api.anthropic.com', '*.example.com'],
-			allow_package_managers: false
+			allow_package_managers: false,
+			allow_mcp_servers: false
 		});
 	});
 
@@ -51,7 +52,8 @@ describe('resolveEnvironmentNetworking', () => {
 		expect(networking).toEqual({
 			type: 'limited',
 			allowed_hosts: ['api.anthropic.com'],
-			allow_package_managers: true
+			allow_package_managers: true,
+			allow_mcp_servers: false
 		});
 	});
 });

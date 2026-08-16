@@ -463,6 +463,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     agentCanCommit:
                         (agent as { permissions?: { canCommitToRepo?: boolean } }).permissions
                             ?.canCommitToRepo !== false,
+                    // Repository registry (Feature G) — lets the provision
+                    // spec carry the agent's attached repos (advisory).
+                    agentId: payload.agentId,
                 });
                 workspaceCwd = provisioned?.cwd ?? null;
             } catch (error) {

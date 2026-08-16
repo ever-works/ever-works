@@ -717,6 +717,16 @@ export function PromptComposer({
         return '';
     }, [attachments]);
 
+    // NOTE (skills / invocation slugs): this composer deliberately has NO
+    // `/slug` autocomplete. Its text never becomes an agent chat message —
+    // every call site (`/new`, `/works/new`, Missions / Ideas / Agents /
+    // Works quick-add) feeds an entity-creation server action, and only
+    // `AgentRunService` chat-kind runs resolve a leading `/<invocation-slug>`.
+    // Offering the completion here would promise an injection that never
+    // happens and would bake a literal "/plan " into the created entity's
+    // description. The popup lives on the task-chat composer
+    // (`TaskDetailClient`), which IS that surface.
+
     /* ---------------------------------------------------------------- */
     /* Text input                                                       */
     /* ---------------------------------------------------------------- */

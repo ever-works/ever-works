@@ -62,9 +62,11 @@ export * from './agent-run.entity';
 export * from './agent-escalation.entity';
 export * from './agent-run-log.entity';
 export * from './agent-budget.entity';
+export * from './agent-collaborator.entity';
 export * from './agent-membership.entity';
 export * from './skill.entity';
 export * from './skill-binding.entity';
+export * from './skill-file.entity';
 export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
@@ -76,6 +78,8 @@ export * from './task-chat-message.entity';
 export * from './task-attachment.entity';
 export * from './task-watcher.entity';
 export * from './task-kb-mention.entity';
+export * from './task-template.entity';
+export * from './task-template-step.entity';
 export * from './user-task-counter.entity';
 export * from './mission-attachment.entity';
 export * from './mission-work.entity';
@@ -102,6 +106,7 @@ export * from './organization-onboarding-profile.entity';
 // Goals & Metrics (PR-8) — measurable targets + samples + Mission link
 export * from './goal.entity';
 export * from './goal-metric-sample.entity';
+export * from './goal-event.entity';
 export * from './mission-goal.entity';
 
 // Composio triggers (EW-684 PR-D)
@@ -122,12 +127,16 @@ export * from './team-member.entity';
 export * from './team-resource.entity';
 // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers that spawn Tasks
 export * from './inbound-trigger.entity';
+// Task Triggers — per-(trigger, event) fire ledger for ingest-spine idempotency
+export * from './inbound-trigger-fire.entity';
 // Event-ingest spine (Wave 6) — normalized external events awaiting fan-out
 export * from './ingested-event.entity';
 // Event-ingest pull path (Wave 8) — per-(user, plugin) pull watermarks/cursors
 export * from './ingest-cursor.entity';
 // Inbound receivers — external workspace/installation → platform user binding
 export * from './ingest-install-binding.entity';
+// Inbox (operator message center) — messages addressed to the human
+export * from './inbox-item.entity';
 // Event-ingest spine — external tracker issue → platform Task mapping
 export * from './external-issue-link.entity';
 // Meetings v1 (Wave 8, feature a) — captured meetings with transcripts
@@ -146,8 +155,15 @@ export * from './fleet-node.entity';
 export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
+// Fleet local-runner routing — per Work / Goal / account execution
+// preference (local runner vs cloud) read by the fleet run router.
+export * from './fleet-execution-preference.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
+// Agent Plugins MCP slice — external MCP server connections + per-agent
+// bindings (docs/specs/features/agent-plugins plan §2.4/§2.5).
+export * from './mcp-server-connection.entity';
+export * from './agent-mcp-server-binding.entity';
 export * from './workflow.entity';
 // One execution of a saved graph — what makes running a workflow leave a
 // trace instead of vanishing into a chat tool's return value.
@@ -155,3 +171,8 @@ export * from './workflow-run.entity';
 // Environments (Settings → Environments) — named, reusable runtime
 // recipes (packages + networking) assigned per-Agent.
 export * from './environment.entity';
+// Memory Files — user-defined folders organizing uploads on /memory.
+export * from './memory-folder.entity';
+// Repository registry (Feature G) — account-level repo records + agent grants.
+export * from './repo-connection.entity';
+export * from './agent-repo-attachment.entity';

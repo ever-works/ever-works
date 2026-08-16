@@ -62,9 +62,14 @@ describe('AnthropicManagedAgentsClient — egress allow-list (H-25)', () => {
 		const callArgs = environmentsCreateMock.mock.calls[0][0];
 		expect(callArgs.name).toBe('pinned-env');
 		expect(callArgs.config.type).toBe('cloud');
+		// SDK >= 0.117 typed networking policy: the former untyped
+		// `{ type: 'allowlist', hosts }` payload became the documented
+		// `limited` policy with explicit registry/MCP egress flags (off).
 		expect(callArgs.config.networking).toEqual({
-			type: 'allowlist',
-			hosts: ['api.anthropic.com', 'foo.example']
+			type: 'limited',
+			allowed_hosts: ['api.anthropic.com', 'foo.example'],
+			allow_package_managers: false,
+			allow_mcp_servers: false
 		});
 	});
 
@@ -76,8 +81,10 @@ describe('AnthropicManagedAgentsClient — egress allow-list (H-25)', () => {
 
 		const callArgs = environmentsCreateMock.mock.calls[0][0];
 		expect(callArgs.config.networking).toEqual({
-			type: 'allowlist',
-			hosts: ['api.anthropic.com', 'foo.example']
+			type: 'limited',
+			allowed_hosts: ['api.anthropic.com', 'foo.example'],
+			allow_package_managers: false,
+			allow_mcp_servers: false
 		});
 	});
 
@@ -135,7 +142,8 @@ describe('AnthropicManagedAgentsClient — Environments-driven networking', () =
 			networking: {
 				type: 'limited',
 				allowed_hosts: ['api.anthropic.com'],
-				allow_package_managers: true
+				allow_package_managers: true,
+				allow_mcp_servers: false
 			}
 		});
 
@@ -145,7 +153,8 @@ describe('AnthropicManagedAgentsClient — Environments-driven networking', () =
 			networking: {
 				type: 'limited',
 				allowed_hosts: ['api.anthropic.com'],
-				allow_package_managers: true
+				allow_package_managers: true,
+				allow_mcp_servers: false
 			}
 		});
 	});
@@ -160,7 +169,11 @@ describe('AnthropicManagedAgentsClient — Environments-driven networking', () =
 		expect(callArgs.config.networking).toEqual({ type: 'unrestricted' });
 	});
 
-	it('an undefined networking input preserves the env-var fallback byte-for-byte', async () => {
+	// The legacy `{ type: 'allowlist', hosts }` payload this assertion used to
+	// pin was never verifiable against the pinned SDK's typed networking union;
+	// `resolveEnvVarNetworking` emits `limited`. Re-pointed, not dropped: the
+	// property under test is still "an undefined input defers to the env var".
+	it('an undefined networking input falls back to the env-var policy', async () => {
 		process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS = 'api.anthropic.com,foo.example';
 
 		const client = new AnthropicManagedAgentsClient('test-key');
@@ -168,8 +181,10 @@ describe('AnthropicManagedAgentsClient — Environments-driven networking', () =
 
 		const callArgs = environmentsCreateMock.mock.calls[0][0];
 		expect(callArgs.config.networking).toEqual({
-			type: 'allowlist',
-			hosts: ['api.anthropic.com', 'foo.example']
+			type: 'limited',
+			allowed_hosts: ['api.anthropic.com', 'foo.example'],
+			allow_package_managers: false,
+			allow_mcp_servers: false
 		});
 	});
 });

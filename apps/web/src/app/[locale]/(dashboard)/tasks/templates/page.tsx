@@ -4,6 +4,12 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { listAstTemplates } from '@/lib/api/agent-templates';
 import { AstTemplatesBrowser } from '@/components/templates/AstTemplatesBrowser';
+// Tasks upgrades — the user's own workflow templates (parent + steps),
+// which is what actually instantiates a task tree. The catalog below
+// stays: it browses single-Task shapes, a different thing.
+import { taskTemplatesAPI } from '@/lib/api/task-templates';
+import type { TaskTemplateRow } from '@/lib/api/task-templates.shared';
+import { TaskWorkflowTemplatesList } from '@/components/tasks/TaskWorkflowTemplatesList';
 
 export const metadata: Metadata = {
     title: 'Task templates',
@@ -17,7 +23,19 @@ export const metadata: Metadata = {
  * Templates catalog (ADR-010) when that surface lands.
  */
 export default async function TaskTemplatesPage() {
-    const entries = await listAstTemplates('task');
+    const [entries, workflowResult] = await Promise.all([
+        listAstTemplates('task'),
+        // Best-effort: the workflow list seeds the default template on a
+        // user's first call, but a failure here must not take the whole
+        // catalog page down.
+        taskTemplatesAPI
+            .list()
+            .then((res) => ({ rows: res.data ?? ([] as TaskTemplateRow[]), error: null }))
+            .catch((err: unknown) => ({
+                rows: [] as TaskTemplateRow[],
+                error: err instanceof Error ? err.message : 'Failed to load workflow templates',
+            })),
+    ]);
     return (
         <div className="w-full space-y-5">
             <Link href={ROUTES.DASHBOARD_TASKS} className="text-xs text-text-muted hover:text-text">
@@ -37,6 +55,10 @@ export default async function TaskTemplatesPage() {
                     </p>
                 </div>
             </div>
+            <TaskWorkflowTemplatesList
+                templates={workflowResult.rows}
+                error={workflowResult.error}
+            />
             <AstTemplatesBrowser entity="task" entries={entries} />
         </div>
     );

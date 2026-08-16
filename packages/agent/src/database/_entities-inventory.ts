@@ -68,6 +68,7 @@ import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-c
 import { Mission } from '../entities/mission.entity';
 import { Goal } from '../entities/goal.entity';
 import { GoalMetricSample } from '../entities/goal-metric-sample.entity';
+import { GoalEvent } from '../entities/goal-event.entity';
 import { MissionGoal } from '../entities/mission-goal.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { Organization } from '../entities/organization.entity';
@@ -78,11 +79,13 @@ import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
+import { AgentCollaborator } from '../entities/agent-collaborator.entity';
 import { Team } from '../entities/team.entity';
 import { TeamMember } from '../entities/team-member.entity';
 import { TeamResource } from '../entities/team-resource.entity';
 import { Skill } from '../entities/skill.entity';
 import { SkillBinding } from '../entities/skill-binding.entity';
+import { SkillFile } from '../entities/skill-file.entity';
 import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
@@ -94,6 +97,8 @@ import { TaskChatMessage } from '../entities/task-chat-message.entity';
 import { TaskAttachment } from '../entities/task-attachment.entity';
 import { TaskWatcher } from '../entities/task-watcher.entity';
 import { TaskKbMention } from '../entities/task-kb-mention.entity';
+import { TaskTemplate } from '../entities/task-template.entity';
+import { TaskTemplateStep } from '../entities/task-template-step.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
 import { MissionWork } from '../entities/mission-work.entity';
@@ -118,9 +123,11 @@ import { TenantJobRuntimeAudit } from '../entities/tenant-job-runtime-audit.enti
 import { TenantRuntimeProviderAllowlist } from '../entities/tenant-runtime-provider-allowlist.entity';
 import { TenantCredentialSnapshot } from '../entities/tenant-credential-snapshot.entity';
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
+import { InboundTriggerFire } from '../entities/inbound-trigger-fire.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
+import { InboxItem } from '../entities/inbox-item.entity';
 import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
@@ -131,10 +138,17 @@ import { FleetNode } from '../entities/fleet-node.entity';
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
 import { FleetJob } from '../entities/fleet-job.entity';
+import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
+import { McpServerConnection } from '../entities/mcp-server-connection.entity';
+import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
 import { Environment } from '../entities/environment.entity';
+import { MemoryFolder } from '../entities/memory-folder.entity';
+// Repository registry (Feature G)
+import { RepoConnection } from '../entities/repo-connection.entity';
+import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 
 import {
     PluginEntity,
@@ -194,6 +208,8 @@ export const ENTITIES = [
     // EntityMetadataNotFoundError → unmapped 500 on every query).
     Goal,
     GoalMetricSample,
+    // Autonomy layer — append-only orchestrator log.
+    GoalEvent,
     MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
@@ -208,6 +224,8 @@ export const ENTITIES = [
     AgentEscalation,
     AgentBudget,
     AgentMembership,
+    // Agent Collaborators — per-agent sub-agent delegation allow-list.
+    AgentCollaborator,
     AgentAttachment,
     // Teams & Prebuilt Companies (teams-and-companies spec §2)
     Team,
@@ -216,6 +234,7 @@ export const ENTITIES = [
     TeamResource,
     Skill,
     SkillBinding,
+    SkillFile,
     // Phase 11 — Tasks family
     Task,
     TaskAssignee,
@@ -229,6 +248,9 @@ export const ENTITIES = [
     TaskAttachment,
     TaskWatcher,
     TaskKbMention,
+    // Tasks upgrades — workflow templates (parent + steps).
+    TaskTemplate,
+    TaskTemplateStep,
     UserTaskCounter,
     // PR #1044 — Mission/Idea attachment edge tables
     MissionAttachment,
@@ -283,6 +305,7 @@ export const ENTITIES = [
     // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
     // that spawn Tasks on verified HMAC deliveries.
     InboundTrigger,
+    InboundTriggerFire,
     // Event-ingest spine (Wave 6) — normalized external events awaiting
     // Activity/Memory fan-out.
     IngestedEvent,
@@ -320,9 +343,19 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Inbox (operator message center) — messages addressed to the human:
+    // blocking questions, approval requests, escalation mirrors, notices.
+    InboxItem,
+    // Fleet local-runner routing — per Work / Goal / account preference
+    // for local-runner vs cloud execution.
+    FleetExecutionPreference,
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,
+    // Agent Plugins MCP slice — manual external MCP server registry +
+    // per-agent/tenant bindings (plan §2.4/§2.5).
+    McpServerConnection,
+    AgentMcpServerBinding,
     // Workflows (judgment layer G5) — saved graphs. Until this row
     // existed a graph could be executed but never KEPT.
     Workflow,
@@ -332,4 +365,10 @@ export const ENTITIES = [
     // Environments (Settings → Environments) — named, reusable runtime
     // recipes (packages + networking) assigned per-Agent.
     Environment,
+    // Memory Files — user-defined folders organizing uploads on /memory.
+    MemoryFolder,
+    // Repository registry (Feature G) — account-level repo records plus
+    // the Agent → repo grant edge rows.
+    RepoConnection,
+    AgentRepoAttachment,
 ];

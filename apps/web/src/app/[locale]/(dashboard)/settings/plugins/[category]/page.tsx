@@ -11,6 +11,8 @@ import { getCategoryLabel } from '@/lib/utils/plugin-category-icons';
 import { isPluginCategory } from '@ever-works/plugin';
 import { PluginSettingsInline } from '@/components/settings/PluginSettingsInline';
 import { PipelineDefaultSelector } from '@/components/settings/PipelineDefaultSelector';
+import { VoiceProviderDefaultSelector } from '@/components/settings/VoiceProviderDefaultSelector';
+import type { VoiceProvidersResponse } from '@/lib/api/plugins';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -70,6 +72,21 @@ export default async function PluginCategoryPage({ params }: PageProps) {
         }),
     );
 
+    // Voice (speech-to-text) is a property of AI-provider plugins, so its
+    // one-time "which provider transcribes" choice belongs on this page —
+    // it is the only screen where every candidate is already listed.
+    // A failure here must not take the whole plugins page down: the provider
+    // cards below are the primary content, and the selector degrades to its
+    // "nothing supports voice" state.
+    let voice: VoiceProvidersResponse | null = null;
+    if (category === 'ai-provider') {
+        try {
+            voice = await pluginsAPI.listVoiceProviders();
+        } catch (error) {
+            console.error('Failed to fetch voice providers:', error);
+        }
+    }
+
     const categoryLabel = getCategoryLabel(category);
 
     const isSinglePlugin = pluginsWithConnections.length === 1;
@@ -87,6 +104,15 @@ export default async function PluginCategoryPage({ params }: PageProps) {
 
             {/* Default pipeline selector — shown only for the pipeline category */}
             {category === 'pipeline' && <PipelineDefaultSelector plugins={plugins} />}
+
+            {/* Voice provider selector — shown only for the ai-provider category */}
+            {category === 'ai-provider' && (
+                <VoiceProviderDefaultSelector
+                    voiceProviders={voice?.providers ?? []}
+                    selectedDefault={voice?.selectedDefault ?? null}
+                    plugins={plugins}
+                />
+            )}
 
             <div className="space-y-3">
                 {pluginsWithConnections.map(({ plugin, oauthConnection, deviceAuthStatus }) => (

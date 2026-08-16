@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { creditsAPI } from '@/lib/api/credits';
+import { costsAPI } from '@/lib/api/costs';
 import { usageAPI, type AccountWideUsage } from '@/lib/api/usage';
 import {
     currentUsageMonth,
@@ -8,7 +9,19 @@ import {
     type UsageSummaryGrouped,
     type UsageSummaryTotals,
 } from '@/lib/api/credits.shared';
+import {
+    COSTS_DEFAULT_WINDOW_DAYS,
+    parseCostsWindowDays,
+    type CostsByAgent,
+    type CostsByModel,
+    type CostsDaily,
+    type CostsSummary,
+    type CostsTopRuns,
+} from '@/lib/api/costs.shared';
+import { parseUsageTab, USAGE_TAB_COSTS } from '@/lib/api/usage-tabs.shared';
 import { UsageCreditsSettings } from '@/components/settings/UsageCreditsSettings';
+import { UsageTabs } from '@/components/settings/usage/UsageTabs';
+import { CostsSettings } from '@/components/settings/costs/CostsSettings';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -31,9 +44,41 @@ interface UsageSettingsPageProps {
  * `parseUsagePeriod`, falling back to the current month), so a shared
  * link renders exactly the month it names; the client selector then
  * refetches through the `/api/credits/usage-summary` proxy.
+ *
+ * Costs tab — `?tab=costs` renders the Costs dashboard instead: total AI
+ * spend for a rolling 7/30/90-day window, daily spend stacked by Agent,
+ * per-Agent and per-model breakdowns and the most expensive runs. The
+ * two tabs fetch DISJOINT endpoint sets and only the active one is
+ * loaded, so adding this tab costs the Overview arm nothing.
  */
 export default async function UsageSettingsPage({ searchParams }: UsageSettingsPageProps) {
     const params = await searchParams;
+    const tab = parseUsageTab(params.tab);
+
+    if (tab === USAGE_TAB_COSTS) {
+        const windowDays = parseCostsWindowDays(params.windowDays) ?? COSTS_DEFAULT_WINDOW_DAYS;
+
+        // Same per-call `.catch(() => null)` posture as the Overview arm:
+        // one failing aggregation must degrade its own panel, not blank
+        // the page.
+        const [summary, daily, byAgent, byModel, topRuns] = await Promise.all([
+            costsAPI.summary({ windowDays }).catch((): CostsSummary | null => null),
+            costsAPI.daily({ windowDays }).catch((): CostsDaily | null => null),
+            costsAPI.byAgent({ windowDays }).catch((): CostsByAgent | null => null),
+            costsAPI.byModel({ windowDays }).catch((): CostsByModel | null => null),
+            costsAPI.topRuns({ windowDays }).catch((): CostsTopRuns | null => null),
+        ]);
+
+        return (
+            <UsageTabs active={USAGE_TAB_COSTS}>
+                <CostsSettings
+                    initialWindowDays={windowDays}
+                    initialSnapshot={{ summary, daily, byAgent, byModel, topRuns }}
+                />
+            </UsageTabs>
+        );
+    }
+
     const period = parseUsagePeriod(params.period) ?? currentUsageMonth();
 
     const [totals, byDay, byModel, byAgent, byWork, accountWide] = await Promise.all([
@@ -54,14 +99,16 @@ export default async function UsageSettingsPage({ searchParams }: UsageSettingsP
     ]);
 
     return (
-        <UsageCreditsSettings
-            initialPeriod={period}
-            initialTotals={totals}
-            initialByDay={byDay}
-            initialByModel={byModel}
-            initialByAgent={byAgent}
-            initialByWork={byWork}
-            accountWide={accountWide}
-        />
+        <UsageTabs active="overview">
+            <UsageCreditsSettings
+                initialPeriod={period}
+                initialTotals={totals}
+                initialByDay={byDay}
+                initialByModel={byModel}
+                initialByAgent={byAgent}
+                initialByWork={byWork}
+                accountWide={accountWide}
+            />
+        </UsageTabs>
     );
 }

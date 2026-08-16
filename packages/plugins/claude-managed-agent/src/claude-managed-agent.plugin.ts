@@ -16,11 +16,13 @@ import type {
 	PluginContext,
 	PluginHealthCheck,
 	PluginManifest,
-	ValidationResult
+	ValidationResult,
+	RuntimeEnvironmentData
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
 
 import {
+	clampPerSessionBudgetUsd,
 	getDefaultValues,
 	getFormFields,
 	getFormGroups,
@@ -32,20 +34,40 @@ import { STEP_DEFINITIONS } from './steps.js';
 import {
 	CLAUDE_MANAGED_AGENT_SUPPORTED_MODELS,
 	type ClaudeManagedAgentStepId,
+	CMA_FAN_OUT_CAPABILITY,
 	DEFAULT_BASE_URL,
 	DEFAULT_MAX_POLL_ATTEMPTS,
 	DEFAULT_MODEL,
 	DEFAULT_POLL_INTERVAL_MS,
 	DEFAULT_WORKSPACE_PATH,
+	type ManagedAgentFanOutCapability,
 	type ManagedAgentRunResources,
+	// `ManagedAgentsSessionResource` is used by the run-resources type below.
+	// develop also imported `ManagedRuntimeEnvironment` here, but this branch's
+	// resolver is typed against the pipeline's flat `RuntimeEnvironmentData`
+	// instead, so that symbol has no remaining use and is deliberately omitted.
+	type ManagedAgentsSessionResource,
+	type ManagedSessionRunResult,
+	MAX_VARIANT_SESSIONS,
+	MIN_VARIANT_SESSIONS,
+	PERSISTENT_AGENT_NAME,
+	type NormalizedManagedAgentOutputs,
+	type PluginRunSessionsOptions,
+	SETTING_MANAGED_AGENT_CONFIG_HASH,
+	SETTING_MANAGED_AGENT_ID,
+	SETTING_MANAGED_ENVIRONMENT_CONFIG_HASH,
+	SETTING_MANAGED_ENVIRONMENT_ID,
 	WORKSPACE_SEED_MANIFEST_MOUNT_PATH
 } from './types.js';
+import { createCmaSdkClient, resolveUserScopedSettings } from './utils/cma-sdk.js';
+import { ensureControlPlane, resolveNetworking } from './utils/control-plane.js';
+import { runManagedSessions } from './utils/fan-out.js';
 import { cleanupManagedAgentRun } from './utils/managed-agents-cleanup.js';
 import { AnthropicManagedAgentsClient } from './utils/managed-agents-client.js';
+import { buildSessionResources, type UploadedAttachedEnvFile } from './utils/session-resources.js';
 import {
 	buildCancelledResult,
 	buildErrorResult,
-	buildMetrics,
 	finalizeCompletedState,
 	getNumericSetting,
 	getStepProgressContext,
@@ -59,11 +81,13 @@ import {
 	buildResultCollectionPrompt,
 	buildSystemPrompt,
 	buildUserPrompt,
+	buildVariantSessionPrompt,
 	buildWorkspaceSeedPrompt
 } from './utils/prompt-builder.js';
 import { extractAgentTranscript, normalizeOutputs, parseStructuredOutput } from './utils/result-parser.js';
-import { buildPackageBootstrapPrompt, resolveEnvironmentNetworking } from './utils/runtime-environment.js';
+import { buildPackageBootstrapPrompt } from './utils/runtime-environment.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
+import { buildManagedAgentMetrics, toManagedSessionTokenUsage } from './utils/usage-metrics.js';
 import { buildWorkspaceSeedManifest } from './utils/workspace-seed.js';
 
 // Security: runtime bounds for `target_items`, mirroring the form-level
@@ -149,6 +173,41 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				maximum: 3600,
 				'x-hidden': true,
 				'x-scope': 'global'
+			},
+			reuseControlPlane: {
+				type: 'boolean',
+				title: 'Reuse Control Plane',
+				description:
+					'Keep one persistent managed agent and environment per user and only create sessions per run (recommended). Disable to fall back to creating and deleting the agent and environment on every run.',
+				default: true,
+				'x-scope': 'global'
+			},
+			// feat-cma-scale — plugin-managed persistent control-plane state.
+			// Hidden: written by the plugin via context.updateSettings at user
+			// scope, never edited by users.
+			[SETTING_MANAGED_AGENT_ID]: {
+				type: 'string',
+				title: 'Managed Agent ID',
+				'x-hidden': true,
+				'x-scope': 'user'
+			},
+			[SETTING_MANAGED_AGENT_CONFIG_HASH]: {
+				type: 'string',
+				title: 'Managed Agent Config Hash',
+				'x-hidden': true,
+				'x-scope': 'user'
+			},
+			[SETTING_MANAGED_ENVIRONMENT_ID]: {
+				type: 'string',
+				title: 'Managed Environment ID',
+				'x-hidden': true,
+				'x-scope': 'user'
+			},
+			[SETTING_MANAGED_ENVIRONMENT_CONFIG_HASH]: {
+				type: 'string',
+				title: 'Managed Environment Config Hash',
+				'x-hidden': true,
+				'x-scope': 'user'
 			}
 		},
 		required: ['apiKey']
@@ -160,7 +219,51 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
+		this.registerFanOutCapability(context);
 		context.logger.log('Claude Managed Agent plugin loaded');
+	}
+
+	/**
+	 * Publish the fan-out service on the platform's custom capability registry
+	 * so API-side services and Trigger.dev tasks can call it without resolving
+	 * the plugin instance themselves.
+	 *
+	 * Guarded on every axis because a failure here must never stop the plugin
+	 * from loading: hosts may hand over a partial context (the capability
+	 * methods are optional in practice even though the interface requires
+	 * them), and the registry THROWS on a duplicate name — which happens when
+	 * a plugin is re-loaded before its previous registration is torn down.
+	 */
+	private registerFanOutCapability(context: PluginContext): void {
+		if (typeof context.registerCustomCapability !== 'function') {
+			return;
+		}
+
+		if (context.hasCustomCapability?.(CMA_FAN_OUT_CAPABILITY)) {
+			return;
+		}
+
+		const implementation: ManagedAgentFanOutCapability = {
+			runSessions: (options) => this.runSessions(options)
+		};
+
+		try {
+			context.registerCustomCapability(
+				{
+					name: CMA_FAN_OUT_CAPABILITY,
+					description: 'Run N Claude Managed Agent sessions in parallel with bounded concurrency.',
+					version: this.version,
+					methods: ['runSessions']
+				},
+				implementation
+			);
+		} catch (error) {
+			context.logger.warn(
+				`Claude Managed Agent: fan-out capability not registered: ${
+					error instanceof Error ? error.message : String(error)
+				}`
+			);
+		}
 	}
 
 	async onUnload(): Promise<void> {
@@ -233,6 +336,77 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 		return STEP_DEFINITIONS;
 	}
 
+	/**
+	 * feat-cma-scale — fan-out service: spawn N parallel Claude Managed Agent
+	 * sessions from one call. Exposed on the plugin instance so API-side code
+	 * (and Trigger.dev tasks holding a plugin reference) can reach it without
+	 * going through the pipeline. Uses the persistent control plane when
+	 * `reuseControlPlane` is enabled; otherwise creates an ephemeral agent +
+	 * environment for the batch and tears them down afterwards.
+	 */
+	async runSessions(options: PluginRunSessionsOptions): Promise<ManagedSessionRunResult[]> {
+		if (!options.userId) {
+			throw new Error('runSessions requires a userId for settings resolution.');
+		}
+
+		if (!Array.isArray(options.prompts) || options.prompts.length === 0) {
+			return [];
+		}
+
+		const logger = this.context?.logger ?? console;
+		const settings = options.workId
+			? await resolveManagedAgentSettings(this.context, options.userId, options.workId)
+			: await resolveUserScopedSettings(this.context, options.userId);
+		const client = createCmaSdkClient(settings);
+		const model = (settings.model as string | undefined) || DEFAULT_MODEL;
+
+		const controlPlane = await ensureControlPlane(
+			client,
+			this.context,
+			options.userId,
+			settings,
+			{
+				name: PERSISTENT_AGENT_NAME,
+				description: 'Persistent Ever Works managed generation agent',
+				model,
+				system: buildSystemPrompt()
+			},
+			null,
+			logger
+		);
+
+		try {
+			return await runManagedSessions(client, {
+				prompts: options.prompts,
+				agentId: controlPlane.agentId,
+				environmentId: controlPlane.environmentId,
+				concurrency: options.concurrency,
+				// The programmatic entry point bypasses the generation form, so
+				// the budget ceiling is re-applied here rather than trusting the
+				// caller — a runaway value would otherwise fan out unbounded spend.
+				perSessionBudgetUsd: clampPerSessionBudgetUsd(options.perSessionBudgetUsd),
+				timeoutMs: options.timeoutMs,
+				resources: options.resources,
+				pollIntervalMs: getNumericSetting(settings.pollIntervalMs, DEFAULT_POLL_INTERVAL_MS),
+				maxPollAttempts: getNumericSetting(settings.maxPollAttempts, DEFAULT_MAX_POLL_ATTEMPTS),
+				agentOverrides: { model },
+				signal: options.signal,
+				logger
+			});
+		} finally {
+			if (controlPlane.ephemeral) {
+				await cleanupManagedAgentRun(
+					client,
+					{
+						createdAgentId: controlPlane.agentId,
+						createdEnvironmentId: controlPlane.environmentId
+					},
+					{ warn: (message) => logger.warn(message) }
+				);
+			}
+		}
+	}
+
 	async execute(
 		work: WorkReference,
 		request: GenerationRequest,
@@ -262,24 +436,21 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 		const logger = this.context?.logger ?? console;
 		const config = request.config || {};
 		const targetItems = this.getTargetItems(config);
+		const variantSessions = this.getVariantSessions(config);
+		const perSessionBudgetUsd = this.getPerSessionBudgetUsd(config);
 		const shouldCaptureScreenshots = config.capture_screenshots !== false;
 		let client: AnthropicManagedAgentsClient | null = null;
+		let preserveControlPlane = false;
 		const runResources: ManagedAgentRunResources = {};
 
 		try {
 			await this.beginStep('configure-managed-agent', onProgress, 5);
 
 			const settings = await resolveManagedAgentSettings(this.context, userId, work.id);
-			const apiKey = getUsableSecret(settings.apiKey);
-			if (!apiKey) {
-				throw new Error('Anthropic API key is required for the Claude Managed Agent plugin.');
-			}
-
-			client = new AnthropicManagedAgentsClient(
-				apiKey,
-				(settings.baseUrl as string | undefined) || DEFAULT_BASE_URL
-			);
+			client = createCmaSdkClient(settings);
 			const model = (settings.model as string | undefined) || DEFAULT_MODEL;
+			const reuseControlPlane = settings.reuseControlPlane !== false;
+			preserveControlPlane = reuseControlPlane;
 			// Memory upgrades M3 — session preamble splice. The block
 			// arrives pre-fenced (`<agent_memory>…</agent_memory>`) +
 			// neutralized from the platform's shared recall helper; append
@@ -296,29 +467,55 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			);
 			runResources.uploadedFileId = uploadedSeedManifest.id;
 
-			const agentId = (
-				await client.createAgent({
-					name: `Ever Works Agent: ${work.slug}`,
-					description: `Managed Ever Works generation agent for ${work.slug}`,
-					model,
-					system: systemPrompt
-				})
-			).id;
-			runResources.createdAgentId = agentId;
+			let agentId: string;
+			let environmentId: string;
+			// Per-session overrides (reuse mode only): the persistent agent
+			// carries the base system prompt; the run's model and any memory
+			// recall ride on the session so agent versions never churn per run.
+			let sessionAgentOverrides: { system?: string; model?: string } | undefined;
 
-			// Environments — when the platform resolved a runtime
-			// Environment for this run (the Agent's assigned, published
-			// `environments` row), its networking posture shapes the CMA
-			// environment. `undefined` keeps the historical env-var
-			// fallback inside the client byte-for-byte.
-			const runtimeEnvironment = execContext.runtimeEnvironment;
-			const environmentId = (
-				await client.createEnvironment({
-					name: `Ever Works Environment: ${work.slug}`,
-					networking: resolveEnvironmentNetworking(runtimeEnvironment)
-				})
-			).id;
-			runResources.createdEnvironmentId = environmentId;
+			// Resolved for BOTH modes: the networking policy is a security
+			// control, so an ephemeral (reuseControlPlane === false) run must
+			// honor it exactly like the persistent one.
+			const runtimeEnvironment = this.getRuntimeEnvironment(execContext);
+
+			if (reuseControlPlane) {
+				const controlPlane = await ensureControlPlane(
+					client,
+					this.context,
+					userId,
+					settings,
+					{
+						name: PERSISTENT_AGENT_NAME,
+						description: 'Persistent Ever Works managed generation agent',
+						model,
+						system: baseSystemPrompt
+					},
+					runtimeEnvironment,
+					logger
+				);
+				agentId = controlPlane.agentId;
+				environmentId = controlPlane.environmentId;
+				sessionAgentOverrides = execContext.memoryRecall ? { model, system: systemPrompt } : { model };
+			} else {
+				agentId = (
+					await client.createAgent({
+						name: `Ever Works Agent: ${work.slug}`,
+						description: `Managed Ever Works generation agent for ${work.slug}`,
+						model,
+						system: systemPrompt
+					})
+				).id;
+				runResources.createdAgentId = agentId;
+
+				environmentId = (
+					await client.createEnvironment({
+						name: `Ever Works Environment: ${work.slug}`,
+						networking: resolveNetworking(runtimeEnvironment)
+					})
+				).id;
+				runResources.createdEnvironmentId = environmentId;
+			}
 
 			this.completeStep('configure-managed-agent');
 
@@ -326,19 +523,88 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				return this.toCancelledResult(startTime).result;
 			}
 
+			// Repository registry (Feature G) — mount the run agent's attached
+			// registry repos alongside the primary workspace. Env files are
+			// uploaded per run and mounted under each repo's directory. With
+			// no attachments (the default) the resource list is byte-identical
+			// to what this plugin has always sent.
+			//
+			// Resolved BEFORE the fan-out branch so the variant sessions
+			// (feat-cma-scale) mount the same repos as the single-session
+			// path — attachments must not depend on `variantSessions`.
+			const attachedRepos = options?.attachedRepos ?? [];
+			const uploadedEnvFiles: UploadedAttachedEnvFile[] = [];
+			for (const attachedRepo of attachedRepos) {
+				for (const envFile of attachedRepo.envFiles ?? []) {
+					const uploadedEnvFile = await client.uploadTextFile(
+						envFile.path.split('/').pop() || '.env',
+						envFile.content,
+						'text/plain'
+					);
+					runResources.uploadedEnvFileIds = runResources.uploadedEnvFileIds ?? [];
+					runResources.uploadedEnvFileIds.push(uploadedEnvFile.id);
+					uploadedEnvFiles.push({
+						fileId: uploadedEnvFile.id,
+						mountDir: attachedRepo.mountDir,
+						path: envFile.path
+					});
+				}
+			}
+
+			const sessionResources = buildSessionResources({
+				workspacePath: DEFAULT_WORKSPACE_PATH,
+				seedManifest: {
+					fileId: uploadedSeedManifest.id,
+					mountPath: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
+				},
+				attachedRepos,
+				uploadedEnvFiles
+			});
+
+			if (variantSessions > 1) {
+				return await this.executeVariantSessions({
+					client,
+					work,
+					request,
+					existing,
+					settings,
+					execContext,
+					abortController,
+					onProgress,
+					startTime,
+					targetItems,
+					variantSessions,
+					perSessionBudgetUsd,
+					shouldCaptureScreenshots,
+					agentId,
+					environmentId,
+					sessionAgentOverrides,
+					sessionResources,
+					workspaceSeedManifest,
+					logger,
+					userId
+				});
+			}
+
+			this.skipStep('run-variant-sessions');
+
 			await this.beginStep('run-managed-session', onProgress, 20);
 
+			// The repo-attachment block that used to sit here is GONE on
+			// purpose. Both sides of this merge carry the Feature G work, so
+			// the auto-merge produced it twice in one scope — `attachedRepos`
+			// and `uploadedEnvFiles` were declared at ~535 and again here,
+			// which is a redeclaration error, and it would have uploaded every
+			// attached repo's env files twice per run. The surviving copy is
+			// develop's, hoisted above the `variantSessions > 1` branch so
+			// variant runs get the same resources.
 			const session = await client.createSession({
 				agentId,
 				environmentId,
 				title: `Ever Works: ${work.name}`,
-				resources: [
-					{
-						type: 'file',
-						file_id: uploadedSeedManifest.id,
-						mount_path: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
-					}
-				]
+				resources: sessionResources,
+				budgetUsd: perSessionBudgetUsd,
+				agentOverrides: sessionAgentOverrides
 			});
 			runResources.sessionId = session.id;
 
@@ -349,7 +615,10 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			// (`buildPackageBootstrapPrompt` — see its security note); its
 			// events land before the seed-idle snapshot below, so they are
 			// naturally excluded from generation-output parsing.
-			const bootstrapPrompt = buildPackageBootstrapPrompt(runtimeEnvironment);
+			// getRuntimeEnvironment() returns `| null` (this plugin's local shape);
+			// the shared contract helper takes `| undefined`. Same object either
+			// way — only the absent-value convention differs between branches.
+			const bootstrapPrompt = buildPackageBootstrapPrompt(runtimeEnvironment ?? undefined);
 			if (bootstrapPrompt) {
 				await client.sendUserMessage(session.id, bootstrapPrompt);
 				await client.waitForSessionIdle(session.id, {
@@ -475,8 +744,23 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				totalSteps: STEP_DEFINITIONS.length,
 				state: this.state,
 				metrics: finalSession.usage
-					? buildMetrics(startTime, Date.now() - startTime, normalizedOutputs.items.length, {
-							usage: finalSession.usage
+					? buildManagedAgentMetrics({
+							startTime,
+							duration: Date.now() - startTime,
+							itemCount: normalizedOutputs.items.length,
+							sessions: [
+								{
+									id: 'session-1',
+									status: 'completed',
+									sessionId: session.id,
+									// Shared seam with the fan-out path so both agree on
+									// what `totalTokens` counts — including the cache
+									// token classes the API reports outside
+									// `input_tokens`.
+									tokens: toManagedSessionTokenUsage(finalSession.usage),
+									costUsd: finalSession.usage.list_cost_usd
+								}
+							]
 						})
 					: undefined,
 				warnings
@@ -487,12 +771,268 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			return this.toErrorResult(err, startTime);
 		} finally {
 			if (client) {
-				await cleanupManagedAgentRun(client, runResources, {
-					warn: (message) => logger.warn(message)
-				});
+				await cleanupManagedAgentRun(
+					client,
+					runResources,
+					{
+						warn: (message) => logger.warn(message)
+					},
+					{ preserveControlPlane }
+				);
 			}
 			this.abortController = null;
 		}
+	}
+
+	/**
+	 * Variants path (feat-cma-scale): fan out N parallel sessions, each
+	 * bootstrapping its own workspace and producing an independent result
+	 * set; per-session transcripts are parsed and merged with de-duplication.
+	 * A failed sibling never aborts the batch — only an all-failed batch
+	 * fails the run.
+	 */
+	private async executeVariantSessions(input: {
+		client: AnthropicManagedAgentsClient;
+		work: WorkReference;
+		request: GenerationRequest;
+		existing: ExistingItems;
+		settings: Record<string, unknown>;
+		execContext: NonNullable<PipelineExecutionOptions['execContext']>;
+		abortController: AbortController;
+		onProgress: PipelineProgressCallback | undefined;
+		startTime: number;
+		targetItems: number;
+		variantSessions: number;
+		perSessionBudgetUsd: number | undefined;
+		shouldCaptureScreenshots: boolean;
+		agentId: string;
+		environmentId: string;
+		sessionAgentOverrides: { system?: string; model?: string } | undefined;
+		/**
+		 * Resources every variant session mounts: the seed manifest plus the
+		 * run agent's attached registry repos + their env files (Feature G).
+		 * Built once by the caller so fan-out and single-session runs mount
+		 * an identical workspace.
+		 */
+		sessionResources: ManagedAgentsSessionResource[];
+		workspaceSeedManifest: ReturnType<typeof buildWorkspaceSeedManifest>;
+		logger: { log(m: string): void; warn(m: string): void; error(m: string): void };
+		userId: string;
+	}): Promise<PipelineResult> {
+		const {
+			client,
+			work,
+			request,
+			existing,
+			settings,
+			execContext,
+			abortController,
+			onProgress,
+			startTime,
+			targetItems,
+			variantSessions,
+			perSessionBudgetUsd,
+			shouldCaptureScreenshots,
+			agentId,
+			environmentId,
+			sessionAgentOverrides,
+			sessionResources,
+			workspaceSeedManifest,
+			logger,
+			userId
+		} = input;
+
+		this.skipStep('run-managed-session');
+		await this.beginStep('run-variant-sessions', onProgress, 20);
+
+		const prompts = Array.from({ length: variantSessions }, (_, index) => ({
+			id: `variant-${index + 1}`,
+			title: `Ever Works: ${work.name} (variant ${index + 1}/${variantSessions})`,
+			prompt: buildVariantSessionPrompt({
+				manifest: workspaceSeedManifest,
+				work,
+				request,
+				existing,
+				targetItems,
+				variantIndex: index,
+				variantCount: variantSessions
+			})
+		}));
+
+		const sessionResults = await runManagedSessions(client, {
+			prompts,
+			agentId,
+			environmentId,
+			perSessionBudgetUsd,
+			resources: sessionResources,
+			pollIntervalMs: getNumericSetting(settings.pollIntervalMs, DEFAULT_POLL_INTERVAL_MS),
+			maxPollAttempts: getNumericSetting(settings.maxPollAttempts, DEFAULT_MAX_POLL_ATTEMPTS),
+			agentOverrides: sessionAgentOverrides,
+			signal: abortController.signal,
+			logger
+		});
+
+		this.completeStep('run-variant-sessions');
+
+		if (abortController.signal.aborted) {
+			return this.toCancelledResult(startTime).result;
+		}
+
+		await this.beginStep('parse-agent-output', onProgress, 80);
+
+		const warnings: string[] = [];
+		const parsedOutputs: NormalizedManagedAgentOutputs[] = [];
+
+		for (const result of sessionResults) {
+			if (result.status !== 'completed' || !result.output) {
+				warnings.push(`Variant session ${result.id} ${result.status}: ${result.error ?? 'no output'}`);
+				continue;
+			}
+
+			try {
+				const structured = parseStructuredOutput(result.output);
+				warnings.push(...(structured.warnings || []).map((warning) => `[${result.id}] ${warning}`));
+				parsedOutputs.push(normalizeOutputs(structured));
+			} catch (parseError) {
+				warnings.push(
+					`Variant session ${result.id} returned an unparsable result: ${
+						parseError instanceof Error ? parseError.message : String(parseError)
+					}`
+				);
+			}
+		}
+
+		if (parsedOutputs.length === 0) {
+			throw new Error(
+				`All ${variantSessions} variant sessions failed. First failure: ${
+					sessionResults.find((r) => r.status !== 'completed')?.error ?? 'unknown error'
+				}`
+			);
+		}
+
+		const normalizedOutputs = this.mergeVariantOutputs(parsedOutputs);
+
+		this.completeStep('parse-agent-output');
+
+		if (abortController.signal.aborted) {
+			return this.toCancelledResult(startTime, normalizedOutputs).result;
+		}
+
+		if (shouldCaptureScreenshots && execContext.screenshotFacade?.isAvailable()) {
+			await this.beginStep('capture-screenshots', onProgress, 92);
+
+			const screenshotWarnings = await captureScreenshots(
+				normalizedOutputs.items,
+				execContext.screenshotFacade,
+				{ userId, workId: work.id },
+				abortController.signal,
+				logger
+			);
+			warnings.push(...screenshotWarnings);
+			this.completeStep('capture-screenshots');
+		} else {
+			this.skipStep('capture-screenshots');
+		}
+
+		const completeStep = getStepProgressContext('capture-screenshots');
+		reportProgress(onProgress, completeStep.stepIndex, 100, 'Complete');
+		this.state = finalizeCompletedState(this.state ?? initializeState());
+
+		return buildSuccessPipelineResult(normalizedOutputs, {
+			duration: Date.now() - startTime,
+			stepsCompleted: this.state.completedSteps.length,
+			totalSteps: STEP_DEFINITIONS.length,
+			state: this.state,
+			metrics: buildManagedAgentMetrics({
+				startTime,
+				duration: Date.now() - startTime,
+				itemCount: normalizedOutputs.items.length,
+				sessions: sessionResults
+			}),
+			warnings
+		});
+	}
+
+	/** Merge variant outputs, de-duplicating items and taxonomy entries. */
+	private mergeVariantOutputs(outputs: NormalizedManagedAgentOutputs[]): NormalizedManagedAgentOutputs {
+		if (outputs.length === 1) {
+			return outputs[0];
+		}
+
+		const itemMap = new Map<string, NormalizedManagedAgentOutputs['items'][number]>();
+		const categoryMap = new Map<string, NormalizedManagedAgentOutputs['categories'][number]>();
+		const tagMap = new Map<string, NormalizedManagedAgentOutputs['tags'][number]>();
+		const collectionMap = new Map<string, NormalizedManagedAgentOutputs['collections'][number]>();
+		const brandMap = new Map<string, NormalizedManagedAgentOutputs['brands'][number]>();
+		const operations = {
+			created_files: [] as string[],
+			updated_files: [] as string[],
+			unchanged_seeded_files_count: 0
+		};
+		let hasOperations = false;
+
+		for (const output of outputs) {
+			for (const item of output.items) {
+				// Items are the same when both the name and the source URL
+				// match (case-insensitive) — first variant wins.
+				const key = `${item.name.toLowerCase()}::${(item.source_url || '').toLowerCase()}`;
+				if (!itemMap.has(key)) {
+					itemMap.set(key, item);
+				}
+			}
+
+			for (const category of output.categories) {
+				if (!categoryMap.has(category.id)) {
+					categoryMap.set(category.id, category);
+				}
+			}
+
+			for (const tag of output.tags) {
+				if (!tagMap.has(tag.id)) {
+					tagMap.set(tag.id, tag);
+				}
+			}
+
+			for (const collection of output.collections) {
+				if (!collectionMap.has(collection.id)) {
+					collectionMap.set(collection.id, collection);
+				}
+			}
+
+			for (const brand of output.brands) {
+				if (!brandMap.has(brand.id)) {
+					brandMap.set(brand.id, brand);
+				}
+			}
+
+			const ops = output.extra?.operations;
+			if (ops) {
+				hasOperations = true;
+				operations.created_files.push(...(ops.created_files ?? []));
+				operations.updated_files.push(...(ops.updated_files ?? []));
+				operations.unchanged_seeded_files_count = Math.max(
+					operations.unchanged_seeded_files_count,
+					ops.unchanged_seeded_files_count ?? 0
+				);
+			}
+		}
+
+		return {
+			items: [...itemMap.values()],
+			categories: [...categoryMap.values()],
+			tags: [...tagMap.values()],
+			collections: [...collectionMap.values()],
+			brands: [...brandMap.values()],
+			extra: hasOperations
+				? {
+						operations: {
+							created_files: [...new Set(operations.created_files)],
+							updated_files: [...new Set(operations.updated_files)],
+							unchanged_seeded_files_count: operations.unchanged_seeded_files_count
+						}
+					}
+				: undefined
+		};
 	}
 
 	async cancel(): Promise<void> {
@@ -548,6 +1088,41 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 		}
 
 		return DEFAULT_TARGET_ITEMS;
+	}
+
+	private getVariantSessions(config: Record<string, unknown>): number {
+		const value = config.variant_sessions;
+		if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+			// Security: same runtime clamp rationale as getTargetItems — each
+			// variant is a full managed-agent session, so an out-of-range value
+			// reaching execute() directly must not fan out unbounded spend.
+			return Math.max(MIN_VARIANT_SESSIONS, Math.min(MAX_VARIANT_SESSIONS, Math.floor(value)));
+		}
+
+		return MIN_VARIANT_SESSIONS;
+	}
+
+	private getPerSessionBudgetUsd(config: Record<string, unknown>): number | undefined {
+		return clampPerSessionBudgetUsd(config.per_session_budget_usd);
+	}
+
+	/**
+	 * Optional serializable runtime-environment object carried on the
+	 * pipeline execution context by the platform's Environments feature
+	 * (parallel branch). Read defensively — absent or malformed values fall
+	 * back to the env-var driven networking policy.
+	 */
+	private getRuntimeEnvironment(execContext: unknown): RuntimeEnvironmentData | null {
+		if (!execContext || typeof execContext !== 'object') {
+			return null;
+		}
+
+		const candidate = (execContext as Record<string, unknown>).runtimeEnvironment;
+		if (!candidate || typeof candidate !== 'object') {
+			return null;
+		}
+
+		return candidate as RuntimeEnvironmentData;
 	}
 }
 

@@ -5,15 +5,31 @@ import type { RuntimeEnvironmentData, StepExecutionContext } from '@ever-works/p
  * Environments — end-to-end plugin spec: an execContext WITH
  * `runtimeEnvironment` produces the CMA environment payload derived from
  * it plus an initial bootstrap install step, and an execContext WITHOUT
- * one preserves today's payloads exactly (no bootstrap message, client
- * env-var fallback in charge of networking).
+ * one produces no bootstrap message and the env-var networking policy.
+ *
+ * Integration note: this spec was authored on the Environments branch, when
+ * every run created an EPHEMERAL agent + environment named after the Work
+ * (`Ever Works Environment: <slug>`). `feat-cma-scale` then made the reusable
+ * persistent control plane the DEFAULT (`reuseControlPlane !== false`), which
+ * names the environment after the resolved Environment (falling back to
+ * `PERSISTENT_ENVIRONMENT_NAME`) and resolves the networking policy eagerly so
+ * it can be hashed for drift detection. The assertions below are re-pointed to
+ * that default path — the property under test (the Environment drives
+ * networking + the package bootstrap) is unchanged.
  */
 
 const createEnvironmentMock = vi.fn().mockResolvedValue({ id: 'cma-env-1' });
 const sendUserMessageMock = vi.fn().mockResolvedValue(undefined);
 const listAllEventsMock = vi.fn();
 
-vi.mock('./utils/managed-agents-client.js', () => {
+// Spread the real module: `control-plane.ts` also imports
+// `resolveEnvVarNetworking` from here, and a factory that returns only the
+// client class leaves that export undefined — which surfaces as a bogus
+// "configure-managed-agent step failed" on the no-Environment path (the only
+// path that calls it) rather than as a mocking error.
+vi.mock('./utils/managed-agents-client.js', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('./utils/managed-agents-client.js')>();
+
 	class AnthropicManagedAgentsClientMock {
 		validateAccess = vi.fn();
 		createAgent = vi.fn().mockResolvedValue({ id: 'cma-agent-1' });
@@ -31,7 +47,7 @@ vi.mock('./utils/managed-agents-client.js', () => {
 		listAllEvents = listAllEventsMock;
 		waitForSessionIdle = vi.fn().mockResolvedValue({ id: 'sess-1', status: 'idle' });
 	}
-	return { AnthropicManagedAgentsClient: AnthropicManagedAgentsClientMock };
+	return { ...actual, AnthropicManagedAgentsClient: AnthropicManagedAgentsClientMock };
 });
 
 vi.mock('./utils/managed-agents-cleanup.js', () => ({
@@ -108,6 +124,9 @@ async function runPlugin(runtimeEnvironment?: RuntimeEnvironmentData) {
 }
 
 beforeEach(() => {
+	// The env-var fallback is the no-Environment baseline asserted below, so
+	// pin it unset rather than inherit whatever the ambient process carries.
+	delete process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS;
 	createEnvironmentMock.mockClear();
 	sendUserMessageMock.mockClear();
 	listAllEventsMock.mockReset();
@@ -121,11 +140,12 @@ describe('ClaudeManagedAgentPlugin — runtimeEnvironment consumption', () => {
 
 		expect(createEnvironmentMock).toHaveBeenCalledTimes(1);
 		expect(createEnvironmentMock).toHaveBeenCalledWith({
-			name: 'Ever Works Environment: test-work',
+			name: 'Python Data',
 			networking: {
 				type: 'limited',
 				allowed_hosts: ['api.anthropic.com', 'pypi.org'],
-				allow_package_managers: true
+				allow_package_managers: true,
+				allow_mcp_servers: false
 			}
 		});
 
@@ -139,16 +159,19 @@ describe('ClaudeManagedAgentPlugin — runtimeEnvironment consumption', () => {
 		expect(secondMessage).not.toContain('pip install');
 	});
 
-	it('without a runtimeEnvironment, payloads match the pre-Environments behavior exactly', async () => {
+	it('without a runtimeEnvironment, falls back to the env-var networking policy and skips the bootstrap', async () => {
 		const result = await runPlugin(undefined);
 		expect(result.success).toBe(true);
 
-		// networking stays undefined → the client's env-var fallback path
-		// decides (covered byte-for-byte in managed-agents-client.spec.ts).
+		// No Environment → the env-var policy decides. The control plane
+		// resolves it eagerly (it has to hash the config for drift detection)
+		// rather than leaving `networking` undefined for the client to fill in;
+		// with CLAUDE_MANAGED_AGENT_EGRESS_HOSTS unset both paths yield the
+		// same `unrestricted` policy.
 		expect(createEnvironmentMock).toHaveBeenCalledTimes(1);
 		expect(createEnvironmentMock).toHaveBeenCalledWith({
-			name: 'Ever Works Environment: test-work',
-			networking: undefined
+			name: 'Ever Works Environment',
+			networking: { type: 'unrestricted' }
 		});
 
 		// No bootstrap round-trip: seed, generation, result collection only.
@@ -170,7 +193,7 @@ describe('ClaudeManagedAgentPlugin — runtimeEnvironment consumption', () => {
 		expect(result.success).toBe(true);
 
 		expect(createEnvironmentMock).toHaveBeenCalledWith({
-			name: 'Ever Works Environment: test-work',
+			name: 'Python Data',
 			networking: { type: 'unrestricted' }
 		});
 		expect(sendUserMessageMock).toHaveBeenCalledTimes(3);

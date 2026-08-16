@@ -3,12 +3,20 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { config } from '@ever-works/agent/config';
 import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
+import { FleetExecutionPreferenceService } from '@ever-works/agent/fleet';
 import type { AgentTaskExecuteDispatchPayload } from '@ever-works/agent/tasks-domain';
-import type { FleetAgentTaskPayload, FleetAgentTaskStep } from '@ever-works/contracts';
+import { decideFleetRouting, DEFAULT_FLEET_EXECUTION_MODE } from '@ever-works/contracts';
+import type {
+    FleetAgentTaskPayload,
+    FleetAgentTaskStep,
+    FleetExecutionScopeQuery,
+    FleetRunRoutingDecision,
+} from '@ever-works/contracts';
 import type {
     NodeDispatcherFactory,
     NodeJobRuntimePlugin,
 } from '@ever-works/job-runtime-node-plugin';
+import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
     NODE_JOB_RUNTIME_DISPATCHER_FACTORY,
     NODE_JOB_RUNTIME_PLUGIN,
@@ -108,6 +116,15 @@ export class FleetRunRouterService {
         @Optional()
         @InjectRepository(TenantJobRuntimeConfig)
         private readonly overlay?: Repository<TenantJobRuntimeConfig>,
+        // Appended LAST and @Optional() — the positional-arity rule the
+        // sibling services follow, so every existing spec that builds
+        // this router positionally keeps compiling. Absent, routing
+        // degrades to the pre-preference behaviour: the fleet whenever
+        // the resolved runtime is `node`, no waiting, no fallback notice.
+        @Optional()
+        private readonly preferences?: FleetExecutionPreferenceService,
+        @Optional()
+        private readonly runners?: FleetRunnerStatusService,
     ) {}
 
     /**
@@ -157,6 +174,54 @@ export class FleetRunRouterService {
     }
 
     /**
+     * The full routing verdict for one dispatch: fleet now, fleet-but-
+     * waiting, or cloud.
+     *
+     * Two questions, in this order, and the order matters:
+     *
+     *   1. **Is the fleet even on the table?** {@link shouldDispatchToFleet}
+     *      answers that from the runtime selector and the operator kill
+     *      switch. A `no` here is final — an owner cannot opt INTO the
+     *      fleet with a preference row when their tenant is not on the
+     *      fleet runtime, and no preference outranks an operator
+     *      draining the fleet.
+     *   2. **Given the fleet is available, what does the owner want for
+     *      THIS Work / Goal, and can a runner take it right now?** That
+     *      is `resolveForUser` + `availability` fed into the pure
+     *      {@link decideFleetRouting}.
+     *
+     * Never throws: any failure below step 1 degrades to plain `fleet`,
+     * which is byte-for-byte what this path did before preferences
+     * existed. Deciding WHERE to run is infrastructure, and an
+     * infrastructure hiccup must not cost the user a run.
+     */
+    async routeAgentTask(
+        payload: AgentTaskExecuteDispatchPayload,
+        scope: FleetExecutionScopeQuery = {},
+    ): Promise<FleetRunRoutingDecision> {
+        if (!(await this.shouldDispatchToFleet(payload.tenantId))) {
+            // Not a fallback: this tenant was never routed to the fleet,
+            // so there is nothing to notify anyone about.
+            return { target: 'cloud', mode: 'cloud' };
+        }
+        if (!this.preferences || !this.runners) {
+            return { target: 'fleet', mode: DEFAULT_FLEET_EXECUTION_MODE };
+        }
+        try {
+            const mode = await this.preferences.resolveForUser(payload.userId, scope);
+            const availability = await this.runners.availability(payload.userId);
+            return decideFleetRouting(mode, availability);
+        } catch (err) {
+            this.logger.warn(
+                `Fleet execution-preference routing failed for task ${payload.taskId} — dispatching to the fleet: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return { target: 'fleet', mode: DEFAULT_FLEET_EXECUTION_MODE };
+        }
+    }
+
+    /**
      * Write the lease-able `agent-task` row for one dispatched run.
      *
      * The returned id is the FLEET JOB id; the caller stamps it onto the
@@ -164,7 +229,16 @@ export class FleetRunRouterService {
      * later status lookup / cancel can reach the remote unit of work
      * through `NodeJobRuntimePlugin.getRunStatus`.
      */
-    async enqueueAgentTask(payload: AgentTaskExecuteDispatchPayload): Promise<{ runId: string }> {
+    async enqueueAgentTask(
+        payload: AgentTaskExecuteDispatchPayload,
+        /**
+         * Stamped onto the queued row when the job was accepted with no
+         * runner able to take it (`local-wait` with a busy or absent
+         * fleet). Cleared by the lease CAS, so it can never outlive the
+         * condition it describes.
+         */
+        queuedReason?: string | null,
+    ): Promise<{ runId: string }> {
         const steps = this.buildAgentTaskSteps(payload);
         const workspacePath = config.fleetNode.getAgentTaskWorkspacePath();
 
@@ -203,6 +277,7 @@ export class FleetRunRouterService {
                 organizationId: payload.organizationId ?? null,
                 payload: jobPayload as unknown as Record<string, unknown>,
                 requiredCapabilities: config.fleetNode.getRequiredCapabilities(),
+                ...(queuedReason ? { queuedReason } : {}),
             },
             enqueueOptions,
         );
@@ -210,7 +285,7 @@ export class FleetRunRouterService {
         this.logger.log(
             `Enqueued fleet job ${jobId} (agent-task) for task ${payload.taskId} run ${
                 payload.runId ?? 'unknown'
-            }`,
+            }${queuedReason ? ` [${queuedReason}]` : ''}`,
         );
         return { runId: jobId };
     }

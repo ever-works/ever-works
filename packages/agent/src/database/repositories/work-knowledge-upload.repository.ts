@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, LessThan, Repository } from 'typeorm';
+import { Brackets, IsNull, LessThan, Repository } from 'typeorm';
 import { WorkKnowledgeUpload } from '../../entities/work-knowledge-upload.entity';
+import { Work } from '../../entities/work.entity';
 import { KbUploadExtractionStatus } from '../../entities/kb-types';
 
 @Injectable()
@@ -189,5 +190,116 @@ export class WorkKnowledgeUploadRepository {
                     'normalizedStoragePath'
                 ] as string | null | undefined) ?? null,
         }));
+    }
+
+    // ─── Memory Files (folder membership) ────────────────────────────────
+
+    /**
+     * The KB originals visible to one user in the /memory Files area:
+     * org-scoped rows (`workId IS NULL`) of the caller's ACTIVE
+     * organization, plus Work-scoped rows of Works the caller owns
+     * (`works.userId = :userId` via join — no cross-user leak by
+     * construction). `folderId` filters folder membership (`null` =
+     * unfiled/root); `undefined` = no folder filter (search mode).
+     */
+    private memoryFilesQuery(opts: {
+        userId: string;
+        organizationId?: string;
+        folderId?: string | null;
+        q?: string;
+    }) {
+        const qb = this.repository.createQueryBuilder('upload');
+        qb.leftJoin(Work, 'work', 'work.id = upload.workId');
+        qb.where(
+            new Brackets((scope) => {
+                scope.where('(upload.workId IS NOT NULL AND work.userId = :userId)', {
+                    userId: opts.userId,
+                });
+                if (opts.organizationId) {
+                    scope.orWhere(
+                        '(upload.workId IS NULL AND upload.organizationId = :organizationId)',
+                        { organizationId: opts.organizationId },
+                    );
+                }
+            }),
+        );
+        if (opts.folderId !== undefined) {
+            if (opts.folderId === null) {
+                qb.andWhere('upload.folderId IS NULL');
+            } else {
+                qb.andWhere('upload.folderId = :folderId', { folderId: opts.folderId });
+            }
+        }
+        if (opts.q) {
+            qb.andWhere('LOWER(upload.originalFilename) LIKE :q', {
+                q: `%${opts.q.toLowerCase()}%`,
+            });
+        }
+        return qb;
+    }
+
+    async listForMemoryFiles(opts: {
+        userId: string;
+        organizationId?: string;
+        folderId?: string | null;
+        q?: string;
+        limit?: number;
+    }): Promise<WorkKnowledgeUpload[]> {
+        const qb = this.memoryFilesQuery(opts);
+        qb.orderBy('upload.updatedAt', 'DESC');
+        if (opts.limit !== undefined) qb.take(opts.limit);
+        return qb.getMany();
+    }
+
+    /**
+     * One row by id, but only when the caller could see it in the Files
+     * area (own Work's row, or an org row of their active organization).
+     * `null` ⇒ 404 at the API layer — cross-user probing is a not-found.
+     */
+    async findForMemoryFiles(
+        id: string,
+        opts: { userId: string; organizationId?: string },
+    ): Promise<WorkKnowledgeUpload | null> {
+        const qb = this.memoryFilesQuery(opts);
+        qb.andWhere('upload.id = :id', { id });
+        return qb.getOne();
+    }
+
+    /** Move one visible row into a folder (or to the root with `null`). */
+    async setFolder(
+        id: string,
+        opts: { userId: string; organizationId?: string },
+        folderId: string | null,
+    ): Promise<boolean> {
+        const row = await this.findForMemoryFiles(id, opts);
+        if (!row) return false;
+        await this.repository.update({ id: row.id }, { folderId });
+        return true;
+    }
+
+    /** Per-folder file counts, for the Files tree. Missing id = zero. */
+    async countByFolderIds(folderIds: string[]): Promise<Map<string, number>> {
+        const counts = new Map<string, number>();
+        if (folderIds.length === 0) return counts;
+        const rows = (await this.repository
+            .createQueryBuilder('upload')
+            .select('upload.folderId', 'folderId')
+            .addSelect('COUNT(*)', 'cnt')
+            .where('upload.folderId IN (:...folderIds)', { folderIds })
+            .groupBy('upload.folderId')
+            .getRawMany()) as Array<{ folderId: string; cnt: number | string }>;
+        for (const row of rows) counts.set(row.folderId, Number(row.cnt));
+        return counts;
+    }
+
+    /** Unlink every original filed under the given folders (folder delete). */
+    async clearFolders(folderIds: string[]): Promise<void> {
+        if (folderIds.length === 0) return;
+        await this.repository
+            .createQueryBuilder()
+            .update(WorkKnowledgeUpload)
+            .set({ folderId: null })
+            .where('folderId IN (:...folderIds)', { folderIds })
+            .execute();
     }
 }

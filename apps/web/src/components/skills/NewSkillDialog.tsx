@@ -31,6 +31,7 @@ type CreateSkillFn = (input: {
     instructionsMd: string;
     frontmatter?: SkillFrontmatter;
     slug?: string;
+    invocationSlug?: string | null;
 }) => Promise<Skill>;
 
 /**
@@ -85,6 +86,7 @@ export function NewSkillDialog({
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [instructionsMd, setInstructionsMd] = useState('');
+    const [invocationSlug, setInvocationSlug] = useState('');
     const [templateSlug, setTemplateSlug] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -203,6 +205,10 @@ export function NewSkillDialog({
             void (async () => {
                 try {
                     const trimmedDescription = description.trim();
+                    const trimmedInvocation = invocationSlug
+                        .trim()
+                        .replace(/^\//, '')
+                        .toLowerCase();
                     const created = await createSkill({
                         ownerType: scope,
                         // Tenant ownerId is derived server-side from the
@@ -213,6 +219,7 @@ export function NewSkillDialog({
                         instructionsMd:
                             instructionsMd.trim() ||
                             defaultInstructions(trimmedTitle, trimmedDescription),
+                        ...(trimmedInvocation ? { invocationSlug: trimmedInvocation } : {}),
                     });
                     router.push(ROUTES.DASHBOARD_SKILL(created.id));
                 } catch (err) {
@@ -425,6 +432,38 @@ export function NewSkillDialog({
                             className="h-8 px-2.5 text-xs"
                             maxLength={240}
                         />
+                        <div>
+                            <label
+                                htmlFor="new-skill-invocation-slug"
+                                className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1"
+                            >
+                                {t('invocationLabel')}
+                            </label>
+                            <div className="relative max-w-xs">
+                                <span
+                                    aria-hidden="true"
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted pointer-events-none"
+                                >
+                                    /
+                                </span>
+                                <Input
+                                    id="new-skill-invocation-slug"
+                                    variant="form"
+                                    type="text"
+                                    value={invocationSlug}
+                                    onChange={(e) => setInvocationSlug(e.target.value)}
+                                    placeholder={t('invocationPlaceholder')}
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    maxLength={64}
+                                    className="h-8 pl-5 pr-2 text-xs font-mono"
+                                    data-testid="new-skill-invocation-slug"
+                                />
+                            </div>
+                            <p className="mt-1 text-[11px] text-text-muted dark:text-text-muted-dark">
+                                {t('invocationHint')}
+                            </p>
+                        </div>
                         <div>
                             <SkillMarkdownEditor
                                 value={instructionsMd}

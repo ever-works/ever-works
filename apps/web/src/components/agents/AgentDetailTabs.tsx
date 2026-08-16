@@ -31,6 +31,21 @@ export function AgentDetailTabs({ agentId }: { agentId: string }) {
             label: t('instructions'),
         },
         { key: 'skills', href: ROUTES.DASHBOARD_AGENT_SKILLS(agentId), label: t('skills') },
+        {
+            key: 'capabilities',
+            href: ROUTES.DASHBOARD_AGENT_CAPABILITIES(agentId),
+            label: t('capabilities'),
+        },
+        {
+            key: 'mcp-servers',
+            href: ROUTES.DASHBOARD_AGENT_MCP_SERVERS(agentId),
+            label: t('mcpServers'),
+        },
+        {
+            key: 'collaborators',
+            href: ROUTES.DASHBOARD_AGENT_COLLABORATORS(agentId),
+            label: t('collaborators'),
+        },
         { key: 'budgets', href: ROUTES.DASHBOARD_AGENT_BUDGETS(agentId), label: t('budgets') },
         { key: 'settings', href: ROUTES.DASHBOARD_AGENT_SETTINGS(agentId), label: t('settings') },
     ];

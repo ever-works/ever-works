@@ -165,6 +165,10 @@
             "types": "./dist/skills/index.d.ts",
             "default": "./dist/skills/index.js"
         },
+        "./mcp": {
+            "types": "./dist/mcp/index.d.ts",
+            "default": "./dist/mcp/index.js"
+        },
         "./tasks-domain": {
             "types": "./dist/tasks-domain/index.d.ts",
             "default": "./dist/tasks-domain/index.js"
@@ -184,6 +188,10 @@
         "./triggers": {
             "types": "./dist/triggers/index.d.ts",
             "default": "./dist/triggers/index.js"
+        },
+        "./inbox": {
+            "types": "./dist/inbox/index.d.ts",
+            "default": "./dist/inbox/index.js"
         },
         "./ingest": {
             "types": "./dist/ingest/index.d.ts",
@@ -280,6 +288,7 @@
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@langchain/textsplitters": "^0.1.0",
+        "@modelcontextprotocol/sdk": "^1.27.1",
         "ai": "^6.0.154",
         "@nestjs/cache-manager": "^3.1.0",
         "@nestjs/config": "^4.0.3",
