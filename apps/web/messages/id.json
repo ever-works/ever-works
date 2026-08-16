@@ -171,7 +171,11 @@
                 "noToken": "Tautan reset tidak valid",
                 "invalidLink": "Tautan Reset Tidak Valid",
                 "missingTokenMessage": "Tautan reset kata sandi tidak valid atau tidak lengkap. Harap minta reset kata sandi baru.",
-                "requestNewLink": "Minta Tautan Reset Baru"
+                "requestNewLink": "Minta Tautan Reset Baru",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead."
             },
             "backToLogin": "Kembali ke masuk"
         },
@@ -181,7 +185,8 @@
             "form": {
                 "name": {
                     "label": "Nama lengkap",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Alamat email",
@@ -190,7 +195,7 @@
                 "password": {
                     "label": "Kata sandi",
                     "placeholder": "Buat kata sandi yang kuat",
-                    "hint": "Harus minimal 8 karakter"
+                    "hint": "Harus minimal 8 karakter dengan huruf kecil dan angka/karakter khusus"
                 },
                 "confirmPassword": {
                     "label": "Konfirmasi kata sandi",
@@ -219,7 +224,41 @@
                 "passwordsDoNotMatch": "Kata sandi tidak cocok",
                 "passwordTooShort": "Kata sandi harus minimal 8 karakter",
                 "generic": "Terjadi kesalahan. Harap coba lagi.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
+            }
+        },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
             }
         }
     },
@@ -1477,7 +1516,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Tanpa Misi",
+                "missionPlaceholder": "Pilih sebuah Misi…",
+                "missionUpdateError": "Gagal memperbarui Misi",
+                "ideaNone": "Tanpa Ide",
+                "ideaPlaceholder": "Pilih sebuah Ide…",
+                "ideaUpdateError": "Gagal memperbarui Ide",
+                "openWork": "Buka Work ini",
+                "openMission": "Buka Misi ini",
+                "openIdea": "Buka Ide ini",
+                "openAgent": "Buka Agen ini"
             },
             "recurring": {
                 "section": "Jadwal berulang",
@@ -1496,7 +1545,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Frekuensi",
+                "endsAt": "Berakhir (opsional)",
+                "maxOccurrences": "Maks. kemunculan (opsional)",
+                "rulePreview": "Pratinjau aturan",
+                "ruleInvalid": "tidak valid",
+                "cancel": "Batal",
+                "inactiveHint": "Tugas ini tidak berulang. Naikkan menjadi templat berulang untuk membuat instance baru sesuai jadwal.",
+                "rule": "Aturan",
+                "nextAt": "Berikutnya pada",
+                "ends": "Berakhir",
+                "max": "Maks.",
+                "stopConfirm": "Hentikan jadwal berulang? Instance yang ada tetap ada; tidak ada yang baru dibuat.",
+                "stopError": "Gagal menghentikan jadwal berulang",
+                "saveError": "Gagal menyimpan jadwal"
             },
             "status": {
                 "backlog": "Daftar tunggu",
@@ -8196,7 +8259,8 @@
             "discover": "Discover",
             "billing": "Billing",
             "usage": "Usage & Credits",
-            "jobRuntime": "Job Runtime"
+            "jobRuntime": "Job Runtime",
+            "resendVerification": "Resend Verification Email"
         }
     },
     "api": {
@@ -8214,7 +8278,8 @@
             "forgotPasswordFailed": "Gagal mengirim email atur ulang kata sandi",
             "resetPasswordFailed": "Gagal mengatur ulang kata sandi",
             "magicLinkFailed": "Failed to send magic link",
-            "magicLinkInvalid": "Invalid or expired magic link"
+            "magicLinkInvalid": "Invalid or expired magic link",
+            "resendVerificationFailed": "Failed to send verification email"
         }
     },
     "actions": {
@@ -8352,6 +8417,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

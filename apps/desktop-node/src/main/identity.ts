@@ -72,11 +72,8 @@ export function toWorkerStatusView(state: WorkerLoopState | null | undefined): W
 		activeJobCount: state.activeJobIds.length,
 		completed: state.completed,
 		failed: state.failed,
-		// The core marks `throttleReason` OPTIONAL (`string | null | undefined`);
-		// the IPC view models "no reason" as an explicit null, so normalize here
-		// rather than widen the view — the renderer and the tray both branch on
-		// `!== null`, and an absent key would read as "unknown", not "not
-		// throttled".
+		// `WorkerLoopState.throttleReason` is optional; the renderer-facing
+		// view models "not throttled" as an explicit null, never `undefined`.
 		throttleReason: state.throttleReason ?? null
 	};
 }

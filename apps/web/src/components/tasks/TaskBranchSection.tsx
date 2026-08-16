@@ -285,7 +285,7 @@ function IsolationOverridePanel({ task }: { task: Task }) {
                 value={mode}
                 onValueChange={handleChange}
                 disabled={pending}
-                size="sm"
+                size="xs"
                 data-testid="task-isolation-override"
             >
                 <option value="inherit">{t('isolationInherit')}</option>

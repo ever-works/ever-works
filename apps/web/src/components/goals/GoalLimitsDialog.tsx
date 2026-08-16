@@ -14,9 +14,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-// Value import from `goals.shared`; `@/lib/api/goals` is `server-only`.
+// Runtime values come from the CLIENT-SAFE module. `@/lib/api/goals` starts
+// with `import 'server-only'`, so a value import from it drags that module into
+// the client bundle and the Next build fails outright. Type-only imports are
+// erased at compile time and stay safe to take from the barrel.
 import { GOAL_EXECUTION_TARGETS } from '@/lib/api/goals.shared';
-import type { Goal, GoalExecutionTarget, UpdateGoalLimitsInput } from '@/lib/api/goals';
+import { type Goal, type GoalExecutionTarget, type UpdateGoalLimitsInput } from '@/lib/api/goals';
 import { updateGoalLimitsAction } from './actions';
 
 /**

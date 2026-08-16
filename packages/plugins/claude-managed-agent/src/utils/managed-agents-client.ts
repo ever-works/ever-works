@@ -139,6 +139,13 @@ export class AnthropicManagedAgentsClient {
 			input.agentOverrides &&
 			(input.agentOverrides.system !== undefined || input.agentOverrides.model !== undefined);
 
+		// Cast mirrors the `networking` precedent above: the pinned SDK's
+		// session-create params may lag the API's resource union (the
+		// `github_repository` variant, Feature G). Narrow once the SDK
+		// types catch up.
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const resources: any = input.resources;
+
 		const session = await this.client.beta.sessions.create({
 			agent: hasOverrides
 				? {
@@ -150,7 +157,9 @@ export class AnthropicManagedAgentsClient {
 				: input.agentId,
 			environment_id: input.environmentId,
 			title: input.title,
-			...(input.resources?.length ? { resources: sessionResources } : {}),
+			// `resources` is the locally-narrowed `const resources: any` declared
+			// above; this branch's `sessionResources` name does not exist here.
+			...(input.resources?.length ? { resources } : {}),
 			...(typeof input.budgetUsd === 'number' && input.budgetUsd > 0
 				? { budget: buildBudgetLimit(input.budgetUsd) }
 				: {}),

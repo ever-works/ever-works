@@ -171,7 +171,11 @@
                 "noToken": "无效的重置链接",
                 "invalidLink": "无效的重置链接",
                 "missingTokenMessage": "密码重置链接无效或不完整。请请求新的密码重置。",
-                "requestNewLink": "请求新的重置链接"
+                "requestNewLink": "请求新的重置链接",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead."
             },
             "backToLogin": "返回登录"
         },
@@ -181,7 +185,8 @@
             "form": {
                 "name": {
                     "label": "全名",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "电子邮件地址",
@@ -190,7 +195,7 @@
                 "password": {
                     "label": "密码",
                     "placeholder": "创建强密码",
-                    "hint": "至少 8 个字符"
+                    "hint": "至少 8 个字符，包含小写字母、数字/特殊字符"
                 },
                 "confirmPassword": {
                     "label": "确认密码",
@@ -219,7 +224,41 @@
                 "passwordsDoNotMatch": "密码不匹配",
                 "passwordTooShort": "密码至少 8 个字符",
                 "generic": "发生错误。请重试。",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
+            }
+        },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
             }
         }
     },
@@ -1444,7 +1483,7 @@
                 "created": "创建时间",
                 "updated": "更新时间",
                 "scopeWork": "工作",
-                "scopeMission": "任务",
+                "scopeMission": "Mission",
                 "scopeIdea": "想法",
                 "delete": {
                     "action": "删除",
@@ -1477,7 +1516,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "无 Mission",
+                "missionPlaceholder": "选择一个 Mission…",
+                "missionUpdateError": "更新 Mission 失败",
+                "ideaNone": "无想法",
+                "ideaPlaceholder": "选择一个想法…",
+                "ideaUpdateError": "更新想法失败",
+                "openWork": "打开此 Work",
+                "openMission": "打开此 Mission",
+                "openIdea": "打开此想法",
+                "openAgent": "打开此代理"
             },
             "recurring": {
                 "section": "重复计划",
@@ -1496,7 +1545,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "频率",
+                "endsAt": "结束（可选）",
+                "maxOccurrences": "最大次数（可选）",
+                "rulePreview": "规则预览",
+                "ruleInvalid": "无效",
+                "cancel": "取消",
+                "inactiveHint": "此任务不会重复。将其提升为周期性模板，即可按计划生成新的实例。",
+                "rule": "规则",
+                "nextAt": "下次时间",
+                "ends": "结束",
+                "max": "上限",
+                "stopConfirm": "停止周期性计划？现有实例将保留，不会再生成新实例。",
+                "stopError": "无法停止周期性计划",
+                "saveError": "无法保存计划"
             },
             "status": {
                 "backlog": "待办",
@@ -8196,7 +8259,8 @@
             "discover": "Discover",
             "billing": "Billing",
             "usage": "Usage & Credits",
-            "jobRuntime": "Job Runtime"
+            "jobRuntime": "Job Runtime",
+            "resendVerification": "Resend Verification Email"
         }
     },
     "api": {
@@ -8214,7 +8278,8 @@
             "forgotPasswordFailed": "发送密码重置邮件失败",
             "resetPasswordFailed": "重置密码失败",
             "magicLinkFailed": "Failed to send magic link",
-            "magicLinkInvalid": "Invalid or expired magic link"
+            "magicLinkInvalid": "Invalid or expired magic link",
+            "resendVerificationFailed": "Failed to send verification email"
         }
     },
     "actions": {
@@ -8352,6 +8417,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

@@ -45,6 +45,7 @@ export {
     type AgentRunTimelineEntry,
     type AgentRunTimelineEntryKind,
     type SessionDetailQuery,
+    type AgentCollaboratorCandidate,
 } from './agents.shared';
 import type {
     AgentGuardrails,
@@ -57,6 +58,7 @@ import type {
     RunResumeResponse,
     AgentCollaboratorCandidate,
     SessionDetailQuery,
+    AgentCollaboratorCandidate,
 } from './agents.shared';
 
 export interface AgentPermissions {

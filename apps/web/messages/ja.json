@@ -171,7 +171,11 @@
                 "noToken": "無効なリセットリンク",
                 "invalidLink": "無効なリセットリンク",
                 "missingTokenMessage": "パスワードリセットリンクが無効または不完全です。新しいパスワードリセットをリクエストしてください。",
-                "requestNewLink": "新しいリセットリンクをリクエスト"
+                "requestNewLink": "新しいリセットリンクをリクエスト",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead."
             },
             "backToLogin": "ログインに戻る"
         },
@@ -181,7 +185,8 @@
             "form": {
                 "name": {
                     "label": "フルネーム",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "メールアドレス",
@@ -190,7 +195,7 @@
                 "password": {
                     "label": "パスワード",
                     "placeholder": "強力なパスワードを作成",
-                    "hint": "最低8文字必要です"
+                    "hint": "最低8文字で、小文字と数字/特殊文字を含む必要があります"
                 },
                 "confirmPassword": {
                     "label": "パスワードを確認",
@@ -219,7 +224,41 @@
                 "passwordsDoNotMatch": "パスワードが一致しません",
                 "passwordTooShort": "パスワードは最低8文字必要です",
                 "generic": "エラーが発生しました。もう一度お試しください。",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
+            }
+        },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
             }
         }
     },
@@ -1477,7 +1516,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "ミッションなし",
+                "missionPlaceholder": "ミッションを選択…",
+                "missionUpdateError": "ミッションの更新に失敗しました",
+                "ideaNone": "アイデアなし",
+                "ideaPlaceholder": "アイデアを選択…",
+                "ideaUpdateError": "アイデアの更新に失敗しました",
+                "openWork": "この Work を開く",
+                "openMission": "このミッションを開く",
+                "openIdea": "このアイデアを開く",
+                "openAgent": "このエージェントを開く"
             },
             "recurring": {
                 "section": "定期的なスケジュール",
@@ -1496,7 +1545,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "頻度",
+                "endsAt": "終了（任意）",
+                "maxOccurrences": "最大実行回数（任意）",
+                "rulePreview": "ルールのプレビュー",
+                "ruleInvalid": "無効",
+                "cancel": "キャンセル",
+                "inactiveHint": "このタスクは繰り返しません。定期テンプレートに昇格すると、スケジュールに従って新しいインスタンスが作成されます。",
+                "rule": "ルール",
+                "nextAt": "次回",
+                "ends": "終了",
+                "max": "最大",
+                "stopConfirm": "繰り返しスケジュールを停止しますか？既存のインスタンスは残り、新しいものは作成されません。",
+                "stopError": "繰り返しスケジュールを停止できませんでした",
+                "saveError": "スケジュールを保存できませんでした"
             },
             "status": {
                 "backlog": "バックログ",
@@ -8196,7 +8259,8 @@
             "discover": "Discover",
             "billing": "Billing",
             "usage": "Usage & Credits",
-            "jobRuntime": "Job Runtime"
+            "jobRuntime": "Job Runtime",
+            "resendVerification": "Resend Verification Email"
         }
     },
     "api": {
@@ -8214,7 +8278,8 @@
             "forgotPasswordFailed": "パスワードリセットメールの送信に失敗しました",
             "resetPasswordFailed": "パスワードのリセットに失敗しました",
             "magicLinkFailed": "Failed to send magic link",
-            "magicLinkInvalid": "Invalid or expired magic link"
+            "magicLinkInvalid": "Invalid or expired magic link",
+            "resendVerificationFailed": "Failed to send verification email"
         }
     },
     "actions": {
@@ -8352,6 +8417,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

@@ -42,6 +42,11 @@ import {
 	DEFAULT_WORKSPACE_PATH,
 	type ManagedAgentFanOutCapability,
 	type ManagedAgentRunResources,
+	// `ManagedAgentsSessionResource` is used by the run-resources type below.
+	// develop also imported `ManagedRuntimeEnvironment` here, but this branch's
+	// resolver is typed against the pipeline's flat `RuntimeEnvironmentData`
+	// instead, so that symbol has no remaining use and is deliberately omitted.
+	type ManagedAgentsSessionResource,
 	type ManagedSessionRunResult,
 	MAX_VARIANT_SESSIONS,
 	MIN_VARIANT_SESSIONS,
@@ -518,40 +523,15 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				return this.toCancelledResult(startTime).result;
 			}
 
-			if (variantSessions > 1) {
-				return await this.executeVariantSessions({
-					client,
-					work,
-					request,
-					existing,
-					settings,
-					execContext,
-					abortController,
-					onProgress,
-					startTime,
-					targetItems,
-					variantSessions,
-					perSessionBudgetUsd,
-					shouldCaptureScreenshots,
-					agentId,
-					environmentId,
-					sessionAgentOverrides,
-					uploadedSeedFileId: uploadedSeedManifest.id,
-					workspaceSeedManifest,
-					logger,
-					userId
-				});
-			}
-
-			this.skipStep('run-variant-sessions');
-
-			await this.beginStep('run-managed-session', onProgress, 20);
-
 			// Repository registry (Feature G) — mount the run agent's attached
 			// registry repos alongside the primary workspace. Env files are
 			// uploaded per run and mounted under each repo's directory. With
 			// no attachments (the default) the resource list is byte-identical
 			// to what this plugin has always sent.
+			//
+			// Resolved BEFORE the fan-out branch so the variant sessions
+			// (feat-cma-scale) mount the same repos as the single-session
+			// path — attachments must not depend on `variantSessions`.
 			const attachedRepos = options?.attachedRepos ?? [];
 			const uploadedEnvFiles: UploadedAttachedEnvFile[] = [];
 			for (const attachedRepo of attachedRepos) {
@@ -571,19 +551,58 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				}
 			}
 
+			const sessionResources = buildSessionResources({
+				workspacePath: DEFAULT_WORKSPACE_PATH,
+				seedManifest: {
+					fileId: uploadedSeedManifest.id,
+					mountPath: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
+				},
+				attachedRepos,
+				uploadedEnvFiles
+			});
+
+			if (variantSessions > 1) {
+				return await this.executeVariantSessions({
+					client,
+					work,
+					request,
+					existing,
+					settings,
+					execContext,
+					abortController,
+					onProgress,
+					startTime,
+					targetItems,
+					variantSessions,
+					perSessionBudgetUsd,
+					shouldCaptureScreenshots,
+					agentId,
+					environmentId,
+					sessionAgentOverrides,
+					sessionResources,
+					workspaceSeedManifest,
+					logger,
+					userId
+				});
+			}
+
+			this.skipStep('run-variant-sessions');
+
+			await this.beginStep('run-managed-session', onProgress, 20);
+
+			// The repo-attachment block that used to sit here is GONE on
+			// purpose. Both sides of this merge carry the Feature G work, so
+			// the auto-merge produced it twice in one scope — `attachedRepos`
+			// and `uploadedEnvFiles` were declared at ~535 and again here,
+			// which is a redeclaration error, and it would have uploaded every
+			// attached repo's env files twice per run. The surviving copy is
+			// develop's, hoisted above the `variantSessions > 1` branch so
+			// variant runs get the same resources.
 			const session = await client.createSession({
 				agentId,
 				environmentId,
 				title: `Ever Works: ${work.name}`,
-				resources: buildSessionResources({
-					workspacePath: DEFAULT_WORKSPACE_PATH,
-					seedManifest: {
-						fileId: uploadedSeedManifest.id,
-						mountPath: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
-					},
-					attachedRepos,
-					uploadedEnvFiles
-				}),
+				resources: sessionResources,
 				budgetUsd: perSessionBudgetUsd,
 				agentOverrides: sessionAgentOverrides
 			});
@@ -789,7 +808,13 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 		agentId: string;
 		environmentId: string;
 		sessionAgentOverrides: { system?: string; model?: string } | undefined;
-		uploadedSeedFileId: string;
+		/**
+		 * Resources every variant session mounts: the seed manifest plus the
+		 * run agent's attached registry repos + their env files (Feature G).
+		 * Built once by the caller so fan-out and single-session runs mount
+		 * an identical workspace.
+		 */
+		sessionResources: ManagedAgentsSessionResource[];
 		workspaceSeedManifest: ReturnType<typeof buildWorkspaceSeedManifest>;
 		logger: { log(m: string): void; warn(m: string): void; error(m: string): void };
 		userId: string;
@@ -811,7 +836,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			agentId,
 			environmentId,
 			sessionAgentOverrides,
-			uploadedSeedFileId,
+			sessionResources,
 			workspaceSeedManifest,
 			logger,
 			userId
@@ -839,13 +864,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			agentId,
 			environmentId,
 			perSessionBudgetUsd,
-			resources: [
-				{
-					type: 'file',
-					file_id: uploadedSeedFileId,
-					mount_path: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
-				}
-			],
+			resources: sessionResources,
 			pollIntervalMs: getNumericSetting(settings.pollIntervalMs, DEFAULT_POLL_INTERVAL_MS),
 			maxPollAttempts: getNumericSetting(settings.maxPollAttempts, DEFAULT_MAX_POLL_ATTEMPTS),
 			agentOverrides: sessionAgentOverrides,

@@ -213,17 +213,27 @@ export class AgentToolService {
         @Optional()
         @Inject(CREDENTIAL_RESOLVER)
         private readonly credentials?: CredentialResolver,
-        // Agent Collaborators — delegateToAgent. Both APPENDED LAST +
-        // @Optional() so every positional constructor call in the unit
-        // tests keeps compiling, and a runtime without them simply never
-        // exposes the tool (the model sees nothing that would fail).
+        // Agent Collaborators — delegateToAgent. Both APPENDED + @Optional()
+        // so every positional constructor call in the unit tests keeps
+        // compiling, and a runtime without them simply never exposes the
+        // tool (the model sees nothing that would fail).
+        // NOTE: these keep positions 13/14 because `agent-tool-delegate.spec.ts`
+        // constructs the service positionally through this slot. Nest resolves
+        // every param below by type/token, so ordering is a test-only concern.
         @Optional() private readonly delegation?: SubAgentDelegationService,
         @Optional() private readonly collaborators?: AgentCollaboratorRepository,
-        // Agent Plugins MCP slice (T26). APPENDED LAST + @Optional() so
-        // every existing positional constructor call keeps working, and
-        // so a runtime without the MCP module behaves exactly as before.
+        // Agent Plugins MCP slice (T26). APPENDED + @Optional() so every
+        // existing positional constructor call keeps working, and so a
+        // runtime without the MCP module behaves exactly as before.
         // Consumed in `resolveGrantedTools` (async — descriptor assembly
         // needs I/O), never in the sync `resolveAllowedTools`.
+        // 🛑 MERGE NOTE: on this branch this param sat at index 13. It now sits
+        // at 15, BEHIND Collaborators' 13/14, because those two shipped to
+        // develop first and `agent-tool-delegate.spec.ts` constructs the
+        // service positionally through those slots. Both sides claimed index
+        // 13, so one had to move; moving this one breaks only this branch's own
+        // `agent-tool-mcp-funnel.spec.ts`, which is padded to match. Nest
+        // resolves by type/token, so this ordering is a test-only concern.
         @Optional()
         @Inject(AGENT_MCP_TOOL_SOURCE)
         private readonly mcpTools?: AgentMcpToolSource,

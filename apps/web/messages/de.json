@@ -171,7 +171,11 @@
                 "noToken": "Ungültiger Reset-Link",
                 "invalidLink": "Ungültiger Reset-Link",
                 "missingTokenMessage": "Der Passwort-Reset-Link ist ungültig oder unvollständig. Bitte fordern Sie einen neuen Passwort-Reset an.",
-                "requestNewLink": "Neuen Reset-Link anfordern"
+                "requestNewLink": "Neuen Reset-Link anfordern",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead."
             },
             "backToLogin": "Zurück zur Anmeldung"
         },
@@ -181,7 +185,8 @@
             "form": {
                 "name": {
                     "label": "Vollständiger Name",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "E-Mail-Adresse",
@@ -190,7 +195,7 @@
                 "password": {
                     "label": "Passwort",
                     "placeholder": "Erstellen Sie ein starkes Passwort",
-                    "hint": "Mindestens 8 Zeichen"
+                    "hint": "Mindestens 8 Zeichen mit Kleinbuchstaben und Zahl/Sonderzeichen"
                 },
                 "confirmPassword": {
                     "label": "Passwort bestätigen",
@@ -219,7 +224,41 @@
                 "passwordsDoNotMatch": "Passwörter stimmen nicht überein",
                 "passwordTooShort": "Passwort muss mindestens 8 Zeichen haben",
                 "generic": "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
+            }
+        },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
             }
         }
     },
@@ -1508,7 +1547,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Keine Mission",
+                "missionPlaceholder": "Mission auswählen…",
+                "missionUpdateError": "Mission konnte nicht aktualisiert werden",
+                "ideaNone": "Keine Idee",
+                "ideaPlaceholder": "Idee auswählen…",
+                "ideaUpdateError": "Idee konnte nicht aktualisiert werden",
+                "openWork": "Dieses Work öffnen",
+                "openMission": "Diese Mission öffnen",
+                "openIdea": "Diese Idee öffnen",
+                "openAgent": "Diesen Agent öffnen"
             },
             "recurring": {
                 "section": "Wiederkehrender Zeitplan",
@@ -1527,7 +1576,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Häufigkeit",
+                "endsAt": "Ende (optional)",
+                "maxOccurrences": "Max. Wiederholungen (optional)",
+                "rulePreview": "Regelvorschau",
+                "ruleInvalid": "ungültig",
+                "cancel": "Abbrechen",
+                "inactiveHint": "Diese Aufgabe wiederholt sich nicht. Stufen Sie sie zu einer wiederkehrenden Vorlage hoch, um nach Zeitplan neue Instanzen zu erzeugen.",
+                "rule": "Regel",
+                "nextAt": "Nächste am",
+                "ends": "Endet",
+                "max": "Max.",
+                "stopConfirm": "Wiederkehrenden Zeitplan beenden? Bestehende Instanzen bleiben erhalten; es werden keine neuen erzeugt.",
+                "stopError": "Wiederkehrender Zeitplan konnte nicht beendet werden",
+                "saveError": "Zeitplan konnte nicht gespeichert werden"
             },
             "status": {
                 "backlog": "Backlog",
@@ -8195,7 +8258,8 @@
             "discover": "Entdecken",
             "billing": "Billing",
             "usage": "Usage & Credits",
-            "jobRuntime": "Job Runtime"
+            "jobRuntime": "Job Runtime",
+            "resendVerification": "Resend Verification Email"
         }
     },
     "api": {
@@ -8213,7 +8277,8 @@
             "forgotPasswordFailed": "Passwort-Reset-E-Mail konnte nicht gesendet werden",
             "resetPasswordFailed": "Passwort konnte nicht zurückgesetzt werden",
             "magicLinkFailed": "Failed to send magic link",
-            "magicLinkInvalid": "Invalid or expired magic link"
+            "magicLinkInvalid": "Invalid or expired magic link",
+            "resendVerificationFailed": "Failed to send verification email"
         }
     },
     "actions": {
@@ -8351,6 +8416,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

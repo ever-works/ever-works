@@ -24,9 +24,15 @@ import { StatusPill } from '@/components/work-agent';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
-// Value import from `goals.shared`; `@/lib/api/goals` is `server-only`.
+// Runtime value from the client-safe module — see GoalLimitsDialog.tsx.
 import { MAX_NUDGE_CHARS } from '@/lib/api/goals.shared';
-import type { Goal, GoalEvent, GoalMetricSample, GoalOutcome, GoalSession } from '@/lib/api/goals';
+import {
+    type Goal,
+    type GoalEvent,
+    type GoalMetricSample,
+    type GoalOutcome,
+    type GoalSession,
+} from '@/lib/api/goals';
 import { COMPARATOR_GLYPH, OutcomeBadge, formatDateTime, formatMetricValue } from './goal-ui';
 import { DodRollup, LoopStatusBadge, formatCents } from './goal-loop-ui';
 import { Sparkline } from './Sparkline';

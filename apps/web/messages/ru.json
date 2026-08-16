@@ -171,7 +171,11 @@
                 "noToken": "Недействительная ссылка сброса",
                 "invalidLink": "Недействительная ссылка для сброса",
                 "missingTokenMessage": "Ссылка для сброса пароля недействительна или неполна. Пожалуйста, запросите новый сброс пароля.",
-                "requestNewLink": "Запросить новую ссылку для сброса"
+                "requestNewLink": "Запросить новую ссылку для сброса",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead."
             },
             "backToLogin": "Назад к входу"
         },
@@ -181,7 +185,8 @@
             "form": {
                 "name": {
                     "label": "Полное имя",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Адрес email",
@@ -190,7 +195,7 @@
                 "password": {
                     "label": "Пароль",
                     "placeholder": "Создайте надёжный пароль",
-                    "hint": "Должен содержать минимум 8 символов"
+                    "hint": "Должен содержать минимум 8 символов, включая строчные буквы и цифру/спецсимвол"
                 },
                 "confirmPassword": {
                     "label": "Подтвердите пароль",
@@ -219,7 +224,41 @@
                 "passwordsDoNotMatch": "Пароли не совпадают",
                 "passwordTooShort": "Пароль должен содержать минимум 8 символов",
                 "generic": "Произошла ошибка. Пожалуйста, попробуйте снова.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
+            }
+        },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
             }
         }
     },
@@ -1477,7 +1516,17 @@
                 },
                 "attachmentAttachAs": "Attach as",
                 "attachmentRoleInitial": "Input",
-                "attachmentRoleResult": "Result"
+                "attachmentRoleResult": "Result",
+                "missionNone": "Без миссии",
+                "missionPlaceholder": "Выберите Миссию…",
+                "missionUpdateError": "Не удалось обновить Миссию",
+                "ideaNone": "Без идеи",
+                "ideaPlaceholder": "Выберите Идею…",
+                "ideaUpdateError": "Не удалось обновить Идею",
+                "openWork": "Открыть этот Work",
+                "openMission": "Открыть эту Миссию",
+                "openIdea": "Открыть эту Идею",
+                "openAgent": "Открыть этого Агента"
             },
             "recurring": {
                 "section": "Повторяющееся расписание",
@@ -1496,7 +1545,21 @@
                 "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
                 "errorPickWeekday": "Pick at least one weekday.",
                 "errorInvalidRule": "A valid recurrence rule is required.",
-                "errorInvalidCron": "A cron expression needs exactly 5 fields."
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "Частота",
+                "endsAt": "Окончание (необязательно)",
+                "maxOccurrences": "Макс. повторений (необязательно)",
+                "rulePreview": "Предпросмотр правила",
+                "ruleInvalid": "недопустимо",
+                "cancel": "Отмена",
+                "inactiveHint": "Эта задача не повторяется. Повысьте её до повторяющегося шаблона, чтобы создавать новые экземпляры по расписанию.",
+                "rule": "Правило",
+                "nextAt": "Следующее",
+                "ends": "Окончание",
+                "max": "Макс.",
+                "stopConfirm": "Остановить повторяющееся расписание? Существующие экземпляры сохранятся; новые создаваться не будут.",
+                "stopError": "Не удалось остановить повторяющееся расписание",
+                "saveError": "Не удалось сохранить расписание"
             },
             "status": {
                 "backlog": "Бэклог",
@@ -8196,7 +8259,8 @@
             "discover": "Discover",
             "billing": "Billing",
             "usage": "Usage & Credits",
-            "jobRuntime": "Job Runtime"
+            "jobRuntime": "Job Runtime",
+            "resendVerification": "Resend Verification Email"
         }
     },
     "api": {
@@ -8214,7 +8278,8 @@
             "forgotPasswordFailed": "Не удалось отправить email для сброса пароля",
             "resetPasswordFailed": "Не удалось сбросить пароль",
             "magicLinkFailed": "Failed to send magic link",
-            "magicLinkInvalid": "Invalid or expired magic link"
+            "magicLinkInvalid": "Invalid or expired magic link",
+            "resendVerificationFailed": "Failed to send verification email"
         }
     },
     "actions": {
@@ -8352,6 +8417,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },
