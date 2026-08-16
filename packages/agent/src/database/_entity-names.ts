@@ -53,6 +53,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentEmailAssignment',
     'AgentEscalation',
     'AgentMembership',
+    // Repository registry (Feature G) — Agent → repo grant edge rows.
+    'AgentRepoAttachment',
     'AgentRun',
     'AgentRunLog',
     // ───────────────────────────────
@@ -124,6 +126,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'PlanEntitlement',
     'PluginUsageEvent',
     'RefreshToken',
+    // Repository registry (Feature G) — account-level repo records.
+    'RepoConnection',
     // Skills family (PR #1019) ──
     'Skill',
     'SkillBinding',

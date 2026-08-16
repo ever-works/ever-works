@@ -9,6 +9,7 @@ import {
     AlertTriangle,
     HardDrive,
     Github,
+    FolderGit2,
     Bot,
     Cpu,
     Building2,
@@ -94,6 +95,14 @@ export function SettingsLayoutClient({
                     label: t('tabs.githubApp'),
                     icon: Github,
                     href: `${baseSettingsPath}/github-app`,
+                },
+                // Repository registry (Feature G) — account-level repos agents
+                // can be granted; sits beside GitHub App, its import source.
+                {
+                    id: 'repositories',
+                    label: t('tabs.repositories'),
+                    icon: FolderGit2,
+                    href: `${baseSettingsPath}/repositories`,
                 },
                 {
                     id: 'work-agent',

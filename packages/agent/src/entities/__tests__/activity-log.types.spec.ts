@@ -128,11 +128,17 @@ describe('activity-log.types', () => {
             //    Inbox train merged develop's Agent Collaborators work.
             // +11 goal_* (Goals autonomy layer: loop lifecycle x5, iteration
             //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 142.
-            // 142 is COUNTED from the merged enum, not added up from the two
-            // sides' comments: each branch budgeted from its own base (137 and
-            // 131), so neither number is right after the merge. Scope the count
-            // to ActivityActionType — this file also declares ActivityStatus.
-            expect(literals).toHaveLength(142);
+            // +6 repo_connection_created / _updated / _deleted / _imported and
+            //    repo_attached_to_agent / repo_detached_from_agent
+            //    (repository registry, Feature G) -> 148.
+            //
+            // 🛑 148 is COUNTED from the merged enum, never added up from the
+            // comments above. Every feature branch budgets from its own base
+            // (this one said 135, develop said 142), so after a merge neither
+            // side's number is right and the arithmetic silently drifts. Scope
+            // the count to ActivityActionType — the file also declares
+            // ActivityStatus, and including it inflates the total by 5.
+            expect(literals).toHaveLength(148);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

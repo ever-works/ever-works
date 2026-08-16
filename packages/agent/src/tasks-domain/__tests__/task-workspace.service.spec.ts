@@ -152,6 +152,90 @@ describe('TaskWorkspaceService', () => {
         expect(result).not.toBeNull();
     });
 
+    describe('attached repos (Feature G — advisory provision-spec field)', () => {
+        const buildWithAttachments = (attachments: { listEnabledForAgentWithRepos: jest.Mock }) =>
+            new TaskWorkspaceService(
+                works as any,
+                tasks as any,
+                runs as any,
+                workspaceFacade as any,
+                gitFacade as any,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                attachments as any,
+            );
+
+        it('passes the agent enabled attachments as advisory attachedRepos', async () => {
+            const attachments = {
+                listEnabledForAgentWithRepos: jest.fn().mockResolvedValue([
+                    {
+                        repoConnection: {
+                            url: 'https://github.com/acme/tools',
+                            defaultBranch: 'main',
+                            mountPath: null,
+                            name: 'tools',
+                            enabled: true,
+                        },
+                    },
+                    {
+                        // Disabled repo row → filtered out even though the
+                        // attachment edge itself is enabled.
+                        repoConnection: {
+                            url: 'https://github.com/acme/off',
+                            defaultBranch: null,
+                            mountPath: 'off-dir',
+                            name: 'off',
+                            enabled: false,
+                        },
+                    },
+                ]),
+            };
+            await buildWithAttachments(attachments).provisionForRun({
+                ...input(),
+                agentId: 'agent-1',
+            });
+            expect(attachments.listEnabledForAgentWithRepos).toHaveBeenCalledWith(
+                'agent-1',
+                'user-1',
+            );
+            expect(workspaceFacade.provision).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    attachedRepos: [
+                        { url: 'https://github.com/acme/tools', branch: 'main', mountDir: 'tools' },
+                    ],
+                }),
+                expect.anything(),
+            );
+        });
+
+        it('omits the field entirely without an agentId or with no attachments', async () => {
+            const attachments = { listEnabledForAgentWithRepos: jest.fn().mockResolvedValue([]) };
+            await buildWithAttachments(attachments).provisionForRun(input());
+            expect(attachments.listEnabledForAgentWithRepos).not.toHaveBeenCalled();
+            expect(workspaceFacade.provision.mock.calls[0][0]).not.toHaveProperty('attachedRepos');
+
+            await buildWithAttachments(attachments).provisionForRun({
+                ...input(),
+                agentId: 'agent-1',
+            });
+            expect(workspaceFacade.provision.mock.calls[1][0]).not.toHaveProperty('attachedRepos');
+        });
+
+        it('a failed attachment read degrades to no extra repos, never a failed provision', async () => {
+            const attachments = {
+                listEnabledForAgentWithRepos: jest.fn().mockRejectedValue(new Error('db down')),
+            };
+            const result = await buildWithAttachments(attachments).provisionForRun({
+                ...input(),
+                agentId: 'agent-1',
+            });
+            expect(result).not.toBeNull();
+            expect(workspaceFacade.provision.mock.calls[0][0]).not.toHaveProperty('attachedRepos');
+        });
+    });
+
     describe('finalizeRun (M4)', () => {
         let transitions: { transition: jest.Mock };
         let taskChat: { post: jest.Mock };
