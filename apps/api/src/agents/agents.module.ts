@@ -12,6 +12,7 @@ import {
     AGENT_EMAIL_FACADE,
     AGENT_NOTIFY_CHANNEL_FACADE,
     AGENT_DOMAIN_TOOL_SOURCES,
+    AGENT_MCP_TOOL_SOURCE,
     SKILL_FILE_CONTENT_READER,
     AgentEscalationService,
     RunSteeringService,
@@ -104,6 +105,9 @@ import {
 // `PluginUsageRepository`.
 import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 import { DatabaseModule } from '@ever-works/agent/database';
+// Agent Plugins MCP slice — McpToolSource backs the AGENT_MCP_TOOL_SOURCE
+// binding below so agent runs expose `mcp__<server>__<tool>` descriptors.
+import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
 // Inbox (operator message center) — InboxService backs the `ask_human`
 // domain tool source below. The agent-side InboxModule imports the
 // agent-side AgentsModule / AgentApprovalsModule / NotificationsModule
@@ -184,6 +188,10 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         FleetModule,
         PrReviewModule,
         PolicyModule,
+        // Agent Plugins MCP slice — provides McpToolSource for the
+        // AGENT_MCP_TOOL_SOURCE binding below. Imports nothing api-side,
+        // so no cycle is introduced.
+        McpModule,
         AgentInboxModule,
         // Skill files — supplies SkillFileContentReaderService for the
         // SKILL_FILE_CONTENT_READER binding below. api SkillsModule
@@ -884,6 +892,13 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 inbox: { service: inboxService },
             }),
         },
+        // Agent Plugins MCP slice (T26) — AGENT_MCP_TOOL_SOURCE binding.
+        // `AgentToolService.resolveGrantedTools` injects this @Optional();
+        // without the binding no run would ever see an MCP tool, exactly
+        // the dead-seam failure mode this module's pin spec exists to
+        // catch. `useExisting` so the McpModule-provided singleton (with
+        // its listTools TTL cache) is shared with the HTTP surface.
+        { provide: AGENT_MCP_TOOL_SOURCE, useExisting: McpToolSource },
         // Skill files — expose the uploads-spine reader to the agent-side
         // AgentToolService (@Optional() @Inject(SKILL_FILE_CONTENT_READER)).
         // Unbound, `getSkillFile` would list files but refuse every read.
@@ -908,6 +923,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         AGENT_EMAIL_FACADE,
         AGENT_NOTIFY_CHANNEL_FACADE,
         AGENT_DOMAIN_TOOL_SOURCES,
+        AGENT_MCP_TOOL_SOURCE,
         INBOUND_EMAIL_TASK_SPAWNER,
         RUN_STEERING_PORT,
         TERMINAL_SESSION_DISPATCHER,

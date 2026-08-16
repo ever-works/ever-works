@@ -285,6 +285,16 @@ export enum ActivityActionType {
     GIT_COMMITTED = 'git_committed',
     GIT_MERGED = 'git_merged',
 
+    // Agent Plugins MCP slice — manual MCP connection lifecycle + per-agent
+    // binding changes. Additive members — storage is a plain varchar, so no
+    // migration is needed. `details` carries `{ connectionId, name }` (and
+    // `{ agentId, enabled }` for binding updates / `{ toolCount }` for tests);
+    // header VALUES are never included.
+    MCP_CONNECTION_CREATED = 'mcp_connection_created',
+    MCP_CONNECTION_UPDATED = 'mcp_connection_updated',
+    MCP_CONNECTION_DELETED = 'mcp_connection_deleted',
+    MCP_CONNECTION_TESTED = 'mcp_connection_tested',
+    MCP_BINDING_UPDATED = 'mcp_binding_updated',
     // Inbox (operator message center) — one row when a message lands in
     // the human's inbox and one when they answer it, so "what did the
     // agent ask, and what did I decide?" shows in the Activity feed

@@ -73,6 +73,13 @@ describe('activity-log.types', () => {
             ['GIT_PUSHED', 'git_pushed'],
             ['GIT_COMMITTED', 'git_committed'],
             ['GIT_MERGED', 'git_merged'],
+            // MCP connections (agent-plugins MCP slice, plan §2.4) — manual
+            // connection lifecycle + per-agent binding changes.
+            ['MCP_CONNECTION_CREATED', 'mcp_connection_created'],
+            ['MCP_CONNECTION_UPDATED', 'mcp_connection_updated'],
+            ['MCP_CONNECTION_DELETED', 'mcp_connection_deleted'],
+            ['MCP_CONNECTION_TESTED', 'mcp_connection_tested'],
+            ['MCP_BINDING_UPDATED', 'mcp_binding_updated'],
             // Agent Collaborators — sub-agent delegation allow-list edits.
             ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
             ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
@@ -131,14 +138,16 @@ describe('activity-log.types', () => {
             // +6 repo_connection_created / _updated / _deleted / _imported and
             //    repo_attached_to_agent / repo_detached_from_agent
             //    (repository registry, Feature G) -> 148.
+            // +5 mcp_connection_created / _updated / _deleted / _tested and
+            //    mcp_binding_updated (agent-plugins MCP slice) -> 153.
             //
-            // 🛑 148 is COUNTED from the merged enum, never added up from the
+            // 🛑 153 is COUNTED from the merged enum, never added up from the
             // comments above. Every feature branch budgets from its own base
-            // (this one said 135, develop said 142), so after a merge neither
-            // side's number is right and the arithmetic silently drifts. Scope
-            // the count to ActivityActionType — the file also declares
+            // (this one said 131, develop was already at 148), so after a merge
+            // neither side's number is right and the arithmetic silently drifts.
+            // Scope the count to ActivityActionType — the file also declares
             // ActivityStatus, and including it inflates the total by 5.
-            expect(literals).toHaveLength(148);
+            expect(literals).toHaveLength(153);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

@@ -74,6 +74,8 @@ export * from './agent-tool.service';
 // assembly `resolveAllowedTools` runs (never hand-maintained).
 export * from './agent-tool-catalog';
 export * from './agent-domain-tool-sources';
+// Agent Plugins MCP slice — the optional MCP tool-source seam (T26).
+export * from './agent-mcp-tool-source';
 export * from './budget-period';
 export * from './guardrails';
 export * from './heartbeat-cron';

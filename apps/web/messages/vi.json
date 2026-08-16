@@ -134,35 +134,6 @@
                 "link": "Đăng ký"
             }
         },
-        "resendVerification": {
-            "title": "Resend verification email",
-            "subtitle": "Enter your email address and we'll send a fresh verification link",
-            "form": {
-                "email": {
-                    "label": "Email address",
-                    "placeholder": "Enter your email"
-                },
-                "submit": "Send verification email",
-                "submitting": "Sending..."
-            },
-            "successTitle": "Check your email",
-            "successSubtitle": "If that address still needs verifying, a new link is on its way",
-            "success": {
-                "title": "Verification link sent — if the account needs one",
-                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
-                "checkSpam": "If you don't see the email, check your spam folder.",
-                "linkExpiry": "Verification links are valid for 24 hours."
-            },
-            "errors": {
-                "failed": "Failed to send verification email. Please try again."
-            },
-            "alreadyVerified": "Already verified?",
-            "backToLogin": "Back to login",
-            "noAccount": {
-                "text": "Don't have an account?",
-                "link": "Sign up"
-            }
-        },
         "resetPassword": {
             "title": "Đặt lại mật khẩu của bạn",
             "subtitle": "Nhập mật khẩu mới bên dưới",
@@ -197,14 +168,14 @@
             },
             "errors": {
                 "failed": "Không thể đặt lại mật khẩu. Vui lòng thử lại hoặc yêu cầu liên kết đặt lại mới.",
-                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
-                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
-                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
-                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "Liên kết đặt lại không hợp lệ",
                 "invalidLink": "Liên kết Đặt lại Không hợp lệ",
                 "missingTokenMessage": "Liên kết đặt lại mật khẩu không hợp lệ hoặc không đầy đủ. Vui lòng yêu cầu đặt lại mật khẩu mới.",
-                "requestNewLink": "Yêu cầu Liên kết Đặt lại Mới"
+                "requestNewLink": "Yêu cầu Liên kết Đặt lại Mới",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead."
             },
             "backToLogin": "Quay lại đăng nhập"
         },
@@ -259,6 +230,35 @@
                     "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
                     "retry": "Try again"
                 }
+            }
+        },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
             }
         }
     },
@@ -637,64 +637,6 @@
                 "error": "Đã xảy ra lỗi. Vui lòng thử lại."
             }
         },
-        "inbox": {
-            "title": "Inbox",
-            "subtitle": "Questions, approvals and notices your agents and works sent you.",
-            "unreadCount": "{count} unread",
-            "unreadDot": "Unread",
-            "tabs": {
-                "active": "Active",
-                "archived": "Archived"
-            },
-            "kind": {
-                "question": "Question",
-                "approval": "Approval",
-                "escalation": "Escalation",
-                "notice": "Notice"
-            },
-            "empty": {
-                "active": "Nothing is waiting on you.",
-                "archived": "No archived messages."
-            },
-            "rowMenu": {
-                "label": "Message actions",
-                "markRead": "Mark as read",
-                "markUnread": "Mark as unread",
-                "archive": "Archive",
-                "unarchive": "Move to Active",
-                "delete": "Delete"
-            },
-            "detail": {
-                "none": "Select a message to read it.",
-                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
-                "yourReply": "Your reply",
-                "noReplyText": "No reply text was recorded."
-            },
-            "reply": {
-                "chooseOption": "Choose an answer",
-                "other": "Other (write your own)",
-                "recommended": "Recommended",
-                "placeholder": "Write your reply…",
-                "send": "Send Reply",
-                "hint": "Your reply goes straight back to the agent.",
-                "needsAnswer": "Pick an option or write a reply first."
-            },
-            "routed": {
-                "steered": "Reply delivered — the running agent picked it up.",
-                "resumed": "Reply delivered — a new run is answering it.",
-                "approved": "Approved.",
-                "rejected": "Rejected.",
-                "escalationResolved": "Escalation resolved.",
-                "alreadyDecided": "This was already decided elsewhere.",
-                "recorded": "Reply recorded."
-            },
-            "toast": {
-                "archived": "Message archived.",
-                "unarchived": "Message moved back to Active.",
-                "deleted": "Message deleted.",
-                "error": "Something went wrong. Please try again."
-            }
-        },
         "title": "Bảng điều khiển",
         "connectGithub": {
             "title": "Kết nối tài khoản GitHub của bạn",
@@ -1030,6 +972,7 @@
                 "budgets": "Ngân sách",
                 "settings": "Cài đặt",
                 "terminal": "Terminal",
+                "mcpServers": "MCP Servers",
                 "collaborators": "Collaborators"
             },
             "newDialog": {
@@ -1249,16 +1192,6 @@
                 "success": "Đã xóa {name}",
                 "error": "Không thể xóa Agent"
             },
-            "collaborators": {
-                "title": "Collaborator Agents",
-                "description": "Select which agents this agent can spawn as collaborators for subtasks. Delegations to agents that are not enabled here are refused.",
-                "empty": "No other agents yet. Create another agent to enable it as a collaborator.",
-                "enabledCount": "{count} enabled",
-                "noTitle": "No role set",
-                "toggleFailed": "Could not update collaborator",
-                "reset": "Clear rule",
-                "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
-            },
             "capabilities": {
                 "title": "Khả năng",
                 "subtitle": "Những gì tác nhân này có thể làm — công cụ, kỹ năng và tập lệnh khởi tạo.",
@@ -1297,6 +1230,26 @@
                     "bytes": "{used} / {max} KB",
                     "tooLong": "Tập lệnh khởi tạo vượt quá 16 KB."
                 }
+            },
+            "mcpServers": {
+                "title": "MCP Servers",
+                "subtitle": "Choose which MCP connections this agent can use. Tenant-wide connections are inherited unless overridden here.",
+                "activeCount": "{count} active",
+                "empty": "No MCP connections configured. Add one under Settings → Connections.",
+                "inherited": "Inherited",
+                "overridden": "Override",
+                "connectionDisabled": "Connection disabled",
+                "revert": "Revert"
+            },
+            "collaborators": {
+                "title": "Collaborator Agents",
+                "description": "Select which agents this agent can spawn as collaborators for subtasks. Delegations to agents that are not enabled here are refused.",
+                "empty": "No other agents yet. Create another agent to enable it as a collaborator.",
+                "enabledCount": "{count} enabled",
+                "noTitle": "No role set",
+                "toggleFailed": "Could not update collaborator",
+                "reset": "Clear rule",
+                "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
             }
         },
         "tasksPage": {
@@ -2470,7 +2423,6 @@
                 "apiKeys": "Khóa API",
                 "data": "Dữ liệu",
                 "githubApp": "Ứng dụng GitHub",
-                "repositories": "Repositories",
                 "workAgent": "Work Agent",
                 "gitProviders": "Nhà cung cấp Git",
                 "dangerZone": "Vùng nguy hiểm",
@@ -2481,7 +2433,9 @@
                 "digest": "Digest",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "connections": "Connections",
+                "repositories": "Repositories"
             },
             "githubApp": {
                 "title": "Cài đặt Ứng dụng GitHub",
@@ -3352,6 +3306,88 @@
                     "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
                 }
             },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
+                }
+            },
+            "connections": {
+                "title": "Connections",
+                "subtitle": "External MCP servers your agents can use as tools. Auth header values are encrypted and never shown again.",
+                "addConnection": "Add Connection",
+                "empty": "No connections yet. Add an MCP server URL to give your agents external tools.",
+                "authHeaders": "Auth headers",
+                "lastConnected": "Connected {date}",
+                "test": "Test",
+                "testOk": "OK — {count} tools ({tools})",
+                "testFailed": "Connection test failed.",
+                "delete": "Delete",
+                "form": {
+                    "name": "Name",
+                    "nameHelp": "Lowercase letters, digits, hyphens. Becomes the mcp__<name>__<tool> prefix.",
+                    "transport": "Transport",
+                    "streamableHttp": "Streamable HTTP",
+                    "sse": "SSE (legacy)",
+                    "url": "Server URL",
+                    "headerName": "Auth header name",
+                    "headerValue": "Auth header value",
+                    "headerValueHelp": "Stored encrypted. Never shown again.",
+                    "cancel": "Cancel",
+                    "save": "Save"
+                }
+            },
             "repositories": {
                 "title": "Repositories",
                 "subtitle": "A global registry of repositories your agents can be granted access to, independent of Works.",
@@ -3423,63 +3459,6 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
-                }
-            },
-            "costs": {
-                "title": "Costs",
-                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
-                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
-                "loading": "Loading…",
-                "empty": "No spend in this window.",
-                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
-                "window": {
-                    "label": "Reporting window",
-                    "days": "{days}d"
-                },
-                "tiles": {
-                    "total": "Total spend",
-                    "runs": "Agent runs",
-                    "avgPerRun": "Average per run"
-                },
-                "panels": {
-                    "daily": "Spend per day, by agent",
-                    "byAgent": "By agent",
-                    "byModel": "By model",
-                    "topRuns": "Most expensive runs"
-                },
-                "series": {
-                    "other": "Other agents",
-                    "unattributed": "Unattributed",
-                    "unknownAgent": "Deleted agent",
-                    "noModel": "No model"
-                },
-                "byAgent": {
-                    "colAgent": "Agent",
-                    "colCost": "Cost",
-                    "colRuns": "Runs",
-                    "colAvg": "Avg / run"
-                },
-                "topRuns": {
-                    "colCost": "Cost",
-                    "colAgent": "Agent",
-                    "colTask": "Task",
-                    "colModel": "Model",
-                    "colStarted": "Started",
-                    "colStatus": "Status",
-                    "noTask": "{trigger} run",
-                    "runHint": "Run {runId}",
-                    "empty": "No runs with settled cost in this window.",
-                    "status": {
-                        "queued": "Queued",
-                        "running": "Running",
-                        "completed": "Completed",
-                        "failed": "Failed",
-                        "cancelled": "Cancelled"
-                    }
-                },
-                "byModel": {
-                    "units": "{units} units",
-                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6784,10 +6763,8 @@
             "newWork": "Công việc Mới",
             "new": "Mới",
             "activityIndicator": "Đang tạo công việc",
-            "inboxUnread": "{count} unread messages",
             "navigation": {
                 "dashboard": "Bảng điều khiển",
-                "inbox": "Inbox",
                 "activity": "Hoạt động",
                 "missions": "Missions",
                 "goals": "Goals",
@@ -6801,7 +6778,8 @@
                 "templates": "Mẫu",
                 "settings": "Cài đặt",
                 "teams": "Nhóm",
-                "meetings": "Meetings"
+                "meetings": "Meetings",
+                "inbox": "Inbox"
             },
             "tooltips": {
                 "expandSidebar": "Mở rộng thanh bên",
@@ -6816,7 +6794,8 @@
                 "usageCredits": "Usage & Credits"
             },
             "signOut": "Đăng xuất",
-            "signingOut": "Đang đăng xuất..."
+            "signingOut": "Đang đăng xuất...",
+            "inboxUnread": "{count} unread messages"
         },
         "dangerZone": {
             "title": "Vùng Nguy hiểm",
@@ -8039,6 +8018,64 @@
                 "hour": "{value}h ago",
                 "day": "{value}d ago"
             }
+        },
+        "inbox": {
+            "title": "Inbox",
+            "subtitle": "Questions, approvals and notices your agents and works sent you.",
+            "unreadCount": "{count} unread",
+            "unreadDot": "Unread",
+            "tabs": {
+                "active": "Active",
+                "archived": "Archived"
+            },
+            "kind": {
+                "question": "Question",
+                "approval": "Approval",
+                "escalation": "Escalation",
+                "notice": "Notice"
+            },
+            "empty": {
+                "active": "Nothing is waiting on you.",
+                "archived": "No archived messages."
+            },
+            "rowMenu": {
+                "label": "Message actions",
+                "markRead": "Mark as read",
+                "markUnread": "Mark as unread",
+                "archive": "Archive",
+                "unarchive": "Move to Active",
+                "delete": "Delete"
+            },
+            "detail": {
+                "none": "Select a message to read it.",
+                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
+                "yourReply": "Your reply",
+                "noReplyText": "No reply text was recorded."
+            },
+            "reply": {
+                "chooseOption": "Choose an answer",
+                "other": "Other (write your own)",
+                "recommended": "Recommended",
+                "placeholder": "Write your reply…",
+                "send": "Send Reply",
+                "hint": "Your reply goes straight back to the agent.",
+                "needsAnswer": "Pick an option or write a reply first."
+            },
+            "routed": {
+                "steered": "Reply delivered — the running agent picked it up.",
+                "resumed": "Reply delivered — a new run is answering it.",
+                "approved": "Approved.",
+                "rejected": "Rejected.",
+                "escalationResolved": "Escalation resolved.",
+                "alreadyDecided": "This was already decided elsewhere.",
+                "recorded": "Reply recorded."
+            },
+            "toast": {
+                "archived": "Message archived.",
+                "unarchived": "Message moved back to Active.",
+                "deleted": "Message deleted.",
+                "error": "Something went wrong. Please try again."
+            }
         }
     },
     "layout": {
@@ -8104,7 +8141,6 @@
             "signIn": "Đăng nhập",
             "createAccount": "Tạo Tài khoản",
             "forgotPassword": "Quên Mật khẩu",
-            "resendVerification": "Resend Verification Email",
             "resetPassword": "Đặt lại Mật khẩu",
             "authError": "Lỗi Xác thực",
             "dashboard": "Bảng điều khiển",
@@ -8130,7 +8166,8 @@
             "discover": "Discover",
             "billing": "Billing",
             "usage": "Usage & Credits",
-            "jobRuntime": "Job Runtime"
+            "jobRuntime": "Job Runtime",
+            "resendVerification": "Resend Verification Email"
         }
     },
     "api": {
@@ -8146,10 +8183,10 @@
             "unsupportedProvider": "Nhà cung cấp không được hỗ trợ",
             "providerConnectFailed": "Kết nối nhà cung cấp thất bại",
             "forgotPasswordFailed": "Gửi email đặt lại mật khẩu thất bại",
-            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "Đặt lại mật khẩu thất bại",
             "magicLinkFailed": "Failed to send magic link",
-            "magicLinkInvalid": "Invalid or expired magic link"
+            "magicLinkInvalid": "Invalid or expired magic link",
+            "resendVerificationFailed": "Failed to send verification email"
         }
     },
     "actions": {

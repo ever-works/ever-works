@@ -12,6 +12,7 @@ import {
     FolderGit2,
     Bot,
     Cpu,
+    Plug,
     Building2,
     CreditCard,
     BarChart3,
@@ -123,6 +124,14 @@ export function SettingsLayoutClient({
                     label: t('tabs.jobRuntime'),
                     icon: Cpu,
                     href: `${baseSettingsPath}/job-runtime`,
+                },
+                // MCP Connections — external MCP servers agents can consume
+                // (agent-plugins spec 2.3; manual connections in v1).
+                {
+                    id: 'connections',
+                    label: t('tabs.connections'),
+                    icon: Plug,
+                    href: `${baseSettingsPath}/connections`,
                 },
                 // Digest briefings — the personal cadence AND the org-scoped
                 // one live on one page, since they are two records of the
