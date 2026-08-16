@@ -396,8 +396,8 @@ jobs:
                          --jq '.comments[-1].body // .body // empty' 2>/dev/null || true)"
 
           SHOULD_COMMENT=1
-          # No pipe in a decision: under `pipefail` a SIGPIPE'd producer can make an already-
-          # matched grep report failure, which would defeat the throttle exactly when it matters.
+          # No pipe in a decision: under `pipefail`, a producer killed by SIGPIPE can make an
+          # already-matched grep report failure, defeating the throttle exactly when it matters.
           if [ -n "${LAST_AT}" ] && grep -qF -- "${MARK}" <<< "${LAST_BODY}"; then
             LAST_EPOCH="$(date -u -d "${LAST_AT}" +%s 2>/dev/null || echo 0)"
             NOW_EPOCH="$(date -u +%s)"
