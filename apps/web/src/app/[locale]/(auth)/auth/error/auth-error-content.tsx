@@ -5,7 +5,7 @@ import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
-import { ROUTES } from '@/lib/constants';
+import { ROUTES, SUPPORT_EMAIL } from '@/lib/constants';
 import { Link } from '@/i18n/navigation';
 
 function AuthErrorContent() {
@@ -190,7 +190,18 @@ function AuthErrorContent() {
 
         if (errorType === 'email_not_verified') {
             buttons.push(
-                <Button key="resend" href="/" size="lg" className="animate-fade-in">
+                // EW-070: this was `href="/"`. A button labelled "Resend
+                // Verification Email" that navigates to the home page and
+                // resends nothing is worse than no button — it is the only
+                // offer made to someone who cannot sign in, and taking it
+                // leaves them exactly where they were. It now points at the
+                // page that actually calls the public resend endpoint.
+                <Button
+                    key="resend"
+                    href={ROUTES.AUTH_RESEND_VERIFICATION}
+                    size="lg"
+                    className="animate-fade-in"
+                >
                     {t('actions.resendVerification')}
                 </Button>,
             );
@@ -198,7 +209,17 @@ function AuthErrorContent() {
 
         if (errorType === 'account_locked') {
             buttons.push(
-                <Button key="support" href="/support" size="lg" className="animate-fade-in">
+                // `/support` has no route anywhere in the app — and because
+                // unknown routes here answer HTTP 200 with a generic page
+                // rather than a 404, the dead link never announced itself. A
+                // locked-out user needs a destination that exists, so this
+                // opens a mail composer to the configured support address.
+                <Button
+                    key="support"
+                    href={`mailto:${SUPPORT_EMAIL}`}
+                    size="lg"
+                    className="animate-fade-in"
+                >
                     {t('actions.contactSupport')}
                 </Button>,
             );
@@ -219,7 +240,15 @@ function AuthErrorContent() {
 
         if (errorType?.startsWith('verify_email_')) {
             buttons.push(
-                <Button key="resend-verification" href="/" size="lg" className="animate-fade-in">
+                // EW-070: same dead `href="/"` as above, on the branch reached
+                // when a verification link is missing/invalid/expired — the
+                // exact situation a resend is meant to resolve.
+                <Button
+                    key="resend-verification"
+                    href={ROUTES.AUTH_RESEND_VERIFICATION}
+                    size="lg"
+                    className="animate-fade-in"
+                >
                     {t('actions.resendVerification')}
                 </Button>,
             );

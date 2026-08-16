@@ -16,3 +16,6 @@ export * from './digest/index.js';
 export * from './workflow/index.js';
 export * from './hitl/index.js';
 export * from './delegation/index.js';
+// Inbox (operator message center) — one surface for questions /
+// approvals / escalations / notices addressed to the human.
+export * from './inbox/index.js';

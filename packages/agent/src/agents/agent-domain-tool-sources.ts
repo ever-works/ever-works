@@ -17,6 +17,7 @@ import type { EscalationToolService } from './agent-escalation-tools';
 import type { ToolGrantEnforcer, ToolGrantResolveInput } from '../policy/tool-grant.enforcer';
 import type { ResolveToolGrantsArgs } from '../policy/agent-tool-grant-tools';
 import type { WorkflowGraphExecutorService } from './workflow-graph-executor.service';
+import type { InboxToolService } from '../inbox/agent-inbox-tools';
 
 /**
  * Domain chat-tool sources — the ONE injection seam that lets
@@ -142,6 +143,18 @@ export interface AgentWorkflowToolSource {
 }
 
 /**
+ * Inbox (operator message center) — the `ask_human` blocking-question
+ * tool. Ungated by agent permissions on purpose: asking the OWNER a
+ * question grants nothing and touches nothing, and a gated question
+ * tool would push agents back to guessing. Only `askHuman` is carried
+ * — the reply router and list surface must not be reachable from the
+ * model.
+ */
+export interface AgentInboxToolSource {
+    service: InboxToolService;
+}
+
+/**
  * The bundle itself. Every member optional: a runtime binds what it can
  * reach, and `resolveAllowedTools` registers exactly the corresponding
  * tools.
@@ -158,4 +171,5 @@ export interface AgentDomainToolSources {
     escalations?: AgentEscalationToolSource;
     toolGrants?: AgentToolGrantToolSource;
     workflow?: AgentWorkflowToolSource;
+    inbox?: AgentInboxToolSource;
 }

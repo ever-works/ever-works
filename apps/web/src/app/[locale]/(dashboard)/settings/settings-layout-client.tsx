@@ -9,8 +9,11 @@ import {
     AlertTriangle,
     HardDrive,
     Github,
+    FolderGit2,
     Bot,
+    Boxes,
     Cpu,
+    Plug,
     Building2,
     CreditCard,
     BarChart3,
@@ -95,6 +98,14 @@ export function SettingsLayoutClient({
                     icon: Github,
                     href: `${baseSettingsPath}/github-app`,
                 },
+                // Repository registry (Feature G) — account-level repos agents
+                // can be granted; sits beside GitHub App, its import source.
+                {
+                    id: 'repositories',
+                    label: t('tabs.repositories'),
+                    icon: FolderGit2,
+                    href: `${baseSettingsPath}/repositories`,
+                },
                 {
                     id: 'work-agent',
                     label: t('tabs.workAgent'),
@@ -114,6 +125,23 @@ export function SettingsLayoutClient({
                     label: t('tabs.jobRuntime'),
                     icon: Cpu,
                     href: `${baseSettingsPath}/job-runtime`,
+                },
+                // Environments sit beside Job Runtime: both describe the
+                // sandbox an Agent's work runs in — packages and networking
+                // here, dispatch mechanics there.
+                {
+                    id: 'environments',
+                    label: t('tabs.environments'),
+                    icon: Boxes,
+                    href: `${baseSettingsPath}/environments`,
+                },
+                // MCP Connections — external MCP servers agents can consume
+                // (agent-plugins spec 2.3; manual connections in v1).
+                {
+                    id: 'connections',
+                    label: t('tabs.connections'),
+                    icon: Plug,
+                    href: `${baseSettingsPath}/connections`,
                 },
                 // Digest briefings — the personal cadence AND the org-scoped
                 // one live on one page, since they are two records of the

@@ -3,16 +3,43 @@
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { Plus, RotateCcw, ShieldCheck, Sparkles, TerminalSquare, Wrench } from 'lucide-react';
+import {
+    Boxes,
+    FolderGit2,
+    Plug,
+    Plus,
+    RotateCcw,
+    ShieldCheck,
+    Sparkles,
+    TerminalSquare,
+    Wrench,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import type { AgentCapabilitiesPayload, AgentCapabilityToolRow } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { ROUTES } from '@/lib/constants';
+// TYPE-ONLY on purpose: `@/lib/api/*` modules open with `import
+// 'server-only'`, which hard-fails the production build the moment a
+// 'use client' module takes a VALUE from one. Types are erased, so these
+// three imports are safe; the runtime calls all go through the Server
+// Actions imported below.
 import type { Agent, AgentPermissions } from '@/lib/api/agents';
-import { listAgentSkillsAction } from '@/app/actions/agents';
-import { composeGrantForToggle, toolToggleState } from './agent-capabilities.shared';
+import type { AgentMcpServerState } from '@/lib/api/mcp-connections';
+import type { AgentRepoDto } from '@/lib/api/repo-connections';
+import { listAgentSkillsAction, updateAgentAction } from '@/app/actions/agents';
+import {
+    clearAgentMcpBindingAction,
+    listAgentMcpServersAction,
+    setAgentMcpBindingAction,
+} from '@/app/actions/mcp-connections';
+import { removeAgentRepoAttachment, setAgentRepoAttachment } from '@/app/actions/repo-connections';
+import {
+    composeGrantForToggle,
+    repoIsReadOnly,
+    toolToggleState,
+} from './agent-capabilities.shared';
 import {
     bindSkillToAgentAction,
     installAndBindSkillAction,
@@ -23,14 +50,24 @@ import {
 } from '@/app/actions/agent-capabilities';
 
 /**
- * Agent Capabilities tab — sectioned on purpose so the sibling features
- * built on parallel branches (MCP servers, repositories, environments)
- * can add their own sections without restructuring:
+ * Agent Capabilities tab — ONE page listing everything this agent can
+ * use. The sibling features that shipped on parallel branches now each
+ * own a section here:
  *
  *   1. Agent tools   — the tool-grant matrix's first web UI.
  *   2. Permissions   — read-only summary; edited in Settings.
  *   3. Skills        — agent-scope bindings + inherited, read-only.
- *   4. Init Script   — advisory v1 bootstrap script.
+ *   4. MCP           — per-agent MCP connection state + inherited badge.
+ *   5. Repositories  — registry attachments; Work-derived rows read-only.
+ *   6. Environment   — the published Environment this agent runs in.
+ *   7. Init Script   — advisory v1 bootstrap script.
+ *
+ * Sections 4-6 are CONSOLIDATION, not a move: the standalone MCP Servers
+ * tab, the Repositories card on Settings and the Settings Environment
+ * picker all keep working over the very same endpoints. Every one of
+ * them is a second view over the same server state, so each mutation
+ * here re-reads (MCP) or patches the row it owns (repos) rather than
+ * assuming this page is the only writer.
  *
  * ## Tool-toggle semantics (narrowing only)
  *
@@ -68,6 +105,21 @@ interface Props {
     initialBoundSkills: BoundSkill[];
     installedSkills: SkillOption[];
     catalogSkills: CatalogOption[];
+    /**
+     * Effective per-agent MCP state for every connection the user owns
+     * (`GET /api/agents/:id/mcp-servers`). Defaults to empty so a flaky
+     * connections API degrades the section rather than the page — and so
+     * the standalone MCP Servers tab remains the unchanged source of
+     * truth for the same rows.
+     */
+    initialMcpServers?: AgentMcpServerState[];
+    /** Registry repos with this agent's attachment state (`GET /api/agents/:id/repos`). */
+    initialRepos?: AgentRepoDto[];
+    /**
+     * PUBLISHED environments only — the server refuses assigning a draft
+     * with a 422, so the picker offers exactly what it will accept.
+     */
+    environments?: Array<{ id: string; name: string }>;
 }
 
 /** Same labels the Settings tab uses for the 8 flags. */
@@ -97,6 +149,9 @@ export function AgentCapabilitiesClient({
     initialBoundSkills,
     installedSkills,
     catalogSkills,
+    initialMcpServers = [],
+    initialRepos = [],
+    environments = [],
 }: Props) {
     const t = useTranslations('dashboard.agentsPage.capabilities');
     const [caps, setCaps] = useState(initialCapabilities);
@@ -235,6 +290,101 @@ export function AgentCapabilitiesClient({
                     toast.error(err instanceof Error ? err.message : String(err));
                 } finally {
                     setBusySkill(null);
+                }
+            })();
+        });
+    };
+
+    // ── MCP connections ───────────────────────────────────────────────
+
+    const [mcpRows, setMcpRows] = useState(initialMcpServers);
+    const [busyMcp, setBusyMcp] = useState<string | null>(null);
+
+    /**
+     * Every MCP mutation re-reads the list instead of patching the row
+     * locally: `effectiveEnabled` is DERIVED server-side from the agent
+     * override on top of the tenant binding, so a local guess is only
+     * right for the row that was clicked and only until the tenant
+     * binding changes underneath it.
+     */
+    const runMcp = (connectionId: string, fn: () => Promise<unknown>) => {
+        if (busyMcp) return;
+        setBusyMcp(connectionId);
+        startTransition(() => {
+            void (async () => {
+                try {
+                    await fn();
+                    const next = await listAgentMcpServersAction(agent.id);
+                    setMcpRows(next.data);
+                } catch (err) {
+                    toast.error(err instanceof Error ? err.message : String(err));
+                } finally {
+                    setBusyMcp(null);
+                }
+            })();
+        });
+    };
+
+    // ── Repositories ──────────────────────────────────────────────────
+
+    const [repoRows, setRepoRows] = useState(initialRepos);
+    const [busyRepo, setBusyRepo] = useState<string | null>(null);
+
+    const toggleRepo = (repo: AgentRepoDto, next: boolean) => {
+        if (busyRepo || repoIsReadOnly(repo)) return;
+        setBusyRepo(repo.id);
+        startTransition(() => {
+            void (async () => {
+                try {
+                    const result = next
+                        ? await setAgentRepoAttachment(agent.id, repo.id, true)
+                        : await removeAgentRepoAttachment(agent.id, repo.id);
+                    if (!result.success) {
+                        toast.error(result.error || t('repositories.toggleError'));
+                        return;
+                    }
+                    setRepoRows((current) =>
+                        current.map((row) =>
+                            row.id === repo.id
+                                ? { ...row, attached: next, attachmentEnabled: next }
+                                : row,
+                        ),
+                    );
+                } finally {
+                    setBusyRepo(null);
+                }
+            })();
+        });
+    };
+
+    // ── Environment ───────────────────────────────────────────────────
+
+    const [environmentId, setEnvironmentId] = useState(agent.environmentId ?? '');
+    const [savingEnvironment, setSavingEnvironment] = useState(false);
+
+    const environmentOptions: SearchableSelectOption[] = useMemo(
+        () => environments.map((row) => ({ value: row.id, label: row.name })),
+        [environments],
+    );
+
+    const pickEnvironment = (value: string) => {
+        if (savingEnvironment || value === environmentId) return;
+        const previous = environmentId;
+        setEnvironmentId(value);
+        setSavingEnvironment(true);
+        startTransition(() => {
+            void (async () => {
+                try {
+                    // `''` is the picker's "None (default)"; the column is
+                    // nullable, so it must be CLEARED with null rather than
+                    // written as an empty string the API would reject.
+                    await updateAgentAction(agent.id, { environmentId: value ? value : null });
+                    toast.success(t('environment.saved'));
+                } catch (err) {
+                    setEnvironmentId(previous);
+                    toast.error(err instanceof Error ? err.message : String(err));
+                } finally {
+                    setSavingEnvironment(false);
                 }
             })();
         });
@@ -492,6 +642,232 @@ export function AgentCapabilitiesClient({
                             </span>
                         </article>
                     ))}
+                </div>
+            </section>
+
+            {/* ── Section: MCP connections ──
+                Same rows as the standalone MCP Servers tab, which keeps
+                working unchanged — this is a second view over the SAME
+                `GET/PUT /api/agents/:id/mcp-servers`, not a move. */}
+            <section className={sectionClass} data-testid="capabilities-mcp-section">
+                <div className="p-4 border-b border-border/40 dark:border-border-dark/40 flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
+                            <Plug className="w-4 h-4 text-primary" />
+                            {t('mcp.title')}
+                        </h3>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1 max-w-2xl">
+                            {t('mcp.description')}
+                        </p>
+                    </div>
+                    <Link
+                        href={ROUTES.DASHBOARD_AGENT_MCP_SERVERS(agent.id)}
+                        className="text-xs text-primary hover:underline shrink-0"
+                        data-testid="capabilities-manage-mcp"
+                    >
+                        {t('mcp.manage')}
+                    </Link>
+                </div>
+                <div className="divide-y divide-border/40 dark:divide-border-dark/40">
+                    {mcpRows.length === 0 && (
+                        <div className="p-6 text-center text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('mcp.empty')}
+                        </div>
+                    )}
+                    {mcpRows.map((row) => (
+                        <article
+                            key={row.connection.id}
+                            className="p-4 flex items-center gap-3"
+                            data-testid={`capabilities-mcp-${row.connection.name}`}
+                        >
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm text-text dark:text-text-dark truncate">
+                                        {row.connection.name}
+                                    </span>
+                                    <span className="text-text-muted dark:text-text-muted-dark text-xs font-mono">
+                                        {row.connection.transport}
+                                    </span>
+                                    {row.inheritedFromTenant && (
+                                        <span
+                                            className="inline-flex items-center rounded-full bg-surface-secondary dark:bg-surface-secondary-dark px-2 py-0.5 text-[11px] text-text-muted dark:text-text-muted-dark"
+                                            data-testid={`capabilities-mcp-inherited-${row.connection.name}`}
+                                        >
+                                            {t('mcp.inherited')}
+                                        </span>
+                                    )}
+                                    {row.bindingSource === 'agent' && (
+                                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+                                            {t('mcp.overridden')}
+                                        </span>
+                                    )}
+                                    {!row.connection.enabled && (
+                                        <span className="inline-flex items-center rounded-full bg-danger/10 px-2 py-0.5 text-[11px] text-danger">
+                                            {t('mcp.connectionDisabled')}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="mt-0.5 text-[11px] font-mono text-text-muted dark:text-text-muted-dark truncate">
+                                    {row.connection.url}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {row.bindingSource === 'agent' && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                            runMcp(row.connection.id, () =>
+                                                clearAgentMcpBindingAction(
+                                                    agent.id,
+                                                    row.connection.id,
+                                                ),
+                                            )
+                                        }
+                                        disabled={busyMcp !== null}
+                                        className="gap-1"
+                                        data-testid={`capabilities-mcp-revert-${row.connection.name}`}
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        {t('mcp.revert')}
+                                    </Button>
+                                )}
+                                <Switch
+                                    checked={row.effectiveEnabled}
+                                    // A connection disabled workspace-wide cannot be
+                                    // turned on for one agent — the same rule the
+                                    // MCP Servers tab enforces.
+                                    disabled={busyMcp !== null || !row.connection.enabled}
+                                    onChange={(checked) =>
+                                        runMcp(row.connection.id, () =>
+                                            setAgentMcpBindingAction(
+                                                agent.id,
+                                                row.connection.id,
+                                                checked,
+                                            ),
+                                        )
+                                    }
+                                    className="mt-0"
+                                    data-testid={`capabilities-mcp-switch-${row.connection.name}`}
+                                />
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            </section>
+
+            {/* ── Section: Repositories ──
+                Mirrors the Settings → Repositories card (which stays), over
+                the same `GET/PUT /api/agents/:id/repos`. */}
+            <section className={sectionClass} data-testid="capabilities-repos-section">
+                <div className="p-4 border-b border-border/40 dark:border-border-dark/40 flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
+                            <FolderGit2 className="w-4 h-4 text-primary" />
+                            {t('repositories.title')}
+                        </h3>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1 max-w-2xl">
+                            {t('repositories.description')}
+                        </p>
+                    </div>
+                    <Link
+                        href={ROUTES.DASHBOARD_SETTINGS_REPOSITORIES}
+                        className="text-xs text-primary hover:underline shrink-0"
+                        data-testid="capabilities-manage-repos"
+                    >
+                        {t('repositories.manage')}
+                    </Link>
+                </div>
+                <div className="divide-y divide-border/40 dark:divide-border-dark/40">
+                    {repoRows.length === 0 && (
+                        <div className="p-6 text-center text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('repositories.empty')}
+                        </div>
+                    )}
+                    {repoRows.map((repo) => {
+                        const readOnly = repoIsReadOnly(repo);
+                        return (
+                            <article
+                                key={repo.id}
+                                className={`p-4 flex items-center gap-3${readOnly ? ' opacity-80' : ''}`}
+                                data-testid={`capabilities-repo-${repo.name}`}
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="text-sm text-text dark:text-text-dark truncate">
+                                            {repo.name}
+                                        </span>
+                                        {readOnly && (
+                                            <span
+                                                className="inline-flex items-center rounded-full bg-surface-secondary dark:bg-surface-secondary-dark px-2 py-0.5 text-[11px] text-text-muted dark:text-text-muted-dark"
+                                                data-testid={`capabilities-repo-source-${repo.name}`}
+                                            >
+                                                {t('repositories.source', {
+                                                    source: repo.sourceType,
+                                                })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="mt-0.5 text-[11px] font-mono text-text-muted dark:text-text-muted-dark truncate">
+                                        {repo.url}
+                                    </div>
+                                </div>
+                                {readOnly ? (
+                                    <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] shrink-0">
+                                        {repo.attached
+                                            ? t('repositories.attached')
+                                            : t('repositories.notAttached')}
+                                    </span>
+                                ) : (
+                                    <Switch
+                                        checked={repo.attached && repo.attachmentEnabled}
+                                        disabled={busyRepo !== null}
+                                        onChange={(checked) => toggleRepo(repo, checked)}
+                                        className="mt-0 shrink-0"
+                                        data-testid={`capabilities-repo-switch-${repo.name}`}
+                                    />
+                                )}
+                            </article>
+                        );
+                    })}
+                </div>
+            </section>
+
+            {/* ── Section: Environment ── */}
+            <section className={sectionClass} data-testid="capabilities-environment-section">
+                <div className="p-4 border-b border-border/40 dark:border-border-dark/40 flex items-start justify-between gap-4">
+                    <div>
+                        <h3 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
+                            <Boxes className="w-4 h-4 text-primary" />
+                            {t('environment.title')}
+                        </h3>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1 max-w-2xl">
+                            {t('environment.description')}
+                        </p>
+                    </div>
+                    <Link
+                        href={ROUTES.DASHBOARD_SETTINGS_ENVIRONMENTS}
+                        className="text-xs text-primary hover:underline shrink-0"
+                        data-testid="capabilities-manage-environments"
+                    >
+                        {t('environment.manage')}
+                    </Link>
+                </div>
+                <div className="p-4 max-w-md">
+                    <SearchableSelect
+                        value={environmentId}
+                        onChange={pickEnvironment}
+                        options={environmentOptions}
+                        emptyOptionLabel={t('environment.none')}
+                        placeholder={t('environment.none')}
+                        disabled={savingEnvironment}
+                        testId="capabilities-environment"
+                    />
+                    {environments.length === 0 && (
+                        <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('environment.empty')}
+                        </p>
+                    )}
                 </div>
             </section>
 

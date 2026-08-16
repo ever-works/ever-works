@@ -129,6 +129,12 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_RUN_TRIGGERED,
     ActivityActionType.AGENT_RUN_CANCELLED,
     ActivityActionType.AGENT_TASK_ASSIGNED,
+    // Agent Collaborators — allow-list edits are emitted by
+    // `AgentCollaboratorsController` with `details.resourceId` = the
+    // PARENT agent, so they belong in this agent's feed.
+    ActivityActionType.AGENT_COLLABORATOR_ENABLED,
+    ActivityActionType.AGENT_COLLABORATOR_DISABLED,
+    ActivityActionType.AGENT_COLLABORATOR_REMOVED,
 ];
 
 /**
@@ -324,6 +330,9 @@ export class AgentsController {
             capabilities: body.capabilities ?? null,
             aiProviderId: body.aiProviderId ?? null,
             modelId: body.modelId ?? null,
+            // Environments — service validates same-user + published
+            // (draft → 422, cross-user/unknown → 404).
+            environmentId: body.environmentId ?? null,
             maxSkillContextTokens: body.maxSkillContextTokens,
             heartbeatCadence: body.heartbeatCadence ?? null,
             idleBehavior: body.idleBehavior,
@@ -637,6 +646,9 @@ export class AgentsController {
             capabilities: body.capabilities,
             aiProviderId: body.aiProviderId,
             modelId: body.modelId,
+            // Environments — `undefined` leaves the assignment alone,
+            // `null` clears it, an id is validated by the service.
+            environmentId: body.environmentId,
             maxSkillContextTokens: body.maxSkillContextTokens,
             memoryRecallEnabled: body.memoryRecallEnabled,
             heartbeatCadence: body.heartbeatCadence,

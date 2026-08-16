@@ -1,9 +1,11 @@
 import {
     BadRequestException,
     ConflictException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, type FindOptionsWhere } from 'typeorm';
@@ -15,6 +17,8 @@ import {
     type AgentActionProposalStatus,
 } from '../entities/agent-action-proposal.entity';
 import { Agent } from '../entities/agent.entity';
+// Leaf token file — no runtime graph (see inbox-producer.port.ts).
+import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import { evaluateGuardrails } from '../agents/guardrails';
 import { RISK_SCORER } from './risk-scorer';
 import { toAgentActionProposalDto, type AgentActionProposalDto } from './types';
@@ -63,6 +67,10 @@ export class AgentApprovalsService {
         // module only needs the two entities in `forFeature`.
         @InjectRepository(Agent)
         private readonly agents: Repository<Agent>,
+        // Inbox (operator message center). @Optional() and appended LAST
+        // so existing positional constructions keep working; bound by the
+        // api-side @Global() InboxModule. Absent = pre-inbox behaviour.
+        @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
     ) {}
 
     /**
@@ -133,6 +141,29 @@ export class AgentApprovalsService {
             row.decidedVia = 'guardrail';
         }
         const saved = await this.proposals.save(row);
+        // Inbox mirror — PENDING proposals only (a guardrail-decided row
+        // never needed a human), additive alongside the proposal row,
+        // idempotent per proposalId inside the producer, best-effort.
+        if (saved.status === 'pending' && this.inbox) {
+            try {
+                await this.inbox.proposalPending({
+                    userId: saved.userId,
+                    proposalId: saved.id,
+                    title: saved.title,
+                    actionType: saved.actionType,
+                    riskFlags: saved.riskFlags,
+                    agentId: saved.agentId,
+                    runId: saved.runId ?? null,
+                    organizationId: saved.organizationId ?? null,
+                });
+            } catch (error) {
+                this.logger.warn(
+                    `Proposal ${saved.id} inbox mirror failed: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
         return toAgentActionProposalDto(saved);
     }
 

@@ -44,7 +44,7 @@ import {
 } from '@ever-works/agent/services';
 import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
-import { GoalEvaluationService } from '@ever-works/agent/goals';
+import { GoalEvaluationService, GoalOrchestratorService } from '@ever-works/agent/goals';
 import {
     AgentEscalationService,
     AgentRunService,
@@ -363,6 +363,14 @@ export class TriggerInternalController implements OnModuleInit {
         // per the arity rule above.
         @Optional()
         private readonly taskGateJudgeService?: TaskGateJudgeService,
+        // Autonomy layer — backs the `goal-advance-dispatcher` cron: the
+        // worker proxy calls `advanceDue()` over the internal RPC channel,
+        // landing here where the Tasks runtime and the dispatch gate are
+        // wired. Appended LAST + @Optional() per the arity rule above —
+        // inserting mid-list silently shifts every later positional arg in
+        // the controller specs.
+        @Optional()
+        private readonly goalOrchestratorService?: GoalOrchestratorService,
     ) {}
 
     onModuleInit() {
@@ -393,6 +401,8 @@ export class TriggerInternalController implements OnModuleInit {
             IdeaBuildExecutorService: this.ideaBuildExecutorService,
             // Goals & Metrics PR-8 — exposed for the goal-evaluate-dispatcher cron.
             GoalEvaluationService: this.goalEvaluationService,
+            // Autonomy layer — exposed for the goal-advance-dispatcher cron.
+            GoalOrchestratorService: this.goalOrchestratorService,
             // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,

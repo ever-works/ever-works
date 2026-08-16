@@ -7,3 +7,17 @@ export { GoalForm } from './GoalForm';
 export { GoalDetailClient } from './GoalDetailClient';
 export { Sparkline } from './Sparkline';
 export { OutcomeBadge, COMPARATOR_GLYPH, formatMetricValue, formatDateTime } from './goal-ui';
+// Autonomy layer — Definition of Done, limits, orchestrator log, sessions.
+export { GoalDodPanel } from './GoalDodPanel';
+export { GoalLimitsDialog, type GoalAgentOption } from './GoalLimitsDialog';
+export { GoalOrchestratorLog } from './GoalOrchestratorLog';
+export { GoalSessionsPanel } from './GoalSessionsPanel';
+export { GoalResultsPanel } from './GoalResultsPanel';
+export {
+    LoopStatusBadge,
+    EventKindBadge,
+    DodRollup,
+    DodProgressBar,
+    formatCents,
+    formatDuration,
+} from './goal-loop-ui';

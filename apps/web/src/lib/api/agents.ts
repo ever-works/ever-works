@@ -40,6 +40,7 @@ export {
     type RunSteerResponse,
     type RunInterruptResponse,
     type RunResumeResponse,
+    type AgentCollaboratorCandidate,
     type AgentRunSessionDetail,
     type AgentRunTimelineEntry,
     type AgentRunTimelineEntryKind,
@@ -54,6 +55,7 @@ import type {
     RunSteerResponse,
     RunInterruptResponse,
     RunResumeResponse,
+    AgentCollaboratorCandidate,
     SessionDetailQuery,
 } from './agents.shared';
 
@@ -103,6 +105,11 @@ export interface Agent {
     capabilities: string | null;
     aiProviderId: string | null;
     modelId: string | null;
+    /**
+     * Environments (Settings → Environments) — assigned runtime
+     * Environment id; null = platform default runtime.
+     */
+    environmentId: string | null;
     maxSkillContextTokens: number;
     status: AgentStatus;
     permissions: AgentPermissions;
@@ -198,6 +205,8 @@ export interface UpdateAgentInput {
     capabilities?: string | null;
     aiProviderId?: string | null;
     modelId?: string | null;
+    /** Environments — published Environment id; null clears to default. */
+    environmentId?: string | null;
     maxSkillContextTokens?: number;
     heartbeatCadence?: string | null;
     idleBehavior?: AgentIdleBehavior;
@@ -532,6 +541,18 @@ export const agentsAPI = {
         return serverFetch(`/agents/runs${qs ? `?${qs}` : ''}`, { method: 'GET' });
     },
 
+    // ── Agent Collaborators — sub-agent delegation allow-list ──
+
+    /**
+     * Every OTHER agent of the owner as a collaborator candidate, each
+     * carrying its configured/enabled allow-list state for this parent.
+     */
+    async listCollaborators(id: string): Promise<{ data: AgentCollaboratorCandidate[] }> {
+        return serverFetch<{ data: AgentCollaboratorCandidate[] }>(`/agents/${id}/collaborators`, {
+            method: 'GET',
+        });
+    },
+
     /**
      * Session detail (Feature K) — the drill-in behind each Sessions row
      * (`GET /api/agents/runs/:runId/detail`): full session projection +
@@ -549,6 +570,33 @@ export const agentsAPI = {
         const qs = params.toString();
         return serverFetch(`/agents/runs/${runId}/detail${qs ? `?${qs}` : ''}`, {
             method: 'GET',
+        });
+    },
+
+    /** Idempotent upsert of one collaborator rule's `enabled` toggle. */
+    async setCollaborator(
+        id: string,
+        collaboratorAgentId: string,
+        enabled: boolean,
+    ): Promise<{ agentId: string; collaboratorAgentId: string; enabled: boolean }> {
+        return serverMutation({
+            endpoint: `/agents/${id}/collaborators/${collaboratorAgentId}`,
+            data: { enabled },
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    /** Remove the rule entirely (back to unconfigured). Idempotent. */
+    async removeCollaborator(
+        id: string,
+        collaboratorAgentId: string,
+    ): Promise<{ removed: boolean }> {
+        return serverMutation({
+            endpoint: `/agents/${id}/collaborators/${collaboratorAgentId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
         });
     },
 

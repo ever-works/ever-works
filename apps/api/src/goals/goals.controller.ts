@@ -10,20 +10,33 @@ import {
     ParseUUIDPipe,
     Patch,
     Post,
+    Put,
     Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+    GoalOrchestratorService,
     GoalStatus,
     GoalsService,
+    type GoalAdvanceResult,
     type GoalDto,
     type GoalEvaluationEntry,
+    type GoalEventDto,
     type GoalMetricSampleDto,
+    type GoalSessionDto,
 } from '@ever-works/agent/goals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { CreateGoalDto, UpdateGoalDto } from './dto/goal.dto';
+import {
+    ApproveGoalDodDto,
+    NudgeGoalDto,
+    PatchGoalDodCriterionDto,
+    ProposeGoalDodDto,
+    SetGoalDodDto,
+    UpdateGoalLimitsDto,
+} from './dto/goal-orchestration.dto';
 
 /**
  * Goals & Metrics — PR-8 (spec FR-9..FR-14). User-owned measurable
@@ -41,15 +54,32 @@ import { CreateGoalDto, UpdateGoalDto } from './dto/goal.dto';
  *   POST   /api/me/goals/:id/evaluate-now  manual tick (bypasses nextCheckAt,
  *                                          NOT the budget guard)
  *
+ * Autonomy layer (`GoalOrchestratorService`) adds the execution loop:
+ *   PATCH  /api/me/goals/:id/limits            budgets + routing hints
+ *   PUT    /api/me/goals/:id/dod               replace the DoD checklist
+ *   POST   /api/me/goals/:id/dod/propose       planner-authored entries
+ *   POST   /api/me/goals/:id/dod/approve       approve proposed entries
+ *   PATCH  /api/me/goals/:id/dod/:criterionId  tick / untick / waive one
+ *   GET    /api/me/goals/:id/events            orchestrator log
+ *   GET    /api/me/goals/:id/sessions          iteration tasks + runs
+ *   POST   /api/me/goals/:id/advance           run the router now
+ *   POST   /api/me/goals/:id/nudge             steer the live session
+ *   POST   /api/me/goals/:id/loop/start|pause|resume|restart|cancel
+ *   POST   /api/me/goals/:id/archive|unarchive
+ *
  * Mission link/unlink lives on the MissionsController
  * (`/api/me/missions/:id/goals`). Same throttling posture as
  * Missions: 30/min writes, 10/min for evaluate-now (it hits an
- * upstream metrics provider).
+ * upstream metrics provider). Advance/restart share the 10/min bucket —
+ * each one can start a paid agent run.
  */
 @ApiTags('goals')
 @Controller('api/me/goals')
 export class GoalsController {
-    constructor(private readonly service: GoalsService) {}
+    constructor(
+        private readonly service: GoalsService,
+        private readonly orchestrator: GoalOrchestratorService,
+    ) {}
 
     @Get()
     @ApiOperation({ summary: 'List my goals' })
@@ -59,11 +89,13 @@ export class GoalsController {
         @Query('status') status?: string,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
+        @Query('archived') archived?: string,
     ): Promise<GoalDto[]> {
         return this.service.listForUser(auth.userId, {
             status: this.parseStatus(status),
             limit: this.parseIntParam(limit, 'limit', 1, 101),
             offset: this.parseIntParam(offset, 'offset', 0),
+            archived: this.parseArchived(archived),
         });
     }
 
@@ -197,6 +229,243 @@ export class GoalsController {
         return this.service.evaluateNow(auth.userId, id);
     }
 
+    // ─── autonomy layer — limits ────────────────────────────────────
+
+    @Patch(':id/limits')
+    @ApiOperation({
+        summary:
+            'Adjust per-Goal budgets and routing hints live. Omitted fields are untouched; `null` CLEARS a ceiling.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async updateLimits(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: UpdateGoalLimitsDto,
+    ): Promise<GoalDto> {
+        // Every field is forwarded explicitly, and `undefined` (leave
+        // alone) is preserved as distinct from `null` (clear) — a mapping
+        // that collapsed the two would silently make "remove this cap"
+        // impossible while the DTO advertised it.
+        return this.orchestrator.updateLimits(auth.userId, id, {
+            spendCapCents: body.spendCapCents,
+            wallClockLimitHours: body.wallClockLimitHours,
+            stuckThresholdIterations: body.stuckThresholdIterations,
+            sessionBudgetMinutes: body.sessionBudgetMinutes,
+            gracePeriodMinutes: body.gracePeriodMinutes,
+            executionTarget: body.executionTarget,
+            plannerModelHint: body.plannerModelHint,
+            workerModelHint: body.workerModelHint,
+            assignedAgentId: body.assignedAgentId,
+        });
+    }
+
+    // ─── autonomy layer — Definition of Done ────────────────────────
+
+    @Put(':id/dod')
+    @ApiOperation({
+        summary: 'Replace the Definition-of-Done checklist. `criteria: null` clears it entirely.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async setDod(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: SetGoalDodDto,
+    ): Promise<GoalDto> {
+        return this.orchestrator.setDodCriteria(auth.userId, id, body.criteria ?? null);
+    }
+
+    @Post(':id/dod/propose')
+    @ApiOperation({
+        summary:
+            'Append planner-authored criteria for operator approval. Proposed criteria never count toward completion.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async proposeDod(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: ProposeGoalDodDto,
+    ): Promise<GoalDto> {
+        return this.orchestrator.proposeDodCriteria(auth.userId, id, body.criteria);
+    }
+
+    @Post(':id/dod/approve')
+    @ApiOperation({ summary: 'Approve proposed criteria (all, or the named subset)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async approveDod(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: ApproveGoalDodDto,
+    ): Promise<GoalDto> {
+        return this.orchestrator.approveDodCriteria(auth.userId, id, body.criterionIds ?? null);
+    }
+
+    @Patch(':id/dod/:criterionId')
+    @ApiOperation({ summary: 'Tick, untick or waive one criterion (waivers carry a note)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async patchDodCriterion(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('criterionId') criterionId: string,
+        @Body() body: PatchGoalDodCriterionDto,
+    ): Promise<GoalDto> {
+        return this.orchestrator.patchDodCriterion(auth.userId, id, criterionId, {
+            status: body.status,
+            text: body.text,
+            evidence: body.evidence,
+            note: body.note,
+        });
+    }
+
+    // ─── autonomy layer — orchestrator log + sessions ───────────────
+
+    @Get(':id/events')
+    @ApiOperation({ summary: 'Orchestrator log for this Goal (newest first)' })
+    @HttpCode(HttpStatus.OK)
+    async events(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query('limit') limit?: string,
+    ): Promise<GoalEventDto[]> {
+        return this.orchestrator.listEvents(
+            auth.userId,
+            id,
+            this.parseIntParam(limit, 'limit', 1, 500) ?? 100,
+        );
+    }
+
+    @Get(':id/sessions')
+    @ApiOperation({ summary: 'Iteration Tasks for this Goal, each with its latest agent run' })
+    @HttpCode(HttpStatus.OK)
+    async sessions(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalSessionDto[]> {
+        return this.orchestrator.listSessions(auth.userId, id);
+    }
+
+    @Post(':id/spend-rollup')
+    @ApiOperation({ summary: 'Recompute spent-to-date from the linked runs and persist it' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async spendRollup(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalDto> {
+        return this.orchestrator.rollupSpend(auth.userId, id);
+    }
+
+    // ─── autonomy layer — loop control ──────────────────────────────
+
+    @Post(':id/loop/start')
+    @ApiOperation({ summary: 'Start (or resume) the execution loop' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async startLoop(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalDto> {
+        return this.orchestrator.startLoop(auth.userId, id);
+    }
+
+    @Post(':id/loop/resume')
+    @ApiOperation({ summary: 'Resume a paused or stuck execution loop' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async resumeLoop(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalDto> {
+        return this.orchestrator.startLoop(auth.userId, id);
+    }
+
+    @Post(':id/loop/pause')
+    @ApiOperation({ summary: 'Pause the execution loop (the in-flight session is left to land)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async pauseLoop(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalDto> {
+        return this.orchestrator.pauseLoop(auth.userId, id);
+    }
+
+    @Post(':id/loop/cancel')
+    @ApiOperation({ summary: 'Cancel the execution loop and its in-flight session' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async cancelLoop(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalDto> {
+        return this.orchestrator.cancelLoop(auth.userId, id);
+    }
+
+    @Post(':id/loop/restart')
+    @ApiOperation({ summary: 'Cancel the in-flight session and route a fresh iteration' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async restartSession(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalAdvanceResult> {
+        return this.orchestrator.restartSession(auth.userId, id);
+    }
+
+    @Post(':id/advance')
+    @ApiOperation({
+        summary:
+            'Run the orchestrator now: evaluate DoD + budgets and either dispatch the next iteration or stop the loop.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async advance(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalAdvanceResult> {
+        return this.orchestrator.advance(auth.userId, id);
+    }
+
+    @Post(':id/nudge')
+    @ApiOperation({ summary: 'Inject a steering message into the live iteration run' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async nudge(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: NudgeGoalDto,
+    ): Promise<{ goal: GoalDto; runId: string; queuedCount?: number }> {
+        return this.orchestrator.nudge(auth.userId, id, body.message);
+    }
+
+    // ─── autonomy layer — archive ───────────────────────────────────
+
+    @Post(':id/archive')
+    @ApiOperation({ summary: 'Archive a Goal (hidden from the default catalog, never deleted)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async archive(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalDto> {
+        return this.orchestrator.archive(auth.userId, id);
+    }
+
+    @Post(':id/unarchive')
+    @ApiOperation({ summary: 'Restore an archived Goal to the catalog' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async unarchive(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<GoalDto> {
+        return this.orchestrator.unarchive(auth.userId, id);
+    }
+
     private parseStatus(value?: string): GoalStatus | undefined {
         if (!value) return undefined;
         if (!Object.values(GoalStatus).includes(value as GoalStatus)) {
@@ -218,6 +487,20 @@ export class GoalsController {
         }
         const clamped = Math.max(min, n);
         return max !== undefined ? Math.min(max, clamped) : clamped;
+    }
+
+    /**
+     * `?archived=` — omitted/`false` hides archived Goals (the default
+     * catalog), `true` shows only them, `all` drops the filter. Anything
+     * else is a 400 rather than a silent fallback: a typo'd filter that
+     * quietly returns the wrong set is worse than an error.
+     */
+    private parseArchived(value?: string): boolean | 'all' | undefined {
+        if (value === undefined || value === '') return undefined;
+        if (value === 'all') return 'all';
+        if (value === 'true' || value === '1') return true;
+        if (value === 'false' || value === '0') return false;
+        throw new BadRequestException(`Invalid archived filter: ${value}. Use true, false or all.`);
     }
 
     private parseDeadline(value: string | null | undefined): Date | null {

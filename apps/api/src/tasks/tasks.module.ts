@@ -30,6 +30,10 @@ import { SubAgentDelegationDepthResolverService } from '../agents/sub-agent-dele
 // without it the API fails to boot with an
 // `UnknownDependenciesException: TasksController (..., ?)`.
 import { KnowledgeBaseModule } from '@ever-works/agent/services';
+// Tasks upgrades — the per-Task activity feed endpoint injects
+// ActivityLogService, which TasksDomainModule imports but does not
+// re-export; the controller resolves it against THIS module's imports.
+import { ActivityLogModule as AgentActivityLogModule } from '@ever-works/agent/activity-log';
 // The producer behind the "local runner fallback → cloud" inbox entry.
 // `NotificationsModule` is re-exported by FleetApiModule (imported
 // below), so the token resolves without a second import here.
@@ -72,7 +76,14 @@ import { TaskChatController } from './task-chat.controller';
 // breaking the entire Phase 15.3 / 15.4 dispatch fan-out.
 @Global()
 @Module({
-    imports: [TasksDomainModule, DatabaseModule, AgentsModule, KnowledgeBaseModule, FleetApiModule],
+    imports: [
+        TasksDomainModule,
+        DatabaseModule,
+        AgentsModule,
+        KnowledgeBaseModule,
+        FleetApiModule,
+        AgentActivityLogModule,
+    ],
     controllers: [TasksController, TaskChatController],
     providers: [
         // AUDIT A46/A24 — routing binding, not a replacement: the

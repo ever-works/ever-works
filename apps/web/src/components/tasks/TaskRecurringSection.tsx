@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Repeat, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import type { Task } from '@/lib/api/tasks';
 import { clearTaskRecurringAction, setTaskRecurringAction } from '@/app/actions/tasks';
 
@@ -16,24 +18,69 @@ import { clearTaskRecurringAction, setTaskRecurringAction } from '@/app/actions/
  *
  *   - Inactive (`task.isRecurring=false`): "Make recurring" CTA
  *     opens a frequency picker (Daily / Weekly / Monthly / Custom
- *     RRULE) + optional end date / max occurrences.
+ *     RRULE / Cron) + optional end date / max occurrences.
  *   - Active: shows the current RRULE + nextOccurrenceAt + occurrence
  *     counter, with a "Stop recurring" button that demotes the
  *     template back to a plain Task.
  *
  * The picker emits an RRULE string per RFC 5545 (`FREQ=DAILY` /
- * `FREQ=WEEKLY` / `FREQ=MONTHLY` / custom). `TasksService.setRecurring`
- * validates the rule + computes the first `nextOccurrenceAt`; rules
- * with no future occurrences are rejected with a clear error.
+ * `FREQ=WEEKLY` / `FREQ=MONTHLY` / custom) or a 5-field cron
+ * expression. `TasksService.setRecurring` validates the rule + computes
+ * the first `nextOccurrenceAt`; rules with no future occurrences are
+ * rejected with a clear error.
  */
 
-type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
+/* The right rail is one visual system: every section is the same neutral
+ * card with the same uppercase muted heading, and every control is the
+ * shared `Select` / `Input` at the rail's `xs` scale. Kept as constants
+ * so this section cannot drift away from `TaskBranchSection` and the
+ * Details card next to it. */
+const SECTION_CLASS =
+    'rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3';
+const HEADING_CLASS =
+    'text-xs font-semibold uppercase tracking-wide text-text-muted flex items-center gap-2';
+const FIELD_LABEL_CLASS = 'block text-[10px] uppercase tracking-wide text-text-muted mb-1';
+/** Pulls the shared `Input` down to the height/type scale of `Select size="xs"`. */
+const FIELD_CLASS = 'h-8 px-2 py-0 text-xs';
+
+type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM' | 'CRON';
 
 export function TaskRecurringSection({ task }: { task: Task }) {
     if (task.isRecurring) {
         return <ActivePanel task={task} />;
     }
     return <InactivePanel task={task} />;
+}
+
+/** Rail row: fixed label column, value on the right — mirrors `DetailRow`. */
+function RecurrenceRow({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="grid grid-cols-[5.5rem_1fr] items-start gap-3">
+            <dt className="text-xs text-text-muted pt-0.5">{label}</dt>
+            <dd className="min-w-0">{children}</dd>
+        </div>
+    );
+}
+
+function Field({
+    htmlFor,
+    label,
+    children,
+    className,
+}: {
+    htmlFor: string;
+    label: string;
+    children: React.ReactNode;
+    className?: string;
+}) {
+    return (
+        <div className={className}>
+            <label htmlFor={htmlFor} className={FIELD_LABEL_CLASS}>
+                {label}
+            </label>
+            {children}
+        </div>
+    );
 }
 
 function ActivePanel({ task }: { task: Task }) {
@@ -43,7 +90,7 @@ function ActivePanel({ task }: { task: Task }) {
     const [error, setError] = useState<string | null>(null);
 
     const handleStop = () => {
-        if (!confirm('Stop the recurring schedule? Existing instances stay; no new ones spawn.')) {
+        if (!confirm(t('stopConfirm'))) {
             return;
         }
         setError(null);
@@ -53,61 +100,64 @@ function ActivePanel({ task }: { task: Task }) {
                     await clearTaskRecurringAction(task.id);
                     router.refresh();
                 } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Failed to stop');
+                    setError(err instanceof Error ? err.message : t('stopError'));
                 }
             })();
         });
     };
 
     return (
-        <section className="rounded-xl border border-info/30 bg-info/5 p-5 space-y-3">
-            <h2 className="text-sm font-medium text-info flex items-center gap-2">
-                <Repeat className="w-4 h-4" />
+        <section className={SECTION_CLASS} data-testid="task-recurring-section">
+            <h2 className={HEADING_CLASS}>
+                <Repeat className="w-3.5 h-3.5" />
                 {t('section')}
             </h2>
-            <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-1 text-xs">
-                <dt className="text-text-muted">Rule</dt>
-                <dd className="font-mono break-all text-text-secondary dark:text-text-secondary-dark">
-                    {task.recurrenceRule ?? '(unknown)'}
-                </dd>
+            <dl className="space-y-3">
+                {/* Cron and RRULE are stored in separate columns (XOR), so the
+                    row names whichever dialect this template actually uses. */}
+                <RecurrenceRow label={task.recurrenceCron ? t('cron') : t('rule')}>
+                    <span className="text-xs font-mono break-all text-text dark:text-text-dark">
+                        {task.recurrenceCron ?? task.recurrenceRule ?? '—'}
+                    </span>
+                </RecurrenceRow>
                 {task.recurrenceTimezone && (
-                    <>
-                        <dt className="text-text-muted">Timezone</dt>
-                        <dd className="text-text-secondary">{task.recurrenceTimezone}</dd>
-                    </>
+                    <RecurrenceRow label={t('timezone')}>
+                        <span className="text-xs font-mono text-text-secondary dark:text-text-secondary-dark">
+                            {task.recurrenceTimezone}
+                        </span>
+                    </RecurrenceRow>
                 )}
                 {task.nextOccurrenceAt && (
-                    <>
-                        <dt className="text-text-muted">Next at</dt>
-                        <dd className="text-text-secondary">
+                    <RecurrenceRow label={t('nextAt')}>
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
                             {new Date(task.nextOccurrenceAt).toLocaleString()}
-                        </dd>
-                    </>
+                        </span>
+                    </RecurrenceRow>
                 )}
                 {task.recurrenceEndsAt && (
-                    <>
-                        <dt className="text-text-muted">Ends</dt>
-                        <dd className="text-text-secondary">
+                    <RecurrenceRow label={t('ends')}>
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
                             {new Date(task.recurrenceEndsAt).toLocaleDateString()}
-                        </dd>
-                    </>
+                        </span>
+                    </RecurrenceRow>
                 )}
                 {task.recurrenceMaxOccurrences != null && (
-                    <>
-                        <dt className="text-text-muted">Max</dt>
-                        <dd className="text-text-secondary">
+                    <RecurrenceRow label={t('max')}>
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
                             {task.recurrenceOccurredCount ?? 0} / {task.recurrenceMaxOccurrences}
-                        </dd>
-                    </>
+                        </span>
+                    </RecurrenceRow>
                 )}
             </dl>
-            <div>
+            <div className="pt-2 border-t border-border/40 dark:border-border-dark/40">
                 <Button
+                    type="button"
                     size="sm"
                     variant="ghost"
                     onClick={handleStop}
                     disabled={pending}
                     className="text-danger gap-1.5"
+                    data-testid="task-recurring-demote"
                 >
                     <Trash2 className="w-3.5 h-3.5" />
                     {pending ? '…' : t('demote')}
@@ -148,6 +198,9 @@ function InactivePanel({ task }: { task: Task }) {
     const [open, setOpen] = useState(false);
     const [frequency, setFrequency] = useState<Frequency>('WEEKLY');
     const [customRule, setCustomRule] = useState('FREQ=WEEKLY;BYDAY=MO');
+    // Schedule-modes upgrade — cron cadence alternative (XOR with the
+    // RRULE server-side; this picker only ever sends one of the two).
+    const [cronExpr, setCronExpr] = useState('0 9 * * 1');
     const [endsAt, setEndsAt] = useState('');
     const [maxOccurrences, setMaxOccurrences] = useState('');
     // FU-7 — friendly RRULE controls. Defaults match the original
@@ -161,6 +214,7 @@ function InactivePanel({ task }: { task: Task }) {
     const [error, setError] = useState<string | null>(null);
 
     const ruleString = useMemo(() => {
+        if (frequency === 'CRON') return cronExpr.trim();
         if (frequency === 'CUSTOM') return customRule.trim();
         const parts: string[] = [`FREQ=${frequency}`];
         // Parse HH:MM → BYHOUR + BYMINUTE. Skip when blank.
@@ -178,12 +232,16 @@ function InactivePanel({ task }: { task: Task }) {
             parts.push(`BYMONTHDAY=${d}`);
         }
         return parts.join(';');
-    }, [frequency, customRule, timeOfDay, daysOfWeek, dayOfMonth]);
+    }, [frequency, customRule, cronExpr, timeOfDay, daysOfWeek, dayOfMonth]);
 
     const isValidRule = useMemo(() => {
         // Lightweight client-side check — fully validated server-side
-        // via the `rrule` package on `TasksService.setRecurring`.
+        // (RRULE via the `rrule` package, cron via parseCron) on
+        // `TasksService.setRecurring`.
         if (!ruleString) return false;
+        if (frequency === 'CRON') {
+            return ruleString.split(/\s+/).length === 5;
+        }
         if (!/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY|HOURLY|MINUTELY|SECONDLY)/.test(ruleString)) {
             return false;
         }
@@ -201,8 +259,10 @@ function InactivePanel({ task }: { task: Task }) {
         if (!isValidRule) {
             setError(
                 frequency === 'WEEKLY' && daysOfWeek.length === 0
-                    ? 'Pick at least one weekday.'
-                    : 'A valid recurrence rule is required.',
+                    ? t('errorPickWeekday')
+                    : frequency === 'CRON'
+                      ? t('errorInvalidCron')
+                      : t('errorInvalidRule'),
             );
             return;
         }
@@ -210,9 +270,17 @@ function InactivePanel({ task }: { task: Task }) {
         startTransition(() => {
             void (async () => {
                 try {
+                    // XOR on the wire: the cron dialect goes in
+                    // `recurrenceCron`, everything else is an RRULE.
+                    // Sending both is a 400 by service validation.
                     await setTaskRecurringAction(task.id, {
-                        recurrenceRule: ruleString,
-                        recurrenceTimezone: timezone || undefined,
+                        recurrenceRule: frequency === 'CRON' ? undefined : ruleString,
+                        recurrenceCron: frequency === 'CRON' ? ruleString : undefined,
+                        // Cron expressions are evaluated in UTC by
+                        // `computeNextCronFire`; stamping the browser zone
+                        // would render a next-fire time in a zone the
+                        // dispatcher never used.
+                        recurrenceTimezone: frequency === 'CRON' ? 'UTC' : timezone || undefined,
                         recurrenceEndsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
                         recurrenceMaxOccurrences:
                             maxOccurrences.trim().length > 0
@@ -222,7 +290,7 @@ function InactivePanel({ task }: { task: Task }) {
                     setOpen(false);
                     router.refresh();
                 } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Failed to save');
+                    setError(err instanceof Error ? err.message : t('saveError'));
                 }
             })();
         });
@@ -233,20 +301,26 @@ function InactivePanel({ task }: { task: Task }) {
         WEEKLY: t('weekly'),
         MONTHLY: t('monthly'),
         CUSTOM: t('custom'),
+        CRON: t('cron'),
     };
 
     if (!open) {
         return (
-            <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-2">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
-                    <Repeat className="w-4 h-4 text-text-muted" />
+            <section className={SECTION_CLASS} data-testid="task-recurring-section">
+                <h2 className={HEADING_CLASS}>
+                    <Repeat className="w-3.5 h-3.5" />
                     {t('section')}
                 </h2>
                 <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    This Task does not repeat. Promote it to a recurring template to spawn fresh
-                    instances on a schedule.
+                    {t('inactiveHint')}
                 </p>
-                <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setOpen(true)}
+                    data-testid="task-recurring-promote"
+                >
                     {t('promoteToRecurring')}
                 </Button>
             </section>
@@ -254,58 +328,80 @@ function InactivePanel({ task }: { task: Task }) {
     }
 
     return (
-        <section className="rounded-xl border border-info/30 bg-info/5 p-5 space-y-3">
-            <h2 className="text-sm font-medium text-info flex items-center gap-2">
-                <Repeat className="w-4 h-4" />
+        <section className={SECTION_CLASS} data-testid="task-recurring-section">
+            <h2 className={HEADING_CLASS}>
+                <Repeat className="w-3.5 h-3.5" />
                 {t('promoteToRecurring')}
             </h2>
             <div className="grid grid-cols-1 @md/main:grid-cols-2 gap-3">
-                <div>
-                    <label className="block text-[10px] text-text-muted mb-1">Frequency</label>
-                    <select
+                <Field htmlFor="task-recurring-frequency" label={t('frequency')}>
+                    <Select
+                        id="task-recurring-frequency"
                         value={frequency}
-                        onChange={(e) => setFrequency(e.target.value as Frequency)}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                        onValueChange={(next) => setFrequency(next as Frequency)}
+                        disabled={pending}
+                        size="xs"
+                        data-testid="task-recurring-frequency"
                     >
                         {(Object.keys(FREQUENCY_LABEL) as Frequency[]).map((f) => (
                             <option key={f} value={f}>
                                 {FREQUENCY_LABEL[f]}
                             </option>
                         ))}
-                    </select>
-                </div>
+                    </Select>
+                </Field>
                 {frequency === 'CUSTOM' && (
-                    <div>
-                        <label className="block text-[10px] text-text-muted mb-1">
-                            {t('custom')}
-                        </label>
-                        <input
+                    <Field htmlFor="task-recurring-custom-rule" label={t('custom')}>
+                        <Input
+                            id="task-recurring-custom-rule"
                             type="text"
                             value={customRule}
                             onChange={(e) => setCustomRule(e.target.value)}
                             placeholder="FREQ=WEEKLY;BYDAY=MO,WE,FR"
-                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono"
+                            disabled={pending}
+                            variant="form"
+                            className={`${FIELD_CLASS} font-mono`}
                         />
-                    </div>
+                    </Field>
                 )}
-                {frequency !== 'CUSTOM' && (
-                    <div>
-                        <label className="block text-[10px] text-text-muted mb-1">
-                            {t('timeOfDay')}
-                        </label>
-                        <input
+                {frequency === 'CRON' && (
+                    <Field
+                        htmlFor="task-recurring-cron"
+                        label={t('cron')}
+                        className="@md/main:col-span-2"
+                    >
+                        <Input
+                            id="task-recurring-cron"
+                            type="text"
+                            value={cronExpr}
+                            onChange={(e) => setCronExpr(e.target.value)}
+                            placeholder="0 9 * * 1"
+                            disabled={pending}
+                            variant="form"
+                            className={`${FIELD_CLASS} font-mono`}
+                            data-testid="task-recurring-cron"
+                        />
+                        <p className="mt-1 text-[10px] leading-relaxed text-text-muted dark:text-text-muted-dark">
+                            {t('cronHint')}
+                        </p>
+                    </Field>
+                )}
+                {frequency !== 'CUSTOM' && frequency !== 'CRON' && (
+                    <Field htmlFor="task-recurring-time" label={t('timeOfDay')}>
+                        <Input
+                            id="task-recurring-time"
                             type="time"
                             value={timeOfDay}
                             onChange={(e) => setTimeOfDay(e.target.value)}
-                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                            disabled={pending}
+                            variant="form"
+                            className={FIELD_CLASS}
                         />
-                    </div>
+                    </Field>
                 )}
                 {frequency === 'WEEKLY' && (
                     <div className="@md/main:col-span-2">
-                        <label className="block text-[10px] text-text-muted mb-1">
-                            {t('dayOfWeek')}
-                        </label>
+                        <span className={FIELD_LABEL_CLASS}>{t('dayOfWeek')}</span>
                         <div className="flex flex-wrap gap-1">
                             {DAYS_OF_WEEK.map((d) => {
                                 const active = daysOfWeek.includes(d.value);
@@ -313,11 +409,13 @@ function InactivePanel({ task }: { task: Task }) {
                                     <button
                                         key={d.value}
                                         type="button"
+                                        aria-pressed={active}
+                                        disabled={pending}
                                         onClick={() => toggleDay(d.value)}
-                                        className={`text-[11px] px-2 h-7 rounded border transition-colors ${
+                                        className={`text-xs px-2 h-8 rounded-lg border transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
                                             active
                                                 ? 'border-primary bg-primary/10 text-primary'
-                                                : 'border-border/60 dark:border-border-dark/60 text-text-secondary hover:text-text'
+                                                : 'border-border dark:border-border-secondary-dark bg-card dark:bg-card-primary-dark text-text-secondary dark:text-text-secondary-dark hover:border-border-secondary dark:hover:border-white/40'
                                         }`}
                                     >
                                         {d.label}
@@ -328,31 +426,31 @@ function InactivePanel({ task }: { task: Task }) {
                     </div>
                 )}
                 {frequency === 'MONTHLY' && (
-                    <div>
-                        <label className="block text-[10px] text-text-muted mb-1">
-                            {t('dayOfMonth')}
-                        </label>
-                        <input
+                    <Field htmlFor="task-recurring-day-of-month" label={t('dayOfMonth')}>
+                        <Input
+                            id="task-recurring-day-of-month"
                             type="number"
                             value={dayOfMonth}
                             onChange={(e) => setDayOfMonth(e.target.value)}
                             min={1}
                             max={31}
-                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                            disabled={pending}
+                            variant="form"
+                            className={FIELD_CLASS}
                         />
-                    </div>
+                    </Field>
                 )}
-                {frequency !== 'CUSTOM' && (
-                    <div>
-                        <label className="block text-[10px] text-text-muted mb-1">
-                            {t('timezone')}
-                        </label>
-                        <input
+                {frequency !== 'CUSTOM' && frequency !== 'CRON' && (
+                    <Field htmlFor="task-recurring-timezone" label={t('timezone')}>
+                        <Input
+                            id="task-recurring-timezone"
                             type="text"
                             value={timezone}
                             onChange={(e) => setTimezone(e.target.value)}
                             placeholder="UTC"
-                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono"
+                            disabled={pending}
+                            variant="form"
+                            className={`${FIELD_CLASS} font-mono`}
                             list="task-tz-suggestions"
                         />
                         <datalist id="task-tz-suggestions">
@@ -365,44 +463,58 @@ function InactivePanel({ task }: { task: Task }) {
                             <option value="Asia/Singapore" />
                             <option value="Australia/Sydney" />
                         </datalist>
-                    </div>
+                    </Field>
                 )}
-                <div>
-                    <label className="block text-[10px] text-text-muted mb-1">
-                        Ends (optional)
-                    </label>
-                    <input
+                <Field htmlFor="task-recurring-ends-at" label={t('endsAt')}>
+                    <Input
+                        id="task-recurring-ends-at"
                         type="date"
                         value={endsAt}
                         onChange={(e) => setEndsAt(e.target.value)}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                        disabled={pending}
+                        variant="form"
+                        className={FIELD_CLASS}
                     />
-                </div>
-                <div>
-                    <label className="block text-[10px] text-text-muted mb-1">
-                        Max occurrences (optional)
-                    </label>
-                    <input
+                </Field>
+                <Field htmlFor="task-recurring-max" label={t('maxOccurrences')}>
+                    <Input
+                        id="task-recurring-max"
                         type="number"
                         value={maxOccurrences}
                         onChange={(e) => setMaxOccurrences(e.target.value)}
                         min={1}
                         max={9999}
                         placeholder="∞"
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs"
+                        disabled={pending}
+                        variant="form"
+                        className={FIELD_CLASS}
                     />
-                </div>
+                </Field>
             </div>
-            <div className="text-[11px] text-text-muted font-mono">
-                Rule preview: {ruleString || '(empty)'}
-                {!isValidRule && ruleString && <span className="text-danger ml-2">· invalid</span>}
-            </div>
-            <div className="flex items-center gap-2">
-                <Button size="sm" onClick={handleSave} disabled={pending || !isValidRule}>
+            <p className="text-[11px] font-mono break-all text-text-muted dark:text-text-muted-dark">
+                {t('rulePreview')}: {ruleString || '—'}
+                {!isValidRule && ruleString && (
+                    <span className="text-danger ml-2">· {t('ruleInvalid')}</span>
+                )}
+            </p>
+            <div className="flex items-center gap-2 pt-2 border-t border-border/40 dark:border-border-dark/40">
+                <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={pending || !isValidRule}
+                    data-testid="task-recurring-save"
+                >
                     {pending ? '…' : t('save')}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
-                    Cancel
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setOpen(false)}
+                    disabled={pending}
+                >
+                    {t('cancel')}
                 </Button>
             </div>
             {error && (

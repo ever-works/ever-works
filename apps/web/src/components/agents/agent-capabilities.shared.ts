@@ -141,3 +141,23 @@ export function composeGrantForToggle(
     if (agentGrantRow?.note) grant.note = agentGrantRow.note;
     return grant;
 }
+
+/**
+ * Repositories section — whether a registry row may be attached/detached
+ * from the Capabilities page.
+ *
+ * Work-DERIVED rows (`sourceType: 'work'`) exist because a Work declared
+ * them; their attachment follows the Work assignment, so a toggle here
+ * would either no-op or fight the Work. The registry also carries an
+ * explicit `readonly` flag for rows the caller may not mutate at all.
+ * Both render read-only with a source badge; only manually registered
+ * (and GitHub-App imported) rows are toggleable.
+ *
+ * Deliberately shaped as a pure predicate over the two fields rather than
+ * `sourceType !== 'manual'`: GitHub-App imports ARE ordinary registry
+ * rows the user owns, and lumping them in would silently strip a working
+ * affordance the Settings card still offers.
+ */
+export function repoIsReadOnly(repo: { sourceType: string; readonly?: boolean | null }): boolean {
+    return repo.sourceType === 'work' || repo.readonly === true;
+}

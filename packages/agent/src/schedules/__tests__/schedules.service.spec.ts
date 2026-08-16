@@ -252,4 +252,62 @@ describe('SchedulesService', () => {
         });
         expect(enabledOnly).toHaveLength(0);
     });
+
+    // Schedule-modes upgrade — a recurring Task may carry EITHER an RRULE
+    // or a 5-field cron (XOR). Reading only `recurrenceRule` rendered the
+    // cron dialect with a blank cadence on this page.
+    it('renders the cron cadence of a cron-recurring Task', async () => {
+        const taskRepo = makeRepo([
+            {
+                id: 'task-cron',
+                title: 'Monday standup',
+                recurrenceRule: null,
+                recurrenceCron: '0 9 * * 1',
+                nextOccurrenceAt: new Date('2026-07-20T09:00:00.000Z'),
+                recurrenceEndsAt: null,
+                recurrenceMaxOccurrences: null,
+                recurrenceOccurredCount: 0,
+            },
+        ]);
+        const service = new SchedulesService(
+            taskRepo as never,
+            makeRepo([]) as never,
+            makeWorkScheduleRepo([]) as never,
+            makeRepo([]) as never,
+            { find: jest.fn().mockResolvedValue([]) } as never,
+            makeRepo([]) as never,
+        );
+
+        const views = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });
+        expect(views).toHaveLength(1);
+        expect(views[0].cadenceRaw).toBe('0 9 * * 1');
+        expect(views[0].cadenceHuman).toBe('Every Monday at 09:00');
+    });
+
+    it('still renders the RRULE cadence when that is the dialect in use', async () => {
+        const taskRepo = makeRepo([
+            {
+                id: 'task-rrule',
+                title: 'Weekly report',
+                recurrenceRule: 'FREQ=WEEKLY',
+                recurrenceCron: null,
+                nextOccurrenceAt: new Date('2026-07-20T09:00:00.000Z'),
+                recurrenceEndsAt: null,
+                recurrenceMaxOccurrences: null,
+                recurrenceOccurredCount: 0,
+            },
+        ]);
+        const service = new SchedulesService(
+            taskRepo as never,
+            makeRepo([]) as never,
+            makeWorkScheduleRepo([]) as never,
+            makeRepo([]) as never,
+            { find: jest.fn().mockResolvedValue([]) } as never,
+            makeRepo([]) as never,
+        );
+
+        const views = await service.getSchedules(SCOPE, { sourceType: 'recurring_task' });
+        expect(views[0].cadenceRaw).toBe('FREQ=WEEKLY');
+        expect(views[0].cadenceHuman.toLowerCase()).toContain('week');
+    });
 });

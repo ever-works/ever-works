@@ -33,6 +33,11 @@ export interface AgentDto {
     capabilities: string | null;
     aiProviderId: string | null;
     modelId: string | null;
+    /**
+     * Environments (Settings → Environments) — assigned runtime
+     * Environment id; null = platform default runtime.
+     */
+    environmentId: string | null;
     maxSkillContextTokens: number;
     /** Memory recall injection toggle (memory upgrades M2) — on by default. */
     memoryRecallEnabled: boolean;
@@ -88,6 +93,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         capabilities: agent.capabilities ?? null,
         aiProviderId: agent.aiProviderId ?? null,
         modelId: agent.modelId ?? null,
+        environmentId: agent.environmentId ?? null,
         maxSkillContextTokens: agent.maxSkillContextTokens,
         // `?? true` — recall is on by default; rows created before the
         // memory-upgrades migration (or sqlite test fixtures) surface

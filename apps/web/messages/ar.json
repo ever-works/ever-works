@@ -171,7 +171,11 @@
                 "noToken": "رابط إعادة تعيين غير صالح",
                 "invalidLink": "رابط إعادة تعيين غير صالح",
                 "missingTokenMessage": "رابط إعادة تعيين كلمة المرور غير صالح أو غير كامل. يرجى طلب إعادة تعيين جديدة.",
-                "requestNewLink": "طلب رابط إعادة تعيين جديد"
+                "requestNewLink": "طلب رابط إعادة تعيين جديد",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead."
             },
             "backToLogin": "العودة إلى تسجيل الدخول"
         },
@@ -181,7 +185,8 @@
             "form": {
                 "name": {
                     "label": "الاسم الكامل",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "عنوان البريد الإلكتروني",
@@ -190,7 +195,7 @@
                 "password": {
                     "label": "كلمة المرور",
                     "placeholder": "إنشاء كلمة مرور قوية",
-                    "hint": "يجب أن تكون 8 أحرف على الأقل"
+                    "hint": "يجب أن تكون 8 أحرف على الأقل مع حرف صغير ورقم/رمز خاص"
                 },
                 "confirmPassword": {
                     "label": "تأكيد كلمة المرور",
@@ -219,7 +224,41 @@
                 "passwordsDoNotMatch": "كلمات المرور غير متطابقة",
                 "passwordTooShort": "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
                 "generic": "حدث خطأ. يرجى المحاولة مرة أخرى.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
+            }
+        },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
             }
         }
     },
@@ -598,6 +637,64 @@
                 "error": "حدث خطأ ما. يُرجى المحاولة مرة أخرى."
             }
         },
+        "inbox": {
+            "title": "Inbox",
+            "subtitle": "Questions, approvals and notices your agents and works sent you.",
+            "unreadCount": "{count} unread",
+            "unreadDot": "Unread",
+            "tabs": {
+                "active": "Active",
+                "archived": "Archived"
+            },
+            "kind": {
+                "question": "Question",
+                "approval": "Approval",
+                "escalation": "Escalation",
+                "notice": "Notice"
+            },
+            "empty": {
+                "active": "Nothing is waiting on you.",
+                "archived": "No archived messages."
+            },
+            "rowMenu": {
+                "label": "Message actions",
+                "markRead": "Mark as read",
+                "markUnread": "Mark as unread",
+                "archive": "Archive",
+                "unarchive": "Move to Active",
+                "delete": "Delete"
+            },
+            "detail": {
+                "none": "Select a message to read it.",
+                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
+                "yourReply": "Your reply",
+                "noReplyText": "No reply text was recorded."
+            },
+            "reply": {
+                "chooseOption": "Choose an answer",
+                "other": "Other (write your own)",
+                "recommended": "Recommended",
+                "placeholder": "Write your reply…",
+                "send": "Send Reply",
+                "hint": "Your reply goes straight back to the agent.",
+                "needsAnswer": "Pick an option or write a reply first."
+            },
+            "routed": {
+                "steered": "Reply delivered — the running agent picked it up.",
+                "resumed": "Reply delivered — a new run is answering it.",
+                "approved": "Approved.",
+                "rejected": "Rejected.",
+                "escalationResolved": "Escalation resolved.",
+                "alreadyDecided": "This was already decided elsewhere.",
+                "recorded": "Reply recorded."
+            },
+            "toast": {
+                "archived": "Message archived.",
+                "unarchived": "Message moved back to Active.",
+                "deleted": "Message deleted.",
+                "error": "Something went wrong. Please try again."
+            }
+        },
         "title": "لوحة التحكم",
         "connectGithub": {
             "title": "ربط حساب GitHub الخاص بك",
@@ -960,10 +1057,12 @@
                 "activity": "النشاط",
                 "instructions": "التعليمات",
                 "skills": "المهارات",
-                "capabilities": "القدرات",
                 "budgets": "الميزانيات",
                 "settings": "الإعدادات",
-                "terminal": "Terminal"
+                "terminal": "Terminal",
+                "collaborators": "Collaborators",
+                "mcpServers": "MCP Servers",
+                "capabilities": "القدرات"
             },
             "newDialog": {
                 "title": "وكيل جديد",
@@ -1182,6 +1281,26 @@
                 "success": "تم حذف {name}",
                 "error": "تعذر حذف الوكيل"
             },
+            "collaborators": {
+                "title": "Collaborator Agents",
+                "description": "Select which agents this agent can spawn as collaborators for subtasks. Delegations to agents that are not enabled here are refused.",
+                "empty": "No other agents yet. Create another agent to enable it as a collaborator.",
+                "enabledCount": "{count} enabled",
+                "noTitle": "No role set",
+                "toggleFailed": "Could not update collaborator",
+                "reset": "Clear rule",
+                "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
+            },
+            "mcpServers": {
+                "title": "MCP Servers",
+                "subtitle": "Choose which MCP connections this agent can use. Tenant-wide connections are inherited unless overridden here.",
+                "activeCount": "{count} active",
+                "empty": "No MCP connections configured. Add one under Settings → Connections.",
+                "inherited": "Inherited",
+                "overridden": "Override",
+                "connectionDisabled": "Connection disabled",
+                "revert": "Revert"
+            },
             "capabilities": {
                 "title": "القدرات",
                 "subtitle": "ما يستطيع هذا الوكيل فعله — الأدوات والمهارات وبرنامج التهيئة.",
@@ -1210,6 +1329,34 @@
                     "installAndAttach": "تثبيت وإرفاق",
                     "inherited": "موروثة",
                     "empty": "لا توجد مهارات مرتبطة بعد."
+                },
+                "mcp": {
+                    "title": "MCP Connections",
+                    "description": "Which MCP connections this agent can use. Tenant-wide connections are inherited unless this agent overrides them.",
+                    "inherited": "Inherited from tenant",
+                    "overridden": "Override",
+                    "connectionDisabled": "Connection disabled",
+                    "revert": "Reset to inherited",
+                    "manage": "Manage MCP servers",
+                    "empty": "No MCP connections configured. Add one under Settings → Connections."
+                },
+                "repositories": {
+                    "title": "Repositories",
+                    "description": "Repositories from your registry this agent can work in. Repositories derived from a Work are managed with that Work and shown read-only here.",
+                    "source": "From {source}",
+                    "attached": "Attached",
+                    "notAttached": "Not attached",
+                    "manage": "Manage repositories",
+                    "empty": "No repositories in your registry yet.",
+                    "toggleError": "Failed to update repository attachment"
+                },
+                "environment": {
+                    "title": "Environment",
+                    "description": "The runtime recipe this agent runs in. Only published environments can be assigned.",
+                    "none": "None (default)",
+                    "manage": "Manage environments",
+                    "empty": "No published environments yet. Create one under Settings → Environments.",
+                    "saved": "Environment updated"
                 },
                 "initScript": {
                     "title": "برنامج التهيئة",
@@ -1313,7 +1460,22 @@
                 "acceptanceChecks": "Acceptance checks",
                 "acceptanceChecksHint": "Commands that must exit 0 before this Task's agent work can open a pull request. Leave empty to inherit the Work's default checks.",
                 "maxGateAttempts": "Max gate attempts",
-                "maxGateAttemptsInherit": "Inherit from Work"
+                "maxGateAttemptsInherit": "Inherit from Work",
+                "modeLabel": "What to create",
+                "modeBlank": "Blank task",
+                "modeTemplate": "From template",
+                "template": "Workflow template",
+                "templateOption": "{name} — {steps} steps",
+                "templatesEmpty": "No workflow templates available",
+                "templatesLoadError": "Failed to load workflow templates",
+                "templateRequired": "Pick a workflow template first.",
+                "branchName": "Branch name (optional)",
+                "branchNamePlaceholder": "feat/my-feature",
+                "willCreate": "Will create a parent Task plus {steps} sub-tasks:",
+                "stepApproval": "approval",
+                "featureName": "Feature name",
+                "featureDescription": "Feature description",
+                "createFromTemplate": "Create workflow"
             },
             "detail": {
                 "moveTo": "نقل إلى",
@@ -1382,7 +1544,20 @@
                     "resumeDispatched": "Resumed — a new run is picking up the same session.",
                     "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
                     "genericError": "That run control could not be applied."
-                }
+                },
+                "attachmentAttachAs": "Attach as",
+                "attachmentRoleInitial": "Input",
+                "attachmentRoleResult": "Result",
+                "missionNone": "بدون مهمة",
+                "missionPlaceholder": "اختر مهمة…",
+                "missionUpdateError": "تعذّر تحديث المهمة",
+                "ideaNone": "بدون فكرة",
+                "ideaPlaceholder": "اختر فكرة…",
+                "ideaUpdateError": "تعذّر تحديث الفكرة",
+                "openWork": "فتح هذا الـ Work",
+                "openMission": "فتح هذه المهمة",
+                "openIdea": "فتح هذه الفكرة",
+                "openAgent": "فتح هذا الوكيل"
             },
             "recurring": {
                 "section": "جدول متكرر",
@@ -1396,7 +1571,26 @@
                 "dayOfWeek": "يوم الأسبوع",
                 "dayOfMonth": "يوم الشهر",
                 "timezone": "المنطقة الزمنية",
-                "save": "حفظ الجدول"
+                "save": "حفظ الجدول",
+                "cron": "Cron expression",
+                "cronHint": "Five fields: minute hour day-of-month month day-of-week, evaluated in UTC. Examples: “0 9 * * 1” Mondays at 09:00, “*/15 * * * *” every 15 minutes, “0 0 1 * *” the 1st of each month.",
+                "errorPickWeekday": "Pick at least one weekday.",
+                "errorInvalidRule": "A valid recurrence rule is required.",
+                "errorInvalidCron": "A cron expression needs exactly 5 fields.",
+                "frequency": "التكرار",
+                "endsAt": "الانتهاء (اختياري)",
+                "maxOccurrences": "الحد الأقصى للتكرارات (اختياري)",
+                "rulePreview": "معاينة القاعدة",
+                "ruleInvalid": "غير صالحة",
+                "cancel": "إلغاء",
+                "inactiveHint": "هذه المهمة لا تتكرر. رقّها إلى قالب متكرر لإنشاء نسخ جديدة وفق جدول.",
+                "rule": "القاعدة",
+                "nextAt": "التالي في",
+                "ends": "ينتهي",
+                "max": "الحد الأقصى",
+                "stopConfirm": "إيقاف الجدول المتكرر؟ تبقى النسخ الحالية ولن تُنشأ نسخ جديدة.",
+                "stopError": "تعذّر إيقاف الجدول المتكرر",
+                "saveError": "تعذّر حفظ الجدول"
             },
             "status": {
                 "backlog": "قائمة الانتظار",
@@ -1501,6 +1695,52 @@
                     "typecheck": "Type check",
                     "custom": "Custom"
                 }
+            },
+            "schedule": {
+                "section": "Schedule",
+                "modeOnce": "Run once",
+                "modeScheduled": "Scheduled",
+                "modeRecurring": "Recurring",
+                "onceHint": "This Task runs when it is dispatched — there is no schedule.",
+                "scheduledHint": "Run this Task once, automatically, at the time you pick.",
+                "recurringHint": "Spawn a fresh instance of this Task on a repeating cadence.",
+                "runAt": "Run at",
+                "save": "Schedule",
+                "unschedule": "Remove schedule",
+                "scheduleError": "Failed to schedule this Task",
+                "unscheduleError": "Failed to remove the schedule",
+                "errorInvalidDate": "Pick a valid date and time.",
+                "errorPastDate": "Pick a time in the future.",
+                "armedFor": "Armed for {at}",
+                "firedAt": "Dispatched at {at}",
+                "stillScheduled": "Still scheduled for {at}",
+                "recurringConflict": "This Task is a recurring template. Stop the recurrence before scheduling a one-shot run."
+            },
+            "subtasks": {
+                "section": "Sub-tasks",
+                "empty": "No sub-tasks yet.",
+                "add": "Add",
+                "addPlaceholder": "Add a sub-task…",
+                "addError": "Failed to add the sub-task",
+                "approvalPending": "Approval",
+                "approvalCleared": "Approved",
+                "approvalCount": "{approved} of {total} approvers signed off"
+            },
+            "activity": {
+                "section": "Activity",
+                "empty": "No activity recorded for this Task yet.",
+                "viewRuns": "View runs",
+                "truncated": "Showing {shown} of {total} entries"
+            },
+            "templates": {
+                "workflowsSection": "My workflows",
+                "workflowsEmpty": "No workflow templates yet.",
+                "useInNewTask": "Use in a new Task",
+                "stepCount": "{count} steps",
+                "delete": "Delete template",
+                "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
+                "deleteError": "Failed to delete the template",
+                "requiresApproval": "Requires approval"
             }
         },
         "skillsPage": {
@@ -2347,7 +2587,10 @@
                 "digest": "Digest",
                 "notifications": "Notifications",
                 "channels": "Channels",
-                "emails": "Email Addresses"
+                "emails": "Email Addresses",
+                "environments": "Environments",
+                "connections": "Connections",
+                "repositories": "Repositories"
             },
             "githubApp": {
                 "title": "تثبيتات تطبيق GitHub",
@@ -3216,6 +3459,168 @@
                     "saveError": "Failed to save the digest settings",
                     "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
                     "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
+                }
+            },
+            "environments": {
+                "title": "Environments",
+                "subtitle": "Named, reusable runtime environments — packages and networking — you can assign to your Agents.",
+                "empty": "No environments yet. Create one to define the packages and networking your Agents run with.",
+                "editor": {
+                    "createTitle": "New environment",
+                    "editTitle": "Edit environment"
+                },
+                "table": {
+                    "name": "Name",
+                    "networking": "Networking",
+                    "status": "Status",
+                    "updated": "Updated"
+                },
+                "status": {
+                    "draft": "Draft",
+                    "published": "Published"
+                },
+                "networking": {
+                    "unrestricted": "Unrestricted",
+                    "limited": "Limited ({count} hosts)"
+                },
+                "networkingOption": {
+                    "unrestricted": "Unrestricted — the runtime may reach any host",
+                    "limited": "Limited — only the allowed hosts below are reachable"
+                },
+                "fields": {
+                    "name": "Name",
+                    "description": "Description",
+                    "availableInAllProjects": "Available in all projects",
+                    "availableInAllProjectsHelper": "Offer this environment everywhere Agents are assigned environments.",
+                    "pipPackages": "Python packages (pip)",
+                    "pipPackagesHelper": "One pip requirement specifier per line, e.g. pandas>=2.0,<3.0 (a specifier may itself contain a comma).",
+                    "npmPackages": "Node packages (npm)",
+                    "npmPackagesHelper": "One npm package spec per line, e.g. @scope/pkg@^1.2.0.",
+                    "networking": "Networking",
+                    "allowedHosts": "Allowed hosts",
+                    "allowedHostsHelper": "One host per line (or comma-separated). A single leading *. wildcard is allowed, e.g. *.example.com.",
+                    "allowPackageManagers": "Allow package managers",
+                    "allowPackageManagersHelper": "Keep package-manager registries reachable even with limited networking."
+                },
+                "actions": {
+                    "new": "New environment",
+                    "edit": "Edit",
+                    "delete": "Delete",
+                    "save": "Save draft",
+                    "publish": "Publish",
+                    "savePublish": "Save & publish",
+                    "cancel": "Cancel"
+                },
+                "messages": {
+                    "nameRequired": "Give the environment a name first.",
+                    "saveSuccess": "Environment saved",
+                    "publishSuccess": "Environment published",
+                    "deleteSuccess": "Environment deleted",
+                    "error": "Something went wrong. Please try again."
+                },
+                "delete": {
+                    "title": "Delete environment",
+                    "description": "Delete \"{name}\"? Agents must be unassigned from it first — deletion is refused while any Agent still uses it.",
+                    "cancel": "Cancel",
+                    "confirm": "Delete"
+                }
+            },
+            "connections": {
+                "title": "Connections",
+                "subtitle": "External MCP servers your agents can use as tools. Auth header values are encrypted and never shown again.",
+                "addConnection": "Add Connection",
+                "empty": "No connections yet. Add an MCP server URL to give your agents external tools.",
+                "authHeaders": "Auth headers",
+                "lastConnected": "Connected {date}",
+                "test": "Test",
+                "testOk": "OK — {count} tools ({tools})",
+                "testFailed": "Connection test failed.",
+                "delete": "Delete",
+                "form": {
+                    "name": "Name",
+                    "nameHelp": "Lowercase letters, digits, hyphens. Becomes the mcp__<name>__<tool> prefix.",
+                    "transport": "Transport",
+                    "streamableHttp": "Streamable HTTP",
+                    "sse": "SSE (legacy)",
+                    "url": "Server URL",
+                    "headerName": "Auth header name",
+                    "headerValue": "Auth header value",
+                    "headerValueHelp": "Stored encrypted. Never shown again.",
+                    "cancel": "Cancel",
+                    "save": "Save"
+                }
+            },
+            "repositories": {
+                "title": "Repositories",
+                "subtitle": "A global registry of repositories your agents can be granted access to, independent of Works.",
+                "addRepo": "Add Repo",
+                "editRepo": "Edit {name}",
+                "emptyTitle": "No repositories yet",
+                "emptyDescription": "Add a repository manually or import one from a GitHub App installation to make it attachable to your agents.",
+                "columns": {
+                    "name": "Name",
+                    "url": "URL",
+                    "credential": "Credential",
+                    "source": "Source",
+                    "updated": "Updated"
+                },
+                "source": {
+                    "manual": "Manual",
+                    "work": "Work",
+                    "github-app": "GitHub App"
+                },
+                "credential": {
+                    "inherit": "Inherited",
+                    "github-app": "GitHub App",
+                    "secret-ref": "Secret reference"
+                },
+                "tabs": {
+                    "general": "General",
+                    "environment": "Environment"
+                },
+                "fields": {
+                    "url": "Repository URL",
+                    "name": "Name",
+                    "mountPath": "Mount Path",
+                    "mountPathHint": "Mounted at /workspace/{path}",
+                    "defaultBranch": "Default Branch",
+                    "credentialKey": "Credential Key",
+                    "credentialInstallation": "Select installation",
+                    "description": "Description",
+                    "availableInAllProjects": "Available in all projects",
+                    "availableInAllProjectsHint": "Offer this repository everywhere without an explicit attachment."
+                },
+                "save": "Save",
+                "cancel": "Cancel",
+                "edit": "Edit",
+                "delete": "Delete",
+                "created": "Repository added",
+                "updated": "Repository updated",
+                "deleted": "Repository deleted",
+                "saveError": "Failed to save repository",
+                "deleteError": "Failed to delete repository",
+                "importTitle": "Import from GitHub App",
+                "importSubtitle": "Repositories available through your GitHub App installations can be imported with one click.",
+                "import": "Import",
+                "imported": "Repository imported",
+                "importError": "Failed to import repository",
+                "envFiles": {
+                    "masked": "{count} env file(s) stored. Contents are hidden until revealed.",
+                    "reveal": "Reveal",
+                    "revealError": "Failed to load env files",
+                    "add": "Add .env file",
+                    "remove": "Remove file",
+                    "saveAll": "Save All",
+                    "saved": "Env files saved",
+                    "saveError": "Failed to save env files",
+                    "savedWithRepo": "Env files are saved together with the repository."
+                },
+                "agentCard": {
+                    "title": "Repositories",
+                    "subtitle": "Grant this agent access to repositories from your registry.",
+                    "empty": "No repositories in your registry yet.",
+                    "manageLink": "Manage repositories",
+                    "toggleError": "Failed to update repository attachment"
                 }
             },
             "costs": {
@@ -6268,6 +6673,15 @@
                     "total": "Total",
                     "point": "Point-in-time"
                 }
+            },
+            "viewToggle": {
+                "label": "Goal catalog view",
+                "live": "Active",
+                "archived": "Archived"
+            },
+            "emptyArchived": {
+                "title": "No archived Goals",
+                "subtitle": "Goals you archive are hidden from the catalog but keep their history, and can be restored anytime."
             }
         },
         "goalNew": {
@@ -6329,12 +6743,15 @@
                 "evaluateNow": "Evaluate now",
                 "activate": "Activate",
                 "pause": "Pause",
-                "delete": "Delete"
+                "delete": "Delete",
+                "archive": "Archive",
+                "unarchive": "Unarchive"
             },
             "sections": {
                 "progress": "Progress",
                 "details": "Details",
-                "outcome": "Outcome"
+                "outcome": "Outcome",
+                "limits": "Budget & limits"
             },
             "progress": {
                 "current": "Current",
@@ -6385,10 +6802,177 @@
                 "outcomeSaved": "Outcome updated",
                 "outcomeError": "Couldn't update the outcome.",
                 "deleted": "Goal deleted",
-                "deleteError": "Couldn't delete the Goal."
+                "deleteError": "Couldn't delete the Goal.",
+                "loopStarted": "Loop started",
+                "loopPaused": "Loop paused",
+                "loopCancelled": "Loop cancelled",
+                "advanced": "Orchestrator ran",
+                "restarted": "Session restarted",
+                "nudged": "Nudge delivered",
+                "archived": "Goal archived",
+                "unarchived": "Goal restored",
+                "loopError": "Couldn't run that loop action."
             },
             "confirm": {
-                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone.",
+                "cancelLoop": "Cancel this Goal loop? The in-flight session is cancelled too. The Goal itself and its history are kept."
+            },
+            "tabs": {
+                "label": "Goal detail sections",
+                "dod": "Definition of Done",
+                "progress": "Progress log",
+                "sessions": "Sessions",
+                "orchestrator": "Orchestrator",
+                "results": "Results"
+            },
+            "loop": {
+                "archived": "Archived",
+                "iteration": "Iteration {n}",
+                "spent": "Spent {spent} of {cap}",
+                "uncapped": "No limit",
+                "nudgeLabel": "Steer the running session",
+                "nudgePlaceholder": "Focus on the pricing page copy first…",
+                "sendNudge": "Send nudge",
+                "cancelNudge": "Cancel",
+                "statuses": {
+                    "running": "Loop running",
+                    "paused": "Loop paused",
+                    "done": "Loop done",
+                    "cancelled": "Loop cancelled",
+                    "stuck": "Loop stuck"
+                },
+                "actions": {
+                    "start": "Start loop",
+                    "advance": "Advance now",
+                    "nudge": "Nudge",
+                    "pause": "Pause loop",
+                    "restart": "Restart session",
+                    "cancel": "Cancel loop",
+                    "adjustLimits": "Adjust limits"
+                }
+            },
+            "dod": {
+                "title": "Definition of Done",
+                "hint": "The checklist that decides when this Goal is finished. The orchestrator stops the loop once every criterion is done or waived.",
+                "rollup": "{done} done · {waived} waived · {open} open",
+                "rollupProposed": "{count} awaiting approval",
+                "empty": "No criteria yet. Add the first one to tell the orchestrator what finished looks like.",
+                "add": "Add",
+                "addLabel": "New criterion",
+                "addPlaceholder": "Pricing page ships with three tiers",
+                "atCap": "This Goal has reached the maximum of {max} criteria.",
+                "approve": "Approve",
+                "approveAll": "Approve all",
+                "proposalBanner": "A planning run proposed {count} criteria. They do not count toward completion until you approve them.",
+                "markDone": "Mark done",
+                "waive": "Waive",
+                "reopen": "Reopen",
+                "remove": "Remove",
+                "confirmRemove": "Remove this criterion from the Definition of Done?",
+                "confirmWaive": "Waive it",
+                "cancel": "Cancel",
+                "waiveNotePlaceholder": "Why does this no longer apply?",
+                "awaitingApproval": "awaiting approval",
+                "evidenceLabel": "Evidence",
+                "noteLabel": "Note",
+                "statuses": {
+                    "open": "Open",
+                    "done": "Done",
+                    "waived": "Waived"
+                },
+                "bySource": {
+                    "planner": "proposed by a planning run"
+                },
+                "toasts": {
+                    "added": "Criterion added",
+                    "removed": "Criterion removed",
+                    "statusSaved": "Criterion updated",
+                    "waived": "Criterion waived",
+                    "approved": "Criteria approved",
+                    "error": "Couldn't update the Definition of Done."
+                }
+            },
+            "limits": {
+                "title": "Adjust limits",
+                "description": "Budgets and routing hints for this Goal. Leave a field empty to remove that ceiling entirely.",
+                "save": "Save limits",
+                "cancel": "Cancel",
+                "clearHint": "An empty field means \"no limit\". Changes apply to the next iteration.",
+                "spentToDate": "Spent to date",
+                "fields": {
+                    "spendCap": "Spend cap (USD)",
+                    "spendCapHelp": "Total spend across every iteration of this Goal.",
+                    "wallClock": "Wall-clock limit (hours)",
+                    "wallClockHelp": "Measured from when the loop first started.",
+                    "stuckThreshold": "Stuck after (iterations)",
+                    "stuckThresholdHelp": "Iterations with no Definition-of-Done progress before the loop stops.",
+                    "sessionBudget": "Session budget (minutes)",
+                    "sessionBudgetHelp": "Advisory runtime budget handed to the routed agent.",
+                    "gracePeriod": "Grace period (minutes)",
+                    "gracePeriodHelp": "Extra time a running session gets after the wall-clock limit, so it can land.",
+                    "executionTarget": "Execution target",
+                    "executionTargetDefault": "Platform default",
+                    "executionTargetHelp": "Advisory hint recorded on every dispatch.",
+                    "plannerModel": "Planner model hint",
+                    "plannerModelHelp": "Free text; passed through to planning runs.",
+                    "workerModel": "Worker model hint",
+                    "workerModelHelp": "Free text; passed through to iteration runs.",
+                    "assignedAgent": "Pinned agent",
+                    "assignedAgentNone": "No pin (round-robin)",
+                    "assignedAgentHelp": "Routing always picks this agent. Without a pin the router round-robins over the agents that have already worked this Goal — so a brand-new Goal needs one before the loop can start work."
+                },
+                "executionTargets": {
+                    "cloud": "Cloud",
+                    "local-runner": "Local runner"
+                },
+                "errors": {
+                    "spendCap": "Spend cap must be a non-negative amount."
+                },
+                "toasts": {
+                    "saved": "Limits saved",
+                    "error": "Couldn't save the limits."
+                }
+            },
+            "orchestrator": {
+                "empty": "No routing decisions yet",
+                "emptyHint": "Once the loop runs, every routing decision, dispatch, nudge and limit lands here with the reasoning behind it.",
+                "iteration": "iteration {n}",
+                "openTask": "Open session task",
+                "kinds": {
+                    "route": "Route",
+                    "dispatch": "Dispatch",
+                    "complete": "Complete",
+                    "limit": "Limit",
+                    "nudge": "Nudge",
+                    "control": "Control",
+                    "dod": "DoD"
+                }
+            },
+            "sessions": {
+                "empty": "No sessions yet",
+                "emptyHint": "Each loop iteration creates a session task assigned to the routed agent. They appear here.",
+                "columns": {
+                    "iteration": "Iteration",
+                    "task": "Session task",
+                    "runStatus": "Run",
+                    "started": "Started",
+                    "duration": "Duration",
+                    "cost": "Cost"
+                },
+                "runStatuses": {
+                    "queued": "Queued",
+                    "running": "Running",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                }
+            },
+            "results": {
+                "title": "Latest session summary",
+                "titleWithIteration": "Latest session summary — iteration {n}",
+                "empty": "No session summary yet",
+                "emptyHint": "The summary of the most recent finished session appears here.",
+                "cost": "Cost"
             }
         },
         "sidebar": {
@@ -6397,8 +6981,10 @@
             "newWork": "عمل جديد",
             "new": "جديد",
             "activityIndicator": "جاري إنشاء العمل",
+            "inboxUnread": "{count} unread messages",
             "navigation": {
                 "dashboard": "لوحة التحكم",
+                "inbox": "Inbox",
                 "activity": "النشاط",
                 "missions": "Missions",
                 "goals": "Goals",
@@ -7672,7 +8258,8 @@
             "discover": "اكتشف",
             "billing": "Billing",
             "usage": "Usage & Credits",
-            "jobRuntime": "Job Runtime"
+            "jobRuntime": "Job Runtime",
+            "resendVerification": "Resend Verification Email"
         }
     },
     "api": {
@@ -7690,7 +8277,8 @@
             "forgotPasswordFailed": "فشل في إرسال بريد إعادة تعيين كلمة المرور",
             "resetPasswordFailed": "فشل في إعادة تعيين كلمة المرور",
             "magicLinkFailed": "Failed to send magic link",
-            "magicLinkInvalid": "Invalid or expired magic link"
+            "magicLinkInvalid": "Invalid or expired magic link",
+            "resendVerificationFailed": "Failed to send verification email"
         }
     },
     "actions": {
@@ -7828,6 +8416,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

@@ -4,6 +4,9 @@ jest.mock('../facades/facades.module', () => ({
 jest.mock('../services/knowledge-base.module', () => ({
     KnowledgeBaseModule: class KnowledgeBaseModule {},
 }));
+jest.mock('../environments/environments.module', () => ({
+    EnvironmentsModule: class EnvironmentsModule {},
+}));
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -60,7 +63,7 @@ describe('PipelineModule', () => {
         expect(exports).toHaveLength(5);
     });
 
-    it('imports FacadesModule + KnowledgeBaseModule (PluginsModule stays globally-registered)', () => {
+    it('imports FacadesModule + KnowledgeBaseModule + EnvironmentsModule (PluginsModule stays globally-registered)', () => {
         const imports = meta('imports') as Array<{ name?: string }>;
         const names = imports.map((m) => m?.name);
         // FacadesModule for AI/Search/Screenshot/etc. facades.
@@ -70,15 +73,19 @@ describe('PipelineModule', () => {
         // actually resolves at runtime (NestJS DI doesn't walk a
         // consumer's imports — the receiving module needs the provider).
         expect(names).toContain('KnowledgeBaseModule');
+        // Environments — EnvironmentsModule must be in scope so the
+        // full executor's @Optional() EnvironmentsService injection
+        // (agentId → runtime Environment resolution) resolves at runtime.
+        expect(names).toContain('EnvironmentsModule');
         // PluginsModule stays globally-registered via forRoot() at the
         // app root; the pipeline module specifically does NOT import
         // it directly (documentation comment pins this contract).
         expect(names).not.toContain('PluginsModule');
     });
 
-    it('keeps the imports list at the documented 2-module shape', () => {
+    it('keeps the imports list at the documented 3-module shape', () => {
         // Pin so a future silent extra-import is a deliberate change.
-        expect(meta('imports')).toHaveLength(2);
+        expect(meta('imports')).toHaveLength(3);
     });
 });
 

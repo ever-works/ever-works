@@ -94,11 +94,27 @@ export interface ManagedAgentsSession {
 	usage?: ManagedAgentsUsage;
 }
 
-export interface ManagedAgentsSessionResource {
+export interface ManagedAgentsSessionFileResource {
 	type: 'file';
 	file_id: string;
 	mount_path?: string;
 }
+
+/**
+ * Repository registry (Feature G) — a git repository mounted into the
+ * managed session's workspace. Emitted for each of the run agent's
+ * attached registry repos (`PipelineExecutionOptions.attachedRepos`).
+ */
+export interface ManagedAgentsSessionGithubRepositoryResource {
+	type: 'github_repository';
+	url: string;
+	branch?: string;
+	mount_path?: string;
+}
+
+export type ManagedAgentsSessionResource =
+	| ManagedAgentsSessionFileResource
+	| ManagedAgentsSessionGithubRepositoryResource;
 
 export interface ManagedAgentOperationSummary {
 	created_files?: string[];
@@ -227,6 +243,8 @@ export interface WorkspaceSeedManifest {
 export interface ManagedAgentRunResources {
 	sessionId?: string;
 	uploadedFileId?: string;
+	/** Env files of attached registry repos, uploaded per run (Feature G). */
+	uploadedEnvFileIds?: string[];
 	createdAgentId?: string;
 	createdEnvironmentId?: string;
 }
@@ -234,21 +252,16 @@ export interface ManagedAgentRunResources {
 // --- Cloud Managed Agents at scale (feat-cma-scale) ---
 
 /**
- * Serializable runtime-environment descriptor optionally carried on the
- * pipeline execution context by the platform (Environments feature, parallel
- * branch). The plugin reads it defensively — it must NOT import the entity —
- * so every field is optional and unknown shapes degrade to the env-var
- * fallback.
+ * Runtime Environments — the descriptor carried on the pipeline execution
+ * context is the platform's shipped contract, `RuntimeEnvironmentData` from
+ * `@ever-works/plugin` (FLAT: `networkingMode`, `allowedHosts`,
+ * `allowPackageManagers`). This plugin once declared a local
+ * `ManagedRuntimeEnvironment` with a NESTED `networking` object, written
+ * defensively before that contract landed; it never matched real data, so
+ * every configured Environment silently fell back to env-var networking.
+ * The contract is now the single input type — do not reintroduce a local
+ * guess.
  */
-export interface ManagedRuntimeEnvironment {
-	name?: string;
-	networking?: {
-		type?: 'unrestricted' | 'limited' | string;
-		allowedHosts?: string[];
-		allowPackageManagers?: boolean;
-		allowMcpServers?: boolean;
-	};
-}
 
 /** Desired persistent-agent configuration used for drift detection. */
 export interface ManagedAgentDesiredConfig {

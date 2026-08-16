@@ -83,9 +83,12 @@ export async function getProposalsStatusAction() {
     return workProposalsAPI.status();
 }
 
+// `limit` is a pass-through to the API's existing paging param. The
+// Task detail Idea picker reads a single capped page rather than the
+// whole catalog; every other caller omits it and keeps the API default.
 export async function listProposalsAction(
     statuses: WorkProposalStatus[] = ['pending'],
-    opts: { missionId?: string } = {},
+    opts: { missionId?: string; limit?: number } = {},
 ) {
     const user = await getAuthFromCookie();
     if (!user) {
