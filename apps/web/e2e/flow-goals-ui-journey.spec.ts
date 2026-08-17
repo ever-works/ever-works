@@ -352,6 +352,13 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         });
         await expect(page.getByRole('link', { name: 'Back to Goals' })).toBeVisible();
 
+        // The autonomy layer (#2093) turned this page into a tab strip —
+        // Definition of Done | Progress log | Sessions | Orchestrator | Results
+        // — and it opens on 'dod'. The Progress/Details/Outcome sections still
+        // exist under exactly these names, but they are inside the 'progress'
+        // panel, so the tab has to be opened before they render at all.
+        await page.getByRole('tab', { name: 'Progress log' }).click();
+
         // Section scaffold.
         await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible();
@@ -485,6 +492,12 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         await expect(page.getByRole('heading', { name: goal.title, level: 1 })).toBeVisible({
             timeout: 30_000,
         });
+        // The outcome override lives in the 'progress' panel, and #2093 made
+        // this page open on 'dod' — without this click the trigger below is
+        // not in the DOM at all and the test fails looking like a missing
+        // control rather than an unopened tab.
+        await page.getByRole('tab', { name: 'Progress log' }).click();
+
         // The only listbox trigger INSIDE the page content is the outcome
         // override. Scoped to #main-content because since a350801a the chat
         // composer carries a second listbox trigger (the voice-provider
