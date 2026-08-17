@@ -59,17 +59,27 @@ export function verifyEmailErrorCode(error: unknown): VerifyEmailErrorCode {
         return VERIFY_EMAIL_ERROR.FAILED;
     }
 
+    // No status at all means the request never got an answer (DNS, TLS,
+    // connection reset, or a throw on our own side). Same reasoning as the
+    // 5xx branch: the token is unjudged, so don't judge it.
+    //
+    // 🛑 This MUST stay ahead of the /expir/ test below. The docblock promises
+    // the stem match happens "only on a response that actually came from the
+    // API", and ordering is the only thing that keeps that promise. Reversed,
+    // an expired TLS certificate on the API arrives as a plain Error reading
+    // "certificate has expired", matches /expir/, and tells the user their
+    // VERIFICATION LINK expired — a confident, wrong diagnosis that sends them
+    // to request a new link that will fail exactly the same way. That is the
+    // very failure mode EW-078 exists to remove, so it would be an unfortunate
+    // one to reintroduce here.
+    if (typeof statusCode !== 'number') {
+        return VERIFY_EMAIL_ERROR.FAILED;
+    }
+
     // `auth.service.ts#verifyEmail` → `BadRequestException('Verification token
     // expired')`. This is the branch EW-078 is about.
     if (/expir/i.test(message)) {
         return VERIFY_EMAIL_ERROR.EXPIRED;
-    }
-
-    // No status at all means the request never got an answer (DNS, TLS,
-    // connection reset, or a throw on our own side). Same reasoning as the
-    // 5xx branch: the token is unjudged, so don't judge it.
-    if (typeof statusCode !== 'number') {
-        return VERIFY_EMAIL_ERROR.FAILED;
     }
 
     // A 4xx that the API did answer: the token really was rejected.

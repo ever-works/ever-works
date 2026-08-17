@@ -129,6 +129,22 @@ describe('GET /api/auth/verify-email', () => {
             expect(redirectedErrorCode()).toBe('verify_email_failed');
         });
 
+        it('does NOT call a transport error "expired" just because it says so', async () => {
+            // The API's TLS certificate lapsing produces a plain Error reading
+            // "certificate has expired" and carries NO statusCode. If the
+            // /expir/ stem match runs before the no-status check, this is
+            // reported to the user as an expired VERIFICATION LINK — they go
+            // and request a new one, which fails identically, because the link
+            // was never the problem. That is exactly the confident-but-wrong
+            // diagnosis EW-078 removed, so it is pinned here.
+            verifyEmailMock.mockRejectedValue(new Error('certificate has expired'));
+
+            const { GET } = await import('./route');
+            await GET(requestWith('a'.repeat(64)));
+
+            expect(redirectedErrorCode()).toBe('verify_email_failed');
+        });
+
         it('still reports a missing token as verify_email_missing_token', async () => {
             const { GET } = await import('./route');
             await GET(requestWith(null));
