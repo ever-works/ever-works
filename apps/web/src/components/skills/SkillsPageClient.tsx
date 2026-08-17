@@ -33,6 +33,15 @@ interface SkillsPageClientProps {
         installed?: string | null;
         catalog?: string | null;
     };
+    /**
+     * Navigation consolidation: this client is hosted twice — standalone on
+     * `/skills` and as the Skills block on the Agents tab. `basePath`/`hash`
+     * tell it which URL its tab/search/pagination state belongs to, so the
+     * block rewrites `/agents?section=…#skills` instead of navigating the
+     * user away to `/skills`.
+     */
+    basePath?: string;
+    hash?: string;
 }
 
 const SECTIONS: Section[] = ['installed', 'available', 'custom'];
@@ -45,6 +54,8 @@ export function SkillsPageClient({
     catalogLimit,
     filters,
     loadErrors = {},
+    basePath = ROUTES.DASHBOARD_SKILLS,
+    hash = '',
 }: SkillsPageClientProps) {
     const t = useTranslations('dashboard.skillsPage');
     const router = useRouter();
@@ -85,7 +96,7 @@ export function SkillsPageClient({
         if (next.search.trim()) params.set('search', next.search.trim());
         if (next.installedOffset > 0) params.set('installedOffset', String(next.installedOffset));
         if (next.catalogOffset > 0) params.set('catalogOffset', String(next.catalogOffset));
-        router.replace(`${ROUTES.DASHBOARD_SKILLS}${params.size ? `?${params}` : ''}`);
+        router.replace(`${basePath}${params.size ? `?${params}` : ''}${hash}`);
     };
 
     const handleSectionChange = (next: Section) => {
