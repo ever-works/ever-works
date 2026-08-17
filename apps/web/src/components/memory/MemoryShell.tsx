@@ -20,6 +20,7 @@ import { MemoryFilesPanel } from './MemoryFilesPanel';
 import { AgentMemoryPanel } from './AgentMemoryPanel';
 import { MemoryReviewPanel } from './MemoryReviewPanel';
 import { MemoryConsolidationSettings } from './MemoryConsolidationSettings';
+import { MemoryMeetingsPanel, type MemoryMeetingsData } from './MemoryMeetingsPanel';
 import {
     buildMemoryQuery,
     type MemoryConsolidationReport,
@@ -30,6 +31,12 @@ import {
 
 interface MemoryShellProps {
     initial: MemoryResponse;
+    /**
+     * Meetings catalog for the `#meetings` block, server-fetched by the
+     * page. Optional so the shell still renders standalone (and in specs)
+     * without it — the block is simply absent.
+     */
+    meetings?: MemoryMeetingsData;
 }
 
 /** Facet kinds that map to a filter chip group. */
@@ -62,7 +69,7 @@ function formatDate(iso: string): string {
  * (they depend on cross-feature prerequisites — see the Memory spec
  * §2.4 / §4.3).
  */
-export function MemoryShell({ initial }: MemoryShellProps) {
+export function MemoryShell({ initial, meetings }: MemoryShellProps) {
     const t = useTranslations('dashboard.memoryPage');
 
     const [data, setData] = useState<MemoryResponse>(initial);
@@ -268,6 +275,11 @@ export function MemoryShell({ initial }: MemoryShellProps) {
 
             {/* Agent memory — the half of Memory that is not a knowledge base */}
             <AgentMemoryPanel />
+
+            {/* Meetings — a memory SOURCE, so it sits with the other sources
+                rather than below the document list. Anchored `#meetings`;
+                `/meetings` redirects here. */}
+            {meetings && <MemoryMeetingsPanel data={meetings} />}
 
             {/* Memory Consolidation — dry-run confirm surface / applied summary */}
             {consolidateFailed && (
