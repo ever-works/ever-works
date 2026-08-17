@@ -20,8 +20,10 @@ export default async function SkillTemplatesPage() {
     const entries = await listAstTemplates('skill');
     return (
         <div className="w-full space-y-5">
+            {/* Navigation consolidation: the Skills catalog is a block on the
+                Agents tab now — `/skills` only redirects there. */}
             <Link
-                href={ROUTES.DASHBOARD_SKILLS}
+                href={ROUTES.DASHBOARD_AGENTS_SKILLS}
                 className="text-xs text-text-muted hover:text-text"
             >
                 ← Skills

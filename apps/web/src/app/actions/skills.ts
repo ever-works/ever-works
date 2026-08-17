@@ -16,6 +16,11 @@ import { getAuthFromCookie } from '@/lib/auth';
  * Skills feature. Each mutation invalidates `/skills` so the page
  * re-fetches on the next render.
  *
+ * Navigation consolidation: the catalog also renders as a block on the
+ * Agents tab (`/agents#skills`), so every `/skills` invalidation is
+ * paired with `/agents`. `/skills` itself is kept (it is still a real
+ * route — a redirect — and other surfaces may link to it).
+ *
  * `installCatalogSkillAction` defaults to tenant-scope using the
  * current userId as ownerId. The userId is read from the encrypted
  * auth cookie (`everworks_auth_token`) at server-action time via
@@ -41,6 +46,7 @@ export async function installCatalogSkillAction(input: {
     const ownerId = input.ownerId ?? (await getCurrentUserId());
     const skill = await skillsAPI.install({ slug: input.slug, ownerType, ownerId });
     revalidatePath('/skills');
+    revalidatePath('/agents');
     return skill;
 }
 
@@ -64,6 +70,7 @@ export async function createCustomSkillAction(input: {
         input.ownerType === 'tenant' && !input.ownerId ? await getCurrentUserId() : input.ownerId;
     const skill = await skillsAPI.create({ ...input, ownerId });
     revalidatePath('/skills');
+    revalidatePath('/agents');
     return skill;
 }
 
@@ -83,6 +90,7 @@ export async function updateSkillAction(
 ): Promise<Skill> {
     const skill = await skillsAPI.update(id, body);
     revalidatePath('/skills');
+    revalidatePath('/agents');
     revalidatePath(`/skills/${id}`);
     return skill;
 }
@@ -90,6 +98,7 @@ export async function updateSkillAction(
 export async function deleteSkillAction(id: string): Promise<{ deleted: true }> {
     const res = await skillsAPI.remove(id);
     revalidatePath('/skills');
+    revalidatePath('/agents');
     return res;
 }
 
@@ -111,6 +120,7 @@ export async function createBindingAction(
 export async function deleteBindingAction(bindingId: string): Promise<{ deleted: true }> {
     const res = await skillsAPI.deleteBinding(bindingId);
     revalidatePath('/skills');
+    revalidatePath('/agents');
     return res;
 }
 

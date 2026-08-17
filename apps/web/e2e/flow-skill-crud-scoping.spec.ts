@@ -716,10 +716,13 @@ test.describe('Skill CRUD + scope/owner validation', () => {
         expect(skill.slug).toBe(`crud-ui-${stamp}`);
         expect(skill.version).toBe('3.1.4');
 
-        // The index hub renders (section toggles present). Navigation uses
-        // relative paths against the playwright-configured baseURL.
-        await page.goto('/skills', { waitUntil: 'domcontentloaded' });
+        // The catalog block renders (section toggles present). Navigation
+        // consolidation: the catalog lives on the Agents tab and `/skills`
+        // only redirects there. Navigation uses relative paths against the
+        // playwright-configured baseURL.
+        await page.goto('/agents#skills', { waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle').catch(() => {});
+        await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
         await expect(page.getByText(/installed/i).first()).toBeVisible({ timeout: 30_000 });
 
         // The detail page renders the skill's title heading. Local-vs-CI route
