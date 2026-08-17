@@ -8,6 +8,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
+import { isUniqueConstraintError } from '@ever-works/agent/utils';
 import type {
     Organization,
     OrganizationRegistrationProvider,
@@ -500,76 +501,142 @@ export class OrganizationService {
         const tenant = await this.tenantBootstrap.ensureTenant(userId);
 
         const slugBase = slugOverride?.trim() || trimmedName;
-        const slug = await this.usernameAllocator.allocateUsername(slugBase);
 
-        return this.dataSource.transaction(async (manager) => {
-            // Use the manager's repository so the INSERT lands in the
-            // same transaction as the backfill UPDATEs below.
-            //
-            // `extra` fields are layered on top of the base shape so
-            // Phase 6 callers (which pass nothing) keep producing
-            // `{ tenantId, slug, displayName }` exactly as before. The
-            // entity's column defaults handle the unspecified columns
-            // (registrationStatus defaults to `'draft'`).
-            // PR-6 — vision is optional at creation; empty/whitespace
-            // collapses to null so we never stamp `visionUpdatedAt`
-            // for a blank field the modal submitted untouched.
-            const vision = this.normalizeVision(extra?.vision);
-            const org = manager.getRepository<Organization>('organizations').create({
-                tenantId: tenant.id,
-                slug,
-                displayName: trimmedName,
-                legalName: extra?.legalName ?? null,
-                countryCode: extra?.countryCode ?? null,
-                registrationProvider: extra?.registrationProvider ?? null,
-                registrationStatus: extra?.registrationStatus ?? 'draft',
-                linkedWorkId: extra?.linkedWorkId ?? null,
-                vision,
-                visionUpdatedAt: vision !== null ? new Date() : null,
-            });
-            const saved = await manager.getRepository<Organization>('organizations').save(org);
+        // 🛑 `allocateUsername` RESERVES NOTHING. It loops until it finds a
+        // candidate that does not currently collide and hands it back; the
+        // INSERT happens afterwards, in the transaction below. Between those
+        // two moments another request can take the same slug — and it does:
+        // two people registering a company with the same name at the same
+        // moment both get told `acme` is free, and the second INSERT hits the
+        // UNIQUE index on `organizations.slug`.
+        //
+        // That violation used to escape as a raw `QueryFailedError`, which
+        // Nest renders as **HTTP 500**. `organization.service.ts` was not among
+        // the files using `isUniqueConstraintError`, even though that helper's
+        // own docblock describes precisely this case. The e2e
+        // `flow-idempotency-concurrency-matrix` caught it intermittently, and
+        // `user.entity.ts:305` had already noted that "the DB UNIQUE constraint
+        // will catch any race" — it does; nothing was catching the catch.
+        //
+        // Retry rather than 409: the slug is DERIVED, not chosen. The caller
+        // asked for an organization named "Acme", not for the string `acme`,
+        // so losing the race should yield `acme-2` and a 201 — the same result
+        // they would have got a second later. A 409 would be us reporting our
+        // own race back to a user who did nothing wrong.
+        return this.withSlugCollisionRetry(slugBase, (slug) =>
+            this.dataSource.transaction(async (manager) => {
+                // Use the manager's repository so the INSERT lands in the
+                // same transaction as the backfill UPDATEs below.
+                //
+                // `extra` fields are layered on top of the base shape so
+                // Phase 6 callers (which pass nothing) keep producing
+                // `{ tenantId, slug, displayName }` exactly as before. The
+                // entity's column defaults handle the unspecified columns
+                // (registrationStatus defaults to `'draft'`).
+                // PR-6 — vision is optional at creation; empty/whitespace
+                // collapses to null so we never stamp `visionUpdatedAt`
+                // for a blank field the modal submitted untouched.
+                const vision = this.normalizeVision(extra?.vision);
+                const org = manager.getRepository<Organization>('organizations').create({
+                    tenantId: tenant.id,
+                    slug,
+                    displayName: trimmedName,
+                    legalName: extra?.legalName ?? null,
+                    countryCode: extra?.countryCode ?? null,
+                    registrationProvider: extra?.registrationProvider ?? null,
+                    registrationStatus: extra?.registrationStatus ?? 'draft',
+                    linkedWorkId: extra?.linkedWorkId ?? null,
+                    vision,
+                    visionUpdatedAt: vision !== null ? new Date() : null,
+                });
+                const saved = await manager.getRepository<Organization>('organizations').save(org);
 
-            // Step (d): pin the new Org as the user's last-seen scope
-            // so the next login lands on it. Only do this if the user
-            // hasn't already explicitly picked another Org as their
-            // landing scope (defensive — shouldn't be possible on first
-            // Org, but cheap to check).
-            const currentUser = await manager
-                .getRepository('users')
-                .findOne({ where: { id: userId } });
-            if (currentUser && currentUser.lastScopeOrganizationId === null) {
-                await manager
+                // Step (d): pin the new Org as the user's last-seen scope
+                // so the next login lands on it. Only do this if the user
+                // hasn't already explicitly picked another Org as their
+                // landing scope (defensive — shouldn't be possible on first
+                // Org, but cheap to check).
+                const currentUser = await manager
                     .getRepository('users')
-                    .update(userId, { lastScopeOrganizationId: saved.id });
+                    .findOne({ where: { id: userId } });
+                if (currentUser && currentUser.lastScopeOrganizationId === null) {
+                    await manager
+                        .getRepository('users')
+                        .update(userId, { lastScopeOrganizationId: saved.id });
+                }
+
+                // Step (e): unconditional tenantId backfill. Walks every
+                // user-owned table and stamps `tenantId = tenant.id` on
+                // rows where it's still NULL. Idempotent — re-running this
+                // is a no-op once all rows have tenantId set.
+                const allTables = [...TIER_A_BACKFILL_TABLES, ...TIER_B_BACKFILL_TABLES];
+                // Emit driver-correct positional placeholders. Postgres uses `$1/$2`;
+                // better-sqlite3 (the e2e in-memory driver) uses `?`. The previously
+                // hard-coded `$1/$2` raw query threw `RangeError: Too many parameter
+                // values were provided` under sqlite, which 500'd the whole
+                // create-Organization transaction. Behaviour on Postgres is unchanged.
+                const isPostgres = manager.connection?.options?.type === 'postgres';
+                for (const { table, userColumn } of allTables) {
+                    // Security: validate interpolated identifiers (defense-in-depth).
+                    this.assertSafeSqlIdentifier(table);
+                    this.assertSafeSqlIdentifier(userColumn);
+                    const sql = isPostgres
+                        ? `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`
+                        : `UPDATE "${table}" SET "tenantId" = ? WHERE "${userColumn}" = ? AND "tenantId" IS NULL`;
+                    await manager.query(sql, [tenant.id, userId]);
+                }
+
+                this.logger.log(
+                    `Created Organization ${saved.id} (slug=${saved.slug}) for user ${userId}; tenantId backfilled across ${allTables.length} tables`,
+                );
+
+                return saved;
+            }),
+        );
+    }
+
+    /**
+     * Allocate a slug, run `create`, and re-allocate if the UNIQUE index says
+     * somebody else took it first.
+     *
+     * The allocator is a read-then-return loop with no reservation, so its
+     * answer is only ever "free a moment ago". The DB index is the actual
+     * arbiter. Losing that race is normal under concurrency, not exceptional —
+     * so it is retried, and only a run of consecutive losses is an error.
+     *
+     * The whole transaction is retried, not just the INSERT: it rolls back as a
+     * unit, so a failed attempt leaves nothing behind and the next attempt
+     * starts clean. `allocateUsername` is called fresh each time, so attempt 2
+     * sees the winner's row and picks the next free suffix.
+     */
+    private async withSlugCollisionRetry<T>(
+        slugBase: string,
+        create: (slug: string) => Promise<T>,
+    ): Promise<T> {
+        // 4 attempts covers concurrency far past anything this endpoint sees;
+        // a caller that loses four consecutive races is not racing, something
+        // else is wrong and a 409 is the honest answer.
+        const MAX_ATTEMPTS = 4;
+
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            const slug = await this.usernameAllocator.allocateUsername(slugBase);
+            try {
+                return await create(slug);
+            } catch (error) {
+                if (!isUniqueConstraintError(error) || attempt === MAX_ATTEMPTS) {
+                    throw error;
+                }
+                // Deliberately `warn`, not `error`: this is the system working.
+                // It is logged because a SUSTAINED rate of these means the
+                // allocator is being outrun and is worth knowing about.
+                this.logger.warn(
+                    `Organization slug race on "${slug}" (attempt ${attempt}/${MAX_ATTEMPTS}) — re-allocating`,
+                );
             }
+        }
 
-            // Step (e): unconditional tenantId backfill. Walks every
-            // user-owned table and stamps `tenantId = tenant.id` on
-            // rows where it's still NULL. Idempotent — re-running this
-            // is a no-op once all rows have tenantId set.
-            const allTables = [...TIER_A_BACKFILL_TABLES, ...TIER_B_BACKFILL_TABLES];
-            // Emit driver-correct positional placeholders. Postgres uses `$1/$2`;
-            // better-sqlite3 (the e2e in-memory driver) uses `?`. The previously
-            // hard-coded `$1/$2` raw query threw `RangeError: Too many parameter
-            // values were provided` under sqlite, which 500'd the whole
-            // create-Organization transaction. Behaviour on Postgres is unchanged.
-            const isPostgres = manager.connection?.options?.type === 'postgres';
-            for (const { table, userColumn } of allTables) {
-                // Security: validate interpolated identifiers (defense-in-depth).
-                this.assertSafeSqlIdentifier(table);
-                this.assertSafeSqlIdentifier(userColumn);
-                const sql = isPostgres
-                    ? `UPDATE "${table}" SET "tenantId" = $1 WHERE "${userColumn}" = $2 AND "tenantId" IS NULL`
-                    : `UPDATE "${table}" SET "tenantId" = ? WHERE "${userColumn}" = ? AND "tenantId" IS NULL`;
-                await manager.query(sql, [tenant.id, userId]);
-            }
-
-            this.logger.log(
-                `Created Organization ${saved.id} (slug=${saved.slug}) for user ${userId}; tenantId backfilled across ${allTables.length} tables`,
-            );
-
-            return saved;
-        });
+        // Unreachable: the final attempt either returns or rethrows above.
+        throw new ConflictException('Could not allocate a unique organization slug');
     }
 
     /**
