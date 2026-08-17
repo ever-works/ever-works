@@ -19,8 +19,9 @@ Organizations relate to platform admins and per-work isolation.
 **Sidebar → Teams** is the hub for both halves of your organization — people
 and Agents. It opens on the **Teams** tab (the teams below, plus the **Org
 Chart** covering humans _and_ agents); the other tabs are **Agents** (the
-Agent catalog, its **Agents Chart** and the **Skills** block), **Sessions**
-and **Archived**. Organizations themselves are still managed under Settings.
+Agent catalog, its **Agents Chart** at `/agents/chart` — the same tree with
+human members stripped — and the **Skills** block), **Sessions** and
+**Archived**. Organizations themselves are still managed under Settings.
 :::
 
 :::note Two isolation layers

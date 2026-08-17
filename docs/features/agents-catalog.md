@@ -22,7 +22,8 @@ see [Agents (Your AI Employees)](./agents.md) and the
 The Create-Agent wizard that surfaces these templates opens from
 **Sidebar → Teams → Agents tab → + New Agent**. Agents are tab 2 of the
 **Teams** hub (**Teams | Agents | Sessions | Archived**); the same tab hosts
-the **Agents Chart** and the **Skills** block.
+the **Agents Chart** button (`/agents/chart`) and the **Skills** block
+(`/agents#skills`).
 :::
 
 **Key sources:**
