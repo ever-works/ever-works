@@ -25,13 +25,13 @@ Spec: [`spec.md`](./spec.md) (same folder). Worktree: `E:\Coding\_wt-nav-teams-m
 
 ## File map
 
-| Area | Create | Modify |
-| --- | --- | --- |
-| Foundations | `src/components/icons/HumanAgentIcon.tsx`, `src/components/icons/HumanAgentIcon.unit.spec.tsx`, `src/components/agents/AgentsPageTabs.unit.spec.tsx` | `src/lib/constants.ts`, `messages/en.json`, `src/components/agents/AgentsPageTabs.tsx` |
-| Meetings → Memory | `src/components/memory/MemoryMeetingsPanel.tsx`, `src/components/meetings/MeetingsList.unit.spec.tsx`, `src/lib/api/meetings-page-params.ts` (+ `.unit.spec.ts`) | `src/components/meetings/MeetingsList.tsx`, `src/components/memory/MemoryShell.tsx`, `src/components/memory/index.ts`, `src/app/[locale]/(dashboard)/memory/page.tsx`, `src/app/[locale]/(dashboard)/meetings/page.tsx` (→ redirect), `src/components/meetings/MeetingDetailClient.tsx`, `src/components/meetings/MeetingForm.tsx`, `e2e/flow-meetings-ui-journey.spec.ts`, `e2e/flow-memory-ui-journey.spec.ts` (only if it asserts panel order) |
-| Skills → Agents | `src/components/skills/SkillsSection.tsx`, `src/lib/skills-page-data.ts` (+ `.unit.spec.ts`), `src/components/skills/SkillsSection.unit.spec.tsx` | `src/components/skills/SkillsPageClient.tsx`, `src/components/skills/SkillDetailClient.tsx`, `src/app/[locale]/(dashboard)/skills/page.tsx` (→ redirect), `src/app/[locale]/(dashboard)/skills/templates/page.tsx`, `src/app/actions/skills.ts`, `src/app/actions/agent-capabilities.ts`, `e2e/flow-skill-bulk-operations.spec.ts`, `e2e/flow-skill-crud-scoping.spec.ts`, `e2e/flow-skill-marketplace-share.spec.ts`, `e2e/skills.spec.ts`, `e2e/skills-list-filter.spec.ts` (only where they open `/skills` UI) |
-| Teams hub + Agents tab + chart + sidebar | `src/app/[locale]/(dashboard)/agents/chart/page.tsx`, `src/components/dashboard/DashboardSidebar.unit.spec.tsx` (if none exists; else extend) | `src/app/[locale]/(dashboard)/teams/page.tsx`, `src/app/[locale]/(dashboard)/agents/page.tsx`, `src/components/agents/AgentsList.tsx`, `src/components/dashboard/DashboardSidebar.tsx`, `e2e/flow-teams-ui-journey.spec.ts`, `e2e/flow-agents-ui-journey.spec.ts` |
-| Docs | — | `docs/features/agents-catalog.md`, `docs/features/skills-catalog.md`, `docs/features/index.md`, `docs/advanced/teams-and-organizations.md`, meetings/memory feature doc if present (`grep -ril "meetings" docs/features`) |
+| Area                                     | Create                                                                                                                                                           | Modify                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Foundations                              | `src/components/icons/HumanAgentIcon.tsx`, `src/components/icons/HumanAgentIcon.unit.spec.tsx`, `src/components/agents/AgentsPageTabs.unit.spec.tsx`             | `src/lib/constants.ts`, `messages/en.json`, `src/components/agents/AgentsPageTabs.tsx`                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Meetings → Memory                        | `src/components/memory/MemoryMeetingsPanel.tsx`, `src/components/meetings/MeetingsList.unit.spec.tsx`, `src/lib/api/meetings-page-params.ts` (+ `.unit.spec.ts`) | `src/components/meetings/MeetingsList.tsx`, `src/components/memory/MemoryShell.tsx`, `src/components/memory/index.ts`, `src/app/[locale]/(dashboard)/memory/page.tsx`, `src/app/[locale]/(dashboard)/meetings/page.tsx` (→ redirect), `src/components/meetings/MeetingDetailClient.tsx`, `src/components/meetings/MeetingForm.tsx`, `e2e/flow-meetings-ui-journey.spec.ts`, `e2e/flow-memory-ui-journey.spec.ts` (only if it asserts panel order)                                                                 |
+| Skills → Agents                          | `src/components/skills/SkillsSection.tsx`, `src/lib/skills-page-data.ts` (+ `.unit.spec.ts`), `src/components/skills/SkillsSection.unit.spec.tsx`                | `src/components/skills/SkillsPageClient.tsx`, `src/components/skills/SkillDetailClient.tsx`, `src/app/[locale]/(dashboard)/skills/page.tsx` (→ redirect), `src/app/[locale]/(dashboard)/skills/templates/page.tsx`, `src/app/actions/skills.ts`, `src/app/actions/agent-capabilities.ts`, `e2e/flow-skill-bulk-operations.spec.ts`, `e2e/flow-skill-crud-scoping.spec.ts`, `e2e/flow-skill-marketplace-share.spec.ts`, `e2e/skills.spec.ts`, `e2e/skills-list-filter.spec.ts` (only where they open `/skills` UI) |
+| Teams hub + Agents tab + chart + sidebar | `src/app/[locale]/(dashboard)/agents/chart/page.tsx`, `src/components/dashboard/DashboardSidebar.unit.spec.tsx` (if none exists; else extend)                    | `src/app/[locale]/(dashboard)/teams/page.tsx`, `src/app/[locale]/(dashboard)/agents/page.tsx`, `src/components/agents/AgentsList.tsx`, `src/components/dashboard/DashboardSidebar.tsx`, `e2e/flow-teams-ui-journey.spec.ts`, `e2e/flow-agents-ui-journey.spec.ts`                                                                                                                                                                                                                                                 |
+| Docs                                     | —                                                                                                                                                                | `docs/features/agents-catalog.md`, `docs/features/skills-catalog.md`, `docs/features/index.md`, `docs/advanced/teams-and-organizations.md`, meetings/memory feature doc if present (`grep -ril "meetings" docs/features`)                                                                                                                                                                                                                                                                                         |
 
 Paths are relative to `apps/web/` unless they start with `docs/`.
 
@@ -42,6 +42,7 @@ Paths are relative to `apps/web/` unless they start with `docs/`.
 ### Task 0.1: ROUTES constants + i18n keys
 
 **Files:**
+
 - Modify: `src/lib/constants.ts` (ROUTES block around lines 145–195)
 - Modify: `messages/en.json`
 
@@ -94,6 +95,7 @@ Paths are relative to `apps/web/` unless they start with `docs/`.
 ### Task 0.2: `HumanAgentIcon`
 
 **Files:**
+
 - Create: `src/components/icons/HumanAgentIcon.tsx`
 - Test: `src/components/icons/HumanAgentIcon.unit.spec.tsx`
 
@@ -107,18 +109,18 @@ import { describe, expect, it } from 'vitest';
 import { HumanAgentIcon } from './HumanAgentIcon';
 
 describe('HumanAgentIcon', () => {
-    it('renders a lucide-compatible svg with the given class and stroke width', () => {
-        const { container } = render(<HumanAgentIcon className="w-5 h-5" strokeWidth={1.5} />);
-        const svg = container.querySelector('svg');
-        expect(svg).not.toBeNull();
-        expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
-        expect(svg?.getAttribute('class')).toContain('w-5');
-        expect(svg?.getAttribute('stroke-width')).toBe('1.5');
-        expect(svg?.getAttribute('aria-hidden')).toBe('true');
-        // both halves present: a person head (circle) and a bot head (rect)
-        expect(container.querySelector('circle')).not.toBeNull();
-        expect(container.querySelector('rect')).not.toBeNull();
-    });
+	it('renders a lucide-compatible svg with the given class and stroke width', () => {
+		const { container } = render(<HumanAgentIcon className="w-5 h-5" strokeWidth={1.5} />);
+		const svg = container.querySelector('svg');
+		expect(svg).not.toBeNull();
+		expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
+		expect(svg?.getAttribute('class')).toContain('w-5');
+		expect(svg?.getAttribute('stroke-width')).toBe('1.5');
+		expect(svg?.getAttribute('aria-hidden')).toBe('true');
+		// both halves present: a person head (circle) and a bot head (rect)
+		expect(container.querySelector('circle')).not.toBeNull();
+		expect(container.querySelector('rect')).not.toBeNull();
+	});
 });
 ```
 
@@ -136,32 +138,32 @@ import type { LucideProps } from 'lucide-react';
  * two eyes). Accepts the same props as a lucide icon.
  */
 export function HumanAgentIcon({ strokeWidth = 2, className, ...rest }: LucideProps) {
-    return (
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            width={24}
-            height={24}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={className}
-            aria-hidden="true"
-            {...rest}
-        >
-            {/* person (left) */}
-            <circle cx="7.5" cy="7" r="3" />
-            <path d="M2 21v-2a4.5 4.5 0 0 1 4.5-4.5h2A4.5 4.5 0 0 1 13 19v2" />
-            {/* bot head (right) */}
-            <rect x="13" y="10" width="9" height="8" rx="2" />
-            <path d="M17.5 10V7" />
-            <circle cx="17.5" cy="6" r="1" />
-            <path d="M15.5 14v1" />
-            <path d="M19.5 14v1" />
-        </svg>
-    );
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			viewBox="0 0 24 24"
+			width={24}
+			height={24}
+			fill="none"
+			stroke="currentColor"
+			strokeWidth={strokeWidth}
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			aria-hidden="true"
+			{...rest}
+		>
+			{/* person (left) */}
+			<circle cx="7.5" cy="7" r="3" />
+			<path d="M2 21v-2a4.5 4.5 0 0 1 4.5-4.5h2A4.5 4.5 0 0 1 13 19v2" />
+			{/* bot head (right) */}
+			<rect x="13" y="10" width="9" height="8" rx="2" />
+			<path d="M17.5 10V7" />
+			<circle cx="17.5" cy="6" r="1" />
+			<path d="M15.5 14v1" />
+			<path d="M19.5 14v1" />
+		</svg>
+	);
 }
 ```
 
@@ -171,6 +173,7 @@ export function HumanAgentIcon({ strokeWidth = 2, className, ...rest }: LucidePr
 ### Task 0.3: Tab strip gets a first "Teams" tab
 
 **Files:**
+
 - Modify: `src/components/agents/AgentsPageTabs.tsx`
 - Test: `src/components/agents/AgentsPageTabs.unit.spec.tsx`
 
@@ -180,17 +183,17 @@ export function HumanAgentIcon({ strokeWidth = 2, className, ...rest }: LucidePr
 
 ```tsx
 it('renders Teams | Agents | Sessions | Archived in that order and marks the active one', () => {
-    render(<AgentsPageTabs active="teams" />);
-    const tabs = screen.getAllByRole('link');
-    expect(tabs.map((a) => a.getAttribute('data-testid'))).toEqual([
-        'agents-page-tab-teams',
-        'agents-page-tab-agents',
-        'agents-page-tab-sessions',
-        'agents-page-tab-archived',
-    ]);
-    expect(tabs[0].getAttribute('href')).toBe('/teams');
-    expect(tabs[0].className).toContain('border-primary');
-    expect(tabs[1].className).not.toContain('border-primary');
+	render(<AgentsPageTabs active="teams" />);
+	const tabs = screen.getAllByRole('link');
+	expect(tabs.map((a) => a.getAttribute('data-testid'))).toEqual([
+		'agents-page-tab-teams',
+		'agents-page-tab-agents',
+		'agents-page-tab-sessions',
+		'agents-page-tab-archived'
+	]);
+	expect(tabs[0].getAttribute('href')).toBe('/teams');
+	expect(tabs[0].className).toContain('border-primary');
+	expect(tabs[1].className).not.toContain('border-primary');
 });
 ```
 
@@ -208,6 +211,7 @@ it('renders Teams | Agents | Sessions | Archived in that order and marks the act
 #### Task A.1: Shared meetings page-param helper
 
 **Files:**
+
 - Create: `src/lib/api/meetings-page-params.ts`
 - Test: `src/lib/api/meetings-page-params.unit.spec.ts`
 
@@ -215,9 +219,17 @@ it('renders Teams | Agents | Sessions | Archived in that order and marks the act
 
 ```ts
 export const MEETINGS_PAGE_SIZE = 12;
-export interface MeetingsPageQuery { source?: MeetingSource; workId?: string; offset: number }
+export interface MeetingsPageQuery {
+	source?: MeetingSource;
+	workId?: string;
+	offset: number;
+}
 export function parseMeetingsSearchParams(params: Record<string, string | string[] | undefined>): MeetingsPageQuery;
-export function buildMeetingsHref(basePath: string, input: { source?: MeetingSource; workId?: string; offset?: number }, hash?: string): string;
+export function buildMeetingsHref(
+	basePath: string,
+	input: { source?: MeetingSource; workId?: string; offset?: number },
+	hash?: string
+): string;
 ```
 
 `parseMeetingsSearchParams` = the whitelisting the old `/meetings/page.tsx` did (source ∈ `MEETING_SOURCES`, workId must match the uuid regex, offset ≥ 0 int). `buildMeetingsHref('/memory', {source:'zoom'}, '#meetings')` → `'/memory?source=zoom#meetings'`; `buildMeetingsHref('/meetings', {})` → `'/meetings'`.
@@ -228,6 +240,7 @@ export function buildMeetingsHref(basePath: string, input: { source?: MeetingSou
 #### Task A.2: `MeetingsList` gains `variant` + `basePath`
 
 **Files:**
+
 - Modify: `src/components/meetings/MeetingsList.tsx`
 - Test: `src/components/meetings/MeetingsList.unit.spec.tsx` (create)
 
@@ -239,6 +252,7 @@ export function buildMeetingsHref(basePath: string, input: { source?: MeetingSou
 #### Task A.3: `MemoryMeetingsPanel` + `MemoryShell` + `MemoryPage` + `/meetings` redirect + back-links
 
 **Files:**
+
 - Create: `src/components/memory/MemoryMeetingsPanel.tsx`
 - Modify: `src/components/memory/index.ts` (export it), `src/components/memory/MemoryShell.tsx`, `src/app/[locale]/(dashboard)/memory/page.tsx`, `src/app/[locale]/(dashboard)/meetings/page.tsx`, `src/components/meetings/MeetingDetailClient.tsx` (lines ~460, ~473), `src/components/meetings/MeetingForm.tsx` (lines ~156, ~335)
 
@@ -247,11 +261,11 @@ export function buildMeetingsHref(basePath: string, input: { source?: MeetingSou
 ```ts
 // MemoryMeetingsPanel.tsx ('use client')
 export interface MemoryMeetingsData {
-    meetings: Meeting[];
-    works: MeetingWorkOption[];
-    loadError: string | null;
-    filters: { source?: MeetingSource; workId?: string };
-    pagination: { offset: number; hasPrevious: boolean; hasNext: boolean; previousHref: string; nextHref: string };
+	meetings: Meeting[];
+	works: MeetingWorkOption[];
+	loadError: string | null;
+	filters: { source?: MeetingSource; workId?: string };
+	pagination: { offset: number; hasPrevious: boolean; hasNext: boolean; previousHref: string; nextHref: string };
 }
 export function MemoryMeetingsPanel({ data }: { data: MemoryMeetingsData }): JSX.Element;
 // renders <MeetingsList variant="panel" basePath={ROUTES.DASHBOARD_MEMORY} hash="#meetings" hint={t('meetings.hint')} {...data} />
@@ -275,10 +289,14 @@ import { ROUTES } from '@/lib/constants';
  * page. Kept as a redirect so bookmarks and older deep links keep working;
  * `/meetings/new` and `/meetings/[id]` are unchanged.
  */
-export default async function MeetingsIndexRedirect({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-    const q = parseMeetingsSearchParams(await searchParams);
-    const locale = await getLocale();
-    redirect({ href: buildMeetingsHref(ROUTES.DASHBOARD_MEMORY, q, '#meetings'), locale });
+export default async function MeetingsIndexRedirect({
+	searchParams
+}: {
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+	const q = parseMeetingsSearchParams(await searchParams);
+	const locale = await getLocale();
+	redirect({ href: buildMeetingsHref(ROUTES.DASHBOARD_MEMORY, q, '#meetings'), locale });
 }
 ```
 
@@ -303,6 +321,7 @@ Back-links: replace `ROUTES.DASHBOARD_MEETINGS` / `"/meetings"` in `MeetingDetai
 #### Task C.1: `loadSkillsPageData` helper
 
 **Files:**
+
 - Create: `src/lib/skills-page-data.ts`, `src/lib/skills-page-data.unit.spec.ts`
 
 **Produces:**
@@ -310,13 +329,21 @@ Back-links: replace `ROUTES.DASHBOARD_MEETINGS` / `"/meetings"` in `MeetingDetai
 ```ts
 export const SKILLS_PAGE_SIZE = 50;
 export type SkillsSection = 'installed' | 'available' | 'custom';
-export interface SkillsPageFilters { section: SkillsSection; search: string; installedOffset: number; catalogOffset: number }
+export interface SkillsPageFilters {
+	section: SkillsSection;
+	search: string;
+	installedOffset: number;
+	catalogOffset: number;
+}
 export function parseSkillsSearchParams(params: Record<string, string | string[] | undefined>): SkillsPageFilters;
 export function buildSkillsHref(basePath: string, filters: SkillsPageFilters, hash?: string): string; // omits defaults, e.g. '/agents?section=custom#skills'
 export interface SkillsPageData {
-    installed: Skill[]; installedMeta: { total: number; limit: number; offset: number };
-    catalog: SkillCatalogEntry[]; catalogTotal: number; catalogLimit: number;
-    loadErrors: { installed: string | null; catalog: string | null };
+	installed: Skill[];
+	installedMeta: { total: number; limit: number; offset: number };
+	catalog: SkillCatalogEntry[];
+	catalogTotal: number;
+	catalogLimit: number;
+	loadErrors: { installed: string | null; catalog: string | null };
 }
 export async function loadSkillsPageData(filters: SkillsPageFilters): Promise<SkillsPageData>; // the exact Promise.all + .then/.catch from the old skills/page.tsx
 ```
@@ -327,21 +354,39 @@ export async function loadSkillsPageData(filters: SkillsPageFilters): Promise<Sk
 #### Task C.2: `SkillsPageClient.basePath` + `SkillsSection`
 
 **Files:**
+
 - Modify: `src/components/skills/SkillsPageClient.tsx` (props + `updateUrl` line ~88)
 - Create: `src/components/skills/SkillsSection.tsx`, `src/components/skills/SkillsSection.unit.spec.tsx`
 
 **Produces:**
+
 - `SkillsPageClientProps` gains `basePath?: string` (default `ROUTES.DASHBOARD_SKILLS`) and `hash?: string` (default `''`); `updateUrl` → `router.replace(\`${basePath}${params.size ? \`?${params}\` : ''}${hash}\`)`.
 - `SkillsSection({ data, filters }: { data: SkillsPageData; filters: SkillsPageFilters })` (client or server — it has no state of its own, so a **server** component is fine; `SkillsPageClient` inside is the client island): renders
 
 ```tsx
-<section id="skills" data-testid="agents-skills-section" className="mt-10 rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 sm:p-6">
-    <PageHeader icon={Sparkles} title={t('skillsBlock.title')} subtitle={t('skillsBlock.subtitle')} tone="success"
-        actions={<>
-            <Button href={ROUTES.DASHBOARD_SKILL_TEMPLATES} variant="secondary" size="sm">{tSkills('list.browseTemplates')}</Button>
-            <Button href={ROUTES.DASHBOARD_SKILL_NEW} size="sm"><Plus className="w-3.5 h-3.5" aria-hidden="true" />{tSkills('list.newSkill')}</Button>
-        </>} />
-    <SkillsPageClient {...data} filters={filters} basePath={ROUTES.DASHBOARD_AGENTS} hash="#skills" />
+<section
+	id="skills"
+	data-testid="agents-skills-section"
+	className="mt-10 rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 sm:p-6"
+>
+	<PageHeader
+		icon={Sparkles}
+		title={t('skillsBlock.title')}
+		subtitle={t('skillsBlock.subtitle')}
+		tone="success"
+		actions={
+			<>
+				<Button href={ROUTES.DASHBOARD_SKILL_TEMPLATES} variant="secondary" size="sm">
+					{tSkills('list.browseTemplates')}
+				</Button>
+				<Button href={ROUTES.DASHBOARD_SKILL_NEW} size="sm">
+					<Plus className="w-3.5 h-3.5" aria-hidden="true" />
+					{tSkills('list.newSkill')}
+				</Button>
+			</>
+		}
+	/>
+	<SkillsPageClient {...data} filters={filters} basePath={ROUTES.DASHBOARD_AGENTS} hash="#skills" />
 </section>
 ```
 
@@ -353,6 +398,7 @@ with `t = getTranslations('dashboard.agentsPage')`, `tSkills = getTranslations('
 #### Task C.3: `/skills` redirect, back-links, revalidatePath, e2e
 
 **Files:**
+
 - Modify: `src/app/[locale]/(dashboard)/skills/page.tsx` → redirect to `buildSkillsHref(ROUTES.DASHBOARD_AGENTS, parseSkillsSearchParams(await searchParams), '#skills')` (same `redirect` idiom as Task A.3; doc comment mirrors it).
 - Modify: `src/components/skills/SkillDetailClient.tsx` (~77 href, ~951 `router.push`) and `src/app/[locale]/(dashboard)/skills/templates/page.tsx` (~24) → `ROUTES.DASHBOARD_AGENTS_SKILLS`.
 - Modify: `src/app/actions/skills.ts` (5 sites) and `src/app/actions/agent-capabilities.ts` (1 site): after each `revalidatePath('/skills')` add `revalidatePath('/agents')`.
@@ -393,30 +439,44 @@ with `t = getTranslations('dashboard.agentsPage')`, `tSkills = getTranslations('
 - [ ] Navigation becomes (comments preserved/adapted):
 
 ```ts
-const navigation: Array<{ name: string; href: string; icon: LucideIcon | typeof HumanAgentIcon; matchPrefixes?: string[] }> = [
-    { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
-    { name: t('navigation.missions'), href: ROUTES.DASHBOARD_MISSIONS, icon: Target },
-    { name: t('navigation.goals'), href: '/goals', icon: Gauge },
-    { name: t('navigation.ideas'), href: ROUTES.DASHBOARD_IDEAS, icon: Lightbulb },
-    { name: t('navigation.works'), href: ROUTES.DASHBOARD_WORKS, icon: FolderClosed },
-    { name: t('navigation.tasks'), href: ROUTES.DASHBOARD_TASKS, icon: ListChecks },
-    // Navigation consolidation — "Teams" is the hub for people AND agents
-    // (tabs Teams | Agents | Sessions | Archived); Skills live on the Agents
-    // tab. Active for /teams/*, /agents/*, /skills/* (skill detail pages).
-    { name: t('navigation.teams'), href: ROUTES.DASHBOARD_TEAMS, icon: HumanAgentIcon,
-      matchPrefixes: [ROUTES.DASHBOARD_TEAMS, ROUTES.DASHBOARD_AGENTS, ROUTES.DASHBOARD_SKILLS] },
-    // Memory now also hosts the Meetings catalog; meeting detail/new pages
-    // keep Memory highlighted.
-    { name: t('navigation.memory'), href: ROUTES.DASHBOARD_MEMORY, icon: Brain,
-      matchPrefixes: [ROUTES.DASHBOARD_MEMORY, ROUTES.DASHBOARD_MEETINGS] },
-    { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
-    { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
-    { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
-    { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
+const navigation: Array<{
+	name: string;
+	href: string;
+	icon: LucideIcon | typeof HumanAgentIcon;
+	matchPrefixes?: string[];
+}> = [
+	{ name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
+	{ name: t('navigation.missions'), href: ROUTES.DASHBOARD_MISSIONS, icon: Target },
+	{ name: t('navigation.goals'), href: '/goals', icon: Gauge },
+	{ name: t('navigation.ideas'), href: ROUTES.DASHBOARD_IDEAS, icon: Lightbulb },
+	{ name: t('navigation.works'), href: ROUTES.DASHBOARD_WORKS, icon: FolderClosed },
+	{ name: t('navigation.tasks'), href: ROUTES.DASHBOARD_TASKS, icon: ListChecks },
+	// Navigation consolidation — "Teams" is the hub for people AND agents
+	// (tabs Teams | Agents | Sessions | Archived); Skills live on the Agents
+	// tab. Active for /teams/*, /agents/*, /skills/* (skill detail pages).
+	{
+		name: t('navigation.teams'),
+		href: ROUTES.DASHBOARD_TEAMS,
+		icon: HumanAgentIcon,
+		matchPrefixes: [ROUTES.DASHBOARD_TEAMS, ROUTES.DASHBOARD_AGENTS, ROUTES.DASHBOARD_SKILLS]
+	},
+	// Memory now also hosts the Meetings catalog; meeting detail/new pages
+	// keep Memory highlighted.
+	{
+		name: t('navigation.memory'),
+		href: ROUTES.DASHBOARD_MEMORY,
+		icon: Brain,
+		matchPrefixes: [ROUTES.DASHBOARD_MEMORY, ROUTES.DASHBOARD_MEETINGS]
+	},
+	{ name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
+	{ name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
+	{ name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
+	{ name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings }
 ];
 ```
 
-  and the active check: `const prefixes = item.matchPrefixes ?? [item.href]; const isActive = prefixes.some((p) => pathname === p || pathname?.startsWith(p + '/'));`. Remove now-unused lucide imports (`Bot`, `Users`, `Sparkles`, `Video`) only if lint flags them (they are unused → yes, drop them; that is lint hygiene, not feature removal). Keep `key={item.name}` unique (Teams appears once).
+and the active check: `const prefixes = item.matchPrefixes ?? [item.href]; const isActive = prefixes.some((p) => pathname === p || pathname?.startsWith(p + '/'));`. Remove now-unused lucide imports (`Bot`, `Users`, `Sparkles`, `Video`) only if lint flags them (they are unused → yes, drop them; that is lint hygiene, not feature removal). Keep `key={item.name}` unique (Teams appears once).
+
 - [ ] Unit test: mock `@/i18n/navigation` (`usePathname` → configurable, `Link` → `a`, `useRouter`), `next-intl`, `../works/detail/WorkDetailContext` (`useWorkDetail: () => ({ config: {} })`), `../layout/WorkspaceSwitcher`, `./RunnerStatusPill`, `./SidebarActivityIndicator`, `@/components/ai/ChatPanel` (`ChatPanelExpandButton: () => null`), `@/lib/hooks/use-mounted` (`() => true`), `@/app/actions/auth`. Render with a minimal `user`; assert link texts contain no `navigation.meetings` / `navigation.skills` / `navigation.agents`, contain `navigation.teams` exactly once with an `svg` child containing a `rect` (HumanAgentIcon), and that with `usePathname` = `/agents/abc` the Teams link has the active class (`bg-surface-secondary`), and with `/meetings/xyz` the Memory link does.
 - [ ] `pnpm test -- DashboardSidebar && pnpm type-check && pnpm lint` → commit `feat(web): sidebar — Teams hub replaces Agents/Teams/Skills entries, Meetings folds into Memory`.
 
@@ -433,13 +493,16 @@ const navigation: Array<{ name: string; href: string; icon: LucideIcon | typeof 
 ## Phase 3 — Verify, review, docs, PR
 
 ### Task V.1: Whole-app checks
+
 - [ ] From `apps/web`: `pnpm type-check` · `pnpm lint` · `pnpm test` (all vitest) — all green; paste the summary lines into the PR body.
 - [ ] `pnpm build` **only if** the machine has the RAM (Next build of this app is heavy); otherwise rely on type-check + the CI build.
 
 ### Task V.2: Docs
+
 - [ ] `docs/features/agents-catalog.md`, `docs/features/skills-catalog.md`, `docs/features/index.md`, `docs/advanced/teams-and-organizations.md`, and the meetings/memory feature doc(s) found by `grep -ril "meetings" docs/features docs/advanced` — add/adjust one short paragraph each: where the feature now lives in the sidebar/tabs (`Teams → Agents tab → Skills block`, `Memory → Meetings block`, `Teams hub tabs`), and note that `/skills` and `/meetings` redirect. Commit `docs: navigation consolidation (Teams hub, Meetings in Memory, Skills in Agents)`.
 
 ### Task V.3: Review + PR
+
 - [ ] Two independent review passes on the full diff (`git diff origin/develop...HEAD`): (1) correctness/regressions (redirects, params, RSC boundaries, i18n keys exist, test ids), (2) UX consistency vs spec (order of tabs, block placement, icon). Fix findings, re-run V.1.
 - [ ] Push branch, open PR to `develop` titled `feat(web): navigation consolidation — Teams hub, Meetings in Memory, Skills in Agents`, body = spec §2 + §3.1 table + verification output. Do **not** merge; the owner reviews. Report the PR URL.
 

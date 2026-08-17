@@ -13,6 +13,10 @@ This section covers the individual capabilities that make that possible, beyond 
 
 > New here? Read the [Platform Overview](../overview.md) for the big picture, or the [Founder Journey guide](../guides/founder-journey.md) for the Start → Build → Sell → Scale playbook that ties these features together.
 
+:::note Where these live in the sidebar
+A few features share a sidebar entry rather than owning one. **Teams** is the hub for people _and_ Agents — tabs **Teams | Agents | Sessions | Archived**, with the **Agents Chart** and the **Skills** catalog on the Agents tab. **Memory** hosts the **Meetings** catalog as a block. The retired index links still work: `/skills` redirects to `/agents#skills` and `/meetings` to `/memory#meetings`, filters and all. Detail pages (`/agents/:id`, `/teams/:id`, `/skills/:id`, `/meetings/:id`) are unchanged.
+:::
+
 ## Getting started
 
 | Feature                                      | Description                                                                                   |

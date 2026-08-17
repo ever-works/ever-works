@@ -158,9 +158,17 @@ test.describe('Agents catalog UI — prompt-first surface', () => {
 
         // Playwright reports the hash inconsistently across navigations, so the
         // pathname + query are the post-condition, not the raw url string.
+        //
+        // The pathname is asserted prefix-agnostically because `/en/…` never
+        // survives: `i18n/routing.ts` runs `localePrefix: 'never'`, so
+        // `proxy.ts` (`detectLegacyLocalePrefix`) 307s the legacy `/en/skills`
+        // bookmark to `/skills` before this page's own redirect ever runs, and
+        // next-intl's `redirect()` emits an unprefixed `Location` in that mode.
+        // Same contract as the meetings journey (`flow-meetings-ui-journey`)
+        // and `flow-i18n-locale-switching` ("legacy /en/login collapses").
         await expect
             .poll(() => new URL(page.url()).pathname, { timeout: 30_000 })
-            .toBe('/en/agents');
+            .toMatch(/^\/(en\/)?agents$/);
         expect(new URL(page.url()).searchParams.get('section')).toBe('custom');
         await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
     });

@@ -73,6 +73,10 @@ Enable them like any other [plugin](../plugin-system/index.md), under **Settings
 
 A **Meeting** is a first-class record: title, start/end, source, participants, a deep link, and optionally a transcript.
 
+:::note Where to find it
+Meetings have no sidebar entry of their own — a meeting is a _memory source_, so the catalog renders as the **Meetings** block on **Sidebar → Memory** (anchor `/memory#meetings`), right under the agent-memory panel. The source and Work filters, pagination and **New meeting** button are unchanged. The old `/meetings` link still works: it redirects to that block and carries its filters across. `/meetings/new` and the meeting detail pages (`/meetings/:id`) are unchanged.
+:::
+
 | Endpoint                            | What it does                                                 |
 | ----------------------------------- | ------------------------------------------------------------ |
 | `GET /api/meetings`                 | Your meetings, newest first. Filter by `workId` or `source`. |

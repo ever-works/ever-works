@@ -33,6 +33,19 @@ export async function generateMetadata(): Promise<Metadata> {
  * `/skills` page owned — parsing and fetching both live in
  * `lib/skills-page-data.ts` so the two surfaces cannot drift — and adds that
  * fetch to the same `Promise.all`, keeping the page one round of waterfall.
+ *
+ * Known and accepted cost of hosting Skills here: `SkillsPageClient.updateUrl`
+ * does a `router.replace` on this route, so every Skills tab/search/page click
+ * re-runs THIS server component — `agentsAPI.list` and
+ * `fetchAgentTemplateCatalog` are re-issued alongside `loadSkillsPageData`,
+ * where the old standalone `/skills` page re-fetched skills only. They stay in
+ * one `Promise.all`, so the click costs one extra *parallel* upstream call, not
+ * extra serial latency, and `fetchAgentTemplateCatalog` degrades to the
+ * built-in `listAstTemplates` list rather than failing. Deliberately NOT fixed
+ * by caching: both fetches are per-user/cookie-scoped, and an `unstable_cache`
+ * keyed wrongly would serve one tenant's Agents to another. If this ever shows
+ * up in traces, the safe lever is a `<Suspense>` boundary around the Skills
+ * block (stream it) — not a shared cache.
  */
 export default async function AgentsPage({
     searchParams,

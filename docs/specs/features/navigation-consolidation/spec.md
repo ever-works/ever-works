@@ -7,11 +7,11 @@
 The dashboard sidebar has grown one entry per feature. Three of them are really facets of a bigger
 concept and read as clutter:
 
-| Today (sidebar)              | Really is …                                                             |
-| ---------------------------- | ----------------------------------------------------------------------- |
-| **Meetings** (`/meetings`)   | a memory source — transcripts + AI summaries ingest straight into Memory |
-| **Agents** + **Teams**       | one org — the same people/agents hierarchy seen from two doors           |
-| **Skills** (`/skills`)       | something Agents own — nobody browses skills without an agent in mind    |
+| Today (sidebar)            | Really is …                                                              |
+| -------------------------- | ------------------------------------------------------------------------ |
+| **Meetings** (`/meetings`) | a memory source — transcripts + AI summaries ingest straight into Memory |
+| **Agents** + **Teams**     | one org — the same people/agents hierarchy seen from two doors           |
+| **Skills** (`/skills`)     | something Agents own — nobody browses skills without an agent in mind    |
 
 ## 2. Goal (owner's words, normalised)
 
@@ -52,8 +52,8 @@ New order (removed: Agents-as-is, Meetings, Skills, old Teams; added: merged **T
 
 - **Teams** takes the slot Agents had (after Tasks); `href = ROUTES.DASHBOARD_TEAMS`.
 - Active-state matching gains optional `matchPrefixes`:
-  - Teams: `['/teams', '/agents', '/skills']`
-  - Memory: `['/memory', '/meetings']`
+    - Teams: `['/teams', '/agents', '/skills']`
+    - Memory: `['/memory', '/meetings']`
 - **Icon** — new `HumanAgentIcon` (`components/icons/HumanAgentIcon.tsx`): a lucide-style 24×24 stroke
   SVG, left half a person (head circle + shoulders, from lucide `user`), right half a bot head (rounded
   rect + antenna + two eyes, from lucide `bot`). Same `strokeWidth`/`className` contract as lucide icons so
