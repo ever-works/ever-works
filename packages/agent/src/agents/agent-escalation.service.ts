@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { AgentEscalationDto, AgentEscalationStatus } from '@ever-works/contracts';
 import { config } from '../config';
 import {
@@ -7,6 +7,8 @@ import {
     type RecordEscalationInput,
 } from '../database/repositories/agent-escalation.repository';
 import type { AgentEscalation } from '../entities/agent-escalation.entity';
+// Leaf token file — no runtime graph (see inbox-producer.port.ts).
+import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import { EscalationConfidenceService } from './escalation-confidence';
 
 /**
@@ -37,6 +39,10 @@ export class AgentEscalationService {
         // argument, and an absent scorer simply leaves `confidence` NULL
         // — which reads as "never scored", never as "not confident".
         @Optional() private readonly confidenceScorer?: EscalationConfidenceService,
+        // Inbox (operator message center). @Optional() and appended LAST
+        // per the positional-spec arity rule; bound by the api-side
+        // @Global() InboxModule. Absent = pre-inbox behaviour, unchanged.
+        @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
     ) {}
 
     /**
@@ -60,6 +66,10 @@ export class AgentEscalationService {
                     `Escalation ${input.reasonCode} recorded for run=${input.runId ?? 'none'} ` +
                         `task=${input.taskId ?? 'none'}.`,
                 );
+                // Inbox mirror — additive alongside the escalation row,
+                // idempotent per escalationId inside the producer, and
+                // best-effort like everything else on this path.
+                await this.mirrorToInbox(row);
             }
             return row;
         } catch (error) {
@@ -124,6 +134,30 @@ export class AgentEscalationService {
      */
     async resolve(id: string, userId: string, note?: string | null): Promise<boolean> {
         return this.repository.resolve(id, userId, note ?? null);
+    }
+
+    /** Mirror one recorded escalation into the owner's inbox. Best-effort. */
+    private async mirrorToInbox(row: AgentEscalation): Promise<void> {
+        if (!this.inbox) return;
+        try {
+            await this.inbox.escalationRaised({
+                userId: row.userId,
+                escalationId: row.id,
+                summary: row.summary,
+                decisionNeeded: row.decisionNeeded,
+                agentId: row.agentId ?? null,
+                runId: row.runId ?? null,
+                taskId: row.taskId ?? null,
+                workId: row.workId ?? null,
+                organizationId: row.organizationId ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Escalation ${row.id} inbox mirror failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /**

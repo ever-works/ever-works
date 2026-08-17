@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, type FindOptionsWhere } from 'typeorm';
+import { In, IsNull, Not, Repository, type FindOptionsWhere } from 'typeorm';
 import {
     Goal,
     GoalStatus,
@@ -94,6 +94,13 @@ export class GoalsService {
         const where: FindOptionsWhere<Goal> = {
             userId,
             ...(filter.status ? { status: filter.status } : {}),
+            // Archive is a VIEW, not a deletion: the default catalog hides
+            // archived Goals, `archived: true` shows only those, and
+            // `'all'` drops the predicate entirely. Every pre-existing row
+            // has a NULL `archivedAt`, so the default filter matches all of
+            // them and the catalog is unchanged for anyone who never
+            // archives anything.
+            ...this.archivedPredicate(filter.archived),
         };
         const rows = await this.goals.find({
             where,
@@ -396,6 +403,11 @@ export class GoalsService {
     }
 
     // ─── internals ──────────────────────────────────────────────────
+
+    private archivedPredicate(archived: ListGoalsFilter['archived']): FindOptionsWhere<Goal> {
+        if (archived === 'all') return {};
+        return archived === true ? { archivedAt: Not(IsNull()) } : { archivedAt: IsNull() };
+    }
 
     private async findOrThrow(userId: string, goalId: string): Promise<Goal> {
         const row = await this.goals.findOne({ where: { id: goalId, userId } });

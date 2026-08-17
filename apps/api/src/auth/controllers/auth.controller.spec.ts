@@ -10,8 +10,11 @@ jest.mock('@ever-works/agent/services', () => ({
     ZeroFrictionFunnelService: class ZeroFrictionFunnelService {},
 }));
 
+import 'reflect-metadata';
 import { BadRequestException } from '@nestjs/common';
+import { THROTTLER_LIMIT, THROTTLER_TTL } from '@nestjs/throttler/dist/throttler.constants';
 import { AuthController } from './auth.controller';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import type { AuthService } from '../services/auth.service';
 import type { AnonymousAuthService } from '../services/anonymous-auth.service';
 import type { ClaimAccountService } from '../services/claim-account.service';
@@ -31,6 +34,7 @@ describe('AuthController', () => {
             | 'getUserProfile'
             | 'updateUserProfile'
             | 'verifyEmail'
+            | 'resendVerificationEmail'
             | 'forgotPassword'
             | 'getUserByPasswordResetToken'
             | 'consumePasswordResetToken'
@@ -75,6 +79,7 @@ describe('AuthController', () => {
             getUserProfile: jest.fn(),
             updateUserProfile: jest.fn(),
             verifyEmail: jest.fn(),
+            resendVerificationEmail: jest.fn(),
             forgotPassword: jest.fn(),
             getUserByPasswordResetToken: jest.fn(),
             consumePasswordResetToken: jest.fn().mockResolvedValue(undefined),
@@ -763,6 +768,56 @@ describe('AuthController', () => {
                 'Invalid or expired token',
             );
             expect(authProvider.issueSession).not.toHaveBeenCalled();
+        });
+    });
+
+    // EW-070 — the signed-out resend route. The two properties that make this
+    // route safe (it is reachable WITHOUT a session, and it cannot be turned
+    // into a mail cannon) live in decorator metadata, so they are asserted
+    // here rather than left to a code reading.
+    describe('resendVerification (POST /api/auth/resend-verification)', () => {
+        it('forwards the full dto to authService.resendVerificationEmail', async () => {
+            authService.resendVerificationEmail.mockResolvedValue({ message: 'ok' } as any);
+
+            const dto: any = {
+                email: 'a@b.co',
+                emailVerificationCallbackUrl: 'https://app/v',
+            };
+            const result = await controller.resendVerification(dto);
+
+            expect(authService.resendVerificationEmail).toHaveBeenCalledWith(dto);
+            expect(result).toEqual({ message: 'ok' });
+        });
+
+        it('is @Public() — the whole point is that it works WITHOUT a session', () => {
+            // An unverified user cannot log in (login answers 403), so a
+            // session-guarded resend is unreachable exactly when it is needed.
+            const meta = Reflect.getMetadata(
+                IS_PUBLIC_KEY,
+                AuthController.prototype.resendVerification,
+            );
+            expect(meta).toBe(true);
+        });
+
+        it('is @Throttle()d on the `long` tier so it cannot be used as a mail cannon', () => {
+            const handler = AuthController.prototype.resendVerification;
+
+            // Keyed on `long`, not `default`. A `default`-keyed override binds
+            // to no configured throttler (the tiers are short/medium/long — see
+            // throttler.config.ts) and is silently ignored, leaving only the
+            // loose 1000/min global cap. That trap is why this asserts the tier
+            // NAME and not merely "some throttle exists".
+            const limit = Reflect.getMetadata(THROTTLER_LIMIT + 'long', handler);
+            const ttl = Reflect.getMetadata(THROTTLER_TTL + 'long', handler);
+
+            expect(limit).toBeDefined();
+            expect(Number(limit)).toBe(5);
+            expect(Number(ttl)).toBe(60_000);
+
+            // The inert key carries nothing — if someone "fixes" this route by
+            // moving the override to `default`, the cap silently disappears and
+            // the assertion above starts failing.
+            expect(Reflect.getMetadata(THROTTLER_LIMIT + 'default', handler)).toBeUndefined();
         });
     });
 

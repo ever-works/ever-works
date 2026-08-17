@@ -49,6 +49,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     type AgentDomainToolSources,
 } from './agent-domain-tool-sources';
+import { AGENT_MCP_TOOL_SOURCE, type AgentMcpToolSource } from './agent-mcp-tool-source';
 // Domain chat-tool factories. VALUE imports on purpose — every one of
 // these modules imports its own domain only with `import type`, so
 // pulling the factory functions in here adds ZERO runtime graph to the
@@ -62,6 +63,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
+import { buildInboxTools } from '../inbox/agent-inbox-tools';
 import { buildWorkflowTools } from './agent-workflow-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
@@ -220,6 +222,21 @@ export class AgentToolService {
         // every param below by type/token, so ordering is a test-only concern.
         @Optional() private readonly delegation?: SubAgentDelegationService,
         @Optional() private readonly collaborators?: AgentCollaboratorRepository,
+        // Agent Plugins MCP slice (T26). APPENDED + @Optional() so every
+        // existing positional constructor call keeps working, and so a
+        // runtime without the MCP module behaves exactly as before.
+        // Consumed in `resolveGrantedTools` (async — descriptor assembly
+        // needs I/O), never in the sync `resolveAllowedTools`.
+        // 🛑 MERGE NOTE: on this branch this param sat at index 13. It now sits
+        // at 15, BEHIND Collaborators' 13/14, because those two shipped to
+        // develop first and `agent-tool-delegate.spec.ts` constructs the
+        // service positionally through those slots. Both sides claimed index
+        // 13, so one had to move; moving this one breaks only this branch's own
+        // `agent-tool-mcp-funnel.spec.ts`, which is padded to match. Nest
+        // resolves by type/token, so this ordering is a test-only concern.
+        @Optional()
+        @Inject(AGENT_MCP_TOOL_SOURCE)
+        private readonly mcpTools?: AgentMcpToolSource,
         // Skill files feature — companion-file rows + the uploads-spine
         // content reader (bound API-side). APPENDED LAST + @Optional() so
         // every existing positional constructor call keeps working;
@@ -508,6 +525,29 @@ export class AgentToolService {
             );
         }
 
+        // Inbox (operator message center) — the `ask_human` blocking
+        // question. Ungated by agent permissions on purpose: asking the
+        // owner is always safe (it grants nothing and touches nothing),
+        // so EVERY agent may raise its hand. The run/agent links are
+        // bound here from the run context — never model-supplied.
+        if (sources.inbox) {
+            const inbox = sources.inbox;
+            add('inbox', () =>
+                buildInboxTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    // `'no-run'` is the sentinel the default runContext
+                    // uses; passing it through would park a run that
+                    // cannot exist.
+                    agentRunId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: inbox.service,
+                }),
+            );
+        }
+
         // Judgment layer G3/G10 — "what is waiting on me?" and the
         // matching close. Ungated by agent permissions on purpose: these
         // read and close the OWNER'S OWN escalation queue, which is
@@ -626,6 +666,43 @@ export class AgentToolService {
         },
     ): Promise<{ tools: AgentToolDescriptor[]; refused: ToolGrantDecision[] }> {
         const tools = this.resolveAllowedTools(agent, runContext);
+
+        // Agent Plugins MCP slice (T26): append the MCP descriptors BEFORE
+        // the grant partition so `mcp__<server>__<tool>` names flow through
+        // the tool-grant matrix like every other tool. Failure-isolated on
+        // BOTH levels: the source itself already skips dead servers, and a
+        // broken source contributes zero tools — never a failed run.
+        if (this.mcpTools) {
+            try {
+                const mcpDescriptors = await this.mcpTools.buildTools(agent);
+                const existing = new Set(tools.map((tool) => tool.name));
+                for (const descriptor of mcpDescriptors) {
+                    // A server-supplied name must never shadow a built-in —
+                    // the run loop's descriptorByName map is last-write-wins,
+                    // so a collision is dropped HERE with a WARN.
+                    if (existing.has(descriptor.name)) {
+                        this.logger.warn(
+                            `Agent ${agent.id}: MCP tool "${descriptor.name}" collides with an existing tool and was dropped.`,
+                        );
+                        continue;
+                    }
+                    existing.add(descriptor.name);
+                    // Same `{{cred.key}}` wrapper the built-ins get in
+                    // `resolveAllowedTools`. MCP tools are the outbound
+                    // calls credentials exist FOR, so skipping the wrapper
+                    // here would send the literal `{{cred.x}}` text to a
+                    // third-party server and scrub nothing on the way back.
+                    tools.push(this.withCredentialInterpolation(agent, descriptor));
+                }
+            } catch (err) {
+                this.logger.warn(
+                    `Agent ${agent.id}: MCP tool source failed (no MCP tools this run): ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+
         if (!this.toolGrants) return { tools, refused: [] };
 
         try {

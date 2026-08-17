@@ -14,12 +14,14 @@ import { TaskTemplate } from '../entities/task-template.entity';
 import { TaskTemplateStep } from '../entities/task-template-step.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
+import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { Work } from '../entities/work.entity';
 import { Mission } from '../entities/mission.entity';
 import { Team } from '../entities/team.entity';
 import { Goal } from '../entities/goal.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
 import { TaskTemplateRepository } from '../database/repositories/task-template.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -91,6 +93,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
             // entity throws EntityMetadataNotFoundError on first query.
             Team,
             Goal,
+            // Repository registry (Feature G) — TaskWorkspaceService reads
+            // the run agent's repo attachments for the advisory
+            // `attachedRepos` provision-spec field. RepoConnection itself
+            // needs no forFeature here: the relation loads through the
+            // DataSource metadata (both entities are in ENTITIES).
+            AgentRepoAttachment,
         ]),
         ActivityLogModule,
         // Phase 15 — TaskTransitionService + TaskChatService consume
@@ -110,6 +118,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     ],
     providers: [
         TaskRepository,
+        AgentRepoAttachmentRepository,
         TaskAssigneeRepository,
         TaskReviewerRepository,
         TaskApproverRepository,

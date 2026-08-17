@@ -176,6 +176,16 @@ export class CreateAgentDto {
     @MaxLength(100)
     modelId?: string;
 
+    /**
+     * Environments (Settings → Environments) — assigned runtime
+     * Environment. Must be the caller's own PUBLISHED Environment
+     * (draft → 422, cross-user/unknown → 404; service-enforced).
+     */
+    @ApiProperty({ required: false })
+    @IsOptional()
+    @IsUUID()
+    environmentId?: string;
+
     @ApiProperty({ required: false, minimum: 0, maximum: 20000 })
     @IsOptional()
     @IsInt()
@@ -304,6 +314,17 @@ export class UpdateAgentDto {
     @IsString()
     @MaxLength(100)
     modelId?: string | null;
+
+    /**
+     * Environments (Settings → Environments) — assigned runtime
+     * Environment; `null` clears back to the platform default. A
+     * non-null id must be the caller's own PUBLISHED Environment
+     * (draft → 422, cross-user/unknown → 404; service-enforced).
+     */
+    @ApiProperty({ required: false, nullable: true })
+    @IsOptional()
+    @IsUUID()
+    environmentId?: string | null;
 
     @ApiProperty({ required: false, minimum: 0, maximum: 20000 })
     @IsOptional()

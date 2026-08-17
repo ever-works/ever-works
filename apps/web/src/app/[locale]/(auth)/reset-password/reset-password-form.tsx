@@ -25,6 +25,12 @@ function ResetPasswordContent() {
         confirmPassword?: string;
         general?: string;
     }>({});
+    // EW-082: when the submit failed because the LINK is dead (expired, or
+    // already used) rather than because the request hiccuped, "try again"
+    // cannot work — only a fresh link can. Track that so the form can offer the
+    // one action that helps, instead of leaving the user to re-press a button
+    // that will fail identically forever.
+    const [linkIsDead, setLinkIsDead] = useState(false);
     const [success] = useState(false);
 
     // If no token, show error message instead of redirecting
@@ -82,6 +88,7 @@ function ResetPasswordContent() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setErrors({});
+        setLinkIsDead(false);
 
         // Validate passwords match
         if (formData.password !== formData.confirmPassword) {
@@ -104,7 +111,13 @@ function ResetPasswordContent() {
             void (async () => {
                 const response = await resetPasswordAction(token!, formData.password);
                 if (!response.success) {
+                    // EW-082: `response.error` is now the specific string for
+                    // whichever failure actually happened — expired link, a
+                    // no-longer-valid link, throttled, or a server-side problem
+                    // — instead of one "Failed to reset password" for all four.
+                    // See `classifyResetPasswordError`.
                     setErrors({ general: response.error || t('errors.failed') });
+                    setLinkIsDead(Boolean(response.linkIsDead));
                     return;
                 }
             })();
@@ -157,8 +170,19 @@ function ResetPasswordContent() {
         <AuthLayout title={t('title')} subtitle={t('subtitle')}>
             <form onSubmit={handleSubmit} className="space-y-6">
                 {errors.general && (
-                    <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm">
-                        {errors.general}
+                    <div className="bg-danger/10 border border-danger/20 text-danger px-4 py-3 rounded-lg text-sm space-y-3">
+                        <p>{errors.general}</p>
+
+                        {/* EW-082: a dead link cannot be retried into working.
+                            Surface the only action that resolves it, right
+                            where the failure is reported — the message above
+                            tells the user to request a new link, so make that
+                            clickable instead of making them go find the page. */}
+                        {linkIsDead && (
+                            <Button href={ROUTES.AUTH_FORGOT_PASSWORD} size="sm">
+                                {t('errors.requestNewLink')}
+                            </Button>
+                        )}
                     </div>
                 )}
 

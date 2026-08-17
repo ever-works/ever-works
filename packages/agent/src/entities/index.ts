@@ -106,6 +106,7 @@ export * from './organization-onboarding-profile.entity';
 // Goals & Metrics (PR-8) — measurable targets + samples + Mission link
 export * from './goal.entity';
 export * from './goal-metric-sample.entity';
+export * from './goal-event.entity';
 export * from './mission-goal.entity';
 
 // Composio triggers (EW-684 PR-D)
@@ -134,6 +135,8 @@ export * from './ingested-event.entity';
 export * from './ingest-cursor.entity';
 // Inbound receivers — external workspace/installation → platform user binding
 export * from './ingest-install-binding.entity';
+// Inbox (operator message center) — messages addressed to the human
+export * from './inbox-item.entity';
 // Event-ingest spine — external tracker issue → platform Task mapping
 export * from './external-issue-link.entity';
 // Meetings v1 (Wave 8, feature a) — captured meetings with transcripts
@@ -157,9 +160,19 @@ export * from './fleet-job.entity';
 export * from './fleet-execution-preference.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
+// Agent Plugins MCP slice — external MCP server connections + per-agent
+// bindings (docs/specs/features/agent-plugins plan §2.4/§2.5).
+export * from './mcp-server-connection.entity';
+export * from './agent-mcp-server-binding.entity';
 export * from './workflow.entity';
 // One execution of a saved graph — what makes running a workflow leave a
 // trace instead of vanishing into a chat tool's return value.
 export * from './workflow-run.entity';
+// Environments (Settings → Environments) — named, reusable runtime
+// recipes (packages + networking) assigned per-Agent.
+export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
+// Repository registry (Feature G) — account-level repo records + agent grants.
+export * from './repo-connection.entity';
+export * from './agent-repo-attachment.entity';

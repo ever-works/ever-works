@@ -8,6 +8,7 @@ import type { IPromptFacade } from '../facades/prompt-facade.interface.js';
 import type { IKbToolsFacade } from '../facades/kb-tools-facade.interface.js';
 import type { IAgentMemoryStepFacade } from '../facades/agent-memory-facade.interface.js';
 import type { WorkReference, UserReference } from './generation-context.interface.js';
+import type { RuntimeEnvironmentData } from './runtime-environment.js';
 
 /**
  * Logger interface for step execution.
@@ -173,4 +174,19 @@ export interface StepExecutionContext {
 	 * plugins must treat `undefined` as "nothing to splice".
 	 */
 	readonly memoryRecall?: string;
+
+	/**
+	 * Environments — the resolved runtime Environment for this run, when the
+	 * orchestrator that dispatched the pipeline knows the run's Agent and
+	 * that Agent has a published Environment assigned
+	 * (`agents.environmentId` → `environments` row → this plain object).
+	 *
+	 * Same optional-carrier posture as `kbContext` / `memoryRecall`:
+	 * absent when no Agent is in play (plain Work-generation runs), when
+	 * the Agent has no Environment, or on older orchestrators — plugins
+	 * MUST treat `undefined` as "behave exactly as before Environments
+	 * existed" (e.g. claude-managed-agent keeps its
+	 * `CLAUDE_MANAGED_AGENT_EGRESS_HOSTS` env-var fallback).
+	 */
+	readonly runtimeEnvironment?: RuntimeEnvironmentData;
 }

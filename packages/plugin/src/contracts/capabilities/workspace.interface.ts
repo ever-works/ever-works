@@ -41,6 +41,18 @@ export interface WorkspaceProvisionSpec {
 	/** Per-operation auth injected by the facade (short-lived token). */
 	readonly auth?: { username?: string; token?: string };
 	readonly settings?: PluginSettings;
+	/**
+	 * Repository registry (Feature G) — ADVISORY list of additional
+	 * repositories attached to the executing agent. v1 providers
+	 * (sandbox/local) ignore it — multi-mount is a follow-up — but the
+	 * field rides on the spec now so future executors can consume it
+	 * without contract churn. URLs are token-free, mirroring `repoUrl`.
+	 */
+	readonly attachedRepos?: readonly {
+		readonly url: string;
+		readonly branch?: string;
+		readonly mountDir: string;
+	}[];
 }
 
 export interface WorkspaceHandle {
