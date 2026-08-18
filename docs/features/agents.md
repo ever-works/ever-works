@@ -98,7 +98,11 @@ Every Agent can have one budget row. Before any AI call, the platform checks the
 
 ## The Agents workbench
 
-- **Sidebar → Agents** lists every Agent you own, with Cards/Table views and filters for status (`All / Active / Paused / Error`) and scope (`Tenant / Mission / Idea / Work`).
+:::note Where to find it
+Agents live under **Sidebar → Teams**, which is the hub for your people _and_ your AI workforce: tabs **Teams | Agents | Sessions | Archived**. The **Agents** tab is the catalog below, and it also carries the **Agents Chart** button (your Agent hierarchy without human members) and the **Skills** block. `/agents` and `/skills` still work as links — `/skills` redirects to the Skills block on the Agents tab.
+:::
+
+- **Sidebar → Teams → Agents tab** lists every Agent you own, with Cards/Table views and filters for status (`All / Active / Paused / Error`) and scope (`Tenant / Mission / Idea / Work`).
 - Each **Agent detail page** has six tabs: **Dashboard** (live status, run history, tasks, cost snapshot), **Activity**, **Instructions**, **Skills**, **Budgets**, and **Settings**.
 - Header actions: **Run heartbeat now**, **Assign Task**, **Pause / Resume**, **Archive**, **Delete**.
 - Work, Mission, and Idea detail pages each gain an **Agents** tab listing the Agents that can act on them.
@@ -107,7 +111,7 @@ A **dry-run** mode (`POST /agents/:id/dry-run`) builds the prompt and estimates 
 
 ## Creating an Agent
 
-1. Sidebar → **Agents** → **+ New Agent**.
+1. Sidebar → **Teams** → **Agents** tab → **+ New Agent**.
 2. Give it a `name` and `title`, and describe its `capabilities`.
 3. Pick a provider/model (or keep your account default).
 4. Choose a scope — Tenant for a company-wide role, or a specific Mission/Idea/Work.

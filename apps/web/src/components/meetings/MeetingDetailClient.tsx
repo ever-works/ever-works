@@ -457,7 +457,10 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
             try {
                 await deleteMeetingAction(meeting.id);
                 toast.success(t('toasts.deleted'));
-                router.push(ROUTES.DASHBOARD_MEETINGS);
+                // The catalog lives on the Memory page now (navigation
+                // consolidation) — send the user to the block, not to the
+                // `/meetings` redirect that would bounce them there anyway.
+                router.push(ROUTES.DASHBOARD_MEMORY_MEETINGS);
             } catch (err) {
                 setDeleteError(err instanceof Error ? err.message : t('deleteDialog.error'));
             }
@@ -470,7 +473,7 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
             <div>
                 <div className="flex items-center justify-between gap-3">
                     <Link
-                        href={ROUTES.DASHBOARD_MEETINGS}
+                        href={ROUTES.DASHBOARD_MEMORY_MEETINGS}
                         className="inline-flex min-w-0 items-center gap-1 text-xs text-text-muted transition-colors hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark"
                     >
                         <ChevronLeft className="h-3.5 w-3.5 shrink-0" />

@@ -15,7 +15,14 @@ import { clickAndExpectUrl, clickUntil } from './helpers/nav';
  * health strip, the capabilities block, the Guardrails card, the 6-tab strip
  * wiring, the 5-pill instructions editor presence, and the Settings status
  * controls that differ per lifecycle state (draft → Activate, active → Pause,
- * paused → Resume). Data is seeded via the API as the SAME seeded user the
+ * paused → Resume).
+ *
+ * Navigation consolidation (docs/specs/features/navigation-consolidation):
+ * /agents is tab 2 of the Teams hub, so this file also covers the Agents Chart
+ * CTA + the /agents/chart page (org chart with human members stripped), the
+ * Skills catalog block (anchor #skills) and the /skills → /agents redirect.
+ *
+ * Data is seeded via the API as the SAME seeded user the
  * `chromium` project's storageState authenticates as, so create-via-API agents
  * are visible + mutable in the UI.
  *
@@ -122,6 +129,48 @@ test.describe('Agents catalog UI — prompt-first surface', () => {
         // The "Or → Create Agent Manually" alternative below the composer.
         await expect(page.getByText('Or', { exact: true }).first()).toBeVisible();
         await expect(page.getByText('Create Agent Manually').first()).toBeVisible();
+    });
+
+    test('the header exposes the Agents Chart CTA and the Skills block renders below the grid', async ({
+        page,
+    }) => {
+        // Navigation consolidation (docs/specs/features/navigation-consolidation
+        // §3.5): /agents is tab 2 of the Teams hub — it owns the Agents Chart
+        // entry point and hosts the Skills catalog as a block (anchor #skills;
+        // /skills redirects here).
+        await page.goto('/en/agents', { waitUntil: 'domcontentloaded' });
+        await expect(page).not.toHaveURL(/\/login/);
+
+        const chartLink = page.getByTestId('agents-chart-link');
+        await expect(chartLink).toBeVisible({ timeout: 30_000 });
+        await expect(chartLink).toHaveAttribute('href', /\/agents\/chart$/);
+
+        const skills = page.getByTestId('agents-skills-section');
+        await expect(skills).toBeVisible({ timeout: 30_000 });
+        await expect(skills).toHaveAttribute('id', 'skills');
+        // The block keeps the old page's chrome: an h2 (the page's single h1
+        // stays "Agents") plus the two catalog CTAs.
+        await expect(skills.getByRole('heading', { name: 'Skills', level: 2 })).toBeVisible();
+    });
+
+    test('/skills redirects into the Agents tab, filters intact', async ({ page }) => {
+        await page.goto('/en/skills?section=custom', { waitUntil: 'domcontentloaded' });
+
+        // Playwright reports the hash inconsistently across navigations, so the
+        // pathname + query are the post-condition, not the raw url string.
+        //
+        // The pathname is asserted prefix-agnostically because `/en/…` never
+        // survives: `i18n/routing.ts` runs `localePrefix: 'never'`, so
+        // `proxy.ts` (`detectLegacyLocalePrefix`) 307s the legacy `/en/skills`
+        // bookmark to `/skills` before this page's own redirect ever runs, and
+        // next-intl's `redirect()` emits an unprefixed `Location` in that mode.
+        // Same contract as the meetings journey (`flow-meetings-ui-journey`)
+        // and `flow-i18n-locale-switching` ("legacy /en/login collapses").
+        await expect
+            .poll(() => new URL(page.url()).pathname, { timeout: 30_000 })
+            .toMatch(/^\/(en\/)?agents$/);
+        expect(new URL(page.url()).searchParams.get('section')).toBe('custom');
+        await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
     });
 
     test('an API-created draft agent appears as a card with its name, Draft badge, and Workspace scope', async ({
@@ -518,5 +567,54 @@ test.describe('Agent settings — scorecard section', () => {
         await expect(page.getByRole('button', { name: 'Add metric' })).toBeVisible({
             timeout: 15_000,
         });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Agents Chart (/agents/chart) — the org chart with human members stripped
+// ---------------------------------------------------------------------------
+
+test.describe('Agents Chart — /agents/chart', () => {
+    test('renders the chart (or its empty state) and never draws a human member card', async ({
+        page,
+        request,
+    }) => {
+        test.setTimeout(90_000);
+        // Seed an Agent so the chart has something to draw — without one the
+        // page legitimately renders `agents-chart-empty` and the member-count
+        // assertion below would be vacuous.
+        await createSeededAgent(request);
+        await page.goto('/en/agents/chart', { waitUntil: 'domcontentloaded' });
+        await expect(page).not.toHaveURL(/\/login/);
+
+        // Exactly one of the three terminal surfaces must render: no-org,
+        // empty, or the canvas. Which one depends on the shared seeded org's
+        // state, so accept any of them rather than pinning a fixture.
+        const surface = page.locator(
+            '[data-testid="agents-chart-no-org"], [data-testid="agents-chart-empty"], [data-testid="org-chart-canvas"]',
+        );
+        await expect(surface.first()).toBeVisible({ timeout: 30_000 });
+
+        const canvas = page.getByTestId('org-chart-canvas');
+        if (await canvas.isVisible().catch(() => false)) {
+            await expect(page.getByRole('heading', { name: 'Agents Chart' })).toBeVisible();
+            // CONTROL: nodes exist and do carry `data-node-kind`, so the zero
+            // member count below is a real absence and not a selector typo.
+            expect(await page.locator('[data-node-kind]').count()).toBeGreaterThan(0);
+            await expect(page.locator('[data-node-kind="member"]')).toHaveCount(0);
+        }
+    });
+
+    test('the back-link returns to the Agents tab', async ({ page }) => {
+        await page.goto('/en/agents/chart', { waitUntil: 'domcontentloaded' });
+
+        const back = page.getByRole('link', { name: /Back to Agents/ });
+        // The no-org branch renders a different CTA, so only assert the
+        // back-link when the org-scoped page actually rendered.
+        if (await back.isVisible().catch(() => false)) {
+            await expect(back).toHaveAttribute('href', /\/agents$/);
+        } else {
+            await expect(page.getByTestId('agents-chart-no-org')).toBeVisible({ timeout: 30_000 });
+        }
     });
 });

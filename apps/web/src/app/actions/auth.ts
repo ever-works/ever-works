@@ -9,6 +9,7 @@ import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
 import { getRedirectUrl } from '@/lib/auth/redirect';
+import { isEmailUnconfirmed, withUnverifiedEmailNotice } from '@/lib/auth/unverified-email';
 import { classifyResetPasswordError, resetLinkIsDead } from '@/lib/auth/reset-password-error';
 import { OAuthProvider } from '@/lib/api/enums';
 
@@ -276,9 +277,31 @@ export async function register(
         };
     }
 
+    // EW-077: registration signs the new user in immediately, so the account
+    // works right now — and stops working the moment this session ends, when
+    // the password gate (`requireEmailVerification`, H-07) starts refusing
+    // them with "Please verify your email address before signing in". Nothing
+    // used to mark that difference, so a restriction that applied from the
+    // first second surfaced days later looking like a fresh breakage, on a
+    // page that gives no hint the two things are connected.
+    //
+    // Rather than gate here — which would throw away the working session the
+    // API deliberately issued, and take the new-user onboarding on the
+    // dashboard with it — say what is true: you are in, the address is not
+    // confirmed yet, here is what happens if you leave it that way.
+    //
+    // Read from the response the API actually returned rather than assumed:
+    // when `REQUIRE_EMAIL_VERIFICATION=false` (local dev, e2e) or the account
+    // arrives already confirmed, `emailVerified` is not `false` and the notice
+    // correctly stays quiet instead of nagging about a rule that isn't on.
+    let href = ROUTES.DASHBOARD + '?newUser=true';
+    if (isEmailUnconfirmed(authResponse?.user)) {
+        href = withUnverifiedEmailNotice(href);
+    }
+
     redirect({
         locale: await getLocale(),
-        href: ROUTES.DASHBOARD + '?newUser=true',
+        href,
     });
 
     return {
@@ -545,6 +568,36 @@ export async function issueMagicLink(email: string) {
  * the caller is redirected to the dashboard (or the requested
  * `redirectUrl`, when valid). On failure returns an error string so
  * the UI can render a "Send a new link" recovery path.
+ *
+ * ---
+ * EW-080 — why this signs in a user the password tab would refuse.
+ *
+ * The two tabs on the login page apply different rules to the same account.
+ * Password sign-in is gated on `emailVerified` (`requireEmailVerification`,
+ * H-07): register with someone else's address and you must not get a session
+ * out of it. Magic-link sign-in is not gated, and that is deliberate, not an
+ * oversight in the gate.
+ *
+ * H-07 exists to stop an attacker turning "I typed this address" into a
+ * session. A magic link cannot be used that way. `requestMagicLink` only ever
+ * mints a token for an address already on an account, the raw token is never
+ * returned in the HTTP response — it exists solely inside the email body —
+ * and redemption is single-use with a 15-minute TTL. So holding a redeemable
+ * token IS possession of the mailbox. That is the identical proof the
+ * verification link provides; asking someone who just demonstrated it to go
+ * demonstrate it again would be theatre, and it would break the recovery path
+ * for exactly the users who need it: someone locked out by the password gate
+ * can still get in through their inbox.
+ *
+ * So: intentional, and left as-is.
+ *
+ * What was NOT acceptable is that the disagreement was silent. The API does
+ * not set `emailVerified` when a magic link is redeemed, so this session is
+ * live while the account is still, on the record, unconfirmed — and the
+ * password tab will keep refusing the same person, with no explanation
+ * anywhere connecting the two. The notice below makes that state visible and
+ * tells them the one action that clears it (the verification link in their
+ * inbox); the magic-link tab on the login page states the rule up front.
  */
 export async function redeemMagicLink(token: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
@@ -587,6 +640,12 @@ export async function redeemMagicLink(token: string, redirectUrl: string | null)
         href = redirectUrl;
     } else if (authResponse) {
         href = await getRedirectUrl(authResponse, href);
+    }
+
+    // EW-080: signed in, but the address is still unconfirmed on the record —
+    // so the password tab will refuse this same person next time. Say so.
+    if (isEmailUnconfirmed(authResponse?.user)) {
+        href = withUnverifiedEmailNotice(href);
     }
 
     redirect({ locale: await getLocale(), href });

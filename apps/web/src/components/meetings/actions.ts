@@ -27,6 +27,23 @@ async function requireMeetingAuth() {
 
 const MEETINGS_LIST_PATH = '/[locale]/(dashboard)/meetings';
 
+/**
+ * Navigation consolidation (docs/specs/features/navigation-consolidation
+ * §3.7): the Meetings catalog now renders as a block on the **Memory** page
+ * (`/memory#meetings`); `/meetings` itself is only a redirect. So every
+ * catalog invalidation has to hit Memory too — invalidating just
+ * `MEETINGS_LIST_PATH` would bust a page that renders nothing and leave the
+ * page that actually lists meetings holding a stale render. Mirrors the
+ * `revalidatePath('/skills')` + `revalidatePath('/agents')` pairing in
+ * `app/actions/skills.ts`. Both are kept: `/meetings` is still a real route.
+ */
+const MEMORY_PAGE_PATH = '/[locale]/(dashboard)/memory';
+
+function revalidateMeetingsCatalog() {
+    revalidatePath(MEETINGS_LIST_PATH, 'page');
+    revalidatePath(MEMORY_PAGE_PATH, 'page');
+}
+
 function revalidateMeetingDetail(id: string) {
     revalidatePath(`/[locale]/(dashboard)/meetings/${id}`, 'page');
 }
@@ -34,14 +51,14 @@ function revalidateMeetingDetail(id: string) {
 export async function createMeetingAction(input: CreateMeetingInput) {
     await requireMeetingAuth();
     const meeting = await meetingsAPI.create(input);
-    revalidatePath(MEETINGS_LIST_PATH, 'page');
+    revalidateMeetingsCatalog();
     return meeting;
 }
 
 export async function updateMeetingAction(id: string, input: UpdateMeetingInput) {
     await requireMeetingAuth();
     const meeting = await meetingsAPI.update(id, input);
-    revalidatePath(MEETINGS_LIST_PATH, 'page');
+    revalidateMeetingsCatalog();
     revalidateMeetingDetail(id);
     return meeting;
 }
@@ -49,7 +66,7 @@ export async function updateMeetingAction(id: string, input: UpdateMeetingInput)
 export async function deleteMeetingAction(id: string) {
     await requireMeetingAuth();
     await meetingsAPI.remove(id);
-    revalidatePath(MEETINGS_LIST_PATH, 'page');
+    revalidateMeetingsCatalog();
     return { deleted: true as const };
 }
 
@@ -63,7 +80,7 @@ export async function deleteMeetingAction(id: string) {
 export async function ingestMeetingTranscriptAction(id: string, transcriptText: string) {
     await requireMeetingAuth();
     const result = await meetingsAPI.ingestTranscript(id, transcriptText);
-    revalidatePath(MEETINGS_LIST_PATH, 'page');
+    revalidateMeetingsCatalog();
     revalidateMeetingDetail(id);
     return result;
 }

@@ -12,3 +12,7 @@ export * from './generation-cancellation.utils';
 export * from './ssrf-guard';
 export * from './redaction';
 export * from './secret-scan';
+// `isUniqueConstraintError` — services outside this package need it too. It was
+// only reachable via a deep relative import, so `apps/api` could not use it and
+// `organization.service.ts` let a lost slug race escape as a raw 500.
+export * from './db-error.utils';

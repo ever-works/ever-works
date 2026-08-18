@@ -49,17 +49,41 @@ interface MeetingsListProps {
         previousHref: string;
         nextHref: string;
     };
+    /**
+     * Which chrome to draw. `'page'` is the standalone catalog (a
+     * `PageHeader` with the page's single `h1`); `'panel'` is the block
+     * the Memory page embeds — card chrome, an `h2`, and an `id` the
+     * `#meetings` anchor can land on.
+     */
+    variant?: 'page' | 'panel';
+    /**
+     * Page the filter form and the Reset link post back to. Defaults to
+     * the historical `/meetings`; the Memory block passes `/memory`.
+     * Pagination hrefs arrive already built by the caller.
+     */
+    basePath?: string;
+    /** Anchor appended to `basePath` so a filter submit re-lands on the block. */
+    hash?: string;
+    /** Optional one-liner from the host page, shown above the connect hint. */
+    hint?: string;
 }
 
 /**
- * Meetings — `/meetings` catalog list client. Grid of MeetingCards with
- * source + Work filters and a "+ New meeting" CTA routing to the
- * dedicated capture form. Load failures are surfaced explicitly so a
- * flaky API never masquerades as an empty meeting history (same
- * contract as `GoalsList`).
+ * Meetings — the catalog list client. Grid of MeetingCards with source +
+ * Work filters and a "+ New meeting" CTA routing to the dedicated
+ * capture form. Load failures are surfaced explicitly so a flaky API
+ * never masquerades as an empty meeting history (same contract as
+ * `GoalsList`).
  *
  * The filter form is a plain GET form (no client router push), so the
  * filtered view is a real, shareable URL and works before hydration.
+ *
+ * Two chromes, one body: navigation consolidation moved the catalog off
+ * `/meetings` and onto the Memory page as a block, so the same component
+ * renders either the standalone page or the embedded panel rather than
+ * the panel being a divergent copy
+ * (docs/specs/features/navigation-consolidation). Every `data-testid` is
+ * shared by both, so the e2e journey only had to change its URLs.
  */
 export function MeetingsList({
     meetings,
@@ -67,6 +91,10 @@ export function MeetingsList({
     loadError = null,
     filters,
     pagination,
+    variant = 'page',
+    basePath = '/meetings',
+    hash = '',
+    hint,
 }: MeetingsListProps) {
     const t = useTranslations('dashboard.meetingsPage');
     const [sourceFilter, setSourceFilter] = useState<string>(filters?.source ?? '');
@@ -79,21 +107,12 @@ export function MeetingsList({
         setWorkFilter(filters?.workId ?? '');
     }, [filters?.workId]);
 
-    return (
-        <div className="w-full" data-testid="meetings-shell">
-            <PageHeader
-                icon={Video}
-                title={t('title')}
-                subtitle={t('subtitle')}
-                tone="info"
-                actions={
-                    <Button href="/meetings/new" size="sm">
-                        <Plus className="h-4 w-4" />
-                        <span className="font-medium">{t('newMeeting')}</span>
-                    </Button>
-                }
-            />
+    const isPanel = variant === 'panel';
+    /** Where "apply filters" and "reset" land — the host page, re-anchored. */
+    const catalogHref = `${basePath}${hash}`;
 
+    const body = (
+        <>
             {/*
                 Connect affordance: provider-synced meetings (Zoom
                 recordings, Google Meet transcripts picked up by the
@@ -111,7 +130,17 @@ export function MeetingsList({
                 </Link>
             </p>
 
-            <form className="mb-5 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">
+            {/*
+                The panel is embedded in a page that owns a different URL,
+                so the GET form needs an explicit action — without one the
+                browser would post the filters back to `/memory` and drop
+                the `#meetings` anchor, scrolling the user to the top.
+                The standalone page keeps no action (submits to itself).
+            */}
+            <form
+                action={isPanel ? catalogHref : undefined}
+                className="mb-5 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end"
+            >
                 <div className="min-w-40">
                     <span className="mb-1 block text-xs text-text-secondary dark:text-text-secondary-dark">
                         {t('filterBar.source')}
@@ -163,7 +192,7 @@ export function MeetingsList({
                     <Button type="submit" size="sm">
                         {t('filterBar.apply')}
                     </Button>
-                    <Button href="/meetings" size="sm" variant="ghost">
+                    <Button href={catalogHref} size="sm" variant="ghost">
                         {t('filterBar.reset')}
                     </Button>
                 </div>
@@ -248,6 +277,69 @@ export function MeetingsList({
                     </div>
                 </nav>
             ) : null}
+        </>
+    );
+
+    if (isPanel) {
+        return (
+            <section
+                id="meetings"
+                data-testid="meetings-shell"
+                className="w-full scroll-mt-6 rounded-lg border border-card-border bg-card p-4 dark:border-white/9 dark:bg-card-primary-dark sm:p-5"
+            >
+                {/* Compact header — the host page owns the h1, so the block
+                    announces itself with an h2 and a smaller icon tile. */}
+                <div className="mb-5 flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-info/20 bg-info/10">
+                            <Video className="h-4 w-4 text-info" />
+                        </span>
+                        <div className="min-w-0">
+                            <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                                {t('title')}
+                            </h2>
+                            <p className="mt-0.5 max-w-2xl text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('subtitle')}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="shrink-0">
+                        <Button href="/meetings/new" size="sm">
+                            <Plus className="h-4 w-4" />
+                            <span className="font-medium">{t('newMeeting')}</span>
+                        </Button>
+                    </div>
+                </div>
+
+                {hint ? (
+                    <p
+                        data-testid="meetings-panel-hint"
+                        className="mb-4 text-xs text-text-muted dark:text-text-muted-dark"
+                    >
+                        {hint}
+                    </p>
+                ) : null}
+
+                {body}
+            </section>
+        );
+    }
+
+    return (
+        <div className="w-full" data-testid="meetings-shell">
+            <PageHeader
+                icon={Video}
+                title={t('title')}
+                subtitle={t('subtitle')}
+                tone="info"
+                actions={
+                    <Button href="/meetings/new" size="sm">
+                        <Plus className="h-4 w-4" />
+                        <span className="font-medium">{t('newMeeting')}</span>
+                    </Button>
+                }
+            />
+            {body}
         </div>
     );
 }

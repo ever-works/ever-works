@@ -138,6 +138,9 @@ export async function installAndBindSkillAction(
     revalidatePath(`/agents/${agentId}/capabilities`);
     revalidatePath(`/agents/${agentId}/skills`);
     revalidatePath('/skills');
+    // Navigation consolidation: the Skills catalog is also a block on the
+    // Agents tab, so a freshly installed Skill has to invalidate `/agents` too.
+    revalidatePath('/agents');
     return { skill, binding };
 }
 

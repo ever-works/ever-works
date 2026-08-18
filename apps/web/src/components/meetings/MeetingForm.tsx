@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
+import { ROUTES } from '@/lib/constants';
 import {
     MEETING_CREATABLE_SOURCES,
     MEETING_EXTERNAL_ID_MAX_CHARS,
@@ -152,8 +153,10 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
     return (
         <div className="mx-auto w-full max-w-3xl space-y-6 p-6" data-testid="meeting-form">
             <div>
+                {/* Back to the catalog — which is the Memory page's
+                    `#meetings` block since the navigation consolidation. */}
                 <Link
-                    href="/meetings"
+                    href={ROUTES.DASHBOARD_MEMORY_MEETINGS}
                     className="inline-flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text dark:text-text-muted-dark dark:hover:text-text-dark"
                 >
                     <ChevronLeft className="h-3.5 w-3.5" />
@@ -332,7 +335,7 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
             {/* Cancel then submit, secondary beside primary — the pairing the
                 edit dialog's footer uses, so the two forms end the same way. */}
             <div className="flex items-center justify-end gap-2">
-                <Button href="/meetings" variant="secondary" size="sm">
+                <Button href={ROUTES.DASHBOARD_MEMORY_MEETINGS} variant="secondary" size="sm">
                     {t('actions.cancel')}
                 </Button>
                 <Button
