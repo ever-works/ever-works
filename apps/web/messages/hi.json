@@ -85,6 +85,7 @@
             },
             "magicLink": {
                 "subtitle": "We'll email you a one-time link to sign in. No password needed.",
+                "worksWhenUnverified": "Opening the link proves you own the address, so this works even if you haven't confirmed your email yet.",
                 "form": {
                     "submit": "Send magic link",
                     "submitting": "Sending..."
@@ -101,6 +102,7 @@
                     "title": "Signing you in",
                     "loading": "Verifying your magic link...",
                     "errorTitle": "This link can't be used",
+                    "errorSubtitle": "We couldn't sign you in with that link.",
                     "errorBody": "Your magic link is invalid or has expired. Magic links can only be used once and stay valid for 15 minutes.",
                     "requestNewLink": "Send a new link",
                     "missingToken": "This magic link is missing a token. Request a new one to continue."
@@ -710,6 +712,7 @@
             "emailVerification": {
                 "title": "अपना ईमेल सत्यापित करें",
                 "description": "हमने आपके ईमेल पते पर सत्यापन लिंक भेज दिया है। कृपया अपना इनबॉक्स और स्पैम फोल्डर जांचें।",
+                "pendingDescription": "You can keep using your account now, but you'll need to confirm this address before you can sign in again. We've emailed you a link — check your inbox and spam folder, or resend it from Profile settings.",
                 "action": "ईमेल पुनः भेजें"
             },
             "verified": {

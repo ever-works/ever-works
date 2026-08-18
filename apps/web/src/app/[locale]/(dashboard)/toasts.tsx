@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { APP_NAME } from '@/lib/constants';
 import { OAuthProvider } from '@/lib/api/enums';
+import { VERIFY_EMAIL_PARAM, VERIFY_EMAIL_REQUIRED } from '@/lib/auth/unverified-email';
 
 export default function DashboardToasts() {
     const searchParams = useSearchParams();
@@ -13,6 +14,10 @@ export default function DashboardToasts() {
 
     const isNewUser = searchParams.get('newUser') === 'true';
     const isVerified = searchParams.get('verified') === 'true';
+    // EW-077 / EW-080: set by `register` and `redeemMagicLink` when the session
+    // they just minted belongs to an address nobody has confirmed yet.
+    const isEmailUnconfirmed =
+        searchParams.get(VERIFY_EMAIL_PARAM) === VERIFY_EMAIL_REQUIRED && !isVerified;
     const isOAuthConnected = searchParams.get('oauth_connected') === 'true';
     const oauthError = searchParams.get('oauth_error');
     // Security: validate oauth_provider against a known allow-list before
@@ -49,17 +54,29 @@ export default function DashboardToasts() {
                     </svg>
                 ),
             });
+        }
 
-            // Show email verification reminder
-            toast.info(t('emailVerification.title'), {
-                description: t('emailVerification.description'),
-                duration: 8000,
-                // action: {
-                //     label: t('emailVerification.action'),
-                //     onClick: () => {
-                //         window.location.href = '/resend-verification';
-                //     },
-                // },
+        // EW-077 / EW-080: the honest version of the old reminder.
+        //
+        // This used to fire inside the `isNewUser` branch above, unconditionally
+        // and with no idea whether the address actually needed confirming — so
+        // it told people to check their inbox even when the deployment does not
+        // require verification at all. Worse, it described only the email
+        // ("we've sent a link, check your spam folder") and never the part that
+        // matters: that this session keeps working, and the NEXT one will not.
+        // That omission is the whole of EW-077 — the gate looked like a new
+        // failure days later because nothing ever announced it.
+        //
+        // Now it fires on the actual state reported by the API, says what
+        // happens next, and does not auto-dismiss: a 4-second toast is not a
+        // reasonable way to deliver "you will be locked out later". The
+        // matching persistent banner (with a working Resend button) lives in
+        // profile settings, which is where the copy points.
+        if (isEmailUnconfirmed) {
+            toast.warning(t('emailVerification.title'), {
+                description: t('emailVerification.pendingDescription'),
+                duration: Infinity,
+                closeButton: true,
             });
         }
 
@@ -111,7 +128,7 @@ export default function DashboardToasts() {
         }
 
         // Clean up URL after showing toasts
-        if (isNewUser || isVerified || isOAuthConnected || oauthError) {
+        if (isNewUser || isVerified || isOAuthConnected || oauthError || isEmailUnconfirmed) {
             const timer = setTimeout(() => {
                 // Remove query params without page refresh
                 const url = new URL(window.location.href);
@@ -120,12 +137,13 @@ export default function DashboardToasts() {
                 url.searchParams.delete('oauth_connected');
                 url.searchParams.delete('oauth_error');
                 url.searchParams.delete('oauth_provider');
+                url.searchParams.delete(VERIFY_EMAIL_PARAM);
                 window.history.replaceState({}, '', url.pathname + url.search);
             }, 1000);
 
             return () => clearTimeout(timer);
         }
-    }, [isNewUser, isVerified, isOAuthConnected, oauthError, providerLabel, t]);
+    }, [isNewUser, isVerified, isOAuthConnected, oauthError, isEmailUnconfirmed, providerLabel, t]);
 
     return null; // This component doesn't render anything
 }
