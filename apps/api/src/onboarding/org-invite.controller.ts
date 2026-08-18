@@ -6,7 +6,6 @@ import {
     HttpCode,
     HttpStatus,
     Post,
-    Query,
     UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -67,16 +66,29 @@ export class OrgInviteController {
      * there is no signed-in user yet, and this grants nothing.
      */
     @Public()
-    @Get('preview')
+    // 🛑 POST, not GET, even though this is a read.
+    //
+    // A GET puts the token in the URL, and this repo persists URLs in two
+    // places: `logging.interceptor.ts` logs `Incoming Request: ${method}
+    // ${originalUrl}` (forwarded on as $log events), and Sentry attaches
+    // `event.request.url` — query string included — to transaction events.
+    // Sentry's scrubber only matches pathnames under `/auth`, so this route
+    // would not be covered.
+    //
+    // That would defeat the entire design: the database stores only
+    // sha256(token) precisely so the plaintext lives in exactly one place, the
+    // email. A request BODY is captured by neither of those two paths.
+    @Post('preview')
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     @ApiOperation({
         summary: 'Preview an organization invitation without consuming it',
-        description: 'Public. 400 if expired or already accepted, 403 if revoked, 404 if unknown.',
+        description:
+            'Public, and a POST only so the token stays out of URLs and logs. 400 if expired or already accepted, 403 if revoked, 404 if unknown.',
     })
     @ApiResponse({ status: 200, description: 'Invitation preview' })
-    async preview(@Query('token') token: string): Promise<OrgInvitePreviewResponse> {
-        const invitation = await this.invitations.findConsumable(token ?? '');
+    async preview(@Body() dto: AcceptOrgInviteDto): Promise<OrgInvitePreviewResponse> {
+        const invitation = await this.invitations.findConsumable(dto.token ?? '');
         const organization = await this.organizations.findById(invitation.organizationId);
         if (!organization) {
             throw new BadRequestException('organization_no_longer_exists');

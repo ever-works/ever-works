@@ -57,10 +57,14 @@ export const orgInviteAPI = {
      * cookie.
      */
     async preview(token: string): Promise<OrgInvitePreview> {
-        return serverFetch<OrgInvitePreview>(
-            `/org-invite/preview?token=${encodeURIComponent(token)}`,
-            { method: 'GET' },
-        );
+        // POST for a read, deliberately: a GET would put the token in the URL,
+        // where the API's request logger and Sentry both capture it.
+        return serverMutation<OrgInvitePreview>({
+            endpoint: '/org-invite/preview',
+            method: 'POST',
+            data: { token },
+            wrapInData: false,
+        });
     },
 
     /** Redeem as the signed-in user. Requires a session. */

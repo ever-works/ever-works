@@ -75,7 +75,7 @@ describe('OrgInviteController', () => {
     describe('preview (public)', () => {
         it('MASKS the invited address', async () => {
             const { controller } = build();
-            const res = await controller.preview('t'.repeat(64));
+            const res = await controller.preview({ token: 't'.repeat(64) });
 
             expect(res.invitedEmailMasked).toBe('n***@example.com');
             // The whole address must not appear anywhere in the payload.
@@ -86,13 +86,13 @@ describe('OrgInviteController', () => {
             const { controller } = build({
                 invitation: makeInvitation({ email: 'a@example.com' }),
             });
-            const res = await controller.preview('t'.repeat(64));
+            const res = await controller.preview({ token: 't'.repeat(64) });
             expect(res.invitedEmailMasked).toBe('*@example.com');
         });
 
         it('does not consume the invitation', async () => {
             const { controller, invitations } = build();
-            await controller.preview('t'.repeat(64));
+            await controller.preview({ token: 't'.repeat(64) });
             expect(invitations.tryAccept).not.toHaveBeenCalled();
         });
 
@@ -101,7 +101,7 @@ describe('OrgInviteController', () => {
             // Acme" before they have an account. Passing an address here would
             // make the preview 403 for exactly the people it exists to serve.
             const { controller, invitations } = build();
-            await controller.preview('t'.repeat(64));
+            await controller.preview({ token: 't'.repeat(64) });
 
             expect(invitations.findConsumable).toHaveBeenCalledTimes(1);
             expect(invitations.findConsumable.mock.calls[0][1]).toBeUndefined();
@@ -109,17 +109,21 @@ describe('OrgInviteController', () => {
 
         it('returns the organization display name, falling back to the slug', async () => {
             const named = build();
-            expect((await named.controller.preview('t')).organizationName).toBe('Acme Inc');
+            expect((await named.controller.preview({ token: 't' })).organizationName).toBe(
+                'Acme Inc',
+            );
 
             const unnamed = build({
                 organization: { id: 'org-1', slug: 'acme', displayName: null },
             });
-            expect((await unnamed.controller.preview('t')).organizationName).toBe('acme');
+            expect((await unnamed.controller.preview({ token: 't' })).organizationName).toBe(
+                'acme',
+            );
         });
 
         it('400s when the Organization has been deleted since the invite', async () => {
             const { controller } = build({ organization: null });
-            await expect(controller.preview('t')).rejects.toThrow(BadRequestException);
+            await expect(controller.preview({ token: 't' })).rejects.toThrow(BadRequestException);
         });
 
         it('passes an empty string rather than undefined for a missing token', async () => {
@@ -127,7 +131,7 @@ describe('OrgInviteController', () => {
             // coercion keeps that path deterministic instead of relying on
             // whatever the query parser produced.
             const { controller, invitations } = build();
-            await controller.preview(undefined as unknown as string);
+            await controller.preview({ token: undefined } as never);
             expect(invitations.findConsumable).toHaveBeenCalledWith('');
         });
     });
