@@ -18,6 +18,8 @@ import { WorkModule } from '@ever-works/agent/services';
 // the whole app) is what gives this module the provider without
 // duplicating the template catalog wiring here.
 import { AgentsModule as AgentDomainAgentsModule } from '@ever-works/agent/agents';
+import { OrganizationsModule } from '../organizations/organizations.module';
+import { OrgInviteController } from './org-invite.controller';
 import { OnboardingController } from './onboarding.controller';
 import { OnboardingService } from './onboarding.service';
 import { OnboardingTerminalService } from './onboarding-terminal.service';
@@ -43,6 +45,9 @@ import { UsersModule } from '../users/users.module';
         AuthModule,
         UsersModule,
         AgentDomainAgentsModule,
+        // The org-invite accept route reuses OrganizationInvitationFlowService,
+        // which OrganizationsModule owns and exports.
+        OrganizationsModule,
     ],
     controllers: [
         OnboardingController,
@@ -53,6 +58,10 @@ import { UsersModule } from '../users/users.module';
         OnboardingCatalogController,
         OnboardingTelemetryController,
         OnboardingSuggestionsController,
+        // Public preview + authenticated accept for organization invitations.
+        // Lives here rather than on the api/organizations/:orgId family, whose
+        // guard requires the membership the invitee does not have yet.
+        OrgInviteController,
     ],
     providers: [
         OnboardingService,

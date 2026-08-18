@@ -117,6 +117,11 @@ import { WorkRegisteredListener } from './work-registered.listener';
         // expose findById through the remote-proxy controller for
         // the worker-host resolveForOrganization path.
         OrganizationRepository,
+        // Consumed by OnboardingModule's OrgInviteController: the accept
+        // route cannot live on the :orgId family, whose guard requires the
+        // membership the invitee does not have yet.
+        OrganizationInvitationFlowService,
+        OrganizationInvitationService,
     ],
 })
 export class OrganizationsModule {}
