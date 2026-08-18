@@ -15,6 +15,15 @@ documents that model — what an Organization is, how membership and
 ownership are enforced, the register-company flow, slug rules, and how
 Organizations relate to platform admins and per-work isolation.
 
+:::note Where to find it
+**Sidebar → Teams** is the hub for both halves of your organization — people
+and Agents. It opens on the **Teams** tab (the teams below, plus the **Org
+Chart** covering humans _and_ agents); the other tabs are **Agents** (the
+Agent catalog, its **Agents Chart** at `/agents/chart` — the same tree with
+human members stripped — and the **Skills** block), **Sessions** and
+**Archived**. Organizations themselves are still managed under Settings.
+:::
+
 :::note Two isolation layers
 This page covers the **account/Tenant/Organization** scope. A separate,
 finer-grained layer scopes content _inside_ a single Work via

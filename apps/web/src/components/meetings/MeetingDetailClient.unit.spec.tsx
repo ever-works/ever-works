@@ -114,8 +114,10 @@ describe('MeetingDetailClient — header', () => {
         // row and once as the Details "source" row value.
         expect(screen.getAllByTestId('meeting-source-badge')).toHaveLength(2);
         expect(screen.getByTestId('meeting-transcript-badge')).toBeTruthy();
+        // The catalog is the Memory page's `#meetings` block since the
+        // navigation consolidation — `/meetings` only redirects there.
         expect(screen.getByText('backToMeetings').closest('a')?.getAttribute('href')).toBe(
-            '/meetings',
+            '/memory#meetings',
         );
     });
 
@@ -160,7 +162,7 @@ describe('MeetingDetailClient — delete', () => {
         fireEvent.click(screen.getByTestId('meeting-delete-confirm'));
 
         await waitFor(() => expect(deleteMock).toHaveBeenCalledWith('mtg-1'));
-        await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/meetings'));
+        await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/memory#meetings'));
     });
 
     it('a failed delete surfaces the error inline and stays on the page', async () => {

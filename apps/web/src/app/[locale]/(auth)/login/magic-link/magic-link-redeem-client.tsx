@@ -52,11 +52,24 @@ export function MagicLinkRedeemClient() {
         '?tab=magic-link' +
         (redirectUrl ? `&${REDIRECT_SEARCH_PARAM}=${encodeURIComponent(redirectUrl)}` : '');
 
+    // EW-081: the page header was hardcoded to the in-progress copy — "Signing
+    // you in" / "Verifying your magic link..." — and stayed there after the
+    // redemption failed. The two halves of the screen then said opposite
+    // things: the banner explained the link could not be used while the
+    // heading above it still claimed a sign-in was under way. On a page whose
+    // whole job is to report the outcome of one action, the largest text on it
+    // was the one part that never reflected that outcome. Derive both from the
+    // same state the body renders from, so they cannot disagree.
+    const isLoading = state.status === 'loading';
+
     return (
-        <AuthLayout title={t('title')} subtitle={t('loading')}>
+        <AuthLayout
+            title={isLoading ? t('title') : t('errorTitle')}
+            subtitle={isLoading ? t('loading') : t('errorSubtitle')}
+        >
             <ThemeToggle variant="fixed" />
 
-            {state.status === 'loading' && (
+            {isLoading && (
                 <div
                     data-testid="magic-link-loading"
                     className="flex items-center justify-center py-8"
@@ -67,11 +80,14 @@ export function MagicLinkRedeemClient() {
                 </div>
             )}
 
-            {state.status !== 'loading' && (
+            {!isLoading && (
                 <div data-testid="magic-link-error" className="space-y-4">
                     <div className="bg-danger/10 border border-danger/20 px-4 py-3 rounded-lg space-y-2">
-                        <p className="text-sm font-medium text-danger">{t('errorTitle')}</p>
-                        <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                        {/* `errorTitle` moved up into the page heading (EW-081);
+                            repeating it here would just say the same sentence
+                            twice. The box keeps the part the heading cannot
+                            carry — WHY this particular link was refused. */}
+                        <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                             {state.status === 'missing-token' ? t('missingToken') : state.message}
                         </p>
                     </div>

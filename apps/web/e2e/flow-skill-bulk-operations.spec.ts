@@ -70,7 +70,8 @@ async function createOwnedWorkId(request: APIRequestContext, token: string): Pro
  * registerUserViaAPI() users with unique titles (Date.now suffix). Counts are
  * asserted against this run's own private dataset (a fresh user starts empty),
  * so exact equality is safe here. The seeded storageState user is used ONLY
- * for the one UI-driven assertion. Routes are unprefixed (/skills, /skills/:id).
+ * for the one UI-driven assertion. Routes are unprefixed (/agents#skills for
+ * the catalog block, /skills/:id for the detail page).
  */
 
 const BULK = 12;
@@ -674,16 +675,19 @@ test.describe('Skills — bulk operations + at-scale list semantics', () => {
     });
 
     /**
-     * Flow 7 (UI) — A bulk-created skill is discoverable on the /skills hub for the
-     * seeded user, with its slug + version chip, and its detail page resolves.
+     * Flow 7 (UI) — A bulk-created skill is discoverable in the Skills block on
+     * the Agents tab for the seeded user, with its slug + version chip, and its
+     * detail page resolves.
      *
      * Uses the SEEDED storageState user (UI-driven). Creates a uniquely-titled
-     * skill via the seeded user's API token, loads /skills (the Installed section
-     * server-fetches up to 50 rows), asserts the title + slug render, then opens
-     * the detail page and confirms the title shows there too. Resilient to
-     * next-dev local/CI route divergence via .or() fallbacks.
+     * skill via the seeded user's API token, loads `/agents#skills` (navigation
+     * consolidation: the catalog is a block there now and `/skills` only
+     * redirects to it; the Installed section still server-fetches up to 50
+     * rows), asserts the title + slug render, then opens the detail page and
+     * confirms the title shows there too. Resilient to next-dev local/CI route
+     * divergence via .or() fallbacks.
      */
-    test('UI: a bulk-created skill surfaces on the /skills hub and its detail page', async ({
+    test('UI: a bulk-created skill surfaces in the Agents tab Skills block and its detail page', async ({
         page,
         request,
         baseURL,
@@ -711,7 +715,8 @@ test.describe('Skills — bulk operations + at-scale list semantics', () => {
         });
 
         const origin = baseURL ?? 'http://localhost:3000';
-        await page.goto(`${origin}/skills`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${origin}/agents#skills`, { waitUntil: 'domcontentloaded' });
+        await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
 
         // Title may render in the Installed grid. Tolerate ordering / dev hydration.
         // The card renders BOTH the title (<h3>) and slug (<span.font-mono>), so the

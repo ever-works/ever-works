@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Bot, Plus } from 'lucide-react';
+import { Bot, Network, Plus } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
-import { useRouter } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import {
     PromptComposer,
     buildAttachmentRefs,
@@ -36,6 +36,22 @@ const PROMPT_INPUT_ID = 'agents-prompt';
 
 /** Agent-flavoured placeholder cycle — mirrors the agent examples used
  *  by the unified `/new` page so the surfaces feel like one primitive. */
+/**
+ * Secondary-button chrome for the header's "Agents Chart" link. A plain
+ * `<Link>` rather than `<Button href>` on purpose: the Button's href branch
+ * renders a `LinkComponent` with an explicit prop list (href/className/
+ * target/rel/children) and therefore drops every extra prop — including the
+ * `data-testid` the e2e journey and the unit spec below select the CTA by.
+ * Classes mirror `<Button variant="secondary" size="sm">` so the two controls
+ * are visually identical; the same idiom is used on the Teams page.
+ */
+const CHART_LINK_CLASSES =
+    'inline-flex cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-colors ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 dark:focus-visible:ring-white/20 [&_svg]:shrink-0 ' +
+    'h-8 px-3 text-xs border border-border dark:border-border-dark ' +
+    'bg-button-primary dark:bg-button-primary-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark ' +
+    'text-button-primary-foreground dark:text-button-primary-foreground-dark';
+
 const AGENT_PLACEHOLDERS: ReadonlyArray<string> = [
     'e.g. "Research assistant that fetches AI safety papers and summarizes them weekly"',
     'e.g. "Content editor that rewrites our directory descriptions in a consistent voice"',
@@ -97,7 +113,25 @@ export function AgentsList({ agents, templates = [], userTemplates = [] }: Agent
 
     return (
         <div className="w-full">
-            <PageHeader icon={Bot} title={t('title')} subtitle={t('subtitle')} tone="agent" />
+            <PageHeader
+                icon={Bot}
+                title={t('title')}
+                subtitle={t('subtitle')}
+                tone="agent"
+                actions={
+                    /* Navigation consolidation §3.6 — the Agents Chart is the
+                       agent-only view of the org chart (human members stripped),
+                       and this header CTA is its only entry point. */
+                    <Link
+                        href={ROUTES.DASHBOARD_AGENTS_CHART}
+                        data-testid="agents-chart-link"
+                        className={CHART_LINK_CLASSES}
+                    >
+                        <Network className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
+                        {t('agentsChartCta')}
+                    </Link>
+                }
+            />
 
             {/* Prompt-first surface — describe the Agent you want. Chips
                 with quick-pick templates + `View All` render below the

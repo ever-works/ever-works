@@ -8,6 +8,7 @@ jest.mock('@ever-works/contracts/api', () => ({
 }));
 
 import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { OrganizationService } from '../organization.service';
 
 /**
@@ -26,8 +27,17 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
         orgCountByTenant?: number;
         tenantId?: string;
         existingLinkedOrg?: (Org & { linkedWorkId?: string | null }) | null;
+        /**
+         * Make the organizations INSERT lose a slug race this many times
+         * before succeeding. Defaults to 0, so every existing test is
+         * unaffected.
+         */
+        slugRaceLosses?: number;
+        /** Throw this from the organizations INSERT instead of succeeding. */
+        saveError?: Error;
     }) {
         const queryLog: QueryRecord[] = [];
+        let remainingRaceLosses = opts.slugRaceLosses ?? 0;
 
         const userRepository = {
             findById: jest.fn().mockResolvedValue(opts.user ?? null),
@@ -61,12 +71,37 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
                 if (target === 'organizations') {
                     return {
                         create: jest.fn((data) => ({ ...data, id: 'o-new' })),
-                        save: jest.fn(async (org) => ({
-                            ...org,
-                            id: 'o-new',
-                            createdAt: new Date('2026-01-01'),
-                            updatedAt: new Date('2026-01-01'),
-                        })),
+                        save: jest.fn(async (org) => {
+                            if (opts.saveError) {
+                                throw opts.saveError;
+                            }
+                            if (remainingRaceLosses > 0) {
+                                remainingRaceLosses -= 1;
+                                // What Postgres actually returns when a
+                                // concurrent INSERT already took the slug:
+                                // SQLSTATE 23505. Constructed as a REAL
+                                // QueryFailedError because that is what
+                                // `isUniqueConstraintError` narrows on — a
+                                // hand-rolled `{ code: '23505' }` would slip
+                                // past the guard and prove nothing.
+                                throw new QueryFailedError(
+                                    'INSERT INTO "organizations" ...',
+                                    [],
+                                    Object.assign(
+                                        new Error(
+                                            'duplicate key value violates unique constraint "UQ_organizations_slug"',
+                                        ),
+                                        { code: '23505' },
+                                    ) as never,
+                                );
+                            }
+                            return {
+                                ...org,
+                                id: 'o-new',
+                                createdAt: new Date('2026-01-01'),
+                                updatedAt: new Date('2026-01-01'),
+                            };
+                        }),
                     };
                 }
                 if (target === 'users') {
@@ -132,6 +167,67 @@ describe('OrganizationService (EW-658 Phase 6)', () => {
             await expect(service.createOrganization('u-1', 'x'.repeat(201))).rejects.toBeInstanceOf(
                 ConflictException,
             );
+        });
+
+        // ── Slug race (the intermittent 500 in flow-idempotency-concurrency) ──
+        //
+        // `allocateUsername` reserves nothing, so between "this slug is free"
+        // and the INSERT another request can take it. The UNIQUE index on
+        // `organizations.slug` then rejects the loser, and that violation used
+        // to reach the client as HTTP 500.
+
+        it('re-allocates and still succeeds when a concurrent create steals the slug', async () => {
+            const { service, usernameAllocator } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+                slugRaceLosses: 1,
+            });
+
+            // No throw: losing a race is not the caller's problem. The slug is
+            // DERIVED from the name, so the right answer is the next free one
+            // and a normal success — exactly what they'd have got a second later.
+            const org = await service.createOrganization('u-1', 'Acme Inc.');
+
+            expect(org.id).toBe('o-new');
+            // Allocated twice: the retry asks again, so attempt 2 sees the
+            // winner's row and picks a different candidate.
+            expect(usernameAllocator.allocateUsername).toHaveBeenCalledTimes(2);
+        });
+
+        it('gives up after repeated slug races rather than retrying forever', async () => {
+            const { service, usernameAllocator } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+                slugRaceLosses: 99,
+            });
+
+            // Bounded at 4 attempts. Losing four consecutive races is not
+            // concurrency any more, so the error surfaces instead of the
+            // request hanging in a retry loop.
+            await expect(service.createOrganization('u-1', 'Acme Inc.')).rejects.toBeInstanceOf(
+                QueryFailedError,
+            );
+            expect(usernameAllocator.allocateUsername).toHaveBeenCalledTimes(4);
+        });
+
+        it('does NOT retry an error that is not a unique-constraint violation', async () => {
+            const { service, usernameAllocator } = makeService({
+                user: { id: 'u-1', tenantId: 't-1', lastScopeOrganizationId: null },
+                // A NOT-NULL violation is a bug, not a lost race. Retrying it
+                // would repeat the same failure three more times, turn one log
+                // line into four, and delay the real error reaching anyone.
+                saveError: new QueryFailedError(
+                    'INSERT INTO "organizations" ...',
+                    [],
+                    Object.assign(new Error('null value in column "displayName"'), {
+                        code: '23502',
+                    }) as never,
+                ),
+            });
+
+            await expect(service.createOrganization('u-1', 'Acme Inc.')).rejects.toBeInstanceOf(
+                QueryFailedError,
+            );
+            // Allocated exactly once — the error propagated on the first attempt.
+            expect(usernameAllocator.allocateUsername).toHaveBeenCalledTimes(1);
         });
 
         it('lazy-creates Tenant, allocates slug, inserts Org, runs backfill', async () => {

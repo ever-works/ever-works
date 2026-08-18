@@ -21,6 +21,8 @@ import {
 import { Link } from '@/i18n/navigation';
 import { teamsAPI, type Team } from '@/lib/api/teams';
 import { PageHeader } from '@/components/common/PageHeader';
+import { TeamsPageTabs } from '@/components/agents/AgentsPageTabs';
+import { HumanAgentIcon } from '@/components/icons/HumanAgentIcon';
 import { ROUTES } from '@/lib/constants';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,6 +36,14 @@ export async function generateMetadata(): Promise<Metadata> {
  * renders the create-first-org empty state, else `orgs[0]` is the
  * active org. The team list fetch is defensive (`.catch`) so a flaky
  * API renders the empty state instead of a 500.
+ *
+ * Navigation consolidation (`docs/specs/features/navigation-consolidation`
+ * §3.4): this is now **tab 1 of the Teams hub** — Teams | Agents | Sessions
+ * | Archived — reached from the single merged "Teams" sidebar entry. Both
+ * return branches (no-org and the list) render the strip, and the page-local
+ * `p-6 max-w-screen-2xl mx-auto` wrapper gave way to the `w-full` the other
+ * hub tabs use so the four tabs line up at the same width. The URL, the
+ * content and every test id are unchanged.
  */
 
 /**
@@ -73,7 +83,8 @@ export default async function TeamsPage() {
 
     if (orgs.length === 0) {
         return (
-            <div className="p-6 max-w-screen-2xl mx-auto">
+            <div className="w-full">
+                <TeamsPageTabs active="teams" />
                 <div
                     data-testid="teams-no-org"
                     className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-10 flex flex-col items-center text-center gap-3"
@@ -100,9 +111,13 @@ export default async function TeamsPage() {
     const teamById = new Map(teams.map((team) => [team.id, team]));
 
     return (
-        <div className="p-6 max-w-screen-2xl mx-auto">
+        <div className="w-full">
+            <TeamsPageTabs active="teams" />
+            {/* The hub icon is the merged human+agent glyph — a Team here is
+                people AND agents, the same thing the sidebar entry promises.
+                `Users` stays the glyph for team cards and empty states. */}
             <PageHeader
-                icon={Users}
+                icon={HumanAgentIcon}
                 title={t('title')}
                 subtitle={t('subtitle')}
                 actions={

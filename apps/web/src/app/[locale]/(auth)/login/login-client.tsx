@@ -281,6 +281,22 @@ export function LoginClient({ availableSocialProviders, magicLinkEnabled }: Logi
                         {t('magicLink.subtitle')}
                     </p>
 
+                    {/* EW-080: these two tabs apply different rules to the same
+                        account — password sign-in is refused until the address
+                        is confirmed, a magic link is not (opening a link that
+                        only ever went to that mailbox IS the proof; see
+                        `redeemMagicLink`). That is intended, but it used to be
+                        invisible: someone turned away by "Please verify your
+                        email address before signing in" had no way to know the
+                        tab beside it would let them in. Stating it here is what
+                        stops the two from silently disagreeing. */}
+                    <p
+                        data-testid="magic-link-unverified-note"
+                        className="text-xs text-text-muted dark:text-text-muted-dark"
+                    >
+                        {t('magicLink.worksWhenUnverified')}
+                    </p>
+
                     {magicLinkSentTo ? (
                         <MagicLinkSuccessMessage
                             email={magicLinkSentTo}
