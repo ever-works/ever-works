@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { TenantRepository, UserRepository } from '@ever-works/agent/database';
 import type { Tenant } from '@ever-works/agent/entities';
 import { UsernameAllocatorService } from '../users/services/username-allocator.service';
@@ -28,6 +28,12 @@ import { UsernameAllocatorService } from '../users/services/username-allocator.s
  * routing today; the user-facing scope label is the User's slug for
  * the bare-Tenant surface and the Org's slug for org scopes.)
  */
+/**
+ * What `joinTenant` did. `already_member` is the idempotent case — a
+ * second redemption of the same invitation must not look like a failure.
+ */
+export type JoinTenantOutcome = 'joined' | 'already_member';
+
 @Injectable()
 export class TenantBootstrapService {
     private readonly logger = new Logger(TenantBootstrapService.name);
@@ -104,5 +110,75 @@ export class TenantBootstrapService {
         );
 
         return tenant;
+    }
+
+    /**
+     * Attach a user to a Tenant they do NOT own — accepting an Organization
+     * invitation, and nothing else.
+     *
+     * 🛑 This is the third writer of `users.tenantId` in the codebase and the
+     * only one that ever points a user at a Tenant owned by somebody else.
+     * It lives here, beside `ensureTenant`, so that every write to that
+     * column stays in one audited file.
+     *
+     * **It will not move a user between Tenants. That is a hard refusal, not
+     * a best-effort.** Repointing a populated `users.tenantId` is de-facto
+     * data loss without a DELETE, for four independent reasons:
+     *
+     *  1. Every row that user already created is stamped with their OLD
+     *     `tenantId` by `ScopeStampingSubscriber` and by
+     *     `OrganizationService.createOrganization`. Repointing orphans all
+     *     of it — the rows keep the old tenant, so their entire history
+     *     silently vanishes from the scope they can now see.
+     *  2. `tenants.ownerUserId` is UNIQUE. A user who owns a Tenant cannot
+     *     cleanly stop owning it; repointing leaves an owner-linked,
+     *     member-less orphan Tenant behind.
+     *  3. `OrganizationService.listForUser` returns every Org of
+     *     `user.tenantId`, so repointing instantly hides all of their own
+     *     Organizations from them.
+     *  4. The FK on `users.tenantId` is `ON DELETE SET NULL`; there is no
+     *     database-level protection against this write. The guard has to be
+     *     here, in code, and it has to be tested.
+     *
+     * Deliberately does NOT run the `TIER_A`/`TIER_B` backfill that
+     * `createOrganization` performs. Dragging an invitee's pre-existing
+     * private rows into the inviter's Tenant would expose their history
+     * tenant-wide. Their own Works stay reachable — `WorkRepository` filters
+     * on `userId`, never on `tenantId`.
+     */
+    async joinTenant(
+        userId: string,
+        tenantId: string,
+        organizationId?: string,
+    ): Promise<JoinTenantOutcome> {
+        const user = await this.userRepository.findById(userId);
+        if (!user) {
+            throw new NotFoundException(`User ${userId} not found`);
+        }
+
+        if (user.tenantId === tenantId) {
+            return 'already_member';
+        }
+
+        if (user.tenantId) {
+            this.logger.warn(
+                `Refused to move user ${userId} from tenant ${user.tenantId} to ${tenantId} — ` +
+                    `a user may not be re-homed into another Tenant`,
+            );
+            throw new ConflictException('user_already_in_another_tenant');
+        }
+
+        await this.userRepository.update(userId, { tenantId });
+
+        // Point them at the Org they were invited to, but only if they have
+        // no scope preference yet — never stomp an existing choice.
+        if (organizationId && !user.lastScopeOrganizationId) {
+            await this.userRepository.update(userId, {
+                lastScopeOrganizationId: organizationId,
+            });
+        }
+
+        this.logger.log(`User ${userId} joined tenant ${tenantId} (org=${organizationId ?? '-'})`);
+        return 'joined';
     }
 }
