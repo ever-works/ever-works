@@ -40,6 +40,50 @@ export class MailService {
     /**
      * Get branding context for email templates
      */
+    /**
+     * Invitation to join an Organization.
+     *
+     * 🛑 The `acceptUrl` carries the RAW token. That is the only place the
+     * token ever appears — the database holds `sha256(token)` and no API
+     * response returns it. So this method must never log `data`, and the
+     * catch below deliberately logs the recipient and the error only.
+     *
+     * Unlike `sendWorkInvitation`, there is no null-recipient early return:
+     * `OrganizationInvitation.email` is NOT NULL precisely so that an
+     * unreachable invitation cannot be represented. If this is ever called
+     * without one, that is a bug worth surfacing rather than swallowing.
+     */
+    async sendOrganizationInvitation(data: {
+        recipientEmail: string;
+        organizationName: string;
+        inviterName: string;
+        acceptUrl: string;
+        expiresAt: Date;
+    }): Promise<void> {
+        try {
+            await this.mailerService.sendMail({
+                to: data.recipientEmail,
+                subject: `You've been invited to ${data.organizationName}`,
+                template: 'organization-invitation',
+                context: {
+                    ...this.getBrandingContext(),
+                    organizationName: data.organizationName,
+                    inviterName: data.inviterName,
+                    acceptUrl: data.acceptUrl,
+                    recipientEmail: data.recipientEmail,
+                    expiresAtFormatted: this.formatDateTime(data.expiresAt),
+                },
+            });
+        } catch (error) {
+            // Never interpolate `data` — it holds the raw token.
+            this.logger.error(
+                `Failed to send organization invitation to ${data.recipientEmail}`,
+                error instanceof Error ? error.stack : String(error),
+            );
+            throw error;
+        }
+    }
+
     private getBrandingContext() {
         return {
             appName: config.branding.appName(),

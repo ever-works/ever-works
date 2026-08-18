@@ -60,6 +60,7 @@ export const KNOWN_EMAIL_TEMPLATES = [
     'magic-link',
     'member-invitation',
     'new-device-login',
+    'organization-invitation',
     'password-changed',
     'signup-confirmation',
     'welcome',

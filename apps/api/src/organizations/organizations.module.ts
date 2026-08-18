@@ -18,6 +18,7 @@ import { OrganizationService } from './organization.service';
 import { OrganizationMembershipService } from './organization-membership.service';
 import { OrganizationOwnershipGuard } from './guards/organization-ownership.guard';
 import { OrganizationsController } from './organizations.controller';
+import { MailModule } from '../mail/mail.module';
 import { OrganizationInvitationsController } from './organization-invitations.controller';
 import { OrganizationInvitationFlowService } from './organization-invitation-flow.service';
 import { OrganizationInvitationService } from '@ever-works/agent/services';
@@ -63,6 +64,8 @@ import { WorkRegisteredListener } from './work-registered.listener';
         TasksDomainModule,
         AgentTeamsModule,
         FacadesModule,
+        // Organization invitations send email; MailModule exports MailService.
+        MailModule,
     ],
     providers: [
         UserRepository,

@@ -11,6 +11,8 @@ import {
 } from '@ever-works/agent/database';
 import type { OrganizationInvitation, OrganizationMember } from '@ever-works/agent/entities';
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
+import { MailService } from '../mail/mail.service';
+import { config } from '../config/constants';
 import { OrganizationMembershipService } from './organization-membership.service';
 
 export type AcceptOutcome = {
@@ -44,6 +46,7 @@ export class OrganizationInvitationFlowService {
         private readonly tenants: TenantRepository,
         private readonly tenantBootstrap: TenantBootstrapService,
         private readonly membership: OrganizationMembershipService,
+        private readonly mail: MailService,
     ) {}
 
     /**
@@ -88,13 +91,27 @@ export class OrganizationInvitationFlowService {
             throw new BadRequestException('user_added_directly');
         }
 
-        return this.invitations.issue({
+        const issued = await this.invitations.issue({
             organizationId: organization.id,
             tenantId: organization.tenantId,
             invitedById: actorUserId,
             email,
             invitedName,
         });
+
+        // 🛑 The raw token leaves this method exactly once, into the email
+        // body. It is not returned to the caller by the controller, not
+        // logged, and not stored — the row holds only sha256(token).
+        const inviter = await this.users.findById(actorUserId);
+        await this.mail.sendOrganizationInvitation({
+            recipientEmail: issued.invitation.email,
+            organizationName: organization.displayName ?? organization.slug,
+            inviterName: inviter?.username ?? 'A teammate',
+            acceptUrl: `${config.webAppUrl()}/org-invite/${issued.token}`,
+            expiresAt: issued.invitation.tokenExpiresAt,
+        });
+
+        return issued;
     }
 
     /**

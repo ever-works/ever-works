@@ -36,6 +36,10 @@ jest.mock('../../scope/tenant-bootstrap.service', () => ({
 jest.mock('../organization-membership.service', () => ({
     OrganizationMembershipService: class OrganizationMembershipService {},
 }));
+jest.mock('../../mail/mail.service', () => ({
+    MailService: class MailService {},
+}));
+jest.mock('../../config/constants', () => ({ config: { webAppUrl: () => 'https://app.test' } }));
 
 import { OrganizationInvitationFlowService } from '../organization-invitation-flow.service';
 
@@ -47,6 +51,7 @@ const EXPECTED_COLLABORATORS = [
     'TenantRepository',
     'TenantBootstrapService',
     'OrganizationMembershipService',
+    'MailService',
 ];
 
 describe('Organization invitations — module wiring', () => {
