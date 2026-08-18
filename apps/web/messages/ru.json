@@ -8473,6 +8473,32 @@
             "mergePolicy": {
                 "title": "Merge policy",
                 "subtitle": "Whether agents may land the pull requests they open in this Organization. Works and Agents underneath can still override any single field."
+            },
+            "members": {
+                "title": "Members",
+                "subtitle": "Invite people to this organization and manage who has access.",
+                "emailLabel": "Email address",
+                "emailPlaceholder": "colleague@company.com",
+                "inviteCta": "Send invitation",
+                "inviteSent": "Invitation sent to {email}.",
+                "addedDirectly": "{email} already had an account here, so they were added straight away.",
+                "tenantWideNote": "People you invite can see every organization in this workspace, not just this one.",
+                "membersHeading": "Members",
+                "pendingHeading": "Pending invitations",
+                "loading": "Loading…",
+                "noMembers": "No members yet.",
+                "you": "You",
+                "remove": "Remove",
+                "revoke": "Revoke",
+                "memberRemoved": "Member removed.",
+                "invitationRevoked": "Invitation revoked.",
+                "errors": {
+                    "invitation_already_pending": "That address already has a pending invitation. Revoke it first to send a new one.",
+                    "user_already_a_member": "That person is already a member of this organization.",
+                    "invalid_email": "That does not look like a valid email address.",
+                    "organization_has_no_tenant": "This organization is not fully set up yet, so it cannot accept members.",
+                    "unknown": "Could not send the invitation. Please try again."
+                }
             }
         },
         "switcher": {
