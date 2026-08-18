@@ -100,11 +100,24 @@ const rowIcon =
 
 export function MeetingParticipantsEditor({
     label,
+    labelAs = 'span',
     rows,
     onChange,
     disabled = false,
 }: {
     label: string;
+    /**
+     * Element the label renders as. Defaults to a `span` — inside the edit
+     * dialog the roster is one field among others and has no business
+     * appearing in the page's heading outline.
+     *
+     * The `/meetings/new` capture form passes `h2`, because there the roster
+     * IS a section, peer to "Where it came from" and "Transcript". The editor
+     * carries the label (it owns the row that pairs it with the capacity
+     * counter), so promoting it here is what gives that section a heading —
+     * a second heading in the form would put the word on screen twice.
+     */
+    labelAs?: 'span' | 'h2';
     rows: ParticipantRow[];
     onChange: (rows: ParticipantRow[]) => void;
     disabled?: boolean;
@@ -121,6 +134,9 @@ export function MeetingParticipantsEditor({
 
     const atCapacity = rows.length >= MEETING_PARTICIPANTS_MAX;
 
+    /** `span` in the dialog, `h2` on the capture form — see `labelAs`. */
+    const Label = labelAs;
+
     const addRow = () => {
         if (atCapacity) return;
         const row = newParticipantRow();
@@ -136,7 +152,17 @@ export function MeetingParticipantsEditor({
     return (
         <div data-testid="meeting-edit-participants">
             <div className="mb-2 flex items-baseline justify-between gap-3">
-                <span className="text-xs font-medium text-text dark:text-text-dark">{label}</span>
+                {/* As a heading it takes the sibling sections' weight
+                    (`text-sm font-semibold`); as a field label it keeps the
+                    quieter one it has always had. */}
+                <Label
+                    className={cn(
+                        'text-text dark:text-text-dark',
+                        labelAs === 'h2' ? 'text-sm font-semibold' : 'text-xs font-medium',
+                    )}
+                >
+                    {label}
+                </Label>
                 {/* Pure numerals — nothing to translate, and the cap only
                     becomes interesting as you approach it. */}
                 <span
