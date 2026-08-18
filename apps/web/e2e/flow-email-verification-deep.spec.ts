@@ -57,7 +57,16 @@ import {
  *        already-verified actor (svc short-circuit)      -> 400 { message:'Email already verified' }
  *        (asserted as a REAL 400 when MailHog delivers a token; else the cross-account /
  *        no-gate contract is asserted instead — never a fictional success).
- *   POST /api/auth/resend-verification                   -> 404 (does not exist).
+ *   POST /api/auth/resend-verification { email }         -> 200, @Public() (EW-070, #2108).
+ *        ANTI-ENUMERATION: unknown address, already-verified address and deactivated
+ *        account all return the SAME status and byte-identical body
+ *        ('If an account exists for that address and still needs verification, a
+ *        verification email has been sent'), with a throwaway bcrypt on every branch so
+ *        timing does not leak what the body hides. Throttled (5/60s by default) —
+ *        without that it is a mail cannon aimed at any address an attacker names.
+ *        A malformed address is still a 400 (@IsEmail on the DTO).
+ *        (Previously documented here as '-> 404 (does not exist)', which was the EW-070
+ *        DEFECT: a user whose verification mail never arrived was locked out for good.)
  *
  *   POST /api/auth/verify-email { token }                -> 200 + fresh session on a valid token
  *        bad/unknown token   -> 400 { message:'Invalid verification token' }
@@ -404,17 +413,58 @@ test.describe('Flow: email-verification deep (oracle / send / web-route)', () =>
         }
     });
 
-    test('send-verification is auth-gated (401), resend-verification does not exist (404), and send is NON-throttled (4x 200)', async ({
+    test('send-verification is auth-gated (401); resend-verification is PUBLIC, non-enumerating (200) — EW-070', async ({
         request,
     }) => {
         // Unauthenticated => 401 (AuthSessionGuard).
         const anon = await request.post(`${API_BASE}/api/auth/send-verification`);
         expect(anon.status()).toBe(401);
-        // resend-verification is NOT a real route.
-        const wrongPath = await request.post(`${API_BASE}/api/auth/resend-verification`);
-        expect(wrongPath.status()).toBe(404);
 
-        const u = await registerUserViaAPI(request);
+        // ── EW-070 ────────────────────────────────────────────────────────
+        // This assertion used to read `expect(wrongPath.status()).toBe(404)`
+        // — it PINNED the defect: a user whose verification mail never arrived
+        // was permanently locked out because no signed-out resend existed.
+        // #2108 added the endpoint, so 404 is now the wrong answer and this
+        // test was failing for the best possible reason.
+        //
+        // The contract that matters is anti-enumeration: an address with no
+        // account and an address that genuinely needs verification must be
+        // INDISTINGUISHABLE — same status, same byte-identical body.
+        const RESEND = `${API_BASE}/api/auth/resend-verification`;
+        const CONSTANT_BODY =
+            'If an account exists for that address and still needs verification, a verification email has been sent';
+
+        // (a) an address that certainly has no account
+        const unknown = await request.post(RESEND, {
+            data: { email: `no-such-user-${Date.now()}@test.local` },
+        });
+        expect(unknown.status(), 'unknown address must not 404/401 — the route is @Public()').toBe(
+            200,
+        );
+        expect((await unknown.json()).message).toBe(CONSTANT_BODY);
+
+        // (b) a real, freshly-registered (therefore unverified) account
+        const known = await registerUserViaAPI(request);
+        const existing = await request.post(RESEND, { data: { email: known.email } });
+        expect(existing.status()).toBe(200);
+
+        // (c) the oracle check — the two responses must be identical. If these
+        // ever diverge, the endpoint has become an account-existence probe.
+        expect(
+            (await existing.json()).message,
+            'known and unknown addresses must return the SAME body',
+        ).toBe(CONSTANT_BODY);
+
+        // A malformed address is still rejected by the DTO (@IsEmail) — the
+        // anti-enumeration guarantee is about real addresses, not about
+        // accepting garbage.
+        const malformed = await request.post(RESEND, { data: { email: 'not-an-email' } });
+        expect(malformed.status()).toBe(400);
+
+        // Reuse the account registered above rather than creating a second
+        // one — this suite is load-sensitive and registration is its most
+        // expensive step.
+        const u = known;
 
         // send-verification carries NO @Throttle, so four rapid authed calls all return 200 with
         // the documented envelope (an unverified actor each time regenerates a verification token).

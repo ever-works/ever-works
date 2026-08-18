@@ -55,8 +55,25 @@ test.describe('Registration', () => {
         await expect(page).not.toHaveURL(/\/register/);
     });
 
-    test('should show error for mismatched passwords', async ({ page }) => {
+    // ── Registration validation errors ──────────────────────────────────
+    //
+    // These two used to assert `locator('.bg-danger/10')` — the single error
+    // BANNER above the form. #2106 (EW-073…EW-076) deliberately removed that
+    // banner for validation problems and keys each error to the field it
+    // belongs to, rendered by `ui/input` as `<p class="… text-danger">`. The
+    // banner still exists, but only for `errors.general` (e.g. terms not
+    // accepted), so the old locator can never match a password problem again.
+    //
+    // Asserting the MESSAGE rather than the class is deliberate: the class is
+    // styling and will drift, the sentence is the thing the user must actually
+    // be told. Each test checks the message is absent BEFORE submitting, so a
+    // locator that silently matches nothing cannot pass by accident.
+
+    test('should show a field-level error for mismatched passwords', async ({ page }) => {
         await page.goto('/en/register');
+
+        const mismatch = page.getByText('Passwords do not match');
+        await expect(mismatch).toBeHidden(); // control: not shown before submit
 
         await page.locator('input[name="name"]').fill('Test User');
         await page.locator('input[name="email"]').fill('mismatch@test.local');
@@ -66,13 +83,16 @@ test.describe('Registration', () => {
 
         await page.locator('button[type="submit"]').click();
 
-        // Should show password mismatch error (stays on register page)
         await expect(page).toHaveURL(/\/register/);
-        await expect(page.locator('.bg-danger\\/10')).toBeVisible();
+        await expect(mismatch).toBeVisible();
     });
 
-    test('should show error for short password', async ({ page }) => {
+    test('should show a field-level error for short password', async ({ page }) => {
         await page.goto('/en/register');
+
+        // EW-073: the hint now states the rule the server actually enforces.
+        const tooShort = page.getByText('Password must be at least 8 characters');
+        await expect(tooShort).toBeHidden(); // control: not shown before submit
 
         await page.locator('input[name="name"]').fill('Test User');
         await page.locator('input[name="email"]').fill('short@test.local');
@@ -82,9 +102,8 @@ test.describe('Registration', () => {
 
         await page.locator('button[type="submit"]').click();
 
-        // Should show password too short error
         await expect(page).toHaveURL(/\/register/);
-        await expect(page.locator('.bg-danger\\/10')).toBeVisible();
+        await expect(tooShort).toBeVisible();
     });
 
     test('should have link to login page', async ({ page }) => {
