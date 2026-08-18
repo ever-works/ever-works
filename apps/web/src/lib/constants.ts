@@ -283,6 +283,15 @@ export const ROUTES = {
     // UNAUTHENTICATED by fresh visitors — the page mints an anonymous session
     // client-side, so it MUST be in PUBLIC_ROUTES (mirrors AUTH_MAGIC_LINK).
     ONBOARDING: '/onboarding',
+    // Organization-invitation landing page. Reached by a BRAND-NEW person
+    // straight from an email, with no account and no session — which is
+    // the entire point of the feature. It must be public: the proxy auth
+    // gate below bounces an unauthenticated request to /login AND clears
+    // the cookie, and it preserves no token, so gating this page would
+    // silently destroy the invitation the visitor was sent.
+    ORG_INVITE: '/org-invite/:token',
+    /** Concrete href for a given token. */
+    orgInvite: (token: string) => `/org-invite/${token}`,
 
     // API routes
     API_AUTH_VERIFY_EMAIL: '/api/auth/verify-email',
@@ -320,6 +329,11 @@ export const PUBLIC_ROUTES = [
     // client-side redeem can set the session cookie (mirrors the other
     // token-landing pages above).
     ROUTES.AUTH_MAGIC_LINK,
+    // Organization invitations — the invitee has no account yet, so this
+    // page has to render signed-out. `path-to-regexp` matches the :token
+    // segment. The page itself grants nothing: it renders a preview and
+    // sends the visitor to register or sign in.
+    ROUTES.ORG_INVITE,
     // EW-617 zero-friction onboarding landing page — public so anonymous
     // visitors from the marketing site can mint a guest session client-side.
     ROUTES.ONBOARDING,
