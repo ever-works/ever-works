@@ -28,6 +28,8 @@ import { WorkCustomDomain } from '../entities/work-custom-domain.entity';
 import { WorkDeployment } from '../entities/work-deployment.entity';
 import { WorkMember } from '../entities/work-member.entity';
 import { WorkInvitation } from '../entities/work-invitation.entity';
+import { OrganizationInvitation } from '../entities/organization-invitation.entity';
+import { OrganizationMember } from '../entities/organization-member.entity';
 import { WorkGenerationHistory } from '../entities/work-generation-history.entity';
 import { SubscriptionPlan } from '../entities/subscription-plan.entity';
 import { UserSubscription } from '../entities/user-subscription.entity';
@@ -167,6 +169,8 @@ export const ENTITIES = [
     WorkDeployment,
     WorkMember,
     WorkInvitation,
+    OrganizationInvitation,
+    OrganizationMember,
     User,
     RefreshToken,
     CacheEntry,

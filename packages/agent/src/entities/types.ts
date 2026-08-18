@@ -90,6 +90,41 @@ export const ALL_INVITATION_ROLES = [
     INVITATION_ROLE_OWNER_CLAIM,
 ] as const;
 
+/**
+ * Roles on an Organization membership or invitation.
+ *
+ * Exactly one value today, on purpose. `OrganizationMembershipService`
+ * currently defines `ensureAdmin` as `return this.ensureMember(...)`, and its
+ * docblock explicitly forbids adding a role check without a product decision.
+ * Shipping an `admin` option before that decision would put a control in the
+ * UI that grants nothing — worse than having no control at all. When per-Org
+ * roles land, widen this tuple; the DB column is already sized for it.
+ */
+export const ORGANIZATION_MEMBER_ROLES = ['member'] as const;
+
+export type OrganizationMemberRole = (typeof ORGANIZATION_MEMBER_ROLES)[number];
+
+/** Invitations carry the role the membership will be created with. */
+export type OrganizationInvitationRole = OrganizationMemberRole;
+
+/**
+ * Lifecycle of an `OrganizationInvitation`.
+ *
+ * A sibling of `WorkInvitationStatus` rather than a re-export: the two
+ * features are adjacent but independent, and aliasing them would mean a
+ * later state added for Works (say a transfer step) silently appears in the
+ * Org state machine too.
+ *
+ * 🛑 `EXPIRED` is a terminal state a row is moved INTO, not a state it
+ * reaches by itself. Nothing sweeps on a timer, so a row can sit at PENDING
+ * past its expiry — always ask `isExpired()`, never read `status` alone.
+ */
+export enum OrganizationInvitationStatus {
+    PENDING = 'pending',
+    ACCEPTED = 'accepted',
+    EXPIRED = 'expired',
+    REVOKED = 'revoked',
+}
 export enum WorkInvitationStatus {
     PENDING = 'pending',
     ACCEPTED = 'accepted',
