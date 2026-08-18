@@ -79,6 +79,8 @@ import { WorkCustomDomainRepository } from './repositories/work-custom-domain.re
 import { WorkDeploymentRepository } from './repositories/work-deployment.repository';
 import { WorkGenerationHistoryRepository } from './repositories/work-generation-history.repository';
 import { WorkInvitationRepository } from './repositories/work-invitation.repository';
+import { OrganizationInvitationRepository } from './repositories/organization-invitation.repository';
+import { OrganizationMemberRepository } from './repositories/organization-member.repository';
 import { WorkMemberRepository } from './repositories/work-member.repository';
 import { WorkRepository } from './repositories/work.repository';
 import { WorkScheduleRepository } from './repositories/work-schedule.repository';
@@ -133,6 +135,8 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     WorkDeploymentRepository,
     WorkGenerationHistoryRepository,
     WorkInvitationRepository,
+    OrganizationInvitationRepository,
+    OrganizationMemberRepository,
     WorkMemberRepository,
     WorkRepository,
     WorkScheduleRepository,
