@@ -296,11 +296,17 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
                 capture form was the last surface still teaching that format;
                 it now authors the roster exactly the way the detail page's
                 edit dialog does, so there is one way to name a participant.
-                The editor carries its own label and count, so the section
-                needs no heading of its own. */}
+
+                The editor owns the label (it pairs it with the capacity
+                counter on one line), so the section's heading is that label
+                promoted to an `h2` via `labelAs` rather than a second heading
+                above it — which would print "Participants" twice. Before
+                `labelAs` existed this section had no heading at all while its
+                peers did, and the e2e assertion for it sat red on stage. */}
             <section className={sectionCard}>
                 <MeetingParticipantsEditor
-                    label={t('fields.participants')}
+                    label={t('sections.participants')}
+                    labelAs="h2"
                     rows={participantRows}
                     onChange={setParticipantRows}
                     disabled={pending}

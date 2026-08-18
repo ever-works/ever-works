@@ -7264,6 +7264,7 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
+                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
