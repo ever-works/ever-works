@@ -6,15 +6,27 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 
 /**
- * Run orchestration (Wave 4 M4) — top-level tab strip on the Agents
- * page: the Agents catalog and the org-wide Sessions view (a filtered
- * projection of `agent_runs`, exactly as the Tasks kanban is a view
- * over Task). Same visual language as the per-agent `AgentDetailTabs`.
+ * Teams hub tab strip: Teams | Agents | Sessions | Archived — rendered on
+ * `/teams`, `/agents`, `/agents/sessions` and `/agents/archived`.
+ *
+ * Run orchestration (Wave 4 M4) introduced it over the Agents catalog and
+ * the org-wide Sessions view (a filtered projection of `agent_runs`, exactly
+ * as the Tasks kanban is a view over Task). Navigation consolidation
+ * (`docs/specs/features/navigation-consolidation`) then folded Teams in as
+ * the first tab, since people and agents are one org seen through two doors
+ * — hence the `TeamsPageTabs` alias below for the `/teams` entry point.
+ * Same visual language as the per-agent `AgentDetailTabs`.
  */
-export function AgentsPageTabs({ active }: { active: 'agents' | 'sessions' | 'archived' }) {
+export function AgentsPageTabs({
+    active,
+}: {
+    active: 'teams' | 'agents' | 'sessions' | 'archived';
+}) {
     const t = useTranslations('dashboard.agentsPage.pageTabs');
 
     const tabs = [
+        // The hub's front door — the old standalone Teams page, now tab 1.
+        { key: 'teams' as const, href: ROUTES.DASHBOARD_TEAMS, label: t('teams') },
         { key: 'agents' as const, href: ROUTES.DASHBOARD_AGENTS, label: t('agents') },
         {
             key: 'sessions' as const,
@@ -57,3 +69,10 @@ export function AgentsPageTabs({ active }: { active: 'agents' | 'sessions' | 'ar
         </nav>
     );
 }
+
+/**
+ * Alias for the `/teams` side of the same hub — identical component, named
+ * after the page that renders it so the Teams pages don't read as importing
+ * "Agents" tabs. The test ids stay `agents-page-tab-*` either way.
+ */
+export const TeamsPageTabs = AgentsPageTabs;

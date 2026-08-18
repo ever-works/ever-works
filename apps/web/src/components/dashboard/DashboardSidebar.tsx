@@ -25,6 +25,11 @@ import {
     Lightbulb,
     Target,
     Gauge,
+    // Bot / Sparkles / Users / Video no longer label a nav entry of their own —
+    // Agents, Skills, Teams and Meetings folded into the two merged entries
+    // below (navigation consolidation §3.2). Kept per the repo's no-removal
+    // rule: neither eslint nor tsc flags them, they cost nothing after
+    // tree-shaking, and re-splitting an entry shouldn't need an import hunt.
     Bot,
     Brain,
     ListChecks,
@@ -34,8 +39,10 @@ import {
     BarChart3,
     Video,
     Inbox,
+    type LucideIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { HumanAgentIcon } from '@/components/icons/HumanAgentIcon';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import {
@@ -114,7 +121,19 @@ export function DashboardSidebar({
         });
     };
 
-    const navigation = [
+    /**
+     * `matchPrefixes` (navigation consolidation,
+     * `docs/specs/features/navigation-consolidation` §3.2) lets one entry own
+     * more than its own href: three features folded into two entries, but their
+     * URLs deliberately did not move, so the highlight has to follow them.
+     * Omitted = the old behaviour, `[item.href]`.
+     */
+    const navigation: Array<{
+        name: string;
+        href: string;
+        icon: LucideIcon | typeof HumanAgentIcon;
+        matchPrefixes?: string[];
+    }> = [
         { name: t('navigation.dashboard'), href: ROUTES.DASHBOARD, icon: Home },
         // Inbox (operator message center) — the one surface carrying
         // messages ADDRESSED TO the human: blocking agent questions
@@ -145,21 +164,37 @@ export function DashboardSidebar({
         },
         // Agents/Skills/Tasks PR #1017 — Phase 5.
         { name: t('navigation.tasks'), href: ROUTES.DASHBOARD_TASKS, icon: ListChecks },
-        { name: t('navigation.agents'), href: ROUTES.DASHBOARD_AGENTS, icon: Bot },
+        // Teams & Prebuilt Companies (teams-and-companies spec §4.1), merged
+        // with the former Agents entry: one hub for people AND agents, tabs
+        // Teams | Agents | Sessions | Archived, with Skills as a block on the
+        // Agents tab. It takes the slot Agents held (right after Tasks) and
+        // stays lit across /teams/*, /agents/* and the /skills/* detail pages.
+        {
+            name: t('navigation.teams'),
+            href: ROUTES.DASHBOARD_TEAMS,
+            icon: HumanAgentIcon,
+            matchPrefixes: [
+                ROUTES.DASHBOARD_TEAMS,
+                ROUTES.DASHBOARD_AGENTS,
+                ROUTES.DASHBOARD_SKILLS,
+            ],
+        },
         // Org-wide Memory (Cortex P1) — one place to search everything the
         // active Organization knows, aggregated across all its Works' KB.
-        // Sits directly below Agents per spec §4.1.
-        { name: t('navigation.memory'), href: ROUTES.DASHBOARD_MEMORY, icon: Brain },
-        // Meetings (Wave 8, feature a) — captured meetings, transcripts
-        // and their AI summaries. Sits right after Memory: a meeting
-        // transcript is one of the richest things the platform learns
-        // from, and its ingest writes straight into Memory + Activity.
-        { name: t('navigation.meetings'), href: ROUTES.DASHBOARD_MEETINGS, icon: Video },
-        // Teams & Prebuilt Companies (teams-and-companies spec §4.1).
-        { name: t('navigation.teams'), href: ROUTES.DASHBOARD_TEAMS, icon: Users },
+        // Sits directly below the Teams hub per spec §4.1.
+        //
+        // Meetings (Wave 8, feature a) folded in here: a meeting transcript is
+        // one of the richest things the platform learns from and its ingest
+        // writes straight into Memory, so the catalog is a block on this page
+        // (`/memory#meetings`) and /meetings/* keeps Memory highlighted.
+        {
+            name: t('navigation.memory'),
+            href: ROUTES.DASHBOARD_MEMORY,
+            icon: Brain,
+            matchPrefixes: [ROUTES.DASHBOARD_MEMORY, ROUTES.DASHBOARD_MEETINGS],
+        },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },
         { name: t('navigation.plugins'), href: ROUTES.DASHBOARD_PLUGINS, icon: Plug },
-        { name: t('navigation.skills'), href: ROUTES.DASHBOARD_SKILLS, icon: Sparkles },
         { name: t('navigation.activity'), href: ROUTES.DASHBOARD_ACTIVITY, icon: Activity },
         { name: t('navigation.settings'), href: ROUTES.DASHBOARD_SETTINGS, icon: Settings },
     ];
@@ -315,8 +350,11 @@ export function DashboardSidebar({
                         )}
                     >
                         {navigation.map((item) => {
-                            const isActive =
-                                pathname === item.href || pathname?.startsWith(item.href + '/');
+                            const prefixes = item.matchPrefixes ?? [item.href];
+                            const isActive = prefixes.some(
+                                (prefix) =>
+                                    pathname === prefix || pathname?.startsWith(prefix + '/'),
+                            );
                             return (
                                 <li
                                     key={item.name}

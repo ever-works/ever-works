@@ -7,8 +7,10 @@
  * lazily-created org is `orgs[0]` — see e2e/global-setup.ts step 1b) and pins
  * the RENDERED content of every teams route:
  *
- *   • /en/teams            list header (title/subtitle/org chip + New Team /
- *                          Org Chart CTAs), seeded team cards, card → detail nav
+ *   • /en/teams            hub tab strip (Teams | Agents | Sessions | Archived,
+ *                          Teams active), list header (title/subtitle/org chip +
+ *                          New Team / Org Chart CTAs), seeded team cards,
+ *                          card → detail nav
  *   • /en/teams/new        create-team form (name/description/parent/manager),
  *                          submit disabled-until-name, parent-select population,
  *                          and the true UI create flow → lands on /teams/:id
@@ -159,6 +161,9 @@ test.describe('Teams UI — list page', () => {
         await expect(page.getByRole('heading', { name: 'Teams', exact: true })).toBeVisible({
             timeout: 30_000,
         });
+        // Navigation consolidation: /teams is tab 1 of the Teams hub.
+        await expect(page.getByTestId('agents-page-tab-teams')).toBeVisible();
+        await expect(page.getByTestId('agents-page-tab-teams')).toHaveAttribute('href', /\/teams$/);
         await expect(page.getByText('Organize your Agents and members into teams')).toBeVisible();
         // The active org's displayName is shown as a chip (dynamic — read from
         // the same GET /api/organizations the page resolves orgs[0] from).
@@ -170,6 +175,24 @@ test.describe('Teams UI — list page', () => {
         const chartLink = page.getByTestId('teams-org-chart-link');
         await expect(chartLink).toBeVisible();
         await expect(chartLink).toHaveAttribute('href', /\/teams\/org-chart$/);
+    });
+
+    test('the hub tab strip renders Teams | Agents | Sessions | Archived with Teams active', async ({
+        page,
+    }) => {
+        await page.goto('/en/teams', { waitUntil: 'domcontentloaded' });
+
+        await expect(page.getByTestId('agents-page-tabs')).toBeVisible({ timeout: 30_000 });
+        const tabs = page.getByTestId('agents-page-tabs').getByRole('link');
+        await expect(tabs).toHaveCount(4);
+        await expect(tabs.nth(0)).toHaveAttribute('href', /\/teams$/);
+        await expect(tabs.nth(1)).toHaveAttribute('href', /\/agents$/);
+        await expect(tabs.nth(2)).toHaveAttribute('href', /\/agents\/sessions$/);
+        await expect(tabs.nth(3)).toHaveAttribute('href', /\/agents\/archived$/);
+        // Active = the `border-primary` underline. Asserted on Teams AND
+        // negated on Agents so a class-name drift can't pass silently.
+        await expect(page.getByTestId('agents-page-tab-teams')).toHaveClass(/border-primary/);
+        await expect(page.getByTestId('agents-page-tab-agents')).not.toHaveClass(/border-primary/);
     });
 
     test('a seeded team renders as a card inside teams-list with its name + description', async ({

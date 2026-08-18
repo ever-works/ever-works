@@ -220,11 +220,16 @@ function ChartNodeCard({ placed, onNodeClick }: ChartNodeCardProps) {
 
     const style = { left: placed.x, top: placed.y, width: NODE_W, height: NODE_H };
 
+    // `data-node-kind` is additive and purely for assertions: the Agents Chart
+    // (`/agents/chart`, navigation consolidation §3.6) renders this same chart
+    // with `members: []`, and the e2e journey proves the absence of human cards
+    // by counting `[data-node-kind="member"]`. Nothing reads it at runtime.
     if (interactive) {
         return (
             <button
                 type="button"
                 data-testid={`org-chart-node-${node.id}`}
+                data-node-kind={node.kind}
                 className={cardClass}
                 style={style}
                 onClick={() => onNodeClick(node)}
@@ -234,7 +239,12 @@ function ChartNodeCard({ placed, onNodeClick }: ChartNodeCardProps) {
         );
     }
     return (
-        <div data-testid={`org-chart-node-${node.id}`} className={cardClass} style={style}>
+        <div
+            data-testid={`org-chart-node-${node.id}`}
+            data-node-kind={node.kind}
+            className={cardClass}
+            style={style}
+        >
             {inner}
         </div>
     );

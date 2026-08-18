@@ -549,7 +549,9 @@ test.describe('Skill marketplace / share / visibility', () => {
     });
 
     /**
-     * Flow 6 — UI: the marketplace HUB at /skills. Driven as the SEEDED user via
+     * Flow 6 — UI: the marketplace HUB, which the navigation consolidation moved
+     * into the Skills block on the Agents tab (`/agents#skills`; `/skills` only
+     * redirects there now). Driven as the SEEDED user via
      * storageState. The hub has three section toggles — Installed / Available /
      * Custom. We seed (via API as the same seeded user) one workspace skill so
      * the Installed section is non-empty, then: switch to "Available" and assert
@@ -575,8 +577,9 @@ test.describe('Skill marketplace / share / visibility', () => {
         });
         expect(skill.sourceCatalogSlug).toBeNull();
 
-        await page.goto('/skills', { waitUntil: 'domcontentloaded' });
+        await page.goto('/agents#skills', { waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle');
+        await expect(page.getByTestId('agents-skills-section')).toBeVisible({ timeout: 30_000 });
 
         // The three section toggles render as ARIA tabs (a `tablist` of
         // `<button role="tab">`). Because the explicit role="tab" overrides the

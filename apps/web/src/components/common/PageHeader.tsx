@@ -32,6 +32,14 @@ interface PageHeaderProps {
     tone?: PageHeaderTone;
     actions?: ReactNode;
     className?: string;
+    /**
+     * Heading level for the title. Defaults to `h1` — this component *is* the
+     * page title on every dashboard index. Pass `h2` when the header is reused
+     * as a *block* header inside a page that already owns an `h1` (e.g. the
+     * Skills block on the Agents tab, per the navigation consolidation), so
+     * the document outline keeps exactly one `h1`.
+     */
+    as?: 'h1' | 'h2';
 }
 
 const toneClasses: Record<PageHeaderTone, { bg: string; border: string; text: string }> = {
@@ -99,6 +107,7 @@ export function PageHeader({
     tone = 'primary',
     actions,
     className,
+    as: Heading = 'h1',
 }: PageHeaderProps) {
     const t = toneClasses[tone];
     return (
@@ -114,9 +123,9 @@ export function PageHeader({
                     <Icon className={cn('w-4 h-4', t.text)} />
                 </div>
                 <div className="min-w-0">
-                    <h1 className="text-2xl font-semibold text-text dark:text-text-dark truncate">
+                    <Heading className="text-2xl font-semibold text-text dark:text-text-dark truncate">
                         {title}
-                    </h1>
+                    </Heading>
                     {subtitle ? (
                         <p className="text-sm text-text-secondary dark:text-text-secondary-dark mt-1 max-w-2xl">
                             {subtitle}

@@ -18,6 +18,17 @@ This page covers the catalog **format**, the first-party provider
 (catalog reads, per-user installs), see the
 [Skills API](/api/skills).
 
+:::note Where to find it
+Skills have no sidebar entry of their own — nobody browses Skills without an
+Agent in mind — so the catalog renders as the **Skills** block at the bottom
+of **Sidebar → Teams → Agents tab** (anchor `/agents#skills`). Its tabs
+(**Installed / Available / Custom**), search, **Browse templates** and **New
+skill** are unchanged. The old `/skills` link still works: it redirects to
+that block and carries your filters across. Skill detail pages
+(`/skills/:id`), `/skills/new` and `/skills/templates` are unchanged, as is
+the per-Agent **Skills** tab on an Agent's detail page.
+:::
+
 **Key sources:**
 
 - `packages/plugins/everworks-skills/src/everworks-skills.plugin.ts` — the provider plugin

@@ -1151,6 +1151,9 @@
             },
             "title": "Memory",
             "subtitle": "Everything your organization knows, in one place — aggregated across every Work's Knowledge Base.",
+            "meetings": {
+                "hint": "Meetings are one of the richest things the platform learns from — every transcript and summary is ingested straight into Memory."
+            },
             "searchPlaceholder": "Search across everything the organization knows…",
             "newDocument": "New",
             "documentsIndexed": "{count, plural, =0 {No documents indexed} one {# document indexed} other {# documents indexed}}",
@@ -1233,6 +1236,11 @@
             "title": "Agents",
             "subtitle": "Your AI teammates. Each one carries a soul (who they are), instructions, and a budget — and acts on Missions, Works, or your whole Workspace.",
             "newAgent": "New Agent",
+            "agentsChartCta": "Agents Chart",
+            "skillsBlock": {
+                "title": "Skills",
+                "subtitle": "Skills your Agents can use — installed, available in the catalog, and custom ones you wrote."
+            },
             "scorecard": {
                 "title": "Scorecard",
                 "empty": "No metrics yet. Add quantified goals so this Agent's output is measurable.",
@@ -1388,6 +1396,7 @@
                 "resetSuccess": "Guardrails reset to default"
             },
             "pageTabs": {
+                "teams": "Teams",
                 "agents": "Agents",
                 "sessions": "Sessions",
                 "archived": "Archived"
@@ -8100,6 +8109,13 @@
             "membersBadge": "{count, plural, one {# member} other {# members}}",
             "empty": "Nothing to chart yet — create teams or Agents in this organization first.",
             "noOrg": "Create an organization to see its Org Chart."
+        },
+        "agentsChartPage": {
+            "title": "Agents Chart",
+            "subtitle": "How your Agents are organized — teams and reporting lines, without human members.",
+            "backToAgents": "Back to Agents",
+            "empty": "No Agents yet. Create an Agent and it will appear here.",
+            "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
         },
         "discover": {
             "title": "Discover",

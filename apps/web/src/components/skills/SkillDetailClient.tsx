@@ -73,8 +73,10 @@ export function SkillDetailClient({
 
     return (
         <div className="max-w-screen-2xl mx-auto p-6 space-y-6">
+            {/* Navigation consolidation: the catalog lives on the Agents tab
+                (`/agents#skills`) — `/skills` only redirects there now. */}
             <Link
-                href={ROUTES.DASHBOARD_SKILLS}
+                href={ROUTES.DASHBOARD_AGENTS_SKILLS}
                 className="inline-flex items-center gap-1.5 text-sm text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
             >
                 <ArrowLeft className="w-4 h-4" />
@@ -948,7 +950,9 @@ function DangerZone({ skillId }: { skillId: string }) {
             void (async () => {
                 try {
                     await deleteSkillAction(skillId);
-                    router.push(ROUTES.DASHBOARD_SKILLS);
+                    // Navigation consolidation: back to the catalog, which is
+                    // now the Skills block on the Agents tab.
+                    router.push(ROUTES.DASHBOARD_AGENTS_SKILLS);
                 } catch (err) {
                     setError(err instanceof Error ? err.message : 'Delete failed');
                     setConfirming(false);

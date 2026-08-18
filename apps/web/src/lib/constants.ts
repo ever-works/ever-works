@@ -169,6 +169,11 @@ export const ROUTES = {
     DASHBOARD_MEETINGS: '/meetings',
     DASHBOARD_MEETINGS_NEW: '/meetings/new',
     DASHBOARD_MEETING: (id: string) => `/meetings/${id}`,
+    // Navigation consolidation (docs/specs/features/navigation-consolidation):
+    // the Meetings catalog now renders as a block on the Memory page, so
+    // `/meetings` (index only) redirects here. `/meetings/new` and
+    // `/meetings/[id]` are unchanged.
+    DASHBOARD_MEMORY_MEETINGS: '/memory#meetings',
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
@@ -192,6 +197,13 @@ export const ROUTES = {
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
     DASHBOARD_AGENT_TEMPLATES: '/agents/templates',
+    // Navigation consolidation (docs/specs/features/navigation-consolidation):
+    // the Skills catalog now renders as a block on the Agents tab, so
+    // `/skills` (index only) redirects here. Skill detail routes are
+    // unchanged.
+    DASHBOARD_AGENTS_SKILLS: '/agents#skills',
+    // Agents Chart — the org chart with human members stripped.
+    DASHBOARD_AGENTS_CHART: '/agents/chart',
     // Teams & Prebuilt Companies (docs/specs/features/teams-and-companies §4)
     DASHBOARD_TEAMS: '/teams',
     DASHBOARD_TEAM_NEW: '/teams/new',

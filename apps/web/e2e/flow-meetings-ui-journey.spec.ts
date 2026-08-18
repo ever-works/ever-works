@@ -4,16 +4,25 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { clickAndExpectUrl, clickUntil } from './helpers/nav';
 
 /**
- * flow-meetings-ui-journey — the `/meetings` DASHBOARD UI, end-to-end.
+ * flow-meetings-ui-journey — the Meetings DASHBOARD UI, end-to-end.
  *
  * `flow-meetings-crud-contract.spec.ts` drives the `/api/meetings` REST surface
  * with fresh registered users. This file is the DISTINCT, additive UI angle: it
  * seeds meetings through the API as the SEEDED storageState user (so they render
  * for the authenticated browser session) and then asserts the real rendered
  * Next.js pages:
- *   - `/meetings`        list catalog          (MeetingsList + MeetingCard)
+ *   - `/memory#meetings` list catalog          (MeetingsList + MeetingCard)
  *   - `/meetings/new`    capture form          (MeetingForm + createMeetingAction)
  *   - `/meetings/[id]`   detail + mutations    (MeetingDetailClient)
+ *
+ * NAVIGATION CONSOLIDATION (docs/specs/features/navigation-consolidation):
+ * meetings are a memory source, so the catalog moved off its own sidebar entry
+ * and onto the Memory page as the `#meetings` block. Only the INDEX moved —
+ * `/meetings/new` and `/meetings/[id]` are untouched, and `/meetings` itself
+ * still resolves as a redirect carrying its filters. The block is the same
+ * `MeetingsList` in its `panel` chrome, so every `data-testid` this file used
+ * still exists; what changed is the URL it lives at and that its heading is an
+ * `h2` under the Memory page's `h1`.
  *
  * The Meetings surface is a server component that fetches with the seeded user's
  * Better-Auth session cookie, so a meeting created via the JWT API for that same
@@ -123,19 +132,38 @@ function cardFor(page: Page, id: string) {
     return page.locator(`a[href*="/meetings/${id}"]`);
 }
 
+/**
+ * The catalog block on the Memory page. Scoping to it keeps the
+ * assertions honest — the Memory page around it has its own headings,
+ * links and empty states.
+ */
+function catalog(page: Page) {
+    return page.getByTestId('meetings-shell');
+}
+
+/** Open the Memory page at the Meetings block, with optional filters. */
+async function gotoCatalog(page: Page, query = ''): Promise<void> {
+    await page.goto(`/en/memory${query}#meetings`, { waitUntil: 'domcontentloaded' });
+    await expect(catalog(page)).toBeVisible({ timeout: 30_000 });
+}
+
 // ============================================================================
-// A. /meetings list catalog
+// A. Meetings catalog — the `#meetings` block on /memory
 // ============================================================================
 
-test.describe('Meetings — /meetings list catalog (UI)', () => {
+test.describe('Meetings — /memory#meetings list catalog (UI)', () => {
     test('list shell renders header, subtitle, connect hint and New meeting CTA', async ({
         page,
     }) => {
-        await page.goto('/en/meetings', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page);
         await expect(page).not.toHaveURL(/\/login/);
-        await expect(page.getByRole('heading', { name: 'Meetings', level: 1 })).toBeVisible({
+        // The Memory page owns the h1; the block announces itself with an h2.
+        await expect(page.getByRole('heading', { name: 'Memory', level: 1 })).toBeVisible({
             timeout: 30_000,
         });
+        await expect(
+            catalog(page).getByRole('heading', { name: 'Meetings', level: 2 }),
+        ).toBeVisible({ timeout: 30_000 });
         await expect(
             page.getByText('Every meeting the platform captured', { exact: false }),
         ).toBeVisible();
@@ -150,21 +178,22 @@ test.describe('Meetings — /meetings list catalog (UI)', () => {
             /\/plugins/,
         );
 
-        const cta = page.getByRole('link', { name: /New meeting/i }).first();
+        const cta = catalog(page)
+            .getByRole('link', { name: /New meeting/i })
+            .first();
         await expect(cta).toBeVisible();
         await expect(cta).toHaveAttribute('href', /\/meetings\/new/);
     });
 
     test('filter bar exposes the Source control, Apply and Reset', async ({ page }) => {
-        await page.goto('/en/meetings', { waitUntil: 'domcontentloaded' });
-        await expect(page.getByRole('heading', { name: 'Meetings', level: 1 })).toBeVisible({
-            timeout: 30_000,
-        });
+        await gotoCatalog(page);
         await expect(page.getByTestId('meetings-source-filter')).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Apply' })).toBeVisible();
-        const reset = page.getByRole('link', { name: 'Reset' });
+        await expect(catalog(page).getByRole('button', { name: 'Apply' })).toBeVisible();
+        const reset = catalog(page).getByRole('link', { name: 'Reset' });
         await expect(reset).toBeVisible();
-        await expect(reset).toHaveAttribute('href', /\/meetings$/);
+        // Applying/resetting filters re-lands on the block, not on the top of
+        // the Memory page — the GET form posts to `/memory#meetings`.
+        await expect(reset).toHaveAttribute('href', /\/memory#meetings$/);
     });
 
     test('a seeded meeting renders as a card with source, transcript chip and roster', async ({
@@ -178,7 +207,7 @@ test.describe('Meetings — /meetings list catalog (UI)', () => {
             participants: [{ name: 'Ada Lovelace', email: 'ada@example.com' }, { name: 'Grace' }],
         });
 
-        await page.goto('/en/meetings', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page);
         const card = cardFor(page, meeting.id);
         await expect(card).toBeVisible({ timeout: 30_000 });
         await expect(card).toContainText(title);
@@ -205,7 +234,7 @@ test.describe('Meetings — /meetings list catalog (UI)', () => {
             transcriptText: 'Ada: the gate is green. Grace: merging the task branch.',
         });
 
-        await page.goto('/en/meetings', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page);
         const card = cardFor(page, meeting.id);
         await expect(card).toBeVisible({ timeout: 30_000 });
         // The list projection omits the transcript BODY but keeps the flag —
@@ -223,14 +252,14 @@ test.describe('Meetings — /meetings list catalog (UI)', () => {
         // ?offset=480 always overshoots the seeded user's meeting count → API []
         // → the empty-state block AND the "No results on this page" nav. This is
         // deterministic regardless of how many meetings the shared seed owns.
-        await page.goto('/en/meetings?offset=480', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page, '?offset=480');
         await expect(page.getByTestId('meetings-empty')).toBeVisible({ timeout: 30_000 });
         await expect(page.getByText('No meetings yet.')).toBeVisible();
         await expect(
             page.getByText('Capture a meeting by hand and paste its transcript', { exact: false }),
         ).toBeVisible();
         await expect(page.getByText('No results on this page')).toBeVisible();
-        await expect(page.getByRole('link', { name: 'Previous' })).toBeVisible();
+        await expect(catalog(page).getByRole('link', { name: 'Previous' })).toBeVisible();
     });
 
     test('the source filter narrows the list to matching meetings', async ({ page, request }) => {
@@ -244,7 +273,7 @@ test.describe('Meetings — /meetings list catalog (UI)', () => {
             source: 'manual',
         });
 
-        await page.goto('/en/meetings?source=zoom', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page, '?source=zoom');
         await expect(cardFor(page, zoom.id)).toBeVisible({ timeout: 30_000 });
         // The manual meeting must be filtered OUT of the zoom view.
         await expect(cardFor(page, manual.id)).toHaveCount(0);
@@ -257,7 +286,7 @@ test.describe('Meetings — /meetings list catalog (UI)', () => {
         const token = await seededToken(request);
         const meeting = await createMeeting(request, token, { title: `Bogus Source ${suffix()}` });
 
-        await page.goto('/en/meetings?source=telepathy', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page, '?source=telepathy');
         // The page whitelists `source` against the closed set → drops the bogus
         // value → unfiltered list, and the load-error alert never renders.
         await expect(cardFor(page, meeting.id)).toBeVisible({ timeout: 30_000 });
@@ -273,7 +302,7 @@ test.describe('Meetings — /meetings list catalog (UI)', () => {
 
         // `workId` is compared straight against a uuid column server-side, so an
         // arbitrary string would be a cast error (500). The page must drop it.
-        await page.goto('/en/meetings?workId=not-a-uuid', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page, '?workId=not-a-uuid');
         await expect(cardFor(page, meeting.id)).toBeVisible({ timeout: 30_000 });
         await expect(page.getByTestId('meetings-load-error')).toHaveCount(0);
     });
@@ -283,7 +312,7 @@ test.describe('Meetings — /meetings list catalog (UI)', () => {
         const title = `Click Through ${suffix()}`;
         const meeting = await createMeeting(request, token, { title });
 
-        await page.goto('/en/meetings', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page);
         const card = cardFor(page, meeting.id);
         await expect(card).toBeVisible({ timeout: 30_000 });
         // The card is a client <Link>: a click landing before hydration is
@@ -317,7 +346,10 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible({
             timeout: 30_000,
         });
-        await expect(page.getByRole('link', { name: 'Back to Meetings' })).toBeVisible();
+        // The back link points at the catalog's new home — the Memory block.
+        const back = page.getByRole('link', { name: 'Back to Meetings' });
+        await expect(back).toBeVisible();
+        await expect(back).toHaveAttribute('href', /\/memory#meetings$/);
 
         await expect(page.getByRole('heading', { name: 'Summary' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Transcript' })).toBeVisible();
@@ -570,7 +602,7 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         }).toPass({ timeout: 60_000 });
 
         // …and the catalog shows the new title on the same card.
-        await page.goto('/en/meetings', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page);
         await expect(cardFor(page, meeting.id)).toContainText(renamed, { timeout: 30_000 });
     });
 
@@ -603,8 +635,11 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         );
         expect(await getMeetingStatus(request, token, meeting.id)).toBe(404);
 
-        // …and the successful delete pushed us back to the catalog.
-        await expect(page).toHaveURL(/\/meetings$/, { timeout: 30_000 });
+        // …and the successful delete pushed us back to the catalog, which is
+        // the Memory page's block now. The trailing `#meetings` is asserted
+        // optionally — a soft nav's fragment is not reliably reflected in
+        // `page.url()` across browsers.
+        await expect(page).toHaveURL(/\/memory(#meetings)?$/, { timeout: 30_000 });
         await expect(cardFor(page, meeting.id)).toHaveCount(0);
     });
 
@@ -710,7 +745,7 @@ test.describe('Meetings — /meetings/new capture form (UI)', () => {
         });
 
         // And it now appears back in the catalog.
-        await page.goto('/en/meetings', { waitUntil: 'domcontentloaded' });
+        await gotoCatalog(page);
         await expect(page.getByText(title, { exact: true }).first()).toBeVisible({
             timeout: 30_000,
         });
@@ -819,18 +854,60 @@ test.describe('Meetings — /meetings/new capture form (UI)', () => {
 // ============================================================================
 
 test.describe('Meetings — dashboard navigation', () => {
-    test('the sidebar Meetings link routes to the catalog', async ({ page }) => {
+    test('the sidebar no longer carries a Meetings entry', async ({ page }) => {
         await page.goto('/en', { waitUntil: 'domcontentloaded' });
-        const link = page.locator('a[href$="/meetings"], a[href*="/meetings?"]').first();
-        if (!(await link.isVisible({ timeout: 10_000 }).catch(() => false))) {
-            test.skip(true, 'no Meetings nav link surfaced in this build');
-        }
-        // Post-condition: the catalog URL. Sidebar entries are client <Link>s —
-        // a pre-hydration click never starts the soft nav, and `load` never
-        // re-fires on one either, so waitForURL would time out regardless.
-        await clickAndExpectUrl(page, link, /\/meetings(\?|$)/);
-        await expect(page.getByRole('heading', { name: 'Meetings', level: 1 })).toBeVisible({
+        // The dashboard chrome has to be up before "absent" means anything —
+        // asserting a count of 0 against an unrendered page always passes.
+        await expect(page.locator('nav a[href$="/memory"]').first()).toBeVisible({
             timeout: 30_000,
         });
+        // Meetings folded into Memory, so no nav entry points at the retired
+        // index any more. Detail/new links live on pages, not in the sidebar.
+        await expect(
+            page.locator('nav a[href$="/meetings"], nav a[href*="/meetings?"]'),
+        ).toHaveCount(0);
+    });
+
+    test('the sidebar Memory link routes to the page hosting the catalog', async ({ page }) => {
+        await page.goto('/en', { waitUntil: 'domcontentloaded' });
+        const link = page.locator('nav a[href$="/memory"]').first();
+        await expect(link).toBeVisible({ timeout: 30_000 });
+        // Sidebar entries are client <Link>s — a pre-hydration click never
+        // starts the soft nav, and `load` never re-fires on one either, so
+        // waitForURL would time out regardless.
+        await clickAndExpectUrl(page, link, /\/memory(\?|#|$)/);
+        await expect(catalog(page)).toBeVisible({ timeout: 30_000 });
+        await expect(
+            catalog(page).getByRole('heading', { name: 'Meetings', level: 2 }),
+        ).toBeVisible();
+    });
+
+    test('/meetings redirects to the Memory block and carries its filters', async ({ page }) => {
+        await page.goto('/en/meetings?source=zoom', { waitUntil: 'domcontentloaded' });
+        await expect(catalog(page)).toBeVisible({ timeout: 30_000 });
+
+        // Assert the parts, not the whole string: the locale prefix collapses
+        // and Playwright does not reflect the fragment consistently, but the
+        // pathname and the preserved filter are the actual contract.
+        const url = new URL(page.url());
+        expect(url.pathname).toMatch(/^\/(en\/)?memory$/);
+        expect(url.searchParams.get('source')).toBe('zoom');
+
+        // The filter really applied — the source picker shows Zoom, not "Any".
+        await expect(page.getByTestId('meetings-source-filter')).toContainText('Zoom');
+    });
+
+    test('a junk filter is dropped by the redirect rather than forwarded', async ({ page }) => {
+        // `workId` is compared against a uuid column server-side, so the
+        // redirect re-parses instead of passing the query through verbatim.
+        await page.goto('/en/meetings?workId=not-a-uuid&source=telepathy', {
+            waitUntil: 'domcontentloaded',
+        });
+        await expect(catalog(page)).toBeVisible({ timeout: 30_000 });
+        const url = new URL(page.url());
+        expect(url.pathname).toMatch(/^\/(en\/)?memory$/);
+        expect(url.searchParams.get('workId')).toBeNull();
+        expect(url.searchParams.get('source')).toBeNull();
+        await expect(page.getByTestId('meetings-load-error')).toHaveCount(0);
     });
 });

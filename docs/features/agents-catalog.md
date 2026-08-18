@@ -18,6 +18,14 @@ and **how the platform reads it**. For the Agent runtime and REST surface,
 see [Agents (Your AI Employees)](./agents.md) and the
 [Agents API](/api/agents).
 
+:::note Where to find it
+The Create-Agent wizard that surfaces these templates opens from
+**Sidebar → Teams → Agents tab → + New Agent**. Agents are tab 2 of the
+**Teams** hub (**Teams | Agents | Sessions | Archived**); the same tab hosts
+the **Agents Chart** button (`/agents/chart`) and the **Skills** block
+(`/agents#skills`).
+:::
+
 **Key sources:**
 
 - `apps/api/src/agents/agent-template-catalog.service.ts` — the catalog reader
