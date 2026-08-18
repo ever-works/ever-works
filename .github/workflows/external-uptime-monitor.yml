@@ -151,14 +151,24 @@ jobs:
           probe_once() {
             local url="$1"
             : > "${BODY}"; : > "${ERRF}"
+            # 🛑 `|| CURL_RC=$?` is load-bearing, not defensive style.
+            # GitHub runs `run:` steps under `bash -e`, and the `set -uo
+            # pipefail` above ADDS flags — it does not clear `-e`. With this
+            # assignment unchecked, a curl timeout (exit 28) terminated the
+            # whole STEP right here: before the 3-attempt retry below, and
+            # before the control-target check that says "vantage point
+            # suspect". Both safety nets were dead code for every transport
+            # failure, so one blip on one target reported as a hard failure
+            # with no verdict. Observed twice on demo.ever.works while all
+            # seven production surfaces answered 200.
+            CURL_RC=0
             W="$(curl -sS -L \
                   --connect-timeout 8 \
                   --max-time 20 \
                   -A "${PROBE_UA}" \
                   -o "${BODY}" \
                   -w '%{http_code} %{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer} %{time_total} %{size_download}' \
-                  "${url}" 2>"${ERRF}")"
-            CURL_RC=$?
+                  "${url}" 2>"${ERRF}")" || CURL_RC=$?
             if [ -z "${W}" ]; then
               W="000 0.000000 0.000000 0.000000 0.000000 0.000000 0"
             fi
