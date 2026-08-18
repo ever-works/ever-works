@@ -16,9 +16,17 @@ import type { LucideProps } from 'lucide-react';
  * are typed as, and a plain function component is not assignable to it.
  */
 export const HumanAgentIcon = forwardRef<SVGSVGElement, LucideProps>(function HumanAgentIcon(
-    { size = 24, strokeWidth = 2, className, ...rest },
+    { size = 24, strokeWidth = 2, absoluteStrokeWidth = false, className, ...rest },
     ref,
 ) {
+    // Same rule as lucide's own icons: with `absoluteStrokeWidth` the stroke
+    // stays the same visual weight at any `size` instead of scaling with the
+    // viewBox. Destructured either way so it never lands on the <svg> as an
+    // unknown attribute.
+    const numericSize = Number(size) || 24;
+    const resolvedStrokeWidth = absoluteStrokeWidth
+        ? (Number(strokeWidth) * 24) / numericSize
+        : strokeWidth;
     return (
         <svg
             ref={ref}
@@ -28,7 +36,7 @@ export const HumanAgentIcon = forwardRef<SVGSVGElement, LucideProps>(function Hu
             height={size}
             fill="none"
             stroke="currentColor"
-            strokeWidth={strokeWidth}
+            strokeWidth={resolvedStrokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
             className={className}

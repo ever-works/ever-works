@@ -35,4 +35,15 @@ describe('HumanAgentIcon', () => {
         expect(svg?.getAttribute('stroke')).toBe('currentColor');
         expect(svg?.getAttribute('fill')).toBe('none');
     });
+
+    it('honours absoluteStrokeWidth like lucide (stroke = width * 24 / size) and does not forward it', () => {
+        const { container } = render(
+            <HumanAgentIcon size={48} strokeWidth={2} absoluteStrokeWidth />,
+        );
+        const svg = container.querySelector('svg');
+        expect(svg?.getAttribute('width')).toBe('48');
+        expect(svg?.getAttribute('stroke-width')).toBe('1');
+        expect(svg?.hasAttribute('absoluteStrokeWidth')).toBe(false);
+        expect(svg?.hasAttribute('absolutestrokewidth')).toBe(false);
+    });
 });

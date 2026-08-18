@@ -8112,7 +8112,7 @@
         },
         "agentsChartPage": {
             "title": "Agents Chart",
-            "subtitle": "How your Agents are organised — teams and reporting lines, without human members.",
+            "subtitle": "How your Agents are organized — teams and reporting lines, without human members.",
             "backToAgents": "Back to Agents",
             "empty": "No Agents yet. Create an Agent and it will appear here.",
             "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
