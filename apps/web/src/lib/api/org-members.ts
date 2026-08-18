@@ -12,6 +12,8 @@ export interface OrgMember {
     joinedAt: string;
     /** Server-computed. The UI must never offer a self-removal button. */
     isSelf: boolean;
+    /** The Tenant owner: never removable. */
+    isOwner: boolean;
 }
 
 export interface OrgInvitation {

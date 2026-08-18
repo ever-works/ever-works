@@ -32,6 +32,12 @@ export type OrganizationMemberView = {
     joinedAt: Date;
     /** Server-computed, so the client cannot forget to ask. */
     isSelf: boolean;
+    /**
+     * The Tenant owner. Never removable — removing them would orphan every
+     * Organization in the Tenant — and possibly SYNTHESIZED, because an org
+     * created before organization_members existed has no roster row for them.
+     */
+    isOwner: boolean;
 };
 
 export type AcceptOutcome = {
@@ -265,16 +271,51 @@ export class OrganizationInvitationFlowService {
      * told its own id separately is a client that will one day forget to.
      */
     async listMembers(orgId: string, actorUserId: string): Promise<OrganizationMemberView[]> {
-        await this.membership.ensureMember(orgId, actorUserId);
+        const organization = await this.membership.ensureMember(orgId, actorUserId);
         const rows = await this.members.listForOrganization(orgId);
-        if (rows.length === 0) return [];
 
+        // 🛑 The Tenant owner is a member by construction and has NO roster row:
+        // nothing ever wrote one, because organization_members did not exist
+        // when their Organization was created. Without this, the members list
+        // is EMPTY for every Organization that predates this feature — which,
+        // on the day it ships, is all of them — and the owner sees a panel
+        // implying they are not in their own org.
+        //
+        // Synthesized rather than backfilled: this is a read path, and a lazy
+        // write here would be a surprising side effect of opening a settings
+        // page. The synthetic row carries the real user, is flagged `isOwner`,
+        // and is never removable — which is also the correct behaviour, since
+        // removing the owner would orphan every Organization in the Tenant.
+        const ownerId = organization.tenantId
+            ? ((await this.tenants.findById(organization.tenantId))?.ownerUserId ?? null)
+            : null;
+        const ownerHasRow = ownerId ? rows.some((r) => r.userId === ownerId) : true;
+
+        if (rows.length === 0 && ownerHasRow) return [];
+
+        const userIds = [...rows.map((r) => r.userId), ...(ownerHasRow ? [] : [ownerId!])];
         const users = await Promise.all(
-            rows.map((r) => this.users.findById(r.userId).catch(() => null)),
+            userIds.map((id) => this.users.findById(id).catch(() => null)),
         );
         const byId = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));
 
-        return rows.map((r) => {
+        const synthetic: OrganizationMemberView[] = ownerHasRow
+            ? []
+            : [
+                  {
+                      id: `owner:${ownerId}`,
+                      userId: ownerId!,
+                      username: byId.get(ownerId!)?.username ?? null,
+                      email: byId.get(ownerId!)?.email ?? null,
+                      role: 'owner',
+                      invitedById: null,
+                      joinedAt: organization.createdAt ?? new Date(),
+                      isSelf: ownerId === actorUserId,
+                      isOwner: true,
+                  },
+              ];
+
+        const real: OrganizationMemberView[] = rows.map((r) => {
             const user = byId.get(r.userId);
             return {
                 id: r.id,
@@ -288,8 +329,12 @@ export class OrganizationInvitationFlowService {
                 invitedById: r.invitedById,
                 joinedAt: r.joinedAt,
                 isSelf: r.userId === actorUserId,
+                isOwner: ownerId !== null && r.userId === ownerId,
             };
         });
+
+        // Owner first — they are the fixed point of the list.
+        return [...synthetic, ...real];
     }
 
     async listInvitations(orgId: string, actorUserId: string): Promise<OrganizationInvitation[]> {

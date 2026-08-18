@@ -131,8 +131,14 @@ export function OrganizationMembersSection({ organizationId }: Props) {
                                     and every member — including you — was offered a
                                     Remove button that clears their own tenant
                                     access. */}
-                                {m.isSelf ? (
-                                    <span className="text-xs text-text-secondary">{t('you')}</span>
+                                {m.isOwner || m.isSelf ? (
+                                    // The owner is a member by construction, and
+                                    // removing them would orphan every
+                                    // Organization in the Tenant — so they get a
+                                    // label rather than a button, same as you.
+                                    <span className="text-xs text-text-secondary">
+                                        {m.isOwner ? t('owner') : t('you')}
+                                    </span>
                                 ) : (
                                     <button
                                         type="button"

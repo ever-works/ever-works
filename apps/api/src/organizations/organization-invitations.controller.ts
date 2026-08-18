@@ -41,6 +41,8 @@ export interface OrganizationMemberResponse {
     joinedAt: Date;
     /** Server-computed, so the UI never offers you a button that evicts you. */
     isSelf: boolean;
+    /** The Tenant owner: never removable, and may be a synthesized row. */
+    isOwner: boolean;
 }
 
 /**
