@@ -116,6 +116,17 @@ export interface TeamsOrganization {
     displayName: string;
 }
 
+/**
+ * A person in the org directory, for the add-member picker.
+ * Hand-mirrors `OrgUserView` in `packages/agent/src/teams/types.ts`.
+ */
+export interface OrgUser {
+    id: string;
+    username: string;
+    email: string | null;
+    avatar: string | null;
+}
+
 export const teamsAPI = {
     /** Organizations of the current user's Tenant (server-side). */
     async listOrganizations(): Promise<TeamsOrganization[]> {
@@ -128,6 +139,24 @@ export const teamsAPI = {
 
     async list(orgId: string): Promise<Team[]> {
         return serverFetch<Team[]>(`/organizations/${orgId}/teams`, { method: 'GET' });
+    },
+
+    /**
+     * The people who can be added to a team as human members.
+     *
+     * Swallows failures to `[]` like `listOrganizations` above: this feeds a
+     * picker on a page whose primary job (viewing the team) must still render
+     * if the directory call fails. An empty picker degrades; a thrown error
+     * would blank the whole team page.
+     */
+    async listUsers(orgId: string): Promise<OrgUser[]> {
+        try {
+            return await serverFetch<OrgUser[]>(`/organizations/${orgId}/users`, {
+                method: 'GET',
+            });
+        } catch {
+            return [];
+        }
     },
 
     async get(orgId: string, teamId: string): Promise<TeamDetail | null> {

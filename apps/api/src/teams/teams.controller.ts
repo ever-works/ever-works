@@ -18,6 +18,7 @@ import type { Team, TeamResourceType } from '@ever-works/agent/teams';
 import { OrgChartService, TeamResourcesService, TeamsService } from '@ever-works/agent/teams';
 import type {
     OrgChartPayload,
+    OrgUserView,
     ResourceTeamRef,
     TeamMemberView,
     TeamResourceItem,
@@ -79,6 +80,17 @@ export class TeamsController {
         private readonly orgChart: OrgChartService,
         private readonly teamResources: TeamResourcesService,
     ) {}
+
+    @Get('users')
+    @ApiOperation({
+        summary: 'List the people in an Organization',
+        description:
+            'The directory behind the Teams add-member picker. Returns exactly the users that POST teams/:teamId/members accepts as a human member, so the picker cannot offer someone it would then be refused.',
+    })
+    @ApiResponse({ status: 200, description: 'Users listed' })
+    async listUsers(@Param('orgId', ParseUUIDPipe) orgId: string): Promise<OrgUserView[]> {
+        return this.teamsService.listOrgUsers(orgId);
+    }
 
     @Get('teams')
     @ApiOperation({

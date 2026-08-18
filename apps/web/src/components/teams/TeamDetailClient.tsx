@@ -28,6 +28,7 @@ import { ROUTES } from '@/lib/constants';
 import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
 import { TeamResourcesSection, type ResourceOption } from '@/components/teams/TeamResourcesSection';
 import type {
+    OrgUser,
     Team,
     TeamDetail,
     TeamMemberRole,
@@ -77,6 +78,8 @@ export interface TeamDetailClientProps {
     teams: Team[];
     /** Org Agents — add-member select + manager/member name resolution. */
     agents: TeamAgentOption[];
+    /** Org people — the human half of the add-member select + name resolution. */
+    users: OrgUser[];
     /** Resources (Works/Agents/…) attached to this team, grouped by type. */
     resources: TeamResourcesGrouped;
     /** Org Works available to attach in the Resources section. */
@@ -86,23 +89,24 @@ export interface TeamDetailClientProps {
 /**
  * Teams & Prebuilt Companies §4.2 — `/teams/[id]` overview client.
  * Header (icon, manager chip, parent link, settings), roster with
- * add/remove (v1: agent members only — the user option is telegraphed
- * but disabled), and sub-team cards. Mutations go through the server
- * actions then `router.refresh()` so the server payload stays the
- * single source of truth.
+ * add/remove (Agents and people — the Type select switches which
+ * directory the Who select is drawn from), and sub-team cards.
+ * Mutations go through the server actions then `router.refresh()` so
+ * the server payload stays the single source of truth.
  */
 export function TeamDetailClient({
     org,
     team,
     teams,
     agents,
+    users,
     resources,
     works,
 }: TeamDetailClientProps) {
     const t = useTranslations('dashboard.teamsPage');
     const router = useRouter();
     const [memberType, setMemberType] = useState<TeamMemberType>('agent');
-    const [selectedAgentId, setSelectedAgentId] = useState('');
+    const [selectedMemberId, setSelectedMemberId] = useState('');
     const [role, setRole] = useState<TeamMemberRole>('member');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
@@ -116,31 +120,59 @@ export function TeamDetailClient({
         .map((childId) => teamById.get(childId))
         .filter((entry): entry is Team => Boolean(entry));
 
-    const rosterAgentIds = new Set(
-        team.members
-            .filter((member) => member.memberType === 'agent')
-            .map((member) => member.memberId),
-    );
+    const userById = new Map(users.map((user) => [user.id, user]));
+
+    /** Already on the roster, so not offerable again — the DB carries a
+     *  matching UNIQUE(teamId, memberType, memberId), and an option that can
+     *  only 409 is not a choice. Keyed per type: Agent ids and user ids are
+     *  separate id spaces, so one shared set would hide real candidates. */
+    const rosterIdsByType = (type: TeamMemberType) =>
+        new Set(
+            team.members
+                .filter((member) => member.memberType === type)
+                .map((member) => member.memberId),
+        );
+    const rosterAgentIds = rosterIdsByType('agent');
+    const rosterUserIds = rosterIdsByType('user');
     const addableAgents = agents.filter((agent) => !rosterAgentIds.has(agent.id));
+    const addableUsers = users.filter((user) => !rosterUserIds.has(user.id));
+
+    /** What the Who select offers, for whichever directory is selected. */
+    const addableOptions =
+        memberType === 'agent'
+            ? addableAgents.map((agent) => ({
+                  id: agent.id,
+                  label: agent.title ? `${agent.name} — ${agent.title}` : agent.name,
+              }))
+            : addableUsers.map((user) => ({
+                  id: user.id,
+                  // Usernames are unique, but they are not always
+                  // recognisable — the email is what lets you tell which
+                  // colleague this actually is. Shown when there is one.
+                  label: user.email ? `${user.username} — ${user.email}` : user.username,
+              }));
 
     const memberName = (member: TeamMemberView): string => {
         if (member.name) return member.name;
         if (member.memberType === 'agent') {
             return agentById.get(member.memberId)?.name ?? member.memberId;
         }
-        return member.memberId;
+        // The server resolves human members to their username, so this only
+        // fires when the User row is gone. Try the directory before falling
+        // back to echoing a raw UUID at whoever is reading the roster.
+        return userById.get(member.memberId)?.username ?? member.memberId;
     };
 
     const handleAdd = async () => {
-        if (!selectedAgentId || isSubmitting) return;
+        if (!selectedMemberId || isSubmitting) return;
         setIsSubmitting(true);
         try {
             await addTeamMemberAction(org.id, team.id, {
-                memberType: 'agent',
-                memberId: selectedAgentId,
+                memberType,
+                memberId: selectedMemberId,
                 role,
             });
-            setSelectedAgentId('');
+            setSelectedMemberId('');
             setRole('member');
             router.refresh();
         } catch {
@@ -304,15 +336,18 @@ export function TeamDetailClient({
                             <select
                                 id="team-member-type"
                                 value={memberType}
-                                onChange={(event) =>
-                                    setMemberType(event.target.value as TeamMemberType)
-                                }
+                                onChange={(event) => {
+                                    setMemberType(event.target.value as TeamMemberType);
+                                    // Agent ids and user ids are separate id
+                                    // spaces. Carrying the old selection across
+                                    // a type switch would post an Agent id as a
+                                    // user — a 404 the user cannot explain.
+                                    setSelectedMemberId('');
+                                }}
                                 className={SELECT_CLASSES}
                             >
                                 <option value="agent">{t('detail.addMemberAgent')}</option>
-                                <option value="user" disabled>
-                                    {t('detail.addMemberUser')}
-                                </option>
+                                <option value="user">{t('detail.addMemberUser')}</option>
                             </select>
                         </div>
                         <div className="flex-1 min-w-0">
@@ -324,16 +359,14 @@ export function TeamDetailClient({
                             </label>
                             <select
                                 id="team-member-select"
-                                value={selectedAgentId}
-                                onChange={(event) => setSelectedAgentId(event.target.value)}
+                                value={selectedMemberId}
+                                onChange={(event) => setSelectedMemberId(event.target.value)}
                                 className={SELECT_CLASSES}
                             >
                                 <option value="">{t('detail.addMemberSelectLabel')}</option>
-                                {addableAgents.map((agent) => (
-                                    <option key={agent.id} value={agent.id}>
-                                        {agent.title
-                                            ? `${agent.name} — ${agent.title}`
-                                            : agent.name}
+                                {addableOptions.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                        {option.label}
                                     </option>
                                 ))}
                             </select>
@@ -352,7 +385,7 @@ export function TeamDetailClient({
                         <Button
                             size="sm"
                             onClick={handleAdd}
-                            disabled={!selectedAgentId || isSubmitting}
+                            disabled={!selectedMemberId || isSubmitting}
                             loading={isSubmitting}
                             data-testid="team-member-add"
                             className="shrink-0"
