@@ -19,6 +19,7 @@ import { OrganizationMembershipService } from './organization-membership.service
 import { OrganizationOwnershipGuard } from './guards/organization-ownership.guard';
 import { OrganizationsController } from './organizations.controller';
 import { MailModule } from '../mail/mail.module';
+import { AuthModule } from '../auth/auth.module';
 import { OrganizationInvitationsController } from './organization-invitations.controller';
 import { OrganizationInvitationFlowService } from './organization-invitation-flow.service';
 import { OrganizationInvitationService } from '@ever-works/agent/services';
@@ -66,6 +67,12 @@ import { WorkRegisteredListener } from './work-registered.listener';
         FacadesModule,
         // Organization invitations send email; MailModule exports MailService.
         MailModule,
+        // 🛑 REQUIRED by OrganizationInvitationsController's
+        // @UseGuards(AuthSessionGuard, ...). AuthModule is NOT @Global and
+        // AuthSessionGuard uses constructor injection, so without this the
+        // API crash-loops at boot with "Nest can't resolve dependencies".
+        // TeamsModule imports it for exactly the same reason.
+        AuthModule,
     ],
     providers: [
         UserRepository,

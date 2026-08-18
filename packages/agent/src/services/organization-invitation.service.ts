@@ -115,6 +115,18 @@ export class OrganizationInvitationService {
         }
     }
 
+    /**
+     * Read one invitation by id, whatever its state.
+     *
+     * Distinct from `findConsumable`, which refuses anything already spent:
+     * the accept path needs to inspect a CLAIMED row to tell "this same user
+     * double-clicked" from "somebody else took it", and a consumable-only
+     * lookup cannot answer that.
+     */
+    async findById(id: string): Promise<OrganizationInvitation | null> {
+        return this.invitations.findById(id);
+    }
+
     async listForOrganization(organizationId: string): Promise<OrganizationInvitation[]> {
         return this.invitations.listForOrganization(organizationId);
     }

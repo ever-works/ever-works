@@ -19,10 +19,15 @@ describe('TenantBootstrapService (EW-658 Phase 6)', () => {
         userById?: ReturnType<typeof makeUser> | null;
         tenantById?: { id: string; slug: string; ownerUserId: string } | null;
         tenantByOwner?: { id: string; slug: string; ownerUserId: string } | null;
+        /** false models another accept winning the tenant assignment first. */
+        claimWins?: boolean;
     }) {
         const userRepository = {
             findById: jest.fn().mockResolvedValue(opts.userById ?? null),
             update: jest.fn().mockResolvedValue(undefined),
+            // The conditional UPDATE that replaced the read-then-write.
+            // Defaults to winning; tests override it to model a lost race.
+            claimTenantIfUnassigned: jest.fn().mockResolvedValue(opts.claimWins ?? true),
         };
         const tenantRepository = {
             findById: jest.fn().mockResolvedValue(opts.tenantById ?? null),
@@ -126,7 +131,7 @@ describe('TenantBootstrapService (EW-658 Phase 6)', () => {
             });
 
             await expect(service.joinTenant('u-1', 't-host', 'org-1')).resolves.toBe('joined');
-            expect(userRepository.update).toHaveBeenCalledWith('u-1', { tenantId: 't-host' });
+            expect(userRepository.claimTenantIfUnassigned).toHaveBeenCalledWith('u-1', 't-host');
         });
 
         it(`🛑 REFUSES to move a user who already belongs to a different Tenant`, async () => {
@@ -191,6 +196,41 @@ describe('TenantBootstrapService (EW-658 Phase 6)', () => {
             );
         });
 
+        it('🛑 refuses when another accept won the tenant assignment first', async () => {
+            // The TOCTOU this replaced: the initial read says tenantId IS
+            // NULL, then a concurrent accept of a DIFFERENT invitation
+            // assigns one. An unconditional write would clobber it and home
+            // the user in whichever tenant committed last — with BOTH
+            // invitations left marked accepted.
+            const { service, userRepository } = makeService({
+                userById: makeUser({ id: 'u-1', tenantId: null }),
+                claimWins: false,
+            });
+            userRepository.findById
+                .mockResolvedValueOnce(makeUser({ id: 'u-1', tenantId: null }))
+                .mockResolvedValueOnce(makeUser({ id: 'u-1', tenantId: 't-somebody-else' }));
+
+            await expect(service.joinTenant('u-1', 't-host', 'org-1')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+        });
+
+        it('treats losing the race to the SAME tenant as idempotent success', async () => {
+            // A double-clicked accept: the loser must not report a conflict
+            // when the outcome it wanted is exactly what happened.
+            const { service, userRepository } = makeService({
+                userById: makeUser({ id: 'u-1', tenantId: null }),
+                claimWins: false,
+            });
+            userRepository.findById
+                .mockResolvedValueOnce(makeUser({ id: 'u-1', tenantId: null }))
+                .mockResolvedValueOnce(makeUser({ id: 'u-1', tenantId: 't-host' }));
+
+            await expect(service.joinTenant('u-1', 't-host', 'org-1')).resolves.toBe(
+                'already_member',
+            );
+        });
+
         it('never runs the tenantId backfill', async () => {
             // createOrganization walks TIER_A + TIER_B tables stamping the
             // new tenantId onto the user's existing rows. Doing that here
@@ -203,12 +243,10 @@ describe('TenantBootstrapService (EW-658 Phase 6)', () => {
 
             await service.joinTenant('u-1', 't-host', 'org-1');
 
+            // The tenant assignment now goes through the conditional claim,
+            // so the ONLY plain update() left is the optional landing scope.
             for (const call of userRepository.update.mock.calls) {
-                expect(Object.keys(call[1])).toEqual(
-                    expect.arrayContaining([
-                        expect.stringMatching(/^(tenantId|lastScopeOrganizationId)$/),
-                    ]),
-                );
+                expect(Object.keys(call[1])).toEqual(['lastScopeOrganizationId']);
             }
             expect(tenantRepository.create).not.toHaveBeenCalled();
         });

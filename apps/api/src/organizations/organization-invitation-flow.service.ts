@@ -121,14 +121,17 @@ export class OrganizationInvitationFlowService {
      *
      *  1. `findConsumable` with the redeemer's address — validates the token
      *     AND enforces the email binding before anything is written.
-     *  2. `joinTenant` — may THROW for a user who already belongs elsewhere.
-     *     It runs before the invitation is marked accepted so that a refusal
-     *     leaves the invitation still redeemable; burning a token on a
-     *     failure would strand the invitee with no way back.
-     *  3. `tryAccept` — the conditional UPDATE that resolves concurrent
-     *     redemptions. If it returns false somebody else won the race.
-     *  4. The roster row last, because it is the only step that is safe to
-     *     retry and the only one that is purely a record.
+     *  2. `tryAccept` — the conditional UPDATE, and the ONLY atomic gate.
+     *     Nothing is granted unless it wins.
+     *  3. `joinTenant` — the access grant, only after the claim succeeded.
+     *  4. The roster row last: it is purely a record and safe to retry.
+     *
+     * 🛑 Steps 2 and 3 were originally swapped, and that was a real defect,
+     * not a stylistic choice. `joinTenant` commits `users.tenantId`, so with
+     * the grant first a concurrent REVOKE landing in the window left the
+     * invitee with tenant-wide access, no roster row, no entry in the
+     * members list, and no way for an admin to remove them. Whatever gate
+     * authorizes access has to be the atomic one.
      */
     async accept(token: string, userId: string): Promise<AcceptOutcome> {
         const user = await this.users.findById(userId);
@@ -147,24 +150,41 @@ export class OrganizationInvitationFlowService {
             throw new BadRequestException('organization_not_found');
         }
 
-        // May throw ConflictException('user_already_in_another_tenant').
-        // Deliberately BEFORE tryAccept — see the docblock.
-        const outcome = await this.tenantBootstrap.joinTenant(
-            userId,
-            invitation.tenantId,
-            invitation.organizationId,
-        );
-
+        // 🛑 The CLAIM comes first, and it is what authorizes the grant.
+        //
+        // This ordering was originally the other way round, on the theory
+        // that refusing a cross-tenant user before burning the token left
+        // the invitation redeemable. That reasoning only covered the
+        // REFUSAL case and missed the inverse: joinTenant commits
+        // `users.tenantId`, so if the claim then lost a race with a
+        // concurrent revoke, the invitee kept tenant-wide access with NO
+        // roster row — invisible in the members list (which reads the
+        // roster) and not removable through removeMember (which needs one).
+        // A revoked invitation therefore still granted access.
+        //
+        // Claiming first inverts that: the conditional UPDATE is the single
+        // atomic gate, and nothing is granted unless it wins.
         const claimed = await this.invitations.tryAccept(invitation.id, userId);
         if (!claimed) {
-            // Someone redeemed this token between our read and our write.
-            // If that someone was this same user (a double-clicked accept),
-            // the tenant join above was idempotent and they are already in —
-            // so report success rather than a confusing error.
-            const fresh = await this.invitations
-                .findConsumable(token, user.email)
-                .catch(() => null);
-            if (fresh === null && outcome === 'already_member') {
+            // Somebody consumed this token between our read and our write.
+            // If it was this same user (a double-clicked accept) the row now
+            // records THEM, so report success instead of a confusing error.
+            // Checking `acceptedByUserId` is what makes that precise — the
+            // previous code inferred it from a failed re-read, which also
+            // matched a REVOKED invitation and reported success for it.
+            const current = await this.invitations.findById(invitation.id);
+            if (current?.acceptedByUserId === userId) {
+                // Their earlier accept already granted the tenant and wrote
+                // the roster row; make sure both are present, then succeed.
+                await this.tenantBootstrap.joinTenant(
+                    userId,
+                    invitation.tenantId,
+                    invitation.organizationId,
+                );
+                await this.recordMembership(organization.id, invitation.tenantId, userId, {
+                    invitedById: invitation.invitedById,
+                    invitationId: invitation.id,
+                });
                 return {
                     organizationId: organization.id,
                     organizationSlug: organization.slug,
@@ -172,6 +192,29 @@ export class OrganizationInvitationFlowService {
                 };
             }
             throw new BadRequestException('invitation_state_changed');
+        }
+
+        // The token is now spent and belongs to this user. Grant access.
+        //
+        // joinTenant may still throw ConflictException for a user who
+        // already belongs to another Tenant. That leaves the invitation
+        // marked accepted without a grant — deliberately: the alternative
+        // is leaving a live token for a person who provably cannot use it,
+        // and re-inviting a DIFFERENT address is the actual remedy. The
+        // roster row is not written either, so the state stays consistent.
+        let outcome: Awaited<ReturnType<TenantBootstrapService['joinTenant']>>;
+        try {
+            outcome = await this.tenantBootstrap.joinTenant(
+                userId,
+                invitation.tenantId,
+                invitation.organizationId,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Invitation ${invitation.id} was claimed by ${userId} but the tenant join failed — ` +
+                    `no access granted, no roster row written`,
+            );
+            throw error;
         }
 
         await this.recordMembership(organization.id, invitation.tenantId, userId, {

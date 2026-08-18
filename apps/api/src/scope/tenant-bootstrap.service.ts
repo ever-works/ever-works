@@ -168,7 +168,29 @@ export class TenantBootstrapService {
             throw new ConflictException('user_already_in_another_tenant');
         }
 
-        await this.userRepository.update(userId, { tenantId });
+        // 🛑 Conditional UPDATE, not `update(id, { tenantId })`.
+        //
+        // The read above is a hint, not a decision: between it and the write,
+        // a concurrent accept of a DIFFERENT invitation can assign a Tenant.
+        // An unconditional write would clobber it last-write-wins, quietly
+        // homing the user in one Tenant while a second invitation is also
+        // marked accepted. `WHERE "tenantId" IS NULL` lets the database
+        // arbitrate so exactly one accept can win.
+        const claimed = await this.userRepository.claimTenantIfUnassigned(userId, tenantId);
+        if (!claimed) {
+            // Somebody assigned a Tenant in the window. Re-read to see whose
+            // it is: the same one is idempotent success, a different one is
+            // the refusal above, arrived at a few milliseconds later.
+            const fresh = await this.userRepository.findById(userId);
+            if (fresh?.tenantId === tenantId) {
+                return 'already_member';
+            }
+            this.logger.warn(
+                `Lost a race assigning tenant ${tenantId} to user ${userId} — ` +
+                    `they were concurrently homed in ${fresh?.tenantId ?? 'none'}`,
+            );
+            throw new ConflictException('user_already_in_another_tenant');
+        }
 
         // Point them at the Org they were invited to, but only if they have
         // no scope preference yet — never stomp an existing choice.
