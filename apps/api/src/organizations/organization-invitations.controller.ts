@@ -33,9 +33,14 @@ export interface OrganizationInvitationResponse {
 export interface OrganizationMemberResponse {
     id: string;
     userId: string;
+    /** Display identity. Null only if the User row vanished mid-read. */
+    username: string | null;
+    email: string | null;
     role: string;
     invitedById: string | null;
     joinedAt: Date;
+    /** Server-computed, so the UI never offers you a button that evicts you. */
+    isSelf: boolean;
 }
 
 /**
@@ -68,13 +73,9 @@ export class OrganizationInvitationsController {
         @CurrentUser() user: AuthenticatedUser,
     ): Promise<OrganizationMemberResponse[]> {
         const members = await this.flow.listMembers(orgId, user.userId);
-        return members.map((m) => ({
-            id: m.id,
-            userId: m.userId,
-            role: m.role,
-            invitedById: m.invitedById,
-            joinedAt: m.joinedAt,
-        }));
+        // The service already resolved identity and isSelf; passing the view
+        // straight through keeps one definition of "who is this row".
+        return members;
     }
 
     @Get('invitations')

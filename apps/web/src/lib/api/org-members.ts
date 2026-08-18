@@ -4,9 +4,14 @@ import { serverFetch, serverMutation } from './server-api';
 export interface OrgMember {
     id: string;
     userId: string;
+    /** Display identity, resolved server-side. Null only if the User vanished. */
+    username: string | null;
+    email: string | null;
     role: string;
     invitedById: string | null;
     joinedAt: string;
+    /** Server-computed. The UI must never offer a self-removal button. */
+    isSelf: boolean;
 }
 
 export interface OrgInvitation {

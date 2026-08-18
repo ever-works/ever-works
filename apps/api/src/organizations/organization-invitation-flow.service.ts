@@ -15,6 +15,25 @@ import { MailService } from '../mail/mail.service';
 import { config } from '../config/constants';
 import { OrganizationMembershipService } from './organization-membership.service';
 
+/**
+ * A roster row as the members UI needs it.
+ *
+ * `username`/`email` are nullable because the roster row outlives nothing but
+ * could still be read while the User row is mid-delete; the UI falls back
+ * rather than rendering a UUID.
+ */
+export type OrganizationMemberView = {
+    id: string;
+    userId: string;
+    username: string | null;
+    email: string | null;
+    role: string;
+    invitedById: string | null;
+    joinedAt: Date;
+    /** Server-computed, so the client cannot forget to ask. */
+    isSelf: boolean;
+};
+
 export type AcceptOutcome = {
     organizationId: string;
     organizationSlug: string;
@@ -233,9 +252,44 @@ export class OrganizationInvitationFlowService {
         };
     }
 
-    async listMembers(orgId: string, actorUserId: string): Promise<OrganizationMember[]> {
+    /**
+     * The roster, with each member resolved to a person.
+     *
+     * Returns display identity rather than bare `userId`s. A members list that
+     * renders raw UUIDs is unusable for its one purpose — deciding who to
+     * remove — and it makes "is this row me?" impossible to answer, which is
+     * how a UI ends up offering somebody a button that evicts themselves.
+     *
+     * `isSelf` is computed here rather than left to the client: the caller's
+     * identity is already known at this layer, and a client that has to be
+     * told its own id separately is a client that will one day forget to.
+     */
+    async listMembers(orgId: string, actorUserId: string): Promise<OrganizationMemberView[]> {
         await this.membership.ensureMember(orgId, actorUserId);
-        return this.members.listForOrganization(orgId);
+        const rows = await this.members.listForOrganization(orgId);
+        if (rows.length === 0) return [];
+
+        const users = await Promise.all(
+            rows.map((r) => this.users.findById(r.userId).catch(() => null)),
+        );
+        const byId = new Map(users.filter(Boolean).map((u) => [u!.id, u!]));
+
+        return rows.map((r) => {
+            const user = byId.get(r.userId);
+            return {
+                id: r.id,
+                userId: r.userId,
+                // `username` is non-null on User and is what
+                // `resolveMemberViews` uses for team rosters — the same person
+                // reads the same way in both places.
+                username: user?.username ?? null,
+                email: user?.email ?? null,
+                role: r.role,
+                invitedById: r.invitedById,
+                joinedAt: r.joinedAt,
+                isSelf: r.userId === actorUserId,
+            };
+        });
     }
 
     async listInvitations(orgId: string, actorUserId: string): Promise<OrganizationInvitation[]> {

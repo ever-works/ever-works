@@ -15,8 +15,6 @@ import type { OrgInvitation, OrgMember } from '@/lib/api/org-members';
 
 interface Props {
     organizationId: string;
-    /** The signed-in user, so the UI never offers to remove them from under themselves. */
-    currentUserId?: string;
 }
 
 /**
@@ -33,7 +31,7 @@ interface Props {
  * read side. The copy below says so out loud rather than letting people
  * discover it.
  */
-export function OrganizationMembersSection({ organizationId, currentUserId }: Props) {
+export function OrganizationMembersSection({ organizationId }: Props) {
     const t = useTranslations('organizations.settings.members');
     const [pending, startTransition] = useTransition();
     const [email, setEmail] = useState('');
@@ -121,8 +119,19 @@ export function OrganizationMembersSection({ organizationId, currentUserId }: Pr
                     <ul className="divide-y divide-border" data-testid="org-members-list">
                         {members.map((m) => (
                             <li key={m.id} className="flex items-center justify-between py-2">
-                                <span className="text-sm">{m.userId}</span>
-                                {m.userId === currentUserId ? (
+                                {/* Identity comes from the API, which resolves it
+                                    from `users`. Rendering `m.userId` showed a raw
+                                    UUID — unusable for the one decision this list
+                                    exists to support. The id remains the fallback
+                                    only if the User row has genuinely vanished. */}
+                                <span className="text-sm">{m.username ?? m.email ?? m.userId}</span>
+                                {/* `isSelf` is computed SERVER-side. This used to
+                                    compare against a `currentUserId` prop that the
+                                    parent never passed, so it was always undefined
+                                    and every member — including you — was offered a
+                                    Remove button that clears their own tenant
+                                    access. */}
+                                {m.isSelf ? (
                                     <span className="text-xs text-text-secondary">{t('you')}</span>
                                 ) : (
                                     <button
