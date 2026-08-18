@@ -49,7 +49,33 @@ export function OrganizationMembersSection({ organizationId }: Props) {
     };
 
     useEffect(() => {
-        refresh();
+        // 🛑 Clear before fetching, and ignore a response for an org we have
+        // since navigated away from.
+        //
+        // Switching organizations left the PREVIOUS org's roster on screen
+        // until the new fetch resolved — so for a second or two the panel
+        // showed real people who are not in the org named above them, with a
+        // Remove button next to each. Acting on that stale list removes
+        // somebody from an org you are not looking at.
+        //
+        // The `cancelled` flag also handles the out-of-order case: switch A→B→A
+        // quickly and B's slower response would otherwise land last and win.
+        let cancelled = false;
+        setLoading(true);
+        setMembers([]);
+        setInvitations([]);
+
+        startTransition(async () => {
+            const data = await listOrgMembersAction(organizationId);
+            if (cancelled) return;
+            setMembers(data.members);
+            setInvitations(data.invitations);
+            setLoading(false);
+        });
+
+        return () => {
+            cancelled = true;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [organizationId]);
 
@@ -152,7 +178,7 @@ export function OrganizationMembersSection({ organizationId }: Props) {
                                                     );
                                                     toast.success(t('memberRemoved'));
                                                 } catch {
-                                                    toast.error(t('errors.unknown'));
+                                                    toast.error(t('errors.removeFailed'));
                                                 }
                                                 refresh();
                                             })
@@ -187,7 +213,7 @@ export function OrganizationMembersSection({ organizationId }: Props) {
                                                 );
                                                 toast.success(t('invitationRevoked'));
                                             } catch {
-                                                toast.error(t('errors.unknown'));
+                                                toast.error(t('errors.revokeFailed'));
                                             }
                                             refresh();
                                         })

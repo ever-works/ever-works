@@ -8520,7 +8520,9 @@
                     "user_already_a_member": "That person is already a member of this organization.",
                     "invalid_email": "That does not look like a valid email address.",
                     "organization_has_no_tenant": "This organization is not fully set up yet, so it cannot accept members.",
-                    "unknown": "Could not send the invitation. Please try again."
+                    "unknown": "Could not send the invitation. Please try again.",
+                    "removeFailed": "Could not remove that member. Please try again.",
+                    "revokeFailed": "Could not revoke that invitation. Please try again."
                 }
             }
         },
