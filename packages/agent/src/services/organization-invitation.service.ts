@@ -90,6 +90,17 @@ export class OrganizationInvitationService {
         const expiresInDays = this.normaliseExpiry(input.expiresInDays);
         const token = this.generateToken();
 
+        // Retire any invitation for this address that has already aged out.
+        // The partial unique index only covers `status = pending`, and nothing
+        // sweeps rows on a timer — so without this, an invitation nobody
+        // accepted within its window occupies the slot FOREVER and re-inviting
+        // that person fails with `invitation_already_pending`, naming a live
+        // invitation whose token is dead. There is no UI to revoke it either,
+        // because it looks pending.
+        await this.invitations
+            .expireStaleForEmail(input.organizationId, emailNormalized)
+            .catch(() => 0);
+
         try {
             const invitation = await this.invitations.create({
                 organizationId: input.organizationId,

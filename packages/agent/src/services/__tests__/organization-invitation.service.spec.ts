@@ -28,6 +28,7 @@ type RepoMock = {
     tryMarkAccepted: jest.Mock;
     markRevoked: jest.Mock;
     expireBefore: jest.Mock;
+    expireStaleForEmail: jest.Mock;
     findExpiredPending: jest.Mock;
 };
 
@@ -42,6 +43,7 @@ function repoMock(): RepoMock {
         tryMarkAccepted: jest.fn().mockResolvedValue(true),
         markRevoked: jest.fn().mockResolvedValue(true),
         expireBefore: jest.fn().mockResolvedValue(0),
+        expireStaleForEmail: jest.fn().mockResolvedValue(0),
         findExpiredPending: jest.fn().mockResolvedValue([]),
     };
 }
@@ -126,6 +128,24 @@ describe('OrganizationInvitationService', () => {
             repo.create.mockRejectedValue(dup);
 
             await expect(service.issue(BASE_INPUT)).rejects.toThrow(ConflictException);
+        });
+
+        it('retires an aged-out invitation so the address can be re-invited', async () => {
+            // The partial unique index is WHERE status = 'pending', and nothing
+            // moves a row to `expired` on a timer. Without this sweep an
+            // invitation nobody accepted in time holds the slot forever and
+            // re-inviting that person fails with `invitation_already_pending` —
+            // naming a live invitation whose token is dead, with no UI to
+            // revoke it because it still looks pending.
+            const { service, repo } = build();
+
+            await service.issue(BASE_INPUT);
+
+            expect(repo.expireStaleForEmail).toHaveBeenCalledWith('org-1', 'newcomer@example.com');
+            // And it happens BEFORE the insert, or the index rejects us first.
+            const sweepOrder = repo.expireStaleForEmail.mock.invocationCallOrder[0];
+            const createOrder = repo.create.mock.invocationCallOrder[0];
+            expect(sweepOrder).toBeLessThan(createOrder);
         });
 
         it('rejects a malformed address before minting anything', async () => {
