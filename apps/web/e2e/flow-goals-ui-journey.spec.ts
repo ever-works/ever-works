@@ -357,10 +357,18 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         // — and it opens on 'dod'. The Progress/Details/Outcome sections still
         // exist under exactly these names, but they are inside the 'progress'
         // panel, so the tab has to be opened before they render at all.
-        await page.getByRole('tab', { name: 'Progress log' }).click();
+        // 🛑 clickUntil, not click: the tab strip is client state, so a click
+        // dispatched before hydration is SWALLOWED and the panel never opens —
+        // the same hazard this file already documents for the outcome listbox.
+        // A bare click left this test failing on the heading below, which reads
+        // as "the section is gone" rather than "the tab never opened".
+        const progressHeading = page.getByRole('heading', { name: 'Progress' });
+        await clickUntil(page.getByRole('tab', { name: 'Progress log' }), () =>
+            progressHeading.isVisible().catch(() => false),
+        );
 
         // Section scaffold.
-        await expect(page.getByRole('heading', { name: 'Progress' })).toBeVisible();
+        await expect(progressHeading).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Outcome' })).toBeVisible();
 
@@ -496,7 +504,14 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         // this page open on 'dod' — without this click the trigger below is
         // not in the DOM at all and the test fails looking like a missing
         // control rather than an unopened tab.
-        await page.getByRole('tab', { name: 'Progress log' }).click();
+        // Same hydration caveat as above — the trigger below only exists once
+        // the Progress panel is actually open.
+        await clickUntil(page.getByRole('tab', { name: 'Progress log' }), () =>
+            page
+                .locator('#main-content button[aria-haspopup="listbox"]')
+                .isVisible()
+                .catch(() => false),
+        );
 
         // The only listbox trigger INSIDE the page content is the outcome
         // override. Scoped to #main-content because since a350801a the chat
