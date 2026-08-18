@@ -219,14 +219,39 @@ export class OrganizationInvitationFlowService {
             throw new BadRequestException('invitation_state_changed');
         }
 
-        // The token is now spent and belongs to this user. Grant access.
+        // 🛑 The ROSTER ROW comes before the grant, and that ordering is the
+        // whole point.
         //
-        // joinTenant may still throw ConflictException for a user who
-        // already belongs to another Tenant. That leaves the invitation
-        // marked accepted without a grant — deliberately: the alternative
-        // is leaving a live token for a person who provably cannot use it,
-        // and re-inviting a DIFFERENT address is the actual remedy. The
-        // roster row is not written either, so the state stays consistent.
+        // These are three separate commits with no enclosing transaction
+        // (joinTenant writes through a different repository), so SOME partial
+        // state is unavoidable. The choice is which partial state to prefer,
+        // and the deciding property is VISIBILITY:
+        //
+        //   roster-then-grant (this order): if the grant fails, a roster row
+        //     exists with no access. The person shows up in the members list,
+        //     an admin can see and remove them, and re-accepting repairs it.
+        //     Harmless and self-announcing.
+        //
+        //   grant-then-roster (the obvious order): if the roster write fails,
+        //     the person has TENANT-WIDE ACCESS with no roster row — invisible
+        //     in the members list, and removeMember refuses with `not_a_member`
+        //     because it has no row to delete. That is exactly the unrevocable
+        //     state this method was already fixed once to avoid; reintroducing
+        //     it through a different door would be worse for having been
+        //     thought about.
+        //
+        // recordMembership is idempotent (it no-ops when a row exists), so
+        // writing it first costs nothing on the happy path.
+        await this.recordMembership(organization.id, invitation.tenantId, userId, {
+            invitedById: invitation.invitedById,
+            invitationId: invitation.id,
+        });
+
+        // joinTenant may still throw ConflictException for a user who already
+        // belongs to another Tenant. The invitation stays marked accepted —
+        // deliberately, since leaving a live token for someone who provably
+        // cannot use it helps nobody, and re-inviting a DIFFERENT address is
+        // the actual remedy.
         let outcome: Awaited<ReturnType<TenantBootstrapService['joinTenant']>>;
         try {
             outcome = await this.tenantBootstrap.joinTenant(
@@ -237,15 +262,10 @@ export class OrganizationInvitationFlowService {
         } catch (error) {
             this.logger.warn(
                 `Invitation ${invitation.id} was claimed by ${userId} but the tenant join failed — ` +
-                    `no access granted, no roster row written`,
+                    `a roster row exists WITHOUT access, so they are visible and removable`,
             );
             throw error;
         }
-
-        await this.recordMembership(organization.id, invitation.tenantId, userId, {
-            invitedById: invitation.invitedById,
-            invitationId: invitation.id,
-        });
 
         this.logger.log(
             `User ${userId} accepted invitation ${invitation.id} into org ${organization.id}`,
