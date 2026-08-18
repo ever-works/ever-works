@@ -18,6 +18,13 @@ import { OrganizationService } from './organization.service';
 import { OrganizationMembershipService } from './organization-membership.service';
 import { OrganizationOwnershipGuard } from './guards/organization-ownership.guard';
 import { OrganizationsController } from './organizations.controller';
+import { OrganizationInvitationsController } from './organization-invitations.controller';
+import { OrganizationInvitationFlowService } from './organization-invitation-flow.service';
+import { OrganizationInvitationService } from '@ever-works/agent/services';
+import {
+    OrganizationInvitationRepository,
+    OrganizationMemberRepository,
+} from '@ever-works/agent/database';
 import { OrgTemplateCatalogService } from './org-template-catalog.service';
 import { OrgTemplatesController } from './org-templates.controller';
 import { CompanyImportService } from './company-import.service';
@@ -84,8 +91,20 @@ import { WorkRegisteredListener } from './work-registered.listener';
         // Teams & Prebuilt Companies (spec §6) — catalog reader + importer.
         OrgTemplateCatalogService,
         CompanyImportService,
+        // Organization invitations (spec §7 v1.1) — composes the agent-side
+        // token service, the roster repository, and TenantBootstrapService,
+        // which is the audited writer of users.tenantId.
+        OrganizationInvitationService,
+        OrganizationInvitationRepository,
+        OrganizationMemberRepository,
+        OrganizationInvitationFlowService,
     ],
-    controllers: [OrganizationsController, OrgTemplatesController, CompanyImportController],
+    controllers: [
+        OrganizationsController,
+        OrgTemplatesController,
+        CompanyImportController,
+        OrganizationInvitationsController,
+    ],
     exports: [
         OrganizationService,
         OrganizationMembershipService,
