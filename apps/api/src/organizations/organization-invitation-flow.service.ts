@@ -128,13 +128,37 @@ export class OrganizationInvitationFlowService {
         // body. It is not returned to the caller by the controller, not
         // logged, and not stored — the row holds only sha256(token).
         const inviter = await this.users.findById(actorUserId);
-        await this.mail.sendOrganizationInvitation({
-            recipientEmail: issued.invitation.email,
-            organizationName: organization.displayName ?? organization.slug,
-            inviterName: inviter?.username ?? 'A teammate',
-            acceptUrl: `${config.webAppUrl()}/org-invite/${issued.token}`,
-            expiresAt: issued.invitation.tokenExpiresAt,
-        });
+        try {
+            await this.mail.sendOrganizationInvitation({
+                recipientEmail: issued.invitation.email,
+                organizationName: organization.displayName ?? organization.slug,
+                inviterName: inviter?.username ?? 'A teammate',
+                acceptUrl: `${config.webAppUrl()}/org-invite/${issued.token}`,
+                expiresAt: issued.invitation.tokenExpiresAt,
+            });
+        } catch (error) {
+            // 🛑 The row is committed but the token only ever existed in the
+            // email that failed to send — so NOBODY holds it, and it cannot be
+            // recovered (the database has only sha256). Left pending, that row
+            // is worse than useless: the partial unique index makes it BLOCK
+            // re-inviting the same address, and there is no resend, so the
+            // admin is told an invitation is pending for a token that reached
+            // no one.
+            //
+            // Revoking it releases the address immediately, so the obvious
+            // response — try again — actually works. The failure is rethrown
+            // so the caller reports it rather than claiming an invite was sent.
+            await this.invitations
+                .revoke(organization.id, issued.invitation.id)
+                .catch(() => undefined);
+            this.logger.error(
+                `Invitation ${issued.invitation.id} was revoked because its email could not be ` +
+                    `sent — the token reached nobody and would otherwise have blocked re-inviting ` +
+                    `that address`,
+                error instanceof Error ? error.stack : String(error),
+            );
+            throw error;
+        }
 
         return issued;
     }
