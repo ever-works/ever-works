@@ -20,6 +20,7 @@ import {
     IsOptional,
     IsString,
     MaxLength,
+    ValidateIf,
     ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -82,9 +83,24 @@ class CreateConversationDto {
  * inside one thread, not identity: the user re-points the same provider at a
  * different model mid-conversation and the pin has to survive a reload.
  */
-class UpdateConversationDto {
+export class UpdateConversationDto {
+    /**
+     * 🛑 `@ValidateIf`, deliberately NOT `@IsOptional()`.
+     *
+     * `@IsOptional()` skips every other validator when the value is `null` as
+     * well as when it is `undefined` — class-validator's condition is literally
+     * `value !== null && value !== undefined`. With it, `PATCH {"title": null}`
+     * sailed past `@IsString`, then satisfied the handler's
+     * `body.title !== undefined` guard (because `null !== undefined`) and WROTE
+     * NULL over the user's title. That was a hard 400 before this field became
+     * optional, and the `model` docblock below still claimed non-string
+     * payloads were rejected.
+     *
+     * `@ValidateIf(o => o.title !== undefined)` restores the intent exactly:
+     * absent is fine, present-but-not-a-string is a 400.
+     */
     @ApiProperty({ required: false, maxLength: 200 })
-    @IsOptional()
+    @ValidateIf((o: UpdateConversationDto) => o.title !== undefined)
     @IsString()
     @MaxLength(200)
     title?: string;
@@ -93,9 +109,14 @@ class UpdateConversationDto {
      * Empty string clears the pin back to "resolve the provider's configured
      * default". `null` would be the more obvious signal, but the field is
      * typed `string` so the whitelist keeps rejecting non-string payloads.
+     *
+     * That last sentence is only TRUE because of the `@ValidateIf` below —
+     * see the note on `title`. Under `@IsOptional()` a null slipped through to
+     * `updateModel`, where it happened to coincide with the clear-the-pin path
+     * and so did no damage, but the documented contract was false.
      */
     @ApiProperty({ required: false, maxLength: 100 })
-    @IsOptional()
+    @ValidateIf((o: UpdateConversationDto) => o.model !== undefined)
     @IsString()
     @MaxLength(100)
     model?: string;

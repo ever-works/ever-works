@@ -93,6 +93,13 @@ describe('EW-077 — register tells the user the address is unconfirmed', () => 
         registerMock.mockReset();
         setAuthCookiesMock.mockReset();
         redirectMock.mockReset();
+        // `register` now consults the stored destination the way `login` always
+        // has, so the mock has to behave like the real one: return the href it
+        // was handed when nothing is stored. A bare vi.fn() resolves to
+        // undefined, which silently swallows the destination.
+        getRedirectUrlMock
+            .mockReset()
+            .mockImplementation(async (_r: unknown, href: string) => href);
         vi.spyOn(console, 'error').mockImplementation(() => {});
     });
 

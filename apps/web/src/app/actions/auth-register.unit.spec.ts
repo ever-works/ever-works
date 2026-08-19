@@ -18,10 +18,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * returns rather than by prose that may later be re-worded.
  */
 
-const { registerMock, setAuthCookiesMock, redirectMock } = vi.hoisted(() => ({
+const { registerMock, setAuthCookiesMock, redirectMock, getRedirectUrlMock } = vi.hoisted(() => ({
     registerMock: vi.fn(),
     setAuthCookiesMock: vi.fn(),
     redirectMock: vi.fn(),
+    getRedirectUrlMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -46,6 +47,11 @@ vi.mock('next-intl/server', () => ({
 
 vi.mock('@/i18n/navigation', () => ({ redirect: redirectMock }));
 
+// `register` consults the stored destination exactly as `login` does. The
+// organization-invitation flow depends on it: registration is the only way an
+// invited outsider gets an account.
+vi.mock('@/lib/auth/redirect', () => ({ getRedirectUrl: getRedirectUrlMock }));
+
 /** One valid claim — the terms plumbing is not what this file is testing. */
 const TERMS = [
     {
@@ -66,6 +72,9 @@ beforeEach(() => {
     registerMock.mockResolvedValue({ access_token: 'token' });
     setAuthCookiesMock.mockReset();
     redirectMock.mockReset();
+    // Passthrough by default — no stored destination, so the href the action
+    // computed wins and every pre-existing assertion still holds.
+    getRedirectUrlMock.mockReset().mockImplementation(async (_res, href) => href);
 });
 
 afterEach(() => {
@@ -140,5 +149,31 @@ describe('register — the rejection names the field the form shows (EW-074)', (
         await callRegister('  山田家  ', 'lowercase1');
         expect(registerMock).toHaveBeenCalledTimes(1);
         expect(registerMock.mock.calls[0][0].username).toBe('山田家');
+    });
+});
+
+describe('register — the stored destination survives signing up', () => {
+    it('returns a newly-registered user to where they were headed', async () => {
+        // Registration is the ONLY way an invited outsider gets an account.
+        // Without this, the org-invitation landing page stores
+        // /org-invite/<token>, sends them here to sign up, and they land on the
+        // dashboard instead — invitation unaccepted and no longer reachable
+        // from anywhere in the UI. `login` has always honoured the cookie;
+        // `register` never did, so the "create an account" half of every invite
+        // link was a dead end.
+        getRedirectUrlMock.mockResolvedValue('/org-invite/abc123');
+
+        await callRegister('Jane Doe', 'lowercase1');
+
+        expect(getRedirectUrlMock).toHaveBeenCalledTimes(1);
+        expect(redirectMock.mock.calls[0][0].href).toBe('/org-invite/abc123');
+    });
+
+    it('still lands on the dashboard when nothing is stored', async () => {
+        // The ordinary signup path, unchanged: getRedirectUrl falls through to
+        // the href the action computed.
+        await callRegister('Jane Doe', 'lowercase1');
+
+        expect(redirectMock.mock.calls[0][0].href).toContain('newUser=true');
     });
 });

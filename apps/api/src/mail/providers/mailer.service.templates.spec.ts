@@ -54,6 +54,7 @@ const TEMPLATES_USED_BY_MAIL_SERVICE = [
     'magic-link',
     'member-invitation',
     'new-device-login',
+    'organization-invitation',
     'password-changed',
     'signup-confirmation',
     'welcome',
@@ -184,6 +185,47 @@ describe('MailerService template packaging (no mocks)', () => {
             expect(sent.html).toContain('https://app.ever.works/verify?token');
             expect(sent.html).toContain('abc123');
             expect(sent.html).toContain('Ada');
+        });
+
+        it('renders the organization invitation with a working accept link', async () => {
+            // A Handlebars variable that no context key satisfies renders as
+            // an EMPTY STRING rather than throwing, so a typo in the template
+            // ships an email with a dead "Accept invitation" button and
+            // nothing anywhere reports a problem. This asserts each
+            // substitution actually landed.
+            const service = buildService();
+
+            await service.sendMail({
+                to: 'newcomer@test.example',
+                subject: 'You have been invited to Acme',
+                template: 'organization-invitation',
+                context: {
+                    appName: 'Ever Works',
+                    companyOwner: 'Ever Co. LTD',
+                    platformWebsite: 'https://ever.works',
+                    currentYear: 2026,
+                    organizationName: 'Acme Inc',
+                    inviterName: 'ada',
+                    acceptUrl: 'https://app.ever.works/org-invite/tok123',
+                    recipientEmail: 'newcomer@test.example',
+                    expiresAtFormatted: 'Aug 25, 2026',
+                },
+            });
+
+            const sent = resend.emails.send.mock.calls[0][0];
+            expect(sent.html).toContain('Acme Inc');
+            expect(sent.html).toContain('ada');
+            expect(sent.html).toContain('Aug 25, 2026');
+            // Double-brace expressions are HTML-escaped, so assert on the
+            // parts escaping leaves alone rather than pinning the escaped form.
+            expect(sent.html).toContain('https://app.ever.works/org-invite/tok123');
+            // The recipient address is stated on purpose: the token is
+            // email-bound, so redeeming it as another account 403s, and the
+            // email is the only place that can explain that in advance.
+            expect(sent.html).toContain('newcomer@test.example');
+
+            // And nothing was left unsubstituted.
+            expect(sent.html).not.toContain('{{');
         });
     });
 
