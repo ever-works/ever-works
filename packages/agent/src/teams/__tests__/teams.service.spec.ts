@@ -5,6 +5,7 @@ import type { Team } from '../../entities/team.entity';
 import type { TeamMember } from '../../entities/team-member.entity';
 import { OrgChartService } from '../org-chart.service';
 import { TeamsService } from '../teams.service';
+import { ORG_USER_DIRECTORY_LIMIT } from '../types';
 
 /**
  * Teams & Prebuilt Companies — TeamsService/OrgChartService unit specs
@@ -255,6 +256,108 @@ describe('TeamsService', () => {
         });
     });
 
+    describe(`listOrgUsers — the add-member picker's directory`, () => {
+        /**
+         * The Teams page shipped a `Type` select whose `Member` (human) option
+         * was hard-disabled, so a team could only ever be staffed with Agents —
+         * even though `addMember` has had a complete `memberType: 'user'` branch
+         * the whole time. The missing piece was this: nothing could list the
+         * people an org has, so the picker had nothing to offer.
+         */
+
+        it(`returns the tenant's people in the picker's shape`, async () => {
+            const { service, users } = build();
+            users.find.mockResolvedValue([
+                {
+                    id: 'u1',
+                    username: 'ruslan',
+                    email: 'ruslan@ever.co',
+                    avatar: 'https://cdn/av.png',
+                },
+            ]);
+
+            await expect(service.listOrgUsers('org-1')).resolves.toEqual([
+                {
+                    id: 'u1',
+                    username: 'ruslan',
+                    email: 'ruslan@ever.co',
+                    avatar: 'https://cdn/av.png',
+                },
+            ]);
+        });
+
+        it(`scopes the query to the org's tenant, never the org id`, async () => {
+            // Organization membership is expressed through the Tenant — it is
+            // what `addMember` checks before accepting a user. Querying by
+            // organizationId instead would return nobody, since `users` has no
+            // such column, and the picker would be permanently empty.
+            const { service, users } = build();
+            await service.listOrgUsers('org-1');
+
+            const where = users.find.mock.calls[0][0].where;
+            expect(where.tenantId).toBe('ten-1');
+        });
+
+        it('SELECTS an allowlist, so a new User column can never leak', async () => {
+            // `User` carries `password`, `emailVerificationToken`,
+            // `passwordResetToken` and `magicLinkToken`. This endpoint hands one
+            // user a list of others, so the select is an allowlist and this test
+            // is what keeps it one — a bare find() would ship every column.
+            const { service, users } = build();
+            await service.listOrgUsers('org-1');
+
+            const select = users.find.mock.calls[0][0].select;
+            expect(select).toEqual(['id', 'username', 'email', 'avatar']);
+            for (const secret of [
+                'password',
+                'emailVerificationToken',
+                'passwordResetToken',
+                'magicLinkToken',
+            ]) {
+                expect(select).not.toContain(secret);
+            }
+        });
+
+        it('excludes guests and deactivated accounts', async () => {
+            // `addMember` only checks the Tenant, so this filter is the only
+            // thing keeping an anonymous session or a disabled account out of
+            // the list of people you can staff a team with.
+            const { service, users } = build();
+            await service.listOrgUsers('org-1');
+
+            const where = users.find.mock.calls[0][0].where;
+            expect(where.isAnonymous).toBe(false);
+            expect(where.isActive).toBe(true);
+        });
+
+        it('caps the result rather than returning an unbounded list', async () => {
+            const { service, users } = build();
+            await service.listOrgUsers('org-1');
+
+            expect(users.find.mock.calls[0][0].take).toBe(ORG_USER_DIRECTORY_LIMIT);
+        });
+
+        it('404s an unknown org instead of listing anyone', async () => {
+            // 404-never-403, matching the rest of this controller surface: the
+            // response must not tell an attacker which org ids are real.
+            const { service, organizations, users } = build();
+            organizations.findOne.mockResolvedValue(null);
+
+            await expect(service.listOrgUsers('nope')).rejects.toThrow(NotFoundException);
+            expect(users.find).not.toHaveBeenCalled();
+        });
+
+        it('returns [] for an org with no tenant instead of querying', async () => {
+            // `tenantId` is nullable on Organization. Passing undefined into the
+            // where clause would drop the scope entirely and list EVERY user in
+            // the database, so the guard is a real one, not defensive noise.
+            const { service, organizations, users } = build();
+            organizations.findOne.mockResolvedValue({ ...ORG, tenantId: null });
+
+            await expect(service.listOrgUsers('org-1')).resolves.toEqual([]);
+            expect(users.find).not.toHaveBeenCalled();
+        });
+    });
     it('getOrThrow 404s a team of another org', async () => {
         const { service, teams } = build();
         teams.findOne.mockResolvedValue(null);
