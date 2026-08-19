@@ -67,6 +67,8 @@ export * from './repositories/agent-mcp-server-binding.repository';
 // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653.
 export * from './repositories/tenant.repository';
 export * from './repositories/organization.repository';
+export * from './repositories/organization-invitation.repository';
+export * from './repositories/organization-member.repository';
 // Notifications v2 (EW-650 / EW-663 / EW-664) — email + multi-channel
 // + per-user preference repositories.
 export * from './repositories/tenant-email-address.repository';

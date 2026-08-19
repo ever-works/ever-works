@@ -1,0 +1,180 @@
+<html lang='en'>
+    <head>
+        <meta charset='UTF-8' />
+        <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+        <title>You've been invited to {{organizationName}}</title>
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                font-family:
+                    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+                    sans-serif;
+                background-color: #f8fafc;
+                line-height: 1.6;
+            }
+            .container {
+                max-width: 600px;
+                margin: 0 auto;
+            }
+            .logo-section {
+                padding: 40px 20px 30px;
+                text-align: center;
+            }
+            .logo-title {
+                font-size: 28px;
+                font-weight: 600;
+                color: #1e293b;
+                margin: 0;
+            }
+            .logo-subtitle {
+                font-size: 14px;
+                color: #94a3b8;
+                margin: 5px 0 0;
+            }
+            .main-card {
+                margin: 0 20px 40px;
+                background-color: #ffffff;
+                border-radius: 8px;
+                padding: 40px 30px;
+            }
+            .icon {
+                text-align: center;
+                font-size: 40px;
+                margin-bottom: 20px;
+            }
+            .title {
+                font-size: 24px;
+                color: #1e293b;
+                font-weight: 600;
+                text-align: center;
+                margin: 0 0 10px;
+            }
+            .subtitle {
+                text-align: center;
+                color: #64748b;
+                margin: 0 0 30px;
+                font-size: 16px;
+            }
+            .button-container {
+                text-align: center;
+                margin: 30px 0 10px;
+            }
+            .button {
+                display: inline-block;
+                padding: 14px 32px;
+                background-color: #4338ca;
+                color: #ffffff !important;
+                text-decoration: none;
+                border-radius: 6px;
+                font-size: 16px;
+                font-weight: 500;
+            }
+            .meta {
+                text-align: center;
+                color: #94a3b8;
+                font-size: 13px;
+                margin: 18px 0 0;
+            }
+            .fallback {
+                color: #64748b;
+                font-size: 12px;
+                word-break: break-all;
+                margin: 14px 0 0;
+            }
+            .footer {
+                padding: 0 20px 40px;
+                text-align: center;
+            }
+            .footer-text {
+                font-size: 12px;
+                color: #94a3b8;
+                margin: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='logo-section'>
+                <h1 class='logo-title'>{{appName}}</h1>
+                <p class='logo-subtitle'>by {{companyOwner}}</p>
+            </div>
+
+            <div class='main-card'>
+                <div class='icon'>👋</div>
+
+                <h2 class='title'>You've been invited!</h2>
+
+                <p class='subtitle'>
+                    {{inviterName}}
+                    has invited you to join
+                    <strong>{{organizationName}}</strong>
+                    on
+                    {{appName}}.
+                </p>
+
+                <table
+                    width='100%'
+                    cellpadding='0'
+                    cellspacing='0'
+                    style='border-collapse: collapse; background:#f8fafc; border-radius:6px; padding:0; margin-bottom:25px;'
+                >
+                    <tr>
+                        <td
+                            style='padding: 12px 16px; font-size: 14px; color: #94a3b8; width: 120px;'
+                        >Organization</td>
+                        <td
+                            style='padding: 12px 16px; font-size: 14px; color: #1e293b; font-weight: 500;'
+                        >{{organizationName}}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding: 12px 16px; font-size: 14px; color: #94a3b8;'>Invited by</td>
+                        <td
+                            style='padding: 12px 16px; font-size: 14px; color: #1e293b; font-weight: 500;'
+                        >{{inviterName}}</td>
+                    </tr>
+                    <tr>
+                        <td
+                            style='padding: 12px 16px; font-size: 14px; color: #94a3b8;'
+                        >Expires</td>
+                        <td
+                            style='padding: 12px 16px; font-size: 14px; color: #1e293b;'
+                        >{{expiresAtFormatted}}</td>
+                    </tr>
+                </table>
+
+                <div class='button-container'>
+                    <a href='{{acceptUrl}}' class='button'>Accept invitation</a>
+                </div>
+
+                {{!
+                    The address is stated explicitly because the token is
+                    EMAIL-BOUND: redeeming it while signed in as a different
+                    account fails with a mismatch. Saying so here turns a
+                    confusing 403 into an obvious "sign in as this one".
+                }}
+                <p class='meta'>
+                    This invitation is for
+                    <strong>{{recipientEmail}}</strong>
+                    and can only be accepted while signed in as that address. It expires on
+                    {{expiresAtFormatted}}.
+                </p>
+
+                <p class='fallback'>
+                    If the button doesn't work, paste this into your browser:<br />
+                    {{acceptUrl}}
+                </p>
+            </div>
+
+            <div class='footer'>
+                <p class='footer-text'>
+                    If you didn't expect this email, you can safely ignore it — the invitation
+                    cannot be used without access to this mailbox.<br /><br />
+                    ©
+                    {{currentYear}}
+                    {{companyOwner}}. All rights reserved.
+                </p>
+            </div>
+        </div>
+    </body>
+</html>

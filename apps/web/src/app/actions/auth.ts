@@ -295,6 +295,28 @@ export async function register(
     // arrives already confirmed, `emailVerified` is not `false` and the notice
     // correctly stays quiet instead of nagging about a rule that isn't on.
     let href = ROUTES.DASHBOARD + '?newUser=true';
+
+    // Honour a stored destination, exactly as `login` does.
+    //
+    // Registration is the ONLY way an invited outsider gets an account, and
+    // without this the organization-invitation flow silently loses them: the
+    // landing page stores `/org-invite/<token>` in `redirect_url`, sends them
+    // here to sign up, and this returned them to the dashboard instead — with
+    // the invitation unaccepted and no longer reachable from anywhere in the
+    // UI. `login` has always consulted the cookie; `register` never did, so
+    // the "create an account" half of every invite link was a dead end.
+    //
+    // `getRedirectUrl` validates the stored value (relative or allow-listed
+    // host only), so this cannot become an open redirect, and it returns the
+    // href above unchanged when nothing is stored.
+    href = await getRedirectUrl(authResponse, href);
+
+    // 🛑 The unverified-email notice is applied AFTER the destination is
+    // resolved, not before. `getRedirectUrl` REPLACES the href wholesale when a
+    // cookie is present, so appending the notice first meant it was silently
+    // dropped for exactly the users who followed a stored link — which is every
+    // invited newcomer, the group most likely to have an unconfirmed address.
+    // Applying it last means the notice survives whichever destination wins.
     if (isEmailUnconfirmed(authResponse?.user)) {
         href = withUnverifiedEmailNotice(href);
     }

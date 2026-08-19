@@ -9,6 +9,7 @@ export * from './work-schedule-dispatcher.service';
 export * from './work-memory.service';
 export * from './work-member.service';
 export * from './work-invitation.service';
+export * from './organization-invitation.service';
 export * from './work-import.service';
 export * from './work-advanced-prompts.service';
 export * from './repository-management.service';
