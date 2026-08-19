@@ -16,9 +16,20 @@
  *     GET    /api/organizations/:slug            (GLOBAL slug resolver)
  *     PATCH  /api/organizations/:id              (owner/tenant-scoped update)
  *     POST   /api/organizations/:id/upgrade-from-account
- * There is NO `/:id/members`, NO add/remove-member, NO role enum, NO DELETE
- * org, NO last-owner concept — every `/members`, `/invitations`, PATCH-role
- * and DELETE-org URL was probed and returned 404 "Cannot <VERB> ...".
+ * ── UPDATE (2026-08-19): the members half of that is no longer true ─────────
+ * The organization-invitations feature shipped a real
+ * OrganizationInvitationsController mounted at `api/organizations/:orgId`:
+ *     GET    /:orgId/members
+ *     GET    /:orgId/invitations
+ *     POST   /:orgId/invitations            (invite by email; 201)
+ *     DELETE /:orgId/invitations/:id        (revoke; 204)
+ *     DELETE /:orgId/members/:userId        (remove; 204)
+ * Joining is INVITATION-ONLY, so there is STILL no direct add-member, no role
+ * enum / PATCH-role, no DELETE org and no last-owner concept — those URLs
+ * remain route-not-found. The negative contract below was written so "a future
+ * implementer notices the gap"; it did exactly that when `/members` began
+ * answering 200, and has been updated to the new truthful contract rather than
+ * deleted.
  *
  * The role/member MATRIX in this product lives on WORKS, not Organizations
  * (messages/en.json → works.members: roles owner/manager/viewer, "Invite
@@ -294,7 +305,7 @@ test.describe('Org authorization boundary (owner vs non-member, multi-tenant)', 
         }
     });
 
-    test('no org-members API exists: probed /members + DELETE-org surfaces are 404 (truthful negative contract)', async ({
+    test('org-members contract: /members is live and owner-scoped; add/role/DELETE-org stay 404', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -307,35 +318,69 @@ test.describe('Org authorization boundary (owner vs non-member, multi-tenant)', 
         );
         const headers = authedHeaders(owner.access_token);
 
-        // These are the endpoints the assigned "role matrix" WOULD use. Each was
-        // probed live and route-not-found. Asserting the 404 documents the real
-        // (negative) contract so a future implementer notices the gap, instead of
-        // silently asserting a fictional success.
+        // GET /members SHIPPED with organization-invitations. The owner has no
+        // organization_members row — that table did not exist when their org
+        // was created — so the service SYNTHESIZES them. An empty array here
+        // would mean the owner is absent from their own org's member list,
+        // which is what the synthesis exists to prevent.
         const listMembers = await request.get(`${API_BASE}/api/organizations/${org.id}/members`, {
             headers,
         });
-        expect(listMembers.status()).toBe(404);
+        expect(listMembers.status()).toBe(200);
+        const roster = await listMembers.json();
+        expect(Array.isArray(roster)).toBe(true);
+        expect(roster).toHaveLength(1);
+        expect(roster[0]).toMatchObject({
+            userId: owner.user.id,
+            role: 'owner',
+            isOwner: true,
+            isSelf: true,
+        });
 
+        // 🛑 The boundary the ORIGINAL version of this test could not assert,
+        // because the route did not exist: another tenant's owner must NOT be
+        // able to read this roster. 404-never-403 is deliberate
+        // (OrganizationOwnershipGuard) — the response must not confirm the org
+        // exists. This is the assertion that would catch the members API being
+        // accidentally opened up.
+        const outsider = await registerUserViaAPI(request);
+        await createOrganizationViaAPI(request, outsider.access_token, `Outsider Org ${s}`);
+        const outsiderRead = await request.get(`${API_BASE}/api/organizations/${org.id}/members`, {
+            headers: authedHeaders(outsider.access_token),
+        });
+        expect(outsiderRead.status()).toBe(404);
+
+        // Direct add still does NOT exist: joining is invitation-only, so
+        // nobody can be placed into an Organization without redeeming a token
+        // sent to their own mailbox.
         const addMember = await request.post(`${API_BASE}/api/organizations/${org.id}/members`, {
             headers,
             data: { email: member.email, role: 'admin' },
         });
         expect(addMember.status()).toBe(404);
 
+        // Still NO role matrix — roles are owner/member by construction and
+        // are not assignable over HTTP.
         const patchMemberRole = await request.patch(
             `${API_BASE}/api/organizations/${org.id}/members/${member.user.id}`,
             { headers, data: { role: 'member' } },
         );
         expect(patchMemberRole.status()).toBe(404);
 
+        // DELETE /members/:userId now EXISTS, so this is no longer
+        // route-not-found. Removing somebody who never joined is a truthful
+        // 400 `not_a_member` from a LIVE route — deliberately asserted as 400
+        // rather than 404 so that a regression which un-mounted the route
+        // (404) could not masquerade as this passing.
         const removeMember = await request.delete(
             `${API_BASE}/api/organizations/${org.id}/members/${member.user.id}`,
             { headers },
         );
-        expect(removeMember.status()).toBe(404);
+        expect(removeMember.status()).toBe(400);
+        expect(JSON.stringify(await removeMember.json())).toContain('not_a_member');
 
-        // There is likewise NO DELETE /api/organizations/:id (no org teardown /
-        // last-owner concept) — also route-not-found.
+        // There is likewise STILL NO DELETE /api/organizations/:id (no org
+        // teardown / last-owner concept) — route-not-found.
         const deleteOrg = await request.delete(`${API_BASE}/api/organizations/${org.id}`, {
             headers,
         });
