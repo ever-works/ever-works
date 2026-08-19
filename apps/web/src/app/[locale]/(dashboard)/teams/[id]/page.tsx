@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { teamsAPI, type Team, type TeamResourcesGrouped } from '@/lib/api/teams';
+import { teamsAPI, type OrgUser, type Team, type TeamResourcesGrouped } from '@/lib/api/teams';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { getWorks } from '@/app/actions/dashboard/works';
 import { TeamDetailClient } from '@/components/teams/TeamDetailClient';
@@ -10,7 +10,8 @@ import type { ResourceOption } from '@/components/teams/TeamResourcesSection';
  * v1 resolution (`orgs[0]`); a team can only exist inside an org, so
  * zero orgs — like an unknown team id — is a `notFound()`. The full
  * team list rides along for parent/sub-team name resolution and the
- * Agent list feeds the add-member + manager displays; both defensive.
+ * Agent list feeds the add-member + manager displays; both defensive. The
+ * org user directory feeds the same picker's `Member` (human) option.
  */
 export default async function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -26,13 +27,14 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
         idea: [],
     };
 
-    const [team, teams, agentsResp, resources, worksResp] = await Promise.all([
+    const [team, teams, agentsResp, users, resources, worksResp] = await Promise.all([
         teamsAPI.get(org.id, id),
         teamsAPI.list(org.id).catch(() => [] as Team[]),
         agentsAPI.list({ limit: 100 }).catch(() => ({
             data: [] as Agent[],
             meta: { total: 0, limit: 100, offset: 0 },
         })),
+        teamsAPI.listUsers(org.id).catch(() => [] as OrgUser[]),
         teamsAPI.listResources(org.id, id).catch(() => emptyResources),
         getWorks({ limit: 100, offset: 0 }).catch(() => ({ success: false, works: [], total: 0 })),
     ]);
@@ -56,6 +58,7 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
             team={team}
             teams={teams}
             agents={agents}
+            users={users}
             resources={resources}
             works={works}
         />

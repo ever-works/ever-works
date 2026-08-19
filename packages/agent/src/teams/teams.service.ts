@@ -15,6 +15,8 @@ import { slugifyText } from '../utils/text.utils';
 import {
     AddTeamMemberInput,
     CreateTeamInput,
+    ORG_USER_DIRECTORY_LIMIT,
+    OrgUserView,
     TEAM_HIERARCHY_WALK_LIMIT,
     TEAM_MAX_DEPTH,
     TeamMemberView,
@@ -149,6 +151,58 @@ export class TeamsService {
         await this.getOrThrow(orgId, teamId);
         const rows = await this.members.find({ where: { teamId }, order: { createdAt: 'ASC' } });
         return this.resolveMemberViews(rows);
+    }
+
+    /**
+     * The org-internal people directory, for the Teams "add a human member"
+     * picker.
+     *
+     * Membership in an Organization is expressed through its TENANT, not a
+     * join table: `addMember` accepts a user when `user.tenantId` matches the
+     * org, so the pickable set is exactly "users of this org's tenant". This
+     * method returns that same set, which keeps the picker and the write path
+     * from disagreeing — a directory that offers someone the API then refuses
+     * is worse than no directory.
+     *
+     * Authorization is the CONTROLLER's job: this sits behind
+     * `OrganizationOwnershipGuard`, which requires the caller to already be a
+     * member of `orgId` and 404s (never 403s) otherwise, so the endpoint
+     * cannot be used to probe which organizations exist.
+     */
+    async listOrgUsers(orgId: string): Promise<OrgUserView[]> {
+        const org = await this.organizations.findOne({ where: { id: orgId } });
+        if (!org) {
+            throw new NotFoundException(`Organization ${orgId} not found`);
+        }
+        if (!org.tenantId) {
+            return [];
+        }
+
+        const rows = await this.users.find({
+            where: {
+                tenantId: org.tenantId,
+                // Guests and deactivated accounts are in the Tenant but are not
+                // people you can staff a team with. `addMember` only checks the
+                // Tenant, so this filter is the only thing keeping them out of
+                // the picker.
+                isAnonymous: false,
+                isActive: true,
+            },
+            // EXPLICIT select — never a bare find(). This crosses a trust
+            // boundary (one user listing others) and `User` holds
+            // `password`, `emailVerificationToken`, `passwordResetToken` and
+            // `magicLinkToken`. An allowlist cannot leak a column added later.
+            select: ['id', 'username', 'email', 'avatar'],
+            order: { username: 'ASC' },
+            take: ORG_USER_DIRECTORY_LIMIT,
+        });
+
+        return rows.map((user) => ({
+            id: user.id,
+            username: user.username,
+            email: user.email ?? null,
+            avatar: user.avatar ?? null,
+        }));
     }
 
     async addMember(
