@@ -27,9 +27,21 @@ RUN echo "shamefully-hoist=true" > .npmrc
 # Package registry selection (backward-compatible, fork-safe) — see the
 # API/MCP Dockerfiles for the full rationale. Empty is a no-op.
 ARG VERDACCIO_REGISTRY=""
+# Reachability probe (this repo's builds run inside BuildKit on our LAN
+# runners, where the VIP is normally reachable — but a Verdaccio outage, or a
+# build that ends up on a GitHub-hosted runner, must NOT fail the image build):
+# probe the registry with a 5s timeout in the SAME layer, and fall back to the
+# public npm registry with a loud warning when it is unreachable. `node` is the
+# probe because the base image has no curl/wget guarantee. Any HTTP response
+# counts as reachable; only a connect failure/timeout trips the fallback.
 RUN if [ -n "$VERDACCIO_REGISTRY" ]; then \
-        echo "registry=${VERDACCIO_REGISTRY}" >> .npmrc && \
-        { sed -i "s|https://registry.npmjs.org|${VERDACCIO_REGISTRY%/}|g; s|https://registry.yarnpkg.com|${VERDACCIO_REGISTRY%/}|g" pnpm-lock.yaml 2>/dev/null || true; }; \
+        if node -e "fetch(process.argv[1],{signal:AbortSignal.timeout(5000)}).then(r=>{r.body&&r.body.cancel();process.exitCode=0},()=>{process.exitCode=1})" "${VERDACCIO_REGISTRY%/}/"; then \
+            echo "==> Verdaccio reachable - installing through ${VERDACCIO_REGISTRY}" && \
+            echo "registry=${VERDACCIO_REGISTRY}" >> .npmrc && \
+            { sed -i "s|https://registry.npmjs.org|${VERDACCIO_REGISTRY%/}|g; s|https://registry.yarnpkg.com|${VERDACCIO_REGISTRY%/}|g" pnpm-lock.yaml 2>/dev/null || true; }; \
+        else \
+            echo "WARNING: VERDACCIO_REGISTRY=${VERDACCIO_REGISTRY} is unreachable from this builder - falling back to the public npm registry." >&2; \
+        fi; \
     fi
 
 RUN pnpm install --frozen-lockfile
