@@ -203,6 +203,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkDeployment',
     'WorkGenerationHistory',
     'WorkInvitation',
+    'OrganizationInvitation',
+    'OrganizationMember',
     'WorkKnowledgeChunk',
     'WorkKnowledgeChunkCoordinate',
     'WorkKnowledgeCitation',

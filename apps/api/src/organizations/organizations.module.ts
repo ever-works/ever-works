@@ -18,6 +18,15 @@ import { OrganizationService } from './organization.service';
 import { OrganizationMembershipService } from './organization-membership.service';
 import { OrganizationOwnershipGuard } from './guards/organization-ownership.guard';
 import { OrganizationsController } from './organizations.controller';
+import { MailModule } from '../mail/mail.module';
+import { AuthModule } from '../auth/auth.module';
+import { OrganizationInvitationsController } from './organization-invitations.controller';
+import { OrganizationInvitationFlowService } from './organization-invitation-flow.service';
+import { OrganizationInvitationService } from '@ever-works/agent/services';
+import {
+    OrganizationInvitationRepository,
+    OrganizationMemberRepository,
+} from '@ever-works/agent/database';
 import { OrgTemplateCatalogService } from './org-template-catalog.service';
 import { OrgTemplatesController } from './org-templates.controller';
 import { CompanyImportService } from './company-import.service';
@@ -56,6 +65,14 @@ import { WorkRegisteredListener } from './work-registered.listener';
         TasksDomainModule,
         AgentTeamsModule,
         FacadesModule,
+        // Organization invitations send email; MailModule exports MailService.
+        MailModule,
+        // 🛑 REQUIRED by OrganizationInvitationsController's
+        // @UseGuards(AuthSessionGuard, ...). AuthModule is NOT @Global and
+        // AuthSessionGuard uses constructor injection, so without this the
+        // API crash-loops at boot with "Nest can't resolve dependencies".
+        // TeamsModule imports it for exactly the same reason.
+        AuthModule,
     ],
     providers: [
         UserRepository,
@@ -84,8 +101,20 @@ import { WorkRegisteredListener } from './work-registered.listener';
         // Teams & Prebuilt Companies (spec §6) — catalog reader + importer.
         OrgTemplateCatalogService,
         CompanyImportService,
+        // Organization invitations (spec §7 v1.1) — composes the agent-side
+        // token service, the roster repository, and TenantBootstrapService,
+        // which is the audited writer of users.tenantId.
+        OrganizationInvitationService,
+        OrganizationInvitationRepository,
+        OrganizationMemberRepository,
+        OrganizationInvitationFlowService,
     ],
-    controllers: [OrganizationsController, OrgTemplatesController, CompanyImportController],
+    controllers: [
+        OrganizationsController,
+        OrgTemplatesController,
+        CompanyImportController,
+        OrganizationInvitationsController,
+    ],
     exports: [
         OrganizationService,
         OrganizationMembershipService,
@@ -95,6 +124,11 @@ import { WorkRegisteredListener } from './work-registered.listener';
         // expose findById through the remote-proxy controller for
         // the worker-host resolveForOrganization path.
         OrganizationRepository,
+        // Consumed by OnboardingModule's OrgInviteController: the accept
+        // route cannot live on the :orgId family, whose guard requires the
+        // membership the invitee does not have yet.
+        OrganizationInvitationFlowService,
+        OrganizationInvitationService,
     ],
 })
 export class OrganizationsModule {}

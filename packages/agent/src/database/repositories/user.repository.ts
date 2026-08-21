@@ -136,6 +136,28 @@ export class UserRepository {
         return await this.findById(id);
     }
 
+    /**
+     * Attach a user to a Tenant, but ONLY if they have none yet.
+     *
+     * A conditional UPDATE rather than a read-then-write, because the
+     * read-then-write version is a TOCTOU: two invitations accepted at the
+     * same instant both observe `tenantId IS NULL`, both write, and the
+     * user silently ends up in whichever Tenant committed last — with the
+     * other invitation also marked accepted. `WHERE "tenantId" IS NULL` lets
+     * the database arbitrate, so exactly one wins.
+     *
+     * Returns true if this call is the one that assigned the Tenant.
+     */
+    async claimTenantIfUnassigned(id: string, tenantId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(User)
+            .set({ tenantId })
+            .where('id = :id AND "tenantId" IS NULL', { id })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
     async updateForSocialAuth(id: string, userData: Partial<User>): Promise<User> {
         await this.repository.update(id, userData);
         return this.findByIdForSocialAuth(id);

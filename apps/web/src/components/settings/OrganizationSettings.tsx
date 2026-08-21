@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { MergePolicyCard } from '@/components/policy/MergePolicyCard';
 import { useOrganizations } from '@/lib/hooks/use-organizations';
+import { OrganizationMembersSection } from './OrganizationMembersSection';
 
 /**
  * PR-6 (domain-model evolution, review §23.5) — Organization settings
@@ -266,6 +267,14 @@ export function OrganizationSettings() {
                             subtitle={t('mergePolicy.subtitle')}
                             testIdPrefix="organization-merge-policy"
                         />
+                    ) : null}
+
+                    {/* Members + invitations — the v1.1 item deferred in
+                        docs/specs/features/tenants-and-organizations/spec.md
+                        §6.4. Lives on this page rather than a new settings
+                        tab because that is where the spec put it. */}
+                    {selectedOrg ? (
+                        <OrganizationMembersSection organizationId={selectedOrg.id} />
                     ) : null}
                 </div>
             )}
