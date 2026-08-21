@@ -1,0 +1,176 @@
+# Chooses the npm registry for this job, and is the single place that logic lives in this repo.
+#
+# WHY THIS IS A LOCAL COPY RATHER THAN `ever-co/ever-gauzy/.github/actions/configure-registry`
+# ---------------------------------------------------------------------------------------------
+# The shared Gauzy action (pinned at adbc9bcbf72960d49c3853552d69d5b5b3b5e56d) opens with an
+# unconditional
+#
+#     if ! git checkout -- .npmrc yarn.lock; then <error>; exit 1; fi
+#
+# ever-works is a **pnpm** workspace: it tracks neither `.npmrc` nor `yarn.lock` at the repo root.
+# `git checkout --` errors with "pathspec ... did not match any file(s) known to git" and exits 1
+# when a pathspec matches nothing -- verified locally, and it exits 1 even when only ONE of the
+# two pathspecs is missing. Using the shared action verbatim here would therefore not be a no-op,
+# it would hard-fail every job it was added to.
+#
+# This copy keeps the shared action's inputs, semantics, probe, retry policy and warnings intact,
+# and changes exactly one thing: the reset step is guarded so it resets what is actually tracked
+# and deletes untracked leftovers, instead of assuming a yarn repo. It stays drop-in compatible,
+# so once the shared action grows the same guard this file can be replaced by a
+# `uses: ever-co/ever-gauzy/...` reference with no other edit.
+#
+# WHY THE LOCKFILE REWRITE IS A NO-OP HERE (and is still kept, guarded)
+# ---------------------------------------------------------------------------------------------
+# yarn v1 and npm record an absolute `resolved` URL per package and fetch THAT, ignoring the
+# `registry` setting -- so for those package managers a config-only change moves zero bytes and
+# the lockfile has to be rewritten at CI time. pnpm does not work that way: `pnpm-lock.yaml` v9
+# stores only `resolution: {integrity: sha512-...}` and derives the tarball URL from the
+# configured registry at install time. Verified on this repo's lockfile: zero occurrences of
+# `registry.npmjs.org` or `registry.yarnpkg.com`. Config alone is therefore both sufficient and
+# load-bearing here.
+#
+# The yarn.lock rewrite below is kept, gated on the file existing, so this action keeps working
+# unchanged if any part of the repo ever grows a yarn.lock.
+#
+# Nothing is ever committed: every edit below lives only in the runner's checkout, so developers
+# and the files in git are unaffected.
+name: Configure npm registry
+description: >-
+  Point the job at the internal Verdaccio VIP when it is reachable, otherwise at the public npm
+  registry. The Cloudflare-fronted packages.ever.co route is gated behind an explicit opt-in.
+
+inputs:
+  verdaccio-registry:
+    description: Internal Verdaccio VIP, normally vars.VERDACCIO_REGISTRY. Empty disables the probe.
+    required: false
+    default: ''
+  verdaccio-token:
+    description: Auth token for the public packages.ever.co route. Only used when force-public is true.
+    required: false
+    default: ''
+  force-public:
+    description: Set to 'true' to force the public packages.ever.co route even when the VIP answers.
+    required: false
+    default: ''
+  expect-vip:
+    description: >-
+      'true' for in-network runners. Controls whether an unreachable VIP is retried and warned
+      about. Derive it from the runner variable the job really uses, e.g.
+      vars.RUNNER_LINUX_X64_4 != ''. Do NOT use contains(matrix.os, ...) unless the job actually
+      defines strategy.matrix.os -- the expression then silently evaluates false and quietly
+      disables both the retry and the warning, which is a mute switch rather than an error.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Configure Registry
+      shell: bash
+      env:
+        VERDACCIO_REGISTRY: ${{ inputs.verdaccio-registry }}
+        VERDACCIO_TOKEN: ${{ inputs.verdaccio-token }}
+        VERDACCIO_FORCE_PUBLIC: ${{ inputs.force-public }}
+        EXPECT_VIP: ${{ inputs.expect-vip }}
+      run: |
+        # Registry selection is CONDITIONAL on where this job runs.
+        #
+        # The public Cloudflare-fronted route https://packages.ever.co intermittently TRUNCATES
+        # large tarballs mid-stream, and the truncation is UNDETECTABLE by the client: Cloudflare
+        # always sends "Accept-Encoding: gzip" to the origin, Verdaccio re-gzips the already
+        # gzipped .tgz, and Content-Length is dropped in favour of chunked encoding. A cut stream
+        # is therefore a complete-looking HTTP 200 whose body fails gunzip. That route is GATED
+        # behind VERDACCIO_FORCE_PUBLIC rather than removed.
+        #
+        # Every job that uses this action runs on `vars.RUNNER_LINUX_X64_* || ubuntu-latest`, so
+        # the runner is not statically known: if the org variable were unset the job would land on
+        # a GitHub-hosted runner that can never reach a 192.168.x.x VIP. The choice is therefore
+        # made by PROBING the VIP, and `expect-vip` only controls how loudly a miss is reported.
+
+        # Start from a known state. Self-hosted runners can check out with clean: false, so
+        # registry edits from a PREVIOUS run can still be on disk -- .npmrc and .yarnrc are
+        # untracked in this repo, so nothing else restores them and a stale "registry" line from
+        # an earlier run would silently win over this run's decision.
+        #
+        # Guarded, unlike the Gauzy original: reset what git actually tracks, delete what it does
+        # not. Failing to reach a known state is still fatal -- selecting a registry from an
+        # unknown state would mean installing against whatever the last job left behind.
+        rm -f .yarnrc .npmrc.bak .npmrc.scrubbed yarn.lock.bak yarn.lock.rewritten
+        for f in .npmrc yarn.lock; do
+          if git ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+            if ! git checkout -- "$f"; then
+              echo "::error title=Could not reset registry configuration::git checkout -- $f failed on this workspace, so the previous run's registry settings may still be in place. Refusing to select a registry from an unknown state."
+              exit 1
+            fi
+          elif ! rm -f "$f"; then
+            # Untracked (the normal case in this pnpm repo): a leftover from a previous run on a
+            # clean: false runner is the only way it can exist, so remove it.
+            echo "::error title=Could not reset registry configuration::rm -f $f failed on this workspace. Refusing to select a registry from an unknown state."
+            exit 1
+          fi
+        done
+
+        REGISTRY=""
+        if [ "$VERDACCIO_FORCE_PUBLIC" = "true" ] && [ -n "$VERDACCIO_TOKEN" ]; then
+          # Evaluated BEFORE the probe so the override actually overrides: an operator setting
+          # this wants the public route even when the VIP is up (e.g. the internal cache is
+          # serving bad data). Gating it on a failed probe would make the flag a no-op.
+          REGISTRY="https://packages.ever.co/"
+          echo "::warning title=Verdaccio public route in use::VERDACCIO_FORCE_PUBLIC=true - installing through packages.ever.co, which is known to truncate large tarballs mid-stream."
+          echo "//packages.ever.co/:_authToken=$VERDACCIO_TOKEN" >> .npmrc
+          echo "always-auth=true" >> .npmrc
+        else
+          if [ "$VERDACCIO_FORCE_PUBLIC" = "true" ]; then
+            echo "::warning title=VERDACCIO_FORCE_PUBLIC set without a token::VERDACCIO_TOKEN is empty, so packages.ever.co cannot be used; probing the internal VIP instead."
+          fi
+          # Retry only where the VIP is expected to answer. A GitHub-hosted runner can never
+          # reach it, so a second attempt would just add dead time to the job.
+          if [ "$EXPECT_VIP" = "true" ]; then ATTEMPTS=2; else ATTEMPTS=1; fi
+          if [ -n "$VERDACCIO_REGISTRY" ]; then
+            attempt=1
+            while [ "$attempt" -le "$ATTEMPTS" ]; do
+              if curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null "${VERDACCIO_REGISTRY%/}/-/ping"; then
+                REGISTRY="${VERDACCIO_REGISTRY%/}/"
+                echo "Verdaccio VIP is reachable (attempt $attempt) - using the internal npm cache."
+                break
+              fi
+              attempt=$((attempt + 1))
+              if [ "$attempt" -le "$ATTEMPTS" ]; then sleep 3; fi
+            done
+          fi
+          if [ -z "$REGISTRY" ] && [ -z "$VERDACCIO_REGISTRY" ]; then
+            echo "No internal Verdaccio registry is configured (VERDACCIO_REGISTRY is empty) - resolving from the public npm registry."
+          elif [ -z "$REGISTRY" ]; then
+            echo "Verdaccio VIP did not answer - resolving from the public npm registry."
+            # An EXTERNAL runner not reaching the VIP is the designed outcome and stays quiet.
+            # An IN-NETWORK runner means the internal cache is silently unavailable (this fleet
+            # has a recurring MetalLB speaker flap that presents exactly this way), so surface it.
+            # Deliberately a warning, not a failure: a cache blip must never redden a pipeline
+            # that npmjs can serve correctly.
+            if [ "$EXPECT_VIP" = "true" ]; then
+              echo "::warning title=Verdaccio VIP unreachable from an in-network runner::${RUNNER_NAME:-unknown} fell back to the public npm registry; the internal cache was expected to be reachable here."
+            fi
+          fi
+        fi
+        if [ -n "$REGISTRY" ]; then
+          # Appended, never overwritten: last key wins in ini parsing, and yarn v1 does not
+          # reliably read .npmrc for the registry. pnpm reads .npmrc at the workspace root, which
+          # is the working directory of every install step in this repo.
+          #
+          # This sets the DEFAULT registry only. It does not affect publishing: publish-cli.yml
+          # publishes from apps/*/dist (a different npm prefix, so this file is not read at all),
+          # and publish-plugins.yml passes an explicit --registry to every `pnpm publish`, which
+          # is a CLI flag and outranks any .npmrc.
+          echo "registry=$REGISTRY" >> .npmrc
+          echo "registry \"$REGISTRY\"" >> .yarnrc
+          # No-op in this pnpm repo (there is no yarn.lock), kept so the action keeps working if
+          # one ever appears. One pass, no -i: an -i.bak backup survives on a clean: false runner
+          # if the step fails between the rewrite and its cleanup, and bare -i is not portable to
+          # the BSD sed on macOS runners. The temp file is only ever the finished rewrite.
+          if [ -f yarn.lock ]; then
+            sed -e "s|https://registry.yarnpkg.com|${REGISTRY%/}|g" \
+                -e "s|https://registry.npmjs.org|${REGISTRY%/}|g" yarn.lock > yarn.lock.rewritten
+            mv -f yarn.lock.rewritten yarn.lock
+          fi
+        fi
+        echo "Using npm registry: ${REGISTRY:-https://registry.npmjs.org/ (repo default)}"
