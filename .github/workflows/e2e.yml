@@ -136,6 +136,17 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
+      # Resolve dependencies through the internal Verdaccio cache when this job runs
+      # on the in-network ARC pool, so the install does not re-pull the tree from the
+      # public registry. Falls back to npmjs automatically when the VIP does not answer.
+      - name: Configure Registry
+        uses: ./.github/actions/configure-registry
+        with:
+          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
+          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
+          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_8 != '' }}
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -501,6 +512,17 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
+
+      # Resolve dependencies through the internal Verdaccio cache when this job runs
+      # on the in-network ARC pool, so the install does not re-pull the tree from the
+      # public registry. Falls back to npmjs automatically when the VIP does not answer.
+      - name: Configure Registry
+        uses: ./.github/actions/configure-registry
+        with:
+          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
+          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
+          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_8 != '' }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
