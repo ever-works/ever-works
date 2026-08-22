@@ -98,6 +98,27 @@ describe('DeployReadyPollerService.pollOnce', () => {
         expect(funnel.emit).not.toHaveBeenCalled();
     });
 
+    it('rechecks a stale TIMEOUT projection and reconciles it after a healthy probe', async () => {
+        const work = {
+            id: 'w-timeout',
+            slug: 'recovered-site',
+            deploymentState: 'TIMEOUT',
+            deploymentStartedAt: STARTED_AT,
+            lastDeployCorrelationId: null,
+        };
+        const httpFetch = jest.fn().mockResolvedValue({ status: 200 }) as unknown as typeof fetch;
+        const { service, workRepository } = buildService([work], httpFetch);
+
+        await service.pollOnce({ fetch: httpFetch, now: () => NOW, domain: 'ever.works' });
+
+        expect(workRepository.findByDeploymentStates).toHaveBeenCalledWith(
+            expect.arrayContaining(['TIMEOUT']),
+        );
+        expect(workRepository.update).toHaveBeenCalledWith('w-timeout', {
+            deploymentState: 'READY',
+        });
+    });
+
     it('leaves the row alone and counts stillPending when the health probe returns non-200', async () => {
         const work = {
             id: 'w-3',

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { WorkDeployment, DeploymentEnvironment } from '../../entities/work-deployment.entity';
 
 @Injectable()
@@ -38,6 +38,29 @@ export class WorkDeploymentRepository {
             where: { workId, environment },
             order: { createdAt: 'DESC' },
         });
+    }
+
+    async findLatestForWorks(
+        workIds: string[],
+        environment: DeploymentEnvironment,
+    ): Promise<Map<string, WorkDeployment>> {
+        if (workIds.length === 0) {
+            return new Map();
+        }
+
+        const rows = await this.repository.find({
+            where: { workId: In(workIds), environment },
+            order: { createdAt: 'DESC', id: 'DESC' },
+        });
+        const latestByWork = new Map<string, WorkDeployment>();
+
+        for (const row of rows) {
+            if (!latestByWork.has(row.workId)) {
+                latestByWork.set(row.workId, row);
+            }
+        }
+
+        return latestByWork;
     }
 
     findByPr(workId: string, prNumber: number): Promise<WorkDeployment | null> {

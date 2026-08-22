@@ -5,6 +5,17 @@ export { GenerateStatusType } from './generate-status.enum.js';
 // Work DTOs
 export type { WorkScheduleAllowedCadence, WorkScheduleDto, UpdateWorkSchedulePayload } from './work-schedule.dto.js';
 export type {
+	WorkCurrentState,
+	WorkDeploymentReadiness,
+	WorkDeploymentHealthSource,
+	WorkLastGenerationRunDto,
+	WorkLastDeploymentRunDto,
+	WorkLastRunDto,
+	WorkCurrentDeploymentHealthDto,
+	WorkCurrentHealthDto,
+	WorkStatusProjectionDto
+} from './work-status.dto.js';
+export type {
 	GenerationMetrics,
 	WorkChangelog,
 	WorkHistoryChangeEntry,

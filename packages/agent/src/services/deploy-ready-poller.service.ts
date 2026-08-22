@@ -28,8 +28,10 @@ const HEALTH_PATH = '/api/health';
 const SLUG_PLACEHOLDER = /\{slug\}/g;
 
 /**
- * Pending-style states the poller probes for readiness. Mirrors the
- * states the DeploymentVerifierService transitions through.
+ * States the poller can reconcile by observing endpoint readiness. This
+ * includes pending-style verifier states plus historical TIMEOUT projections,
+ * because a timeout records the last verifier result rather than permanent
+ * endpoint availability.
  *
  * **Mixed case is intentional.** `'pending'` is the legacy internal
  * state value; `'INITIALIZING' | 'QUEUED' | 'BUILDING'` are Vercel's
@@ -38,7 +40,16 @@ const SLUG_PLACEHOLDER = /\{slug\}/g;
  * one canonical case. Normalising would require a one-shot
  * migration of historical rows — leave as-is until that's planned.
  */
-const PENDING_STATES: readonly string[] = ['pending', 'INITIALIZING', 'QUEUED', 'BUILDING'];
+const RECONCILABLE_STATES: readonly string[] = [
+    'pending',
+    'INITIALIZING',
+    'QUEUED',
+    'BUILDING',
+    // A TIMEOUT records what the last deploy verifier observed. It is not
+    // proof that the endpoint is still unavailable, so keep health-probing
+    // this denormalized projection until a 200 response reconciles it.
+    'TIMEOUT',
+];
 
 /**
  * EW-617 G8 — emits the funnel `deploy_ready` event when a freshly
@@ -134,15 +145,17 @@ export class DeployReadyPollerService {
             );
         }
 
-        const pendingWorks = await this.workRepository.findByDeploymentStates([...PENDING_STATES]);
+        const reconcilableWorks = await this.workRepository.findByDeploymentStates([
+            ...RECONCILABLE_STATES,
+        ]);
         const summary: DeployReadyPollerSummary = {
-            scanned: pendingWorks.length,
+            scanned: reconcilableWorks.length,
             ready: 0,
             stillPending: 0,
             failed: 0,
         };
 
-        for (const work of pendingWorks) {
+        for (const work of reconcilableWorks) {
             try {
                 // Security (SSRF): the slug is validated as DNS-safe on creation
                 // (DTO `@Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)`) but is re-read
@@ -171,6 +184,9 @@ export class DeployReadyPollerService {
                     : undefined;
                 const elapsedMs = startedAt ? now().getTime() - startedAt : 0;
 
+                // Reconcile only the denormalized current projection. The
+                // WorkDeployment TIMEOUT/ERROR rows are immutable run history
+                // and must continue to describe what that verifier observed.
                 await this.workRepository.update(work.id, { deploymentState: READY_STATE });
                 summary.ready += 1;
 

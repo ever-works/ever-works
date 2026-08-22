@@ -12,6 +12,7 @@ describe('WorkQueryService', () => {
     let workMemberRepository: any;
     let dataGenerator: any;
     let generationHistoryRepository: any;
+    let workDeploymentRepository: any;
     let ownershipService: any;
     let websiteRepositoryState: any;
     let service: WorkQueryService;
@@ -30,6 +31,10 @@ describe('WorkQueryService', () => {
         generationHistoryRepository = {
             findLatestPositiveItemCounts: jest.fn(),
         };
+        workDeploymentRepository = {
+            findLatestForWorks: jest.fn().mockResolvedValue(new Map()),
+            findLatest: jest.fn().mockResolvedValue(null),
+        };
         ownershipService = {};
         websiteRepositoryState = {
             isInitialized: jest.fn().mockResolvedValue(false),
@@ -42,6 +47,7 @@ describe('WorkQueryService', () => {
             generationHistoryRepository,
             ownershipService as any,
             websiteRepositoryState,
+            workDeploymentRepository,
         );
     });
 
@@ -102,6 +108,100 @@ describe('WorkQueryService', () => {
                 itemsCount: 0,
             }),
         );
+    });
+
+    it('separates historical failures from a paused, ready current projection', async () => {
+        const work = {
+            id: 'dir-health',
+            userId: user.id,
+            owner: 'ever-works',
+            website: 'https://recovered-site.ever.works',
+            deploymentState: 'READY',
+            scheduledStatus: 'paused',
+            generateStatus: {
+                status: GenerateStatusType.ERROR,
+                error: 'Unknown remote target: TemplateRepository',
+            },
+            generationStartedAt: new Date('2026-05-01T10:00:00.000Z'),
+            generationFinishedAt: new Date('2026-05-01T10:05:00.000Z'),
+            itemsCount: 12,
+            getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+        } as any;
+        const deployment = {
+            state: 'TIMEOUT',
+            startedAt: new Date('2026-05-01T10:06:00.000Z'),
+            completedAt: new Date('2026-05-01T10:16:00.000Z'),
+        };
+
+        workMemberRepository.getAccessibleWorkIds.mockResolvedValue([]);
+        workRepository.findAllAccessible.mockResolvedValue([work]);
+        workRepository.countAllAccessible.mockResolvedValue(1);
+        workMemberRepository.getMemberRolesForWorks.mockResolvedValue(new Map());
+        generationHistoryRepository.findLatestPositiveItemCounts.mockResolvedValue(new Map());
+        workDeploymentRepository.findLatestForWorks.mockResolvedValue(
+            new Map([['dir-health', deployment]]),
+        );
+
+        const result = await service.getWorks({}, user);
+
+        expect(result.works[0]).toEqual(
+            expect.objectContaining({
+                lastRun: {
+                    generation: {
+                        status: GenerateStatusType.ERROR,
+                        startedAt: '2026-05-01T10:00:00.000Z',
+                        finishedAt: '2026-05-01T10:05:00.000Z',
+                    },
+                    deployment: {
+                        status: 'TIMEOUT',
+                        startedAt: '2026-05-01T10:06:00.000Z',
+                        finishedAt: '2026-05-01T10:16:00.000Z',
+                    },
+                },
+                currentHealth: {
+                    state: 'paused',
+                    deployment: {
+                        readiness: 'ready',
+                        source: 'deployment_projection',
+                        observedAt: null,
+                    },
+                },
+            }),
+        );
+    });
+
+    it('reports the readiness observation time when the latest deployment completed READY', async () => {
+        const work = {
+            id: 'dir-ready',
+            userId: user.id,
+            owner: 'ever-works',
+            website: 'https://ready-site.ever.works',
+            deploymentState: 'READY',
+            itemsCount: 1,
+            getRepoOwner: jest.fn().mockReturnValue('ever-works'),
+        } as any;
+        const deployment = {
+            state: 'READY',
+            startedAt: new Date('2026-08-22T07:55:00.000Z'),
+            completedAt: new Date('2026-08-22T08:00:00.000Z'),
+        };
+
+        workMemberRepository.getAccessibleWorkIds.mockResolvedValue([]);
+        workRepository.findAllAccessible.mockResolvedValue([work]);
+        workRepository.countAllAccessible.mockResolvedValue(1);
+        workMemberRepository.getMemberRolesForWorks.mockResolvedValue(new Map());
+        generationHistoryRepository.findLatestPositiveItemCounts.mockResolvedValue(new Map());
+        workDeploymentRepository.findLatestForWorks.mockResolvedValue(
+            new Map([['dir-ready', deployment]]),
+        );
+
+        const result = await service.getWorks({}, user);
+
+        expect(result.works[0].currentHealth.deployment).toEqual({
+            readiness: 'ready',
+            source: 'deployment_projection',
+            observedAt: '2026-08-22T08:00:00.000Z',
+        });
     });
 
     /**

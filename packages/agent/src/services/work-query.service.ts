@@ -5,7 +5,7 @@ import { WorkGenerationHistoryRepository } from '@src/database/repositories/work
 import { DataGeneratorService } from '@src/generators/data-generator/data-generator.service';
 import { User } from '@src/entities/user.entity';
 import { Work } from '@src/entities/work.entity';
-import { WorkMemberRole, GenerateStatusType } from '@src/entities/types';
+import { WorkMemberRole, GenerateStatusType, WorkScheduleStatus } from '@src/entities/types';
 import { WorkOwnershipService } from './work-ownership.service';
 import { normalizeGeneratorError, rethrowAsNormalized } from './utils/error.utils';
 import {
@@ -15,6 +15,9 @@ import {
 import { WorkGenerationHistory } from '@src/entities/work-generation-history.entity';
 import { WorkHistoryActivityType } from '@ever-works/contracts/api';
 import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
+import { WorkDeploymentRepository } from '@src/database/repositories/work-deployment.repository';
+import { DeploymentEnvironment, WorkDeployment } from '@src/entities/work-deployment.entity';
+import type { WorkCurrentHealthDto, WorkStatusProjectionDto } from '@ever-works/contracts/api';
 
 // Extended work response type with userRole for API responses
 // Uses Omit to exclude class methods from Work, then adds userRole
@@ -33,7 +36,7 @@ type WorkMethods =
 export type WorkWithRole = Omit<Work, WorkMethods> & {
     userRole: WorkMemberRole;
     websiteRepositoryInitialized?: boolean;
-};
+} & WorkStatusProjectionDto;
 
 @Injectable()
 export class WorkQueryService {
@@ -46,6 +49,7 @@ export class WorkQueryService {
         private readonly generationHistoryRepository: WorkGenerationHistoryRepository,
         private readonly ownershipService: WorkOwnershipService,
         private readonly websiteRepositoryState: WorkWebsiteRepositoryStateService,
+        private readonly workDeploymentRepository: WorkDeploymentRepository,
     ) {}
 
     async getWorks(options: { limit?: number; offset?: number; search?: string } = {}, user: User) {
@@ -78,6 +82,11 @@ export class WorkQueryService {
                     workIdsNeedingRecoveredCounts,
                 );
 
+            const latestDeployments = await this.workDeploymentRepository.findLatestForWorks(
+                works.map((work) => work.id),
+                DeploymentEnvironment.PRODUCTION,
+            );
+
             // Separate works into owned vs member-accessed for role computation
             const nonOwnedWorkIds = works
                 .filter((dir) => dir.userId !== user.id)
@@ -109,6 +118,7 @@ export class WorkQueryService {
                     ...dir,
                     itemsCount,
                     userRole,
+                    ...this.toStatusProjection(dir, latestDeployments.get(dir.id)),
                 } as WorkWithRole;
             });
 
@@ -173,6 +183,10 @@ export class WorkQueryService {
                 work,
                 user,
             );
+            const latestDeployment = await this.workDeploymentRepository.findLatest(
+                work.id,
+                DeploymentEnvironment.PRODUCTION,
+            );
 
             // Lazy backfill of the denormalised cache columns
             // (configCache + counts). When a Work pre-dates the
@@ -213,6 +227,7 @@ export class WorkQueryService {
                 ...work,
                 userRole: accessResult.role,
                 websiteRepositoryInitialized,
+                ...this.toStatusProjection(work, latestDeployment ?? undefined),
             };
 
             return {
@@ -222,6 +237,84 @@ export class WorkQueryService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'getting work');
         }
+    }
+
+    private toStatusProjection(
+        work: Work,
+        latestDeployment?: WorkDeployment,
+    ): WorkStatusProjectionDto {
+        const generation = work.generateStatus
+            ? {
+                  status: work.generateStatus.status,
+                  startedAt: this.toIsoString(work.generationStartedAt),
+                  finishedAt: this.toIsoString(work.generationFinishedAt),
+              }
+            : null;
+        const deployment = latestDeployment
+            ? {
+                  status: latestDeployment.state,
+                  startedAt: this.toIsoString(latestDeployment.startedAt),
+                  finishedAt: this.toIsoString(latestDeployment.completedAt),
+              }
+            : null;
+
+        return {
+            lastRun: { generation, deployment },
+            currentHealth: {
+                state:
+                    work.generateStatus?.status === GenerateStatusType.GENERATING
+                        ? 'running'
+                        : work.scheduledStatus === WorkScheduleStatus.PAUSED
+                          ? 'paused'
+                          : 'idle',
+                deployment: this.toCurrentDeploymentHealth(work, latestDeployment),
+            },
+        };
+    }
+
+    private toCurrentDeploymentHealth(
+        work: Work,
+        latestDeployment?: WorkDeployment,
+    ): WorkCurrentHealthDto['deployment'] {
+        const deploymentState = work.deploymentState?.toUpperCase();
+
+        if (deploymentState === 'READY') {
+            return {
+                readiness: 'ready',
+                source: 'deployment_projection',
+                observedAt:
+                    latestDeployment?.state === 'READY'
+                        ? this.toIsoString(latestDeployment.completedAt)
+                        : null,
+            };
+        }
+
+        if (['PENDING', 'INITIALIZING', 'QUEUED', 'BUILDING'].includes(deploymentState ?? '')) {
+            return {
+                readiness: 'pending',
+                source: 'deployment_projection',
+                observedAt: null,
+            };
+        }
+
+        if (!work.website && !work.deployProjectId && !work.deploymentState) {
+            return { readiness: 'not_deployed', source: 'none', observedAt: null };
+        }
+
+        return {
+            readiness: 'unknown',
+            source: work.deploymentState ? 'deployment_projection' : 'none',
+            observedAt: null,
+        };
+    }
+
+    private toIsoString(value?: Date | string | null): string | null {
+        if (!value) {
+            return null;
+        }
+
+        const date = value instanceof Date ? value : new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date.toISOString();
     }
 
     /**
