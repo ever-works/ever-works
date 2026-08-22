@@ -275,15 +275,14 @@ differ:
   `['main', 'MAIN']` stores two entries that behave as one. Should the
   sanitizer normalise case on write, or is preserving the operator's
   original casing for display the better trade-off?
-- **OQ-7** `isCredentialKey(value)` is `CREDENTIAL_KEY_PATTERN.test(value)`, and
-  `RegExp.test` **stringifies its argument**. So `isCredentialKey(undefined)`
-  returns `true` (the string `'undefined'` matches the pattern), as do `null`,
-  `123`, `true`, `false` and a one-element array. Both current call sites are
-  protected by other means — `checkToolCredentialDeclarations` reads keys from
-  `Object.entries`, and `EnvCredentialResolver` would crash a moment later in
-  `key.replace(...)` rather than resolve anything — so this is a latent
-  robustness hole in a **security gate**, not a live credential leak. Should
-  the guard reject non-strings explicitly (`typeof value === 'string' && …`)?
+- **OQ-7 — RESOLVED.** `isCredentialKey` used to be
+  `CREDENTIAL_KEY_PATTERN.test(value)` with a `string` parameter, and
+  `RegExp.test` **stringifies its argument** — so `isCredentialKey(undefined)`
+  returned `true` (the string `'undefined'` matches), as did `null`, `123`,
+  `true`, `false` and a one-element array. Both call sites were protected by
+  other means, so it was a latent robustness hole in a **security gate** rather
+  than a live credential leak. It now takes `unknown` and is a type predicate:
+  `(value: unknown): value is string`, guarded by an explicit `typeof` check.
 
 ## 9. Constitution Gates
 

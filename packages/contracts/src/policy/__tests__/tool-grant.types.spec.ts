@@ -441,30 +441,44 @@ describe('CREDENTIAL_KEY_PATTERN and isCredentialKey', () => {
 		expect(isCredentialKey(key)).toBe(CREDENTIAL_KEY_PATTERN.test(key));
 	});
 
-	it('BUG: returns true for non-string values because RegExp.test stringifies', () => {
-		// `CREDENTIAL_KEY_PATTERN.test(value)` coerces its argument, so
-		// `undefined` becomes the STRING 'undefined', which matches the pattern.
-		// Consumers use `if (!isCredentialKey(key))` as a security gate, and a
-		// null/undefined key sails straight through it. Pinned as CURRENT
-		// behaviour so a fix is a visible, intentional change here.
-		expect(isCredentialKey(undefined as never)).toBe(true);
-		expect(isCredentialKey(null as never)).toBe(true);
-		expect(isCredentialKey(123 as never)).toBe(true);
-		expect(isCredentialKey(0 as never)).toBe(true);
-		expect(isCredentialKey(true as never)).toBe(true);
-		expect(isCredentialKey(false as never)).toBe(true);
-		expect(isCredentialKey(Number.NaN as never)).toBe(true);
-		// A one-element array stringifies to its single member.
-		expect(isCredentialKey(['A'] as never)).toBe(true);
+	it.each([
+		['undefined', undefined],
+		['null', null],
+		['a number', 123],
+		['zero', 0],
+		['true', true],
+		['false', false],
+		['NaN', Number.NaN],
+		['a one-element array', ['A']],
+		['an empty object', {}],
+		['an empty array', []],
+		['a multi-element array', ['a', 'b']]
+	])('rejects %s', (_label, value) => {
+		// Regression guard for the coercion hole this function used to have.
+		// `RegExp.test` STRINGIFIES its argument, so without the `typeof` check
+		// `undefined` became the string 'undefined' — which matches the pattern —
+		// and `null`, `123`, `true`, `false` and `['A']` all did the same. Callers
+		// use `if (!isCredentialKey(key))` as a security gate, so those values
+		// sailed straight through it. The first eight cases below were the hole;
+		// the last three were rejected only by accident of their String() form.
+		expect(isCredentialKey(value)).toBe(false);
 	});
 
-	it('returns false for the non-strings that happen to stringify badly', () => {
-		// The balancing half of the bug above: these are rejected only by
-		// accident of their String() form, not by any type check.
-		expect(isCredentialKey({} as never)).toBe(false);
-		expect(isCredentialKey([] as never)).toBe(false);
-		expect(isCredentialKey(['a', 'b'] as never)).toBe(false);
-		expect(isCredentialKey('' as never)).toBe(false);
-		expect(isCredentialKey(' A ' as never)).toBe(false);
+	it('narrows to string, so a validated value is usable without a cast', () => {
+		// The guard is a type predicate now, which is the point: callers stop
+		// needing `as string` after checking.
+		const value: unknown = 'GOOD_KEY';
+		if (isCredentialKey(value)) {
+			expect(value.toUpperCase()).toBe('GOOD_KEY');
+		} else {
+			throw new Error('expected GOOD_KEY to be a valid credential key');
+		}
+	});
+
+	it('still rejects the string values the pattern excludes', () => {
+		expect(isCredentialKey('')).toBe(false);
+		expect(isCredentialKey(' A ')).toBe(false);
+		expect(isCredentialKey('.leading-dot')).toBe(false);
+		expect(isCredentialKey('-leading-dash')).toBe(false);
 	});
 });
