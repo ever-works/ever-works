@@ -4,6 +4,8 @@ jest.mock('@src/generators/data-generator/data-generator.service', () => ({
 
 import { WorkQueryService } from '../work-query.service';
 import { WorkMemberRole, GenerateStatusType } from '@src/entities/types';
+import type { WorkDeploymentRepository } from '@src/database/repositories/work-deployment.repository';
+import { WorkDeployment } from '@src/entities/work-deployment.entity';
 
 describe('WorkQueryService', () => {
     const user = { id: 'user-1' } as any;
@@ -12,7 +14,9 @@ describe('WorkQueryService', () => {
     let workMemberRepository: any;
     let dataGenerator: any;
     let generationHistoryRepository: any;
-    let workDeploymentRepository: any;
+    let workDeploymentRepository: jest.Mocked<
+        Pick<WorkDeploymentRepository, 'findLatestForWorks' | 'findLatest'>
+    >;
     let ownershipService: any;
     let websiteRepositoryState: any;
     let service: WorkQueryService;
@@ -47,7 +51,7 @@ describe('WorkQueryService', () => {
             generationHistoryRepository,
             ownershipService as any,
             websiteRepositoryState,
-            workDeploymentRepository,
+            workDeploymentRepository as unknown as WorkDeploymentRepository,
         );
     });
 
@@ -127,11 +131,11 @@ describe('WorkQueryService', () => {
             itemsCount: 12,
             getRepoOwner: jest.fn().mockReturnValue('ever-works'),
         } as any;
-        const deployment = {
+        const deployment = Object.assign(new WorkDeployment(), {
             state: 'TIMEOUT',
             startedAt: new Date('2026-05-01T10:06:00.000Z'),
             completedAt: new Date('2026-05-01T10:16:00.000Z'),
-        };
+        });
 
         workMemberRepository.getAccessibleWorkIds.mockResolvedValue([]);
         workRepository.findAllAccessible.mockResolvedValue([work]);
@@ -180,11 +184,11 @@ describe('WorkQueryService', () => {
             itemsCount: 1,
             getRepoOwner: jest.fn().mockReturnValue('ever-works'),
         } as any;
-        const deployment = {
+        const deployment = Object.assign(new WorkDeployment(), {
             state: 'READY',
             startedAt: new Date('2026-08-22T07:55:00.000Z'),
             completedAt: new Date('2026-08-22T08:00:00.000Z'),
-        };
+        });
 
         workMemberRepository.getAccessibleWorkIds.mockResolvedValue([]);
         workRepository.findAllAccessible.mockResolvedValue([work]);

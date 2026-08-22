@@ -73,30 +73,28 @@ export class WorkQueryService {
                 search: sanitizedSearch,
             });
 
+            const workIds = works.map((work) => work.id);
             const workIdsNeedingRecoveredCounts = works
                 .filter((dir) => this.shouldRecoverItemsCount(dir))
                 .map((dir) => dir.id);
-
-            const recoveredItemCounts =
-                await this.generationHistoryRepository.findLatestPositiveItemCounts(
-                    workIdsNeedingRecoveredCounts,
-                );
-
-            const latestDeployments = await this.workDeploymentRepository.findLatestForWorks(
-                works.map((work) => work.id),
-                DeploymentEnvironment.PRODUCTION,
-            );
-
-            // Separate works into owned vs member-accessed for role computation
             const nonOwnedWorkIds = works
                 .filter((dir) => dir.userId !== user.id)
                 .map((dir) => dir.id);
-
-            // Batch fetch member roles for non-owned works (single query)
-            const memberRoles = await this.workMemberRepository.getMemberRolesForWorks(
-                user.id,
-                nonOwnedWorkIds,
-            );
+            const [recoveredItemCounts, latestDeployments, memberRoles, total] = await Promise.all([
+                this.generationHistoryRepository.findLatestPositiveItemCounts(
+                    workIdsNeedingRecoveredCounts,
+                ),
+                this.workDeploymentRepository.findLatestForWorks(
+                    workIds,
+                    DeploymentEnvironment.PRODUCTION,
+                ),
+                this.workMemberRepository.getMemberRolesForWorks(user.id, nonOwnedWorkIds),
+                this.workRepository.countAllAccessible({
+                    userId: user.id,
+                    memberWorkIds,
+                    search: sanitizedSearch,
+                }),
+            ]);
 
             // Add userRole to each work without additional queries
             const worksWithRoles: WorkWithRole[] = works.map((dir) => {
@@ -120,12 +118,6 @@ export class WorkQueryService {
                     userRole,
                     ...this.toStatusProjection(dir, latestDeployments.get(dir.id)),
                 } as WorkWithRole;
-            });
-
-            const total = await this.workRepository.countAllAccessible({
-                userId: user.id,
-                memberWorkIds,
-                search: sanitizedSearch,
             });
 
             // Diagnostic: explicit log when listing returns empty so we can
@@ -239,6 +231,7 @@ export class WorkQueryService {
         }
     }
 
+    /** Build the immutable last-run and derived current-health read model. */
     private toStatusProjection(
         work: Work,
         latestDeployment?: WorkDeployment,
@@ -272,6 +265,7 @@ export class WorkQueryService {
         };
     }
 
+    /** Derive availability without treating historical failure as current downtime. */
     private toCurrentDeploymentHealth(
         work: Work,
         latestDeployment?: WorkDeployment,
@@ -308,6 +302,7 @@ export class WorkQueryService {
         };
     }
 
+    /** Serialize legacy Date/string timestamps defensively for the API contract. */
     private toIsoString(value?: Date | string | null): string | null {
         if (!value) {
             return null;

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { WorkDeployment, DeploymentEnvironment } from '../../entities/work-deployment.entity';
 
 @Injectable()
@@ -36,10 +36,15 @@ export class WorkDeploymentRepository {
     findLatest(workId: string, environment: DeploymentEnvironment): Promise<WorkDeployment | null> {
         return this.repository.findOne({
             where: { workId, environment },
-            order: { createdAt: 'DESC' },
+            order: { createdAt: 'DESC', id: 'DESC' },
         });
     }
 
+    /**
+     * Load one newest history row per Work. The correlated subquery keeps the
+     * result bounded to the requested Work count instead of materializing and
+     * folding every historical deployment in application memory.
+     */
     async findLatestForWorks(
         workIds: string[],
         environment: DeploymentEnvironment,
@@ -48,19 +53,23 @@ export class WorkDeploymentRepository {
             return new Map();
         }
 
-        const rows = await this.repository.find({
-            where: { workId: In(workIds), environment },
-            order: { createdAt: 'DESC', id: 'DESC' },
-        });
-        const latestByWork = new Map<string, WorkDeployment>();
+        const query = this.repository.createQueryBuilder('deployment');
+        const latestIdQuery = query
+            .subQuery()
+            .select('latest.id')
+            .from(WorkDeployment, 'latest')
+            .where('latest.workId = deployment.workId')
+            .andWhere('latest.environment = :environment')
+            .orderBy('latest.createdAt', 'DESC')
+            .addOrderBy('latest.id', 'DESC')
+            .limit(1);
+        const rows = await query
+            .where('deployment.workId IN (:...workIds)', { workIds })
+            .andWhere('deployment.environment = :environment', { environment })
+            .andWhere(`deployment.id = ${latestIdQuery.getQuery()}`)
+            .getMany();
 
-        for (const row of rows) {
-            if (!latestByWork.has(row.workId)) {
-                latestByWork.set(row.workId, row);
-            }
-        }
-
-        return latestByWork;
+        return new Map(rows.map((row) => [row.workId, row]));
     }
 
     findByPr(workId: string, prNumber: number): Promise<WorkDeployment | null> {

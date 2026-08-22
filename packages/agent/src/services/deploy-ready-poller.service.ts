@@ -10,8 +10,6 @@ export interface DeployReadyPollerSummary {
     failed: number;
 }
 
-const READY_STATE = 'READY';
-
 /**
  * Health endpoint probed on each tenant site.
  *
@@ -187,7 +185,15 @@ export class DeployReadyPollerService {
                 // Reconcile only the denormalized current projection. The
                 // WorkDeployment TIMEOUT/ERROR rows are immutable run history
                 // and must continue to describe what that verifier observed.
-                await this.workRepository.update(work.id, { deploymentState: READY_STATE });
+                const reconciled = await this.workRepository.markDeploymentReadyIfCurrent(work.id, {
+                    deploymentState: work.deploymentState,
+                    deploymentStartedAt: work.deploymentStartedAt,
+                    lastDeployCorrelationId: work.lastDeployCorrelationId,
+                });
+                if (!reconciled) {
+                    summary.stillPending += 1;
+                    continue;
+                }
                 summary.ready += 1;
 
                 if (work.lastDeployCorrelationId) {

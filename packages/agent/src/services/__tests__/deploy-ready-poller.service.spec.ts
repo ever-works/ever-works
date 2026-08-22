@@ -41,7 +41,7 @@ describe('DeployReadyPollerService.pollOnce', () => {
     ) => {
         const workRepository = {
             findByDeploymentStates: jest.fn().mockResolvedValue(works),
-            update: jest.fn().mockResolvedValue(undefined),
+            markDeploymentReadyIfCurrent: jest.fn().mockResolvedValue(true),
         };
         const funnel = { emit: jest.fn() };
         const service = new DeployReadyPollerService(workRepository as never, funnel as never);
@@ -52,6 +52,7 @@ describe('DeployReadyPollerService.pollOnce', () => {
         const work = {
             id: 'w-1',
             slug: 'my-site',
+            deploymentState: 'pending',
             deploymentStartedAt: STARTED_AT,
             lastDeployCorrelationId: 'corr-abc123-uuid',
         };
@@ -71,7 +72,11 @@ describe('DeployReadyPollerService.pollOnce', () => {
             'https://my-site.ever.works/api/health',
             expect.objectContaining({ method: 'GET' }),
         );
-        expect(workRepository.update).toHaveBeenCalledWith('w-1', { deploymentState: 'READY' });
+        expect(workRepository.markDeploymentReadyIfCurrent).toHaveBeenCalledWith('w-1', {
+            deploymentState: 'pending',
+            deploymentStartedAt: STARTED_AT,
+            lastDeployCorrelationId: 'corr-abc123-uuid',
+        });
         expect(funnel.emit).toHaveBeenCalledTimes(1);
         const payload = funnel.emit.mock.calls[0][0];
         expect(payload.event).toBe(ZERO_FRICTION_FUNNEL_EVENTS.DEPLOY_READY);
@@ -86,6 +91,7 @@ describe('DeployReadyPollerService.pollOnce', () => {
         const work = {
             id: 'w-2',
             slug: 'other-site',
+            deploymentState: 'pending',
             deploymentStartedAt: STARTED_AT,
             lastDeployCorrelationId: null,
         };
@@ -94,7 +100,11 @@ describe('DeployReadyPollerService.pollOnce', () => {
 
         await service.pollOnce({ fetch: httpFetch, now: () => NOW, domain: 'ever.works' });
 
-        expect(workRepository.update).toHaveBeenCalledWith('w-2', { deploymentState: 'READY' });
+        expect(workRepository.markDeploymentReadyIfCurrent).toHaveBeenCalledWith('w-2', {
+            deploymentState: 'pending',
+            deploymentStartedAt: STARTED_AT,
+            lastDeployCorrelationId: null,
+        });
         expect(funnel.emit).not.toHaveBeenCalled();
     });
 
@@ -114,9 +124,33 @@ describe('DeployReadyPollerService.pollOnce', () => {
         expect(workRepository.findByDeploymentStates).toHaveBeenCalledWith(
             expect.arrayContaining(['TIMEOUT']),
         );
-        expect(workRepository.update).toHaveBeenCalledWith('w-timeout', {
-            deploymentState: 'READY',
+        expect(workRepository.markDeploymentReadyIfCurrent).toHaveBeenCalledWith('w-timeout', {
+            deploymentState: 'TIMEOUT',
+            deploymentStartedAt: STARTED_AT,
+            lastDeployCorrelationId: null,
         });
+    });
+
+    it('does not overwrite a newer deployment when the compare-and-set loses the race', async () => {
+        const work = {
+            id: 'w-raced',
+            slug: 'raced-site',
+            deploymentState: 'TIMEOUT',
+            deploymentStartedAt: STARTED_AT,
+            lastDeployCorrelationId: 'old-correlation',
+        };
+        const httpFetch = jest.fn().mockResolvedValue({ status: 200 }) as unknown as typeof fetch;
+        const { service, workRepository, funnel } = buildService([work], httpFetch);
+        workRepository.markDeploymentReadyIfCurrent.mockResolvedValue(false);
+
+        const summary = await service.pollOnce({
+            fetch: httpFetch,
+            now: () => NOW,
+            domain: 'ever.works',
+        });
+
+        expect(summary).toEqual({ scanned: 1, ready: 0, stillPending: 1, failed: 0 });
+        expect(funnel.emit).not.toHaveBeenCalled();
     });
 
     it('leaves the row alone and counts stillPending when the health probe returns non-200', async () => {
@@ -136,7 +170,7 @@ describe('DeployReadyPollerService.pollOnce', () => {
         });
 
         expect(summary).toEqual({ scanned: 1, ready: 0, stillPending: 1, failed: 0 });
-        expect(workRepository.update).not.toHaveBeenCalled();
+        expect(workRepository.markDeploymentReadyIfCurrent).not.toHaveBeenCalled();
         expect(funnel.emit).not.toHaveBeenCalled();
     });
 

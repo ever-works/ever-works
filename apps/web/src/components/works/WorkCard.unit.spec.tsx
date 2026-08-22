@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GenerateStatusType, WorkScheduleStatus } from '@/lib/api/enums';
 import type { Work } from '@/lib/api/work';
+import type { AnchorHTMLAttributes, HTMLAttributes, ReactNode, Ref } from 'react';
 
 vi.mock('next-intl', () => ({
     useTranslations: (namespace: string) => (key: string) => {
@@ -14,7 +15,14 @@ vi.mock('next-intl', () => ({
 }));
 
 vi.mock('@/i18n/navigation', () => ({
-    Link: ({ children, href, ...props }: any) => (
+    Link: ({
+        children,
+        href,
+        ...props
+    }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
+        children: ReactNode;
+        href: string | object;
+    }) => (
         <a href={typeof href === 'string' ? href : '#'} {...props}>
             {children}
         </a>
@@ -23,11 +31,17 @@ vi.mock('@/i18n/navigation', () => ({
 }));
 
 vi.mock('../ui/show-datetime', () => ({ ShowDateTime: () => null }));
-vi.mock('../ui/tooltip', () => ({ Tooltip: ({ children }: any) => children }));
-vi.mock('../ui/ShinyText', () => ({ ShinyText: ({ text }: any) => text }));
+vi.mock('../ui/tooltip', () => ({
+    Tooltip: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock('../ui/ShinyText', () => ({ ShinyText: ({ text }: { text: string }) => text }));
 vi.mock('../ui/AnimatedClock', () => ({ AnimatedClock: () => null }));
 vi.mock('./detail/items/HoverPopup', () => ({
-    HoverPopup: ({ trigger }: any) => trigger(undefined, {}),
+    HoverPopup: ({
+        trigger,
+    }: {
+        trigger: (ref: Ref<HTMLSpanElement>, props: HTMLAttributes<HTMLSpanElement>) => ReactNode;
+    }) => trigger(null, {}),
 }));
 vi.mock('./WorkErrorPopup', () => ({ WorkErrorPopup: () => null }));
 vi.mock('./shared/WorkKindBadge', () => ({ WorkKindBadge: () => null }));

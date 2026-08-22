@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Pin the API projection contract
+## Task 1: Pin the API projection contract
 
 **Files:**
 
@@ -25,7 +25,7 @@
 - [x] Implement the shared contract and pure derivation.
 - [x] Run the focused service tests.
 
-### Task 2: Reconcile stale deployment projections safely
+## Task 2: Reconcile stale deployment projections safely
 
 **Files:**
 
@@ -36,7 +36,7 @@
 - [x] Include recoverable stale projection states without editing historical deployment rows.
 - [x] Run the focused poller tests.
 
-### Task 3: Separate the list badge from historical run state
+## Task 3: Separate the list badge from historical run state
 
 **Files:**
 
@@ -48,7 +48,7 @@
 - [x] Render current health as the primary badge and last-run failure/warnings separately.
 - [x] Run focused web tests.
 
-### Task 4: Verify and deliver
+## Task 4: Verify and deliver
 
 - [x] Run focused Jest/Vitest tests, package type checks, formatting/lint checks, and inspect the final diff.
 - [ ] Commit and push the feature branch.
