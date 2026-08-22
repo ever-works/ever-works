@@ -6,11 +6,13 @@ import {
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomBytes } from 'crypto';
+import { DeployFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import {
-    DeployFacadeService,
-    GitFacadeService,
-    PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
-} from '@ever-works/agent/facades';
+    DeploymentContextResolutionError,
+    coerceDeploymentClusterSource,
+    resolveEffectiveDeploymentContext,
+    type EffectiveDeploymentContext,
+} from '@ever-works/agent/deployment-context';
 import {
     WorkRepository,
     WorkDeploymentRepository,
@@ -33,7 +35,6 @@ import {
     EverWorksDnsService,
     SubdomainAllocator,
     EverWorksDbProvisionService,
-    buildEverWorksTenantNamespace,
 } from '@ever-works/agent/ever-works-providers';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
@@ -44,34 +45,9 @@ import {
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
 import type { DeploymentConfig, DeploymentResult, IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
-import {
-    ClusterSource,
-    isReservedDeployNamespace,
-    isSharedClusterSource,
-    normalizeClusterSource,
-    resolveKubeconfigForClusterSource,
-    validateClusterSourceForOwner,
-} from './cluster-source-matrix';
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
-
-function coerceClusterSource(value: unknown): ClusterSource {
-    if (typeof value === 'string') {
-        // `normalizeClusterSource` accepts the current values and remaps the
-        // unambiguous legacy `k8s-gauzy` alias → `k8s-works`. It deliberately
-        // does NOT remap `k8s-works` → `k8s-works-shared` (that stored-value
-        // rewrite is done once, atomically, by the RenameK8sClusterSource
-        // migration); doing it here would silently break admin selections.
-        const normalized = normalizeClusterSource(value);
-        if (normalized) return normalized;
-    }
-    // Back-compat: Works that pre-date the cluster-source dropdown have no
-    // `clusterSource` set in their plugin settings. Treat them as
-    // `custom-kubeconfig` so they keep working as long as their
-    // website repo is not in an Ever Works-shared org.
-    return 'custom-kubeconfig';
-}
 
 /**
  * Default workflow filenames to dispatch when a deployment plugin does not
@@ -224,14 +200,15 @@ export class DeployService {
         //   to avoid cross-tenant credential exposure.
         // The resolved kubeconfig replaces the user-pasted one for
         // platform-managed sources.
-        const effectiveDeployToken = this.resolveDeployToken(
-            work.deployProvider,
+        const effectiveContext = this.resolveDeploymentContext(
+            work,
             plugin.id,
             websiteOwner,
             settings ?? {},
             token,
-            Boolean(user.isPlatformAdmin),
+            user,
         );
+        const effectiveDeployToken = effectiveContext.token;
 
         const ctx = await this.createRepoContext(websiteOwner, websiteRepo, gitToken);
 
@@ -248,23 +225,7 @@ export class DeployService {
         // the user's directory is reachable at that subdomain without any
         // manual DNS. If env vars are missing the DNS service no-ops; the
         // k8s plugin's default LB hostname remains the fallback.
-        let deploySettings = await this.applyManagedSubdomain(work, settings);
-
-        // EW (owner item #3b) — authoritative, server-side namespace policy.
-        // The k8s `namespace` field is free-text with no client-side guarantee;
-        // enforce the per-tenant override (shared clusters) + reserved-namespace
-        // blocklist HERE, before the plugin's `getDeploymentSecrets` turns it
-        // into the pushed `K8S_NAMESPACE`. A user-supplied `ever-works` /
-        // `kube-system` / other-tenant namespace can never reach the cluster.
-        const enforcedNamespace = this.resolveDeployNamespace(
-            work.deployProvider,
-            plugin?.id,
-            work,
-            settings ?? {},
-        );
-        if (enforcedNamespace !== undefined) {
-            deploySettings = { ...(deploySettings ?? {}), namespace: enforcedNamespace };
-        }
+        const deploySettings = await this.applyManagedSubdomain(work, effectiveContext.settings);
 
         // EW — server-side deploy for platform-managed cluster tiers.
         //
@@ -281,7 +242,7 @@ export class DeployService {
         const serverSide = this.isServerSideManagedDeploy(
             work.deployProvider,
             plugin,
-            settings ?? {},
+            effectiveContext.settings,
             effectiveDeployToken,
         );
 
@@ -491,150 +452,39 @@ export class DeployService {
         }
     }
 
-    /**
-     * EW-616: Apply the deploy-matrix validation for the k8s provider and
-     * substitute the platform's kubeconfig env var when the user picked a
-     * platform-managed cluster source. For non-k8s providers (Vercel, etc.)
-     * this is a pass-through and the validation is skipped.
-     */
-    private resolveDeployToken(
-        deployProvider: string | undefined,
+    private resolveDeploymentContext(
+        work: Work,
         pluginId: string | undefined,
         websiteOwner: string,
         settings: Record<string, unknown>,
-        userToken: string,
-        isPlatformAdmin: boolean,
-    ): string {
-        if (!this.isKubernetesDeploy(deployProvider, pluginId)) {
-            return userToken;
-        }
-
-        // Task 10 — the managed `ever-works` provider deploys to a
-        // platform-OWNED cluster using a platform-HELD kubeconfig that the
-        // deploy facade already resolved from `EVER_WORKS_DEPLOY_*` (dedicated,
-        // Path A) or `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG` (shared, Path B).
-        // The user-cluster deploy matrix (`validateClusterSourceForOwner`)
-        // exists to stop a USER's own cluster from receiving a shared-org PAT —
-        // it does not apply here, and applying it would wrongly reject managed
-        // deploys whose website repo lives in the `ever-works-cloud` storage
-        // org (rule 2). Pass the platform kubeconfig straight through; strip
-        // the sentinel so it can never leak into `K8S_TOKEN`.
-        if (deployProvider === EVER_WORKS_DEPLOY_PROVIDER_ID) {
-            return userToken === PLATFORM_MANAGED_KUBECONFIG_SENTINEL ? '' : userToken;
-        }
-
-        // EW-616: the deploy facade returns a sentinel string when the
-        // user picked a platform-managed cluster without pasting a
-        // kubeconfig. Treat it as "no kubeconfig" for the validator and
-        // discard it before resolution so it can never leak into the
-        // pushed `K8S_TOKEN` secret on the website repo.
-        const realUserToken = userToken === PLATFORM_MANAGED_KUBECONFIG_SENTINEL ? '' : userToken;
-
-        const clusterSource = coerceClusterSource(settings.clusterSource);
-        const failure = validateClusterSourceForOwner(websiteOwner, clusterSource, {
-            hasKubeconfig: Boolean(realUserToken && realUserToken.trim()),
-            isPlatformAdmin,
-        });
-        if (failure) {
-            this.logger.warn(`Deploy-matrix violation [${failure.code}]: ${failure.message}`);
-            throw new BadRequestException(failure.message);
-        }
-
+        resolvedToken: string,
+        user: User,
+    ): EffectiveDeploymentContext {
         try {
-            return resolveKubeconfigForClusterSource(clusterSource, realUserToken);
-        } catch (error: any) {
-            // The only failure path here is a missing platform-managed
-            // env var (`EVER_WORKS_K8S_WORKS_KUBECONFIG` /
-            // `EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG`). The user picked a
-            // valid option — this is a platform-provisioning gap, so
-            // surface it as 5xx, not 4xx, so on-call can distinguish it
-            // from genuine user-input errors.
-            const message = error instanceof Error ? error.message : String(error);
-            this.logger.error(`Cluster-source resolution failed for ${websiteOwner}: ${message}`);
-            throw new InternalServerErrorException(message);
-        }
-    }
-
-    /**
-     * EW (owner item #3b) — authoritative per-tenant namespace resolution for
-     * the k8s deploy path. Mirrors `resolveDeployToken`: a no-op pass-through
-     * (returns `undefined`) for non-k8s providers, so Vercel and friends are
-     * untouched.
-     *
-     * Policy (see `cluster-source-matrix`):
-     *  - **Shared, platform-owned clusters** (`k8s-works-shared`, any shared
-     *    source) AND the managed `ever-works` provider: OVERRIDE whatever the
-     *    user typed with a deterministic per-tenant namespace
-     *    (`{base}-{ownerUserId}`). The namespace field is never user-editable
-     *    to a foreign/system namespace on a cluster shared with other tenants.
-     *  - **All other k8s sources** (`custom-kubeconfig` = user's own cluster,
-     *    `k8s-works` = admin internal): the user's namespace passes through,
-     *    but a platform-reserved namespace (`ever-works`, `kube-system`, …,
-     *    any `kube-*`) is rejected with a clear 400. An empty namespace returns
-     *    `undefined` so the k8s plugin keeps its existing default.
-     *
-     * Returns the namespace to force onto `deploySettings.namespace`, or
-     * `undefined` to leave the plugin's own resolution in place.
-     */
-    private resolveDeployNamespace(
-        deployProvider: string | undefined,
-        pluginId: string | undefined,
-        work: Work,
-        settings: Record<string, unknown>,
-    ): string | undefined {
-        if (!this.isKubernetesDeploy(deployProvider, pluginId)) {
-            return undefined;
-        }
-
-        const clusterSource = coerceClusterSource(settings.clusterSource);
-        const isManagedShared =
-            deployProvider === EVER_WORKS_DEPLOY_PROVIDER_ID ||
-            isSharedClusterSource(clusterSource);
-
-        if (isManagedShared) {
-            // Cross-tenant isolation: ignore user input entirely and derive a
-            // deterministic per-tenant namespace from the Work owner.
-            const owner = work.user as User | undefined;
-            const tenantId = owner?.id || work.id;
-            const base = process.env.EVER_WORKS_DEPLOY_NAMESPACE?.trim() || 'ever-works-tenants';
-            return buildEverWorksTenantNamespace(tenantId, base);
-        }
-
-        // custom-kubeconfig (user's own cluster) / k8s-works (admin internal):
-        // honour the user's namespace, but never a platform-reserved one.
-        const requested = typeof settings.namespace === 'string' ? settings.namespace.trim() : '';
-        if (!requested) {
-            // `k8s-works` is OUR cluster, and leaving this undefined means the
-            // plugin falls back to its own DEFAULT_NAMESPACE ('ever-works') —
-            // which is platform-reserved. The blocklist below never catches it
-            // because it only inspects a namespace the user actually typed, so
-            // every Work created on k8s-works without an explicit namespace
-            // silently targets the reserved shared namespace. Derive one.
-            //
-            // custom-kubeconfig is deliberately left alone: that is the user's
-            // own cluster and their default namespace is their business.
-            if (clusterSource === 'k8s-works') {
-                const slug = (work.slug || work.id)
-                    .toLowerCase()
-                    .replace(/[^a-z0-9-]+/g, '-')
-                    .replace(/^-+|-+$/g, '')
-                    .slice(0, 40);
-                const derived = slug ? `ever-works-${slug}-prod` : '';
-                if (derived && !isReservedDeployNamespace(derived)) {
-                    return derived;
-                }
+            return resolveEffectiveDeploymentContext({
+                deployProvider: work.deployProvider,
+                pluginId,
+                resolvedToken,
+                settings,
+                websiteOwner,
+                workId: work.id,
+                workSlug: work.slug,
+                ownerUserId: user.id,
+                isPlatformAdmin: Boolean(user.isPlatformAdmin),
+            });
+        } catch (error) {
+            if (!(error instanceof DeploymentContextResolutionError)) throw error;
+            if (error.code === 'DEPLOY_MATRIX_VIOLATION' || error.code === 'RESERVED_NAMESPACE') {
+                this.logger.warn(
+                    `Deploy context rejected${error.reason ? ` [${error.reason}]` : ''}: ${error.message}`,
+                );
+                throw new BadRequestException(error.message);
             }
-            return undefined;
+            this.logger.error(
+                `Cluster-source resolution failed for ${websiteOwner}: ${error.message}`,
+            );
+            throw new InternalServerErrorException(error.message);
         }
-        if (isReservedDeployNamespace(requested)) {
-            const message =
-                `Namespace '${requested}' is reserved and cannot be used as a deploy target. ` +
-                `Choose a different namespace (reserved: ever-works, default, kube-*, argocd, ` +
-                `cert-manager, ingress-nginx, monitoring).`;
-            this.logger.warn(`Deploy namespace rejected for work ${work.id}: ${message}`);
-            throw new BadRequestException(message);
-        }
-        return requested;
     }
 
     private async createRepoContext(
@@ -1224,7 +1074,7 @@ export class DeployService {
             return false;
         if (!resolvedKubeconfig || !resolvedKubeconfig.trim()) return false;
         if (deployProvider === EVER_WORKS_DEPLOY_PROVIDER_ID) return true;
-        return coerceClusterSource(settings.clusterSource) !== 'custom-kubeconfig';
+        return coerceDeploymentClusterSource(settings.clusterSource) !== 'custom-kubeconfig';
     }
 
     /**

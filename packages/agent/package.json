@@ -97,6 +97,10 @@
             "types": "./dist/facades/index.d.ts",
             "default": "./dist/facades/index.js"
         },
+        "./deployment-context": {
+            "types": "./dist/deployment-context/index.d.ts",
+            "default": "./dist/deployment-context/index.js"
+        },
         "./plugins": {
             "types": "./dist/plugins/index.d.ts",
             "default": "./dist/plugins/index.js"

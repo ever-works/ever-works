@@ -7,6 +7,10 @@ describe('DeployFacadeService', () => {
         scopedSettings?: Record<string, unknown>;
         pluginId?: string;
         pluginName?: string;
+        pluginOverrides?: Record<string, unknown>;
+        work?: Record<string, unknown>;
+        domainRepository?: Record<string, unknown>;
+        everWorksDeployProvider?: Record<string, unknown>;
     }) => {
         const pluginId = args.pluginId ?? args.deployProvider ?? 'k8s';
         const plugin = {
@@ -15,6 +19,7 @@ describe('DeployFacadeService', () => {
             providerName: 'kubernetes',
             capabilities: ['deployment'],
             lookupExistingDeployment: jest.fn().mockResolvedValue({ found: false }),
+            ...args.pluginOverrides,
         };
         const registered = {
             plugin,
@@ -39,12 +44,20 @@ describe('DeployFacadeService', () => {
         const workRepository = {
             findById: jest.fn().mockResolvedValue({
                 id: 'work-1',
+                slug: 'awesome-time-tracking',
+                user: { id: 'user-1', isPlatformAdmin: true },
                 deployProvider: args.deployProvider ?? pluginId,
+                getWebsiteRepo: () => 'awesome-time-tracking-website',
+                getRepoOwner: () => 'ever-works',
+                ...args.work,
             }),
             update: jest.fn(),
         };
         const domainRepository = {
             findByWork: jest.fn().mockResolvedValue([]),
+            findOne: jest.fn().mockResolvedValue(null),
+            removeDomain: jest.fn().mockResolvedValue(false),
+            ...args.domainRepository,
         };
 
         const service = new DeployFacadeService(
@@ -53,9 +66,11 @@ describe('DeployFacadeService', () => {
             workRepository as any,
             {} as any,
             domainRepository as any,
+            undefined,
+            args.everWorksDeployProvider as any,
         );
 
-        return { service, plugin, registry, settingsService, workRepository };
+        return { service, plugin, registry, settingsService, workRepository, domainRepository };
     };
 
     describe('work-scoped deployment lookup context', () => {
@@ -75,16 +90,15 @@ describe('DeployFacadeService', () => {
             }
         });
 
-        it('uses the Work cluster and enforced namespace instead of the inherited shared context', async () => {
+        it('uses the Work cluster and generated internal namespace instead of singleton defaults', async () => {
             process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
             process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'wrong-shared-cluster';
             const scopedSettings = {
                 clusterSource: 'k8s-works',
-                namespace: 'ever-works-timetrack-prod',
                 kubeContext: 'work-context',
             };
             const { service, plugin } = createService({
-                deployProvider: 'ever-works',
+                deployProvider: 'k8s',
                 pluginId: 'k8s',
                 settings: { clusterSource: { value: 'k8s-works' } },
                 scopedSettings,
@@ -100,8 +114,180 @@ describe('DeployFacadeService', () => {
                 'internal-work-cluster',
                 undefined,
                 {
-                    settingsOverride: scopedSettings,
-                    namespaceOverride: 'ever-works-timetrack-prod',
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-awesome-time-tracking-prod',
+                    },
+                    namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                },
+            );
+        });
+
+        it('keeps the dedicated managed-provider kubeconfig even when Work settings name the internal cluster', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'wrong-internal-cluster';
+            const scopedSettings = {
+                clusterSource: 'k8s-works',
+                namespace: 'foreign-tenant',
+            };
+            const { service, plugin } = createService({
+                deployProvider: 'ever-works',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                scopedSettings,
+                everWorksDeployProvider: {
+                    isEnabled: () => true,
+                    resolveKubeconfig: jest.fn().mockResolvedValue('dedicated-managed-cluster'),
+                },
+            });
+
+            await service.lookupExistingDeployment('awesome-time-tracking-website', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
+                'awesome-time-tracking-website',
+                'dedicated-managed-cluster',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-tenants-user-1',
+                    },
+                    namespaceOverride: 'ever-works-tenants-user-1',
+                },
+            );
+        });
+
+        it('keeps the managed-provider shared fallback instead of re-resolving clusterSource', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'wrong-internal-cluster';
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'managed-shared-fallback';
+            const scopedSettings = { clusterSource: 'k8s-works' };
+            const { service, plugin } = createService({
+                deployProvider: 'ever-works',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                scopedSettings,
+                everWorksDeployProvider: { isEnabled: () => false },
+            });
+
+            await service.lookupExistingDeployment('awesome-time-tracking-website', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
+                'awesome-time-tracking-website',
+                'managed-shared-fallback',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-tenants-user-1',
+                    },
+                    namespaceOverride: 'ever-works-tenants-user-1',
+                },
+            );
+        });
+
+        it('replaces a user-supplied shared-cluster namespace with the tenant namespace', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'shared-cluster';
+            const scopedSettings = {
+                clusterSource: 'k8s-works-shared',
+                namespace: 'foreign-tenant',
+            };
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works-shared' } },
+                scopedSettings,
+            });
+
+            await service.lookupExistingDeployment('awesome-time-tracking-website', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
+                'awesome-time-tracking-website',
+                'shared-cluster',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-tenants-user-1',
+                    },
+                    namespaceOverride: 'ever-works-tenants-user-1',
+                },
+            );
+        });
+
+        it('propagates the effective context through the post-domain-removal relookup', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
+            const scopedSettings = { clusterSource: 'k8s-works' };
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                scopedSettings,
+                work: {
+                    website: 'https://old.example.com',
+                    deployProjectId: 'project-1',
+                },
+                pluginOverrides: {
+                    removeDomain: jest.fn().mockResolvedValue(undefined),
+                },
+                domainRepository: {
+                    findOne: jest.fn().mockResolvedValue({ provider: 'k8s' }),
+                    removeDomain: jest.fn().mockResolvedValue(true),
+                },
+            });
+
+            await service.removeDomain('old.example.com', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
+                'awesome-time-tracking',
+                'internal-work-cluster',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-awesome-time-tracking-prod',
+                    },
+                    namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                },
+            );
+        });
+
+        it('propagates the effective context through project-id resolution', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
+            const scopedSettings = { clusterSource: 'k8s-works' };
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                scopedSettings,
+                pluginOverrides: {
+                    lookupExistingDeployment: jest
+                        .fn()
+                        .mockResolvedValue({ found: true, projectId: 'project-1' }),
+                    getDomains: jest.fn().mockResolvedValue([]),
+                },
+            });
+
+            await service.getDomains({ userId: 'user-1', workId: 'work-1' });
+
+            expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
+                'awesome-time-tracking-website',
+                'internal-work-cluster',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-awesome-time-tracking-prod',
+                    },
+                    namespaceOverride: 'ever-works-awesome-time-tracking-prod',
                 },
             );
         });

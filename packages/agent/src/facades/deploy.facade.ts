@@ -6,7 +6,6 @@ import type {
     DeployFacadeTeam,
     DeployProviderInfo,
     DeploymentLookupResult,
-    DeploymentLookupContext,
     DeploymentDomain,
     AddDomainResult,
 } from '@ever-works/plugin';
@@ -22,6 +21,10 @@ import { EverWorksK8sDeployProvider } from '../ever-works-providers';
 import { FacadeError, NoProviderError, ProviderNotFoundError } from './base.facade';
 import type { Work } from '../entities/work.entity';
 import type { User } from '../entities/user.entity';
+import {
+    PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
+    resolveEffectiveDeploymentContext,
+} from './deployment-context.resolver';
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
@@ -299,32 +302,18 @@ export class DeployFacadeService implements IDeployFacade {
         try {
             const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
 
-            // Get team scope from settings
-            const settings = await this.settingsService.getSettings(plugin.id, {
-                userId: options.userId,
-                workId: options.workId,
-                includeSecrets: false,
-            });
-            const teamScope = settings.defaultTeamScope as string | undefined;
-
             if (plugin.lookupExistingDeployment) {
-                const lookupToken = this.resolveLookupToken(plugin.id, token, settings);
-                const lookupContext: DeploymentLookupContext | undefined =
-                    plugin.id === KUBERNETES_DEPLOY_PROVIDER_ID
-                        ? {
-                              settingsOverride: settings,
-                              namespaceOverride:
-                                  typeof settings.namespace === 'string' &&
-                                  settings.namespace.trim()
-                                      ? settings.namespace.trim()
-                                      : undefined,
-                          }
-                        : undefined;
+                const lookup = await this.resolveDeploymentLookupContext(
+                    plugin,
+                    token,
+                    work,
+                    options,
+                );
                 const result = await plugin.lookupExistingDeployment(
                     projectName,
-                    lookupToken,
-                    teamScope,
-                    lookupContext,
+                    lookup.token,
+                    lookup.teamScope,
+                    lookup.context,
                 );
 
                 // Update work with deployment info if found
@@ -825,12 +814,18 @@ export class DeployFacadeService implements IDeployFacade {
         // If the removed domain was the current website URL, re-lookup to update
         if (removed && work.website === `https://${domain}`) {
             try {
-                const teamScope = await this.getTeamScope(plugin.id, options);
                 if (plugin.lookupExistingDeployment) {
+                    const lookupContext = await this.resolveDeploymentLookupContext(
+                        plugin,
+                        token,
+                        work,
+                        options,
+                    );
                     const lookup = await plugin.lookupExistingDeployment(
                         work.slug,
-                        token,
-                        teamScope,
+                        lookupContext.token,
+                        lookupContext.teamScope,
+                        lookupContext.context,
                     );
                     await this.workRepository.update(work.id, {
                         website: lookup.website ?? undefined,
@@ -986,46 +981,34 @@ export class DeployFacadeService implements IDeployFacade {
         return null;
     }
 
-    /**
-     * Resolve the same platform-managed cluster selected by the Work settings
-     * for read-back. `resolvePluginAndTokenWithWork` can inherit the managed
-     * `ever-works` provider's shared/dedicated token before the Work's k8s
-     * `clusterSource` is considered; using that token here made verification
-     * query a different cluster than deploy.
-     */
-    private resolveLookupToken(
-        pluginId: string,
+    private async resolveDeploymentLookupContext(
+        plugin: IDeploymentPlugin,
         resolvedToken: string,
-        settings: Record<string, unknown>,
-    ): string {
-        if (pluginId !== KUBERNETES_DEPLOY_PROVIDER_ID) {
-            return resolvedToken;
-        }
-
-        const clusterSource = settings.clusterSource;
-        if (clusterSource === 'k8s-works' || clusterSource === 'k8s-gauzy') {
-            const kubeconfig = process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG?.trim();
-            if (!kubeconfig) {
-                throw new DeployFacadeError(
-                    'The k8s-works cluster kubeconfig is not configured on the platform.',
-                    'lookupExistingDeployment',
-                    pluginId,
-                );
-            }
-            return kubeconfig;
-        }
-        if (clusterSource === 'k8s-works-shared') {
-            const kubeconfig = process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG?.trim();
-            if (!kubeconfig) {
-                throw new DeployFacadeError(
-                    'The k8s-works-shared cluster kubeconfig is not configured on the platform.',
-                    'lookupExistingDeployment',
-                    pluginId,
-                );
-            }
-            return kubeconfig;
-        }
-        return resolvedToken;
+        work: Work,
+        options: DeployFacadeOptions,
+    ) {
+        const settings = await this.settingsService.getSettings(plugin.id, {
+            userId: options.userId,
+            workId: options.workId,
+            includeSecrets: false,
+        });
+        const owner = work.user as User | undefined;
+        const effective = resolveEffectiveDeploymentContext({
+            deployProvider: work.deployProvider,
+            pluginId: plugin.id,
+            resolvedToken,
+            settings,
+            websiteOwner: work.getRepoOwner('website'),
+            workId: work.id,
+            workSlug: work.slug,
+            ownerUserId: owner?.id,
+            isPlatformAdmin: Boolean(owner?.isPlatformAdmin),
+        });
+        return {
+            token: effective.token,
+            teamScope: effective.settings.defaultTeamScope as string | undefined,
+            context: effective.lookupContext,
+        };
     }
 
     /**
@@ -1043,12 +1026,18 @@ export class DeployFacadeService implements IDeployFacade {
             return work.deployProjectId;
         }
 
-        const teamScope = await this.getTeamScope(plugin.id, options);
         if (plugin.lookupExistingDeployment) {
+            const lookupContext = await this.resolveDeploymentLookupContext(
+                plugin,
+                token,
+                work,
+                options,
+            );
             const result = await plugin.lookupExistingDeployment(
                 work.getWebsiteRepo(),
-                token,
-                teamScope,
+                lookupContext.token,
+                lookupContext.teamScope,
+                lookupContext.context,
             );
             if (result.found && result.projectId) {
                 // Cache the projectId for future calls
@@ -1135,15 +1124,4 @@ export class DeployFacadeService implements IDeployFacade {
     }
 }
 
-/**
- * Sentinel value returned by `getTokenFromSettings` for k8s deploys
- * targeting a platform-managed cluster (`k8s-works` / `k8s-works-shared`).
- * The deploy facade only checks that a token is non-empty before
- * deciding the work is "configured", so any unique string works.
- * `DeployService.resolveDeployToken()` discards this sentinel and
- * substitutes the real platform kubeconfig from
- * `EVER_WORKS_K8S_*_KUBECONFIG` env vars at deploy time.
- *
- * Exported so callers (or tests) can pattern-match on it if needed.
- */
-export const PLATFORM_MANAGED_KUBECONFIG_SENTINEL = '__ever-works-platform-managed-kubeconfig__';
+export { PLATFORM_MANAGED_KUBECONFIG_SENTINEL } from './deployment-context.resolver';
