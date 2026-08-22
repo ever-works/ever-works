@@ -24,10 +24,12 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  * repositories, enrollment/heartbeat crypto, the job lease protocol and
  * the offline sweep all live there).
  *
- * Two controllers, two trust boundaries — kept apart deliberately:
+ * Three controllers, two trust boundaries — kept apart deliberately:
  *   - `FleetController` — owner-scoped registry management
  *     (session/API-key auth) plus the public token-authenticated
  *     enroll/heartbeat pair.
+ *   - `FleetAgentAffinityController` — owner + active-Organization scoped
+ *     Agent-to-node scheduling intent (session/API-key auth).
  *   - `FleetJobsController` — the node work channel (lease / job
  *     heartbeat / complete), node-secret authenticated, public,
  *     fail-closed to one undifferentiated 401.
@@ -51,7 +53,7 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  *
  * Both guards are ordinary providers so Nest can inject them (the node
  * guard needs `FleetNodeRepository`, which `AgentFleetModule` exports):
- *   - `FleetEnabledGuard` — the `FLEET_ENABLED` gate on BOTH controllers,
+ *   - `FleetEnabledGuard` — the `FLEET_ENABLED` gate on all three controllers,
  *     so the surface cannot end up half-on.
  *   - `FleetNodeAuthGuard` — node-credential authentication for the work
  *     channel, at the edge instead of only inside the services.

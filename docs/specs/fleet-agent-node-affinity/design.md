@@ -1,6 +1,6 @@
 # Fleet Agent-to-Node Affinity Design
 
-**Status:** Approved for implementation on 2026-08-22  
+**Status:** Approved for implementation on 2026-08-22
 **Scope:** Code and migration only; no deployment, node enrollment, or live Fleet job execution
 
 ## Problem
@@ -35,14 +35,14 @@ If a bound node is offline, paused, disabled, or otherwise unavailable, its targ
 
 ### `fleet_agent_node_affinities`
 
-| Column | Meaning |
-| --- | --- |
-| `id` | UUID primary key |
-| `userId` | Owner isolation boundary |
-| `organizationId` | Active Organization boundary |
-| `agentId` | Organization Agent selected by the owner |
-| `nodeId` | User-owned Fleet node selected for that Agent |
-| `createdAt`, `updatedAt` | Audit timestamps |
+| Column                   | Meaning                                       |
+| ------------------------ | --------------------------------------------- |
+| `id`                     | UUID primary key                              |
+| `userId`                 | Owner isolation boundary                      |
+| `organizationId`         | Active Organization boundary                  |
+| `agentId`                | Organization Agent selected by the owner      |
+| `nodeId`                 | User-owned Fleet node selected for that Agent |
+| `createdAt`, `updatedAt` | Audit timestamps                              |
 
 Constraints and indexes:
 

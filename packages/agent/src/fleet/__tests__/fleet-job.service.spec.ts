@@ -209,12 +209,14 @@ function enrolledNode(id: string, secret: string, overrides: Partial<FleetNode> 
 describe('FleetJobService', () => {
     let stores: Stores;
     let service: FleetJobService;
+    let affinities: FleetAgentNodeAffinityRepository;
     const secretA = randomBytes(32).toString('base64url');
     const secretB = randomBytes(32).toString('base64url');
 
     beforeEach(() => {
         stores = { nodes: [], jobs: [], affinities: [] };
         const repos = makeRepos(stores);
+        affinities = repos.affinities;
         service = new FleetJobService(repos.jobs, repos.nodes, repos.affinities);
     });
 
@@ -305,6 +307,18 @@ describe('FleetJobService', () => {
 
             expect(ordinary.targetNodeId).toBeNull();
             expect(unbound.targetNodeId).toBeNull();
+        });
+
+        it('does not query a UUID column for a malformed Agent correlation id', async () => {
+            const job = await service.enqueue({
+                userId: 'owner-1',
+                organizationId: ORGANIZATION,
+                kind: 'agent-task',
+                payload: { taskId: 'task-1', agentId: 'not-a-uuid' },
+            });
+
+            expect(job.targetNodeId).toBeNull();
+            expect(affinities.findForAgent).not.toHaveBeenCalled();
         });
     });
 

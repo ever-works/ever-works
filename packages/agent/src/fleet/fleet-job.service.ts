@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import type {
     FleetJobKind,
     FleetJobStatus,
@@ -158,7 +159,7 @@ export class FleetJobService {
             return null;
         }
         const agentId = payload?.agentId;
-        if (typeof agentId !== 'string' || !agentId.trim()) {
+        if (typeof agentId !== 'string' || !isUUID(agentId)) {
             return null;
         }
         const affinity = await this.affinities.findForAgent(userId, organizationId, agentId);
