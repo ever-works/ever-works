@@ -56,7 +56,11 @@ export class SubscriptionPlan {
      * `lookup_key` in the shared account — see
      * `packages/agent/src/subscriptions/billing/stripe-catalog.ts`.
      */
-    @Column({ type: 'varchar', default: 'cloud' })
+    // 🛑 `length` must match the migration's `varchar(32)`. Without it TypeORM `synchronize`
+    // renders an unbounded `character varying` on dev and stage, while prod — the only environment
+    // that executes migration files — gets `varchar(32)`. The two would then run different schemas,
+    // which is precisely what makes "it worked on stage" worthless for anything schema-shaped.
+    @Column({ type: 'varchar', length: 32, default: 'cloud' })
     hosting: SubscriptionPlanHosting;
 
     /**
