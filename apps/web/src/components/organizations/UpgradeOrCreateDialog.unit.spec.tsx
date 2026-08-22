@@ -133,6 +133,22 @@ describe('UpgradeOrCreateDialog — EW-661 Phase 9', () => {
         });
     });
 
+    it('keeps the dialog open and reports a parent completion failure', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValue(
+            new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+        );
+        const onClose = vi.fn().mockRejectedValue(new Error('Active scope was not persisted'));
+        render(<UpgradeOrCreateDialog open={true} organization={fakeOrg} onClose={onClose} />);
+
+        fireEvent.click(screen.getByText('organizations.upgrade.confirm'));
+
+        await waitFor(() => {
+            expect(screen.getByRole('alert')).toHaveTextContent('Active scope was not persisted');
+        });
+        expect(onClose).toHaveBeenCalledWith(true);
+        expect(screen.getByText('organizations.upgrade.title')).toBeInTheDocument();
+    });
+
     /**
      * 409 UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS — first-Org-only
      * guard fired on the API side. The dialog surfaces a generic

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import type { OrganizationResponse } from '@ever-works/contracts/api';
+import type { ActiveScopeResponse, OrganizationResponse } from '@ever-works/contracts/api';
 import { useOrganizations } from './use-organizations';
 
 export interface UseActiveScopeResult {
@@ -23,12 +23,6 @@ export interface UseActiveScopeResult {
     activeOrganization: OrganizationResponse | null;
     /** Update the local view only after the server confirms a persisted switch. */
     setActiveOrganization: (organization: OrganizationResponse | null) => void;
-}
-
-interface ActiveScopeResponse {
-    tenantId: string | null;
-    organizationId: string | null;
-    organizationSlug: string | null;
 }
 
 /**

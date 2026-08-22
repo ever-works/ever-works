@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
 import { OrganizationMembershipService } from '../../organizations/organization-membership.service';
 import { ActiveScopeService } from './active-scope.service';
@@ -8,6 +9,7 @@ describe('ActiveScopeService', () => {
     let users: jest.Mocked<Pick<UserRepository, 'findById' | 'update'>>;
     let organizations: jest.Mocked<Pick<OrganizationRepository, 'findById' | 'findBySlug'>>;
     let membership: jest.Mocked<Pick<OrganizationMembershipService, 'ensureMember'>>;
+    let moduleRef: TestingModule;
 
     const user = {
         id: 'user-1',
@@ -20,7 +22,7 @@ describe('ActiveScopeService', () => {
         slug: 'ever',
     };
 
-    beforeEach(() => {
+    beforeEach(async () => {
         users = {
             findById: jest.fn(),
             update: jest.fn(),
@@ -32,11 +34,19 @@ describe('ActiveScopeService', () => {
         membership = {
             ensureMember: jest.fn(),
         };
-        service = new ActiveScopeService(
-            users as unknown as UserRepository,
-            organizations as unknown as OrganizationRepository,
-            membership as unknown as OrganizationMembershipService,
-        );
+        moduleRef = await Test.createTestingModule({
+            providers: [
+                ActiveScopeService,
+                { provide: UserRepository, useValue: users },
+                { provide: OrganizationRepository, useValue: organizations },
+                { provide: OrganizationMembershipService, useValue: membership },
+            ],
+        }).compile();
+        service = moduleRef.get(ActiveScopeService);
+    });
+
+    afterEach(async () => {
+        await moduleRef.close();
     });
 
     it('returns the persisted active Organization for a same-Tenant pointer', async () => {
