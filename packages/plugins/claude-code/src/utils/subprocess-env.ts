@@ -30,20 +30,76 @@ const PASSTHROUGH_ENV_KEYS = [
 	'CURL_CA_BUNDLE'
 ] as const;
 
-// Explicit allow-list of Anthropic-/Claude-Code-specific vars the CLI actually
-// consumes. We list each var by exact name rather than matching by prefix so a
-// future/custom var that merely starts with ANTHROPIC_ or CLAUDE_CODE_ is NOT
-// silently forwarded into the subprocess (audit: prefix forwarding leaks any
-// such var to the model).
-const PASSTHROUGH_ANTHROPIC_KEYS = [
-	'ANTHROPIC_API_KEY',
-	'ANTHROPIC_BASE_URL',
-	'ANTHROPIC_AUTH_TOKEN',
-	'CLAUDE_CODE_OAUTH_TOKEN',
-	'CLAUDE_CODE_CONFIG_DIR'
+// Non-credential Anthropic vars that are safe to inherit from the host. Listed
+// by exact name rather than by prefix so a future/custom var that merely starts
+// with ANTHROPIC_ or CLAUDE_CODE_ is NOT silently forwarded into the subprocess
+// (audit: prefix forwarding leaks any such var to the model).
+//
+// 🛑 Credentials are deliberately NOT in this list — see AUTH_ENV_KEYS below.
+const PASSTHROUGH_ANTHROPIC_KEYS = ['ANTHROPIC_BASE_URL'] as const;
+
+/**
+ * Which credential this run is supposed to authenticate with.
+ *
+ * - `subscription` → `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`), billed
+ *   against a Claude Pro/Max/Team/Enterprise plan.
+ * - `api-key` → `ANTHROPIC_API_KEY`, billed per token against the Console org.
+ */
+export type ClaudeAuthMode = 'subscription' | 'api-key';
+
+/**
+ * Every environment variable Claude Code will accept as a credential, in the
+ * CLI's own resolution order (highest priority first).
+ *
+ * 🛑 This ordering is why credentials must never be inherited from the host.
+ * Claude Code resolves `ANTHROPIC_AUTH_TOKEN` (rank 2) and `ANTHROPIC_API_KEY`
+ * (rank 3) ahead of `CLAUDE_CODE_OAUTH_TOKEN` (rank 5), and the docs are
+ * explicit that "in non-interactive mode (-p), the key is always used when
+ * present". So an agent configured for subscription billing that inherits a
+ * stray `ANTHROPIC_API_KEY` from the server environment would silently bill the
+ * API key instead of the subscription — no error, no warning, just an unexpected
+ * Console invoice. We therefore accept credentials ONLY from the caller's
+ * explicit overrides (i.e. resolved plugin settings) and strip any credential
+ * that does not match the selected mode.
+ *
+ * https://code.claude.com/docs/en/authentication
+ */
+const AUTH_ENV_KEYS = ['ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN'] as const;
+
+/** The single credential variable each mode is allowed to set. */
+const AUTH_ENV_KEY_FOR_MODE: Record<ClaudeAuthMode, (typeof AUTH_ENV_KEYS)[number]> = {
+	subscription: 'CLAUDE_CODE_OAUTH_TOKEN',
+	'api-key': 'ANTHROPIC_API_KEY'
+};
+
+/**
+ * Variables that move the session onto a different inference provider entirely
+ * and outrank every credential in AUTH_ENV_KEYS. Never inherited — a stray
+ * `CLAUDE_CODE_USE_BEDROCK` on the host would silently redirect a
+ * subscription-mode agent onto a cloud provider account.
+ */
+const PROVIDER_SELECTION_KEYS = [
+	'CLAUDE_CODE_USE_BEDROCK',
+	'CLAUDE_CODE_USE_VERTEX',
+	'CLAUDE_CODE_USE_FOUNDRY',
+	'ANTHROPIC_PROFILE',
+	'ANTHROPIC_FEDERATION_RULE_ID',
+	'ANTHROPIC_ORGANIZATION_ID'
 ] as const;
 
-export function buildSubprocessEnv(overrides: Record<string, string> = {}): Record<string, string> {
+export interface BuildSubprocessEnvOptions {
+	/**
+	 * Pin the run to one credential. When set, any credential variable that
+	 * does not belong to this mode is dropped from the resulting environment,
+	 * so the CLI cannot resolve a higher-precedence credential we did not choose.
+	 */
+	readonly authMode?: ClaudeAuthMode;
+}
+
+export function buildSubprocessEnv(
+	overrides: Record<string, string> = {},
+	options: BuildSubprocessEnvOptions = {}
+): Record<string, string> {
 	const env: Record<string, string> = {
 		PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
 		HOME: process.env.HOME ?? os.homedir(),
@@ -70,11 +126,6 @@ export function buildSubprocessEnv(overrides: Record<string, string> = {}): Reco
 		}
 	}
 
-	// Allow through the explicitly named Anthropic-/Claude-Code vars only. The
-	// caller is expected to set the actual auth token via `overrides`
-	// (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY) — passing them through here
-	// too is harmless and preserves manual overrides in dev (e.g.
-	// ANTHROPIC_BASE_URL pointed at a local proxy).
 	for (const key of PASSTHROUGH_ANTHROPIC_KEYS) {
 		const value = process.env[key];
 		if (value) {
@@ -86,5 +137,30 @@ export function buildSubprocessEnv(overrides: Record<string, string> = {}): Reco
 		env[key] = value;
 	}
 
+	// A provider-selection variable outranks every credential, so it can only
+	// ever arrive deliberately, from the caller — never from the host.
+	for (const key of PROVIDER_SELECTION_KEYS) {
+		if (!(key in overrides)) {
+			delete env[key];
+		}
+	}
+
+	// Enforce exactly one credential so the CLI's precedence order cannot pick a
+	// different one than the mode we resolved from plugin settings.
+	if (options.authMode) {
+		const allowed = AUTH_ENV_KEY_FOR_MODE[options.authMode];
+		for (const key of AUTH_ENV_KEYS) {
+			if (key !== allowed) {
+				delete env[key];
+			}
+		}
+	}
+
 	return env;
 }
+
+/**
+ * Names of every credential variable, exported so callers and tests can assert
+ * that nothing else leaked into a subprocess environment.
+ */
+export const CLAUDE_AUTH_ENV_KEYS: readonly string[] = AUTH_ENV_KEYS;
