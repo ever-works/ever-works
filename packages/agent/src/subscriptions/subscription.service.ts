@@ -402,6 +402,26 @@ export class SubscriptionService implements OnModuleInit {
                 'Paid plans must be activated through billing and cannot be self-assigned.',
             );
         }
+        // EW-711 #23, second gate (added with the self-hosted editions, 2026-08-22).
+        //
+        // 🛑 The price check alone is NOT sufficient once a self-hosted tier exists. The Community
+        // Edition is genuinely free (`monthlyPrice: '0'`) and genuinely unlimited — that is correct
+        // for someone running the AGPLv3 platform on their own hardware, where quotas are advisory
+        // because they own the database. But it makes the row look self-serviceable to
+        // `isPaidPlan()`, so on the HOSTED service any authenticated user could assign it to
+        // themselves and receive `maxWorks: 2_147_483_647` plus every cadence — entitlements that
+        // ARE enforced here (`work-schedule.service.ts` checks `plan.maxWorks` and
+        // `getCadenceAllowances`). That is precisely the free→paid escalation #23 closed.
+        //
+        // Self-hosted rows exist so the plan switcher and the licence paperwork describe the same
+        // thing. They are never something a user picks: the paid editions are commercial licences
+        // granted through billing, and the Community Edition applies to a deployment this instance
+        // is not.
+        if (plan.hosting === 'selfhosted') {
+            throw new ForbiddenException(
+                'Self-hosted editions cannot be self-assigned on a hosted deployment.',
+            );
+        }
         return this.persistDefaultPlan(user, plan);
     }
 

@@ -791,6 +791,59 @@ describe('SubscriptionService', () => {
             ).rejects.toThrow(NotFoundException);
         });
 
+        /**
+         * 🛑 REGRESSION (EW-711 #23, reopened and re-closed 2026-08-22).
+         *
+         * Adding the self-hosted editions introduced a row that is genuinely FREE
+         * (`monthlyPrice: '0'`) and genuinely UNLIMITED (`maxWorks` at the int4 ceiling, every
+         * cadence) — correct for someone self-hosting the AGPLv3 platform, where quotas are
+         * advisory because they own the database. But `isPaidPlan()` gates purely on price, so on
+         * the HOSTED service that row looked self-serviceable: any authenticated user could POST
+         * `{planCode:'selfhosted_community'}` and receive unlimited scheduled works plus hourly
+         * cadence for free. Those entitlements ARE enforced — `work-schedule.service.ts` reads
+         * `plan.maxWorks` and `getCadenceAllowances` — so this was a live free→paid escalation,
+         * exactly what #23 exists to prevent. The price check alone is not sufficient once a
+         * hosting axis exists.
+         */
+        it.each([
+            SubscriptionPlanCode.SELFHOSTED_COMMUNITY,
+            SubscriptionPlanCode.SELFHOSTED_PRO,
+            SubscriptionPlanCode.SELFHOSTED_ENTERPRISE,
+        ])('refuses to self-assign %s even when it is free-priced', async (code) => {
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue({
+                    id: 'plan-sh',
+                    code,
+                    displayName: 'Community Edition',
+                    hosting: 'selfhosted',
+                    // Deliberately free AND unlimited — the exact shape that slipped past the
+                    // price-only gate.
+                    monthlyPrice: '0',
+                    maxWorks: 2_147_483_647,
+                    allowedCadences: ALL_CADENCES_IN_PUBLIC_ORDER,
+                    overagePricePerRun: '0',
+                }),
+            });
+
+            await expect(service.changePlanSelfService({ id: 'u1' } as any, code)).rejects.toThrow(
+                ForbiddenException,
+            );
+            // The escalation is only truly closed if NOTHING was written.
+            expect(userRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('still allows a FREE CLOUD plan — the guard must not break the legitimate path', async () => {
+            const user = { id: 'u1' } as any;
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue({ ...FREE_PLAN, hosting: 'cloud' }),
+            });
+
+            await expect(
+                service.changePlanSelfService(user, SubscriptionPlanCode.FREE),
+            ).resolves.toBeDefined();
+            expect(userRepository.update).toHaveBeenCalled();
+        });
+
         it('assigns a FREE plan (monthlyPrice 0) and persists it', async () => {
             const user = { id: 'u1' } as any;
             const { service, userRepository } = makeService({
