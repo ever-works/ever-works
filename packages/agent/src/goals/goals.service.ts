@@ -14,6 +14,7 @@ import { MissionGoal } from '../entities/mission-goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { GoalEvaluationService } from './goal-evaluation.service';
 import { validateGoalJudgment } from './goal-criteria';
+import { ownershipWhere, type OwnershipScope } from '../database/ownership-scope';
 import {
     DEFAULT_CHECK_FREQUENCY_MINUTES,
     MIN_CHECK_FREQUENCY_MINUTES,
@@ -90,9 +91,15 @@ export class GoalsService {
 
     // ─── CRUD ───────────────────────────────────────────────────────
 
-    async listForUser(userId: string, filter: ListGoalsFilter = {}): Promise<GoalDto[]> {
-        const where: FindOptionsWhere<Goal> = {
-            userId,
+    async listForUser(
+        userId: string,
+        filter: ListGoalsFilter = {},
+        scope?: OwnershipScope,
+    ): Promise<GoalDto[]> {
+        const whereBranches: FindOptionsWhere<Goal>[] = (
+            scope ? ownershipWhere<Goal>(userId, scope) : [{ userId }]
+        ).map((branch) => ({
+            ...branch,
             ...(filter.status ? { status: filter.status } : {}),
             // Archive is a VIEW, not a deletion: the default catalog hides
             // archived Goals, `archived: true` shows only those, and
@@ -101,7 +108,10 @@ export class GoalsService {
             // them and the catalog is unchanged for anyone who never
             // archives anything.
             ...this.archivedPredicate(filter.archived),
-        };
+        }));
+        const where: FindOptionsWhere<Goal> | FindOptionsWhere<Goal>[] = scope
+            ? whereBranches
+            : whereBranches[0];
         const rows = await this.goals.find({
             where,
             order: { updatedAt: 'DESC' },
@@ -111,8 +121,8 @@ export class GoalsService {
         return rows.map(toGoalDto);
     }
 
-    async getForUser(userId: string, goalId: string): Promise<GoalDto> {
-        return toGoalDto(await this.findOrThrow(userId, goalId));
+    async getForUser(userId: string, goalId: string, scope?: OwnershipScope): Promise<GoalDto> {
+        return toGoalDto(await this.findOrThrow(userId, goalId, scope));
     }
 
     /**
@@ -409,8 +419,19 @@ export class GoalsService {
         return archived === true ? { archivedAt: Not(IsNull()) } : { archivedAt: IsNull() };
     }
 
-    private async findOrThrow(userId: string, goalId: string): Promise<Goal> {
-        const row = await this.goals.findOne({ where: { id: goalId, userId } });
+    private async findOrThrow(
+        userId: string,
+        goalId: string,
+        scope?: OwnershipScope,
+    ): Promise<Goal> {
+        const row = await this.goals.findOne({
+            where: scope
+                ? ownershipWhere<Goal>(userId, scope).map((branch) => ({
+                      ...branch,
+                      id: goalId,
+                  }))
+                : { id: goalId, userId },
+        });
         if (!row) {
             throw new NotFoundException(`Goal not found`);
         }

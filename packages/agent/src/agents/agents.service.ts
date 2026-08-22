@@ -49,6 +49,7 @@ import {
 // five canonical Agent files), so a secret-like value is hard-rejected
 // rather than redacted.
 import { assertNoSecrets } from '../utils/secret-scan';
+import { ownershipWhere, type OwnershipScope } from '../database/ownership-scope';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -258,22 +259,31 @@ export class AgentsService {
     async list(
         userId: string,
         filter: ListAgentsFilter = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<{
         rows: AgentDto[];
         total: number;
     }> {
-        const { rows, total } = await this.agents.findByUserIdScoped(userId, filter);
+        const { rows, total } = await this.agents.findByUserIdScoped(
+            userId,
+            filter,
+            ownershipScope,
+        );
         return { rows: rows.map(toAgentDto), total };
     }
 
-    async getOne(userId: string, id: string): Promise<AgentDto> {
-        const agent = await this.requireOwned(userId, id);
+    async getOne(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
         return toAgentDto(agent);
     }
 
-    async create(userId: string, input: CreateAgentInput): Promise<AgentDto> {
+    async create(
+        userId: string,
+        input: CreateAgentInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
         this.validateScopeOwnership(input);
-        await this.assertScopeParentExists(userId, input);
+        await this.assertScopeParentExists(userId, input, ownershipScope);
 
         const slug = slugifyText(input.name);
         // `slugifyText('---')` returns `-` (dash), not the empty string,
@@ -286,11 +296,17 @@ export class AgentsService {
             );
         }
 
-        const conflict = await this.agents.findByUserIdAndSlug(userId, input.scope, slug, {
-            missionId: input.scope === AgentScope.MISSION ? (input.missionId ?? null) : null,
-            ideaId: input.scope === AgentScope.IDEA ? (input.ideaId ?? null) : null,
-            workId: input.scope === AgentScope.WORK ? (input.workId ?? null) : null,
-        });
+        const conflict = await this.agents.findByUserIdAndSlug(
+            userId,
+            input.scope,
+            slug,
+            {
+                missionId: input.scope === AgentScope.MISSION ? (input.missionId ?? null) : null,
+                ideaId: input.scope === AgentScope.IDEA ? (input.ideaId ?? null) : null,
+                workId: input.scope === AgentScope.WORK ? (input.workId ?? null) : null,
+            },
+            ownershipScope,
+        );
         if (conflict) {
             throw new ConflictException(
                 `An Agent named "${input.name}" already exists in this scope.`,
@@ -958,8 +974,12 @@ export class AgentsService {
 
     // ── internals ─────────────────────────────────────────────────
 
-    private async requireOwned(userId: string, id: string): Promise<Agent> {
-        const agent = await this.agents.findByIdAndUser(id, userId);
+    private async requireOwned(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent> {
+        const agent = await this.agents.findByIdAndUser(id, userId, ownershipScope);
         if (!agent) {
             // 404 (not 403) — don't leak existence.
             throw new NotFoundException(`Agent ${id} not found.`);
@@ -1048,12 +1068,18 @@ export class AgentsService {
     private async assertScopeParentExists(
         userId: string,
         input: Pick<CreateAgentInput, 'scope' | 'missionId' | 'ideaId' | 'workId'>,
+        ownershipScope?: OwnershipScope,
     ): Promise<void> {
         switch (input.scope) {
             case AgentScope.WORK: {
                 if (!input.workId || !this.workRepo) return;
                 const work = await this.workRepo.findOne({
-                    where: { id: input.workId, userId },
+                    where: ownershipScope
+                        ? ownershipWhere<Work>(userId, ownershipScope).map((branch) => ({
+                              ...branch,
+                              id: input.workId,
+                          }))
+                        : { id: input.workId, userId },
                 });
                 if (!work) throw new NotFoundException(`Work ${input.workId} not found.`);
                 break;
@@ -1061,7 +1087,12 @@ export class AgentsService {
             case AgentScope.MISSION: {
                 if (!input.missionId || !this.missionRepo) return;
                 const mission = await this.missionRepo.findOne({
-                    where: { id: input.missionId, userId },
+                    where: ownershipScope
+                        ? ownershipWhere<Mission>(userId, ownershipScope).map((branch) => ({
+                              ...branch,
+                              id: input.missionId,
+                          }))
+                        : { id: input.missionId, userId },
                 });
                 if (!mission) throw new NotFoundException(`Mission ${input.missionId} not found.`);
                 break;
@@ -1069,7 +1100,12 @@ export class AgentsService {
             case AgentScope.IDEA: {
                 if (!input.ideaId || !this.ideaRepo) return;
                 const idea = await this.ideaRepo.findOne({
-                    where: { id: input.ideaId, userId },
+                    where: ownershipScope
+                        ? ownershipWhere<WorkProposal>(userId, ownershipScope).map((branch) => ({
+                              ...branch,
+                              id: input.ideaId,
+                          }))
+                        : { id: input.ideaId, userId },
                 });
                 if (!idea) throw new NotFoundException(`Idea ${input.ideaId} not found.`);
                 break;

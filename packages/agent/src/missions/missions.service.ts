@@ -34,6 +34,7 @@ import { toMissionDto, type MissionDto } from './types';
 // validate full-URL forms of `missionTemplateRepo` so a malicious value can
 // never be persisted for the Phase 8 scaffolder to clone/fetch.
 import { isSafeWebhookUrl } from '../utils';
+import { ownershipWhere, type OwnershipScope } from '../database/ownership-scope';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -212,18 +213,26 @@ export class MissionsService {
      * PR H adds filter + pagination; PR R (Phase 6 frontend) drives
      * the design for which controls land where.
      */
-    async listForUser(userId: string, filter: ListMissionsFilter = {}): Promise<MissionDto[]> {
-        const baseWhere: FindOptionsWhere<Mission> = {
-            userId,
-            ...(filter.status ? { status: filter.status } : {}),
-        };
+    async listForUser(
+        userId: string,
+        filter: ListMissionsFilter = {},
+        scope?: OwnershipScope,
+    ): Promise<MissionDto[]> {
+        const baseWhere = (scope ? ownershipWhere<Mission>(userId, scope) : [{ userId }]).map(
+            (branch) => ({
+                ...branch,
+                ...(filter.status ? { status: filter.status } : {}),
+            }),
+        );
         const search = filter.search?.trim();
         const where: FindOptionsWhere<Mission> | FindOptionsWhere<Mission>[] = search
-            ? [
-                  { ...baseWhere, title: ILike(`%${search}%`) },
-                  { ...baseWhere, description: ILike(`%${search}%`) },
-              ]
-            : baseWhere;
+            ? baseWhere.flatMap((branch) => [
+                  { ...branch, title: ILike(`%${search}%`) },
+                  { ...branch, description: ILike(`%${search}%`) },
+              ])
+            : scope
+              ? baseWhere
+              : baseWhere[0];
         const rows = await this.missions.find({
             where,
             order: { updatedAt: 'DESC' },
@@ -240,8 +249,12 @@ export class MissionsService {
      * response shape either way so the API doesn't leak whether
      * the id exists.
      */
-    async getForUser(userId: string, missionId: string): Promise<MissionDto> {
-        const row = await this.findOrThrow(userId, missionId);
+    async getForUser(
+        userId: string,
+        missionId: string,
+        scope?: OwnershipScope,
+    ): Promise<MissionDto> {
+        const row = await this.findOrThrow(userId, missionId, scope);
         return toMissionDto(row);
     }
 
@@ -579,10 +592,16 @@ export class MissionsService {
      * `mission_works` edge; review §8.1). Ownership-gated on the
      * Mission; empty when the repo isn't wired (hand-rolled tests).
      */
-    async listWorks(userId: string, missionId: string): Promise<MissionWorkWithWork[]> {
-        await this.findOrThrow(userId, missionId);
+    async listWorks(
+        userId: string,
+        missionId: string,
+        scope?: OwnershipScope,
+    ): Promise<MissionWorkWithWork[]> {
+        await this.findOrThrow(userId, missionId, scope);
         if (!this.missionWorks) return [];
-        return this.missionWorks.listForMissionWithWork(missionId, userId);
+        return scope
+            ? this.missionWorks.listForMissionWithWork(missionId, userId, scope)
+            : this.missionWorks.listForMissionWithWork(missionId, userId);
     }
 
     /**
@@ -597,8 +616,9 @@ export class MissionsService {
         missionId: string,
         workId: string,
         relation: MissionWorkRelation,
+        scope?: OwnershipScope,
     ): Promise<MissionWorkWithWork[]> {
-        await this.findOrThrow(userId, missionId);
+        await this.findOrThrow(userId, missionId, scope);
         if (!MISSION_WORK_RELATIONS.includes(relation)) {
             throw new BadRequestException(
                 `Invalid relation "${relation}". Allowed: ${MISSION_WORK_RELATIONS.join(', ')}.`,
@@ -609,12 +629,18 @@ export class MissionsService {
                 `MissionWorkRepository is not wired — attach the provider before calling attachWork`,
             );
         }
-        const work = await this.worksRepo.findOne({ where: { id: workId, userId } });
+        const work = await this.worksRepo.findOne({
+            where: scope
+                ? ownershipWhere<Work>(userId, scope).map((branch) => ({ ...branch, id: workId }))
+                : { id: workId, userId },
+        });
         if (!work) {
             throw new NotFoundException(`Work not found`);
         }
         await this.missionWorks.attach({ missionId, workId, userId, relation });
-        return this.missionWorks.listForMissionWithWork(missionId, userId);
+        return scope
+            ? this.missionWorks.listForMissionWithWork(missionId, userId, scope)
+            : this.missionWorks.listForMissionWithWork(missionId, userId);
     }
 
     /**
@@ -626,12 +652,19 @@ export class MissionsService {
         missionId: string,
         workId: string,
         relation: MissionWorkRelation,
+        scope?: OwnershipScope,
     ): Promise<{ deleted: true }> {
-        await this.findOrThrow(userId, missionId);
+        await this.findOrThrow(userId, missionId, scope);
         if (!this.missionWorks) {
             throw new NotFoundException(`Relation not found`);
         }
-        const removed = await this.missionWorks.detach({ missionId, workId, userId, relation });
+        const removed = await this.missionWorks.detach({
+            missionId,
+            workId,
+            userId,
+            relation,
+            ...(scope ? { scope } : {}),
+        });
         if (!removed) {
             throw new NotFoundException(`Relation not found`);
         }
@@ -642,15 +675,41 @@ export class MissionsService {
      * PR-2 — reverse lookup: the Missions related to one of the
      * caller's Works (drives the Work-detail "Missions" panel).
      */
-    async listMissionsForWork(userId: string, workId: string): Promise<MissionWorkWithMission[]> {
+    async listMissionsForWork(
+        userId: string,
+        workId: string,
+        scope?: OwnershipScope,
+    ): Promise<MissionWorkWithMission[]> {
+        if (scope && this.worksRepo) {
+            const work = await this.worksRepo.findOne({
+                where: ownershipWhere<Work>(userId, scope).map((branch) => ({
+                    ...branch,
+                    id: workId,
+                })),
+            });
+            if (!work) throw new NotFoundException(`Work not found`);
+        }
         if (!this.missionWorks) return [];
-        return this.missionWorks.listForWorkWithMission(workId, userId);
+        return scope
+            ? this.missionWorks.listForWorkWithMission(workId, userId, scope)
+            : this.missionWorks.listForWorkWithMission(workId, userId);
     }
 
     // ─── internals ──────────────────────────────────────────────────
 
-    private async findOrThrow(userId: string, missionId: string): Promise<Mission> {
-        const row = await this.missions.findOne({ where: { id: missionId, userId } });
+    private async findOrThrow(
+        userId: string,
+        missionId: string,
+        scope?: OwnershipScope,
+    ): Promise<Mission> {
+        const row = await this.missions.findOne({
+            where: scope
+                ? ownershipWhere<Mission>(userId, scope).map((branch) => ({
+                      ...branch,
+                      id: missionId,
+                  }))
+                : { id: missionId, userId },
+        });
         if (!row) {
             throw new NotFoundException(`Mission not found`);
         }

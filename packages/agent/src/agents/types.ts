@@ -23,6 +23,8 @@ import type { AgentGuardrails } from './guardrails';
 export interface AgentDto {
     id: string;
     userId: string;
+    tenantId: string | null;
+    organizationId: string | null;
     scope: AgentScope;
     missionId: string | null;
     ideaId: string | null;
@@ -83,6 +85,8 @@ export function toAgentDto(agent: Agent): AgentDto {
     return {
         id: agent.id,
         userId: agent.userId,
+        tenantId: agent.tenantId ?? null,
+        organizationId: agent.organizationId ?? null,
         scope: agent.scope,
         missionId: agent.missionId ?? null,
         ideaId: agent.ideaId ?? null,

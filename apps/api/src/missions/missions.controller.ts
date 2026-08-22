@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -27,6 +28,7 @@ import { BudgetOwnerType } from '@ever-works/agent/entities';
 import { GoalsService, type MissionGoalLinkDto } from '@ever-works/agent/goals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { ScopeContextService } from '../scope';
 import { LinkMissionGoalDto } from '../goals/dto/goal.dto';
 import {
     AddMissionAttachmentDto,
@@ -82,6 +84,7 @@ export class MissionsController {
         // GoalsService validates ownership of BOTH sides (Mission and
         // Goal) with 404-no-leak semantics.
         private readonly goalsService: GoalsService,
+        @Optional() private readonly scopeContext?: ScopeContextService,
     ) {}
 
     @Get()
@@ -94,12 +97,16 @@ export class MissionsController {
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
     ): Promise<MissionDto[]> {
-        return this.service.listForUser(auth.userId, {
-            status: this.parseStatus(status),
-            search: this.parseSearch(search),
-            limit: this.parseLimit(limit),
-            offset: this.parseOffset(offset),
-        });
+        return this.service.listForUser(
+            auth.userId,
+            {
+                status: this.parseStatus(status),
+                search: this.parseSearch(search),
+                limit: this.parseLimit(limit),
+                offset: this.parseOffset(offset),
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Post()
@@ -130,7 +137,7 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<MissionDto> {
-        return this.service.getForUser(auth.userId, id);
+        return this.service.getForUser(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Get(':id/budget')
@@ -148,7 +155,7 @@ export class MissionsController {
         // service.getForUser call 404s when the Mission belongs to
         // another user, which translates to the standard NestJS
         // 404 response shape.
-        await this.service.getForUser(auth.userId, id);
+        await this.service.getForUser(auth.userId, id, this.scopeContext?.getScope());
         return this.budgetService.summarizeForOwner({
             ownerType: BudgetOwnerType.MISSION,
             ownerId: id,
@@ -286,7 +293,9 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        return { relations: await this.service.listWorks(auth.userId, id) };
+        return {
+            relations: await this.service.listWorks(auth.userId, id, this.scopeContext?.getScope()),
+        };
     }
 
     @Post(':id/works')
@@ -299,7 +308,13 @@ export class MissionsController {
         @Body() body: AttachMissionWorkDto,
     ) {
         return {
-            relations: await this.service.attachWork(auth.userId, id, body.workId, body.relation),
+            relations: await this.service.attachWork(
+                auth.userId,
+                id,
+                body.workId,
+                body.relation,
+                this.scopeContext?.getScope(),
+            ),
         };
     }
 
@@ -317,7 +332,13 @@ export class MissionsController {
                 `Invalid relation "${relation}". Allowed: ${MISSION_WORK_RELATIONS.join(', ')}.`,
             );
         }
-        return this.service.detachWork(auth.userId, id, workId, relation as MissionWorkRelation);
+        return this.service.detachWork(
+            auth.userId,
+            id,
+            workId,
+            relation as MissionWorkRelation,
+            this.scopeContext?.getScope(),
+        );
     }
 
     /**
@@ -332,7 +353,13 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('workId', ParseUUIDPipe) workId: string,
     ) {
-        return { relations: await this.service.listMissionsForWork(auth.userId, workId) };
+        return {
+            relations: await this.service.listMissionsForWork(
+                auth.userId,
+                workId,
+                this.scopeContext?.getScope(),
+            ),
+        };
     }
 
     /**
