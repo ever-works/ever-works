@@ -67,6 +67,7 @@ import {
 	reportItemProgress,
 	resolveSettings,
 	resolveAuthEnv,
+	authModeForEnv,
 	buildMetrics,
 	buildErrorResult,
 	buildCancelledResult,
@@ -184,6 +185,14 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 	readonly settingsSchema: JsonSchema = {
 		type: 'object',
 		properties: {
+			authMode: {
+				type: 'string',
+				title: 'Billing Mode',
+				enum: ['subscription', 'api-key'],
+				description:
+					'Which credential this agent runs on. "subscription" uses the OAuth token from `claude setup-token` and bills your Claude plan; "api-key" bills your Anthropic Console org per token. When set, the agent uses only that credential and fails if it is missing, instead of silently falling back to the other one. Leave unset to keep the legacy behaviour (OAuth token preferred when both are configured).',
+				'x-scope': 'user'
+			},
 			oauthToken: {
 				type: 'string',
 				title: 'OAuth Token (Claude Pro/Max subscription — no per-token cost)',
@@ -613,8 +622,9 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 					cwd: workspacePath,
 					env: {
 						...authEnv,
-						CLAUDE_CODE_CONFIG_DIR: configDir
+						CLAUDE_CONFIG_DIR: configDir
 					},
+					authMode: authModeForEnv(authEnv),
 					maxTurns,
 					maxBudgetUsd,
 					model,
@@ -1153,7 +1163,8 @@ export class ClaudeCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaPr
 				prompt: request.prompt,
 				systemPrompt,
 				cwd: request.workspaceDir,
-				env: { ...authEnv, CLAUDE_CODE_CONFIG_DIR: configDir },
+				env: { ...authEnv, CLAUDE_CONFIG_DIR: configDir },
+				authMode: authModeForEnv(authEnv),
 				maxTurns,
 				maxBudgetUsd,
 				model,

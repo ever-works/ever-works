@@ -72,6 +72,63 @@ describe('pipeline-helpers', () => {
 		expect(await resolveExecutionAuth({})).toBeNull();
 	});
 
+	it('resolves an explicit access-token mode to CODEX_ACCESS_TOKEN', async () => {
+		expect(
+			await resolveExecutionAuth({
+				authMode: 'access-token',
+				accessToken: 'ctk-workspace-token'
+			})
+		).toEqual({
+			mode: 'access-token',
+			env: { CODEX_ACCESS_TOKEN: 'ctk-workspace-token' }
+		});
+	});
+
+	it('never degrades a subscription-backed mode into per-token API billing', async () => {
+		// An agent pinned to the ChatGPT workspace entitlement must not silently
+		// start billing the platform org just because an API key is also on file.
+		expect(
+			await resolveExecutionAuth({
+				authMode: 'access-token',
+				apiKey: 'sk-should-not-be-used'
+			})
+		).toBeNull();
+	});
+
+	it('falls back from access-token to device auth, not to the api key', async () => {
+		expect(
+			await resolveExecutionAuth({
+				authMode: 'access-token',
+				apiKey: 'sk-should-not-be-used',
+				[DEVICE_AUTH_AUTH_JSON_SETTING]: '{"token":"abc"}'
+			})
+		).toEqual({
+			mode: 'device-auth',
+			authJson: '{"token":"abc"}'
+		});
+	});
+
+	it('falls back from a keyless api-key mode to the workspace access token', async () => {
+		expect(
+			await resolveExecutionAuth({
+				authMode: 'api-key',
+				accessToken: 'ctk-workspace-token'
+			})
+		).toEqual({
+			mode: 'access-token',
+			env: { CODEX_ACCESS_TOKEN: 'ctk-workspace-token' }
+		});
+	});
+
+	it('ignores a masked access token placeholder', async () => {
+		expect(
+			await resolveExecutionAuth({
+				authMode: 'access-token',
+				accessToken: '••••••••'
+			})
+		).toBeNull();
+	});
+
 	it('materializes and cleans up a per-run device-auth home', async () => {
 		const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'codex-device-auth-home-'));
 		tempDirs.push(tempRoot);
