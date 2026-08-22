@@ -26,6 +26,18 @@ const ALL_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.HOURLY,
 ];
 
+/**
+ * "Unlimited" for a quota stored in an `int` column.
+ *
+ * 🛑 NOT `Number.MAX_SAFE_INTEGER`. `subscription_plans.maxWorks` is a Postgres `integer`, whose
+ * ceiling is 2147483647; MAX_SAFE_INTEGER is 9007199254740991 and Postgres rejects the INSERT with
+ * `integer out of range`. Because `seedPlans()` runs inside `onModuleInit`, that rejection does not
+ * degrade — it aborts module init and the API never finishes booting, on every environment with a
+ * real database. Unit tests cannot catch it: the plan repository is a mock there, so the value is
+ * never handed to Postgres.
+ */
+const UNLIMITED_WORKS = 2_147_483_647;
+
 const PAID_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.MONTHLY,
     WorkScheduleCadence.WEEKLY,
@@ -128,8 +140,9 @@ const PLAN_SEED_DATA: Array<{
         displayName: 'Community Edition',
         hosting: 'selfhosted',
         // Free AGPLv3 download with no limits, mirroring Gauzy's Community Edition. Never bought,
-        // so it has no Stripe object at all.
-        maxWorks: Number.MAX_SAFE_INTEGER,
+        // so it has no Stripe object at all. Quotas are advisory here anyway — a self-hoster owns
+        // the database — but the value still has to fit the column. See {@link UNLIMITED_WORKS}.
+        maxWorks: UNLIMITED_WORKS,
         allowedCadences: ALL_CADENCES,
         monthlyPrice: '0',
         annualPrice: '0',

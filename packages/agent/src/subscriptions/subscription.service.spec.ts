@@ -139,6 +139,79 @@ describe('SubscriptionService', () => {
             );
         });
 
+        /**
+         * 🛑 Every seeded code MUST be a member of `SubscriptionPlanCode`.
+         *
+         * `PlanSubscriptionService.findPlanByCode` rejects any code that is not in the enum
+         * BEFORE it reaches the repository, and `activate()` treats "no plan" as
+         * "activation skipped" — a warning log and a `false`. So a plan seeded with a code the
+         * enum does not carry is fully purchasable and then silently grants nothing: the money
+         * moves, the webhook returns `ignored`, and the buyer gets no tier. Nothing else in the
+         * suite would catch it, because seeding and activation are tested apart.
+         */
+        it('seeds no plan code that SubscriptionPlanCode does not carry', async () => {
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const seeded = planRepository.upsert.mock.calls.map((c) => c[0].code);
+            const known = new Set<string>(Object.values(SubscriptionPlanCode));
+
+            expect(seeded.length).toBeGreaterThan(0); // never pass vacuously
+            expect(seeded.filter((c: string) => !known.has(c))).toEqual([]);
+        });
+
+        /**
+         * 🛑 REGRESSION. `maxWorks` is a Postgres `integer` (ceiling 2147483647). Seeding
+         * `Number.MAX_SAFE_INTEGER` (9007199254740991) as "unlimited" made Postgres reject the
+         * INSERT with `integer out of range` — and because `seedPlans()` runs inside
+         * `onModuleInit`, that does not degrade gracefully: module init aborts and the API never
+         * finishes booting, on dev, stage AND production alike.
+         *
+         * Nothing else in this suite can catch it, because `planRepository` is a mock here and a
+         * mock accepts any number. This test encodes the column's real ceiling so the value is
+         * checked without a database.
+         */
+        const PG_INT4_MAX = 2_147_483_647;
+
+        it('seeds no integer quota that Postgres int4 would reject', async () => {
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const rows = planRepository.upsert.mock.calls.map((c) => c[0]);
+
+            expect(rows.length).toBeGreaterThan(0); // never pass vacuously
+            for (const row of rows) {
+                expect({ code: row.code, maxWorks: row.maxWorks }).toEqual({
+                    code: row.code,
+                    maxWorks: expect.any(Number),
+                });
+                expect(row.maxWorks).toBeLessThanOrEqual(PG_INT4_MAX);
+                expect(row.maxWorks).toBeGreaterThanOrEqual(0);
+                expect(Number.isInteger(row.maxWorks)).toBe(true);
+            }
+        });
+
+        it('seeds prices that fit decimal(10,2) and parse back to the same number', async () => {
+            // The price columns are decimal(10,2) — max 99,999,999.99 — and TypeORM hands them back
+            // as STRINGS. A value that does not round-trip would bill a different amount than the
+            // one reviewed here.
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const rows = planRepository.upsert.mock.calls.map((c) => c[0]);
+
+            for (const row of rows) {
+                for (const field of ['monthlyPrice', 'annualPrice', 'lifetimePrice'] as const) {
+                    const raw = row[field];
+                    if (raw === null || raw === undefined) continue;
+                    expect(typeof raw).toBe('string');
+                    const n = Number(raw);
+                    expect(Number.isFinite(n)).toBe(true);
+                    expect(n).toBeLessThan(100_000_000);
+                    expect(n).toBeGreaterThanOrEqual(0);
+                    // Two decimal places at most, or the column silently rounds the charge.
+                    expect(Math.round(n * 100)).toBe(n * 100);
+                }
+            }
+        });
+
         it('tags every row with a hosting mode, three cloud and three self-hosted', async () => {
             const { service, planRepository } = makeService();
             await service.seedPlans();
