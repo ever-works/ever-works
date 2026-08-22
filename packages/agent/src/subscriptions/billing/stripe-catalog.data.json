@@ -1,0 +1,127 @@
+{
+  "$comment": [
+    "Ever Works' catalog in the SHARED Stripe account acct_1IDnd6DdBrwbGEir (\"Ever Tech\").",
+    "",
+    "Every Ever product sells through ONE Stripe account, so every price carries a prefixed",
+    "lookup_key. The account-wide plan convention, set by ever-co/ever-website's catalog.json, is:",
+    "  ever_<product>_<hosting>_<tier>_<interval>",
+    "Ever Works extends it with two shapes the shared schema cannot express:",
+    "  ever_works_<hosting>_<tier>_seat_<interval>   per-additional-seat add-on",
+    "  ever_works_credits_<n>                        one-time AI credit pack",
+    "",
+    "scripts/stripe-sync-catalog.mjs applies this file idempotently, keyed on lookup_key.",
+    "Stripe prices are immutable: changing an `amountCents` creates a NEW price, moves the",
+    "lookup_key onto it (transfer_lookup_key) and archives the old one. Existing subscribers stay",
+    "on the price they bought. Never create these by hand in the Dashboard.",
+    "",
+    "Amounts are integer minor units (cents) in `currency`. An annual amount is the figure the",
+    "marketing site displays per month x 12: cloud Pro shows \"$17/mo\" and bills 20400 once a year.",
+    "",
+    "`interval` values:",
+    "  monthly  - recurring, month",
+    "  annual   - recurring, year",
+    "  lifetime - ONE-TIME, bought in Stripe `mode: payment`. Grants a perpetual commercial licence",
+    "             exempting the buyer from AGPLv3. Fulfilment (sending the licence PDF) is a known",
+    "             follow-up across ALL Ever products and is NOT wired up yet.",
+    "",
+    "Prices are anchored to Ever Gauzy / Ever Teams (owner directive 2026-08-22) so the whole Ever",
+    "line reads consistently. The only numbers with no Gauzy counterpart are the credit allowances.",
+    "",
+    "`seatsIncluded: null` means unbounded - no seat price is emitted for that plan.",
+    "An empty `prices` array means the tier is a free download with NO Stripe object at all."
+  ],
+
+  "version": 1,
+  "product": "works",
+  "name": "Ever Works",
+  "site": "https://ever.works",
+  "currency": "usd",
+
+  "dailyFreeCredits": 50,
+
+  "plans": [
+    {
+      "hosting": "cloud",
+      "tier": "free",
+      "tierName": "Free",
+      "seatsIncluded": 1,
+      "seatCentsPerMonth": null,
+      "monthlyCredits": 0,
+      "note": "Free forever. 50 credits/day. Not purchasable through checkout - assigned by the self-service plan endpoint. The $0 prices exist only so a future move to the shared ever.co/checkout can keep 'does this email have a subscription?' a single uniform question.",
+      "prices": [
+        { "interval": "monthly", "amountCents": 0 },
+        { "interval": "annual", "amountCents": 0 }
+      ]
+    },
+    {
+      "hosting": "cloud",
+      "tier": "pro",
+      "tierName": "Pro",
+      "seatsIncluded": 10,
+      "seatCentsPerMonth": 500,
+      "monthlyCredits": 3000,
+      "note": "Matches Ever Gauzy / Ever Teams cloud Small Business ($25 / $204) and their $5 per additional employee.",
+      "prices": [
+        { "interval": "monthly", "amountCents": 2500 },
+        { "interval": "annual", "amountCents": 20400 }
+      ]
+    },
+    {
+      "hosting": "cloud",
+      "tier": "enterprise",
+      "tierName": "Enterprise",
+      "seatsIncluded": 10,
+      "seatCentsPerMonth": 1000,
+      "monthlyCredits": 25000,
+      "note": "Matches Ever Gauzy / Ever Teams Enterprise ($199 / $1,668) and their $10 per additional employee. Option 1 (one organization, unlimited seats) is the same SKU with seat metering switched off on the subscription; Option 2 (unlimited organizations, 10 seats each) is the metered default.",
+      "prices": [
+        { "interval": "monthly", "amountCents": 19900 },
+        { "interval": "annual", "amountCents": 166800 }
+      ]
+    },
+
+    {
+      "hosting": "selfhosted",
+      "tier": "free",
+      "tierName": "Community Edition",
+      "seatsIncluded": null,
+      "seatCentsPerMonth": null,
+      "monthlyCredits": null,
+      "note": "Free AGPLv3 download. Never bought, so it has NO Stripe object - exactly how Gauzy's and Teams' Community Editions are modelled. Unlimited seats. Credits still apply if the deployment uses Ever-hosted AI rather than its own model keys.",
+      "prices": []
+    },
+    {
+      "hosting": "selfhosted",
+      "tier": "pro",
+      "tierName": "Pro Edition",
+      "seatsIncluded": 10,
+      "seatCentsPerMonth": 500,
+      "monthlyCredits": 3000,
+      "note": "Commercial licence lifting AGPLv3 obligations. Mirrors Gauzy's self-hosted Small Business Edition: $49/mo, $408/yr (displays $34/mo), $99 one-time lifetime.",
+      "prices": [
+        { "interval": "monthly", "amountCents": 4900 },
+        { "interval": "annual", "amountCents": 40800 },
+        { "interval": "lifetime", "amountCents": 9900 }
+      ]
+    },
+    {
+      "hosting": "selfhosted",
+      "tier": "enterprise",
+      "tierName": "Enterprise Edition",
+      "seatsIncluded": 10,
+      "seatCentsPerMonth": 1000,
+      "monthlyCredits": 25000,
+      "note": "Commercial licence lifting AGPLv3 obligations. Mirrors Gauzy's self-hosted Enterprise Edition.",
+      "prices": [
+        { "interval": "monthly", "amountCents": 19900 },
+        { "interval": "annual", "amountCents": 166800 }
+      ]
+    }
+  ],
+
+  "creditPacks": [
+    { "packId": "credits-1000", "amountCents": 1000, "credits": 1000, "label": "1,000 credits" },
+    { "packId": "credits-5500", "amountCents": 5000, "credits": 5500, "label": "5,500 credits" },
+    { "packId": "credits-25000", "amountCents": 20000, "credits": 25000, "label": "25,000 credits" }
+  ]
+}

@@ -243,6 +243,8 @@ export class StripeBillingProvider extends BillingProvider {
             [STRIPE_METADATA_KEYS.referenceId]: request.referenceId,
         };
 
+        const lineItems = await this.buildPlanLineItems(request);
+
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
             customer: customerId,
@@ -251,18 +253,7 @@ export class StripeBillingProvider extends BillingProvider {
             // implementation; this one is Stripe's.
             success_url: withSessionIdTemplate(request.successUrl),
             cancel_url: request.cancelUrl,
-            line_items: [
-                {
-                    quantity: 1,
-                    price_data: {
-                        // Price comes from the SERVER plan row.
-                        currency: request.plan.currency,
-                        unit_amount: request.plan.priceCents,
-                        recurring: { interval: request.plan.interval },
-                        product_data: { name: request.plan.label },
-                    },
-                },
-            ],
+            line_items: lineItems,
             metadata,
             subscription_data: { metadata },
         });
@@ -271,6 +262,105 @@ export class StripeBillingProvider extends BillingProvider {
             throw new BillingProviderError('Checkout session did not return a redirect URL');
         }
         return { url: session.url, sessionId: session.id, customerId };
+    }
+
+    /**
+     * Resolve a catalog `lookup_key` to a Stripe Price id, or `null` if this account does not have
+     * it.
+     *
+     * 🛑 `null` is a normal answer, not an error: a self-hosted or CI deployment will not have had
+     * `scripts/stripe-sync-catalog.mjs` run against its account. Callers fall back to an inline
+     * price rather than failing the purchase.
+     *
+     * Results are memoised for the process lifetime. A price's id never changes; when an amount
+     * changes, the sync script moves the lookup_key onto a NEW price
+     * (`transfer_lookup_key`), so a long-lived process could hold a stale id — which is exactly the
+     * behaviour we want for in-flight checkouts, and is corrected on the next deploy.
+     */
+    private readonly priceIdByLookupKey = new Map<string, string | null>();
+
+    private async resolvePriceId(lookupKey: string | null | undefined): Promise<string | null> {
+        if (!nonEmpty(lookupKey)) return null;
+        const key = lookupKey as string;
+
+        const cached = this.priceIdByLookupKey.get(key);
+        if (cached !== undefined) return cached;
+
+        const stripe = this.requireClient();
+        let resolved: string | null = null;
+        try {
+            const found = await stripe.prices.list({ lookup_keys: [key], active: true, limit: 1 });
+            resolved = found.data[0]?.id ?? null;
+        } catch (error) {
+            // A lookup failure must not take a purchase down — fall back to the inline price.
+            this.logger.warn(
+                `Could not resolve Stripe price for lookup_key "${key}"; falling back to an inline price`,
+                error instanceof Error ? error.stack : undefined,
+            );
+            resolved = null;
+        }
+
+        if (resolved === null) {
+            this.logger.warn(
+                `No active Stripe price for lookup_key "${key}" in this account — billing the plan row's ` +
+                    `inline amount instead. Run scripts/stripe-sync-catalog.mjs to publish the catalog.`,
+            );
+        }
+
+        this.priceIdByLookupKey.set(key, resolved);
+        return resolved;
+    }
+
+    /**
+     * Line items for a plan checkout: the plan itself, plus a per-seat line when the buyer wants
+     * more seats than the plan includes.
+     *
+     * The plan line prefers the CATALOG price (shared Stripe account, stable `lookup_key`) and
+     * falls back to the historical inline `price_data` built from the server plan row. Both paths
+     * price from the SERVER — a client-supplied amount never reaches here; `PlanCheckoutController`
+     * rejects a body carrying one.
+     */
+    private async buildPlanLineItems(
+        request: PlanCheckoutRequest,
+    ): Promise<Stripe.Checkout.SessionCreateParams.LineItem[]> {
+        const planPriceId = await this.resolvePriceId(request.plan.lookupKey);
+
+        const planLine: Stripe.Checkout.SessionCreateParams.LineItem = planPriceId
+            ? { quantity: 1, price: planPriceId }
+            : {
+                  quantity: 1,
+                  price_data: {
+                      // Price comes from the SERVER plan row.
+                      currency: request.plan.currency,
+                      unit_amount: request.plan.priceCents,
+                      recurring: { interval: request.plan.interval },
+                      product_data: { name: request.plan.label },
+                  },
+              };
+
+        const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [planLine];
+
+        // Seats are additive and optional. A plan with unbounded seats, a plan whose buyer stays
+        // within the included allowance, and an account with no synced seat price all produce no
+        // second line — never a zero-quantity one, which Stripe rejects.
+        const extraSeats = Math.max(0, Math.floor(request.plan.extraSeats ?? 0));
+        if (extraSeats > 0) {
+            const seatPriceId = await this.resolvePriceId(request.plan.seatLookupKey);
+            if (seatPriceId) {
+                lineItems.push({ quantity: extraSeats, price: seatPriceId });
+            } else {
+                // There is deliberately no inline fallback for seats: the per-seat amount lives in
+                // the catalog, not in the plan row, so inventing one here would bill a number that
+                // no reviewed file contains. Log loudly and sell the base plan.
+                this.logger.error(
+                    `Plan checkout for user ${request.userId} asked for ${extraSeats} extra seat(s) but ` +
+                        `seat price "${request.plan.seatLookupKey}" is not available in this Stripe account. ` +
+                        `Selling the base plan only — the seats were NOT billed.`,
+                );
+            }
+        }
+
+        return lineItems;
     }
 
     /**

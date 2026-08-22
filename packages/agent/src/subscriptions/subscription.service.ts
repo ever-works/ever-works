@@ -14,6 +14,7 @@ import { WorkScheduleAllowedCadence } from '@src/dto';
 import { User } from '@src/entities/user.entity';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { WorkScheduleBillingMode, WorkScheduleCadence, SubscriptionPlanCode } from '@src/entities';
+import type { SubscriptionPlanHosting } from '@src/entities/types';
 
 const ALL_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.MONTHLY,
@@ -25,50 +26,147 @@ const ALL_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.HOURLY,
 ];
 
+const PAID_CADENCES: WorkScheduleCadence[] = [
+    WorkScheduleCadence.MONTHLY,
+    WorkScheduleCadence.WEEKLY,
+    WorkScheduleCadence.DAILY,
+    WorkScheduleCadence.EVERY_12_HOURS,
+];
+
+/**
+ * The plan catalog, upserted on `code` at boot by {@link SubscriptionService.seedPlans}.
+ *
+ * Prices were aligned with Ever Gauzy / Ever Teams on 2026-08-22 (owner directive) so the whole
+ * Ever line reads consistently, and the shared Stripe account
+ * (`acct_1IDnd6DdBrwbGEir`) now carries a matching price for every row — see
+ * {@link ./billing/stripe-catalog.json}. `monthlyPrice` / `annualPrice` / `lifetimePrice` here are
+ * MAJOR units (dollars) because the column is `decimal(10,2)`; the catalog holds the same numbers
+ * in cents. They must agree, and `stripe-catalog.spec.ts` asserts that they do.
+ *
+ * 🛑 `code` values are load-bearing and unchanged — they are stored in `user_subscriptions.planCode`
+ * and in Stripe metadata on every subscription ever created. What changed is `displayName`:
+ * `standard` is now shown as "Pro" and `premium` as "Enterprise", matching what ever.works has
+ * always advertised. The DB seed had drifted from the marketing site; this closes that gap.
+ *
+ * A "seat" is an employee OR an agent — interchangeable, which is the point of the product.
+ * `seatsIncluded: null` means UNBOUNDED and suppresses per-seat billing entirely.
+ *
+ * On the SELF-HOSTED rows, what is being sold is a commercial licence that lifts the buyer's
+ * AGPLv3 obligations. Quota fields there are advisory: a self-hoster owns the database and the
+ * platform cannot meaningfully enforce them. They are seeded so the plan switcher and the licence
+ * paperwork describe the same thing.
+ */
 const PLAN_SEED_DATA: Array<{
     code: SubscriptionPlanCode;
     displayName: string;
+    hosting: SubscriptionPlanHosting;
     maxWorks: number;
     allowedCadences: WorkScheduleCadence[];
     monthlyPrice: string;
+    annualPrice: string;
+    lifetimePrice: string | null;
+    seatsIncluded: number | null;
+    seatMonthlyPrice: string | null;
+    monthlyCredits: number;
     overagePricePerRun: string;
 }> = [
+    /* ------------------------------------------------------------------ cloud */
     {
         code: SubscriptionPlanCode.FREE,
         displayName: 'Free',
+        hosting: 'cloud',
         maxWorks: 1,
         // allowedCadences: [WorkScheduleCadence.MONTHLY],
         allowedCadences: ALL_CADENCES, // for now everything is free
         monthlyPrice: '0',
+        annualPrice: '0',
+        lifetimePrice: null,
+        // One seat, and no per-seat price: upgrading is how you get more, not a top-up.
+        seatsIncluded: 1,
+        seatMonthlyPrice: null,
+        // Free accounts live on the universal 50-credits-a-day grant, not a monthly allowance.
+        monthlyCredits: 0,
         overagePricePerRun: '10',
     },
     {
         code: SubscriptionPlanCode.STANDARD,
-        displayName: 'Standard',
+        displayName: 'Pro',
+        hosting: 'cloud',
         maxWorks: 5,
-        allowedCadences: [
-            WorkScheduleCadence.MONTHLY,
-            WorkScheduleCadence.WEEKLY,
-            WorkScheduleCadence.DAILY,
-            WorkScheduleCadence.EVERY_12_HOURS,
-        ],
-        monthlyPrice: '29',
+        allowedCadences: PAID_CADENCES,
+        // Ever Gauzy / Ever Teams cloud Small Business: $25/mo, $204/yr (displays "$17/mo").
+        monthlyPrice: '25',
+        annualPrice: '204',
+        lifetimePrice: null,
+        seatsIncluded: 10,
+        seatMonthlyPrice: '5',
+        monthlyCredits: 3000,
         overagePricePerRun: '8',
     },
     {
         code: SubscriptionPlanCode.PREMIUM,
-        displayName: 'Premium',
+        displayName: 'Enterprise',
+        hosting: 'cloud',
         maxWorks: 15,
-        allowedCadences: [
-            WorkScheduleCadence.MONTHLY,
-            WorkScheduleCadence.WEEKLY,
-            WorkScheduleCadence.DAILY,
-            WorkScheduleCadence.EVERY_12_HOURS,
-            WorkScheduleCadence.EVERY_8_HOURS,
-            WorkScheduleCadence.EVERY_3_HOURS,
-            WorkScheduleCadence.HOURLY,
-        ],
-        monthlyPrice: '99',
+        allowedCadences: ALL_CADENCES,
+        // Ever Gauzy / Ever Teams Enterprise: $199/mo, $1,668/yr (displays "$139/mo").
+        monthlyPrice: '199',
+        annualPrice: '1668',
+        lifetimePrice: null,
+        // Option 2 (unlimited organizations, 10 seats each) is the metered default. Option 1 (one
+        // organization, unlimited seats) is the same plan with seat metering switched off on the
+        // subscription rather than a separate row.
+        seatsIncluded: 10,
+        seatMonthlyPrice: '10',
+        monthlyCredits: 25000,
+        overagePricePerRun: '0',
+    },
+
+    /* ------------------------------------------------------------- self-hosted */
+    {
+        code: SubscriptionPlanCode.SELFHOSTED_COMMUNITY,
+        displayName: 'Community Edition',
+        hosting: 'selfhosted',
+        // Free AGPLv3 download with no limits, mirroring Gauzy's Community Edition. Never bought,
+        // so it has no Stripe object at all.
+        maxWorks: Number.MAX_SAFE_INTEGER,
+        allowedCadences: ALL_CADENCES,
+        monthlyPrice: '0',
+        annualPrice: '0',
+        lifetimePrice: null,
+        seatsIncluded: null, // unbounded
+        seatMonthlyPrice: null,
+        monthlyCredits: 0,
+        overagePricePerRun: '0',
+    },
+    {
+        code: SubscriptionPlanCode.SELFHOSTED_PRO,
+        displayName: 'Pro Edition',
+        hosting: 'selfhosted',
+        maxWorks: 5,
+        allowedCadences: PAID_CADENCES,
+        // Ever Gauzy self-hosted Small Business Edition: $49/mo, $408/yr (displays "$34/mo"),
+        // or a $99 one-time perpetual commercial licence.
+        monthlyPrice: '49',
+        annualPrice: '408',
+        lifetimePrice: '99',
+        seatsIncluded: 10,
+        seatMonthlyPrice: '5',
+        monthlyCredits: 3000,
+        overagePricePerRun: '8',
+    },
+    {
+        code: SubscriptionPlanCode.SELFHOSTED_ENTERPRISE,
+        displayName: 'Enterprise Edition',
+        hosting: 'selfhosted',
+        maxWorks: 15,
+        allowedCadences: ALL_CADENCES,
+        monthlyPrice: '199',
+        annualPrice: '1668',
+        lifetimePrice: null,
+        seatsIncluded: 10,
+        seatMonthlyPrice: '10',
+        monthlyCredits: 25000,
         overagePricePerRun: '0',
     },
 ];

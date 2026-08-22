@@ -37,10 +37,42 @@ export type GenerateStatus = {
     recentLogs?: GenerationStepLog[];
 };
 
+/**
+ * Where a plan runs. Ever's shared Stripe catalog uses the same two values across every product, so
+ * this string is part of a plan's `lookup_key` and must not drift.
+ */
+export type SubscriptionPlanHosting = 'cloud' | 'selfhosted';
+
+/**
+ * The purchasable plans, one code per (hosting, tier) pair.
+ *
+ * 🛑 The first three codes are LOAD-BEARING and must never be renamed or removed: they are stored
+ * verbatim in `subscription_plans.code`, in `user_subscriptions.planCode`, and in Stripe session
+ * metadata on every subscription ever created. Their DISPLAY names moved to the marketing tiers
+ * (Standard is shown as "Pro", Premium as "Enterprise") — that is a `displayName` change in the
+ * plan seed, not a code change.
+ *
+ * The three `SELFHOSTED_*` codes were added 2026-08-22 when Ever Works gained paid self-hosted
+ * editions. A self-hosted commercial licence lifts the buyer's AGPLv3 obligations; the free
+ * Community Edition needs a row so the plan switcher can show it, but it is never bought and has no
+ * Stripe object.
+ *
+ * Hosting is a separate column rather than being parsed out of the code — see
+ * `subscription-plan.entity.ts`. The code is the identity; the columns describe it.
+ */
 export enum SubscriptionPlanCode {
+    /** Cloud, Free — 1 seat, 50 credits/day, never purchasable through checkout. */
     FREE = 'free',
+    /** Cloud, shown as "Pro" — $25/mo or $204/yr, 10 seats, 3,000 credits/mo. */
     STANDARD = 'standard',
+    /** Cloud, shown as "Enterprise" — $199/mo or $1,668/yr, 10 seats, 25,000 credits/mo. */
     PREMIUM = 'premium',
+    /** Self-hosted Community Edition — free AGPLv3 download, unlimited seats, no Stripe object. */
+    SELFHOSTED_COMMUNITY = 'selfhosted_community',
+    /** Self-hosted Pro Edition — $49/mo, $408/yr, or a $99 one-time perpetual commercial licence. */
+    SELFHOSTED_PRO = 'selfhosted_pro',
+    /** Self-hosted Enterprise Edition — $199/mo or $1,668/yr commercial licence. */
+    SELFHOSTED_ENTERPRISE = 'selfhosted_enterprise',
 }
 
 /**
