@@ -495,6 +495,42 @@ describe('SubscriptionService', () => {
             expect(planRepository.findByCode).toHaveBeenCalledWith(SubscriptionPlanCode.STANDARD);
         });
 
+        /**
+         * 🛑 REGRESSION. `SUBSCRIPTIONS_DEFAULT_PLAN` is an operator-set env var and
+         * `normalizePlanCode` accepts ANY member of the enum — which now includes
+         * `selfhosted_community`, a row that is free AND effectively unlimited. One typo in a Helm
+         * value would hand every user with no subscription an unlimited plan, fleet-wide, with no
+         * purchase involved. Same class as the self-service escalation, reached through
+         * CONFIGURATION rather than a request.
+         */
+        it('REFUSES a self-hosted default plan and falls back to FREE', async () => {
+            process.env.SUBSCRIPTIONS_DEFAULT_PLAN = 'selfhosted_community';
+            const community = {
+                ...FREE_PLAN,
+                code: 'selfhosted_community',
+                displayName: 'Community Edition',
+                hosting: 'selfhosted',
+                maxWorks: 2_147_483_647,
+            };
+            const findByCode = jest
+                .fn()
+                .mockImplementation(async (code: string) =>
+                    code === 'selfhosted_community' ? community : FREE_PLAN,
+                );
+            const { service } = makeService(
+                { findByCode },
+                { findActiveByUser: jest.fn().mockResolvedValue(null) },
+            );
+
+            const plan = await service.resolvePlanForUser({ id: 'u1' } as any);
+
+            // The unlimited row must NOT become everyone's default.
+            expect((plan as any).code).toBe(FREE_PLAN.code);
+            expect((plan as any).maxWorks).toBe(1);
+            // It fell back rather than silently accepting the misconfiguration.
+            expect(findByCode).toHaveBeenCalledWith(SubscriptionPlanCode.FREE);
+        });
+
         it('short-circuits to resolveDefaultPlan when the kill-switch is OFF (no DB lookup of active sub)', async () => {
             process.env.SUBSCRIPTIONS_ENABLED = 'false';
             const { service, planRepository, userSubscriptionRepository } = makeService({
