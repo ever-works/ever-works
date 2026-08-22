@@ -1,0 +1,576 @@
+import { NotFoundException } from '@nestjs/common';
+import type { FindOptionsWhere, Repository } from 'typeorm';
+import { AgentsService } from './agents/agents.service';
+import {
+    Agent,
+    AgentAvatarMode,
+    AgentIdleBehavior,
+    AgentScope,
+    AgentStatus,
+} from './entities/agent.entity';
+import { Goal, GoalStatus } from './entities/goal.entity';
+import type { GoalMetricSample } from './entities/goal-metric-sample.entity';
+import type { MissionGoal } from './entities/mission-goal.entity';
+import { Mission, MissionStatus, MissionType } from './entities/mission.entity';
+import type { Work } from './entities/work.entity';
+import { GoalsService } from './goals/goals.service';
+import type { GoalEvaluationService } from './goals/goal-evaluation.service';
+import { MissionsService } from './missions/missions.service';
+import { TitlerService } from './titler/titler.service';
+
+const EVER_SCOPE = {
+    tenantId: '11111111-1111-4111-8111-111111111111',
+    organizationId: '22222222-2222-4222-8222-222222222222',
+};
+const OTHER_SCOPE = {
+    tenantId: EVER_SCOPE.tenantId,
+    organizationId: '33333333-3333-4333-8333-333333333333',
+};
+const FOREIGN_SCOPE = {
+    tenantId: '44444444-4444-4444-8444-444444444444',
+    organizationId: '55555555-5555-4555-8555-555555555555',
+};
+const PERSONAL_SCOPE = { tenantId: EVER_SCOPE.tenantId, organizationId: null };
+
+type OwnershipScope = typeof EVER_SCOPE | typeof PERSONAL_SCOPE;
+
+function isNullOperator(value: unknown): boolean {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        (value as { _type?: string })._type === 'isNull'
+    );
+}
+
+function matchesWhere<T extends Record<string, unknown>>(
+    row: T,
+    where: FindOptionsWhere<T> | FindOptionsWhere<T>[] | undefined,
+): boolean {
+    if (!where) return true;
+    if (Array.isArray(where)) return where.some((branch) => matchesWhere(row, branch));
+    return Object.entries(where).every(([key, expected]) => {
+        if (isNullOperator(expected)) return row[key] == null;
+        return row[key] === expected;
+    });
+}
+
+function scopedRows<
+    T extends { userId: string; tenantId?: string | null; organizationId?: string | null },
+>(rows: T[], userId: string, scope?: OwnershipScope): T[] {
+    return rows.filter((row) => {
+        if (row.userId !== userId) return false;
+        if (!scope) return true;
+        if (scope.organizationId === null) {
+            return (
+                row.organizationId == null &&
+                (row.tenantId == null || row.tenantId === scope.tenantId)
+            );
+        }
+        return row.tenantId === scope.tenantId && row.organizationId === scope.organizationId;
+    });
+}
+
+function mission(overrides: Partial<Mission>): Mission {
+    return {
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: 'user-1',
+        title: 'Mission',
+        description: 'Mission description',
+        type: MissionType.ONE_SHOT,
+        status: MissionStatus.ACTIVE,
+        outcome: null,
+        completedAt: null,
+        schedule: null,
+        autoBuildWorks: false,
+        outstandingIdeasCap: null,
+        guardrailsOverride: null,
+        missionTemplateRepo: null,
+        missionRepo: null,
+        sourceMissionId: null,
+        tenantId: null,
+        organizationId: null,
+        createdAt: new Date('2026-08-22T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-22T00:00:00.000Z'),
+        ...overrides,
+    };
+}
+
+function goal(overrides: Partial<Goal>): Goal {
+    return {
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        userId: 'user-1',
+        title: 'Goal',
+        description: null,
+        metricSource: { pluginId: 'stripe', metricId: 'income' },
+        comparator: 'gte',
+        targetValue: 100,
+        unit: 'usd',
+        window: 'month',
+        baselineValue: null,
+        currentValue: null,
+        currentValueAt: null,
+        deadline: null,
+        checkFrequencyMinutes: 60,
+        nextCheckAt: null,
+        status: GoalStatus.DRAFT,
+        outcome: null,
+        criteria: null,
+        constraints: null,
+        resolvedScore: null,
+        dodCriteria: null,
+        spendCapCents: null,
+        spentCents: 0,
+        wallClockLimitHours: null,
+        stuckThresholdIterations: null,
+        sessionBudgetMinutes: null,
+        gracePeriodMinutes: null,
+        executionTarget: null,
+        plannerModelHint: null,
+        workerModelHint: null,
+        iteration: 0,
+        lastProgressIteration: 0,
+        activeAgentId: null,
+        assignedAgentId: null,
+        loopStatus: null,
+        loopStartedAt: null,
+        archivedAt: null,
+        tenantId: null,
+        organizationId: null,
+        createdAt: new Date('2026-08-22T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-22T00:00:00.000Z'),
+        ...overrides,
+    } as Goal;
+}
+
+function agent(overrides: Partial<Agent>): Agent {
+    return {
+        id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        userId: 'user-1',
+        scope: AgentScope.TENANT,
+        missionId: null,
+        ideaId: null,
+        workId: null,
+        name: 'Agent',
+        slug: 'agent',
+        title: null,
+        capabilities: null,
+        aiProviderId: null,
+        modelId: null,
+        environmentId: null,
+        maxSkillContextTokens: 4000,
+        memoryRecallEnabled: true,
+        status: AgentStatus.DRAFT,
+        permissions: {
+            canCreateAgents: false,
+            canAssignTasks: false,
+            canEditSkills: false,
+            canEditAgentFiles: false,
+            canSpend: false,
+            canCommitToRepo: false,
+            canOpenPullRequests: false,
+            canCallExternalTools: false,
+        },
+        targets: null,
+        guardrails: null,
+        heartbeatCadence: null,
+        idleBehavior: AgentIdleBehavior.PROPOSE,
+        nextHeartbeatAt: null,
+        lastRunAt: null,
+        lastRunStatus: null,
+        errorCount: 0,
+        pauseAfterFailures: 3,
+        avatarMode: AgentAvatarMode.INITIALS,
+        avatarIcon: null,
+        avatarImageUploadId: null,
+        committerName: null,
+        committerEmail: null,
+        reportsToAgentId: null,
+        scorecard: null,
+        initScript: null,
+        soulMd: null,
+        agentsMd: null,
+        heartbeatMd: null,
+        toolsMd: null,
+        agentYml: null,
+        contentHash: null,
+        tenantId: null,
+        organizationId: null,
+        createdAt: new Date('2026-08-22T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-22T00:00:00.000Z'),
+        ...overrides,
+    } as Agent;
+}
+
+describe('Organization ownership scoping', () => {
+    describe('MissionsService', () => {
+        function makeService(rows: Mission[]) {
+            const repo = {
+                find: jest.fn(
+                    async (options: {
+                        where?: FindOptionsWhere<Mission> | FindOptionsWhere<Mission>[];
+                    }) =>
+                        rows.filter((row) =>
+                            matchesWhere(
+                                row as unknown as Record<string, unknown>,
+                                options.where as never,
+                            ),
+                        ),
+                ),
+                findOne: jest.fn(
+                    async (options: {
+                        where?: FindOptionsWhere<Mission> | FindOptionsWhere<Mission>[];
+                    }) =>
+                        rows.find((row) =>
+                            matchesWhere(
+                                row as unknown as Record<string, unknown>,
+                                options.where as never,
+                            ),
+                        ) ?? null,
+                ),
+                create: jest.fn((partial: Partial<Mission>) => mission(partial)),
+                save: jest.fn(async (row: Mission) => {
+                    row.tenantId = EVER_SCOPE.tenantId;
+                    row.organizationId = EVER_SCOPE.organizationId;
+                    const index = rows.findIndex((candidate) => candidate.id === row.id);
+                    if (index === -1) rows.push(row);
+                    else rows[index] = row;
+                    return row;
+                }),
+            };
+            return {
+                repo,
+                service: new MissionsService(
+                    repo as unknown as Repository<Mission>,
+                    new TitlerService(),
+                ),
+            };
+        }
+
+        it('lists only the active Organization and keeps personal scope compatible with legacy rows', async () => {
+            const rows = [
+                mission({ id: 'ever', ...EVER_SCOPE }),
+                mission({ id: 'other', ...OTHER_SCOPE }),
+                mission({
+                    id: 'personal-current',
+                    tenantId: EVER_SCOPE.tenantId,
+                    organizationId: null,
+                }),
+                mission({ id: 'personal-legacy', tenantId: null, organizationId: null }),
+                mission({
+                    id: 'personal-foreign',
+                    tenantId: FOREIGN_SCOPE.tenantId,
+                    organizationId: null,
+                }),
+            ];
+            const { service } = makeService(rows);
+
+            const ever = await (service.listForUser as any)('user-1', {}, EVER_SCOPE);
+            const personal = await (service.listForUser as any)('user-1', {}, PERSONAL_SCOPE);
+
+            expect(ever.map((row: { id: string }) => row.id)).toEqual(['ever']);
+            expect(personal.map((row: { id: string }) => row.id)).toEqual([
+                'personal-current',
+                'personal-legacy',
+            ]);
+        });
+
+        it.each([
+            ['another Organization', mission({ id: 'hidden-org', ...OTHER_SCOPE })],
+            ['another tenant', mission({ id: 'hidden-tenant', ...FOREIGN_SCOPE })],
+        ])('returns the same 404 for a lookup in %s', async (_label, hidden) => {
+            const { service } = makeService([hidden]);
+            await expect(
+                (service.getForUser as any)('user-1', hidden.id, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('create response and subsequent scoped read expose the same ownership', async () => {
+            const { service } = makeService([]);
+            const created = await service.create('user-1', {
+                title: 'Build Ever Works',
+                description: 'Build Ever Works safely',
+                type: MissionType.ONE_SHOT,
+            });
+            const read = await (service.getForUser as any)('user-1', created.id, EVER_SCOPE);
+            expect(created).toMatchObject(EVER_SCOPE);
+            expect(read).toMatchObject(EVER_SCOPE);
+        });
+    });
+
+    describe('GoalsService', () => {
+        function makeService(rows: Goal[]) {
+            const goalsRepo = {
+                find: jest.fn(
+                    async (options: {
+                        where?: FindOptionsWhere<Goal> | FindOptionsWhere<Goal>[];
+                    }) =>
+                        rows.filter((row) =>
+                            matchesWhere(
+                                row as unknown as Record<string, unknown>,
+                                options.where as never,
+                            ),
+                        ),
+                ),
+                findOne: jest.fn(
+                    async (options: {
+                        where?: FindOptionsWhere<Goal> | FindOptionsWhere<Goal>[];
+                    }) =>
+                        rows.find((row) =>
+                            matchesWhere(
+                                row as unknown as Record<string, unknown>,
+                                options.where as never,
+                            ),
+                        ) ?? null,
+                ),
+                create: jest.fn((partial: Partial<Goal>) => goal(partial)),
+                save: jest.fn(async (row: Goal) => {
+                    row.tenantId = EVER_SCOPE.tenantId;
+                    row.organizationId = EVER_SCOPE.organizationId;
+                    const index = rows.findIndex((candidate) => candidate.id === row.id);
+                    if (index === -1) rows.push(row);
+                    else rows[index] = row;
+                    return row;
+                }),
+            };
+            const emptyRepo = { find: jest.fn(async () => []), findOne: jest.fn(async () => null) };
+            return new GoalsService(
+                goalsRepo as unknown as Repository<Goal>,
+                emptyRepo as unknown as Repository<GoalMetricSample>,
+                emptyRepo as unknown as Repository<MissionGoal>,
+                emptyRepo as unknown as Repository<Mission>,
+                { evaluateOne: jest.fn() } as unknown as GoalEvaluationService,
+            );
+        }
+
+        it('lists only the active Organization and keeps personal scope compatible with legacy rows', async () => {
+            const service = makeService([
+                goal({ id: 'ever', ...EVER_SCOPE }),
+                goal({ id: 'other', ...OTHER_SCOPE }),
+                goal({
+                    id: 'personal-current',
+                    tenantId: EVER_SCOPE.tenantId,
+                    organizationId: null,
+                }),
+                goal({ id: 'personal-legacy', tenantId: null, organizationId: null }),
+                goal({
+                    id: 'personal-foreign',
+                    tenantId: FOREIGN_SCOPE.tenantId,
+                    organizationId: null,
+                }),
+            ]);
+
+            const ever = await (service.listForUser as any)('user-1', {}, EVER_SCOPE);
+            const personal = await (service.listForUser as any)('user-1', {}, PERSONAL_SCOPE);
+
+            expect(ever.map((row: { id: string }) => row.id)).toEqual(['ever']);
+            expect(personal.map((row: { id: string }) => row.id)).toEqual([
+                'personal-current',
+                'personal-legacy',
+            ]);
+        });
+
+        it.each([
+            ['another Organization', goal({ id: 'hidden-org', ...OTHER_SCOPE })],
+            ['another tenant', goal({ id: 'hidden-tenant', ...FOREIGN_SCOPE })],
+        ])('returns the same 404 for a lookup in %s', async (_label, hidden) => {
+            const service = makeService([hidden]);
+            await expect(
+                (service.getForUser as any)('user-1', hidden.id, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('create response and subsequent scoped read expose the same ownership', async () => {
+            const service = makeService([]);
+            const created = await service.create('user-1', {
+                title: 'Ship ownership proof',
+                metricSource: { pluginId: 'stripe', metricId: 'income' },
+                comparator: 'gte',
+                targetValue: 1,
+                unit: 'proof',
+                window: 'point',
+            });
+            const read = await (service.getForUser as any)('user-1', created.id, EVER_SCOPE);
+            expect(created).toMatchObject(EVER_SCOPE);
+            expect(read).toMatchObject(EVER_SCOPE);
+        });
+    });
+
+    describe('AgentsService', () => {
+        function makeService(rows: Agent[]) {
+            const agents = {
+                findByUserIdScoped: jest.fn(
+                    async (userId: string, _filter: unknown, scope?: OwnershipScope) => {
+                        const owned = scopedRows(rows, userId, scope);
+                        return { rows: owned, total: owned.length };
+                    },
+                ),
+                findByIdAndUser: jest.fn(
+                    async (id: string, userId: string, scope?: OwnershipScope) =>
+                        scopedRows(rows, userId, scope).find((row) => row.id === id) ?? null,
+                ),
+                findByUserIdAndSlug: jest.fn(async () => null),
+                create: jest.fn(async (partial: Partial<Agent>) => {
+                    const saved = agent({ ...partial, ...EVER_SCOPE });
+                    rows.push(saved);
+                    return saved;
+                }),
+            };
+            return new AgentsService(agents as never, {} as never, {} as never);
+        }
+
+        it('lists only the active Organization and keeps personal scope compatible with legacy rows', async () => {
+            const service = makeService([
+                agent({ id: 'ever', ...EVER_SCOPE }),
+                agent({ id: 'other', ...OTHER_SCOPE }),
+                agent({
+                    id: 'personal-current',
+                    tenantId: EVER_SCOPE.tenantId,
+                    organizationId: null,
+                }),
+                agent({ id: 'personal-legacy', tenantId: null, organizationId: null }),
+                agent({
+                    id: 'personal-foreign',
+                    tenantId: FOREIGN_SCOPE.tenantId,
+                    organizationId: null,
+                }),
+            ]);
+
+            const ever = await (service.list as any)('user-1', {}, EVER_SCOPE);
+            const personal = await (service.list as any)('user-1', {}, PERSONAL_SCOPE);
+
+            expect(ever.rows.map((row: { id: string }) => row.id)).toEqual(['ever']);
+            expect(personal.rows.map((row: { id: string }) => row.id)).toEqual([
+                'personal-current',
+                'personal-legacy',
+            ]);
+        });
+
+        it.each([
+            ['another Organization', agent({ id: 'hidden-org', ...OTHER_SCOPE })],
+            ['another tenant', agent({ id: 'hidden-tenant', ...FOREIGN_SCOPE })],
+        ])('returns the same 404 for a lookup in %s', async (_label, hidden) => {
+            const service = makeService([hidden]);
+            await expect(
+                (service.getOne as any)('user-1', hidden.id, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('create response and subsequent scoped read expose the same ownership', async () => {
+            const service = makeService([]);
+            const created = await (service.create as any)(
+                'user-1',
+                { scope: AgentScope.TENANT, name: 'Ownership verifier' },
+                EVER_SCOPE,
+            );
+            const read = await (service.getOne as any)('user-1', created.id, EVER_SCOPE);
+            expect(created).toMatchObject(EVER_SCOPE);
+            expect(read).toMatchObject(EVER_SCOPE);
+        });
+    });
+
+    it('rejects attaching a Work from another Organization without leaking whether it exists', async () => {
+        const missionRows = [mission({ id: 'mission-ever', ...EVER_SCOPE })];
+        const missionRepo = {
+            findOne: jest.fn(
+                async (options: { where?: FindOptionsWhere<Mission> }) =>
+                    missionRows.find((row) =>
+                        matchesWhere(
+                            row as unknown as Record<string, unknown>,
+                            options.where as never,
+                        ),
+                    ) ?? null,
+            ),
+        };
+        const foreignWork = {
+            id: 'work-other',
+            userId: 'user-1',
+            ...OTHER_SCOPE,
+        } as Work;
+        const worksRepo = {
+            findOne: jest.fn(async (options: { where?: FindOptionsWhere<Work> }) =>
+                matchesWhere(
+                    foreignWork as unknown as Record<string, unknown>,
+                    options.where as never,
+                )
+                    ? foreignWork
+                    : null,
+            ),
+        };
+        const relations = {
+            attach: jest.fn(),
+            listForMissionWithWork: jest.fn(async () => []),
+        };
+        const service = new MissionsService(
+            missionRepo as unknown as Repository<Mission>,
+            new TitlerService(),
+            undefined,
+            undefined,
+            undefined,
+            relations as never,
+            worksRepo as unknown as Repository<Work>,
+        );
+
+        await expect(
+            (service.attachWork as any)(
+                'user-1',
+                'mission-ever',
+                'work-other',
+                'operates',
+                EVER_SCOPE,
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(relations.attach).not.toHaveBeenCalled();
+    });
+
+    it('returns the subscriber-stamped relation ownership and the subsequent scoped read agrees', async () => {
+        const ownedMission = mission({ id: 'mission-ever', ...EVER_SCOPE });
+        const ownedWork = { id: 'work-ever', userId: 'user-1', ...EVER_SCOPE } as Work;
+        const rows: Array<Record<string, unknown>> = [];
+        const missionRepo = {
+            findOne: jest.fn(async () => ownedMission),
+        };
+        const worksRepo = {
+            findOne: jest.fn(async () => ownedWork),
+        };
+        const relations = {
+            attach: jest.fn(async (input: Record<string, unknown>) => {
+                rows.push({ id: 'relation-ever', ...input, ...EVER_SCOPE });
+            }),
+            listForMissionWithWork: jest.fn(
+                async (_missionId: string, _userId: string, activeScope?: OwnershipScope) =>
+                    scopedRows(
+                        rows as Array<
+                            Record<string, unknown> & {
+                                userId: string;
+                                tenantId: string | null;
+                                organizationId: string | null;
+                            }
+                        >,
+                        'user-1',
+                        activeScope,
+                    ),
+            ),
+        };
+        const service = new MissionsService(
+            missionRepo as unknown as Repository<Mission>,
+            new TitlerService(),
+            undefined,
+            undefined,
+            undefined,
+            relations as never,
+            worksRepo as unknown as Repository<Work>,
+        );
+
+        const created = await (service.attachWork as any)(
+            'user-1',
+            ownedMission.id,
+            ownedWork.id,
+            'operates',
+            EVER_SCOPE,
+        );
+        const read = await (service.listWorks as any)('user-1', ownedMission.id, EVER_SCOPE);
+
+        expect(created[0]).toMatchObject(EVER_SCOPE);
+        expect(read[0]).toMatchObject(EVER_SCOPE);
+    });
+});

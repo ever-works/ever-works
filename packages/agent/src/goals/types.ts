@@ -35,6 +35,8 @@ export const DEFAULT_CHECK_FREQUENCY_MINUTES = 60;
  */
 export interface GoalDto {
     id: string;
+    tenantId: string | null;
+    organizationId: string | null;
     title: string;
     description: string | null;
     metricSource: GoalMetricSource;
@@ -85,6 +87,8 @@ export interface GoalDto {
 export function toGoalDto(goal: Goal): GoalDto {
     return {
         id: goal.id,
+        tenantId: goal.tenantId ?? null,
+        organizationId: goal.organizationId ?? null,
         title: goal.title,
         description: goal.description ?? null,
         metricSource: goal.metricSource,
