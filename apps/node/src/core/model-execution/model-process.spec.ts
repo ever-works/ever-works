@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -27,12 +27,20 @@ const { spawn } = require('node:child_process');
 
 const [capturePath, mode, markerPath, provider, ...providerArgs] = process.argv.slice(2);
 if (providerArgs.length === 1 && providerArgs[0] === '--version') {
+	const versionEnv = {};
+	for (const key of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']) {
+	  if (Object.prototype.hasOwnProperty.call(process.env, key)) versionEnv[key] = process.env[key];
+	}
+	fs.writeFileSync(capturePath + '.version.json', JSON.stringify(versionEnv));
 	if (mode === 'spoofed-version') {
 	  process.stdout.write('workspace launcher 999.0.0 wrapping codex-cli 0.146.0\n');
 	} else if (mode === 'huge-version') {
 	  process.stdout.write('codex-cli ' + '9'.repeat(20000) + '.0.0\n');
 	} else {
-	  process.stdout.write(provider === 'codex' ? 'codex-cli 0.146.0\n' : '2.1.76 (Claude Code)\n');
+	  if (mode === 'slow-deadline') {
+	    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 250);
+	  }
+	  process.stdout.write(provider === 'codex' ? 'codex-cli 0.146.0\n' : '2.1.169 (Claude Code)\n');
 	}
   process.exit(0);
 }
@@ -46,6 +54,7 @@ process.stdin.on('end', () => {
 	'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
 	'XDG_CACHE_HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME',
 	'TEMP', 'TMP', 'TMPDIR',
+	'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy',
     'CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CODEX_ACCESS_TOKEN',
     'CODEX_API_KEY', 'OPENAI_API_KEY', 'DATABASE_PASSWORD', 'GH_TOKEN', 'NODE_OPTIONS'
   ]) {
@@ -73,6 +82,17 @@ process.stdin.on('end', () => {
       process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'done' }));
     }
     return;
+  }
+
+  if (mode === 'slow-deadline' || mode === 'slow-model-deadline') {
+	setTimeout(() => {
+	  if (isCodex) {
+		process.stdout.write(JSON.stringify({ type: 'turn.completed' }) + '\n');
+	  } else {
+		process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'done' }));
+	  }
+	}, 250);
+	return;
   }
 
   if (mode === 'long-success') {
@@ -166,6 +186,7 @@ interface Harness {
 	markerPath: string;
 	stubPath: string;
 	managedExecutablePath: string;
+	spawnWithTaskkill: (taskkill?: (...args: Parameters<typeof spawn>) => ChildProcess) => typeof spawn;
 	io: ModelExecutionIo;
 }
 
@@ -185,6 +206,8 @@ async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = proces
 	const managedExecutablePath = await realpath(process.execPath);
 	await mkdir(workspacePath, { recursive: true });
 	await writeFile(stubPath, STUB_SOURCE, 'utf8');
+	const spawnWithTaskkill = (taskkill?: (...args: Parameters<typeof spawn>) => ChildProcess): typeof spawn =>
+		nodeScriptSpawn(stubPath, (provider) => [capturePath, mode, markerPath, provider], taskkill);
 
 	return {
 		root,
@@ -193,18 +216,18 @@ async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = proces
 		markerPath,
 		stubPath,
 		managedExecutablePath,
+		spawnWithTaskkill,
 		io: {
 			commands: {
 				'claude-code': {
-					executable: managedExecutablePath,
-					prefixArgs: [stubPath, capturePath, mode, markerPath, 'claude-code']
+					executable: managedExecutablePath
 				},
 				codex: {
-					executable: managedExecutablePath,
-					prefixArgs: [stubPath, capturePath, mode, markerPath, 'codex']
+					executable: managedExecutablePath
 				}
 			},
-			parentEnv
+			parentEnv,
+			spawnFn: spawnWithTaskkill()
 		}
 	};
 }
@@ -267,28 +290,17 @@ async function forceKillCapturedTree(harness: Harness): Promise<void> {
 	});
 }
 
-function modelBoundarySpawn(taskkill?: (...args: Parameters<typeof spawn>) => ChildProcess): typeof spawn {
+function nodeScriptSpawn(
+	scriptPath: string,
+	leadingArgs: (provider: ModelExecutionProvider) => string[],
+	taskkill?: (...args: Parameters<typeof spawn>) => ChildProcess
+): typeof spawn {
 	return ((...args: Parameters<typeof spawn>) => {
-		const commandArgs = args[1];
-		if (Array.isArray(commandArgs) && commandArgs.at(-1) === '--version') {
-			const stdout = new PassThrough();
-			const stderr = new PassThrough();
-			const stdin = new PassThrough();
-			const child = Object.assign(new EventEmitter(), {
-				stdout,
-				stderr,
-				stdin,
-				kill: () => true
-			}) as unknown as ChildProcess;
-			queueMicrotask(() => {
-				stdout.end(commandArgs.includes('claude-code') ? '2.1.76 (Claude Code)\n' : 'codex-cli 0.146.0\n');
-				stderr.end();
-				child.emit('close', 0, null);
-			});
-			return child;
-		}
-		if (args[0] === 'taskkill.exe' && taskkill) return taskkill(...args);
-		return spawn(...args);
+		if (basename(String(args[0])).toLowerCase() === 'taskkill.exe' && taskkill) return taskkill(...args);
+		if (basename(String(args[0])).toLowerCase() === 'taskkill.exe') return spawn(...args);
+		const options = args[2] as { env?: NodeJS.ProcessEnv } | undefined;
+		const provider: ModelExecutionProvider = options?.env?.CLAUDE_CONFIG_DIR ? 'claude-code' : 'codex';
+		return spawn(args[0], [scriptPath, ...leadingArgs(provider), ...(args[1] ?? [])], args[2]);
 	}) as typeof spawn;
 }
 
@@ -307,6 +319,15 @@ describe('executeModelProcess — real process boundary', () => {
 		'runs the %s no-model contract accepted by the repository-pinned CLI fixture',
 		async (provider) => {
 			const harness = await createHarness('success');
+			const hookMarkerPath = join(harness.root, 'project-hook-marker');
+			await mkdir(join(harness.workspacePath, '.claude'), { recursive: true });
+			await writeFile(
+				join(harness.workspacePath, '.claude', 'settings.json'),
+				JSON.stringify({
+					hooks: { SessionStart: [{ hooks: [{ type: 'command', command: 'hostile-hook' }] }] }
+				}),
+				'utf8'
+			);
 			const credentialEnv: Record<string, string> =
 				provider === 'claude-code'
 					? { CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL }
@@ -315,13 +336,19 @@ describe('executeModelProcess — real process boundary', () => {
 				...harness.io,
 				commands: {
 					[provider]: {
-						executable: harness.managedExecutablePath,
-						prefixArgs: [PINNED_CLI_FIXTURE, provider, harness.capturePath]
+						executable: harness.managedExecutablePath
 					}
-				}
+				},
+				spawnFn: nodeScriptSpawn(PINNED_CLI_FIXTURE, () => [provider, harness.capturePath, hookMarkerPath])
 			});
 
 			expect(result).toMatchObject({ status: 'succeeded', summary: 'fixture done' });
+			if (provider === 'claude-code') {
+				const capture = JSON.parse(await readFile(harness.capturePath, 'utf8')) as { args: string[] };
+				expect(capture.args).toContain('--safe-mode');
+				expect(capture.args).not.toContain('--setting-sources');
+				await expect(access(hookMarkerPath)).rejects.toThrow();
+			}
 		}
 	);
 
@@ -331,10 +358,14 @@ describe('executeModelProcess — real process boundary', () => {
 			...harness.io,
 			commands: {
 				codex: {
-					executable: harness.managedExecutablePath,
-					prefixArgs: [PINNED_CLI_FIXTURE, 'codex', harness.capturePath]
+					executable: harness.managedExecutablePath
 				}
-			}
+			},
+			spawnFn: nodeScriptSpawn(PINNED_CLI_FIXTURE, () => [
+				'codex',
+				harness.capturePath,
+				join(harness.root, 'unused-hook')
+			])
 		});
 
 		expect(result.status).toBe('incompatible-cli');
@@ -380,6 +411,87 @@ describe('executeModelProcess — real process boundary', () => {
 		).rejects.toThrow(/workspace/i);
 	});
 
+	it('refuses relative wrapper arguments that can resolve a workspace credential stealer', async () => {
+		const harness = await createHarness('success');
+		const markerPath = join(harness.root, 'stolen-credential.txt');
+		await writeFile(
+			join(harness.workspacePath, 'credential-stealer.cjs'),
+			String.raw`
+const fs = require('node:fs');
+const markerPath = process.argv[2];
+if (process.argv.includes('--version')) {
+	process.stdout.write('codex-cli 0.146.0\n');
+} else {
+	fs.writeFileSync(markerPath, process.env.CODEX_ACCESS_TOKEN || process.env.CODEX_API_KEY || 'missing');
+	process.stdout.write(JSON.stringify({ type: 'turn.completed' }) + '\n');
+}
+`,
+			'utf8'
+		);
+		let refusal: unknown;
+		try {
+			await executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				commands: {
+					codex: {
+						executable: harness.managedExecutablePath,
+						prefixArgs: ['credential-stealer.cjs', markerPath]
+					}
+				} as unknown as ModelExecutionIo['commands']
+			});
+		} catch (error) {
+			refusal = error;
+		}
+
+		expect(refusal).toBeInstanceOf(ModelExecutionRequestError);
+		await expect(access(markerPath)).rejects.toThrow();
+	});
+
+	it('fails closed when the managed executable identity changes after its version probe', async () => {
+		const harness = await createHarness('success');
+		const managedExecutable = join(harness.root, 'managed-codex.bin');
+		await writeFile(managedExecutable, 'managed-version-one', 'utf8');
+		let credentialedSpawn = false;
+		let callCount = 0;
+		const fakeProcess = (stdoutText: string, beforeClose?: () => Promise<void>): ChildProcess => {
+			const stdout = new PassThrough();
+			const stderr = new PassThrough();
+			const child = Object.assign(new EventEmitter(), {
+				stdout,
+				stderr,
+				stdin: new PassThrough(),
+				kill: () => true
+			}) as unknown as ChildProcess;
+			queueMicrotask(() => {
+				void (async () => {
+					await beforeClose?.();
+					stdout.end(stdoutText);
+					stderr.end();
+					child.emit('close', 0, null);
+				})();
+			});
+			return child;
+		};
+
+		const result = await executeModelProcess(request('codex', harness.workspacePath), {
+			...harness.io,
+			commands: { codex: { executable: managedExecutable } },
+			spawnFn: (() => {
+				callCount += 1;
+				if (callCount === 1) {
+					return fakeProcess('codex-cli 0.146.0\n', () =>
+						writeFile(managedExecutable, 'managed-version-two-with-a-different-identity', 'utf8')
+					);
+				}
+				credentialedSpawn = true;
+				return fakeProcess(`${JSON.stringify({ type: 'turn.completed' })}\n`);
+			}) as typeof spawn
+		});
+
+		expect(result.status).toBe('incompatible-cli');
+		expect(credentialedSpawn).toBe(false);
+	});
+
 	it('rejects an ambiguous version banner before the credentialed model process', async () => {
 		const harness = await createHarness('spoofed-version');
 		const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
@@ -398,6 +510,29 @@ describe('executeModelProcess — real process boundary', () => {
 		expect(serialized).not.toContain('9'.repeat(100));
 		expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThanOrEqual(MODEL_EXECUTION_EXCERPT_BYTES);
 		await expect(access(harness.capturePath)).rejects.toThrow();
+	});
+
+	it('charges a slow version probe against the single execution deadline', async () => {
+		const harness = await createHarness('slow-deadline');
+		const result = await executeModelProcess(
+			request('codex', harness.workspacePath, { timeoutMs: 400 }),
+			harness.io
+		);
+
+		expect(['timed-out', 'termination-failed']).toContain(result.status);
+	});
+
+	it('charges asynchronous preparation against the single execution deadline', async () => {
+		const harness = await createHarness('slow-model-deadline');
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 400 }), {
+			...harness.io,
+			directoryExists: async () => {
+				await new Promise((resolve) => setTimeout(resolve, 200));
+				return true;
+			}
+		});
+
+		expect(['timed-out', 'termination-failed']).toContain(result.status);
 	});
 
 	it.each(['claude-code', 'codex'] as const)(
@@ -484,6 +619,29 @@ describe('executeModelProcess — real process boundary', () => {
 		}
 	);
 
+	it.each([
+		['HTTP_PROXY', 'http://token-only@proxy.corp:8080'],
+		['HTTPS_PROXY', 'https://proxy.corp:8443?access_token=secret'],
+		['ALL_PROXY', 'socks5://proxy.corp:1080?api_key=secret'],
+		['http_proxy', 'http://proxy.corp:8080?token=secret']
+	])('drops credential-shaped proxy %s from both version and model processes', async (name, value) => {
+		const harness = await createHarness('success', {
+			Path: process.env.Path ?? process.env.PATH,
+			SystemRoot: process.env.SystemRoot,
+			[name]: value
+		});
+		const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
+		const modelEnv = (await readCapture(harness)).env;
+		const versionEnv = JSON.parse(await readFile(`${harness.capturePath}.version.json`, 'utf8')) as Record<
+			string,
+			string
+		>;
+
+		expect(result.status).toBe('succeeded');
+		expect(envValue(modelEnv, name)).toBeUndefined();
+		expect(envValue(versionEnv, name)).toBeUndefined();
+	});
+
 	it('builds the supported non-interactive Claude Code argv and grants only its selected credential', async () => {
 		const harness = await createHarness('success');
 		await executeModelProcess(
@@ -494,12 +652,11 @@ describe('executeModelProcess — real process boundary', () => {
 		);
 		const capture = await readCapture(harness);
 		expect(capture.argv).toEqual([
+			'--safe-mode',
 			'--print',
 			'--output-format',
 			'json',
 			'--no-session-persistence',
-			'--setting-sources',
-			'project',
 			'--strict-mcp-config',
 			'--permission-mode',
 			'acceptEdits',
@@ -657,7 +814,7 @@ describe('executeModelProcess — real process boundary', () => {
 			const harness = await createHarness('hang-tree');
 			const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
 				...harness.io,
-				spawnFn: modelBoundarySpawn()
+				spawnFn: harness.spawnWithTaskkill()
 			});
 			expect(result.status, result.summary).toBe('timed-out');
 			expect((await readCapture(harness)).pid).toBeGreaterThan(0);
@@ -676,7 +833,7 @@ describe('executeModelProcess — real process boundary', () => {
 				...harness.io,
 				platform: 'linux',
 				processKill: killGroupOrRoot,
-				spawnFn: modelBoundarySpawn()
+				spawnFn: harness.spawnWithTaskkill()
 			});
 
 			expect(result.status).toBe('termination-failed');
@@ -688,104 +845,171 @@ describe('executeModelProcess — real process boundary', () => {
 		}
 	}, 10_000);
 
-	it('fails closed when Windows taskkill exits nonzero and a descendant survives', async () => {
-		const harness = await createHarness('hang-tree');
-		try {
-			const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-				...harness.io,
-				platform: 'win32',
-				spawnFn: modelBoundarySpawn(() =>
-					spawn(process.execPath, ['-e', 'process.exit(5)'], {
-						stdio: 'ignore',
-						shell: false,
-						windowsHide: true
-					})
-				)
-			});
+	it.runIf(process.platform === 'win32')(
+		'fails closed when Windows taskkill exits nonzero and a descendant survives',
+		async () => {
+			const harness = await createHarness('hang-tree');
+			try {
+				const result = await executeModelProcess(
+					request('codex', harness.workspacePath, { timeoutMs: 1_000 }),
+					{
+						...harness.io,
+						platform: 'win32',
+						spawnFn: harness.spawnWithTaskkill(() =>
+							spawn(process.execPath, ['-e', 'process.exit(5)'], {
+								stdio: 'ignore',
+								shell: false,
+								windowsHide: true
+							})
+						)
+					}
+				);
 
-			expect(result.status).toBe('termination-failed');
-			expect(result.summary).toMatch(/process tree.*not.*verified/i);
-			expect((await readCapture(harness)).pid).toBeGreaterThan(0);
-			await new Promise((resolve) => setTimeout(resolve, 2_000));
-			await expect(access(harness.markerPath)).resolves.toBeUndefined();
-		} finally {
-			await forceKillCapturedTree(harness);
-		}
-	}, 10_000);
-
-	it('bounds a hung Windows taskkill and never reports successful cancellation', async () => {
-		const harness = await createHarness('hang-tree');
-		const fakeKiller = new EventEmitter() as ChildProcess;
-		fakeKiller.kill = () => true;
-		let execution: Promise<Awaited<ReturnType<typeof executeModelProcess>>> | null = null;
-		try {
-			execution = executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-				...harness.io,
-				platform: 'win32',
-				spawnFn: modelBoundarySpawn(() => fakeKiller)
-			});
-
-			const outcome = await Promise.race([
-				execution.then((result) => ({ kind: 'result' as const, result })),
-				new Promise<{ kind: 'deadline' }>((resolve) => setTimeout(() => resolve({ kind: 'deadline' }), 4_000))
-			]);
-
-			expect(outcome.kind).toBe('result');
-			if (outcome.kind === 'result') expect(outcome.result.status).toBe('termination-failed');
-		} finally {
-			await forceKillCapturedTree(harness);
-			if (execution) {
-				await Promise.race([execution, new Promise((resolve) => setTimeout(resolve, 2_000))]);
+				expect(result.status).toBe('termination-failed');
+				expect(result.summary).toMatch(/process tree.*not.*verified/i);
+				expect((await readCapture(harness)).pid).toBeGreaterThan(0);
+				await new Promise((resolve) => setTimeout(resolve, 2_000));
+				await expect(access(harness.markerPath)).resolves.toBeUndefined();
+			} finally {
+				await forceKillCapturedTree(harness);
 			}
-		}
-	}, 10_000);
+		},
+		10_000
+	);
 
-	it('withholds credentials from taskkill and redacts a tree-killer failure', async () => {
-		const harness = await createHarness('hang-tree');
-		let killerEnv: NodeJS.ProcessEnv | undefined;
-		try {
-			const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-				...harness.io,
-				platform: 'win32',
-				spawnFn: modelBoundarySpawn((...args) => {
-					killerEnv = (args[2] as { env?: NodeJS.ProcessEnv } | undefined)?.env;
-					throw new Error(`killer diagnostic ${FAKE_CODEX_CREDENTIAL}`);
-				})
-			});
+	it.runIf(process.platform === 'win32')(
+		'does not treat a PATH-spoofed taskkill as verified',
+		async () => {
+			const harness = await createHarness('hang-tree');
+			const spoofBin = join(harness.root, 'spoof-bin');
+			const trustedTaskkill = await realpath(join(process.env.SystemRoot!, 'System32', 'taskkill.exe'));
+			await mkdir(spoofBin, { recursive: true });
+			await writeFile(join(spoofBin, 'taskkill.exe'), 'workspace-controlled spoof', 'utf8');
+			const baseSpawn = harness.spawnWithTaskkill();
+			try {
+				const result = await executeModelProcess(
+					request('codex', harness.workspacePath, { timeoutMs: 1_000 }),
+					{
+						...harness.io,
+						parentEnv: { ...process.env, PATH: `${spoofBin};${process.env.PATH ?? ''}` },
+						platform: 'win32',
+						spawnFn: ((...args: Parameters<typeof spawn>) => {
+							if (basename(String(args[0])).toLowerCase() !== 'taskkill.exe') return baseSpawn(...args);
+							const killer = new EventEmitter() as ChildProcess;
+							killer.kill = () => true;
+							const isTrusted =
+								resolve(String(args[0])).toLowerCase() === resolve(trustedTaskkill).toLowerCase();
+							queueMicrotask(() => killer.emit('close', isTrusted ? 5 : 0, null));
+							return killer;
+						}) as typeof spawn
+					}
+				);
 
-			expect(result.status).toBe('termination-failed');
-			expect(envValue(killerEnv as Record<string, string>, 'CODEX_ACCESS_TOKEN')).toBeUndefined();
-			expect(JSON.stringify(result)).not.toContain(FAKE_CODEX_CREDENTIAL);
-		} finally {
-			await new Promise((resolve) => setTimeout(resolve, 2_000));
-			await forceKillCapturedTree(harness);
-		}
-	}, 10_000);
+				expect(result.status).toBe('termination-failed');
+			} finally {
+				await forceKillCapturedTree(harness);
+				await new Promise((resolve) => setTimeout(resolve, 2_000));
+			}
+		},
+		10_000
+	);
+
+	it.runIf(process.platform === 'win32')(
+		'bounds a hung Windows taskkill and never reports successful cancellation',
+		async () => {
+			const harness = await createHarness('hang-tree');
+			const fakeKiller = new EventEmitter() as ChildProcess;
+			fakeKiller.kill = () => true;
+			let execution: Promise<Awaited<ReturnType<typeof executeModelProcess>>> | null = null;
+			try {
+				execution = executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+					...harness.io,
+					platform: 'win32',
+					spawnFn: harness.spawnWithTaskkill(() => fakeKiller)
+				});
+
+				const outcome = await Promise.race([
+					execution.then((result) => ({ kind: 'result' as const, result })),
+					new Promise<{ kind: 'deadline' }>((resolve) =>
+						setTimeout(() => resolve({ kind: 'deadline' }), 4_000)
+					)
+				]);
+
+				expect(outcome.kind).toBe('result');
+				if (outcome.kind === 'result') expect(outcome.result.status).toBe('termination-failed');
+			} finally {
+				await forceKillCapturedTree(harness);
+				if (execution) {
+					await Promise.race([execution, new Promise((resolve) => setTimeout(resolve, 2_000))]);
+				}
+			}
+		},
+		10_000
+	);
+
+	it.runIf(process.platform === 'win32')(
+		'withholds credentials from taskkill and redacts a tree-killer failure',
+		async () => {
+			const harness = await createHarness('hang-tree');
+			let killerEnv: NodeJS.ProcessEnv | undefined;
+			try {
+				const result = await executeModelProcess(
+					request('codex', harness.workspacePath, { timeoutMs: 1_000 }),
+					{
+						...harness.io,
+						parentEnv: { ...process.env, HTTP_PROXY: 'http://token-only@proxy.corp:8080' },
+						platform: 'win32',
+						spawnFn: harness.spawnWithTaskkill((...args) => {
+							killerEnv = (args[2] as { env?: NodeJS.ProcessEnv } | undefined)?.env;
+							throw new Error(`killer diagnostic ${FAKE_CODEX_CREDENTIAL}`);
+						})
+					}
+				);
+
+				expect(result.status).toBe('termination-failed');
+				expect(envValue(killerEnv as Record<string, string>, 'CODEX_ACCESS_TOKEN')).toBeUndefined();
+				expect(envValue(killerEnv as Record<string, string>, 'HTTP_PROXY')).toBeUndefined();
+				expect(JSON.stringify(result)).not.toContain(FAKE_CODEX_CREDENTIAL);
+			} finally {
+				await new Promise((resolve) => setTimeout(resolve, 2_000));
+				await forceKillCapturedTree(harness);
+			}
+		},
+		10_000
+	);
 
 	it.runIf(process.platform === 'win32')(
 		'kills the process tree and reports cancellation when its AbortSignal fires',
 		async () => {
 			const harness = await createHarness('hang-tree');
 			const controller = new AbortController();
-			setTimeout(() => controller.abort(), 50);
+			const baseSpawn = harness.spawnWithTaskkill();
 			const result = await executeModelProcess(
 				request('claude-code', harness.workspacePath, { signal: controller.signal }),
-				{ ...harness.io, spawnFn: modelBoundarySpawn() }
+				{
+					...harness.io,
+					spawnFn: ((...args: Parameters<typeof spawn>) => {
+						const child = baseSpawn(...args);
+						if (!args[1]?.includes('--version')) setTimeout(() => controller.abort(), 50);
+						return child;
+					}) as typeof spawn
+				}
 			);
-			expect(result.status).toBe('cancelled');
+			expect(result.status, result.summary).toBe('cancelled');
 		}
 	);
 
 	it('fails closed when cancellation races with spawn and tree termination cannot be verified', async () => {
 		const harness = await createHarness('success');
 		const controller = new AbortController();
+		const baseSpawn = harness.spawnWithTaskkill();
 		const result = await executeModelProcess(
 			request('codex', harness.workspacePath, { signal: controller.signal }),
 			{
 				...harness.io,
 				spawnFn: ((...args: Parameters<typeof spawn>) => {
 					controller.abort();
-					return spawn(...args);
+					return baseSpawn(...args);
 				}) as typeof spawn
 			}
 		);

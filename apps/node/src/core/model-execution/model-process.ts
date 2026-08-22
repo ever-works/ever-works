@@ -74,12 +74,15 @@ export interface ModelExecutionResult extends Record<string, unknown> {
 export interface ModelCliCommand {
 	/** Canonical absolute path from node-owned configuration; never task input or PATH lookup. */
 	readonly executable: string;
-	/** Test/packaging adapter only; task payloads never control these arguments. */
-	readonly prefixArgs?: readonly string[];
 }
 
 export interface ModelExecutionIo {
-	/** Trusted node-owned executable configuration. Missing provider entries are refused. */
+	/**
+	 * Trusted node-owned executable configuration. The node operator must keep
+	 * these canonical paths outside task-writable roots and protect them from
+	 * the task identity; this executor rechecks stable file identity after the
+	 * credential-free probe. Missing provider entries are refused.
+	 */
 	readonly commands?: Partial<Record<ModelExecutionProvider, ModelCliCommand>>;
 	readonly parentEnv?: NodeJS.ProcessEnv;
 	readonly platform?: NodeJS.Platform;
@@ -105,9 +108,9 @@ export const MODEL_EXECUTION_OUTPUT_LIMIT_BYTES = 1024 * 1024;
 /** Shared serialized terminal-result budget after parsing and secret redaction. */
 export const MODEL_EXECUTION_EXCERPT_BYTES = 8 * 1024;
 
-/** Compatibility floor shared with the currently managed generator CLI releases. */
+/** Security floors enforced against node-owned managed binaries before credentials are supplied. */
 export const MODEL_CLI_COMPATIBILITY = {
-	'claude-code': { minimumVersion: '2.1.76' },
+	'claude-code': { minimumVersion: '2.1.169' },
 	codex: { minimumVersion: '0.120.0', accessTokenMinimumVersion: '0.146.0' }
 } as const;
 
@@ -116,6 +119,8 @@ const WINDOWS_TREE_KILL_TIMEOUT_MS = 2000;
 const MODEL_CLI_VERSION_PROBE_TIMEOUT_MS = 10_000;
 const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
 const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
+const PROXY_ENV_NAMES = new Set(['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']);
+const CREDENTIAL_QUERY_NAMES = new Set(['access_token', 'access-token', 'api_key', 'api-key', 'apikey', 'token']);
 
 const PROVIDER_CREDENTIALS: Readonly<Record<ModelExecutionProvider, readonly string[]>> = {
 	'claude-code': ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'],
@@ -185,6 +190,15 @@ interface ProcessTreeTermination {
 	readonly detail?: string;
 }
 
+interface ManagedExecutableIdentity {
+	readonly canonicalPath: string;
+	readonly device: number;
+	readonly inode: number;
+	readonly size: number;
+	readonly modifiedAtMs: number;
+	readonly changedAtMs: number;
+}
+
 type ParsedModelOutput =
 	| { readonly status: 'succeeded'; readonly summary: string }
 	| { readonly status: 'model-failed'; readonly summary: string }
@@ -208,6 +222,7 @@ export async function executeModelProcess(
 
 	const startedAt = now();
 	const timeoutMs = await validateRequest(request, io);
+	const deadlineAt = startedAt + timeoutMs;
 	if (request.signal?.aborted) {
 		return terminalResult(request.provider, 'cancelled', Math.max(0, now() - startedAt));
 	}
@@ -247,15 +262,19 @@ export async function executeModelProcess(
 			isolatedTemp,
 			io.parentEnv ?? process.env
 		);
+		const probeBudgetMs = remainingExecutionMs(deadlineAt, now);
+		if (probeBudgetMs <= 0) {
+			return executionDeadlineResult(request.provider, Math.max(0, now() - startedAt));
+		}
 
 		const versionRaw = await runProcess(
 			{
 				executable: trusted.command.executable,
-				args: [...(trusted.command.prefixArgs ?? []), '--version'],
+				args: ['--version'],
 				cwd: trusted.workspacePath,
 				env: withoutProviderCredentials(env),
 				stdin: '',
-				timeoutMs: Math.min(timeoutMs, MODEL_CLI_VERSION_PROBE_TIMEOUT_MS),
+				timeoutMs: Math.min(probeBudgetMs, MODEL_CLI_VERSION_PROBE_TIMEOUT_MS),
 				signal: request.signal
 			},
 			io
@@ -268,8 +287,20 @@ export async function executeModelProcess(
 			secrets
 		);
 		if ('status' in probeResult) return probeResult;
+		if (!(await managedExecutableIdentityMatches(trusted.identity))) {
+			return incompatibleCliResult(
+				request.provider,
+				versionRaw,
+				Math.max(0, now() - startedAt),
+				'Managed model executable identity changed between its version probe and credentialed run'
+			);
+		}
+		const modelBudgetMs = remainingExecutionMs(deadlineAt, now);
+		if (modelBudgetMs <= 0) {
+			return executionDeadlineResult(request.provider, Math.max(0, now() - startedAt));
+		}
 
-		const args = [...(trusted.command.prefixArgs ?? []), ...buildProviderArgs(request)];
+		const args = buildProviderArgs(request);
 
 		const raw = await runProcess(
 			{
@@ -278,7 +309,7 @@ export async function executeModelProcess(
 				cwd: trusted.workspacePath,
 				env,
 				stdin: request.instructions,
-				timeoutMs,
+				timeoutMs: modelBudgetMs,
 				signal: request.signal
 			},
 			io
@@ -304,6 +335,22 @@ export async function executeModelProcess(
 			await rm(runRoot, { recursive: true, force: true }).catch(() => undefined);
 		}
 	}
+}
+
+function remainingExecutionMs(deadlineAt: number, now: () => number): number {
+	return Math.max(0, Math.floor(deadlineAt - now()));
+}
+
+function executionDeadlineResult(provider: ModelExecutionProvider, durationMs: number): ModelExecutionResult {
+	return enforceTerminalBudget({
+		provider,
+		status: 'timed-out',
+		exitCode: null,
+		signal: null,
+		durationMs,
+		summary: 'Model execution exhausted its wall-clock budget before the next process could start',
+		outputTruncated: false
+	});
 }
 
 async function validateRequest(request: ModelExecutionRequest, io: ModelExecutionIo): Promise<number> {
@@ -348,11 +395,20 @@ async function resolveTrustedCommand(
 	workspacePath: string,
 	commands: ModelExecutionIo['commands'],
 	platform: NodeJS.Platform
-): Promise<{ readonly command: ModelCliCommand; readonly workspacePath: string }> {
+): Promise<{
+	readonly command: ModelCliCommand;
+	readonly workspacePath: string;
+	readonly identity: ManagedExecutableIdentity;
+}> {
 	const command = commands?.[provider];
 	const configuredExecutable = command?.executable.trim();
 	if (!command || !configuredExecutable || !isAbsolute(configuredExecutable)) {
 		throw new ModelExecutionRequestError(`A trusted absolute executable path must be configured for ${provider}`);
+	}
+	if (Object.keys(command).some((key) => key !== 'executable')) {
+		throw new ModelExecutionRequestError(
+			`Managed ${provider} command configuration must contain only its executable path`
+		);
 	}
 
 	let canonicalExecutable: string;
@@ -379,9 +435,42 @@ async function resolveTrustedCommand(
 	}
 
 	return {
-		command: { executable: canonicalExecutable, prefixArgs: command.prefixArgs },
-		workspacePath: canonicalWorkspace
+		command: { executable: canonicalExecutable },
+		workspacePath: canonicalWorkspace,
+		identity: await readManagedExecutableIdentity(canonicalExecutable)
 	};
+}
+
+async function readManagedExecutableIdentity(canonicalPath: string): Promise<ManagedExecutableIdentity> {
+	const metadata = await stat(canonicalPath);
+	if (!metadata.isFile()) {
+		throw new ModelExecutionRequestError('Managed model executable must resolve to a regular file');
+	}
+	return {
+		canonicalPath,
+		device: metadata.dev,
+		inode: metadata.ino,
+		size: metadata.size,
+		modifiedAtMs: metadata.mtimeMs,
+		changedAtMs: metadata.ctimeMs
+	};
+}
+
+async function managedExecutableIdentityMatches(expected: ManagedExecutableIdentity): Promise<boolean> {
+	try {
+		const currentPath = await realpath(expected.canonicalPath);
+		const current = await readManagedExecutableIdentity(currentPath);
+		return (
+			pathsEqual(current.canonicalPath, expected.canonicalPath, process.platform) &&
+			current.device === expected.device &&
+			current.inode === expected.inode &&
+			current.size === expected.size &&
+			current.modifiedAtMs === expected.modifiedAtMs &&
+			current.changedAtMs === expected.changedAtMs
+		);
+	} catch {
+		return false;
+	}
 }
 
 function pathsEqual(left: string, right: string, platform: NodeJS.Platform): boolean {
@@ -479,7 +568,7 @@ function buildModelEnvironment(
 		const key = byUpper.get(requested.toUpperCase());
 		if (!key) return;
 		const value = parentEnv[key];
-		if (typeof value !== 'string' || CREDENTIALED_URL_PATTERN.test(value)) return;
+		if (typeof value !== 'string' || !isSafeForwardedEnvironmentValue(requested, value)) return;
 		env[key] = value;
 	};
 	for (const name of SAFE_SYSTEM_ENV_NAMES) copy(name);
@@ -522,6 +611,23 @@ function buildModelEnvironment(
 	return env;
 }
 
+function isSafeForwardedEnvironmentValue(name: string, value: string): boolean {
+	if (CREDENTIALED_URL_PATTERN.test(value)) return false;
+	if (!PROXY_ENV_NAMES.has(name.toUpperCase())) return true;
+
+	let proxy: URL;
+	try {
+		proxy = new URL(value);
+	} catch {
+		return false;
+	}
+	if (proxy.username || proxy.password) return false;
+	for (const queryName of proxy.searchParams.keys()) {
+		if (CREDENTIAL_QUERY_NAMES.has(queryName.toLowerCase())) return false;
+	}
+	return true;
+}
+
 function hasEnvironmentName(env: Record<string, string>, name: string): boolean {
 	const upper = name.toUpperCase();
 	return Object.keys(env).some((key) => key.toUpperCase() === upper);
@@ -531,12 +637,11 @@ function buildProviderArgs(request: ModelExecutionRequest): string[] {
 	if (request.provider === 'claude-code') {
 		const options = request.options ?? {};
 		const args = [
+			'--safe-mode',
 			'--print',
 			'--output-format',
 			'json',
 			'--no-session-persistence',
-			'--setting-sources',
-			'project',
 			'--strict-mcp-config'
 		];
 		if (options.dangerouslySkipPermissions) {
@@ -826,6 +931,20 @@ async function terminateProcessTree(
 ): Promise<ProcessTreeTermination> {
 	const pid = child.pid;
 	if (platform === 'win32' && typeof pid === 'number') {
+		let treeKillerExecutable: string;
+		try {
+			treeKillerExecutable = await resolveWindowsTreeKiller(env);
+		} catch (error) {
+			try {
+				child.kill('SIGKILL');
+			} catch {
+				// A root-only fallback cannot certify that descendants are gone.
+			}
+			return {
+				verified: false,
+				detail: `Windows tree-killer validation failed: ${error instanceof Error ? error.message : String(error)}`
+			};
+		}
 		return new Promise<ProcessTreeTermination>((resolve) => {
 			let killer: ChildProcess;
 			let settled = false;
@@ -844,7 +963,7 @@ async function terminateProcessTree(
 				resolve(outcome);
 			};
 			try {
-				killer = spawnFn('taskkill.exe', ['/PID', String(pid), '/T', '/F'], {
+				killer = spawnFn(treeKillerExecutable, ['/PID', String(pid), '/T', '/F'], {
 					stdio: 'ignore',
 					shell: false,
 					windowsHide: true,
@@ -912,6 +1031,31 @@ async function terminateProcessTree(
 		verified: false,
 		detail: 'POSIX detached descendant termination cannot be verified by process-group signaling'
 	};
+}
+
+async function resolveWindowsTreeKiller(env: Record<string, string>): Promise<string> {
+	const systemRoot = environmentValue(env, 'SystemRoot');
+	if (!systemRoot || !isAbsolute(systemRoot)) {
+		throw new Error('SystemRoot is missing or is not absolute');
+	}
+
+	const canonicalRoot = await realpath(systemRoot);
+	const canonicalSystem32 = await realpath(join(canonicalRoot, 'System32'));
+	const candidate = join(canonicalSystem32, 'taskkill.exe');
+	const canonicalTaskkill = await realpath(candidate);
+	if (!pathsEqual(resolve(candidate), resolve(canonicalTaskkill), 'win32')) {
+		throw new Error('System taskkill path is not canonical');
+	}
+	if (!pathsEqual(join(canonicalSystem32, 'taskkill.exe'), canonicalTaskkill, 'win32')) {
+		throw new Error('System taskkill resolved outside System32');
+	}
+	return canonicalTaskkill;
+}
+
+function environmentValue(env: Record<string, string>, name: string): string | undefined {
+	const upper = name.toUpperCase();
+	const key = Object.keys(env).find((candidate) => candidate.toUpperCase() === upper);
+	return key ? env[key] : undefined;
 }
 
 function toTerminalResult(
