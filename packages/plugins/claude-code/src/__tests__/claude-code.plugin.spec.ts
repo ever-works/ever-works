@@ -207,7 +207,7 @@ describe('ClaudeCodePlugin', () => {
 			expect(vi.mocked(executeClaudeCode)).toHaveBeenCalledWith(
 				expect.objectContaining({
 					env: expect.objectContaining({
-						CLAUDE_CODE_CONFIG_DIR: '/tmp/claude-code-generator/config/user1'
+						CLAUDE_CONFIG_DIR: '/tmp/claude-code-generator/config/user1'
 					})
 				})
 			);
