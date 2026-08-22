@@ -3,6 +3,7 @@ import { statSync } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { isAbsolute, join } from 'path';
 import type { FleetAcceptanceChecksPayload, FleetJobView } from '@ever-works/contracts';
+import { resolveExclusiveAgentCredentials } from '@ever-works/contracts';
 
 /**
  * The `acceptance-checks` executor — the node's v1 job kind.
@@ -446,7 +447,21 @@ export function buildNodeCheckEnv(
 
 	// Explicit per-check grants bypass the secret-name sweep (a listed
 	// name IS the grant) but never the platform-owned refusal.
-	for (const name of normalizePassthrough(passthrough)) {
+	//
+	// Within one CLI these names are prioritised, not interchangeable, and
+	// the CLI's own order does not match the operator's intent: Claude Code
+	// resolves ANTHROPIC_API_KEY ahead of CLAUDE_CODE_OAUTH_TOKEN and always
+	// uses the key in `-p` mode. So on a machine that has both, granting
+	// both would bill the Console org for an agent meant to run on a Claude
+	// plan — silently. Keep one per family, preferring the
+	// subscription-backed credential, and say so in the log.
+	const granted = normalizePassthrough(passthrough);
+	const { names: exclusiveNames, notes } = resolveExclusiveAgentCredentials(granted, parentEnv);
+	for (const note of notes) {
+		// eslint-disable-next-line no-console
+		console.warn(`[fleet-node] credential selection — ${note}`);
+	}
+	for (const name of exclusiveNames) {
 		const found = readParent(name);
 		if (found) env[found.key] = found.value;
 	}

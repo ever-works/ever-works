@@ -129,6 +129,21 @@ jobs:
         # runner for 48min+). The CLI compiles the tasks package itself from source.
         run: pnpm turbo run build --filter=@ever-works/trigger-tasks^... --concurrency=1
 
+      - name: Build the plugins shipped inside the worker bundle
+        if: steps.env.outputs.skip != 'true'
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+        # `prepare:plugins` copies every packages/plugins/* that already has a
+        # dist/. The dependency-closure build above only produces a dist/ for the
+        # two plugins the tasks package imports directly (job-runtime-trigger,
+        # pty-local), so the deployed worker discovered exactly 2 plugins and
+        # every Trigger-dispatched generation failed with "No pipeline plugin
+        # available. Ensure at least one pipeline plugin is loaded." (prod,
+        # 2026-08-22 — run_cmt4q02v84rtf2x0hxrfbicnn). The legacy cloud workflow
+        # built `./packages/**`; build the plugins explicitly here, serialized
+        # for the same ARC-runner reasons as the step above.
+        run: pnpm turbo run build --filter='./packages/plugins/*' --concurrency=1
+
       - name: Prepare plugins for Trigger.dev
         if: steps.env.outputs.skip != 'true'
         working-directory: packages/tasks
