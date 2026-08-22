@@ -1,0 +1,19 @@
+# Files that must never reach a Vercel deployment.
+#
+# `vercel deploy` (see .github/workflows/deploy-vercel-docs-prod.yml) uploads the project
+# directory from the runner. Unlike a Git-integration deploy, the CLI upload has NO `.gitignore`
+# fallback -- Vercel's own default-ignore list is fixed and does not contain `.npmrc`
+# (https://vercel.com/docs/builds/build-features#ignored-files-and-folders), and Vercel treats a
+# project-root `.npmrc` as build configuration for the remote install.
+#
+# CI writes `.npmrc` / `.yarnrc` at the repo root (the `Configure Registry` action) to point the
+# install at the internal Verdaccio VIP. Those are gitignored, but gitignored is not the same as
+# not-uploaded here. Shipping them to Vercel would:
+#   * point Vercel's builder at http://192.168.1.183:4873/, which it can never reach, and
+#   * expose the packages.ever.co auth token in the deployment source view (/_src) if the
+#     VERDACCIO_FORCE_PUBLIC opt-in is ever enabled.
+#
+# Vercel's default exclusions still apply on top of this file, so listing these two adds
+# exclusions rather than replacing any.
+.npmrc
+.yarnrc

@@ -50,6 +50,27 @@ jobs:
         with:
           node-version: 22.x
 
+      # Resolve `npm install -g vercel@latest` through the internal Verdaccio cache when this
+      # job runs on the in-network ARC pool (`vars.RUNNER_LINUX_X64_4`, currently
+      # ever-works-linux-x64-4). Falls back to npmjs automatically when the VIP does not answer,
+      # so the GitHub-hosted `ubuntu-latest` fallback in `runs-on` still works.
+      #
+      # `setup-node` above declares no `cache:`, so there is no lockfile-keyed cache whose save
+      # key could bifurcate against a restore key here — nothing to pin.
+      #
+      # 🛑 The action writes `.npmrc` at the repo root, and `vercel deploy` UPLOADS the project
+      # directory. Vercel CLI has no `.gitignore` fallback and `.npmrc` is not in its default
+      # ignore list, so without the `.vercelignore` added alongside this step the LAN registry
+      # (and, if VERDACCIO_FORCE_PUBLIC is ever turned on, the packages.ever.co auth token) would
+      # be shipped to Vercel and used by the remote builder. See `.vercelignore` at the repo root.
+      - name: Configure Registry
+        uses: ./.github/actions/configure-registry
+        with:
+          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
+          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
+          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
+
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
