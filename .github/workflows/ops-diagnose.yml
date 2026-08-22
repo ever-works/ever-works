@@ -8,11 +8,10 @@ on:
   workflow_dispatch:
     inputs:
       cluster:
-        description: 'Cluster'
+        description: 'DigitalOcean cluster name (doctl), e.g. k8s-works or k8s-gauzy; legacy aliases gauzy/works map to those'
         required: true
-        type: choice
-        options: [gauzy, works]
-        default: gauzy
+        type: string
+        default: 'k8s-works'
       namespace:
         description: 'Namespace (default: "default" for gauzy, "ever-works" for works)'
         required: false
@@ -22,7 +21,7 @@ on:
         description: 'What to inspect'
         required: true
         type: choice
-        options: [pods, deployments, ingress, events, top, describe, logs, secret-keys, nodes]
+        options: [clusters, pods, deployments, ingress, events, top, describe, logs, secret-keys, nodes]
         default: pods
       target:
         description: 'Target for describe/logs/secret-keys, e.g. deploy/ever-works-api or pod/<name> or <secret-name>'
@@ -53,18 +52,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Write kubeconfig (from repo secret, never echoed)
+      - name: Install doctl
+        uses: digitalocean/action-doctl@3cb3953159719656269e044e0e24ca16dd2a690f # v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Resolve cluster + write a short-lived kubeconfig (never echoed)
         env:
-          KC_GAUZY_B64: ${{ secrets.EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64 }}
-          KC_WORKS_B64: ${{ secrets.EVER_WORKS_K8S_WORKS_KUBECONFIG_B64 }}
-          CLUSTER: ${{ inputs.cluster }}
+          CLUSTER_IN: ${{ inputs.cluster }}
+          ACTION: ${{ inputs.action }}
         run: |
           set -euo pipefail
-          if [ "$CLUSTER" = "gauzy" ]; then printf '%s' "$KC_GAUZY_B64" | base64 -d > "$RUNNER_TEMP/kubeconfig"; else printf '%s' "$KC_WORKS_B64" | base64 -d > "$RUNNER_TEMP/kubeconfig"; fi
+          echo "### DigitalOcean Kubernetes clusters visible to this token"
+          doctl kubernetes cluster list --format ID,Name,Region,Version,Status,NodePools
+          if [ "$ACTION" = "clusters" ]; then echo "CLUSTERS_ONLY=true" >> "$GITHUB_ENV"; exit 0; fi
+          CLUSTER="$CLUSTER_IN"
+          case "$CLUSTER" in gauzy) CLUSTER=k8s-gauzy ;; works) CLUSTER=k8s-works ;; esac
+          # The EVER_WORKS_K8S_*_KUBECONFIG_B64 repo secrets point at a deleted
+          # cluster id (DNS `no such host`, 2026-08-22); doctl always returns the
+          # live endpoint for the named cluster.
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          doctl kubernetes cluster kubeconfig save --expiry-seconds 900 "$CLUSTER"
           chmod 600 "$RUNNER_TEMP/kubeconfig"
           echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
           kubectl version --client=true
+          kubectl get nodes -o wide
       - name: Inspect
+        if: env.CLUSTERS_ONLY != 'true'
         env:
           CLUSTER: ${{ inputs.cluster }}
           NS_IN: ${{ inputs.namespace }}
@@ -75,7 +88,7 @@ jobs:
           TAIL: ${{ inputs.tail }}
         run: |
           set -euo pipefail
-          NS="$NS_IN"; if [ -z "$NS" ]; then if [ "$CLUSTER" = "gauzy" ]; then NS=default; else NS=ever-works; fi; fi
+          NS="$NS_IN"; if [ -z "$NS" ]; then case "$CLUSTER" in gauzy|k8s-gauzy) NS=default ;; *) NS=ever-works ;; esac; fi
           filter() { if [ -n "$GREP" ]; then grep -i -E "$GREP" || true; else cat; fi; }
           echo "### cluster=$CLUSTER ns=$NS action=$ACTION target=$TARGET"
           case "$ACTION" in
