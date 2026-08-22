@@ -19,7 +19,8 @@ import { API_BASE, authedHeaders } from './api';
  *     "Name", submit "Create"). The FIRST org also shows the
  *     "Move your existing items?" dialog — we pick "Start empty" → "Continue"
  *     (the default "Move existing items" hits a Postgres-only endpoint that
- *     500s on sqlite). 2nd+ orgs skip it and navigate to /{slug}/dashboard.
+ *     500s on sqlite). 2nd+ orgs persist the scope, visit the validated
+ *     /{slug}/dashboard compatibility route, then redirect to the legacy root.
  */
 
 export interface Organization {
@@ -98,7 +99,7 @@ export async function openWorkspaceSwitcher(page: Page): Promise<void> {
 /**
  * Create an Organization through the UI switcher → modal flow. Handles the
  * first-org "Start empty" branch and the 2nd+-org direct-navigation branch.
- * Returns once the browser lands on the new org's /{slug}/dashboard.
+ * Returns once the validated slug navigation has resolved to the legacy root.
  */
 export async function createOrganizationViaUI(page: Page, name: string): Promise<void> {
     await openWorkspaceSwitcher(page);
@@ -120,17 +121,27 @@ export async function createOrganizationViaUI(page: Page, name: string): Promise
         await blank.click();
     }
 
+    // Observe the compatibility navigation so a redirect to `/` cannot make a
+    // broken switch look green merely because the final route happens to load.
+    const compatibilityNavigation = page.waitForRequest((candidate) => {
+        return (
+            candidate.method() === 'GET' &&
+            /^\/[^/]+\/dashboard$/.test(new URL(candidate.url()).pathname)
+        );
+    });
+
     // Submit via the stable testid (the button label is locale-dependent).
     await page.getByTestId('org-create-submit').click();
 
-    await page.waitForURL(/\/[^/]+\/dashboard(\?|$)/, { timeout: 30_000 });
+    await compatibilityNavigation;
+    await page.waitForURL((url) => url.pathname === '/', { timeout: 30_000 });
 }
 
 /**
  * Select an existing Organization from the switcher dropdown. The switcher
- * routes to the org's slug-scoped URL (`/{slug}/…`). NB: the slug-scoped
- * dashboard page itself is Phase-7-pending web-side (see use-active-scope.ts),
- * so callers should assert the URL slug, not the destination page content.
+ * persists the choice before navigating through the validated slug-dashboard
+ * compatibility route. The route redirects to `/`; the persisted scope keeps
+ * the selected Organization active on the legacy dashboard tree.
  */
 export async function selectOrganizationInSwitcher(page: Page, displayName: string): Promise<void> {
     await openWorkspaceSwitcher(page);
