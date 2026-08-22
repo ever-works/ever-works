@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
-import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, parse } from 'node:path';
+import { isAbsolute, join, parse, relative, resolve } from 'node:path';
 
 /** The two local model CLIs a Fleet node currently knows how to run. */
 export type ModelExecutionProvider = 'claude-code' | 'codex';
@@ -72,12 +72,14 @@ export interface ModelExecutionResult extends Record<string, unknown> {
 }
 
 export interface ModelCliCommand {
+	/** Canonical absolute path from node-owned configuration; never task input or PATH lookup. */
 	readonly executable: string;
 	/** Test/packaging adapter only; task payloads never control these arguments. */
 	readonly prefixArgs?: readonly string[];
 }
 
 export interface ModelExecutionIo {
+	/** Trusted node-owned executable configuration. Missing provider entries are refused. */
 	readonly commands?: Partial<Record<ModelExecutionProvider, ModelCliCommand>>;
 	readonly parentEnv?: NodeJS.ProcessEnv;
 	readonly platform?: NodeJS.Platform;
@@ -131,9 +133,6 @@ const SAFE_SYSTEM_ENV_NAMES: readonly string[] = [
 	'LOGNAME',
 	'TERM',
 	'TZ',
-	'TMPDIR',
-	'TEMP',
-	'TMP',
 	'LANG',
 	'LANGUAGE',
 	'SystemRoot',
@@ -164,11 +163,6 @@ const SAFE_SYSTEM_ENV_NAMES: readonly string[] = [
 	'REQUESTS_CA_BUNDLE',
 	'CURL_CA_BUNDLE'
 ];
-
-const DEFAULT_COMMANDS: Readonly<Record<ModelExecutionProvider, ModelCliCommand>> = {
-	'claude-code': { executable: 'claude' },
-	codex: { executable: 'codex' }
-};
 
 interface SelectedCredential {
 	readonly name: string;
@@ -222,12 +216,20 @@ export async function executeModelProcess(
 
 	let runRoot: string | null = null;
 	try {
+		const trusted = await resolveTrustedCommand(
+			request.provider,
+			request.workspacePath,
+			io.commands,
+			io.platform ?? process.platform
+		);
 		runRoot = await mkdtemp(join(tmpdir(), 'ever-works-model-process-'));
 		const configHome = join(runRoot, request.provider === 'claude-code' ? 'claude' : 'codex');
 		const isolatedHome = join(runRoot, 'home');
+		const isolatedTemp = join(runRoot, 'tmp');
 		await Promise.all(
 			[
 				configHome,
+				isolatedTemp,
 				join(isolatedHome, 'AppData', 'Roaming'),
 				join(isolatedHome, 'AppData', 'Local'),
 				join(isolatedHome, '.cache'),
@@ -242,18 +244,15 @@ export async function executeModelProcess(
 			credential,
 			configHome,
 			isolatedHome,
+			isolatedTemp,
 			io.parentEnv ?? process.env
 		);
-		const command = io.commands?.[request.provider] ?? DEFAULT_COMMANDS[request.provider];
-		if (!command.executable.trim()) {
-			throw new ModelExecutionRequestError(`No executable is configured for ${request.provider}`);
-		}
 
 		const versionRaw = await runProcess(
 			{
-				executable: command.executable,
-				args: [...(command.prefixArgs ?? []), '--version'],
-				cwd: request.workspacePath,
+				executable: trusted.command.executable,
+				args: [...(trusted.command.prefixArgs ?? []), '--version'],
+				cwd: trusted.workspacePath,
 				env: withoutProviderCredentials(env),
 				stdin: '',
 				timeoutMs: Math.min(timeoutMs, MODEL_CLI_VERSION_PROBE_TIMEOUT_MS),
@@ -270,13 +269,13 @@ export async function executeModelProcess(
 		);
 		if ('status' in probeResult) return probeResult;
 
-		const args = [...(command.prefixArgs ?? []), ...buildProviderArgs(request)];
+		const args = [...(trusted.command.prefixArgs ?? []), ...buildProviderArgs(request)];
 
 		const raw = await runProcess(
 			{
-				executable: command.executable,
+				executable: trusted.command.executable,
 				args,
-				cwd: request.workspacePath,
+				cwd: trusted.workspacePath,
 				env,
 				stdin: request.instructions,
 				timeoutMs,
@@ -342,6 +341,51 @@ async function defaultDirectoryExists(path: string): Promise<boolean> {
 	} catch {
 		return false;
 	}
+}
+
+async function resolveTrustedCommand(
+	provider: ModelExecutionProvider,
+	workspacePath: string,
+	commands: ModelExecutionIo['commands'],
+	platform: NodeJS.Platform
+): Promise<{ readonly command: ModelCliCommand; readonly workspacePath: string }> {
+	const command = commands?.[provider];
+	const configuredExecutable = command?.executable.trim();
+	if (!command || !configuredExecutable || !isAbsolute(configuredExecutable)) {
+		throw new ModelExecutionRequestError(`A trusted absolute executable path must be configured for ${provider}`);
+	}
+
+	let canonicalExecutable: string;
+	let canonicalWorkspace: string;
+	try {
+		[canonicalExecutable, canonicalWorkspace] = await Promise.all([
+			realpath(configuredExecutable),
+			realpath(workspacePath)
+		]);
+	} catch {
+		throw new ModelExecutionRequestError(
+			`The trusted executable and workspace for ${provider} must resolve to existing canonical paths`
+		);
+	}
+
+	if (!pathsEqual(resolve(configuredExecutable), resolve(canonicalExecutable), platform)) {
+		throw new ModelExecutionRequestError(`The trusted executable path configured for ${provider} is not canonical`);
+	}
+	const fromWorkspace = relative(canonicalWorkspace, canonicalExecutable);
+	if (!fromWorkspace || (!fromWorkspace.startsWith('..') && !isAbsolute(fromWorkspace))) {
+		throw new ModelExecutionRequestError(
+			`The trusted executable for ${provider} must not be located inside the leased task workspace`
+		);
+	}
+
+	return {
+		command: { executable: canonicalExecutable, prefixArgs: command.prefixArgs },
+		workspacePath: canonicalWorkspace
+	};
+}
+
+function pathsEqual(left: string, right: string, platform: NodeJS.Platform): boolean {
+	return platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
 }
 
 function validateProviderOptions(request: ModelExecutionRequest): void {
@@ -422,6 +466,7 @@ function buildModelEnvironment(
 	credential: SelectedCredential,
 	configHome: string,
 	isolatedHome: string,
+	isolatedTemp: string,
 	parentEnv: NodeJS.ProcessEnv
 ): Record<string, string> {
 	const byUpper = new Map<string, string>();
@@ -447,9 +492,6 @@ function buildModelEnvironment(
 	if (!hasEnvironmentName(env, 'PATH') && process.platform !== 'win32') {
 		env.PATH = '/usr/local/bin:/usr/bin:/bin';
 	}
-	if (!hasEnvironmentName(env, 'TMPDIR') && !hasEnvironmentName(env, 'TEMP') && !hasEnvironmentName(env, 'TMP')) {
-		env.TMPDIR = tmpdir();
-	}
 	const homeRoot = parse(isolatedHome).root;
 	const windowsDrive = /^([A-Za-z]:)[\\/]/u.exec(homeRoot)?.[1];
 	env.HOME = isolatedHome;
@@ -462,6 +504,9 @@ function buildModelEnvironment(
 	env.XDG_CONFIG_HOME = join(isolatedHome, '.config');
 	env.XDG_DATA_HOME = join(isolatedHome, '.local', 'share');
 	env.XDG_STATE_HOME = join(isolatedHome, '.local', 'state');
+	env.TEMP = isolatedTemp;
+	env.TMP = isolatedTemp;
+	env.TMPDIR = isolatedTemp;
 	env.CI = '1';
 	const childCredentialName =
 		provider === 'codex' && credential.name === 'OPENAI_API_KEY' ? 'CODEX_API_KEY' : credential.name;
@@ -541,17 +586,17 @@ function resolveCliVersionProbe(
 	if (raw.termination || raw.spawnError) {
 		return toTerminalResult(provider, raw, durationMs, secrets);
 	}
-	const version = parseCliVersion(raw.stdout || raw.stderr);
+	const version = parseCliVersion(provider, raw.stdout || raw.stderr);
 	if (raw.exitCode !== 0 || !version) {
-		return {
+		const label = provider === 'claude-code' ? 'Claude Code' : 'Codex';
+		return incompatibleCliResult(
 			provider,
-			status: 'incompatible-cli',
-			exitCode: raw.exitCode,
-			signal: raw.signal,
+			raw,
 			durationMs,
-			summary: raw.exitCode !== 0 ? 'Model CLI version probe failed' : 'Model CLI returned no semantic version',
-			outputTruncated: raw.outputTruncated
-		};
+			raw.exitCode !== 0
+				? `${label} version probe failed`
+				: `Unrecognized ${label} version response from the managed executable`
+		);
 	}
 
 	const contract = MODEL_CLI_COMPATIBILITY[provider];
@@ -578,8 +623,14 @@ function resolveCliVersionProbe(
 	return { version };
 }
 
-function parseCliVersion(output: string): string | null {
-	return output.match(/\b(\d+)\.(\d+)\.(\d+)\b/u)?.[0] ?? null;
+function parseCliVersion(provider: ModelExecutionProvider, output: string): string | null {
+	if (Buffer.byteLength(output, 'utf8') > 128) return null;
+	const pattern =
+		provider === 'claude-code'
+			? /^(\d{1,6})\.(\d{1,6})\.(\d{1,6}) \(Claude Code\)$/u
+			: /^codex-cli (\d{1,6})\.(\d{1,6})\.(\d{1,6})$/u;
+	const match = pattern.exec(output.trim());
+	return match ? `${Number(match[1])}.${Number(match[2])}.${Number(match[3])}` : null;
 }
 
 function compareSemver(left: string, right: string): number {
@@ -597,7 +648,7 @@ function incompatibleCliResult(
 	durationMs: number,
 	summary: string
 ): ModelExecutionResult {
-	return {
+	return enforceTerminalBudget({
 		provider,
 		status: 'incompatible-cli',
 		exitCode: raw.exitCode,
@@ -605,7 +656,7 @@ function incompatibleCliResult(
 		durationMs,
 		summary,
 		outputTruncated: raw.outputTruncated
-	};
+	});
 }
 
 async function runProcess(
@@ -843,17 +894,24 @@ async function terminateProcessTree(
 	if (typeof pid === 'number') {
 		try {
 			processKill(-pid, 'SIGKILL');
-			return { verified: true };
 		} catch {
-			// The process may have exited between the timeout and this call.
+			try {
+				child.kill('SIGKILL');
+			} catch {
+				// A root-only fallback cannot certify that descendants are gone.
+			}
+		}
+	} else {
+		try {
+			child.kill('SIGKILL');
+		} catch {
+			// A root-only fallback cannot certify that descendants are gone.
 		}
 	}
-	try {
-		child.kill('SIGKILL');
-	} catch {
-		// A root-only fallback cannot certify that descendants are gone.
-	}
-	return { verified: false, detail: 'Only the root model process could be targeted' };
+	return {
+		verified: false,
+		detail: 'POSIX detached descendant termination cannot be verified by process-group signaling'
+	};
 }
 
 function toTerminalResult(

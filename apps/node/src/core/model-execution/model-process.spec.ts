@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { PassThrough } from 'node:stream';
@@ -27,7 +27,13 @@ const { spawn } = require('node:child_process');
 
 const [capturePath, mode, markerPath, provider, ...providerArgs] = process.argv.slice(2);
 if (providerArgs.length === 1 && providerArgs[0] === '--version') {
-  process.stdout.write(provider === 'codex' ? 'codex-cli 0.146.0\n' : '2.1.76 (Claude Code)\n');
+	if (mode === 'spoofed-version') {
+	  process.stdout.write('workspace launcher 999.0.0 wrapping codex-cli 0.146.0\n');
+	} else if (mode === 'huge-version') {
+	  process.stdout.write('codex-cli ' + '9'.repeat(20000) + '.0.0\n');
+	} else {
+	  process.stdout.write(provider === 'codex' ? 'codex-cli 0.146.0\n' : '2.1.76 (Claude Code)\n');
+	}
   process.exit(0);
 }
 let input = '';
@@ -39,6 +45,7 @@ process.stdin.on('end', () => {
     'PATH', 'Path', 'SystemRoot', 'CI', 'CLAUDE_CONFIG_DIR', 'CODEX_HOME',
 	'HOME', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA',
 	'XDG_CACHE_HOME', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME',
+	'TEMP', 'TMP', 'TMPDIR',
     'CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CODEX_ACCESS_TOKEN',
     'CODEX_API_KEY', 'OPENAI_API_KEY', 'DATABASE_PASSWORD', 'GH_TOKEN', 'NODE_OPTIONS'
   ]) {
@@ -50,7 +57,7 @@ process.stdin.on('end', () => {
     cwd: process.cwd(),
     input,
 	  env: selectedEnv,
-	  profileDirectoriesExist: ['HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'XDG_CACHE_HOME']
+	  profileDirectoriesExist: ['HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'XDG_CACHE_HOME', 'TEMP', 'TMP', 'TMPDIR']
 	    .every((name) => typeof process.env[name] === 'string' && fs.existsSync(process.env[name]))
   }));
 
@@ -157,6 +164,8 @@ interface Harness {
 	workspacePath: string;
 	capturePath: string;
 	markerPath: string;
+	stubPath: string;
+	managedExecutablePath: string;
 	io: ModelExecutionIo;
 }
 
@@ -173,6 +182,7 @@ async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = proces
 	const stubPath = join(root, 'stub cli with spaces.cjs');
 	const capturePath = join(root, 'capture.json');
 	const markerPath = join(root, 'orphan-marker.txt');
+	const managedExecutablePath = await realpath(process.execPath);
 	await mkdir(workspacePath, { recursive: true });
 	await writeFile(stubPath, STUB_SOURCE, 'utf8');
 
@@ -181,14 +191,16 @@ async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = proces
 		workspacePath,
 		capturePath,
 		markerPath,
+		stubPath,
+		managedExecutablePath,
 		io: {
 			commands: {
 				'claude-code': {
-					executable: process.execPath,
+					executable: managedExecutablePath,
 					prefixArgs: [stubPath, capturePath, mode, markerPath, 'claude-code']
 				},
 				codex: {
-					executable: process.execPath,
+					executable: managedExecutablePath,
 					prefixArgs: [stubPath, capturePath, mode, markerPath, 'codex']
 				}
 			},
@@ -303,7 +315,7 @@ describe('executeModelProcess — real process boundary', () => {
 				...harness.io,
 				commands: {
 					[provider]: {
-						executable: process.execPath,
+						executable: harness.managedExecutablePath,
 						prefixArgs: [PINNED_CLI_FIXTURE, provider, harness.capturePath]
 					}
 				}
@@ -319,7 +331,7 @@ describe('executeModelProcess — real process boundary', () => {
 			...harness.io,
 			commands: {
 				codex: {
-					executable: process.execPath,
+					executable: harness.managedExecutablePath,
 					prefixArgs: [PINNED_CLI_FIXTURE, 'codex', harness.capturePath]
 				}
 			}
@@ -327,6 +339,65 @@ describe('executeModelProcess — real process boundary', () => {
 
 		expect(result.status).toBe('incompatible-cli');
 		expect(result.summary).toMatch(/0\.120\.0.*CODEX_ACCESS_TOKEN/i);
+	});
+
+	it('refuses a missing trusted executable instead of resolving a provider name from PATH', async () => {
+		const harness = await createHarness('success');
+		await expect(
+			executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				commands: {}
+			})
+		).rejects.toThrow(/trusted.*absolute.*codex/i);
+	});
+
+	it('refuses a bare executable name before any process can receive credentials', async () => {
+		const harness = await createHarness('success');
+		let spawned = false;
+		await expect(
+			executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				commands: { codex: { executable: 'codex' } },
+				spawnFn: (() => {
+					spawned = true;
+					throw new Error('untrusted executable must not be resolved');
+				}) as never
+			})
+		).rejects.toThrow(/absolute/i);
+		expect(spawned).toBe(false);
+	});
+
+	it('refuses an executable located inside the leased task workspace', async () => {
+		const harness = await createHarness('success');
+		const workspaceExecutable = join(harness.workspacePath, 'codex.exe');
+		await writeFile(workspaceExecutable, 'workspace-controlled executable', 'utf8');
+
+		await expect(
+			executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				commands: { codex: { executable: workspaceExecutable } }
+			})
+		).rejects.toThrow(/workspace/i);
+	});
+
+	it('rejects an ambiguous version banner before the credentialed model process', async () => {
+		const harness = await createHarness('spoofed-version');
+		const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
+
+		expect(result.status).toBe('incompatible-cli');
+		expect(result.summary).toMatch(/unrecognized.*Codex.*version/i);
+		await expect(access(harness.capturePath)).rejects.toThrow();
+	});
+
+	it('bounds and rejects a version with a 20,000-digit numeric component', async () => {
+		const harness = await createHarness('huge-version');
+		const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
+		const serialized = JSON.stringify(result);
+
+		expect(result.status).toBe('incompatible-cli');
+		expect(serialized).not.toContain('9'.repeat(100));
+		expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThanOrEqual(MODEL_EXECUTION_EXCERPT_BYTES);
+		await expect(access(harness.capturePath)).rejects.toThrow();
 	});
 
 	it.each(['claude-code', 'codex'] as const)(
@@ -346,7 +417,7 @@ describe('executeModelProcess — real process boundary', () => {
 
 			expect(result).toMatchObject({ status: 'succeeded', provider, exitCode: 0, summary: 'done' });
 			const capture = await readCapture(harness);
-			expect(capture.cwd).toBe(harness.workspacePath);
+			expect(relative(capture.cwd, harness.workspacePath)).toBe('');
 			expect(capture.input).toBe('Edit the project and report the verified result.');
 			expect(capture.argv.join('\n')).not.toContain(capture.input);
 			expect(capture.argv.join('\n')).not.toContain(
@@ -372,7 +443,10 @@ describe('executeModelProcess — real process boundary', () => {
 				HOMEPATH: `\\${ambientMarker}\\profile`,
 				APPDATA: `C:\\${ambientMarker}\\profile\\AppData\\Roaming`,
 				LOCALAPPDATA: `C:\\${ambientMarker}\\profile\\AppData\\Local`,
-				XDG_CACHE_HOME: `C:\\${ambientMarker}\\cache`
+				XDG_CACHE_HOME: `C:\\${ambientMarker}\\cache`,
+				TEMP: `C:\\${ambientMarker}\\temp`,
+				TMP: `C:\\${ambientMarker}\\tmp`,
+				TMPDIR: `C:\\${ambientMarker}\\tmpdir`
 			});
 
 			const result = await executeModelProcess(request(provider, harness.workspacePath), harness.io);
@@ -380,11 +454,16 @@ describe('executeModelProcess — real process boundary', () => {
 			const configHome = provider === 'claude-code' ? capture.env.CLAUDE_CONFIG_DIR : capture.env.CODEX_HOME;
 			const runRoot = dirname(configHome);
 			const isolatedHome = envValue(capture.env, 'HOME');
+			const isolatedTemp = envValue(capture.env, 'TEMP');
 
 			expect(result.status).toBe('succeeded');
 			expect(isolatedHome).toBeTruthy();
 			expect(envValue(capture.env, 'USERPROFILE')).toBe(isolatedHome);
 			expect(isWithin(runRoot, isolatedHome!)).toBe(true);
+			expect(isolatedTemp).toBeTruthy();
+			expect(envValue(capture.env, 'TMP')).toBe(isolatedTemp);
+			expect(envValue(capture.env, 'TMPDIR')).toBe(isolatedTemp);
+			expect(isWithin(runRoot, isolatedTemp!)).toBe(true);
 			for (const name of [
 				'APPDATA',
 				'LOCALAPPDATA',
@@ -503,7 +582,10 @@ describe('executeModelProcess — real process boundary', () => {
 	it('terminates and reports output that exceeds the hard byte bound', async () => {
 		const harness = await createHarness('oversized');
 		const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
-		expect(result).toMatchObject({ status: 'output-limit', outputTruncated: true });
+		expect(result).toMatchObject({
+			status: process.platform === 'win32' ? 'output-limit' : 'termination-failed',
+			outputTruncated: true
+		});
 		expect(Buffer.byteLength(result.stdoutExcerpt ?? '', 'utf8')).toBeLessThanOrEqual(
 			MODEL_EXECUTION_OUTPUT_LIMIT_BYTES
 		);
@@ -542,7 +624,7 @@ describe('executeModelProcess — real process boundary', () => {
 		const harness = await createHarness('secret-output-boundary');
 		const result = await executeModelProcess(request('claude-code', harness.workspacePath), harness.io);
 
-		expect(result.status).toBe('output-limit');
+		expect(result.status).toBe(process.platform === 'win32' ? 'output-limit' : 'termination-failed');
 		expect(result.stdoutExcerpt).not.toMatch(new RegExp(`${FAKE_CLAUDE_CREDENTIAL.slice(0, 5)}$`, 'u'));
 	});
 
@@ -569,16 +651,41 @@ describe('executeModelProcess — real process boundary', () => {
 		expect(Buffer.byteLength(result.summary ?? '', 'utf8')).toBeLessThanOrEqual(MODEL_EXECUTION_EXCERPT_BYTES);
 	});
 
-	it('kills the whole spawned process tree on timeout so no grandchild survives', async () => {
+	it.runIf(process.platform === 'win32')(
+		'kills the whole spawned process tree on timeout so no grandchild survives',
+		async () => {
+			const harness = await createHarness('hang-tree');
+			const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+				...harness.io,
+				spawnFn: modelBoundarySpawn()
+			});
+			expect(result.status, result.summary).toBe('timed-out');
+			expect((await readCapture(harness)).pid).toBeGreaterThan(0);
+			await new Promise((resolve) => setTimeout(resolve, 2_000));
+			await expect(access(harness.markerPath)).rejects.toThrow();
+		},
+		10_000
+	);
+
+	it('fails closed when a detached POSIX grandchild escapes process-group termination', async () => {
 		const harness = await createHarness('hang-tree');
-		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-			...harness.io,
-			spawnFn: modelBoundarySpawn()
-		});
-		expect(result.status, result.summary).toBe('timed-out');
-		expect((await readCapture(harness)).pid).toBeGreaterThan(0);
-		await new Promise((resolve) => setTimeout(resolve, 2_000));
-		await expect(access(harness.markerPath)).rejects.toThrow();
+		const killGroupOrRoot: typeof process.kill = (pid, signal) =>
+			process.kill(process.platform === 'win32' ? Math.abs(pid) : pid, signal);
+		try {
+			const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+				...harness.io,
+				platform: 'linux',
+				processKill: killGroupOrRoot,
+				spawnFn: modelBoundarySpawn()
+			});
+
+			expect(result.status).toBe('termination-failed');
+			expect(result.summary).toMatch(/detached.*descendant.*not.*verified/i);
+			await new Promise((resolve) => setTimeout(resolve, 2_000));
+			await expect(access(harness.markerPath)).resolves.toBeUndefined();
+		} finally {
+			await new Promise((resolve) => setTimeout(resolve, 2_000));
+		}
 	}, 10_000);
 
 	it('fails closed when Windows taskkill exits nonzero and a descendant survives', async () => {
@@ -655,16 +762,19 @@ describe('executeModelProcess — real process boundary', () => {
 		}
 	}, 10_000);
 
-	it('kills the process tree and reports cancellation when its AbortSignal fires', async () => {
-		const harness = await createHarness('hang-tree');
-		const controller = new AbortController();
-		setTimeout(() => controller.abort(), 50);
-		const result = await executeModelProcess(
-			request('claude-code', harness.workspacePath, { signal: controller.signal }),
-			{ ...harness.io, spawnFn: modelBoundarySpawn() }
-		);
-		expect(result.status).toBe('cancelled');
-	});
+	it.runIf(process.platform === 'win32')(
+		'kills the process tree and reports cancellation when its AbortSignal fires',
+		async () => {
+			const harness = await createHarness('hang-tree');
+			const controller = new AbortController();
+			setTimeout(() => controller.abort(), 50);
+			const result = await executeModelProcess(
+				request('claude-code', harness.workspacePath, { signal: controller.signal }),
+				{ ...harness.io, spawnFn: modelBoundarySpawn() }
+			);
+			expect(result.status).toBe('cancelled');
+		}
+	);
 
 	it('fails closed when cancellation races with spawn and tree termination cannot be verified', async () => {
 		const harness = await createHarness('success');
@@ -683,11 +793,13 @@ describe('executeModelProcess — real process boundary', () => {
 		expect(result.status).toBe('termination-failed');
 	});
 
-	it('distinguishes an executable spawn failure', async () => {
+	it('distinguishes a managed executable spawn failure', async () => {
 		const harness = await createHarness('success');
 		const result = await executeModelProcess(request('codex', harness.workspacePath), {
 			...harness.io,
-			commands: { codex: { executable: join(harness.root, 'missing cli.exe') } }
+			spawnFn: (() => {
+				throw new Error('managed executable could not be spawned');
+			}) as typeof spawn
 		});
 		expect(result).toMatchObject({ status: 'spawn-failed', exitCode: null });
 	});
