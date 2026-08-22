@@ -15,6 +15,8 @@ import type {
  */
 export interface MissionDto {
     id: string;
+    tenantId: string | null;
+    organizationId: string | null;
     title: string;
     description: string;
     type: MissionType;
@@ -43,6 +45,8 @@ export interface MissionDto {
 export function toMissionDto(mission: Mission): MissionDto {
     return {
         id: mission.id,
+        tenantId: mission.tenantId ?? null,
+        organizationId: mission.organizationId ?? null,
         title: mission.title,
         description: mission.description,
         type: mission.type,

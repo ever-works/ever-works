@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -28,6 +29,7 @@ import {
 } from '@ever-works/agent/goals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { ScopeContextService } from '../scope';
 import { CreateGoalDto, UpdateGoalDto } from './dto/goal.dto';
 import {
     ApproveGoalDodDto,
@@ -79,6 +81,7 @@ export class GoalsController {
     constructor(
         private readonly service: GoalsService,
         private readonly orchestrator: GoalOrchestratorService,
+        @Optional() private readonly scopeContext?: ScopeContextService,
     ) {}
 
     @Get()
@@ -91,12 +94,16 @@ export class GoalsController {
         @Query('offset') offset?: string,
         @Query('archived') archived?: string,
     ): Promise<GoalDto[]> {
-        return this.service.listForUser(auth.userId, {
-            status: this.parseStatus(status),
-            limit: this.parseIntParam(limit, 'limit', 1, 101),
-            offset: this.parseIntParam(offset, 'offset', 0),
-            archived: this.parseArchived(archived),
-        });
+        return this.service.listForUser(
+            auth.userId,
+            {
+                status: this.parseStatus(status),
+                limit: this.parseIntParam(limit, 'limit', 1, 101),
+                offset: this.parseIntParam(offset, 'offset', 0),
+                archived: this.parseArchived(archived),
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Post()
@@ -132,7 +139,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
-        return this.service.getForUser(auth.userId, id);
+        return this.service.getForUser(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Get(':id/samples')

@@ -61,6 +61,7 @@ import {
 import type { TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { ScopeContextService } from '../scope';
 import {
     AddAgentAttachmentDto,
     AgentTargetBodyDto,
@@ -286,6 +287,8 @@ export class AgentsController {
         // pretending the control landed.
         @Optional()
         private readonly steering?: RunSteeringService,
+        @Optional()
+        private readonly scopeContext?: ScopeContextService,
     ) {}
 
     @Get()
@@ -297,18 +300,22 @@ export class AgentsController {
     ): Promise<{ data: AgentDto[]; meta: { total: number; limit: number; offset: number } }> {
         const limit = query.limit ?? 50;
         const offset = query.offset ?? 0;
-        const { rows, total } = await this.service.list(auth.userId, {
-            scope: query.scope,
-            status: query.status,
-            missionId: query.missionId,
-            ideaId: query.ideaId,
-            workId: query.workId,
-            assignedWorkId: query.assignedWorkId,
-            assignedIdeaId: query.assignedIdeaId,
-            search: query.search,
-            limit,
-            offset,
-        });
+        const { rows, total } = await this.service.list(
+            auth.userId,
+            {
+                scope: query.scope,
+                status: query.status,
+                missionId: query.missionId,
+                ideaId: query.ideaId,
+                workId: query.workId,
+                assignedWorkId: query.assignedWorkId,
+                assignedIdeaId: query.assignedIdeaId,
+                search: query.search,
+                limit,
+                offset,
+            },
+            this.scopeContext?.getScope(),
+        );
         return { data: rows, meta: { total, limit, offset } };
     }
 
@@ -320,31 +327,35 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateAgentDto,
     ): Promise<AgentDto> {
-        return this.service.create(auth.userId, {
-            scope: body.scope,
-            missionId: body.missionId ?? null,
-            ideaId: body.ideaId ?? null,
-            workId: body.workId ?? null,
-            name: body.name,
-            title: body.title ?? null,
-            capabilities: body.capabilities ?? null,
-            aiProviderId: body.aiProviderId ?? null,
-            modelId: body.modelId ?? null,
-            // Environments — service validates same-user + published
-            // (draft → 422, cross-user/unknown → 404).
-            environmentId: body.environmentId ?? null,
-            maxSkillContextTokens: body.maxSkillContextTokens,
-            heartbeatCadence: body.heartbeatCadence ?? null,
-            idleBehavior: body.idleBehavior,
-            pauseAfterFailures: body.pauseAfterFailures,
-            permissions: body.permissions,
-            targets: (body.targets ?? null) as AgentTarget[] | null,
-            avatarMode: body.avatarMode,
-            avatarIcon: body.avatarIcon ?? null,
-            avatarImageUploadId: body.avatarImageUploadId ?? null,
-            committerName: body.committerName ?? null,
-            committerEmail: body.committerEmail ?? null,
-        });
+        return this.service.create(
+            auth.userId,
+            {
+                scope: body.scope,
+                missionId: body.missionId ?? null,
+                ideaId: body.ideaId ?? null,
+                workId: body.workId ?? null,
+                name: body.name,
+                title: body.title ?? null,
+                capabilities: body.capabilities ?? null,
+                aiProviderId: body.aiProviderId ?? null,
+                modelId: body.modelId ?? null,
+                // Environments — service validates same-user + published
+                // (draft → 422, cross-user/unknown → 404).
+                environmentId: body.environmentId ?? null,
+                maxSkillContextTokens: body.maxSkillContextTokens,
+                heartbeatCadence: body.heartbeatCadence ?? null,
+                idleBehavior: body.idleBehavior,
+                pauseAfterFailures: body.pauseAfterFailures,
+                permissions: body.permissions,
+                targets: (body.targets ?? null) as AgentTarget[] | null,
+                avatarMode: body.avatarMode,
+                avatarIcon: body.avatarIcon ?? null,
+                avatarImageUploadId: body.avatarImageUploadId ?? null,
+                committerName: body.committerName ?? null,
+                committerEmail: body.committerEmail ?? null,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     /**
@@ -628,7 +639,7 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentDto> {
-        return this.service.getOne(auth.userId, id);
+        return this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Patch(':id')
