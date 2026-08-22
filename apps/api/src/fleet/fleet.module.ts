@@ -6,6 +6,7 @@ import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 import { FleetController } from './fleet.controller';
 import { FleetJobsController } from './fleet-jobs.controller';
+import { FleetAgentAffinityController } from './fleet-agent-affinity.controller';
 import { FleetRunRouterService } from './fleet-run-router.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
@@ -66,7 +67,7 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         NotificationsModule,
         TypeOrmModule.forFeature([TenantJobRuntimeConfig]),
     ],
-    controllers: [FleetController, FleetJobsController],
+    controllers: [FleetController, FleetJobsController, FleetAgentAffinityController],
     providers: [
         ...buildNodeJobRuntimeProviders(),
         FleetRunnerStatusService,

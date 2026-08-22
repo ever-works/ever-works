@@ -189,6 +189,8 @@ export interface FleetJobView {
 	status: FleetJobStatus;
 	/** Node currently holding (or last holding) the claim. */
 	nodeId: string | null;
+	/** Node selected at enqueue time, or null when the job is unbound. */
+	targetNodeId?: string | null;
 	/** Capability tags a node must advertise to be eligible. */
 	requiredCapabilities: string[];
 	/** Executor input. Shape is per-kind; see `FleetAcceptanceChecksPayload`. */
@@ -210,6 +212,15 @@ export interface FleetJobView {
 	 * still satisfies this type on a newer client.
 	 */
 	queuedReason?: string | null;
+}
+
+/** Owner-safe view of one active-Organization Agent-to-node binding. */
+export interface FleetAgentNodeAffinityView {
+	agentId: string;
+	nodeId: string;
+	organizationId: string;
+	createdAt: string | null;
+	updatedAt: string | null;
 }
 
 /**
