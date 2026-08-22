@@ -166,6 +166,63 @@ describe('startPlanCheckout — the server prices everything', () => {
         expect(request.referenceId).toBe('u1:standard');
     });
 
+    it('names the shared-account catalog price so the invoice traces back to a reviewed commit', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout(checkoutOptions);
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        // Plan code 'standard' is sold as the "Pro" tier; the fixture has no hosting, which the
+        // resolver reads as cloud — the same default the migration gives every pre-existing row.
+        expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_monthly');
+        // priceCents is still carried: the provider falls back to it when the account has no
+        // catalog price, so removing it would break every unsynced deployment.
+        expect(request.plan.priceCents).toBe(2900);
+    });
+
+    it('bills no seat line when the buyer stays inside the plan allowance', async () => {
+        const { service, provider } = build();
+
+        // Pro includes 10. Asking for 10 is not an upsell.
+        await service.startPlanCheckout({ ...checkoutOptions, seats: 10 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.extraSeats).toBe(0);
+        expect(request.plan.seatLookupKey).toBeNull();
+    });
+
+    it('bills only the seats beyond the allowance, on the matching seat price', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout({ ...checkoutOptions, seats: 27 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        // 27 requested - 10 included = 17 billable, NOT 27.
+        expect(request.plan.extraSeats).toBe(17);
+        expect(request.plan.seatLookupKey).toBe('ever_works_cloud_pro_seat_monthly');
+    });
+
+    it('clamps a hostile seat count on the server rather than trusting it', async () => {
+        // The clamp lives against the PLAN row, so a caller cannot under- or over-report its way
+        // into a wrong bill. Negative and non-finite values must produce no seat charge at all.
+        for (const seats of [-100, 0, Number.NaN]) {
+            const { service, provider } = build();
+            await service.startPlanCheckout({ ...checkoutOptions, seats });
+            const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+            expect(request.plan.extraSeats).toBe(0);
+            expect(request.plan.seatLookupKey).toBeNull();
+        }
+    });
+
+    it('omits the seat count entirely when the caller does not ask for seats', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout(checkoutOptions);
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.extraSeats).toBe(0);
+    });
+
     it('lazily creates the provider customer + billing profile', async () => {
         const { service, provider, profileRepository } = build();
 

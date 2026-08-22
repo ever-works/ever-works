@@ -221,6 +221,51 @@ export function seatAmountCents(plan: CatalogPlan, interval: SeatInterval): numb
     return interval === 'annual' ? plan.seatCentsPerMonth * 12 : plan.seatCentsPerMonth;
 }
 
+/**
+ * `subscription_plans.code` → the catalog tier it sells.
+ *
+ * The two vocabularies are deliberately separate. A plan CODE is an identity that is stored on
+ * every `user_subscriptions` row and in Stripe metadata on every subscription ever created, so it
+ * can never be renamed. A catalog TIER is what the price is called in the shared account. `standard`
+ * has always been sold as "Pro" and `premium` as "Enterprise"; this map is where those two facts
+ * meet, instead of the string being parsed out of the code at each call site.
+ *
+ * Returns `null` for a code this catalog does not sell, which callers must treat as "bill from the
+ * plan row instead" — never as a reason to fail a purchase.
+ */
+const TIER_BY_PLAN_CODE: Readonly<Record<string, CatalogTier>> = {
+    free: 'free',
+    standard: 'pro',
+    premium: 'enterprise',
+    selfhosted_community: 'free',
+    selfhosted_pro: 'pro',
+    selfhosted_enterprise: 'enterprise',
+};
+
+export function catalogTierForPlanCode(code: string): CatalogTier | null {
+    return TIER_BY_PLAN_CODE[code] ?? null;
+}
+
+/**
+ * Resolve a stored plan row to its catalog SKU.
+ *
+ * This is the join between the database (which owns quotas, display names and the plan's identity)
+ * and the catalog (which owns what Stripe charges). A row whose code or hosting the catalog does
+ * not recognise returns `null`, and the provider then bills the row's own amount — the pre-catalog
+ * behaviour, preserved so an unsynced deployment keeps working.
+ */
+export function resolveSkuForPlanRow(params: {
+    code: string;
+    hosting: CatalogHosting | string | null | undefined;
+    interval: CatalogInterval;
+}): ResolvedCatalogSku | null {
+    const tier = catalogTierForPlanCode(params.code);
+    if (!tier) return null;
+
+    const hosting = params.hosting === 'selfhosted' ? 'selfhosted' : 'cloud';
+    return resolveCatalogSku({ hosting, tier, interval: params.interval });
+}
+
 /** Every plan/seat/credit lookup_key this catalog defines — used by the sync script and by tests. */
 export function allCatalogLookupKeys(): string[] {
     const keys: string[] = [];

@@ -15,6 +15,7 @@ import {
     BillingProviderNotConfiguredError,
     type BillingWebhookEvent,
 } from './billing.provider';
+import { billableSeats, resolveSkuForPlanRow, type CatalogInterval } from './stripe-catalog';
 
 /** A checkout was asked for with a plan code that is not sellable. */
 export class UnknownSubscriptionPlanError extends Error {
@@ -56,6 +57,12 @@ export interface StartPlanCheckoutOptions {
     cancelUrl: string;
     organizationId?: string | null;
     tenantId?: string | null;
+    /**
+     * Total seats (employees OR agents) the buyer wants, INCLUSIVE of the plan allowance. The
+     * service clamps this against the plan row and bills only the excess, so a caller cannot
+     * under-report to pay less. Absent means "just the included allowance".
+     */
+    seats?: number | null;
 }
 
 export interface PlanCheckoutStarted {
@@ -170,6 +177,11 @@ export class PlanSubscriptionService {
                 priceCents,
                 currency: plan.currency || this.billingProvider.getDefaultCurrency(),
                 interval: 'month',
+                // Prefer the catalog price in the shared Stripe account over the row's own amount,
+                // so the invoice line carries a lookup_key that maps back to a reviewed commit.
+                // `null` here is normal on a deployment whose catalog has not been synced — the
+                // provider falls back to billing `priceCents` exactly as it did before.
+                ...this.catalogKeysFor(plan, 'monthly', options.seats ?? null),
             },
             successUrl: options.successUrl,
             cancelUrl: options.cancelUrl,
@@ -182,6 +194,35 @@ export class PlanSubscriptionService {
             planCode: plan.code,
             priceCents,
             currency: plan.currency,
+        };
+    }
+
+    /**
+     * The catalog fields for a plan row: which shared-account price to bill, which per-seat price
+     * to add, and how many seats are actually billable.
+     *
+     * Seats are clamped against the PLAN's own allowance, on the server, from the stored row — a
+     * caller cannot ask for a seat count that bills less than it should, and a plan with unbounded
+     * seats (the Community Edition, and Enterprise "Option 1") always yields zero extras.
+     *
+     * Returns empty when the catalog does not know this plan, which leaves the descriptor exactly
+     * as it was before the shared account existed.
+     */
+    private catalogKeysFor(
+        plan: SubscriptionPlan,
+        interval: CatalogInterval,
+        requestedSeats: number | null,
+    ): { lookupKey?: string; seatLookupKey?: string | null; extraSeats?: number } {
+        const sku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
+        if (!sku) return {};
+
+        const extraSeats =
+            requestedSeats === null ? 0 : billableSeats(sku.plan, requestedSeats);
+
+        return {
+            lookupKey: sku.lookupKey,
+            seatLookupKey: extraSeats > 0 ? sku.seatLookupKey : null,
+            extraSeats,
         };
     }
 
