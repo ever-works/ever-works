@@ -22,11 +22,37 @@ import { SubscriptionStatus } from '@src/entities/user-subscription.entity';
  *     the return route) grants the same tier once.
  */
 
+// Mirrors what `SubscriptionService.seedPlans()` actually writes: code 'standard' is the tier the
+// marketing site calls "Pro", at Ever Gauzy / Ever Teams cloud Small Business pricing.
 const STANDARD_PLAN = {
     id: 'plan-standard',
     code: 'standard',
-    displayName: 'Standard',
-    monthlyPrice: '29',
+    displayName: 'Pro',
+    hosting: 'cloud',
+    monthlyPrice: '25',
+    // The YEARLY charge, not the "$17/mo" the marketing site displays.
+    annualPrice: '204',
+    lifetimePrice: null,
+    seatsIncluded: 10,
+    seatMonthlyPrice: '5',
+    monthlyCredits: 3000,
+    currency: 'usd',
+    active: true,
+};
+
+// The only row sold as a one-off perpetual commercial licence — and the only one whose "annual"
+// slot and one-time slot both exist, which is precisely the pair the catalog has to keep apart.
+const SELFHOSTED_PRO_PLAN = {
+    id: 'plan-selfhosted-pro',
+    code: 'selfhosted_pro',
+    displayName: 'Pro Edition',
+    hosting: 'selfhosted',
+    monthlyPrice: '49',
+    annualPrice: '408',
+    lifetimePrice: '99',
+    seatsIncluded: 10,
+    seatMonthlyPrice: '5',
+    monthlyCredits: 3000,
     currency: 'usd',
     active: true,
 };
@@ -154,16 +180,161 @@ describe('startPlanCheckout — the server prices everything', () => {
             url: 'https://pay.example/cs_plan_1',
             sessionId: 'cs_plan_1',
             planCode: 'standard',
-            priceCents: 2900,
+            priceCents: 2500,
             currency: 'usd',
         });
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
-        // $29.00 → 2900 cents, straight from `subscription_plans`.
+        // $25.00 → 2500 cents. The row and the shared-account catalog agree; neither comes from the body.
         expect(request.plan).toEqual(
-            expect.objectContaining({ code: 'standard', priceCents: 2900, interval: 'month' }),
+            expect.objectContaining({ code: 'standard', priceCents: 2500, interval: 'month' }),
         );
         // Server-authored correlation id, echoed back on the signed event.
         expect(request.referenceId).toBe('u1:standard');
+    });
+
+    it('names the shared-account catalog price so the invoice traces back to a reviewed commit', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout(checkoutOptions);
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        // Plan code 'standard' is sold as the "Pro" tier; the fixture has no hosting, which the
+        // resolver reads as cloud — the same default the migration gives every pre-existing row.
+        expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_monthly');
+        // priceCents is still carried: the provider falls back to it when the account has no
+        // catalog price, so removing it would break every unsynced deployment. Here the catalog
+        // and the seeded row agree, which is the invariant stripe-catalog.spec.ts guards.
+        expect(request.plan.priceCents).toBe(2500);
+    });
+
+    it('bills no seat line when the buyer stays inside the plan allowance', async () => {
+        const { service, provider } = build();
+
+        // Pro includes 10. Asking for 10 is not an upsell.
+        await service.startPlanCheckout({ ...checkoutOptions, seats: 10 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.extraSeats).toBe(0);
+        expect(request.plan.seatLookupKey).toBeNull();
+    });
+
+    it('bills only the seats beyond the allowance, on the matching seat price', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout({ ...checkoutOptions, seats: 27 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        // 27 requested - 10 included = 17 billable, NOT 27.
+        expect(request.plan.extraSeats).toBe(17);
+        expect(request.plan.seatLookupKey).toBe('ever_works_cloud_pro_seat_monthly');
+    });
+
+    it('clamps a hostile seat count on the server rather than trusting it', async () => {
+        // The clamp lives against the PLAN row, so a caller cannot under- or over-report its way
+        // into a wrong bill. Negative and non-finite values must produce no seat charge at all.
+        for (const seats of [-100, 0, Number.NaN]) {
+            const { service, provider } = build();
+            await service.startPlanCheckout({ ...checkoutOptions, seats });
+            const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+            expect(request.plan.extraSeats).toBe(0);
+            expect(request.plan.seatLookupKey).toBeNull();
+        }
+    });
+
+    it('omits the seat count entirely when the caller does not ask for seats', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout(checkoutOptions);
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.extraSeats).toBe(0);
+    });
+
+    it('defaults to the monthly period when the caller does not name one', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout(checkoutOptions);
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.interval).toBe('month');
+        expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_monthly');
+    });
+
+    it('buys the annual SKU as a YEARLY subscription when asked for one', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout({ ...checkoutOptions, interval: 'annual' });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.interval).toBe('year');
+        expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_annual');
+        // The seat line has to follow the plan's period — a monthly seat price cannot ride on a
+        // yearly subscription, Stripe rejects mixed intervals in one subscription.
+        expect(request.plan.seatLookupKey).toBeNull();
+    });
+
+    it('matches the seat period to the plan period on an annual purchase', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout({ ...checkoutOptions, interval: 'annual', seats: 12 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.extraSeats).toBe(2);
+        expect(request.plan.seatLookupKey).toBe('ever_works_cloud_pro_seat_annual');
+    });
+
+    it('sells a perpetual licence as a ONE-OFF payment, never a subscription', async () => {
+        const { service, provider } = build({
+            planRepository: makePlanRepository({
+                findByCode: jest.fn().mockResolvedValue(SELFHOSTED_PRO_PLAN),
+            }),
+        });
+
+        const started = await service.startPlanCheckout({
+            ...checkoutOptions,
+            planCode: 'selfhosted_pro',
+            interval: 'lifetime',
+        });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.mode).toBe('payment');
+        expect(request.plan.lookupKey).toBe('ever_works_selfhosted_pro_lifetime');
+        // $99 once. Fulfilment (issuing the licence document) is MANUAL for now.
+        expect(request.plan.priceCents).toBe(9900);
+        expect(started.priceCents).toBe(9900);
+        // A one-off purchase cannot carry a recurring seat line.
+        expect(request.plan.seatLookupKey).toBeNull();
+    });
+
+    it('never sells a recurring period as a one-off, or the reverse', async () => {
+        const { service, provider } = build({
+            planRepository: makePlanRepository({
+                findByCode: jest.fn().mockResolvedValue(SELFHOSTED_PRO_PLAN),
+            }),
+        });
+
+        // The self-hosted "annual" slot is a yearly SUBSCRIPTION on this tier even though the same
+        // tier also sells a one-time licence — the exact confusion the catalog exists to prevent.
+        await service.startPlanCheckout({
+            ...checkoutOptions,
+            planCode: 'selfhosted_pro',
+            interval: 'annual',
+        });
+        const annual = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(annual.plan.mode).toBe('subscription');
+        expect(annual.plan.interval).toBe('year');
+        expect(annual.plan.priceCents).toBe(40800);
+    });
+
+    it('refuses a period the plan does not sell rather than downgrading to one it does', async () => {
+        // Cloud Pro has no lifetime price. Selling the monthly one instead would take money for
+        // the wrong thing entirely.
+        const { service, provider } = build();
+
+        await expect(
+            service.startPlanCheckout({ ...checkoutOptions, interval: 'lifetime' }),
+        ).rejects.toBeInstanceOf(PlanNotPurchasableError);
+        expect(provider.createPlanCheckoutSession).not.toHaveBeenCalled();
     });
 
     it('lazily creates the provider customer + billing profile', async () => {

@@ -93,8 +93,53 @@ export interface BillingPlanDescriptor {
     /** Recurring price in cents, from the server plan row. */
     readonly priceCents: number;
     readonly currency: string;
-    /** Only monthly today; widened here so the seam does not need a bump. */
+    /**
+     * The recurrence, for a recurring plan. Ignored entirely when {@link mode} is `payment` — a
+     * perpetual licence does not recur.
+     */
     readonly interval: 'month' | 'year';
+
+    /**
+     * How the plan is bought. `subscription` (the default, and what every caller sent before this
+     * field existed) recurs; `payment` is a one-off perpetual commercial licence that lifts the
+     * buyer's AGPLv3 obligations.
+     *
+     * 🛑 Read this from the SKU, never from a marketing toggle position: on self-hosted, the
+     * "annual" slot is a yearly subscription on one tier and a one-time licence on another.
+     */
+    readonly mode?: 'subscription' | 'payment' | null;
+
+    /**
+     * Catalog `lookup_key` for this plan, e.g. `ever_works_cloud_pro_monthly`.
+     *
+     * When set AND resolvable in the provider account, the provider bills the CATALOG price object
+     * instead of minting an ad-hoc one from {@link priceCents}. That is what puts Ever Works on the
+     * same shared Stripe account and the same lookup-key convention as every other Ever product,
+     * and it is what makes a charge auditable after the fact: the invoice line carries a key that
+     * maps back to a reviewed commit rather than to a number that happened to be in a plan row.
+     *
+     * 🛑 Optional on purpose. A deployment whose catalog has not been synced — a self-hoster, CI,
+     * local dev — leaves this unset (or sets a key the account does not have) and the provider
+     * falls back to the existing inline-price path. Billing must not stop working because a catalog
+     * sync has not been run.
+     */
+    readonly lookupKey?: string | null;
+
+    /**
+     * Catalog `lookup_key` for this plan's per-additional-seat price, e.g.
+     * `ever_works_cloud_pro_seat_monthly`. Ignored unless {@link extraSeats} is greater than zero.
+     *
+     * A seat is an employee OR an agent — the two are interchangeable in Ever Works. Mirrors Ever
+     * Gauzy / Ever Teams, which include 10 and bill per additional one.
+     */
+    readonly seatLookupKey?: string | null;
+
+    /**
+     * Seats to bill BEYOND the plan's included allowance. Already net of `seatsIncluded`; the
+     * provider does not subtract anything. Zero, absent, or a plan with unbounded seats all mean
+     * "no seat line item".
+     */
+    readonly extraSeats?: number | null;
 }
 
 /**
