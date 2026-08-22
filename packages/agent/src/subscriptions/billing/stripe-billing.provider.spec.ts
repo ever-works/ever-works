@@ -1022,6 +1022,43 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         );
     });
 
+    /**
+     * 🛑 REGRESSION. Stripe rejects a line item carrying `recurring` in a `mode: payment` session.
+     * The inline fallback attached it unconditionally, so on any deployment whose catalog is NOT
+     * synced — exactly the deployments the fallback exists to serve — the $99 perpetual licence
+     * checkout threw instead of selling.
+     */
+    it('omits recurring from the inline fallback for a one-off licence', async () => {
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                mode: 'payment',
+                lookupKey: 'ever_works_selfhosted_pro_lifetime',
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('payment');
+        expect(params.line_items[0].price_data).toBeDefined();
+        expect(params.line_items[0].price_data.recurring).toBeUndefined();
+    });
+
+    it('KEEPS recurring on the inline fallback for a subscription', async () => {
+        // Control: the fix must not strip it from the recurring path.
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('subscription');
+        expect(params.line_items[0].price_data.recurring).toEqual({ interval: 'month' });
+    });
+
     it('bills the shared-account CATALOG price when the lookup key resolves', async () => {
         const { provider, client } = build();
         client.prices = {

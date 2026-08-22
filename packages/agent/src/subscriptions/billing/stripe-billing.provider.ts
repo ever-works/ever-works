@@ -371,6 +371,12 @@ export class StripeBillingProvider extends BillingProvider {
     ): Promise<Stripe.Checkout.SessionCreateParams.LineItem[]> {
         const planPriceId = await this.resolvePriceId(request.plan.lookupKey);
 
+        // 🛑 The inline fallback must respect the MODE. Stripe rejects a line item carrying
+        // `recurring` in a `mode: payment` session, so attaching it unconditionally made the $99
+        // perpetual licence unbuyable on any deployment whose catalog is not synced — the exact
+        // deployments the fallback exists to serve. A one-off line item simply omits `recurring`.
+        const isPerpetualLine = request.plan.mode === 'payment';
+
         const planLine: Stripe.Checkout.SessionCreateParams.LineItem = planPriceId
             ? { quantity: 1, price: planPriceId }
             : {
@@ -379,7 +385,9 @@ export class StripeBillingProvider extends BillingProvider {
                       // Price comes from the SERVER plan row.
                       currency: request.plan.currency,
                       unit_amount: request.plan.priceCents,
-                      recurring: { interval: request.plan.interval },
+                      ...(isPerpetualLine
+                          ? {}
+                          : { recurring: { interval: request.plan.interval } }),
                       product_data: { name: request.plan.label },
                   },
               };
