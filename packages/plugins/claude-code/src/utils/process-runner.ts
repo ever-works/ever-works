@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { MAX_BUFFER_SIZE, KILL_TIMEOUT_MS } from '../types.js';
-import { buildSubprocessEnv } from './subprocess-env.js';
+import { buildSubprocessEnv, type ClaudeAuthMode } from './subprocess-env.js';
 
 export interface ExecuteOptions {
 	/** Path to the Claude Code binary */
@@ -13,6 +13,12 @@ export interface ExecuteOptions {
 	readonly cwd: string;
 	/** Environment variables to set */
 	readonly env: Record<string, string>;
+	/**
+	 * Credential this run must authenticate with. Any credential variable
+	 * belonging to another mode is stripped from the subprocess environment, so
+	 * the CLI's own precedence order cannot select a credential we didn't choose.
+	 */
+	readonly authMode?: ClaudeAuthMode;
 	/** Maximum agentic turns */
 	readonly maxTurns: number;
 	/** Maximum budget in USD (optional) */
@@ -96,13 +102,17 @@ export function executeClaudeCode(options: ExecuteOptions): {
 		// and is fed user prompts + scraped web content + community-PR text — any
 		// prompt-injection in those inputs can drive the model to `printenv` and
 		// exfiltrate every host secret. Mirror the codex / gemini / opencode
-		// pattern: only PATH/HOME/TMPDIR, proxy/CA vars, and ANTHROPIC_*/
-		// CLAUDE_CODE_* keys are forwarded.
-		const env: Record<string, string> = buildSubprocessEnv({
-			...options.env,
-			DISABLE_AUTOUPDATER: '1',
-			DISABLE_TELEMETRY: '1'
-		});
+		// pattern: only PATH/HOME/TMPDIR, proxy/CA vars, and the non-credential
+		// ANTHROPIC_BASE_URL are forwarded. Credentials arrive only via
+		// `options.env`, and `authMode` drops any that belong to another mode.
+		const env: Record<string, string> = buildSubprocessEnv(
+			{
+				...options.env,
+				DISABLE_AUTOUPDATER: '1',
+				DISABLE_TELEMETRY: '1'
+			},
+			{ authMode: options.authMode }
+		);
 
 		childProcess = spawn(options.binaryPath, args, {
 			cwd: options.cwd,

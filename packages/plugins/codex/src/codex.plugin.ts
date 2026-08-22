@@ -46,6 +46,7 @@ import * as https from 'https';
 import type { CodexStepId } from './types.js';
 import { DEFAULT_MODEL } from './types.js';
 import { DEFAULT_CLI_VERSION } from './types.js';
+import { CODEX_AUTH_MODES, CODEX_AUTH_MODE_LABELS } from './types.js';
 import { STEP_DEFINITIONS } from './steps.js';
 import {
 	DEFAULT_TARGET_ITEMS,
@@ -260,8 +261,9 @@ export class CodexPlugin
 			authMode: {
 				type: 'string',
 				title: 'Authentication Mode',
-				description: 'Choose whether Codex uses an OpenAI API key or user-scoped device authentication.',
-				enum: ['api-key', 'device-auth'],
+				description:
+					'How Codex authenticates: an OpenAI API key (per-token billing), a ChatGPT workspace access token (billed against the workspace Codex entitlement), or user-scoped device authentication.',
+				enum: ['api-key', 'access-token', 'device-auth'],
 				default: 'api-key',
 				'x-scope': 'user',
 				'x-hidden': true
@@ -273,6 +275,15 @@ export class CodexPlugin
 				'x-secret': true,
 				'x-scope': 'user',
 				'x-envVar': 'OPENAI_API_KEY'
+			},
+			accessToken: {
+				type: 'string',
+				title: 'Codex Access Token (ChatGPT Business/Enterprise subscription)',
+				description:
+					'A Codex access token from your ChatGPT workspace admin console. This is the credential OpenAI documents for trusted non-interactive Codex runs (scripts, schedulers, private CI runners), and it bills the workspace Codex entitlement instead of per-token API pricing. Requires a ChatGPT Business or Enterprise workspace with the access-token permission enabled. Tokens are tied to the workspace user who created them — give each agent its own.',
+				'x-secret': true,
+				'x-scope': 'user',
+				'x-envVar': 'CODEX_ACCESS_TOKEN'
 			},
 			[DEVICE_AUTH_AUTH_JSON_SETTING]: {
 				type: 'string',
@@ -386,12 +397,23 @@ export class CodexPlugin
 			return apiKey ? this.validateApiKey(apiKey, model) : false;
 		}
 
+		if (authMode === 'access-token') {
+			// A Codex access token is a ChatGPT workspace credential, not an API
+			// key — the /models endpoint we probe for API keys rejects it, so
+			// presence is the only check we can make without burning a real run.
+			return Boolean(this.getRealSecret(resolved.accessToken)?.trim());
+		}
+
 		if (authMode === 'device-auth') {
 			return this.validateCliAuth(resolved);
 		}
 
 		if (apiKey) {
 			return this.validateApiKey(apiKey, model);
+		}
+
+		if (this.getRealSecret(resolved.accessToken)?.trim()) {
+			return true;
 		}
 
 		return this.validateCliAuth(resolved);
@@ -418,16 +440,30 @@ export class CodexPlugin
 	}
 
 	validateSettings(settings: Record<string, unknown>): ValidationResult {
-		if (settings.authMode !== undefined && settings.authMode !== 'api-key' && settings.authMode !== 'device-auth') {
+		if (
+			settings.authMode !== undefined &&
+			!CODEX_AUTH_MODES.includes(settings.authMode as (typeof CODEX_AUTH_MODES)[number])
+		) {
 			return {
 				valid: false,
-				errors: [{ path: 'authMode', message: 'Authentication mode must be "api-key" or "device-auth"' }]
+				errors: [
+					{
+						path: 'authMode',
+						message: `Authentication mode must be one of ${CODEX_AUTH_MODES.map((m) => `"${m}"`).join(', ')}`
+					}
+				]
 			};
 		}
 		if (settings.apiKey !== undefined && typeof settings.apiKey !== 'string') {
 			return {
 				valid: false,
 				errors: [{ path: 'apiKey', message: 'API key must be a string when provided' }]
+			};
+		}
+		if (settings.accessToken !== undefined && typeof settings.accessToken !== 'string') {
+			return {
+				valid: false,
+				errors: [{ path: 'accessToken', message: 'Access token must be a string when provided' }]
 			};
 		}
 		if (settings.unsafeBypassSandbox !== undefined && typeof settings.unsafeBypassSandbox !== 'boolean') {
@@ -464,6 +500,23 @@ export class CodexPlugin
 						success: false,
 						message:
 							'OpenAI API key validation failed. Verify the key, model access, and billing, or switch to device authentication.'
+					};
+		}
+
+		if (authMode === 'access-token') {
+			// Codex access tokens are ChatGPT workspace credentials, so the API
+			// /models probe used for API keys does not apply. Confirm presence
+			// and let the first real run surface an expired or revoked token.
+			return this.getRealSecret(settings.accessToken)?.trim()
+				? {
+						success: true,
+						message:
+							'Codex access token configured. It authenticates against your ChatGPT workspace entitlement; runs will fail if it is revoked or past its expiry.'
+					}
+				: {
+						success: false,
+						message:
+							'Provide a Codex access token from your ChatGPT workspace admin console, or switch authentication mode.'
 					};
 		}
 
@@ -593,7 +646,7 @@ export class CodexPlugin
 				stepId: 'setup-codex',
 				event: 'message',
 				level: 'info',
-				message: `Using Codex ${executionAuth.mode === 'api-key' ? 'API key' : 'device auth'} mode`
+				message: `Using Codex ${CODEX_AUTH_MODE_LABELS[executionAuth.mode]} mode`
 			});
 			this.completeStep('setup-codex', setupStartedAt, onLogEntry);
 
@@ -613,7 +666,7 @@ export class CodexPlugin
 			});
 
 			executionAuthEnv =
-				executionAuth.mode === 'api-key'
+				executionAuth.mode !== 'device-auth'
 					? executionAuth.env
 					: {
 							// Security: materialize the device-auth CODEX_HOME (which writes the
@@ -1407,13 +1460,16 @@ export class CodexPlugin
 				error: 'Configure an OpenAI API key or complete Codex device authentication first.'
 			};
 		}
-		if (executionAuth.mode !== 'api-key') {
+		// device-auth needs a materialized CODEX_HOME, which the code-edit path
+		// does not build yet. api-key and access-token are both plain env
+		// credentials, so they work here unchanged.
+		if (executionAuth.mode === 'device-auth') {
 			return {
 				success: false,
 				summary: 'Codex device-auth mode is not yet supported for code-edit',
 				filesChanged: [],
 				duration: Date.now() - startTime,
-				error: 'Use api-key mode for code-edit runs; device-auth mode is not supported for this operation yet.'
+				error: 'Use api-key or access-token mode for code-edit runs; device-auth mode is not supported for this operation yet.'
 			};
 		}
 

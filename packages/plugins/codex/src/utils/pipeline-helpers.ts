@@ -25,6 +25,10 @@ export type ResolvedExecutionAuth =
 			readonly mode: 'api-key';
 	  }
 	| {
+			readonly env: Record<string, string>;
+			readonly mode: 'access-token';
+	  }
+	| {
 			readonly authJson: string;
 			readonly mode: 'device-auth';
 	  };
@@ -65,16 +69,32 @@ export async function hasDeviceCodexAuth(settings: PluginSettings): Promise<bool
 	return Boolean(getPortableDeviceAuthJson(settings));
 }
 
+export function getCodexAccessToken(settings: PluginSettings): string | undefined {
+	return getUsableSecret(settings.accessToken);
+}
+
 export async function resolveExecutionAuth(settings: PluginSettings): Promise<ResolvedExecutionAuth | null> {
 	const authMode = typeof settings.authMode === 'string' ? settings.authMode : undefined;
 	const apiKey = getUsableSecret(settings.apiKey);
+	const accessToken = getCodexAccessToken(settings);
 	const deviceAuthAuthJson = getPortableDeviceAuthJson(settings);
 
+	// An explicit mode always resolves its own credential first. When that
+	// credential is missing we fall back only *away* from per-token billing —
+	// never toward it. Landing on a subscription credential the operator didn't
+	// pick costs them nothing but plan quota; landing on an API key bills the
+	// Console org for a run they expected their subscription to cover, which is
+	// the surprise worth preventing. So `api-key` may degrade to a subscription
+	// credential, but no mode ever degrades into `api-key`.
 	if (authMode === 'api-key' && apiKey) {
-		return {
-			mode: 'api-key',
-			env: { OPENAI_API_KEY: apiKey }
-		};
+		return { mode: 'api-key', env: { OPENAI_API_KEY: apiKey } };
+	}
+
+	if (authMode === 'access-token') {
+		if (accessToken) {
+			return { mode: 'access-token', env: { CODEX_ACCESS_TOKEN: accessToken } };
+		}
+		return deviceAuthAuthJson ? { mode: 'device-auth', authJson: deviceAuthAuthJson } : null;
 	}
 
 	if (authMode === 'device-auth') {
@@ -91,6 +111,13 @@ export async function resolveExecutionAuth(settings: PluginSettings): Promise<Re
 		return {
 			mode: 'api-key',
 			env: { OPENAI_API_KEY: apiKey }
+		};
+	}
+
+	if (accessToken) {
+		return {
+			mode: 'access-token',
+			env: { CODEX_ACCESS_TOKEN: accessToken }
 		};
 	}
 

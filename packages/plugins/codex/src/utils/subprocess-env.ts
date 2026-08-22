@@ -16,6 +16,17 @@ const PASSTHROUGH_ENV_KEYS = [
 	'CURL_CA_BUNDLE'
 ] as const;
 
+/**
+ * Every environment variable Codex will accept as a credential.
+ *
+ * Only the one belonging to the resolved auth mode may reach the subprocess:
+ * `OPENAI_API_KEY` bills the platform org per token while `CODEX_ACCESS_TOKEN`
+ * draws the ChatGPT workspace entitlement, so letting both through would make
+ * which one pays depend on the CLI's internal precedence rather than on the
+ * mode the operator picked. Neither is ever inherited from the host.
+ */
+const AUTH_ENV_KEYS = ['OPENAI_API_KEY', 'CODEX_ACCESS_TOKEN'] as const;
+
 export function buildSubprocessEnv(overrides: Record<string, string> = {}): Record<string, string> {
 	const tmpdir = process.env.TMPDIR ?? os.tmpdir();
 
@@ -50,5 +61,17 @@ export function buildSubprocessEnv(overrides: Record<string, string> = {}): Reco
 		env[key] = value;
 	}
 
+	// Credentials arrive only from the caller's resolved auth mode. Drop any
+	// that the caller did not explicitly supply, so a stray value can never
+	// decide which account pays for the run.
+	for (const key of AUTH_ENV_KEYS) {
+		if (!(key in overrides)) {
+			delete env[key];
+		}
+	}
+
 	return env;
 }
+
+/** Names of every credential variable, exported for assertions in tests. */
+export const CODEX_AUTH_ENV_KEYS: readonly string[] = AUTH_ENV_KEYS;
