@@ -20,5 +20,12 @@
 			"react-dom": ["./node_modules/@types/react-dom"],
 			"react-dom/*": ["./node_modules/@types/react-dom/*"]
 		}
-	}
+	},
+	// Generated output, never source. `build/assets/files/` in particular holds
+	// code samples Docusaurus COPIES out of other packages so readers can
+	// download them — they import `typeorm`, `next-intl`, `@/components/...`
+	// and other things that do not resolve from this app and never should.
+	// Without this, `type-check` passes on a fresh clone and fails the moment
+	// anyone builds the docs locally, which makes the task non-deterministic.
+	"exclude": ["build", ".docusaurus", "node_modules"]
 }
