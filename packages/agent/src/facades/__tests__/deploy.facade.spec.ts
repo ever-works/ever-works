@@ -247,8 +247,21 @@ describe('DeployFacadeService', () => {
                 workId: 'work-1',
             });
 
+            expect((plugin as any).removeDomain).toHaveBeenCalledWith(
+                'project-1',
+                'old.example.com',
+                'internal-work-cluster',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-awesome-time-tracking-prod',
+                    },
+                    namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                },
+            );
             expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
-                'awesome-time-tracking',
+                'awesome-time-tracking-website',
                 'internal-work-cluster',
                 undefined,
                 {
@@ -288,6 +301,102 @@ describe('DeployFacadeService', () => {
                         namespace: 'ever-works-awesome-time-tracking-prod',
                     },
                     namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                },
+            );
+            expect((plugin as any).getDomains).toHaveBeenCalledWith(
+                'project-1',
+                'internal-work-cluster',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-awesome-time-tracking-prod',
+                    },
+                    namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                },
+            );
+        });
+
+        it('uses the shared Work cluster and scoped context for add-domain operations', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'shared-work-cluster';
+            const scopedSettings = {
+                clusterSource: 'k8s-works-shared',
+                kubeContext: 'shared-work-context',
+                defaultTeamScope: 'tenant-team',
+            };
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works-shared' } },
+                scopedSettings,
+                work: { deployProjectId: 'project-1' },
+                pluginOverrides: {
+                    addDomain: jest.fn().mockResolvedValue({
+                        domain: { name: 'tools.example.com', verified: false },
+                        verified: false,
+                    }),
+                },
+                domainRepository: {
+                    addDomain: jest.fn(),
+                    updateVerified: jest.fn(),
+                },
+            });
+
+            await service.addDomain('tools.example.com', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect((plugin as any).addDomain).toHaveBeenCalledWith(
+                'project-1',
+                'tools.example.com',
+                'shared-work-cluster',
+                'tenant-team',
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-tenants-user-1',
+                    },
+                    namespaceOverride: 'ever-works-tenants-user-1',
+                },
+            );
+        });
+
+        it('uses the shared Work cluster and scoped context for verify-domain operations', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'shared-work-cluster';
+            const scopedSettings = {
+                clusterSource: 'k8s-works-shared',
+                kubeContext: 'shared-work-context',
+            };
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works-shared' } },
+                scopedSettings,
+                work: { deployProjectId: 'project-1' },
+                pluginOverrides: {
+                    verifyDomain: jest.fn().mockResolvedValue({
+                        name: 'tools.example.com',
+                        verified: false,
+                    }),
+                },
+                domainRepository: { updateVerified: jest.fn() },
+            });
+
+            await service.verifyDomain('tools.example.com', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect((plugin as any).verifyDomain).toHaveBeenCalledWith(
+                'project-1',
+                'tools.example.com',
+                'shared-work-cluster',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-tenants-user-1',
+                    },
+                    namespaceOverride: 'ever-works-tenants-user-1',
                 },
             );
         });
@@ -623,6 +732,8 @@ describe('DeployFacadeService', () => {
                 deployProvider: 'k8s',
                 user: { id: 'user-1' },
                 website: 'https://site.ever.works',
+                getWebsiteRepo: () => 'site-website',
+                getRepoOwner: () => 'customer-org',
                 // Short-circuit `resolveProjectId` — the BYO custom-domain
                 // path doesn't care what projectId resolves to; we just need
                 // the addDomain pipeline to reach the DB persist + DNS hook.

@@ -545,6 +545,65 @@ describe('KubernetesPlugin.lookupExistingDeployment', () => {
 	});
 });
 
+describe('KubernetesPlugin Work-scoped domain context', () => {
+	const scopedContext = {
+		settingsOverride: {
+			kubeContext: 'work-context',
+			ingressClass: 'nginx'
+		}
+	};
+
+	it('uses the Work kubeContext when listing domains', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).getDomains('tenant-ns/my-site', VALID, undefined, scopedContext);
+
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'tenant-ns', 'my-site', 'work-context');
+	});
+
+	it('uses the Work kubeContext when adding a domain', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).addDomain('tenant-ns/my-site', 'tools.example.com', VALID, undefined, scopedContext);
+
+		expect(api.listIngressClasses).toHaveBeenCalledWith(VALID, expect.any(Function), 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'tenant-ns', 'my-site', 'work-context');
+		expect(api.applyIngress).toHaveBeenCalledWith(VALID, expect.any(Object), 'work-context');
+	});
+
+	it('uses the Work kubeContext when removing a domain', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).removeDomain('tenant-ns/my-site', 'tools.example.com', VALID, undefined, scopedContext);
+
+		expect(api.listIngressClasses).toHaveBeenCalledWith(VALID, expect.any(Function), 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'tenant-ns', 'my-site', 'work-context');
+		expect(api.applyIngress).toHaveBeenCalledWith(VALID, expect.any(Object), 'work-context');
+	});
+
+	it('uses the Work kubeContext when verifying a domain', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({
+			api,
+			dnsResolver: {
+				resolveCname: vi.fn(async () => ['lb.cluster.example.com']),
+				resolve4: vi.fn(async () => [])
+			}
+		});
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).verifyDomain('tenant-ns/my-site', 'tools.example.com', VALID, undefined, scopedContext);
+
+		expect(api.getIngressLoadBalancerHost).toHaveBeenCalledWith(VALID, 'tenant-ns', 'my-site', 'work-context');
+	});
+});
+
 describe('KubernetesPlugin.getTeams', () => {
 	it('returns an empty list (k8s has no team concept)', async () => {
 		expect(await new KubernetesPlugin().getTeams('whatever')).toEqual([]);

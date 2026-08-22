@@ -102,7 +102,7 @@ export interface AddDomainResult {
 }
 
 /**
- * Effective context for looking up a deployment.
+ * Effective context for deployment operations that must use Work-scoped settings.
  *
  * Deployment plugins are singletons, so their PluginContext does not carry the
  * user/Work settings used by the deploy orchestrator. Facades may provide the
@@ -177,22 +177,45 @@ export interface IDeploymentPlugin extends IPlugin {
 	/**
 	 * Get domains for a project
 	 */
-	getDomains?(projectId: string, token: string, teamScope?: string): Promise<DeploymentDomain[]>;
+	getDomains?(
+		projectId: string,
+		token: string,
+		teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentDomain[]>;
 
 	/**
 	 * Add a domain to a project
 	 */
-	addDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<AddDomainResult>;
+	addDomain?(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<AddDomainResult>;
 
 	/**
 	 * Remove a domain from a project
 	 */
-	removeDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<boolean>;
+	removeDomain?(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<boolean>;
 
 	/**
 	 * Verify a domain on a project
 	 */
-	verifyDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<DeploymentDomain>;
+	verifyDomain?(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentDomain>;
 
 	/**
 	 * Workflow filenames to dispatch when deploying, in priority order.

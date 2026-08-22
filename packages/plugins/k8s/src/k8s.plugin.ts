@@ -696,10 +696,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		_teamScope?: string,
 		context?: DeploymentLookupContext
 	): Promise<{ found: boolean; website?: string; deploymentState?: string; projectId?: string }> {
-		const settings = {
-			...(await this.loadSettings()),
-			...this.coerceSettings(context?.settingsOverride ?? {})
-		};
+		const settings = await this.loadEffectiveDeploymentSettings(context);
 		const slug = sanitiseSlug(projectName);
 		const requestedNamespace = context?.namespaceOverride?.trim();
 		const namespace =
@@ -721,8 +718,13 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		}
 	}
 
-	async getDomains(projectId: string, kubeconfig: string): Promise<DeploymentDomain[]> {
-		const settings = await this.loadSettings();
+	async getDomains(
+		projectId: string,
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentDomain[]> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
 		const { namespace, name } = parseDeploymentId(projectId);
 		const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
 		if (!ingress?.spec) return [];
@@ -746,8 +748,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			}));
 	}
 
-	async addDomain(projectId: string, domain: string, kubeconfig: string): Promise<AddDomainResult> {
-		const settings = await this.loadSettings();
+	async addDomain(
+		projectId: string,
+		domain: string,
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<AddDomainResult> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
 		// Security: the domain is written verbatim as the Ingress `host:` rule.
 		// Reject anything that is not a strict RFC-1123 hostname so a value like
 		// `*` (catch-all rule that hijacks unmatched cluster traffic) or an empty
@@ -789,8 +797,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		};
 	}
 
-	async removeDomain(projectId: string, domain: string, kubeconfig: string): Promise<boolean> {
-		const settings = await this.loadSettings();
+	async removeDomain(
+		projectId: string,
+		domain: string,
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<boolean> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
 		const { namespace, name } = parseDeploymentId(projectId);
 		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
@@ -811,8 +825,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		return true;
 	}
 
-	async verifyDomain(projectId: string, domain: string, kubeconfig: string): Promise<DeploymentDomain> {
-		const settings = await this.loadSettings();
+	async verifyDomain(
+		projectId: string,
+		domain: string,
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentDomain> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
 		const { namespace, name } = parseDeploymentId(projectId);
 		// Resolve the cluster's actual ingress LB host/IP. Without this, any
 		// domain with any DNS record was returned `verified: true` —
@@ -904,6 +924,13 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		if (!this.context) return {};
 		const raw = (await this.context.getSettings()) ?? {};
 		return this.coerceSettings(raw);
+	}
+
+	private async loadEffectiveDeploymentSettings(context?: DeploymentLookupContext): Promise<KubernetesSettings> {
+		return {
+			...(await this.loadSettings()),
+			...this.coerceSettings(context?.settingsOverride ?? {})
+		};
 	}
 
 	private coerceSettings(raw: Record<string, unknown>): KubernetesSettings {
