@@ -11,11 +11,13 @@ import {
 	MODEL_EXECUTION_EXCERPT_BYTES,
 	MODEL_EXECUTION_OUTPUT_LIMIT_BYTES,
 	ModelExecutionRequestError,
-	executeModelProcess,
-	type ModelExecutionIo,
 	type ModelExecutionProvider,
 	type ModelExecutionRequest
 } from './model-process';
+import { executeModelProcessInternal } from './model-process.internal';
+
+const executeModelProcess = executeModelProcessInternal;
+type ModelExecutionIo = NonNullable<Parameters<typeof executeModelProcessInternal>[1]>;
 
 const FAKE_CLAUDE_CREDENTIAL = 'claude-oauth-test-value-123456789';
 const FAKE_CODEX_CREDENTIAL = 'codex-access-test-value-123456789';
@@ -168,7 +170,10 @@ process.stdin.on('end', () => {
   }
 
   if (mode === 'hang-tree') {
-    const grandchild = spawn(process.execPath, ['-e', 'setTimeout(() => require("node:fs").writeFileSync(' + JSON.stringify(markerPath) + ', "orphaned"), 1800)'], {
+	const markerScript = 'setTimeout(() => require("node:fs").writeFileSync(' +
+	  JSON.stringify(markerPath) +
+	  ', process.env.CODEX_ACCESS_TOKEN || process.env.OPENAI_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY || "missing"), 1800)';
+    const grandchild = spawn(process.execPath, ['-e', markerScript], {
 	  stdio: 'ignore',
 	  detached: true,
 	  windowsHide: true
@@ -227,6 +232,7 @@ async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = proces
 				}
 			},
 			parentEnv,
+			platform: 'win32',
 			spawnFn: spawnWithTaskkill()
 		}
 	};
@@ -623,8 +629,10 @@ if (process.argv.includes('--version')) {
 		['HTTP_PROXY', 'http://token-only@proxy.corp:8080'],
 		['HTTPS_PROXY', 'https://proxy.corp:8443?access_token=secret'],
 		['ALL_PROXY', 'socks5://proxy.corp:1080?api_key=secret'],
-		['http_proxy', 'http://proxy.corp:8080?token=secret']
-	])('drops credential-shaped proxy %s from both version and model processes', async (name, value) => {
+		['http_proxy', 'http://proxy.corp:8080?token=secret'],
+		['https_proxy', 'http://proxy.corp:8080?region=eu'],
+		['all_proxy', 'http://proxy.corp:8080#corp']
+	])('drops any non-plain proxy URL in %s from both version and model processes', async (name, value) => {
 		const harness = await createHarness('success', {
 			Path: process.env.Path ?? process.env.PATH,
 			SystemRoot: process.env.SystemRoot,
@@ -824,25 +832,21 @@ if (process.argv.includes('--version')) {
 		10_000
 	);
 
-	it('fails closed when a detached POSIX grandchild escapes process-group termination', async () => {
+	it('refuses a credentialed POSIX spawn before an escaped grandchild can inherit the credential', async () => {
 		const harness = await createHarness('hang-tree');
-		const killGroupOrRoot: typeof process.kill = (pid, signal) =>
-			process.kill(process.platform === 'win32' ? Math.abs(pid) : pid, signal);
-		try {
-			const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-				...harness.io,
-				platform: 'linux',
-				processKill: killGroupOrRoot,
-				spawnFn: harness.spawnWithTaskkill()
-			});
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+			...harness.io,
+			platform: 'linux',
+			spawnFn: harness.spawnWithTaskkill()
+		});
 
-			expect(result.status).toBe('termination-failed');
-			expect(result.summary).toMatch(/detached.*descendant.*not.*verified/i);
-			await new Promise((resolve) => setTimeout(resolve, 2_000));
-			await expect(access(harness.markerPath)).resolves.toBeUndefined();
-		} finally {
-			await new Promise((resolve) => setTimeout(resolve, 2_000));
-		}
+		expect(result.status).toBe('containment-unavailable');
+		expect(result.summary).toMatch(/containment.*unavailable/i);
+		await expect(access(harness.capturePath)).rejects.toThrow();
+		const versionEnvironment = await readFile(`${harness.capturePath}.version.json`, 'utf8');
+		expect(versionEnvironment).not.toContain(FAKE_CODEX_CREDENTIAL);
+		await new Promise((resolve) => setTimeout(resolve, 2_000));
+		await expect(access(harness.markerPath)).rejects.toThrow();
 	}, 10_000);
 
 	it.runIf(process.platform === 'win32')(
@@ -1043,6 +1047,59 @@ if (process.argv.includes('--version')) {
 		expect(result.status).toBe('spawn-failed');
 		expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(MODEL_EXECUTION_EXCERPT_BYTES);
 	});
+
+	it('retries, bounds, and safely surfaces an isolated run-directory cleanup failure', async () => {
+		const harness = await createHarness('success');
+		let cleanupPath: string | null = null;
+		let cleanupAttempts = 0;
+		try {
+			const result = await executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				removeRunRoot: async (path) => {
+					cleanupPath = path;
+					cleanupAttempts += 1;
+					throw new Error(`cleanup diagnostic ${FAKE_CODEX_CREDENTIAL}`);
+				}
+			});
+			expect(result).toMatchObject({ status: 'succeeded', cleanupFailed: true });
+			expect(result.summary).toMatch(/cleanup failed/i);
+			expect(JSON.stringify(result)).not.toContain(FAKE_CODEX_CREDENTIAL);
+			expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(
+				MODEL_EXECUTION_EXCERPT_BYTES
+			);
+			expect(cleanupAttempts).toBe(3);
+		} finally {
+			if (cleanupPath) await rm(cleanupPath, { recursive: true, force: true });
+		}
+	});
+
+	it('does not hang when isolated run-directory cleanup never settles', async () => {
+		const harness = await createHarness('success');
+		let cleanupPath: string | null = null;
+		try {
+			const execution = executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				removeRunRoot: (path) => {
+					cleanupPath = path;
+					return new Promise<void>(() => undefined);
+				}
+			});
+			const outcome = await Promise.race([
+				execution.then(
+					(result) => ({ kind: 'resolved' as const, result }),
+					(error: unknown) => ({ kind: 'rejected' as const, error })
+				),
+				new Promise<{ kind: 'hung' }>((resolve) => setTimeout(() => resolve({ kind: 'hung' }), 1_500))
+			]);
+
+			expect(outcome.kind).toBe('resolved');
+			if (outcome.kind === 'resolved') {
+				expect(outcome.result).toMatchObject({ status: 'succeeded', cleanupFailed: true });
+			}
+		} finally {
+			if (cleanupPath) await rm(cleanupPath, { recursive: true, force: true });
+		}
+	}, 5_000);
 });
 
 describe('executeModelProcess — request refusal', () => {
@@ -1118,6 +1175,73 @@ describe('executeModelProcess — request refusal', () => {
 		);
 
 		expect(result.status).toBe('cancelled');
+		expect(spawned).toBe(false);
+	});
+
+	it('rechecks cancellation immediately before the credentialed model spawn', async () => {
+		const harness = await createHarness('success');
+		const controller = new AbortController();
+		let spawnCount = 0;
+		const baseSpawn = harness.spawnWithTaskkill();
+		const result = await executeModelProcess(
+			request('codex', harness.workspacePath, { signal: controller.signal }),
+			{
+				...harness.io,
+				beforeSpawn: (purpose) => {
+					if (purpose === 'model') controller.abort();
+				},
+				spawnFn: ((...args: Parameters<typeof spawn>) => {
+					spawnCount += 1;
+					return baseSpawn(...args);
+				}) as typeof spawn
+			}
+		);
+
+		expect(result.status).toBe('cancelled');
+		expect(spawnCount).toBe(1);
+		await expect(access(harness.capturePath)).rejects.toThrow();
+	});
+
+	it('rechecks the monotonic deadline immediately before the credentialed model spawn', async () => {
+		const harness = await createHarness('success');
+		let monotonicTime = 0;
+		let spawnCount = 0;
+		const baseSpawn = harness.spawnWithTaskkill();
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+			...harness.io,
+			monotonicNow: () => monotonicTime,
+			beforeSpawn: (purpose) => {
+				if (purpose === 'model') monotonicTime = 1_001;
+			},
+			spawnFn: ((...args: Parameters<typeof spawn>) => {
+				spawnCount += 1;
+				return baseSpawn(...args);
+			}) as typeof spawn
+		});
+
+		expect(result.status).toBe('timed-out');
+		expect(spawnCount).toBe(1);
+		await expect(access(harness.capturePath)).rejects.toThrow();
+	});
+
+	it('bounds a never-resolving workspace validation inside the one execution deadline', async () => {
+		const harness = await createHarness('success');
+		let spawned = false;
+		const execution = executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 100 }), {
+			...harness.io,
+			directoryExists: () => new Promise<boolean>(() => undefined),
+			spawnFn: (() => {
+				spawned = true;
+				throw new Error('process must not spawn after the deadline');
+			}) as never
+		});
+		const outcome = await Promise.race([
+			execution.then((result) => ({ kind: 'result' as const, result })),
+			new Promise<{ kind: 'hung' }>((resolve) => setTimeout(() => resolve({ kind: 'hung' }), 750))
+		]);
+
+		expect(outcome.kind).toBe('result');
+		if (outcome.kind === 'result') expect(outcome.result.status).toBe('timed-out');
 		expect(spawned).toBe(false);
 	});
 });
