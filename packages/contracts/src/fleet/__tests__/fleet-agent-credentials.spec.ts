@@ -233,3 +233,77 @@ describe('resolveExclusiveAgentCredentials — remaining branches', () => {
 		expect(granted).toEqual(['ANTHROPIC_API_KEY']);
 	});
 });
+
+describe('resolveExclusiveAgentCredentials — nullish arguments and padded values', () => {
+	// The signature promises `readonly string[]` and a real env object, so these
+	// casts stand in for a JS caller (or a JSON-parsed operator config) handing
+	// over a nullish value the compiler never saw.
+	const callUnsafely = (grantedNames: unknown, env: unknown) =>
+		resolveExclusiveAgentCredentials(
+			grantedNames as readonly string[],
+			env as Readonly<Record<string, string | undefined>>
+		);
+
+	it.each([
+		['null', null],
+		['undefined', undefined]
+	])('throws a TypeError when grantedNames is %s', (_label, grantedNames) => {
+		// MEASURED, not assumed: `new Set(null)` / `new Set(undefined)` is legal
+		// (both mean "no iterable"), so the function gets all the way to the final
+		// `grantedNames.filter(...)` before failing. It does NOT fail closed to an
+		// empty grant — the doc describes a plain list-in/list-out function and
+		// the code throws instead, so the throw is what gets pinned.
+		expect(() => callUnsafely(grantedNames, { CLAUDE_CODE_OAUTH_TOKEN: 'oauth' })).toThrow(TypeError);
+		expect(() => callUnsafely(grantedNames, { CLAUDE_CODE_OAUTH_TOKEN: 'oauth' })).toThrow(/filter/);
+	});
+
+	it.each([
+		['null', null],
+		['undefined', undefined]
+	])('throws a TypeError when env is %s and a family name was granted', (_label, env) => {
+		// The blank test indexes `env[name]` directly, so a nullish environment
+		// explodes on the FIRST granted family name rather than resolving as "this
+		// node has no credentials". Pinned so a caller that builds `env` lazily
+		// knows it must pass at least `{}`.
+		expect(() => callUnsafely(ALL, env)).toThrow(TypeError);
+		expect(() => callUnsafely(ALL, env)).toThrow(/CLAUDE_CODE_OAUTH_TOKEN/);
+	});
+
+	it.each([
+		['null', null],
+		['undefined', undefined]
+	])('survives a %s env when no family name was granted', (_label, env) => {
+		// `granted.has(name) && …` short-circuits, so the env is never indexed and
+		// the same nullish value that throws above is harmless here. The asymmetry
+		// is pinned so nobody "hardens" one path assuming the other already matches.
+		expect(callUnsafely([], env)).toEqual({ names: [], notes: [] });
+		expect(callUnsafely(['MY_WRAPPER_TOKEN'], env)).toEqual({ names: ['MY_WRAPPER_TOKEN'], notes: [] });
+	});
+
+	it('counts a padded but non-blank value as present', () => {
+		// `.trim()` is used ONLY for the blank comparison, so '  oauth  ' is a real
+		// credential: it wins its family and drops ANTHROPIC_API_KEY exactly as an
+		// unpadded value would. The existing blank cases cover only the
+		// trims-to-empty side of that expression.
+		const { names, notes } = resolveExclusiveAgentCredentials(ALL, {
+			CLAUDE_CODE_OAUTH_TOKEN: '  oauth  ',
+			ANTHROPIC_API_KEY: 'sk-key'
+		});
+		expect(names).toEqual(['CLAUDE_CODE_OAUTH_TOKEN', 'CODEX_ACCESS_TOKEN', 'OPENAI_API_KEY']);
+		expect(notes).toHaveLength(1);
+		expect(notes[0]).toContain('using CLAUDE_CODE_OAUTH_TOKEN');
+		expect(notes[0]).toContain('ignoring ANTHROPIC_API_KEY');
+	});
+
+	it('counts a padded LOSER as present too', () => {
+		// The mirror branch: padding on the lower-preference value must not smuggle
+		// ANTHROPIC_API_KEY past the drop, or a whitespace-wrapped key would still
+		// reach the CLI and bill the Console org.
+		const { names, notes } = resolveExclusiveAgentCredentials(ALL, {
+			CLAUDE_CODE_OAUTH_TOKEN: 'oauth',
+			ANTHROPIC_API_KEY: '  sk-key  '
+		});
+		expect(names).not.toContain('ANTHROPIC_API_KEY');
+		expect(notes).toHaveLength(1);
+	});
+});

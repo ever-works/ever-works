@@ -101,6 +101,10 @@ first, type-only barrels last.
 - [ ] `apps/cli/src/commands` — 29 files missing.
 - [ ] `apps/internal-cli/src/commands` — 26 files missing.
 - [ ] `apps/mcp/src/tools` + `src/openapi-tools` — 13 files missing.
+- [ ] **Wire spec type-checking into CI.** The contracts package's
+      `type-check:tests` script passes today. Either add it to the CI job or fold the
+      spec glob back into the package `tsconfig.json`, and give the other
+      packages the same treatment — several exclude their specs the same way.
 - [ ] **Cross-package mirror guard for the KB vocabularies.** `packages/contracts/src/kb/kb-document-class.ts` is a hand-maintained mirror of
       the agent-side enums in `packages/agent/src/entities/kb-types.ts`, and nothing at build time proves they still agree (contracts is zero-dependency and
       cannot import the agent). Verified in sync on 2026-08-22. The right guard is a test in `packages/agent` (which _can_ import contracts) asserting each
@@ -126,6 +130,19 @@ first, type-only barrels last.
 - [ ] Performance / load tests for the standard pipeline.
 - [ ] Visual-regression for marketing pages.
 
+## Source defects surfaced by coverage work
+
+Pinned as current behaviour in tests (so a fix is a visible, intentional change)
+and filed against the owning feature spec rather than fixed inside a tests-only PR.
+
+| Where                                                              | Defect                                                                                                                                                                                                        | Filed as                   |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `packages/contracts/src/policy/tool-grant.types.ts`                | `isCredentialKey` uses `RegExp.test`, which stringifies — so `isCredentialKey(undefined)` returns `true`. A security gate that admits non-strings. Latent only: both call sites are protected by other means. | policy-matrices OQ-7 / T41 |
+| `packages/contracts/src/policy/merge-policy.types.ts`              | `PLATFORM_DEFAULT_MERGE_POLICY` is shallow-frozen, so `.protectedBranches.push()` silently widens a safety control process-wide. `PLATFORM_DEFAULT_TOOL_GRANT` deep-freezes.                                  | policy-matrices OQ-5 / T39 |
+| `packages/contracts/src/policy/merge-policy.sanitize.ts`           | `protectedBranches` de-duplicates case-sensitively but matches case-insensitively.                                                                                                                            | policy-matrices OQ-6 / T40 |
+| `packages/contracts/src/fleet/fleet-jobs.types.ts`                 | `nodeSatisfiesCapabilities` fails **open** on a non-array required-capabilities list, contradicting its "fail-closed by construction" doc.                                                                    | needs a fleet spec         |
+| `packages/contracts/src/fleet/fleet-execution-preference.types.ts` | `decideFleetRouting` reports `no-runners` when `total <= 0` even if `online > 0`; `resolveFleetExecutionMode` makes an empty-string `scopeId` permanently unresolvable.                                       | needs a fleet spec         |
+
 ## Recently shipped
 
 | Date       | Area                                       | What                                                                                         |
@@ -138,8 +155,16 @@ first, type-only barrels last.
 - **Contracts / plugin / tasks packages** use **vitest**; specs live at
   `src/<area>/__tests__/<source-basename>.spec.ts` and import relatives with a
   `.js` suffix (ESM).
-- **`packages/contracts` runs a typecheck as part of `vitest run`** — a type
-  error in a spec is a test failure. Verify with `npx tsc --noEmit` too.
+- **Spec files are NOT type-checked by the default commands.** This trips people
+  up, so verify deliberately: - `packages/contracts/tsconfig.json` **excludes `**/\*.spec.ts`**, so
+`pnpm type-check`never sees a spec.
+    -`vitest.config.ts`sets`typecheck.include: ['src/**/*.spec-d.ts']`, so the
+      reassuring `Type Errors: no errors`line in`vitest run`output covers only
+      the`.spec-d.ts`type fixtures — **not** your`.spec.ts` files.
+    - Use **`pnpm --filter @ever-works/contracts type-check:tests`** (added
+      2026-08-22, backed by `tsconfig.speccheck.json`) to actually type-check the
+  specs. The package is clean under it today; promoting it to a CI gate is a
+  deliberate follow-up, not something to do silently.
 - **`packages/agent` and `apps/api`** use **jest**.
 - **`apps/web`** uses Playwright for e2e.
 - Pin literal members, counts and ordering of exported constant lists so a silent

@@ -17,7 +17,7 @@ describe('sanitizeMergePolicyOverride — defensive inputs', () => {
 		['true', true],
 		['NaN', Number.NaN]
 	])('returns an empty override for %s', (_label, raw) => {
-		expect(sanitizeMergePolicyOverride(raw as never)).toEqual({});
+		expect(sanitizeMergePolicyOverride(raw as never)).toStrictEqual({});
 	});
 
 	it('accepts an array without throwing and returns an empty override', () => {
@@ -25,12 +25,12 @@ describe('sanitizeMergePolicyOverride — defensive inputs', () => {
 		// slips straight past the `!raw || typeof raw !== 'object'` guard. It is
 		// only saved by carrying none of the five known keys — pinned because a
 		// future guard change must not start throwing on this shape.
-		expect(sanitizeMergePolicyOverride([] as never)).toEqual({});
-		expect(sanitizeMergePolicyOverride([1, 2, 3] as never)).toEqual({});
+		expect(sanitizeMergePolicyOverride([] as never)).toStrictEqual({});
+		expect(sanitizeMergePolicyOverride([1, 2, 3] as never)).toStrictEqual({});
 	});
 
 	it('returns an empty override for an empty object', () => {
-		expect(sanitizeMergePolicyOverride({})).toEqual({});
+		expect(sanitizeMergePolicyOverride({})).toStrictEqual({});
 	});
 
 	it('drops keys that are not part of MergePolicy', () => {
@@ -38,7 +38,7 @@ describe('sanitizeMergePolicyOverride — defensive inputs', () => {
 		// it never passes the input through, so a typo'd or hostile key cannot ride
 		// into a `simple-json` column.
 		const out = sanitizeMergePolicyOverride({ foo: 1, mergePolicy: true, protected_branches: ['main'] } as never);
-		expect(out).toEqual({});
+		expect(out).toStrictEqual({});
 		expect(Object.keys(out)).toHaveLength(0);
 	});
 });
@@ -279,7 +279,14 @@ describe('sanitizeMergePolicyOverride — full round trip', () => {
 	});
 
 	it('produces a plain object with no prototype surprises', () => {
+		// The output is written straight into a `simple-json` column and read back
+		// by callers that do `for (const k in out)`, so it must be an ordinary
+		// Object literal — not an Object.create(null) bag, and carrying nothing
+		// beyond its own keys.
 		const out = sanitizeMergePolicyOverride({ allowAgentMerge: false });
-		expect(Object.keys(out)).toEqual(['allowAgentMerge']);
+		expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+		expect(Object.getOwnPropertyNames(out)).toEqual(['allowAgentMerge']);
+		expect(Object.getOwnPropertySymbols(out)).toEqual([]);
+		expect(Object.prototype.hasOwnProperty.call(out, 'allowAgentMerge')).toBe(true);
 	});
 });

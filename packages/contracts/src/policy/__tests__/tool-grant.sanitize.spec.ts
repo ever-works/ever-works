@@ -16,19 +16,19 @@ describe('sanitizeToolGrantOverride — defensive inputs', () => {
 		['true', true],
 		['NaN', Number.NaN]
 	])('returns an empty override for %s', (_label, raw) => {
-		expect(sanitizeToolGrantOverride(raw as never)).toEqual({});
+		expect(sanitizeToolGrantOverride(raw as never)).toStrictEqual({});
 	});
 
 	it('accepts an array without throwing and returns an empty override', () => {
 		// `typeof [] === 'object'`, so an array is NOT excluded by the guard. It
 		// survives only because it carries neither an `allow` nor a `deny` key.
-		expect(sanitizeToolGrantOverride([] as never)).toEqual({});
-		expect(sanitizeToolGrantOverride([1, 2] as never)).toEqual({});
+		expect(sanitizeToolGrantOverride([] as never)).toStrictEqual({});
+		expect(sanitizeToolGrantOverride([1, 2] as never)).toStrictEqual({});
 	});
 
 	it('returns an empty override for an empty object', () => {
 		const out = sanitizeToolGrantOverride({});
-		expect(out).toEqual({});
+		expect(out).toStrictEqual({});
 		expect(Object.keys(out)).toHaveLength(0);
 	});
 
@@ -36,7 +36,7 @@ describe('sanitizeToolGrantOverride — defensive inputs', () => {
 		// A typo'd key must not become a grant. `allowed` here is deliberately one
 		// character away from the real field name.
 		const out = sanitizeToolGrantOverride({ note: 'hi', allowed: ['*'], denied: ['x'] } as never);
-		expect(out).toEqual({});
+		expect(out).toStrictEqual({});
 	});
 });
 

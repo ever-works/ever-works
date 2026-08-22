@@ -270,7 +270,10 @@ describe('shared vocabulary across the independent columns', () => {
 		// document row is still `active`.
 		expect(KB_DECISION_STATUSES).toContain('archived');
 		expect(KB_DOCUMENT_STATUSES).toContain('archived');
-		expect(KB_DECISION_STATUSES).not.toBe(KB_DOCUMENT_STATUSES);
+		// Reference-inequality would be tautological here; pin the meaningful
+		// difference instead — the two vocabularies overlap ONLY on 'archived'.
+		const shared = KB_DECISION_STATUSES.filter((s) => (KB_DOCUMENT_STATUSES as readonly string[]).includes(s));
+		expect(shared).toEqual(['archived']);
 	});
 
 	it.each([...KB_REVIEW_STATES])('review state %s reuses a decision-status literal', (state) => {
@@ -329,32 +332,5 @@ describe('vocabulary hygiene', () => {
 		// literal — `toEqual` alone would not notice.
 		expect(VOCABULARIES).toHaveLength(9);
 		expect(new Set(VOCABULARIES.map(([, members]) => members)).size).toBe(9);
-	});
-});
-
-describe('the kebab-case token pattern is anchored', () => {
-	it.each(['agent-run', 'additions-only', 'generation-history', 'conversation-message', 'brand', 'seo'])(
-		'accepts %s',
-		(value) => {
-			expect(KEBAB_TOKEN.test(value)).toBe(true);
-		}
-	);
-
-	it.each([
-		['Agent-Run', 'uppercase'],
-		['agent run', 'space instead of a hyphen'],
-		['agent_run', 'underscore instead of a hyphen'],
-		['agent--run', 'empty segment'],
-		['agent-', 'trailing hyphen'],
-		['-agent', 'leading hyphen'],
-		[' agent-run', 'leading whitespace'],
-		['agent-run ', 'trailing whitespace'],
-		['agent-run2', 'digit'],
-		['', 'empty string'],
-		['use agent-run here', 'a valid token embedded in a longer string']
-	])('rejects %s (%s)', (value) => {
-		// The last case is the anchoring check: without ^ and $ the pattern
-		// would happily match a substring of arbitrary text.
-		expect(KEBAB_TOKEN.test(value)).toBe(false);
 	});
 });

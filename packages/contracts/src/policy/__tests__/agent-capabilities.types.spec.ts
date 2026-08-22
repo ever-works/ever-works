@@ -33,40 +33,20 @@ describe('AGENT_INIT_SCRIPT_MAX_BYTES', () => {
 	});
 });
 
-describe('AGENT_INIT_SCRIPT_MAX_BYTES — the boundary the consumer enforces', () => {
-	// The service compares `bytes > AGENT_INIT_SCRIPT_MAX_BYTES`, i.e. STRICTLY
-	// greater, so a script sitting exactly ON the cap is ALLOWED. Classic
-	// off-by-one; all three neighbours are pinned.
-	const exceedsCap = (script: string): boolean => Buffer.byteLength(script, 'utf8') > AGENT_INIT_SCRIPT_MAX_BYTES;
-
-	it.each([
-		[16383, false],
-		[16384, false],
-		[16385, true]
-	] as [number, boolean][])('a %d-byte ASCII script exceeds the cap: %s', (bytes, expected) => {
-		const script = 'a'.repeat(bytes);
-		expect(Buffer.byteLength(script, 'utf8')).toBe(bytes);
-		expect(exceedsCap(script)).toBe(expected);
-	});
-
-	it('accepts an empty init script', () => {
-		expect(exceedsCap('')).toBe(false);
-	});
-
-	it('counts BYTES, not UTF-16 code units', () => {
-		// 8192 two-byte characters are exactly at the cap by bytes, but only 8192
-		// units long. The DTO's @MaxLength counts UTF-16 units, so the two agree
-		// only for ASCII — a multi-byte script is effectively allowed more bytes
-		// than the constant's name implies. Concrete demonstration of that gap.
+describe('AGENT_INIT_SCRIPT_MAX_BYTES — what the value means', () => {
+	// The cap is named BYTES, and the enforcing service compares
+	// `Buffer.byteLength(script) > AGENT_INIT_SCRIPT_MAX_BYTES`. The comparison
+	// itself lives in that service and is tested there — re-implementing it here
+	// would only test the local lambda. What IS a property of the constant is
+	// where the byte cap lands relative to the DTO's `@MaxLength`, which counts
+	// UTF-16 code units: the two agree only for ASCII.
+	it('sits exactly at 8192 two-byte characters, half of what @MaxLength would allow', () => {
 		const twoByteChars = 'é'.repeat(8192);
 		expect(twoByteChars).toHaveLength(8192);
 		expect(Buffer.byteLength(twoByteChars, 'utf8')).toBe(AGENT_INIT_SCRIPT_MAX_BYTES);
-		expect(exceedsCap(twoByteChars)).toBe(false);
 	});
 
-	it('rejects one two-byte character past the cap', () => {
-		const overCap = 'é'.repeat(8193);
-		expect(Buffer.byteLength(overCap, 'utf8')).toBe(AGENT_INIT_SCRIPT_MAX_BYTES + 2);
-		expect(exceedsCap(overCap)).toBe(true);
+	it('is reached by exactly 16384 ASCII characters', () => {
+		expect(Buffer.byteLength('a'.repeat(AGENT_INIT_SCRIPT_MAX_BYTES), 'utf8')).toBe(AGENT_INIT_SCRIPT_MAX_BYTES);
 	});
 });

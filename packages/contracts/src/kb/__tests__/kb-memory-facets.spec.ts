@@ -12,6 +12,7 @@ import {
 	KB_SYNTHESIS_TAG,
 	readKbConnectorSource
 } from '../kb-memory-facets.js';
+import type { KbMemorySourceBadgeInput } from '../kb-memory-facets.js';
 
 /**
  * Memory facets — badge derivation.
@@ -222,6 +223,14 @@ describe('consolidation cadences and modes', () => {
 	});
 });
 
+/** The full source -> badge mapping, also used to prove the matrix is total. */
+const SOURCE_BADGE_MATRIX: Array<[string, string]> = [
+	['user', 'human'],
+	['agent', 'agent'],
+	['imported', 'connector'],
+	['seeded', 'human']
+];
+
 describe('deriveKbMemorySourceBadge — branch and boundary coverage', () => {
 	it('ignores synthesis markers on a non-agent document', () => {
 		// THE sharpest edge in this function: the synthesis check is NESTED
@@ -306,12 +315,7 @@ describe('deriveKbMemorySourceBadge — branch and boundary coverage', () => {
 		expect(deriveKbMemorySourceBadge({ source: 'Imported' })).toBe('human');
 	});
 
-	it.each([
-		['user', 'human'],
-		['agent', 'agent'],
-		['imported', 'connector'],
-		['seeded', 'human']
-	])('badges a plain %s document as %s', (source, badge) => {
+	it.each(SOURCE_BADGE_MATRIX)('badges a plain %s document as %s', (source, badge) => {
 		// Matrix over the FULL KB_DOCUMENT_SOURCES vocabulary: the
 		// derivation must be total over every value the column can hold,
 		// and this breaks if a source is added there without a rule here.
@@ -320,7 +324,10 @@ describe('deriveKbMemorySourceBadge — branch and boundary coverage', () => {
 	});
 
 	it('covers every KB_DOCUMENT_SOURCES member with a case above', () => {
-		expect(KB_DOCUMENT_SOURCES).toHaveLength(4);
+		// The matrix above is written out by hand, so assert it really does name
+		// every member — a new source added to the vocabulary must not slip
+		// through untested just because the count still matches.
+		expect([...KB_DOCUMENT_SOURCES].sort()).toEqual(SOURCE_BADGE_MATRIX.map(([source]) => source).sort());
 	});
 });
 
@@ -367,5 +374,85 @@ describe('readKbConnectorSource — branch and boundary coverage', () => {
 		const snapshot = structuredClone(input);
 		readKbConnectorSource(input);
 		expect(input).toEqual(snapshot);
+	});
+});
+
+/**
+ * Cast helper: these inputs are exactly the ones the compile-time type
+ * FORBIDS, which is why they were untested — a nullable simple-json
+ * column and a nullable text column can still hand them over at runtime.
+ */
+const degenerate = (input: unknown): KbMemorySourceBadgeInput => input as KbMemorySourceBadgeInput;
+
+describe('deriveKbMemorySourceBadge / readKbConnectorSource — degenerate rows', () => {
+	it.each([
+		['null', null],
+		['undefined', undefined]
+	])('THROWS on a %s document instead of badging it', (_label, input) => {
+		// MEASURED, NOT ASSUMED — and the doc and the code disagree: the
+		// module comment calls the derivation "Deterministic, total", but
+		// neither function guards the document itself. `input.metadata` is
+		// read unconditionally on the very first line, so a missing row
+		// throws before any rule runs. Pinned as CURRENT behaviour: the
+		// badge is derived per rendered row, so one absent row takes the
+		// whole list down, and adding a guard is a deliberate change that
+		// must update this test and the doc together.
+		expect(() => deriveKbMemorySourceBadge(degenerate(input))).toThrow(TypeError);
+		expect(() => readKbConnectorSource(degenerate(input))).toThrow(TypeError);
+	});
+
+	it.each([
+		['a bare string off a JSON column', 'synthesis'],
+		['an unparsed JSON array', '["synthesis"]'],
+		['a number', 7],
+		['an object', { 0: 'synthesis' }]
+	])('THROWS when tags is %s on an agent row (it reaches .some unguarded)', (_label, tags) => {
+		// `(input.tags ?? []).some(...)` only defends against null/undefined,
+		// not against a wrong TYPE — the `??` default never fires for a
+		// non-nullish non-array, so the call lands on the raw value.
+		expect(() => deriveKbMemorySourceBadge(degenerate({ source: 'agent', tags }))).toThrow(TypeError);
+	});
+
+	it.each([
+		['a number', 42],
+		['an object', {}]
+	])('THROWS when path is %s on an agent row (it reaches .startsWith unguarded)', (_label, path) => {
+		// Same hole as tags, on the other synthesis marker.
+		expect(() => deriveKbMemorySourceBadge(degenerate({ source: 'agent', path }))).toThrow(TypeError);
+	});
+
+	it('still evaluates a wrong-typed path after the synthesis tag already matched', () => {
+		// `tagged` and `pathed` are BOTH computed before `tagged || pathed`,
+		// so there is no short-circuit: a matching tag does not rescue a row
+		// whose path column is corrupt. Reordering into a real `||` would
+		// silently change this.
+		expect(() =>
+			deriveKbMemorySourceBadge(degenerate({ source: 'agent', tags: [KB_SYNTHESIS_TAG], path: 42 }))
+		).toThrow(TypeError);
+	});
+
+	it('leaves the same corrupt row renderable when it is not badged through the agent branch', () => {
+		// Bounds the blast radius: the marker reads live INSIDE
+		// `source === 'agent'`, and rules 1-2 return before it, so identical
+		// garbage in tags/path is harmless on human, imported and
+		// connector-provenance rows.
+		expect(deriveKbMemorySourceBadge(degenerate({ source: 'user', tags: 'synthesis', path: 42 }))).toBe('human');
+		expect(deriveKbMemorySourceBadge(degenerate({ source: 'imported', tags: 'synthesis', path: 42 }))).toBe(
+			'connector'
+		);
+		expect(
+			deriveKbMemorySourceBadge(
+				degenerate({ source: 'agent', tags: 'synthesis', metadata: { provenance: { source: 'slack' } } })
+			)
+		).toBe('connector');
+	});
+
+	it('fails CLOSED rather than throwing when metadata itself is a wrong type', () => {
+		// Contrast with every case above: `(… as { provenance?: unknown })?.provenance`
+		// on a string or number is just `undefined`, so a corrupt metadata
+		// column degrades to no connector name instead of crashing the row.
+		expect(readKbConnectorSource(degenerate({ metadata: 'slack' }))).toBeNull();
+		expect(readKbConnectorSource(degenerate({ metadata: 7 }))).toBeNull();
+		expect(deriveKbMemorySourceBadge(degenerate({ source: 'agent', metadata: 'slack' }))).toBe('agent');
 	});
 });

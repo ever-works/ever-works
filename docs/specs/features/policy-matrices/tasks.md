@@ -122,6 +122,9 @@ Principle VI — tests are a prerequisite, not a follow-up).
       on write. Today dedup is case-sensitive at sanitize time while matching is
       case-insensitive at decision time, so `['main', 'MAIN']` stores two entries
       that behave as one.
+- [ ] **T41** _(OQ-7)_ Harden `isCredentialKey` to reject non-string input.
+      `RegExp.test` coerces, so `isCredentialKey(undefined)` currently returns
+      `true`. One-line fix plus flipping the test that pins today's behaviour.
 - [ ] **T36** Settings UI for editing both matrices (spec §6 defers this).
 - [ ] **T37** Integration test against a real Postgres covering the full
       four-scope load path (today's coverage is unit-level plus controller-level).

@@ -194,6 +194,27 @@ describe('FLEET_NODE_NON_LEASABLE_STATUSES', () => {
 	});
 });
 
+describe('runtime mutability of the node vocabularies', () => {
+	it.each([
+		['FLEET_NODE_KINDS', FLEET_NODE_KINDS],
+		['FLEET_ENROLLABLE_NODE_KINDS', FLEET_ENROLLABLE_NODE_KINDS],
+		['FLEET_NODE_STATUSES', FLEET_NODE_STATUSES],
+		['FLEET_NODE_NON_LEASABLE_STATUSES', FLEET_NODE_NON_LEASABLE_STATUSES]
+	] as Array<[string, readonly string[]]>)('leaves %s UNFROZEN at runtime', (_name, vocabulary) => {
+		// MEASURED, not assumed. All four are plain array literals: the
+		// `readonly FleetNodeKind[]` / `readonly FleetNodeStatus[]` annotations
+		// are TYPE-SYSTEM guarantees only, so at runtime each list is an
+		// ordinary mutable array shared by the platform API and every node app.
+		//
+		// It matters most HERE, because these particular lists gate enrollment
+		// and leasing: nothing at runtime stops a caster from pushing 'k8s' into
+		// FLEET_ENROLLABLE_NODE_KINDS. Pinned as CURRENT reality, the way the
+		// policy and kb specs pin `Object.isFrozen` for their vocabularies, so
+		// adding or removing an `Object.freeze` is a deliberate, visible change.
+		expect(Object.isFrozen(vocabulary)).toBe(false);
+	});
+});
+
 describe('protocol bounds', () => {
 	const BOUNDS: Array<[string, number, number]> = [
 		['FLEET_MAX_PLATFORM_LENGTH', FLEET_MAX_PLATFORM_LENGTH, 64],

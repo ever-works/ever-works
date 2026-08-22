@@ -178,6 +178,27 @@ describe('FLEET_JOB_KINDS', () => {
 	});
 });
 
+describe('runtime mutability of the job vocabularies', () => {
+	it.each([
+		['FLEET_JOB_STATUSES', FLEET_JOB_STATUSES],
+		['FLEET_JOB_ACTIVE_STATUSES', FLEET_JOB_ACTIVE_STATUSES],
+		['FLEET_JOB_TERMINAL_STATUSES', FLEET_JOB_TERMINAL_STATUSES],
+		['FLEET_JOB_KINDS', FLEET_JOB_KINDS]
+	] as Array<[string, readonly string[]]>)('leaves %s UNFROZEN at runtime', (_name, vocabulary) => {
+		// MEASURED, not assumed. Every list here is a plain array literal, so
+		// its `readonly FleetJobStatus[]` / `readonly FleetJobKind[]` annotation
+		// is a TYPE-SYSTEM guarantee only: at runtime each is an ordinary
+		// mutable array, shared by every importer, and a consumer that casts the
+		// readonly away really can push a member into the canonical list.
+		//
+		// Pinned as CURRENT reality — matching how the policy and kb specs pin
+		// `Object.isFrozen` for their own vocabularies — so that adding (or
+		// removing) an `Object.freeze` here is a loud, deliberate change instead
+		// of a silent one in the file that defines what "terminal" means.
+		expect(Object.isFrozen(vocabulary)).toBe(false);
+	});
+});
+
 describe('isFleetJobKind', () => {
 	it.each(FLEET_JOB_KINDS.map((kind) => [kind]))('accepts %s', (kind) => {
 		// Lockstep with the list: a kind added to FLEET_JOB_KINDS is

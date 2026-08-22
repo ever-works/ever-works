@@ -100,7 +100,7 @@ describe('kb barrel', () => {
 		expect(arrays).toHaveLength(12);
 		for (const [name, value] of arrays) {
 			expect(name.startsWith('KB_')).toBe(true);
-			expect((value as unknown[]).length).toBeGreaterThan(0);
+			expect((value as unknown as unknown[]).length).toBeGreaterThan(0);
 		}
 	});
 

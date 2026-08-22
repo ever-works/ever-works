@@ -1,0 +1,15 @@
+{
+	// Typecheck the SPEC files too.
+	//
+	// `tsconfig.json` excludes `**/*.spec.ts`, and `vitest.config.ts` limits
+	// `typecheck.include` to `src/**/*.spec-d.ts`. Between them, nothing in the
+	// normal `pnpm type-check` / `pnpm test` path ever type-checks a `.spec.ts`
+	// file — a broken cast in a spec stays invisible until someone trips over it.
+	//
+	// This config exists so `pnpm type-check:tests` can close that hole. It is
+	// deliberately NOT wired into `pnpm build` yet: the package is clean today,
+	// and promoting this to a CI gate is a separate, intentional change.
+	"extends": "./tsconfig.json",
+	"include": ["src/**/*"],
+	"exclude": ["node_modules", "dist"]
+}

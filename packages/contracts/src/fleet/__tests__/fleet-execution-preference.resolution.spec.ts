@@ -87,6 +87,25 @@ describe('FLEET_EXECUTION_SCOPE_TYPES', () => {
 	});
 });
 
+describe('runtime mutability of the execution vocabularies', () => {
+	it.each([
+		['FLEET_EXECUTION_MODES', FLEET_EXECUTION_MODES],
+		['FLEET_EXECUTION_SCOPE_TYPES', FLEET_EXECUTION_SCOPE_TYPES]
+	] as Array<[string, readonly string[]]>)('leaves %s UNFROZEN at runtime', (_name, vocabulary) => {
+		// MEASURED, not assumed. Both are plain array literals, so the
+		// `readonly FleetExecutionMode[]` / `readonly FleetExecutionScopeType[]`
+		// annotations are TYPE-SYSTEM guarantees only — at runtime each is an
+		// ordinary mutable array shared by the router, the API and the settings
+		// UI, and a consumer that casts the readonly away can push into it.
+		//
+		// FLEET_EXECUTION_MODES is also the allow-list `isFleetExecutionMode`
+		// reads, so a runtime push would WIDEN a routing guard. Pinned as
+		// CURRENT reality — as the policy and kb specs pin `Object.isFrozen` for
+		// their vocabularies — so adding or removing `Object.freeze` is loud.
+		expect(Object.isFrozen(vocabulary)).toBe(false);
+	});
+});
+
 describe('QUEUED_REASON_WAITING_FOR_RUNNER', () => {
 	it('is the machine token waiting-for-runner', () => {
 		// A UI switches on this string and a log search greps for it, so the
