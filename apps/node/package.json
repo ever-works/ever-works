@@ -37,6 +37,8 @@
 	},
 	"dependencies": {
 		"@ever-works/contracts": "workspace:*",
+		"@ever-works/local-workspace-plugin": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
 		"commander": "^14.0.2"
 	},
 	"devDependencies": {

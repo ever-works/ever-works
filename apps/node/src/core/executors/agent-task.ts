@@ -1,6 +1,12 @@
 import { statSync } from 'fs';
 import { isAbsolute } from 'path';
-import type { FleetAgentTaskPayload, FleetAgentTaskStep, FleetJobView } from '@ever-works/contracts';
+import type {
+	FleetAgentTaskPayload,
+	FleetAgentTaskStep,
+	FleetJobView,
+	FleetTaskWorkspaceDescriptor,
+	FleetTaskWorkspaceSpec
+} from '@ever-works/contracts';
 import { FLEET_AGENT_TASK_MAX_STEPS } from '@ever-works/contracts';
 import { runNodeCommandStep, type AcceptanceChecksIo, type NodeCheckResult, type WireCheck } from './acceptance-checks';
 
@@ -44,6 +50,8 @@ export interface AgentTaskOutcome extends Record<string, unknown> {
 	taskId: string;
 	/** Platform `AgentRun` the result correlates to, when the job carried one. */
 	runId: string | null;
+	/** Validated repository checkout used by this run; null for legacy path-only jobs. */
+	workspace: FleetTaskWorkspaceDescriptor | null;
 	steps: NodeCheckResult[];
 }
 
@@ -58,6 +66,8 @@ export class AgentTaskPayloadError extends Error {
 export interface AgentTaskIo extends AcceptanceChecksIo {
 	/** Directory used when the job carries no `workspacePath`. */
 	defaultWorkspacePath?: string;
+	/** Repository/worktree adapter supplied by the node composition root. */
+	provisionWorkspace?: (taskId: string, spec: FleetTaskWorkspaceSpec) => Promise<FleetTaskWorkspaceDescriptor>;
 }
 
 /**
@@ -69,7 +79,9 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
  * that is a verdict the platform asked for, not an error in the node.
  */
 export async function runAgentTaskJob(job: FleetJobView, io: AgentTaskIo = {}): Promise<AgentTaskOutcome> {
-	const payload = job.payload as unknown as FleetAgentTaskPayload | null;
+	const payload = job.payload as unknown as
+		| (FleetAgentTaskPayload & { workspace?: FleetTaskWorkspaceSpec | null })
+		| null;
 	if (!payload || typeof payload !== 'object') {
 		throw new AgentTaskPayloadError('Job payload is missing');
 	}
@@ -88,11 +100,11 @@ export async function runAgentTaskJob(job: FleetJobView, io: AgentTaskIo = {}): 
 		);
 	}
 
-	const workspacePath = resolveWorkspacePath(payload.workspacePath, io);
+	const workspaceResolution = await resolveAgentTaskWorkspace(taskId, payload, io);
 
 	const results: NodeCheckResult[] = [];
 	for (const step of steps) {
-		results.push(await runNodeCommandStep(step, workspacePath, io));
+		results.push(await runNodeCommandStep(step, workspaceResolution.path, io));
 	}
 
 	const anyRequiredFailed = steps.some((step, index) => step.required !== false && results[index].status !== 'green');
@@ -100,8 +112,27 @@ export async function runAgentTaskJob(job: FleetJobView, io: AgentTaskIo = {}): 
 		status: anyRequiredFailed ? 'failed' : 'succeeded',
 		taskId,
 		runId,
+		workspace: workspaceResolution.descriptor,
 		steps: results
 	};
+}
+
+async function resolveAgentTaskWorkspace(
+	taskId: string,
+	payload: FleetAgentTaskPayload & { workspace?: FleetTaskWorkspaceSpec | null },
+	io: AgentTaskIo
+): Promise<{ path: string; descriptor: FleetTaskWorkspaceDescriptor | null }> {
+	if (payload.workspace !== undefined) {
+		if (typeof payload.workspacePath === 'string' && payload.workspacePath.trim()) {
+			throw new AgentTaskPayloadError('Fleet agent-task payload cannot carry both workspace and workspacePath');
+		}
+		if (!io.provisionWorkspace) {
+			throw new AgentTaskPayloadError('Fleet repository workspace provisioner is not configured on this node');
+		}
+		const descriptor = await io.provisionWorkspace(taskId, payload.workspace as FleetTaskWorkspaceSpec);
+		return { path: resolveWorkspacePath(descriptor.path, io), descriptor };
+	}
+	return { path: resolveWorkspacePath(payload.workspacePath, io), descriptor: null };
 }
 
 /**

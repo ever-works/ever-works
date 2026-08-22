@@ -14,6 +14,7 @@ import { WorkerLoop } from './worker-loop';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
+import { defaultFleetTaskWorkspaceRoot, FleetTaskWorkspaceProvisioner } from './workspaces/fleet-task-workspace';
 import type { Logger } from './logger';
 import {
 	clampResourceLimits,
@@ -245,6 +246,10 @@ export interface CreateNodeRuntimeOptions {
 	 * service's own working directory.
 	 */
 	agentTaskWorkspacePath?: string;
+	/** Persistent bare-cache/worktree root for repository-backed agent Tasks. */
+	agentTaskWorkspaceRoot?: string;
+	/** Test/embedding seam; ordinary runtimes use the local-workspace provider. */
+	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'>;
 
 	/**
 	 * Start the worker drained. The node still heartbeats (so it stays
@@ -316,6 +321,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
 			...(io.scheduler ? { scheduler: io.scheduler } : {})
 		});
+		const workspaceProvisioner =
+			options.workspaceProvisioner ??
+			new FleetTaskWorkspaceProvisioner({
+				rootPath: options.agentTaskWorkspaceRoot ?? defaultFleetTaskWorkspaceRoot()
+			});
 		// The executor seam: a job kind is one more `register` call
 		// against the same protocol — no new endpoint, no new credential.
 		worker.register('acceptance-checks', (job) => runAcceptanceChecksJob(job));
@@ -325,6 +335,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// protocol, same credential — exactly as the header above promised.
 		worker.register('agent-task', (job) =>
 			runAgentTaskJob(job, {
+				provisionWorkspace: (taskId, spec) => workspaceProvisioner.provision(taskId, spec),
 				...(options.agentTaskWorkspacePath !== undefined
 					? { defaultWorkspacePath: options.agentTaskWorkspacePath }
 					: {})

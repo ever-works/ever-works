@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FleetJobView } from '@ever-works/contracts';
 import { AgentTaskPayloadError, normalizeAgentTaskSteps, runAgentTaskJob } from './agent-task';
 
@@ -175,5 +175,75 @@ describe('runAgentTaskJob — verdicts', () => {
 		});
 
 		expect(outcome.status).toBe('succeeded');
+		expect(outcome.workspace).toBeNull();
+	});
+});
+
+describe('runAgentTaskJob — repository workspace boundary', () => {
+	const workspace = {
+		repositoryId: 'ever/repository',
+		repoUrl: 'https://github.com/ever/repository.git',
+		baseRef: 'develop',
+		branch: 'task/platform-task-12345678'
+	};
+	const descriptor = {
+		path: ABSOLUTE,
+		repositoryId: workspace.repositoryId,
+		baseRef: workspace.baseRef,
+		branch: workspace.branch,
+		baseSha: 'a'.repeat(40),
+		headSha: 'b'.repeat(40),
+		reused: false
+	};
+
+	it('provisions before execution, runs every step in that checkout, and returns the descriptor', async () => {
+		const provisionWorkspace = vi.fn().mockResolvedValue(descriptor);
+		const cwd: string[] = [];
+		const scriptedSpawn = fakeSpawn({ passing: 0 }) as unknown as (command: string) => unknown;
+		const spawnFn = ((command: string, options: { cwd?: string }) => {
+			cwd.push(String(options.cwd));
+			return scriptedSpawn(command);
+		}) as never;
+
+		const outcome = await runAgentTaskJob(
+			job({ taskId: 'task-1', workspace, steps: [{ id: 'run', command: 'passing' }] }),
+			{ directoryExists: (path) => path === ABSOLUTE, provisionWorkspace, spawnFn }
+		);
+
+		expect(provisionWorkspace).toHaveBeenCalledOnce();
+		expect(provisionWorkspace).toHaveBeenCalledWith('task-1', workspace);
+		expect(cwd).toEqual([ABSOLUTE]);
+		expect(outcome.workspace).toEqual(descriptor);
+	});
+
+	it('refuses repository metadata when this runtime has no provisioner', async () => {
+		await expect(
+			runAgentTaskJob(job({ taskId: 'task-1', workspace, steps: [{ id: 'run', command: 'passing' }] }), {
+				...alwaysExists,
+				spawnFn: fakeSpawn({ passing: 0 })
+			})
+		).rejects.toThrowError(/workspace provisioner is not configured/i);
+	});
+
+	it('refuses ambiguous legacy and repository workspaces instead of choosing the wrong checkout', async () => {
+		await expect(
+			runAgentTaskJob(
+				job({
+					taskId: 'task-1',
+					workspace,
+					workspacePath: ABSOLUTE,
+					steps: [{ id: 'run', command: 'passing' }]
+				}),
+				{ ...alwaysExists, provisionWorkspace: vi.fn().mockResolvedValue(descriptor) }
+			)
+		).rejects.toThrowError(/cannot carry both/i);
+	});
+
+	it('validates executable steps before provisioning, so malformed retries never touch Git', async () => {
+		const provisionWorkspace = vi.fn().mockResolvedValue(descriptor);
+		await expect(
+			runAgentTaskJob(job({ taskId: 'task-1', workspace }), { provisionWorkspace })
+		).rejects.toThrowError(/FLEET_NODE_AGENT_TASK_COMMAND/);
+		expect(provisionWorkspace).not.toHaveBeenCalled();
 	});
 });
