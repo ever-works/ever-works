@@ -363,27 +363,24 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
     );
 
     const handleUpgradeDialogClose = useCallback(
-        (didUpgrade: boolean) => {
-            setShowUpgradeDialog(false);
+        async (didUpgrade: boolean) => {
             const target = createdOrg;
-            // Reset modal state then close the outer dialog. Navigation
-            // happens after close so a route change doesn't fight the
-            // transition.
+            if (!target || !/^[a-z0-9-]+$/.test(target.slug)) {
+                throw new Error(t('errors.generic'));
+            }
+
+            // Do not close or navigate until the server confirms the new
+            // Organization is the user's persisted active workspace.
+            await persistActiveOrganization(target.slug);
+            setShowUpgradeDialog(false);
             setCreatedOrg(null);
             onOpenChange(false);
-            if (target) {
-                // Security: validate slug matches expected alphanumeric-dash
-                // pattern before interpolating into the router path to prevent
-                // an open redirect if the API ever returns a malformed slug.
-                if (/^[a-z0-9-]+$/.test(target.slug)) {
-                    router.push(`/${target.slug}/dashboard`);
-                }
-                // Pull the freshly-upgraded org list (tenantId is now set
-                // on the user, so subsequent fetches reflect that).
-                if (didUpgrade) void mutate();
-            }
+            router.push(`/${target.slug}/dashboard`);
+            // Pull the freshly-upgraded org list (tenantId is now set on
+            // the user, so subsequent fetches reflect that).
+            if (didUpgrade) void mutate();
         },
-        [createdOrg, mutate, onOpenChange, router],
+        [createdOrg, mutate, onOpenChange, router, t],
     );
 
     // Hide the modal panel while the upgrade dialog is visible so the

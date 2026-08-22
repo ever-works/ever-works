@@ -1,3 +1,4 @@
+import { Test, TestingModule } from '@nestjs/testing';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 import { ActiveScopeService } from '../services/active-scope.service';
 import { UserScopeController } from './user-scope.controller';
@@ -6,13 +7,22 @@ describe('UserScopeController', () => {
     const auth = { userId: 'user-1' } as AuthenticatedUser;
     let activeScope: jest.Mocked<Pick<ActiveScopeService, 'getActiveScope' | 'updateActiveScope'>>;
     let controller: UserScopeController;
+    let moduleRef: TestingModule;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         activeScope = {
             getActiveScope: jest.fn(),
             updateActiveScope: jest.fn(),
         };
-        controller = new UserScopeController(activeScope as unknown as ActiveScopeService);
+        moduleRef = await Test.createTestingModule({
+            controllers: [UserScopeController],
+            providers: [{ provide: ActiveScopeService, useValue: activeScope }],
+        }).compile();
+        controller = moduleRef.get(UserScopeController);
+    });
+
+    afterEach(async () => {
+        await moduleRef.close();
     });
 
     it('returns the authenticated user persisted active scope', async () => {

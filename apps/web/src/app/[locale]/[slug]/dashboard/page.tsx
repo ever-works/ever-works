@@ -1,11 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
-import { serverFetch } from '@/lib/api/server-api';
-
-interface ActiveScopeResponse {
-    tenantId: string | null;
-    organizationId: string | null;
-    organizationSlug: string | null;
-}
+import type { ActiveScopeResponse } from '@ever-works/contracts/api';
+import { ApiResponseError, serverFetch } from '@/lib/api/server-api';
 
 interface OrganizationDashboardCompatibilityPageProps {
     params: Promise<{ slug: string }>;
@@ -24,8 +19,11 @@ export default async function OrganizationDashboardCompatibilityPage({
     let activeScope: ActiveScopeResponse;
     try {
         activeScope = await serverFetch<ActiveScopeResponse>('/users/me/scope');
-    } catch {
-        notFound();
+    } catch (error) {
+        if (error instanceof ApiResponseError && error.statusCode === 404) {
+            notFound();
+        }
+        throw error;
     }
 
     if (!activeScope.organizationId || activeScope.organizationSlug !== slug) {

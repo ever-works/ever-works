@@ -1,13 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
 import type { Organization } from '@ever-works/agent/entities';
+import type { ActiveScopeResponse } from '@ever-works/contracts/api';
 import { OrganizationMembershipService } from '../../organizations/organization-membership.service';
-
-export interface ActiveScopeResponse {
-    tenantId: string | null;
-    organizationId: string | null;
-    organizationSlug: string | null;
-}
 
 @Injectable()
 export class ActiveScopeService {
