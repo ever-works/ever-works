@@ -311,6 +311,38 @@ describe('agent/config', () => {
                 expect(config.fleetNode.getAgentTaskWorkspacePath()).toBe('/srv/work');
             });
         });
+
+        describe('getAgentTaskEnvPassthrough', () => {
+            it('defaults to the well-known Claude / Codex credential names', () => {
+                // Default-ON deliberately: a node scrubs secret-shaped names, so
+                // an unset default would silently leave every token-authenticated
+                // machine with no credential at all.
+                expect(config.fleetNode.getAgentTaskEnvPassthrough()).toEqual([
+                    'CLAUDE_CODE_OAUTH_TOKEN',
+                    'ANTHROPIC_API_KEY',
+                    'CODEX_ACCESS_TOKEN',
+                    'OPENAI_API_KEY',
+                ]);
+            });
+
+            it('grants nothing when explicitly set to empty', () => {
+                process.env.FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH = '';
+                expect(config.fleetNode.getAgentTaskEnvPassthrough()).toEqual([]);
+            });
+
+            it('parses, trims and drops blanks from an operator list', () => {
+                process.env.FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH = ' MY_TOKEN , ,OTHER_KEY ';
+                expect(config.fleetNode.getAgentTaskEnvPassthrough()).toEqual([
+                    'MY_TOKEN',
+                    'OTHER_KEY',
+                ]);
+            });
+
+            it('replaces rather than extends the defaults', () => {
+                process.env.FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH = 'ONLY_THIS';
+                expect(config.fleetNode.getAgentTaskEnvPassthrough()).toEqual(['ONLY_THIS']);
+            });
+        });
     });
 
     describe('config.database', () => {

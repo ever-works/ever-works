@@ -181,6 +181,13 @@ export const JOB_RUNTIMES: RuntimeDescriptor[] = [
 				label: 'Agent task workspace (absolute path on the node, blank = node default)',
 				required: false,
 				secret: false
+			},
+			{
+				key: 'FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH',
+				label: 'Agent task credential env NAMES (comma-separated; unset = Claude/Codex defaults, empty = grant none)',
+				required: false,
+				secret: false,
+				placeholder: 'CLAUDE_CODE_OAUTH_TOKEN,ANTHROPIC_API_KEY,CODEX_ACCESS_TOKEN,OPENAI_API_KEY'
 			}
 		]
 	}
