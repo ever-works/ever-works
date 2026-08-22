@@ -17,7 +17,7 @@ const git = (cwd: string, ...args: string[]): string =>
 
 const SHA = 'a'.repeat(40);
 
-describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', () => {
+describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { timeout: 20_000 }, () => {
 	let ownedRoot: string;
 	let seedDir: string;
 	let originDir: string;
