@@ -1,5 +1,11 @@
 # Coverage Tracker — Tests, Docs, Specs
 
+> **⚠ STALE — see [`COVERAGE-STATUS.md`](./COVERAGE-STATUS.md) for the current
+> inventory and priority queue.** This file was last refreshed 2026-05-09
+> (~PR #600); `develop` is now ~PR #2150. The **Done** ledger below is still
+> valid history, but the inventory snapshot and the Pending sections are
+> three months out of date.
+
 > **Purpose**: track 100%-coverage progress for the Ever Works platform across
 > tests (unit/e2e), docs, and specs. Maintained by the hourly
 > `platform-tests-and-docs` scheduled task so successive runs do not duplicate
