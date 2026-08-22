@@ -506,6 +506,40 @@ describe('KubernetesPlugin.getDeploymentStatus', () => {
 });
 
 describe('KubernetesPlugin.lookupExistingDeployment', () => {
+	it('uses the authoritative Work repository when the positional project name is stale', async () => {
+		const api = makeMockApi({
+			getDeployment: vi.fn(async (_kubeconfig, namespace, name) => ({
+				metadata: { name, namespace },
+				status: {
+					conditions:
+						name === 'current-website-repo'
+							? [{ type: 'Progressing', status: 'True' }]
+							: [{ type: 'Available', status: 'True' }],
+					replicas: 1
+				}
+			})),
+			readIngress: vi.fn(async (_kubeconfig, _namespace, name) => ({
+				metadata: { name },
+				spec: { rules: [{ host: `${name}.example.com` }] }
+			}))
+		});
+		const plugin = new KubernetesPlugin({ api });
+
+		const result = await plugin.lookupExistingDeployment('stale-sibling-repo', VALID, undefined, {
+			namespaceOverride: 'current-tenant-ns',
+			projectNameOverride: 'current-website-repo'
+		});
+
+		expect(api.getDeployment).toHaveBeenCalledWith(VALID, 'current-tenant-ns', 'current-website-repo', undefined);
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'current-tenant-ns', 'current-website-repo', undefined);
+		expect(result).toEqual({
+			found: true,
+			projectId: 'current-tenant-ns/current-website-repo',
+			website: 'https://current-website-repo.example.com',
+			deploymentState: 'BUILDING'
+		});
+	});
+
 	it('uses the managed kubeconfig current context instead of a stale singleton context', async () => {
 		const api = makeMockApi();
 		const plugin = new KubernetesPlugin({ api });

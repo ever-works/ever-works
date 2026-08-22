@@ -700,7 +700,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<{ found: boolean; website?: string; deploymentState?: string; projectId?: string }> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
-		const slug = sanitiseSlug(projectName);
+		const projectNameOverride = context?.projectNameOverride?.trim();
+		const slug = sanitiseSlug(projectNameOverride || projectName);
 		const requestedNamespace = context?.namespaceOverride?.trim();
 		const namespace =
 			(requestedNamespace && isValidK8sNamespace(requestedNamespace) ? requestedNamespace : undefined) ??
