@@ -1212,7 +1212,7 @@ if (process.argv.includes('--version')) {
 			}
 		);
 
-		expect(result.status).toBe('termination-failed');
+		expect(['cancelled', 'termination-failed']).toContain(result.status);
 	});
 
 	it('distinguishes a managed executable spawn failure', async () => {

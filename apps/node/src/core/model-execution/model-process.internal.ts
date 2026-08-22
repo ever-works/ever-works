@@ -275,6 +275,7 @@ export async function executeModelProcessInternal(
 ): Promise<ModelExecutionResult> {
 	const now = io.now ?? Date.now;
 	const monotonicNow = io.monotonicNow ?? (() => performance.now());
+	const platform = io.platform ?? process.platform;
 	if (request.signal?.aborted) {
 		return terminalResult(request.provider, 'cancelled', 0);
 	}
@@ -295,13 +296,7 @@ export async function executeModelProcessInternal(
 				return credentialBoundaryUnavailableResult(request.provider, Math.max(0, now() - startedAt));
 			}
 			const trusted = await withinExecutionDeadline(
-				() =>
-					resolveTrustedCommand(
-						request.provider,
-						request.workspacePath,
-						io.commands,
-						io.platform ?? process.platform
-					),
+				() => resolveTrustedCommand(request.provider, request.workspacePath, io.commands, platform),
 				deadlineAt,
 				monotonicNow,
 				request.signal
@@ -340,7 +335,8 @@ export async function executeModelProcessInternal(
 				trusted.localSessionHome ?? configHome,
 				isolatedHome,
 				isolatedTemp,
-				io.parentEnv ?? process.env
+				io.parentEnv ?? process.env,
+				platform
 			);
 			const probeBudgetMs = remainingExecutionMs(deadlineAt, monotonicNow);
 			if (probeBudgetMs <= 0) {
@@ -372,7 +368,7 @@ export async function executeModelProcessInternal(
 			if ('status' in probeResult) return probeResult;
 			if (
 				!(await withinExecutionDeadline(
-					() => managedExecutableIdentityMatches(trusted.identity),
+					() => managedExecutableIdentityMatches(trusted.identity, platform),
 					deadlineAt,
 					monotonicNow,
 					request.signal
@@ -385,7 +381,7 @@ export async function executeModelProcessInternal(
 					'Managed model executable identity changed between its version probe and credentialed run'
 				);
 			}
-			if ((io.platform ?? process.platform) !== 'win32' || !io.createModelProcessContainment) {
+			if (platform !== 'win32' || !io.createModelProcessContainment) {
 				return containmentUnavailableResult(request.provider, Math.max(0, now() - startedAt));
 			}
 			let containment: ModelProcessContainment;
@@ -714,12 +710,15 @@ async function readManagedExecutableIdentity(canonicalPath: string): Promise<Man
 	};
 }
 
-async function managedExecutableIdentityMatches(expected: ManagedExecutableIdentity): Promise<boolean> {
+async function managedExecutableIdentityMatches(
+	expected: ManagedExecutableIdentity,
+	platform: NodeJS.Platform
+): Promise<boolean> {
 	try {
 		const currentPath = await realpath(expected.canonicalPath);
 		const current = await readManagedExecutableIdentity(currentPath);
 		return (
-			pathsEqual(current.canonicalPath, expected.canonicalPath, process.platform) &&
+			pathsEqual(current.canonicalPath, expected.canonicalPath, platform) &&
 			current.device === expected.device &&
 			current.inode === expected.inode &&
 			current.size === expected.size &&
@@ -831,7 +830,8 @@ function buildModelEnvironment(
 	configHome: string,
 	isolatedHome: string,
 	isolatedTemp: string,
-	parentEnv: NodeJS.ProcessEnv
+	parentEnv: NodeJS.ProcessEnv,
+	platform: NodeJS.Platform
 ): Record<string, string> {
 	const byUpper = new Map<string, string>();
 	for (const key of Object.keys(parentEnv)) {
@@ -853,7 +853,7 @@ function buildModelEnvironment(
 		if (typeof value === 'string' && !CREDENTIALED_URL_PATTERN.test(value)) env[key] = value;
 	}
 
-	if (!hasEnvironmentName(env, 'PATH') && process.platform !== 'win32') {
+	if (!hasEnvironmentName(env, 'PATH') && platform !== 'win32') {
 		env.PATH = '/usr/local/bin:/usr/bin:/bin';
 	}
 	const homeRoot = parse(isolatedHome).root;
