@@ -234,7 +234,17 @@ export class SubscriptionService implements OnModuleInit {
         }
 
         const subscription = await this.getActiveSubscription(user.id);
-        if (subscription?.plan) {
+        // 🛑 Defence in depth: a SELF-HOSTED plan never decides the tier on THIS deployment.
+        //
+        // This is the single choke point where "what plan is this user on" is answered, and it
+        // reads the active subscription BEFORE `user.defaultPlan` — so guarding only the writer
+        // (`activate()`) is not enough on its own. Any row that already exists, or any future
+        // writer, is covered here. A self-hosted licence applies to the buyer's own deployment;
+        // on the hosted service they fall through to whatever they actually pay for.
+        if (
+            subscription?.plan &&
+            (subscription.plan as SubscriptionPlan).hosting !== 'selfhosted'
+        ) {
             return subscription.plan as SubscriptionPlan;
         }
 

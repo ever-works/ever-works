@@ -411,6 +411,48 @@ describe('SubscriptionService', () => {
             expect(planRepository.findByCode).not.toHaveBeenCalled();
         });
 
+        /**
+         * 🛑 REGRESSION — the defect a first attempt at this fix missed entirely.
+         *
+         * `resolvePlanForUser` is the single place that answers "what plan is this user on", and it
+         * reads the ACTIVE subscription BEFORE `user.defaultPlan`. So guarding only the writer was
+         * not enough: an active row pointing at a self-hosted plan still made a $99 one-off licence
+         * the buyer's effective HOSTED tier — the very arbitrage the fix was for.
+         *
+         * Guarding here covers every route: the webhook, the return path, any future writer, and
+         * any row that already exists in the database.
+         */
+        it('IGNORES an active self-hosted subscription — a licence is not a hosted tier', async () => {
+            const selfHosted = {
+                id: 'sub-licence',
+                plan: { ...PREMIUM_PLAN, code: 'selfhosted_pro', hosting: 'selfhosted' },
+            };
+            const { service } = makeService(
+                {},
+                { findActiveByUser: jest.fn().mockResolvedValue(selfHosted) },
+            );
+
+            const plan = await service.resolvePlanForUser({
+                id: 'u1',
+                defaultPlan: FREE_PLAN,
+            } as any);
+
+            // Falls through to what they actually pay for on this deployment.
+            expect(plan).toBe(FREE_PLAN);
+            expect((plan as any).code).not.toBe('selfhosted_pro');
+        });
+
+        it('still returns an active CLOUD subscription — the guard must not break the paying path', async () => {
+            const cloud = { id: 'sub-1', plan: { ...PREMIUM_PLAN, hosting: 'cloud' } };
+            const { service } = makeService(
+                {},
+                { findActiveByUser: jest.fn().mockResolvedValue(cloud) },
+            );
+
+            const plan = await service.resolvePlanForUser({ id: 'u1' } as any);
+            expect((plan as any).code).toBe(PREMIUM_PLAN.code);
+        });
+
         it('falls back to user.defaultPlan when there is no active subscription', async () => {
             const { service, userSubscriptionRepository, planRepository } = makeService(
                 {},
