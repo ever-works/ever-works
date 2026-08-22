@@ -26,6 +26,18 @@ const ALL_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.HOURLY,
 ];
 
+/**
+ * "Unlimited" for a quota stored in an `int` column.
+ *
+ * 🛑 NOT `Number.MAX_SAFE_INTEGER`. `subscription_plans.maxWorks` is a Postgres `integer`, whose
+ * ceiling is 2147483647; MAX_SAFE_INTEGER is 9007199254740991 and Postgres rejects the INSERT with
+ * `integer out of range`. Because `seedPlans()` runs inside `onModuleInit`, that rejection does not
+ * degrade — it aborts module init and the API never finishes booting, on every environment with a
+ * real database. Unit tests cannot catch it: the plan repository is a mock there, so the value is
+ * never handed to Postgres.
+ */
+const UNLIMITED_WORKS = 2_147_483_647;
+
 const PAID_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.MONTHLY,
     WorkScheduleCadence.WEEKLY,
@@ -128,8 +140,9 @@ const PLAN_SEED_DATA: Array<{
         displayName: 'Community Edition',
         hosting: 'selfhosted',
         // Free AGPLv3 download with no limits, mirroring Gauzy's Community Edition. Never bought,
-        // so it has no Stripe object at all.
-        maxWorks: Number.MAX_SAFE_INTEGER,
+        // so it has no Stripe object at all. Quotas are advisory here anyway — a self-hoster owns
+        // the database — but the value still has to fit the column. See {@link UNLIMITED_WORKS}.
+        maxWorks: UNLIMITED_WORKS,
         allowedCadences: ALL_CADENCES,
         monthlyPrice: '0',
         annualPrice: '0',
@@ -387,6 +400,26 @@ export class SubscriptionService implements OnModuleInit {
         if (this.isPaidPlan(plan) && !config.subscriptions.allowSelfServePaidPlans()) {
             throw new ForbiddenException(
                 'Paid plans must be activated through billing and cannot be self-assigned.',
+            );
+        }
+        // EW-711 #23, second gate (added with the self-hosted editions, 2026-08-22).
+        //
+        // 🛑 The price check alone is NOT sufficient once a self-hosted tier exists. The Community
+        // Edition is genuinely free (`monthlyPrice: '0'`) and genuinely unlimited — that is correct
+        // for someone running the AGPLv3 platform on their own hardware, where quotas are advisory
+        // because they own the database. But it makes the row look self-serviceable to
+        // `isPaidPlan()`, so on the HOSTED service any authenticated user could assign it to
+        // themselves and receive `maxWorks: 2_147_483_647` plus every cadence — entitlements that
+        // ARE enforced here (`work-schedule.service.ts` checks `plan.maxWorks` and
+        // `getCadenceAllowances`). That is precisely the free→paid escalation #23 closed.
+        //
+        // Self-hosted rows exist so the plan switcher and the licence paperwork describe the same
+        // thing. They are never something a user picks: the paid editions are commercial licences
+        // granted through billing, and the Community Edition applies to a deployment this instance
+        // is not.
+        if (plan.hosting === 'selfhosted') {
+            throw new ForbiddenException(
+                'Self-hosted editions cannot be self-assigned on a hosted deployment.',
             );
         }
         return this.persistDefaultPlan(user, plan);

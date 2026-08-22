@@ -1022,6 +1022,43 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         );
     });
 
+    /**
+     * 🛑 REGRESSION. Stripe rejects a line item carrying `recurring` in a `mode: payment` session.
+     * The inline fallback attached it unconditionally, so on any deployment whose catalog is NOT
+     * synced — exactly the deployments the fallback exists to serve — the $99 perpetual licence
+     * checkout threw instead of selling.
+     */
+    it('omits recurring from the inline fallback for a one-off licence', async () => {
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                mode: 'payment',
+                lookupKey: 'ever_works_selfhosted_pro_lifetime',
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('payment');
+        expect(params.line_items[0].price_data).toBeDefined();
+        expect(params.line_items[0].price_data.recurring).toBeUndefined();
+    });
+
+    it('KEEPS recurring on the inline fallback for a subscription', async () => {
+        // Control: the fix must not strip it from the recurring path.
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('subscription');
+        expect(params.line_items[0].price_data.recurring).toEqual({ interval: 'month' });
+    });
+
     it('bills the shared-account CATALOG price when the lookup key resolves', async () => {
         const { provider, client } = build();
         client.prices = {
@@ -1075,6 +1112,58 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
 
         const params = client.checkout.sessions.create.mock.calls[0][0];
         expect(params.line_items[0].price_data.unit_amount).toBe(2900);
+    });
+
+    /**
+     * 🛑 REGRESSION. A THROWN lookup must not be memoised. It is a transient condition — timeout,
+     * 5xx, rate limit — not an answer about this account. Caching it made one blip permanent for
+     * the process lifetime, and because the seat line has no inline fallback (the per-seat amount
+     * lives only in the catalog) every later checkout on that pod would silently stop billing
+     * seats. Undercharging, and invisible after the first warning.
+     */
+    it('does NOT cache a thrown lookup — the next attempt retries and bills correctly', async () => {
+        const { provider, client } = build();
+        const list = jest
+            .fn()
+            .mockRejectedValueOnce(new Error('stripe timeout'))
+            .mockResolvedValue({ data: [{ id: 'price_cat_1' }] });
+        client.prices = { list };
+
+        const req = {
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        };
+
+        // First attempt: the lookup throws, so it falls back to the inline price.
+        await provider.createPlanCheckoutSession(req);
+        expect(
+            client.checkout.sessions.create.mock.calls[0][0].line_items[0].price_data,
+        ).toBeDefined();
+
+        // Second attempt: Stripe is healthy again and the catalog price MUST be used.
+        await provider.createPlanCheckoutSession(req);
+        const second = client.checkout.sessions.create.mock.calls[1][0];
+        expect(second.line_items[0].price).toBe('price_cat_1');
+        expect(second.line_items[0].price_data).toBeUndefined();
+        // Proves the retry actually happened rather than a cached null being reused.
+        expect(list).toHaveBeenCalledTimes(2);
+    });
+
+    it('DOES cache a definitive absence — an unsynced account is not re-queried every checkout', async () => {
+        const { provider, client } = build();
+        const list = jest.fn().mockResolvedValue({ data: [] });
+        client.prices = { list };
+
+        const req = {
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        };
+        await provider.createPlanCheckoutSession(req);
+        await provider.createPlanCheckoutSession(req);
+
+        // "This account does not have it" is a real answer and the steady state for a self-hoster,
+        // so it is memoised — one call, not one per checkout.
+        expect(list).toHaveBeenCalledTimes(1);
     });
 
     it('adds a second line item for the seats beyond the allowance', async () => {
