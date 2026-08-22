@@ -44,6 +44,15 @@ interface BindingStamp {
 	worktreePath: string;
 }
 
+/** Persistent stamp written by releases before the strong v2 proof. */
+interface LegacyBindingStamp {
+	version?: undefined;
+	bindingKey: string;
+	branch: string;
+}
+
+type ParsedBindingStamp = BindingStamp | LegacyBindingStamp;
+
 interface ProvisionIntent {
 	version: 1;
 	bindingKey: string;
@@ -569,13 +578,16 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	private withRepoLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
 		const prev = this.repoLocks.get(key) ?? Promise.resolve();
 		const run = prev.then(fn);
-		this.repoLocks.set(
-			key,
-			run.then(
-				() => undefined,
-				() => undefined
-			)
+		const settled = run.then(
+			() => undefined,
+			() => undefined
 		);
+		this.repoLocks.set(key, settled);
+		void settled.then(() => {
+			// A newer waiter may already have replaced this chain. Delete only
+			// the exact settled tail so that waiter never loses serialization.
+			if (this.repoLocks.get(key) === settled) this.repoLocks.delete(key);
+		});
 		return run;
 	}
 
@@ -731,7 +743,18 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		spec: WorkspaceProvisionSpec,
 		signal?: AbortSignal
 	): Promise<OwnedWorktree> {
-		const owned = await this.inspectRegisteredWorktree(poolDir, worktreeDir, spec.auth, signal);
+		let owned: OwnedWorktree;
+		try {
+			owned = await this.inspectRegisteredWorktree(poolDir, worktreeDir, spec.auth, signal);
+		} catch (error) {
+			if (isAbortError(error)) throw error;
+			try {
+				owned = await this.migrateLegacyBindingStamp(poolDir, worktreeDir, spec, signal);
+			} catch (migrationError) {
+				if (isAbortError(migrationError)) throw migrationError;
+				throw error;
+			}
+		}
 		if (
 			owned.stamp.bindingKey !== spec.bindingKey ||
 			owned.stamp.repositoryKey !== repositoryIdentity(spec) ||
@@ -740,6 +763,41 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			throw workspaceOwnershipError('Existing workspace belongs to a different task or repository');
 		}
 		return owned;
+	}
+
+	/**
+	 * Upgrade an exact pre-v2 `{ bindingKey, branch }` stamp in place.
+	 *
+	 * Legacy content is never authority by itself. The expected lexical and
+	 * canonical paths, token-free remote, pool, private Git directory, unique
+	 * porcelain registration, branch and HEAD are all proven first while the
+	 * caller holds both repository and worktree locks. Only then is v2 written.
+	 */
+	private async migrateLegacyBindingStamp(
+		poolDir: string,
+		worktreeDir: string,
+		spec: WorkspaceProvisionSpec,
+		signal?: AbortSignal
+	): Promise<OwnedWorktree> {
+		const checkout = await this.inspectRegisteredCheckout(poolDir, worktreeDir, spec.auth, signal);
+		const stampPath = join(checkout.canonicalGitDir, STAMP_FILE);
+		const stampStats = await fs.lstat(stampPath);
+		if (stampStats.isSymbolicLink() || !stampStats.isFile()) {
+			throw workspaceOwnershipError('Legacy workspace binding stamp is a link or non-file');
+		}
+		const legacy = parseBindingStamp(await fs.readFile(stampPath, 'utf8'));
+		if (
+			legacy.version === 2 ||
+			legacy.bindingKey !== spec.bindingKey ||
+			legacy.branch !== spec.branch ||
+			checkout.registration.branch !== spec.branch ||
+			remoteIdentity(checkout.remoteUrl) !== remoteIdentity(spec.repoUrl)
+		) {
+			throw workspaceOwnershipError('Legacy workspace binding does not match the exact task and repository');
+		}
+
+		await this.writeStamp(poolDir, worktreeDir, spec, signal);
+		return this.inspectRegisteredWorktree(poolDir, worktreeDir, spec.auth, signal);
 	}
 
 	/** Recover only an unstamped checkout backed by this task's durable intent. */
@@ -932,7 +990,9 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		try {
 			const stampStats = await fs.lstat(stampPath);
 			if (stampStats.isSymbolicLink() || !stampStats.isFile()) throw new Error('unsafe stamp');
-			stamp = parseBindingStamp(await fs.readFile(stampPath, 'utf8'));
+			const parsed = parseBindingStamp(await fs.readFile(stampPath, 'utf8'));
+			if (parsed.version !== 2) throw new Error('legacy stamp requires exact provision-time migration');
+			stamp = parsed;
 		} catch (error) {
 			if (isAbortError(error)) throw error;
 			throw workspaceOwnershipError('Workspace binding stamp is missing, foreign, or corrupt');
@@ -1136,8 +1196,17 @@ async function assertPlainDirectory(path: string): Promise<string> {
 	return fs.realpath(path);
 }
 
-function parseBindingStamp(raw: string): BindingStamp {
-	const parsed = JSON.parse(raw) as Partial<Record<keyof BindingStamp, unknown>>;
+function parseBindingStamp(raw: string): ParsedBindingStamp {
+	const parsed = JSON.parse(raw) as Record<string, unknown>;
+	if (
+		parsed.version === undefined &&
+		typeof parsed.bindingKey === 'string' &&
+		parsed.bindingKey &&
+		typeof parsed.branch === 'string' &&
+		parsed.branch
+	) {
+		return { bindingKey: parsed.bindingKey, branch: parsed.branch };
+	}
 	if (
 		parsed.version !== 2 ||
 		typeof parsed.bindingKey !== 'string' ||

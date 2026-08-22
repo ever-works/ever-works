@@ -319,7 +319,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
 			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
 			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
-			...(io.scheduler ? { scheduler: io.scheduler } : {})
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
 		});
 		const workspaceProvisioner =
 			options.workspaceProvisioner ??

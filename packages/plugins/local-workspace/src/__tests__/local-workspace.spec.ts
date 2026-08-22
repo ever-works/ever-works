@@ -113,6 +113,28 @@ describe('provision (persistent pool + worktree)', () => {
 		expect(configMtimeAfter).toBe(configMtimeBefore);
 	});
 
+	it('migrates an exact pre-v2 binding stamp under the existing Git registration and reuses the worktree', async () => {
+		const bindingKey = 'lw-task-v1-migrate';
+		const branch = 'task/v1-migrate-10101010';
+		const first = await plugin.provision(spec(bindingKey, branch));
+		writeFileSync(join(first.path, 'must-remain.txt'), 'persistent task state\n');
+		const gitDir = git(first.path, 'rev-parse', '--path-format=absolute', '--git-dir');
+		const stampPath = join(gitDir, 'ew-workspace.json');
+		writeFileSync(stampPath, JSON.stringify({ bindingKey, branch }));
+
+		const reused = await plugin.provision(spec(bindingKey, branch));
+		expect(reused.reused).toBe(true);
+		expect(reused.path).toBe(first.path);
+		await expect(fs.readFile(join(reused.path, 'must-remain.txt'), 'utf8')).resolves.toBe(
+			'persistent task state\n'
+		);
+		expect(JSON.parse(await fs.readFile(stampPath, 'utf8'))).toMatchObject({
+			version: 2,
+			bindingKey,
+			branch
+		});
+	});
+
 	it('self-heals a branch collision: same binding, different branch → recreate', async () => {
 		const h1 = await plugin.provision(spec('lw-task-3', 'task/heal-cccc3333'));
 		writeFileSync(join(h1.path, 'stale.txt'), 'stale\n');
@@ -204,6 +226,33 @@ describe('provision (persistent pool + worktree)', () => {
 		const list = git(join(baseDir, 'repos', repos[0]), 'worktree', 'list');
 		expect(list).toContain('lw-par-a');
 		expect(list).toContain('lw-par-b');
+	});
+
+	it('releases settled repository and worktree mutex entries after concurrent reuse stress', async () => {
+		const stressPlugin = new LocalWorkspacePlugin();
+		const tasks = Array.from({ length: 8 }, (_, index) => ({
+			bindingKey: `lw-lock-stress-${index}`,
+			branch: `task/lock-stress-${index}-abcdef12`
+		}));
+		const first = await Promise.all(
+			tasks.map((task) => stressPlugin.provision(spec(task.bindingKey, task.branch)))
+		);
+
+		await expect
+			.poll(() => (stressPlugin as unknown as { repoLocks: Map<string, Promise<void>> }).repoLocks.size, {
+				timeout: 1_000
+			})
+			.toBe(0);
+
+		const reused = await Promise.all(
+			tasks.map((task) => stressPlugin.provision(spec(task.bindingKey, task.branch)))
+		);
+		expect(reused.every((handle, index) => handle.reused && handle.path === first[index].path)).toBe(true);
+		await expect
+			.poll(() => (stressPlugin as unknown as { repoLocks: Map<string, Promise<void>> }).repoLocks.size, {
+				timeout: 1_000
+			})
+			.toBe(0);
 	});
 
 	it('passes AbortSignal to a blocking Git process and settles promptly on cancellation', async () => {

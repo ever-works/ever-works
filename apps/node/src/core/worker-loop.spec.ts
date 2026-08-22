@@ -1,9 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { ChildProcess } from 'node:child_process';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FleetJobView } from '@ever-works/contracts';
 import { nextBackoffMs, WorkerLoop, type JobLeaseCapableClient } from './worker-loop';
 import type { Scheduler } from './heartbeat';
 import { runAgentTaskJob } from './executors/agent-task';
+import { terminateNodeProcessTree } from './executors/acceptance-checks';
 
 /**
  * The node worker host.
@@ -48,6 +53,55 @@ function controllableScheduler(): Scheduler & {
 			entry?.callback();
 		}
 	};
+}
+
+/** A deterministic wall clock plus deadline-ordered timer queue. */
+function clockScheduler(startMs: number): Scheduler & {
+	now(): number;
+	nextDueAt(): number | null;
+	advanceTo(epochMs: number): void;
+} {
+	const queue: Array<{ id: number; dueAt: number; callback: () => void }> = [];
+	let current = startMs;
+	let nextId = 1;
+	return {
+		now: () => current,
+		nextDueAt: () =>
+			queue.reduce<number | null>(
+				(next, entry) => (next === null ? entry.dueAt : Math.min(next, entry.dueAt)),
+				null
+			),
+		setTimeout(callback: () => void, ms: number): unknown {
+			const id = nextId++;
+			queue.push({ id, dueAt: current + ms, callback });
+			return id;
+		},
+		clearTimeout(handle: unknown): void {
+			const index = queue.findIndex((entry) => entry.id === handle);
+			if (index >= 0) queue.splice(index, 1);
+		},
+		advanceTo(epochMs: number): void {
+			if (epochMs < current) throw new Error('clock cannot run backwards');
+			for (;;) {
+				const next = queue
+					.filter((entry) => entry.dueAt <= epochMs)
+					.sort((left, right) => left.dueAt - right.dueAt || left.id - right.id)[0];
+				if (!next) break;
+				queue.splice(queue.indexOf(next), 1);
+				current = next.dueAt;
+				next.callback();
+			}
+			current = epochMs;
+		}
+	};
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((settle) => {
+		resolve = settle;
+	});
+	return { promise, resolve };
 }
 
 function job(overrides: Partial<FleetJobView> = {}): FleetJobView {
@@ -214,6 +268,167 @@ describe('WorkerLoop', () => {
 		expect(loop.cancelJob('job-1')).toBe(false);
 		await loop.stop();
 	});
+
+	it('aborts at the last confirmed lease deadline after repeated heartbeat transport failures', async () => {
+		const startedAt = Date.parse('2026-08-22T21:00:00.000Z');
+		const scheduler = clockScheduler(startedAt);
+		const workspacePath = process.platform === 'win32' ? 'C:\\workspace' : '/workspace';
+		const leasedJob = job({
+			kind: 'agent-task',
+			leaseExpiresAt: new Date(startedAt + 30_000).toISOString(),
+			payload: {
+				taskId: 'task-heartbeat-deadline',
+				workspacePath,
+				steps: [{ id: 'blocking', command: 'blocking' }]
+			}
+		});
+		const client = scriptedClient([[leasedJob], []]);
+		client.heartbeat.mockRejectedValue(new Error('transport offline'));
+		let spawned = false;
+		const terminateProcessTree = vi.fn(async (child: ChildProcess) => {
+			child.kill('SIGKILL');
+		});
+		const spawnFn = (() => {
+			spawned = true;
+			const handlers = new Map<string, (arg?: unknown) => void>();
+			return {
+				pid: 4545,
+				stdout: { on: () => undefined, destroy: () => undefined },
+				stderr: { on: () => undefined, destroy: () => undefined },
+				on: (event: string, handler: (arg?: unknown) => void) => handlers.set(event, handler),
+				kill: () => {
+					queueMicrotask(() => {
+						handlers.get('exit')?.(null);
+						handlers.get('close')?.(null);
+					});
+				}
+			};
+		}) as never;
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			leaseTtlSec: 30,
+			idlePollMs: 60_000,
+			now: scheduler.now
+		} as never);
+		loop.register('agent-task', (leased, signal) =>
+			runAgentTaskJob(leased, { directoryExists: () => true, spawnFn, terminateProcessTree }, signal)
+		);
+
+		await loop.start();
+		await vi.waitFor(() => expect(spawned).toBe(true));
+		scheduler.advanceTo(startedAt + 10_000);
+		await vi.waitFor(() => expect(client.heartbeat).toHaveBeenCalledTimes(1));
+		await expect.poll(() => scheduler.nextDueAt()).toBe(startedAt + 20_000);
+		expect(terminateProcessTree).not.toHaveBeenCalled();
+		scheduler.advanceTo(startedAt + 20_000);
+		await vi.waitFor(() => expect(client.heartbeat).toHaveBeenCalledTimes(2));
+		await expect.poll(() => scheduler.nextDueAt()).toBe(startedAt + 30_000);
+		expect(terminateProcessTree).not.toHaveBeenCalled();
+		scheduler.advanceTo(startedAt + 29_999);
+		expect(terminateProcessTree).not.toHaveBeenCalled();
+
+		scheduler.advanceTo(startedAt + 30_000);
+		await vi.waitFor(() => expect(terminateProcessTree).toHaveBeenCalledOnce());
+		await vi.waitFor(() => expect(loop.getState().failed).toBe(1));
+		expect(client.heartbeat).toHaveBeenCalledTimes(2);
+		expect(client.complete).not.toHaveBeenCalledWith('job-1', expect.objectContaining({ success: true }));
+		expect(loop.getState().completed).toBe(0);
+		await loop.stop();
+	});
+
+	it('counts one accepted success when a terminal heartbeat response races its completion response', async () => {
+		const client = scriptedClient([[job()], []]);
+		const successResponse = deferred<boolean>();
+		const heartbeatResponse = deferred<boolean>();
+		client.complete.mockImplementationOnce(() => successResponse.promise).mockResolvedValue(true);
+		client.heartbeat.mockImplementationOnce(() => heartbeatResponse.promise);
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({ client, scheduler, leaseTtlSec: 30 });
+		loop.register('acceptance-checks', async () => ({ gateStatus: 'green' }));
+
+		await loop.start();
+		await vi.waitFor(() => expect(client.complete).toHaveBeenCalledTimes(1));
+		scheduler.runNext();
+		await vi.waitFor(() => expect(client.heartbeat).toHaveBeenCalledTimes(1));
+
+		// The server processed success, while a later heartbeat's terminal
+		// response reached the client first. Accepted terminal state wins.
+		heartbeatResponse.resolve(false);
+		successResponse.resolve(true);
+		await vi.waitFor(() => expect(loop.getState().completed).toBe(1));
+
+		expect(client.complete).toHaveBeenCalledTimes(1);
+		expect(client.complete).toHaveBeenCalledWith('job-1', {
+			success: true,
+			result: { gateStatus: 'green' }
+		});
+		expect(loop.getState().failed).toBe(0);
+		await loop.stop();
+	});
+
+	it('quarantines the worker and leases nothing else when process-tree termination cannot be proven', async () => {
+		const ownedRoot = mkdtempSync(join(tmpdir(), 'ew-worker-unsafe-'));
+		const readyPath = join(ownedRoot, 'ready.txt');
+		const scriptPath = join(ownedRoot, 'blocking.cjs');
+		let capturedChild: ChildProcess | undefined;
+		let loop: WorkerLoop | undefined;
+		try {
+			writeFileSync(
+				scriptPath,
+				`require('node:fs').writeFileSync(${JSON.stringify(readyPath)},'ready');setInterval(()=>{},1000);`
+			);
+			const leasedJob = job({
+				kind: 'agent-task',
+				payload: {
+					taskId: 'task-quarantine',
+					workspacePath: ownedRoot,
+					steps: [{ id: 'blocking', command: `"${process.execPath}" "${scriptPath}"` }]
+				}
+			});
+			const client = scriptedClient([[leasedJob], []]);
+			const scheduler = controllableScheduler();
+			loop = new WorkerLoop({ client, scheduler, leaseTtlSec: 30 });
+			loop.register('agent-task', (leased, signal) =>
+				runAgentTaskJob(
+					leased,
+					{
+						directoryExists: () => true,
+						terminateProcessTree: async (child) => {
+							capturedChild = child;
+							throw Object.assign(new Error('tree kill permission denied'), { code: 'EPERM' });
+						}
+					},
+					signal
+				)
+			);
+
+			await loop.start();
+			await expect.poll(() => existsSync(readyPath), { timeout: 2_500 }).toBe(true);
+			expect(loop.cancelJob('job-1', 'operator cancellation')).toBe(true);
+			await vi.waitFor(() => expect(loop?.getState().state).toBe('unsafe'));
+			await vi.waitFor(() => expect(client.complete).toHaveBeenCalledTimes(1));
+			expect(client.complete).toHaveBeenCalledWith(
+				'job-1',
+				expect.objectContaining({ success: false, error: expect.stringMatching(/could not be terminated/i) })
+			);
+			expect(capturedChild?.pid).toBeTypeOf('number');
+			expect(() => process.kill(capturedChild!.pid!, 0)).not.toThrow();
+
+			const leaseCallsAtQuarantine = client.leaseCalls;
+			for (let attempt = 0; attempt < 3; attempt += 1) {
+				scheduler.runNext();
+				await Promise.resolve();
+			}
+			expect(client.leaseCalls).toBe(leaseCallsAtQuarantine);
+		} finally {
+			if (capturedChild) {
+				await terminateNodeProcessTree(capturedChild).catch(() => capturedChild?.kill('SIGKILL'));
+			}
+			if (loop) await loop.stop();
+			await fs.rm(ownedRoot, { recursive: true, force: true, maxRetries: 3 });
+		}
+	}, 10_000);
 
 	it('survives an unreportable result — the lease expiry is the safety net', async () => {
 		const client = scriptedClient([[job()], []]);

@@ -1,5 +1,5 @@
 import type { FleetJobKind, FleetJobView } from '@ever-works/contracts';
-import { FLEET_JOB_DEFAULT_LEASE_TTL_SEC, FLEET_JOB_MAX_LEASE_BATCH } from '@ever-works/contracts';
+import { clampLeaseTtlSec, FLEET_JOB_DEFAULT_LEASE_TTL_SEC, FLEET_JOB_MAX_LEASE_BATCH } from '@ever-works/contracts';
 import type { Logger } from './logger';
 import type { Scheduler } from './heartbeat';
 import { systemScheduler } from './heartbeat';
@@ -100,6 +100,8 @@ export type WorkerState =
 	// protecting itself.
 	| 'throttled'
 	| 'paused'
+	/** Process-tree termination could not be proven; restart/operator review required. */
+	| 'unsafe'
 	| 'stopped';
 
 export interface WorkerLoopState {
@@ -133,6 +135,8 @@ export interface WorkerLoopOptions {
 	leaseTtlSec?: number;
 	idlePollMs?: number;
 	scheduler?: Scheduler;
+	/** Wall clock paired with the scheduler for lease-expiry enforcement. */
+	now?: () => number;
 	logger?: Logger;
 	/** Capability tags advertised per poll; omitted uses the node's stored tags. */
 	capabilities?: string[];
@@ -151,10 +155,12 @@ export class WorkerLoop {
 	private readonly idlePollMs: number;
 	private readonly limits: NodeResourceLimits;
 	private readonly resourceProbe: ResourceProbe | undefined;
+	private readonly now: () => number;
 
 	private running = false;
 	private stopping = false;
 	private paused = false;
+	private unsafe = false;
 	private timer: unknown = null;
 	private state: WorkerLoopState = {
 		state: 'idle',
@@ -170,8 +176,9 @@ export class WorkerLoop {
 	constructor(private readonly options: WorkerLoopOptions) {
 		this.scheduler = options.scheduler ?? systemScheduler;
 		this.concurrency = Math.min(Math.max(options.concurrency ?? 1, 1), FLEET_JOB_MAX_LEASE_BATCH);
-		this.leaseTtlSec = options.leaseTtlSec ?? FLEET_JOB_DEFAULT_LEASE_TTL_SEC;
+		this.leaseTtlSec = clampLeaseTtlSec(options.leaseTtlSec ?? FLEET_JOB_DEFAULT_LEASE_TTL_SEC);
 		this.idlePollMs = options.idlePollMs ?? DEFAULT_IDLE_POLL_MS;
+		this.now = options.now ?? (() => Date.now());
 		// `limits` wins over the legacy `concurrency` option so there is
 		// exactly one number in play once an operator has set limits.
 		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
@@ -266,10 +273,10 @@ export class WorkerLoop {
 		this.paused = true;
 		this.patch({
 			paused: true,
-			state: this.inFlight.size > 0 ? 'draining' : 'paused'
+			state: this.unsafe ? 'unsafe' : this.inFlight.size > 0 ? 'draining' : 'paused'
 		});
 		await this.drained();
-		if (this.paused) {
+		if (this.paused && !this.unsafe) {
 			this.patch({ state: this.running ? 'paused' : this.state.state });
 		}
 	}
@@ -278,6 +285,10 @@ export class WorkerLoop {
 	resume(): void {
 		if (!this.paused) return;
 		this.paused = false;
+		if (this.unsafe) {
+			this.patch({ paused: false, state: 'unsafe' });
+			return;
+		}
 		this.patch({ paused: false, state: this.inFlight.size > 0 ? 'working' : 'idle' });
 		if (this.running && !this.stopping) {
 			this.cancelTimer();
@@ -310,6 +321,10 @@ export class WorkerLoop {
 	async tick(): Promise<void> {
 		if (!this.running || this.stopping) return;
 		this.cancelTimer();
+		if (this.unsafe) {
+			this.patch({ state: 'unsafe' });
+			return;
+		}
 
 		if (this.paused) {
 			// Drained: no lease call at all. Still re-arm, so `resume()`
@@ -419,6 +434,7 @@ export class WorkerLoop {
 	}
 
 	private nextIdleState(): WorkerState {
+		if (this.unsafe) return 'unsafe';
 		if (this.paused) {
 			return this.inFlight.size > 0 ? 'draining' : 'paused';
 		}
@@ -446,7 +462,8 @@ export class WorkerLoop {
 			return;
 		}
 
-		const keepAlive = this.startKeepAlive(job.id);
+		const keepAlive = this.startKeepAlive(job);
+		let successAccepted = false;
 		try {
 			this.options.logger?.info(`Executing fleet job ${job.id} (${job.kind})`);
 			const result = await executor(job, signal);
@@ -455,20 +472,31 @@ export class WorkerLoop {
 				success: true,
 				result: (result as Record<string, unknown> | undefined) ?? null
 			});
-			throwIfJobAborted(signal);
 			if (!accepted) {
 				throw new Error('Fleet job success settlement was rejected; the lease may no longer be owned');
 			}
+			// The server's accepted terminal transition is authoritative. Stop
+			// heartbeat delivery before any late response can abort/count failure.
+			successAccepted = true;
+			keepAlive.stop();
 			this.patch({ completed: this.state.completed + 1 });
 			this.options.logger?.info(`Fleet job ${job.id} completed`);
 		} catch (error) {
+			if (successAccepted) return;
 			const raw = error instanceof Error ? error.message : String(error);
 			const message = this.options.logger?.redact(raw) ?? raw;
+			if (isProcessTreeTerminationError(error)) {
+				this.unsafe = true;
+				this.patch({ state: 'unsafe', lastError: message });
+				this.options.logger?.warn(
+					`Fleet worker quarantined after unconfirmed process-tree termination: ${message}`
+				);
+			}
 			await this.report(job.id, { success: false, error: message });
 			this.patch({ failed: this.state.failed + 1, lastError: message });
 			this.options.logger?.warn(`Fleet job ${job.id} failed: ${message}`);
 		} finally {
-			this.scheduler.clearTimeout(keepAlive);
+			keepAlive.stop();
 		}
 	}
 
@@ -479,19 +507,58 @@ export class WorkerLoop {
 	 * the same work. Transport errors remain non-fatal because they do not
 	 * prove the lease was lost.
 	 */
-	private startKeepAlive(jobId: string): unknown {
+	private startKeepAlive(job: FleetJobView): { stop(): void } {
+		const jobId = job.id;
 		const everyMs = Math.max(Math.floor((this.leaseTtlSec * 1000) / 3), MIN_KEEPALIVE_MS);
+		const localExpiry = this.now() + this.leaseTtlSec * 1000;
+		const wireExpiry = job.leaseExpiresAt ? Date.parse(job.leaseExpiresAt) : Number.NaN;
+		let confirmedUntil = Number.isFinite(wireExpiry) ? Math.min(localExpiry, wireExpiry) : localExpiry;
+		let beatTimer: unknown = null;
+		let deadlineTimer: unknown = null;
+		let stopped = false;
+
+		const stop = (): void => {
+			if (stopped) return;
+			stopped = true;
+			if (beatTimer !== null) this.scheduler.clearTimeout(beatTimer);
+			if (deadlineTimer !== null) this.scheduler.clearTimeout(deadlineTimer);
+			beatTimer = null;
+			deadlineTimer = null;
+		};
+		const scheduleDeadline = (): void => {
+			if (deadlineTimer !== null) this.scheduler.clearTimeout(deadlineTimer);
+			const remaining = Math.max(0, confirmedUntil - this.now());
+			deadlineTimer = this.scheduler.setTimeout(() => {
+				deadlineTimer = null;
+				if (stopped || !this.inFlight.has(jobId)) return;
+				this.options.logger?.warn(
+					`Fleet job ${jobId} reached its last confirmed lease deadline — aborting before server reclaim`
+				);
+				this.cancelJob(jobId, 'Fleet job lease confirmation expired');
+			}, remaining);
+		};
+		const scheduleBeat = (): void => {
+			if (stopped) return;
+			const remaining = Math.max(0, confirmedUntil - this.now());
+			beatTimer = this.scheduler.setTimeout(beat, Math.min(everyMs, remaining));
+		};
 		const beat = (): void => {
-			if (!this.inFlight.has(jobId)) return;
+			beatTimer = null;
+			if (stopped || !this.inFlight.has(jobId) || this.jobControllers.get(jobId)?.signal.aborted) return;
 			void this.options.client
 				.heartbeat(jobId, this.leaseTtlSec)
 				.then((ok) => {
+					if (stopped || !this.inFlight.has(jobId)) return;
 					if (!ok) {
 						this.options.logger?.warn(
 							`Lost the lease on fleet job ${jobId} — the platform may re-offer it to another node`
 						);
 						this.cancelJob(jobId, 'Fleet job lease was lost');
+						return;
 					}
+					if (this.jobControllers.get(jobId)?.signal.aborted) return;
+					confirmedUntil = this.now() + this.leaseTtlSec * 1000;
+					scheduleDeadline();
 				})
 				.catch((error: unknown) => {
 					const raw = error instanceof Error ? error.message : String(error);
@@ -500,12 +567,12 @@ export class WorkerLoop {
 					);
 				})
 				.finally(() => {
-					if (this.inFlight.has(jobId) && !this.jobControllers.get(jobId)?.signal.aborted) {
-						this.scheduler.setTimeout(beat, everyMs);
-					}
+					if (!this.jobControllers.get(jobId)?.signal.aborted) scheduleBeat();
 				});
 		};
-		return this.scheduler.setTimeout(beat, everyMs);
+		scheduleBeat();
+		scheduleDeadline();
+		return { stop };
 	}
 
 	private async report(
@@ -573,4 +640,8 @@ function throwIfJobAborted(signal: AbortSignal): void {
 	const error = new Error(reason instanceof Error ? reason.message : 'Fleet job was cancelled');
 	error.name = 'AbortError';
 	throw error;
+}
+
+function isProcessTreeTerminationError(error: unknown): boolean {
+	return error instanceof Error && error.name === 'ProcessTreeTerminationError';
 }

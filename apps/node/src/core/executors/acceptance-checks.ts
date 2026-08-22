@@ -376,18 +376,93 @@ export async function terminateNodeProcessTree(child: ReturnType<typeof spawn>):
 	if (!Number.isSafeInteger(pid) || (pid ?? 0) <= 0) {
 		throw new Error('Spawned command has no valid process id for tree termination');
 	}
-	if (process.platform === 'win32') {
-		await new Promise<void>((resolve, reject) => {
-			execFile(
-				'taskkill',
-				['/PID', String(pid), '/T', '/F'],
-				{ windowsHide: true, maxBuffer: 1024 * 1024 },
-				(error) => (error ? reject(error) : resolve())
-			);
-		});
+
+	let primaryError: unknown;
+	try {
+		if (process.platform === 'win32') {
+			await new Promise<void>((resolve, reject) => {
+				execFile(
+					'taskkill',
+					['/PID', String(pid), '/T', '/F'],
+					{ windowsHide: true, maxBuffer: 1024 * 1024 },
+					(error) => (error ? reject(error) : resolve())
+				);
+			});
+			await waitForProcessGone(pid!);
+			return;
+		}
+		process.kill(-pid!, 'SIGKILL');
+		await waitForProcessGroupGone(pid!);
 		return;
+	} catch (error) {
+		primaryError = error;
 	}
-	process.kill(-pid!, 'SIGKILL');
+
+	// A best-effort direct-child kill is still worth doing after the native
+	// whole-tree mechanism fails. On POSIX the process-group probe below can
+	// prove the entire detached group is gone. On Windows a root-only fallback
+	// can never prove descendants, so it deliberately still rejects and causes
+	// the WorkerLoop to quarantine itself rather than leasing more work.
+	let fallbackError: unknown;
+	try {
+		const requested = child.kill('SIGKILL');
+		if (!requested && isProcessAlive(pid!)) {
+			throw new Error('direct child kill was refused while the process remained alive');
+		}
+		await waitForProcessGone(pid!);
+		if (process.platform === 'win32') {
+			throw new Error('Windows direct-child fallback cannot prove descendant termination');
+		}
+		await waitForProcessGroupGone(pid!);
+		return;
+	} catch (error) {
+		fallbackError = error;
+	}
+
+	throw new Error(
+		`native whole-tree termination failed (${errorDetail(primaryError)}); fallback could not prove the tree gone (${errorDetail(fallbackError)})`
+	);
+}
+
+const PROCESS_EXIT_VERIFY_TIMEOUT_MS = 2_000;
+const PROCESS_EXIT_VERIFY_POLL_MS = 20;
+
+async function waitForProcessGone(pid: number): Promise<void> {
+	await waitForGone(() => isProcessAlive(pid), `process ${pid} remained alive after termination`);
+}
+
+async function waitForProcessGroupGone(pid: number): Promise<void> {
+	await waitForGone(() => isProcessGroupAlive(pid), `process group ${pid} remained alive after termination`);
+}
+
+async function waitForGone(isAlive: () => boolean, message: string): Promise<void> {
+	const deadline = Date.now() + PROCESS_EXIT_VERIFY_TIMEOUT_MS;
+	while (isAlive()) {
+		if (Date.now() >= deadline) throw new Error(message);
+		await new Promise<void>((resolve) => setTimeout(resolve, PROCESS_EXIT_VERIFY_POLL_MS));
+	}
+}
+
+function isProcessAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+	}
+}
+
+function isProcessGroupAlive(pid: number): boolean {
+	try {
+		process.kill(-pid, 0);
+		return true;
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+	}
+}
+
+function errorDetail(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }
 
 function throwIfCommandAborted(signal?: AbortSignal): void {
