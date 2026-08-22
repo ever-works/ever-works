@@ -303,17 +303,24 @@ export class DeployController {
     }
 
     /**
-     * Get the per-Work deploy runtime env state. Only `DATABASE_URL` is
-     * user-managed (and returned masked); `AUTH_SECRET`/`COOKIE_SECRET` are
-     * auto-minted by the deploy feature and intentionally not exposed.
+     * Get the per-Work deploy runtime env state: the `DATABASE_URL` section
+     * (masked) plus the operator-managed, allow-listed env map (Stripe keys &
+     * co.), one masked entry per allow-listed key so the dashboard can render
+     * the whole form. `AUTH_SECRET`/`COOKIE_SECRET` are auto-minted by the
+     * deploy feature and intentionally not exposed.
      */
     @Get('/works/:id/runtime-env')
     @ApiOperation({
         summary: 'Get Work runtime env',
-        description: 'Per-Work DATABASE_URL state (masked) for the k8s-deployed site.',
+        description:
+            'Per-Work DATABASE_URL state (masked) plus the allow-listed per-Work env vars (masked, one entry per allowed key) for the deployed site.',
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
-    @ApiResponse({ status: 200, description: 'Runtime env state' })
+    @ApiResponse({
+        status: 200,
+        description:
+            'Runtime env state: { mode, sharedAvailable, databaseUrl: { configured, masked }, managed: string[], allowedEnvKeys: string[], env: Array<{ key, set, masked, secret }> }',
+    })
     async getRuntimeEnv(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', new ParseUUIDPipe()) id: string,
@@ -322,6 +329,7 @@ export class DeployController {
         const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(id);
         const explicitMode = await this.workRuntimeEnvService.getDatabaseMode(id);
         const configured = Boolean(databaseUrl);
+        const env = await this.workRuntimeEnvService.describeRuntimeEnvVars(id);
         return {
             status: 'success',
             // 'shared' (platform-managed Ever Works DB) vs 'custom' (BYO URL).
@@ -335,50 +343,97 @@ export class DeployController {
             // Auto-managed by the deploy feature (minted server-side), so they
             // are not editable here.
             managed: ['AUTH_SECRET', 'COOKIE_SECRET', 'COOKIE_SECURE'],
+            // Operator-managed per-Work env — the keys the UI may offer, and
+            // the masked current state of each (never plaintext).
+            allowedEnvKeys: [...this.workRuntimeEnvService.getAllowedEnvKeys()],
+            env,
         };
     }
 
     /**
-     * Set the per-Work `DATABASE_URL`. Persisted AES-256-GCM-encrypted on the
-     * Work and pushed into the `${slug}-runtime-env` k8s Secret on the next
-     * deploy (so the change applies after a redeploy).
+     * Set the per-Work runtime env. Two independent sections:
+     *  - database (`mode` / `databaseUrl`) — the pre-existing behaviour;
+     *  - `env` — merge-patch over the allow-listed per-Work env map.
+     * Either may be sent alone; `env`-only bodies leave the DB config alone.
+     * Everything is persisted AES-256-GCM-encrypted on the Work and pushed into
+     * the `${slug}-runtime-env` k8s Secret / GitHub Actions repo secrets on the
+     * next deploy (so the change applies after a redeploy).
      */
     @Put('/works/:id/runtime-env')
     @ApiOperation({
         summary: 'Set Work runtime env',
-        description: 'Sets the per-Work DATABASE_URL used by the k8s-deployed site.',
+        description:
+            'Sets the per-Work DATABASE_URL and/or merge-patches the allow-listed per-Work env vars (Stripe keys & co.) used by the deployed site. Keys outside the allow-list are rejected with 400.',
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
-    @ApiResponse({ status: 200, description: 'Runtime env updated' })
+    @ApiResponse({
+        status: 200,
+        description:
+            'Runtime env updated: { mode, sharedAvailable, databaseUrl: { configured, masked }, allowedEnvKeys: string[], env: Array<{ key, set, masked, secret }>, message }',
+    })
+    @ApiResponse({ status: 400, description: 'Invalid body or non-allow-listed env key' })
     async setRuntimeEnv(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', new ParseUUIDPipe()) id: string,
         @Body() dto: SetRuntimeEnvDto,
     ) {
         const { work } = await this.ownershipService.ensureCanEdit(id, auth.userId);
-        const mode: DatabaseMode = dto.mode ?? 'custom';
-        if (mode === 'shared') {
-            if (!this.dbProvisionService.isReady()) {
-                throw new BadRequestException(
-                    'The Ever Works DB (shared) option is not available. Ask an operator to enable it, or use a custom database.',
-                );
+        // The database section applies when the caller addressed it (any
+        // `mode`, or a `databaseUrl` — the legacy bare body). A body that only
+        // carries `env` must NOT touch the DB mode/URL.
+        const appliesDatabase = dto.mode !== undefined || dto.databaseUrl !== undefined;
+        const appliesEnv = dto.env !== undefined;
+        if (!appliesDatabase && !appliesEnv) {
+            throw new BadRequestException(
+                'Provide a database section (mode / databaseUrl) and/or an env patch.',
+            );
+        }
+
+        let mode: DatabaseMode | null = null;
+        if (appliesDatabase) {
+            mode = dto.mode ?? 'custom';
+            if (mode === 'shared') {
+                if (!this.dbProvisionService.isReady()) {
+                    throw new BadRequestException(
+                        'The Ever Works DB (shared) option is not available. Ask an operator to enable it, or use a custom database.',
+                    );
+                }
+                await this.workRuntimeEnvService.setDatabaseMode(id, 'shared');
+                // Provision (or re-point) the shared DB now so it is set + visible
+                // immediately; also re-runs idempotently on the next deploy.
+                await this.dbProvisionService.ensureDatabaseForWork(id, { force: true });
+                // Keep the PostgreSQL DB plugin authoritative: clear any per-Work
+                // override so the Work inherits the account-level setting. Best-
+                // effort — never fail the deploy config if the plugin isn't loaded.
+                await this.deployFacade.setWorkDbOverride(id, '').catch(() => {});
+            } else {
+                await this.workRuntimeEnvService.setDatabaseUrl(id, dto.databaseUrl as string);
+                await this.workRuntimeEnvService.setDatabaseMode(id, 'custom');
+                // Mirror the per-Work override into the PostgreSQL DB plugin's
+                // work-scoped setting (source of truth). Best-effort as above.
+                await this.deployFacade
+                    .setWorkDbOverride(id, dto.databaseUrl as string)
+                    .catch(() => {});
             }
-            await this.workRuntimeEnvService.setDatabaseMode(id, 'shared');
-            // Provision (or re-point) the shared DB now so it is set + visible
-            // immediately; also re-runs idempotently on the next deploy.
-            await this.dbProvisionService.ensureDatabaseForWork(id, { force: true });
-            // Keep the PostgreSQL DB plugin authoritative: clear any per-Work
-            // override so the Work inherits the account-level setting. Best-
-            // effort — never fail the deploy config if the plugin isn't loaded.
-            await this.deployFacade.setWorkDbOverride(id, '').catch(() => {});
-        } else {
-            await this.workRuntimeEnvService.setDatabaseUrl(id, dto.databaseUrl as string);
-            await this.workRuntimeEnvService.setDatabaseMode(id, 'custom');
-            // Mirror the per-Work override into the PostgreSQL DB plugin's
-            // work-scoped setting (source of truth). Best-effort as above.
-            await this.deployFacade
-                .setWorkDbOverride(id, dto.databaseUrl as string)
-                .catch(() => {});
+        }
+
+        let changedEnvKeys: string[] = [];
+        if (appliesEnv) {
+            // Service validates against the allow-list (400 on unknown keys),
+            // trims, caps length, and persists encrypted. Key NAMES only in
+            // logs / activity — never values.
+            changedEnvKeys = Object.keys(dto.env ?? {});
+            await this.workRuntimeEnvService.setRuntimeEnvVars(id, dto.env ?? {});
+        }
+
+        const summaryParts: string[] = [];
+        if (mode) summaryParts.push(`DATABASE_URL (${mode})`);
+        if (appliesEnv) {
+            summaryParts.push(
+                changedEnvKeys.length > 0
+                    ? `env vars ${changedEnvKeys.join(', ')}`
+                    : 'env vars (no-op)',
+            );
         }
         this.activityLogService
             .log({
@@ -387,11 +442,13 @@ export class DeployController {
                 actionType: ActivityActionType.DEPLOYMENT,
                 action: 'work.runtime-env.updated',
                 status: ActivityStatus.COMPLETED,
-                summary: `Updated DATABASE_URL for ${work.name} (${mode})`,
+                summary: `Updated ${summaryParts.join(' and ')} for ${work.name}`,
             })
             .catch(() => {});
+
         const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(id);
         const explicitMode = await this.workRuntimeEnvService.getDatabaseMode(id);
+        const env = await this.workRuntimeEnvService.describeRuntimeEnvVars(id);
         return {
             status: 'success',
             mode: this.resolveDbMode(explicitMode, Boolean(databaseUrl)),
@@ -400,10 +457,14 @@ export class DeployController {
                 configured: Boolean(databaseUrl),
                 masked: databaseUrl ? maskDatabaseUrl(databaseUrl) : null,
             },
+            allowedEnvKeys: [...this.workRuntimeEnvService.getAllowedEnvKeys()],
+            env,
             message:
                 mode === 'shared'
                     ? 'Switched to the Ever Works DB. Redeploy to apply it to the live site.'
-                    : 'Runtime env updated. Redeploy to apply it to the live site.',
+                    : appliesDatabase
+                      ? 'Runtime env updated. Redeploy to apply it to the live site.'
+                      : 'Environment variables updated. Redeploy to apply them to the live site.',
         };
     }
 
