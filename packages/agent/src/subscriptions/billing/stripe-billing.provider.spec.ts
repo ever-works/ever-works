@@ -2,6 +2,7 @@ import { BillingProviderError, BillingProviderNotConfiguredError } from './billi
 import {
     StripeBillingProvider,
     STRIPE_METADATA_KEYS,
+    STRIPE_PERPETUAL_LICENCE,
     STRIPE_PURCHASE_KINDS,
     STRIPE_SETUP_KIND,
 } from './stripe-billing.provider';
@@ -954,6 +955,193 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         expect(params.mode).toBe('subscription');
         expect(params.line_items[0].price_data.unit_amount).toBe(2900);
         expect(params.line_items[0].price_data.recurring).toEqual({ interval: 'month' });
+    });
+
+    it('buys a perpetual licence in payment mode, with no subscription_data', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, mode: 'payment', code: 'selfhosted_pro' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('payment');
+        // Stripe rejects subscription_data outright in payment mode; the one-off equivalent is
+        // payment_intent_data, and the metadata has to be mirrored there because a one-off
+        // purchase creates no subscription for it to live on.
+        expect(params.subscription_data).toBeUndefined();
+        expect(params.payment_intent_data.metadata[STRIPE_METADATA_KEYS.planCode]).toBe(
+            'selfhosted_pro',
+        );
+    });
+
+    it('marks a licence sale so manual fulfilment can find it', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, mode: 'payment' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        // Issuing the licence document is manual for now, so this marker is the only way to list
+        // who is owed one. It must be on BOTH objects.
+        expect(params.metadata[STRIPE_METADATA_KEYS.licence]).toBe(STRIPE_PERPETUAL_LICENCE);
+        expect(params.payment_intent_data.metadata[STRIPE_METADATA_KEYS.licence]).toBe(
+            STRIPE_PERPETUAL_LICENCE,
+        );
+    });
+
+    it('leaves the licence marker OFF a recurring purchase', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('subscription');
+        // A false positive here would put a recurring subscriber on the manual-fulfilment list.
+        expect(params.metadata[STRIPE_METADATA_KEYS.licence]).toBeUndefined();
+        expect(params.subscription_data.metadata[STRIPE_METADATA_KEYS.licence]).toBeUndefined();
+    });
+
+    it('keeps a licence purchase on the SAME webhook kind, so activation is one path', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, mode: 'payment' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        // The act is identical — grant this user this plan — and `activate()` already accepts a
+        // null provider subscription id. A separate kind would need a second activation path for
+        // no reason, and the webhook gate keys on exactly this value.
+        expect(params.metadata[STRIPE_METADATA_KEYS.kind]).toBe(
+            STRIPE_PURCHASE_KINDS.planSubscription,
+        );
+    });
+
+    it('bills the shared-account CATALOG price when the lookup key resolves', async () => {
+        const { provider, client } = build();
+        client.prices = {
+            list: jest.fn().mockResolvedValue({ data: [{ id: 'price_cat_1' }] }),
+        };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        });
+
+        expect(client.prices.list).toHaveBeenCalledWith(
+            expect.objectContaining({
+                lookup_keys: ['ever_works_cloud_pro_monthly'],
+                active: true,
+            }),
+        );
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        // The catalog price object, NOT an ad-hoc amount — that is what makes the invoice line
+        // traceable back to a reviewed commit.
+        expect(params.line_items[0].price).toBe('price_cat_1');
+        expect(params.line_items[0].price_data).toBeUndefined();
+        expect(params.line_items).toHaveLength(1);
+    });
+
+    it('falls back to the inline price when the account has no such lookup key', async () => {
+        // This is what protects self-hosters, CI and local dev: a deployment that has never run
+        // the catalog sync must still be able to take a payment.
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items[0].price).toBeUndefined();
+        expect(params.line_items[0].price_data.unit_amount).toBe(2900);
+    });
+
+    it('falls back to the inline price when the lookup itself throws', async () => {
+        // A Stripe outage on the price lookup must not take checkout down with it.
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockRejectedValue(new Error('stripe down')) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items[0].price_data.unit_amount).toBe(2900);
+    });
+
+    it('adds a second line item for the seats beyond the allowance', async () => {
+        const { provider, client } = build();
+        client.prices = {
+            list: jest.fn().mockImplementation(async ({ lookup_keys }) => ({
+                data: [{ id: lookup_keys[0].includes('_seat_') ? 'price_seat_1' : 'price_cat_1' }],
+            })),
+        };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                lookupKey: 'ever_works_cloud_pro_monthly',
+                seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+                extraSeats: 17,
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items).toHaveLength(2);
+        expect(params.line_items[0]).toEqual({ quantity: 1, price: 'price_cat_1' });
+        expect(params.line_items[1]).toEqual({ quantity: 17, price: 'price_seat_1' });
+    });
+
+    it('never emits a zero-quantity seat line — Stripe rejects one', async () => {
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [{ id: 'price_cat_1' }] }) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                lookupKey: 'ever_works_cloud_pro_monthly',
+                seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+                extraSeats: 0,
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items).toHaveLength(1);
+    });
+
+    it('sells the base plan rather than inventing a seat price it cannot resolve', async () => {
+        // The per-seat amount lives in the catalog, not the plan row, so there is no honest inline
+        // fallback for it. Billing a made-up number would be worse than under-billing.
+        const { provider, client } = build();
+        client.prices = {
+            list: jest.fn().mockImplementation(async ({ lookup_keys }) => ({
+                data: lookup_keys[0].includes('_seat_') ? [] : [{ id: 'price_cat_1' }],
+            })),
+        };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                lookupKey: 'ever_works_cloud_pro_monthly',
+                seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+                extraSeats: 4,
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items).toHaveLength(1);
+        expect(params.line_items[0].price).toBe('price_cat_1');
     });
 
     it('mirrors the plan metadata onto the SUBSCRIPTION so renewals stay attributable', async () => {

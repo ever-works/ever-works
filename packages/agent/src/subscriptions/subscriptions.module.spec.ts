@@ -180,6 +180,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'defaultAutoRechargePack',
                     'StripeBillingProvider',
                     'STRIPE_METADATA_KEYS',
+                    'STRIPE_PERPETUAL_LICENCE',
                     'STRIPE_PURCHASE_KINDS',
                     'STRIPE_CLIENT_FACTORY',
                     'BillingService',
@@ -339,6 +340,12 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                 // Audit B24 — mirrored onto subscription_data.metadata so
                 // renewals/cancels stay attributable to a tier.
                 planCode: 'ever_works_plan_code',
+                // Stamped ONLY on a one-off perpetual licence, on both the session and the payment
+                // intent. Issuing the licence document is manual for now, so this is what makes a
+                // sale findable: /v1/payment_intents/search with DOUBLE-quoted syntax. There is no
+                // /v1/checkout/sessions/search endpoint, which is why the session alone is not
+                // enough to carry it.
+                licence: 'ever_works_licence',
             });
         });
 

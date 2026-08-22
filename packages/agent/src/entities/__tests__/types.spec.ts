@@ -27,17 +27,40 @@ describe('entities/types', () => {
             ['FREE', 'free'],
             ['STANDARD', 'standard'],
             ['PREMIUM', 'premium'],
+            ['SELFHOSTED_COMMUNITY', 'selfhosted_community'],
+            ['SELFHOSTED_PRO', 'selfhosted_pro'],
+            ['SELFHOSTED_ENTERPRISE', 'selfhosted_enterprise'],
         ] as const)('%s → %s', (key, value) => {
             expect(SubscriptionPlanCode[key]).toBe(value);
         });
 
-        it('has exactly 3 plan codes', () => {
+        it('has exactly 6 plan codes', () => {
             const literals = Object.values(SubscriptionPlanCode).filter(
                 (v) => typeof v === 'string',
             );
-            expect(literals).toHaveLength(3);
-            // Pinned ascending tier order: free → standard → premium.
-            expect(literals).toEqual(['free', 'standard', 'premium']);
+            expect(literals).toHaveLength(6);
+            // Pinned order: the three cloud tiers ascending, then the three self-hosted editions.
+            // The self-hosted trio was added 2026-08-22 when Ever Works gained paid self-hosted
+            // editions; a commercial licence lifts the buyer's AGPLv3 obligations.
+            expect(literals).toEqual([
+                'free',
+                'standard',
+                'premium',
+                'selfhosted_community',
+                'selfhosted_pro',
+                'selfhosted_enterprise',
+            ]);
+        });
+
+        it('never renames the three original codes', () => {
+            // 🛑 These three strings are stored verbatim in `subscription_plans.code`, in
+            // `user_subscriptions.planCode`, and in Stripe metadata on every subscription ever
+            // created. Renaming one orphans live subscriptions. Their DISPLAY names moved to the
+            // marketing tiers ('standard' shows as "Pro", 'premium' as "Enterprise") — that is a
+            // `displayName` change in the plan seed, never a change here.
+            expect(SubscriptionPlanCode.FREE).toBe('free');
+            expect(SubscriptionPlanCode.STANDARD).toBe('standard');
+            expect(SubscriptionPlanCode.PREMIUM).toBe('premium');
         });
     });
 

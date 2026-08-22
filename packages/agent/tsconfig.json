@@ -8,6 +8,12 @@
         "experimentalDecorators": true,
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
+        // Required by `subscriptions/billing/stripe-catalog.ts`, which imports the pricing catalog
+        // as data. The catalog is JSON rather than TypeScript so that
+        // `scripts/stripe-sync-catalog.mjs` — plain node, no build step — reads the exact same
+        // bytes the running app does; a second hand-maintained copy would drift, and the thing it
+        // would drift on is prices.
+        "resolveJsonModule": true,
         "target": "ES2021",
         "sourceMap": true,
         "outDir": "./dist",
