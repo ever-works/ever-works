@@ -49,13 +49,13 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 					failureThreshold: input.startupFailureThreshold ?? 30
 				},
 				readinessProbe: {
-					httpGet: { path: '/', port: 'http' },
+					httpGet: { path: '/api/health', port: 'http' },
 					periodSeconds: 10,
 					timeoutSeconds: 5,
 					failureThreshold: 3
 				},
 				livenessProbe: {
-					httpGet: { path: '/', port: 'http' },
+					httpGet: { path: '/api/health', port: 'http' },
 					periodSeconds: 20,
 					timeoutSeconds: 10,
 					failureThreshold: 6

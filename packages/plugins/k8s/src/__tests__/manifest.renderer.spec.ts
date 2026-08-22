@@ -48,6 +48,14 @@ describe('buildDeployment', () => {
 		const d = buildDeployment({ ...baseInput, pullSecretName: 'my-site-pull' }) as Record<string, any>;
 		expect(d.spec.template.spec.imagePullSecrets).toEqual([{ name: 'my-site-pull' }]);
 	});
+
+	it('uses the cheap health endpoint for ongoing readiness and liveness probes', () => {
+		const d = buildDeployment(baseInput) as Record<string, any>;
+		const container = d.spec.template.spec.containers[0];
+
+		expect(container.readinessProbe.httpGet.path).toBe('/api/health');
+		expect(container.livenessProbe.httpGet.path).toBe('/api/health');
+	});
 });
 
 describe('buildService', () => {
