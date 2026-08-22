@@ -18,6 +18,7 @@ export type ModelExecutionStatus =
 	| 'cancelled'
 	| 'output-limit'
 	| 'termination-failed'
+	| 'credential-boundary-unavailable'
 	| 'containment-unavailable';
 
 export type ClaudeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
@@ -44,21 +45,39 @@ interface BaseModelExecutionRequest {
 	/** Prompt/task instructions are written to stdin and never placed on the command line. */
 	readonly instructions: string;
 	readonly model?: string;
-	/** Exactly one provider credential selected from the node's own environment. */
-	readonly credentialEnv: Readonly<Record<string, string>>;
 	readonly timeoutMs?: number;
 	readonly signal?: AbortSignal;
 }
 
+export type ModelExecutionAuthentication =
+	| { readonly kind: 'local-session' }
+	| {
+			readonly kind: 'provider-credential';
+			readonly environment: Readonly<Record<string, string>>;
+	  };
+
+type ModelExecutionAuthenticationRequest =
+	| {
+			readonly authentication: ModelExecutionAuthentication;
+			readonly credentialEnv?: never;
+	  }
+	| {
+			/** @deprecated Raw provider secrets are refused until a task-scoped broker exists. */
+			readonly authentication?: never;
+			readonly credentialEnv: Readonly<Record<string, string>>;
+	  };
+
 export type ModelExecutionRequest =
-	| (BaseModelExecutionRequest & {
-			readonly provider: 'claude-code';
-			readonly options?: ClaudeModelExecutionOptions;
-	  })
-	| (BaseModelExecutionRequest & {
-			readonly provider: 'codex';
-			readonly options?: CodexModelExecutionOptions;
-	  });
+	| (BaseModelExecutionRequest &
+			ModelExecutionAuthenticationRequest & {
+				readonly provider: 'claude-code';
+				readonly options?: ClaudeModelExecutionOptions;
+			})
+	| (BaseModelExecutionRequest &
+			ModelExecutionAuthenticationRequest & {
+				readonly provider: 'codex';
+				readonly options?: CodexModelExecutionOptions;
+			});
 
 /** Structured terminal value for a later AgentRun/task/Git reconciliation layer. */
 export interface ModelExecutionResult extends Record<string, unknown> {
@@ -77,6 +96,8 @@ export interface ModelExecutionResult extends Record<string, unknown> {
 export interface ModelCliCommand {
 	/** Canonical absolute path from node-owned configuration; never task input or PATH lookup. */
 	readonly executable: string;
+	/** Optional CLI-owned auth/config directory for a locally authenticated service identity. */
+	readonly localSessionHome?: string;
 }
 
 interface ModelExecutionIo {
@@ -98,6 +119,12 @@ interface ModelExecutionIo {
 	readonly beforeSpawn?: (purpose: 'version-probe' | 'model') => void;
 	/** Test-only cleanup seam; never exported by the production model-process API. */
 	readonly removeRunRoot?: (path: string) => Promise<void>;
+	/**
+	 * Internal containment integration seam. The production factory deliberately
+	 * supplies none until an audited native launcher can create a suspended child,
+	 * assign it to a kill-on-close Job Object, and only then resume it.
+	 */
+	readonly createModelProcessContainment?: (testSpawn: typeof spawn) => Promise<ModelProcessContainment>;
 }
 
 export class ModelExecutionRequestError extends Error {
@@ -190,6 +217,10 @@ interface SelectedCredential {
 	readonly value: string;
 }
 
+type ResolvedAuthentication =
+	| { readonly kind: 'local-session' }
+	| { readonly kind: 'provider-credential'; readonly credential: SelectedCredential };
+
 interface RawProcessResult {
 	readonly exitCode: number | null;
 	readonly signal: NodeJS.Signals | null;
@@ -204,6 +235,13 @@ interface RawProcessResult {
 interface ProcessTreeTermination {
 	readonly verified: boolean;
 	readonly detail?: string;
+}
+
+interface ModelProcessContainment {
+	/** Must return only after the child is assigned to the containment boundary and resumed. */
+	readonly spawn: typeof spawn;
+	/** Kill-on-close must cover every descendant, including detached children. */
+	readonly close: () => Promise<ProcessTreeTermination>;
 }
 
 interface ManagedExecutableIdentity {
@@ -250,8 +288,12 @@ export async function executeModelProcessInternal(
 	const execute = async (): Promise<ModelExecutionResult> => {
 		try {
 			await withinExecutionDeadline(() => validateRequest(request, io), deadlineAt, monotonicNow, request.signal);
-			const credential = selectCredential(request.provider, request.credentialEnv);
-			secrets = [credential.value];
+			const authentication = resolveAuthentication(request);
+			const credential = authentication.kind === 'provider-credential' ? authentication.credential : null;
+			if (credential) {
+				secrets = [credential.value];
+				return credentialBoundaryUnavailableResult(request.provider, Math.max(0, now() - startedAt));
+			}
 			const trusted = await withinExecutionDeadline(
 				() =>
 					resolveTrustedCommand(
@@ -295,7 +337,7 @@ export async function executeModelProcessInternal(
 			const env = buildModelEnvironment(
 				request.provider,
 				credential,
-				configHome,
+				trusted.localSessionHome ?? configHome,
 				isolatedHome,
 				isolatedTemp,
 				io.parentEnv ?? process.env
@@ -343,7 +385,19 @@ export async function executeModelProcessInternal(
 					'Managed model executable identity changed between its version probe and credentialed run'
 				);
 			}
-			if ((io.platform ?? process.platform) !== 'win32') {
+			if ((io.platform ?? process.platform) !== 'win32' || !io.createModelProcessContainment) {
+				return containmentUnavailableResult(request.provider, Math.max(0, now() - startedAt));
+			}
+			let containment: ModelProcessContainment;
+			try {
+				containment = await withinExecutionDeadline(
+					() => io.createModelProcessContainment!(io.spawnFn ?? spawn),
+					deadlineAt,
+					monotonicNow,
+					request.signal
+				);
+			} catch (error) {
+				if (error instanceof ExecutionDeadlineExceeded || error instanceof ExecutionCancelled) throw error;
 				return containmentUnavailableResult(request.provider, Math.max(0, now() - startedAt));
 			}
 			const modelBudgetMs = remainingExecutionMs(deadlineAt, monotonicNow);
@@ -366,7 +420,8 @@ export async function executeModelProcessInternal(
 					monotonicNow,
 					signal: request.signal
 				},
-				io
+				io,
+				containment
 			);
 
 			return toTerminalResult(request.provider, raw, Math.max(0, now() - startedAt), secrets);
@@ -511,7 +566,23 @@ function containmentUnavailableResult(provider: ModelExecutionProvider, duration
 		signal: null,
 		durationMs,
 		summary:
-			'Credentialed model execution is refused because verified process-tree containment is unavailable on this platform',
+			'Verified process containment is unavailable: a trusted pre-spawn Windows Job Object launcher must assign the suspended child before it can run',
+		outputTruncated: false
+	});
+}
+
+function credentialBoundaryUnavailableResult(
+	provider: ModelExecutionProvider,
+	durationMs: number
+): ModelExecutionResult {
+	return enforceTerminalBudget({
+		provider,
+		status: 'credential-boundary-unavailable',
+		exitCode: null,
+		signal: null,
+		durationMs,
+		summary:
+			'Raw provider credentials are refused for Fleet model execution; use a locally authenticated CLI session or a task-scoped credential broker',
 		outputTruncated: false
 	});
 }
@@ -563,6 +634,7 @@ async function resolveTrustedCommand(
 ): Promise<{
 	readonly command: ModelCliCommand;
 	readonly workspacePath: string;
+	readonly localSessionHome?: string;
 	readonly identity: ManagedExecutableIdentity;
 }> {
 	const command = commands?.[provider];
@@ -570,9 +642,9 @@ async function resolveTrustedCommand(
 	if (!command || !configuredExecutable || !isAbsolute(configuredExecutable)) {
 		throw new ModelExecutionRequestError(`A trusted absolute executable path must be configured for ${provider}`);
 	}
-	if (Object.keys(command).some((key) => key !== 'executable')) {
+	if (Object.keys(command).some((key) => key !== 'executable' && key !== 'localSessionHome')) {
 		throw new ModelExecutionRequestError(
-			`Managed ${provider} command configuration must contain only its executable path`
+			`Managed ${provider} command configuration may contain only its executable path and local session home`
 		);
 	}
 
@@ -598,10 +670,31 @@ async function resolveTrustedCommand(
 			`The trusted executable for ${provider} must not be located inside the leased task workspace`
 		);
 	}
+	let canonicalLocalSessionHome: string | undefined;
+	if (command.localSessionHome !== undefined) {
+		if (!isAbsolute(command.localSessionHome)) {
+			throw new ModelExecutionRequestError(`The local ${provider} session home must be an absolute path`);
+		}
+		try {
+			canonicalLocalSessionHome = await realpath(command.localSessionHome);
+		} catch {
+			throw new ModelExecutionRequestError(`The local ${provider} session home must resolve to an existing path`);
+		}
+		if (!pathsEqual(resolve(command.localSessionHome), resolve(canonicalLocalSessionHome), platform)) {
+			throw new ModelExecutionRequestError(`The local ${provider} session home is not canonical`);
+		}
+		const authFromWorkspace = relative(canonicalWorkspace, canonicalLocalSessionHome);
+		if (!authFromWorkspace || (!authFromWorkspace.startsWith('..') && !isAbsolute(authFromWorkspace))) {
+			throw new ModelExecutionRequestError(
+				`The local ${provider} session home must be outside the leased workspace`
+			);
+		}
+	}
 
 	return {
-		command: { executable: canonicalExecutable },
+		command: { executable: canonicalExecutable, localSessionHome: canonicalLocalSessionHome },
 		workspacePath: canonicalWorkspace,
+		localSessionHome: canonicalLocalSessionHome,
 		identity: await readManagedExecutableIdentity(canonicalExecutable)
 	};
 }
@@ -681,9 +774,26 @@ function validateProviderOptions(request: ModelExecutionRequest): void {
 	}
 }
 
+function resolveAuthentication(request: ModelExecutionRequest): ResolvedAuthentication {
+	if (request.authentication && request.credentialEnv !== undefined) {
+		throw new ModelExecutionRequestError(
+			'Model authentication modes are exclusive; a local session cannot include a raw credential environment'
+		);
+	}
+	if (request.authentication?.kind === 'local-session') return { kind: 'local-session' };
+	const credentialEnv =
+		request.authentication?.kind === 'provider-credential'
+			? request.authentication.environment
+			: request.credentialEnv;
+	return {
+		kind: 'provider-credential',
+		credential: selectCredential(request.provider, credentialEnv)
+	};
+}
+
 function selectCredential(
 	provider: ModelExecutionProvider,
-	credentialEnv: Readonly<Record<string, string>>
+	credentialEnv: Readonly<Record<string, string>> | undefined
 ): SelectedCredential {
 	if (!credentialEnv || typeof credentialEnv !== 'object' || Array.isArray(credentialEnv)) {
 		throw new ModelExecutionRequestError(`A selected ${provider} credential environment is required`);
@@ -717,7 +827,7 @@ function selectCredential(
 
 function buildModelEnvironment(
 	provider: ModelExecutionProvider,
-	credential: SelectedCredential,
+	credential: SelectedCredential | null,
 	configHome: string,
 	isolatedHome: string,
 	isolatedTemp: string,
@@ -762,9 +872,11 @@ function buildModelEnvironment(
 	env.TMP = isolatedTemp;
 	env.TMPDIR = isolatedTemp;
 	env.CI = '1';
-	const childCredentialName =
-		provider === 'codex' && credential.name === 'OPENAI_API_KEY' ? 'CODEX_API_KEY' : credential.name;
-	env[childCredentialName] = credential.value;
+	if (credential) {
+		const childCredentialName =
+			provider === 'codex' && credential.name === 'OPENAI_API_KEY' ? 'CODEX_API_KEY' : credential.name;
+		env[childCredentialName] = credential.value;
+	}
 
 	if (provider === 'claude-code') {
 		env.CLAUDE_CONFIG_DIR = configHome;
@@ -818,7 +930,7 @@ function buildProviderArgs(request: ModelExecutionRequest): string[] {
 	}
 
 	const options = request.options ?? {};
-	const args = ['exec', '--json', '--ephemeral', '--color', 'never'];
+	const args = ['exec', '--json', '--ephemeral', '--color', 'never', '-c', 'shell_environment_policy.inherit=none'];
 	if (options.dangerouslyBypassApprovalsAndSandbox) {
 		args.push('--dangerously-bypass-approvals-and-sandbox');
 	} else {
@@ -845,7 +957,7 @@ function withoutProviderCredentials(env: Record<string, string>): Record<string,
 
 function resolveCliVersionProbe(
 	provider: ModelExecutionProvider,
-	credential: SelectedCredential,
+	credential: SelectedCredential | null,
 	raw: RawProcessResult,
 	durationMs: number,
 	secrets: readonly string[]
@@ -877,7 +989,7 @@ function resolveCliVersionProbe(
 	}
 	if (
 		provider === 'codex' &&
-		credential.name === 'CODEX_ACCESS_TOKEN' &&
+		credential?.name === 'CODEX_ACCESS_TOKEN' &&
 		compareSemver(version, MODEL_CLI_COMPATIBILITY.codex.accessTokenMinimumVersion) < 0
 	) {
 		return incompatibleCliResult(
@@ -939,22 +1051,33 @@ async function runProcess(
 		readonly monotonicNow: () => number;
 		readonly signal?: AbortSignal;
 	},
-	io: ModelExecutionIo
+	io: ModelExecutionIo,
+	containment?: ModelProcessContainment
 ): Promise<RawProcessResult> {
 	const spawnFn = io.spawnFn ?? spawn;
 	const platform = io.platform ?? process.platform;
 	let child: ChildProcess;
 	let processTimeoutMs: number;
+	const closeBeforeSpawn = async (raw: RawProcessResult): Promise<RawProcessResult> => {
+		if (!containment) return raw;
+		const outcome = await boundedProcessTreeTermination(() => containment.close());
+		return outcome.verified
+			? raw
+			: {
+					...raw,
+					terminationFailure: outcome.detail ?? 'The unused process containment boundary could not be closed'
+				};
+	};
 	try {
-		if (options.signal?.aborted) return rawPreSpawnTermination('cancelled');
+		if (options.signal?.aborted) return closeBeforeSpawn(rawPreSpawnTermination('cancelled'));
 		let remainingMs = remainingExecutionMs(options.deadlineAt, options.monotonicNow);
-		if (remainingMs <= 0) return rawPreSpawnTermination('timed-out');
+		if (remainingMs <= 0) return closeBeforeSpawn(rawPreSpawnTermination('timed-out'));
 		io.beforeSpawn?.(options.purpose);
-		if (options.signal?.aborted) return rawPreSpawnTermination('cancelled');
+		if (options.signal?.aborted) return closeBeforeSpawn(rawPreSpawnTermination('cancelled'));
 		remainingMs = remainingExecutionMs(options.deadlineAt, options.monotonicNow);
-		if (remainingMs <= 0) return rawPreSpawnTermination('timed-out');
+		if (remainingMs <= 0) return closeBeforeSpawn(rawPreSpawnTermination('timed-out'));
 		processTimeoutMs = Math.min(options.timeoutMs, remainingMs);
-		child = spawnFn(options.executable, options.args, {
+		child = (containment?.spawn ?? spawnFn)(options.executable, options.args, {
 			cwd: options.cwd,
 			env: options.env,
 			stdio: ['pipe', 'pipe', 'pipe'],
@@ -963,7 +1086,7 @@ async function runProcess(
 			detached: platform !== 'win32'
 		});
 	} catch (error) {
-		return rawSpawnFailure(error);
+		return closeBeforeSpawn(rawSpawnFailure(error));
 	}
 
 	return new Promise<RawProcessResult>((resolve) => {
@@ -973,16 +1096,13 @@ async function runProcess(
 		let capturedBytes = 0;
 		const stdout: Buffer[] = [];
 		const stderr: Buffer[] = [];
-		let fallbackTimer: NodeJS.Timeout | null = null;
 		let terminationAttempt: Promise<ProcessTreeTermination> | null = null;
 		let terminationFailure: string | null = null;
-		let terminationSettled = false;
 
 		const finish = (result: Pick<RawProcessResult, 'exitCode' | 'signal' | 'spawnError'>): void => {
 			if (settled) return;
 			settled = true;
 			clearTimeout(timeoutTimer);
-			if (fallbackTimer) clearTimeout(fallbackTimer);
 			options.signal?.removeEventListener('abort', onAbort);
 			resolve({
 				...result,
@@ -995,7 +1115,6 @@ async function runProcess(
 		};
 
 		const recordTermination = (outcome: ProcessTreeTermination): void => {
-			terminationSettled = true;
 			if (!outcome.verified) {
 				terminationFailure = outcome.detail ?? 'The process tree termination outcome could not be verified';
 			}
@@ -1008,42 +1127,63 @@ async function runProcess(
 			});
 		};
 
+		const makeAbsoluteDeadlineWin = (): void => {
+			if (!termination && remainingExecutionMs(options.deadlineAt, options.monotonicNow) <= 0) {
+				termination = 'timed-out';
+			}
+		};
+
 		const finishAfterTermination = (result: Pick<RawProcessResult, 'exitCode' | 'signal' | 'spawnError'>): void => {
 			const attempt = terminationAttempt;
 			if (!attempt) {
+				makeAbsoluteDeadlineWin();
 				finish(result);
 				return;
 			}
 			void attempt.then(
 				(outcome) => {
 					recordTermination(outcome);
+					makeAbsoluteDeadlineWin();
 					finish(result);
 				},
 				(error) => {
 					recordTerminationError(error);
+					makeAbsoluteDeadlineWin();
 					finish(result);
 				}
 			);
 		};
 
+		const startTreeSafety = (): Promise<ProcessTreeTermination> => {
+			if (!terminationAttempt) {
+				terminationAttempt = boundedProcessTreeTermination(() =>
+					containment
+						? containment.close()
+						: terminateProcessTree(
+								child,
+								platform,
+								spawnFn,
+								io.processKill ?? process.kill,
+								withoutProviderCredentials(options.env)
+							)
+				);
+			}
+			return terminationAttempt;
+		};
+
 		const requestTermination = (reason: NonNullable<RawProcessResult['termination']>): void => {
 			if (termination || settled) return;
 			termination = reason;
-			fallbackTimer = setTimeout(() => {
-				if (!terminationSettled) {
-					terminationFailure =
-						'The process tree termination attempt did not settle before its safety deadline';
+			void startTreeSafety().then(
+				(outcome) => {
+					recordTermination(outcome);
+					finish({ exitCode: null, signal: null, spawnError: null });
+				},
+				(error) => {
+					recordTerminationError(error);
+					finish({ exitCode: null, signal: null, spawnError: null });
 				}
-				finish({ exitCode: null, signal: null, spawnError: null });
-			}, TERMINATION_SETTLE_MS);
-			terminationAttempt = terminateProcessTree(
-				child,
-				platform,
-				spawnFn,
-				io.processKill ?? process.kill,
-				withoutProviderCredentials(options.env)
 			);
-			void terminationAttempt.then(recordTermination, recordTerminationError);
 		};
 
 		const append = (target: Buffer[], chunk: Buffer): void => {
@@ -1066,9 +1206,18 @@ async function runProcess(
 		child.stderr?.on('data', (chunk: Buffer | string) => append(stderr, Buffer.from(chunk)));
 		child.once('error', (error) => {
 			if (termination) return;
+			if (containment) {
+				void startTreeSafety();
+				finishAfterTermination({ exitCode: null, signal: null, spawnError: error });
+				return;
+			}
 			finish({ exitCode: null, signal: null, spawnError: error });
 		});
 		child.once('close', (code, signal) => {
+			if (!termination && remainingExecutionMs(options.deadlineAt, options.monotonicNow) <= 0) {
+				termination = 'timed-out';
+			}
+			if (containment) void startTreeSafety();
 			finishAfterTermination({ exitCode: code, signal, spawnError: null });
 		});
 
@@ -1079,6 +1228,38 @@ async function runProcess(
 
 		child.stdin?.on('error', () => undefined);
 		child.stdin?.end(options.stdin, 'utf8');
+	});
+}
+
+function boundedProcessTreeTermination(
+	operation: () => Promise<ProcessTreeTermination>
+): Promise<ProcessTreeTermination> {
+	return new Promise<ProcessTreeTermination>((resolvePromise) => {
+		let settled = false;
+		const finish = (outcome: ProcessTreeTermination): void => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			resolvePromise(outcome);
+		};
+		const timer = setTimeout(
+			() =>
+				finish({
+					verified: false,
+					detail: 'The process containment close did not settle before its safety deadline'
+				}),
+			TERMINATION_SETTLE_MS
+		);
+		Promise.resolve()
+			.then(operation)
+			.then(
+				(outcome) => finish(outcome),
+				(error) =>
+					finish({
+						verified: false,
+						detail: `The process containment close failed: ${error instanceof Error ? error.message : String(error)}`
+					})
+			);
 	});
 }
 
@@ -1269,17 +1450,17 @@ function toTerminalResult(
 		outputTruncated: raw.outputTruncated
 	};
 
+	if (raw.terminationFailure) {
+		return enforceTerminalBudget({
+			...base,
+			status: 'termination-failed',
+			summary: redactBounded(
+				`Model process tree termination was not verified: ${raw.terminationFailure}`,
+				secrets
+			)
+		});
+	}
 	if (raw.termination) {
-		if (raw.terminationFailure) {
-			return enforceTerminalBudget({
-				...base,
-				status: 'termination-failed',
-				summary: redactBounded(
-					`Model process tree termination was not verified: ${raw.terminationFailure}`,
-					secrets
-				)
-			});
-		}
 		return enforceTerminalBudget({
 			...base,
 			status: raw.termination,

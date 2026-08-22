@@ -86,6 +86,44 @@ process.stdin.on('end', () => {
     return;
   }
 
+	if (mode === 'success-detached-tree') {
+		const markerScript = 'setTimeout(() => require("node:fs").writeFileSync(' +
+		  JSON.stringify(markerPath) +
+		  ', process.env.CODEX_ACCESS_TOKEN || process.env.CODEX_API_KEY || process.env.OPENAI_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY || "missing"), 1200)';
+		const grandchild = spawn(process.execPath, ['-e', markerScript], {
+			stdio: 'ignore',
+			detached: true,
+			windowsHide: true
+		});
+		grandchild.unref();
+		if (isCodex) {
+			process.stdout.write(JSON.stringify({ type: 'turn.completed' }) + '\n');
+		} else {
+			process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'done' }));
+		}
+		return;
+	}
+
+	if (mode === 'tool-env') {
+		const markerScript = 'const fs = require("node:fs"); const selected = {}; ' +
+			'for (const key of ["CODEX_ACCESS_TOKEN", "CODEX_API_KEY", "OPENAI_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"]) ' +
+			'{ if (Object.prototype.hasOwnProperty.call(process.env, key)) selected[key] = process.env[key]; } ' +
+			'fs.writeFileSync(process.argv[1], JSON.stringify(selected));';
+		const tool = spawn(process.execPath, ['-e', markerScript, markerPath], {
+			stdio: 'ignore',
+			windowsHide: true,
+			env: process.env
+		});
+		tool.once('close', () => {
+			if (isCodex) {
+				process.stdout.write(JSON.stringify({ type: 'turn.completed' }) + '\n');
+			} else {
+				process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: 'done' }));
+			}
+		});
+		return;
+	}
+
   if (mode === 'slow-deadline' || mode === 'slow-model-deadline') {
 	setTimeout(() => {
 	  if (isCodex) {
@@ -146,7 +184,7 @@ process.stdin.on('end', () => {
   }
 
   if (mode === 'secret-output-boundary') {
-    process.stdout.write('a'.repeat(${MODEL_EXECUTION_OUTPUT_LIMIT_BYTES - 5}) + credential + 'tail');
+	process.stdout.write('a'.repeat(${MODEL_EXECUTION_OUTPUT_LIMIT_BYTES - 5}) + credential + 'tail'.repeat(10));
     setInterval(() => {}, 1000);
     return;
   }
@@ -191,6 +229,7 @@ interface Harness {
 	markerPath: string;
 	stubPath: string;
 	managedExecutablePath: string;
+	localSessionHome: string;
 	spawnWithTaskkill: (taskkill?: (...args: Parameters<typeof spawn>) => ChildProcess) => typeof spawn;
 	io: ModelExecutionIo;
 }
@@ -208,12 +247,14 @@ async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = proces
 	const stubPath = join(root, 'stub cli with spaces.cjs');
 	const capturePath = join(root, 'capture.json');
 	const markerPath = join(root, 'orphan-marker.txt');
+	const localSessionHome = join(root, 'node-owned-local-session');
 	const managedExecutablePath = await realpath(process.execPath);
-	await mkdir(workspacePath, { recursive: true });
+	await Promise.all([mkdir(workspacePath, { recursive: true }), mkdir(localSessionHome, { recursive: true })]);
 	await writeFile(stubPath, STUB_SOURCE, 'utf8');
 	const spawnWithTaskkill = (taskkill?: (...args: Parameters<typeof spawn>) => ChildProcess): typeof spawn =>
 		nodeScriptSpawn(stubPath, (provider) => [capturePath, mode, markerPath, provider], taskkill);
 
+	const modelSpawn = spawnWithTaskkill();
 	return {
 		root,
 		workspacePath,
@@ -221,19 +262,23 @@ async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = proces
 		markerPath,
 		stubPath,
 		managedExecutablePath,
+		localSessionHome,
 		spawnWithTaskkill,
 		io: {
 			commands: {
 				'claude-code': {
-					executable: managedExecutablePath
+					executable: managedExecutablePath,
+					localSessionHome
 				},
 				codex: {
-					executable: managedExecutablePath
+					executable: managedExecutablePath,
+					localSessionHome
 				}
 			},
 			parentEnv,
 			platform: 'win32',
-			spawnFn: spawnWithTaskkill()
+			spawnFn: modelSpawn,
+			createModelProcessContainment: createVerifiedTestContainment()
 		}
 	};
 }
@@ -247,10 +292,7 @@ function request(
 		workspacePath,
 		instructions: 'Edit the project and report the verified result.',
 		model: provider === 'claude-code' ? 'sonnet' : 'gpt-5.6-codex',
-		credentialEnv:
-			provider === 'claude-code'
-				? { CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL }
-				: { CODEX_ACCESS_TOKEN: FAKE_CODEX_CREDENTIAL },
+		authentication: { kind: 'local-session' as const },
 		timeoutMs: 5_000
 	};
 	return { ...base, ...overrides, provider } as ModelExecutionRequest;
@@ -310,6 +352,52 @@ function nodeScriptSpawn(
 	}) as typeof spawn;
 }
 
+function createVerifiedTestContainment(): NonNullable<ModelExecutionIo['createModelProcessContainment']> {
+	return async (spawnFn) => {
+		let child: ChildProcess | null = null;
+		return {
+			spawn: ((...args: Parameters<typeof spawn>) => {
+				child = spawnFn(...args);
+				return child;
+			}) as typeof spawn,
+			close: async () => {
+				if (!child || child.exitCode !== null || child.signalCode !== null) return { verified: true };
+				const pid = child.pid;
+				if (typeof pid !== 'number' || !process.env.SystemRoot) {
+					return { verified: false, detail: 'test process has no Windows PID/SystemRoot' };
+				}
+				const taskkillPath = join(process.env.SystemRoot, 'System32', 'taskkill.exe');
+				return new Promise((resolvePromise) => {
+					let settled = false;
+					const finish = (outcome: { verified: boolean; detail?: string }): void => {
+						if (settled) return;
+						settled = true;
+						clearTimeout(watchdog);
+						resolvePromise(outcome);
+					};
+					const killer = spawn(taskkillPath, ['/PID', String(pid), '/T', '/F'], {
+						stdio: 'ignore',
+						shell: false,
+						windowsHide: true
+					});
+					const watchdog = setTimeout(() => {
+						killer.kill('SIGKILL');
+						finish({ verified: false, detail: 'test taskkill did not settle' });
+					}, 2_000);
+					killer.once('error', (error) => finish({ verified: false, detail: error.message }));
+					killer.once('close', (code) =>
+						finish(
+							code === 0
+								? { verified: true }
+								: { verified: false, detail: `test taskkill exited with code ${code ?? 'null'}` }
+						)
+					);
+				});
+			}
+		};
+	};
+}
+
 function envValue(env: Record<string, string>, name: string): string | undefined {
 	const key = Object.keys(env).find((candidate) => candidate.toUpperCase() === name.toUpperCase());
 	return key ? env[key] : undefined;
@@ -321,6 +409,95 @@ function isWithin(root: string, candidate: string): boolean {
 }
 
 describe('executeModelProcess — real process boundary', () => {
+	it.each(['claude-code', 'codex'] as const)(
+		'refuses raw %s provider credentials before any model process can inherit them',
+		async (provider) => {
+			const harness = await createHarness('success');
+			const credentialEnv =
+				provider === 'claude-code'
+					? { CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL }
+					: { CODEX_ACCESS_TOKEN: FAKE_CODEX_CREDENTIAL };
+			const result = await executeModelProcess(
+				request(provider, harness.workspacePath, {
+					authentication: { kind: 'provider-credential', environment: credentialEnv }
+				} as never),
+				harness.io
+			);
+
+			expect(result.status).toBe('credential-boundary-unavailable');
+			expect(result.summary).toMatch(/local.*session|credential.*broker/i);
+			await expect(access(harness.capturePath)).rejects.toThrow();
+		}
+	);
+
+	it.each(['claude-code', 'codex'] as const)(
+		'accepts a zero-secret local %s session request but fails closed before model spawn without pre-spawn containment',
+		async (provider) => {
+			const harness = await createHarness('success');
+			const localSessionRequest = request(provider, harness.workspacePath, {
+				authentication: { kind: 'local-session' },
+				credentialEnv: undefined
+			} as never);
+			const result = await executeModelProcess(localSessionRequest, {
+				...harness.io,
+				createModelProcessContainment: undefined
+			});
+
+			expect(result.status).toBe('containment-unavailable');
+			expect(result.summary).toMatch(/pre-spawn.*job object|containment.*prerequisite/i);
+			await expect(access(harness.capturePath)).rejects.toThrow();
+			const versionEnvironment = await readFile(`${harness.capturePath}.version.json`, 'utf8');
+			expect(versionEnvironment).not.toContain(FAKE_CLAUDE_CREDENTIAL);
+			expect(versionEnvironment).not.toContain(FAKE_CODEX_CREDENTIAL);
+		}
+	);
+
+	it('fails closed before model spawn when pre-spawn Job Object assignment cannot be established', async () => {
+		const harness = await createHarness('success');
+		const result = await executeModelProcess(request('codex', harness.workspacePath), {
+			...harness.io,
+			createModelProcessContainment: async () => {
+				throw new Error('AssignProcessToJobObject refused the suspended child');
+			}
+		});
+
+		expect(result.status).toBe('containment-unavailable');
+		expect(result.summary).toMatch(/pre-spawn.*job object|containment.*prerequisite/i);
+		await expect(access(harness.capturePath)).rejects.toThrow();
+	});
+
+	it('does not start a normal-closing model that could leave a detached credential-bearing descendant', async () => {
+		const harness = await createHarness('success-detached-tree');
+		const result = await executeModelProcess(
+			request('codex', harness.workspacePath, {
+				authentication: {
+					kind: 'provider-credential',
+					environment: { CODEX_ACCESS_TOKEN: FAKE_CODEX_CREDENTIAL }
+				}
+			} as never),
+			{ ...harness.io, createModelProcessContainment: undefined }
+		);
+
+		expect(result.status).toBe('credential-boundary-unavailable');
+		await expect(access(harness.capturePath)).rejects.toThrow();
+		await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_500));
+		await expect(access(harness.markerPath)).rejects.toThrow();
+	});
+
+	it('keeps provider credentials out of a repository tool subprocess in local-session mode', async () => {
+		const harness = await createHarness('tool-env', {
+			...process.env,
+			CODEX_ACCESS_TOKEN: FAKE_CODEX_CREDENTIAL,
+			OPENAI_API_KEY: FAKE_CODEX_CREDENTIAL,
+			CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL,
+			ANTHROPIC_API_KEY: FAKE_CLAUDE_CREDENTIAL
+		});
+		const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
+
+		expect(result.status).toBe('succeeded');
+		expect(JSON.parse(await readFile(harness.markerPath, 'utf8'))).toEqual({});
+	});
+
 	it.each(['claude-code', 'codex'] as const)(
 		'runs the %s no-model contract accepted by the repository-pinned CLI fixture',
 		async (provider) => {
@@ -334,11 +511,7 @@ describe('executeModelProcess — real process boundary', () => {
 				}),
 				'utf8'
 			);
-			const credentialEnv: Record<string, string> =
-				provider === 'claude-code'
-					? { CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL }
-					: { OPENAI_API_KEY: FAKE_CODEX_CREDENTIAL };
-			const result = await executeModelProcess(request(provider, harness.workspacePath, { credentialEnv }), {
+			const result = await executeModelProcess(request(provider, harness.workspacePath), {
 				...harness.io,
 				commands: {
 					[provider]: {
@@ -349,8 +522,18 @@ describe('executeModelProcess — real process boundary', () => {
 			});
 
 			expect(result).toMatchObject({ status: 'succeeded', summary: 'fixture done' });
+			const capture = JSON.parse(await readFile(harness.capturePath, 'utf8')) as {
+				args: string[];
+				hasClaudeCredential: boolean;
+				hasCodexApiKey: boolean;
+				hasCodexAccessToken: boolean;
+			};
+			expect(capture).toMatchObject({
+				hasClaudeCredential: false,
+				hasCodexApiKey: false,
+				hasCodexAccessToken: false
+			});
 			if (provider === 'claude-code') {
-				const capture = JSON.parse(await readFile(harness.capturePath, 'utf8')) as { args: string[] };
 				expect(capture.args).toContain('--safe-mode');
 				expect(capture.args).not.toContain('--setting-sources');
 				await expect(access(hookMarkerPath)).rejects.toThrow();
@@ -358,24 +541,32 @@ describe('executeModelProcess — real process boundary', () => {
 		}
 	);
 
-	it('reports the pinned Codex access-token contract as incompatible before a model run', async () => {
+	it('refuses a Codex access token before even probing the pinned CLI', async () => {
 		const harness = await createHarness('success');
-		const result = await executeModelProcess(request('codex', harness.workspacePath), {
-			...harness.io,
-			commands: {
-				codex: {
-					executable: harness.managedExecutablePath
+		const result = await executeModelProcess(
+			request('codex', harness.workspacePath, {
+				authentication: {
+					kind: 'provider-credential',
+					environment: { CODEX_ACCESS_TOKEN: FAKE_CODEX_CREDENTIAL }
 				}
-			},
-			spawnFn: nodeScriptSpawn(PINNED_CLI_FIXTURE, () => [
-				'codex',
-				harness.capturePath,
-				join(harness.root, 'unused-hook')
-			])
-		});
+			} as never),
+			{
+				...harness.io,
+				commands: {
+					codex: {
+						executable: harness.managedExecutablePath
+					}
+				},
+				spawnFn: nodeScriptSpawn(PINNED_CLI_FIXTURE, () => [
+					'codex',
+					harness.capturePath,
+					join(harness.root, 'unused-hook')
+				])
+			}
+		);
 
-		expect(result.status).toBe('incompatible-cli');
-		expect(result.summary).toMatch(/0\.120\.0.*CODEX_ACCESS_TOKEN/i);
+		expect(result.status).toBe('credential-boundary-unavailable');
+		await expect(access(`${harness.capturePath}.version.json`)).rejects.toThrow();
 	});
 
 	it('refuses a missing trusted executable instead of resolving a provider name from PATH', async () => {
@@ -593,11 +784,12 @@ if (process.argv.includes('--version')) {
 			const result = await executeModelProcess(request(provider, harness.workspacePath), harness.io);
 			const capture = await readCapture(harness);
 			const configHome = provider === 'claude-code' ? capture.env.CLAUDE_CONFIG_DIR : capture.env.CODEX_HOME;
-			const runRoot = dirname(configHome);
 			const isolatedHome = envValue(capture.env, 'HOME');
 			const isolatedTemp = envValue(capture.env, 'TEMP');
+			const runRoot = dirname(isolatedHome!);
 
 			expect(result.status).toBe('succeeded');
+			expect(resolve(configHome).toLowerCase()).toBe(resolve(harness.localSessionHome).toLowerCase());
 			expect(isolatedHome).toBeTruthy();
 			expect(envValue(capture.env, 'USERPROFILE')).toBe(isolatedHome);
 			expect(isWithin(runRoot, isolatedHome!)).toBe(true);
@@ -650,7 +842,7 @@ if (process.argv.includes('--version')) {
 		expect(envValue(versionEnv, name)).toBeUndefined();
 	});
 
-	it('builds the supported non-interactive Claude Code argv and grants only its selected credential', async () => {
+	it('builds the supported non-interactive Claude Code argv with zero provider credential injection', async () => {
 		const harness = await createHarness('success');
 		await executeModelProcess(
 			request('claude-code', harness.workspacePath, {
@@ -675,14 +867,16 @@ if (process.argv.includes('--version')) {
 			'--max-budget-usd',
 			'5'
 		]);
-		expect(capture.env.CLAUDE_CODE_OAUTH_TOKEN).toBe(FAKE_CLAUDE_CREDENTIAL);
+		expect(capture.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
 		expect(capture.env.ANTHROPIC_API_KEY).toBeUndefined();
 		expect(capture.env.CODEX_ACCESS_TOKEN).toBeUndefined();
 		expect(capture.env.OPENAI_API_KEY).toBeUndefined();
-		expect(capture.env.CLAUDE_CONFIG_DIR).toBeTruthy();
+		expect(resolve(capture.env.CLAUDE_CONFIG_DIR).toLowerCase()).toBe(
+			resolve(harness.localSessionHome).toLowerCase()
+		);
 	});
 
-	it('builds the supported non-interactive Codex argv and grants only its selected credential', async () => {
+	it('builds the supported non-interactive Codex argv with zero provider credential injection', async () => {
 		const harness = await createHarness('success');
 		await executeModelProcess(
 			request('codex', harness.workspacePath, { options: { sandbox: 'workspace-write' } }),
@@ -695,6 +889,8 @@ if (process.argv.includes('--version')) {
 			'--ephemeral',
 			'--color',
 			'never',
+			'-c',
+			'shell_environment_policy.inherit=none',
 			'--sandbox',
 			'workspace-write',
 			'--model',
@@ -702,26 +898,27 @@ if (process.argv.includes('--version')) {
 			'--',
 			'-'
 		]);
-		expect(capture.env.CODEX_ACCESS_TOKEN).toBe(FAKE_CODEX_CREDENTIAL);
+		expect(capture.env.CODEX_ACCESS_TOKEN).toBeUndefined();
 		expect(capture.env.OPENAI_API_KEY).toBeUndefined();
 		expect(capture.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
 		expect(capture.env.ANTHROPIC_API_KEY).toBeUndefined();
-		expect(capture.env.CODEX_HOME).toBeTruthy();
+		expect(resolve(capture.env.CODEX_HOME).toLowerCase()).toBe(resolve(harness.localSessionHome).toLowerCase());
 	});
 
-	it('maps a selected OpenAI platform key to the Codex exec-only credential name', async () => {
+	it('refuses an OpenAI platform key instead of mapping it into the Codex child', async () => {
 		const harness = await createHarness('success');
-		await executeModelProcess(
+		const result = await executeModelProcess(
 			request('codex', harness.workspacePath, {
-				credentialEnv: { OPENAI_API_KEY: FAKE_CODEX_CREDENTIAL }
-			}),
+				authentication: {
+					kind: 'provider-credential',
+					environment: { OPENAI_API_KEY: FAKE_CODEX_CREDENTIAL }
+				}
+			} as never),
 			harness.io
 		);
-		const capture = await readCapture(harness);
 
-		expect(capture.env.CODEX_API_KEY).toBe(FAKE_CODEX_CREDENTIAL);
-		expect(capture.env.OPENAI_API_KEY).toBeUndefined();
-		expect(capture.env.CODEX_ACCESS_TOKEN).toBeUndefined();
+		expect(result.status).toBe('credential-boundary-unavailable');
+		await expect(access(harness.capturePath)).rejects.toThrow();
 	});
 
 	it.each(['claude-code', 'codex'] as const)('distinguishes a structured %s model failure', async (provider) => {
@@ -756,21 +953,24 @@ if (process.argv.includes('--version')) {
 		);
 	});
 
-	it('redacts the selected credential from parsed output and diagnostics', async () => {
+	it('never fabricates or exposes a provider credential in local-session output or diagnostics', async () => {
 		const harness = await createHarness('secret');
 		const result = await executeModelProcess(request('claude-code', harness.workspacePath), harness.io);
 		const serialized = JSON.stringify(result);
 		expect(result.status).toBe('succeeded');
 		expect(serialized).not.toContain(FAKE_CLAUDE_CREDENTIAL);
-		expect(serialized).toContain('[redacted]');
+		expect(serialized).not.toContain(FAKE_CODEX_CREDENTIAL);
 	});
 
-	it('never exempts a short selected credential from diagnostic redaction', async () => {
+	it('never echoes even a short rejected raw credential', async () => {
 		const harness = await createHarness('secret');
 		const result = await executeModelProcess(
 			request('claude-code', harness.workspacePath, {
-				credentialEnv: { CLAUDE_CODE_OAUTH_TOKEN: 'xy' }
-			}),
+				authentication: {
+					kind: 'provider-credential',
+					environment: { CLAUDE_CODE_OAUTH_TOKEN: 'xy' }
+				}
+			} as never),
 			harness.io
 		);
 
@@ -793,17 +993,20 @@ if (process.argv.includes('--version')) {
 		expect(result.stdoutExcerpt).not.toMatch(new RegExp(`${FAKE_CLAUDE_CREDENTIAL.slice(0, 5)}$`, 'u'));
 	});
 
-	it('shares one post-redaction 8 KiB serialized budget across every terminal text field', async () => {
+	it('keeps a rejected raw-credential result inside the shared 8 KiB serialized budget', async () => {
 		const harness = await createHarness('all-fields-budget');
 		const result = await executeModelProcess(
 			request('claude-code', harness.workspacePath, {
-				credentialEnv: { CLAUDE_CODE_OAUTH_TOKEN: 'ZX' }
-			}),
+				authentication: {
+					kind: 'provider-credential',
+					environment: { CLAUDE_CODE_OAUTH_TOKEN: 'ZX' }
+				}
+			} as never),
 			harness.io
 		);
 		const serialized = JSON.stringify(result);
 
-		expect(result.status).toBe('succeeded');
+		expect(result.status).toBe('credential-boundary-unavailable');
 		expect(serialized).not.toContain('ZX');
 		expect(Buffer.byteLength(serialized, 'utf8')).toBeLessThanOrEqual(MODEL_EXECUTION_EXCERPT_BYTES);
 	});
@@ -837,6 +1040,7 @@ if (process.argv.includes('--version')) {
 		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
 			...harness.io,
 			platform: 'linux',
+			commands: { codex: { executable: harness.managedExecutablePath } },
 			spawnFn: harness.spawnWithTaskkill()
 		});
 
@@ -850,27 +1054,28 @@ if (process.argv.includes('--version')) {
 	}, 10_000);
 
 	it.runIf(process.platform === 'win32')(
-		'fails closed when Windows taskkill exits nonzero and a descendant survives',
+		'fails closed when the containment boundary cannot verify descendant termination',
 		async () => {
 			const harness = await createHarness('hang-tree');
+			const createBaseContainment = createVerifiedTestContainment();
 			try {
 				const result = await executeModelProcess(
 					request('codex', harness.workspacePath, { timeoutMs: 1_000 }),
 					{
 						...harness.io,
 						platform: 'win32',
-						spawnFn: harness.spawnWithTaskkill(() =>
-							spawn(process.execPath, ['-e', 'process.exit(5)'], {
-								stdio: 'ignore',
-								shell: false,
-								windowsHide: true
-							})
-						)
+						createModelProcessContainment: async (spawnFn) => {
+							const containment = await createBaseContainment(spawnFn);
+							return {
+								...containment,
+								close: async () => ({ verified: false, detail: 'Job Object close was not verified' })
+							};
+						}
 					}
 				);
 
 				expect(result.status).toBe('termination-failed');
-				expect(result.summary).toMatch(/process tree.*not.*verified/i);
+				expect(result.summary).toMatch(/termination.*not.*verified/i);
 				expect((await readCapture(harness)).pid).toBeGreaterThan(0);
 				await new Promise((resolve) => setTimeout(resolve, 2_000));
 				await expect(access(harness.markerPath)).resolves.toBeUndefined();
@@ -882,54 +1087,38 @@ if (process.argv.includes('--version')) {
 	);
 
 	it.runIf(process.platform === 'win32')(
-		'does not treat a PATH-spoofed taskkill as verified',
+		'does not let a PATH-spoofed taskkill substitute for the missing Job Object launcher',
 		async () => {
-			const harness = await createHarness('hang-tree');
+			const harness = await createHarness('success');
 			const spoofBin = join(harness.root, 'spoof-bin');
-			const trustedTaskkill = await realpath(join(process.env.SystemRoot!, 'System32', 'taskkill.exe'));
 			await mkdir(spoofBin, { recursive: true });
 			await writeFile(join(spoofBin, 'taskkill.exe'), 'workspace-controlled spoof', 'utf8');
-			const baseSpawn = harness.spawnWithTaskkill();
-			try {
-				const result = await executeModelProcess(
-					request('codex', harness.workspacePath, { timeoutMs: 1_000 }),
-					{
-						...harness.io,
-						parentEnv: { ...process.env, PATH: `${spoofBin};${process.env.PATH ?? ''}` },
-						platform: 'win32',
-						spawnFn: ((...args: Parameters<typeof spawn>) => {
-							if (basename(String(args[0])).toLowerCase() !== 'taskkill.exe') return baseSpawn(...args);
-							const killer = new EventEmitter() as ChildProcess;
-							killer.kill = () => true;
-							const isTrusted =
-								resolve(String(args[0])).toLowerCase() === resolve(trustedTaskkill).toLowerCase();
-							queueMicrotask(() => killer.emit('close', isTrusted ? 5 : 0, null));
-							return killer;
-						}) as typeof spawn
-					}
-				);
+			const result = await executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				parentEnv: { ...process.env, PATH: `${spoofBin};${process.env.PATH ?? ''}` },
+				createModelProcessContainment: undefined
+			});
 
-				expect(result.status).toBe('termination-failed');
-			} finally {
-				await forceKillCapturedTree(harness);
-				await new Promise((resolve) => setTimeout(resolve, 2_000));
-			}
+			expect(result.status).toBe('containment-unavailable');
+			await expect(access(harness.capturePath)).rejects.toThrow();
 		},
-		10_000
+		5_000
 	);
 
 	it.runIf(process.platform === 'win32')(
-		'bounds a hung Windows taskkill and never reports successful cancellation',
+		'bounds a hung containment close and never reports successful cancellation',
 		async () => {
 			const harness = await createHarness('hang-tree');
-			const fakeKiller = new EventEmitter() as ChildProcess;
-			fakeKiller.kill = () => true;
+			const createBaseContainment = createVerifiedTestContainment();
 			let execution: Promise<Awaited<ReturnType<typeof executeModelProcess>>> | null = null;
 			try {
 				execution = executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
 					...harness.io,
 					platform: 'win32',
-					spawnFn: harness.spawnWithTaskkill(() => fakeKiller)
+					createModelProcessContainment: async (spawnFn) => {
+						const containment = await createBaseContainment(spawnFn);
+						return { ...containment, close: () => new Promise(() => undefined) };
+					}
 				});
 
 				const outcome = await Promise.race([
@@ -952,10 +1141,10 @@ if (process.argv.includes('--version')) {
 	);
 
 	it.runIf(process.platform === 'win32')(
-		'withholds credentials from taskkill and redacts a tree-killer failure',
+		'withholds provider credentials and unsafe proxy data from the contained model and close path',
 		async () => {
 			const harness = await createHarness('hang-tree');
-			let killerEnv: NodeJS.ProcessEnv | undefined;
+			const createBaseContainment = createVerifiedTestContainment();
 			try {
 				const result = await executeModelProcess(
 					request('codex', harness.workspacePath, { timeoutMs: 1_000 }),
@@ -963,16 +1152,21 @@ if (process.argv.includes('--version')) {
 						...harness.io,
 						parentEnv: { ...process.env, HTTP_PROXY: 'http://token-only@proxy.corp:8080' },
 						platform: 'win32',
-						spawnFn: harness.spawnWithTaskkill((...args) => {
-							killerEnv = (args[2] as { env?: NodeJS.ProcessEnv } | undefined)?.env;
-							throw new Error(`killer diagnostic ${FAKE_CODEX_CREDENTIAL}`);
-						})
+						createModelProcessContainment: async (spawnFn) => {
+							const containment = await createBaseContainment(spawnFn);
+							return {
+								...containment,
+								close: async () => ({ verified: false, detail: 'Job Object close failed safely' })
+							};
+						}
 					}
 				);
 
 				expect(result.status).toBe('termination-failed');
-				expect(envValue(killerEnv as Record<string, string>, 'CODEX_ACCESS_TOKEN')).toBeUndefined();
-				expect(envValue(killerEnv as Record<string, string>, 'HTTP_PROXY')).toBeUndefined();
+				const modelEnv = (await readCapture(harness)).env;
+				expect(envValue(modelEnv, 'CODEX_ACCESS_TOKEN')).toBeUndefined();
+				expect(envValue(modelEnv, 'CODEX_API_KEY')).toBeUndefined();
+				expect(envValue(modelEnv, 'HTTP_PROXY')).toBeUndefined();
 				expect(JSON.stringify(result)).not.toContain(FAKE_CODEX_CREDENTIAL);
 			} finally {
 				await new Promise((resolve) => setTimeout(resolve, 2_000));
@@ -1103,6 +1297,20 @@ if (process.argv.includes('--version')) {
 });
 
 describe('executeModelProcess — request refusal', () => {
+	it('refuses a local session request that also smuggles a raw credential environment', async () => {
+		const harness = await createHarness('success');
+		await expect(
+			executeModelProcess(
+				{
+					...request('codex', harness.workspacePath),
+					credentialEnv: { CODEX_ACCESS_TOKEN: FAKE_CODEX_CREDENTIAL }
+				} as ModelExecutionRequest,
+				harness.io
+			)
+		).rejects.toThrow(/local session.*raw credential|authentication.*exclusive/i);
+		await expect(access(harness.capturePath)).rejects.toThrow();
+	});
+
 	it.each([
 		['claude-code', { dangerouslySkipPermissions: 'false' }],
 		['codex', { dangerouslyBypassApprovalsAndSandbox: 'false' }]
@@ -1121,11 +1329,14 @@ describe('executeModelProcess — request refusal', () => {
 		await expect(
 			executeModelProcess(
 				request('claude-code', harness.workspacePath, {
-					credentialEnv: {
-						CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL,
-						ANTHROPIC_API_KEY: 'anthropic-api-test-value-123456789'
+					authentication: {
+						kind: 'provider-credential',
+						environment: {
+							CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL,
+							ANTHROPIC_API_KEY: 'anthropic-api-test-value-123456789'
+						}
 					}
-				}),
+				} as never),
 				harness.io
 			)
 		).rejects.toBeInstanceOf(ModelExecutionRequestError);
@@ -1136,8 +1347,11 @@ describe('executeModelProcess — request refusal', () => {
 		await expect(
 			executeModelProcess(
 				request('codex', harness.workspacePath, {
-					credentialEnv: { CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL }
-				}),
+					authentication: {
+						kind: 'provider-credential',
+						environment: { CLAUDE_CODE_OAUTH_TOKEN: FAKE_CLAUDE_CREDENTIAL }
+					}
+				} as never),
 				harness.io
 			)
 		).rejects.toThrow(/credential.*codex/i);
@@ -1222,6 +1436,56 @@ describe('executeModelProcess — request refusal', () => {
 		expect(result.status).toBe('timed-out');
 		expect(spawnCount).toBe(1);
 		await expect(access(harness.capturePath)).rejects.toThrow();
+	});
+
+	it('makes the absolute deadline win when a contained model closes after its budget', async () => {
+		const harness = await createHarness('success');
+		let monotonicTime = 0;
+		const baseCreateContainment = harness.io.createModelProcessContainment!;
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+			...harness.io,
+			monotonicNow: () => monotonicTime,
+			createModelProcessContainment: async (spawnFn) => {
+				const containment = await baseCreateContainment(spawnFn);
+				return {
+					...containment,
+					spawn: ((...args: Parameters<typeof spawn>) => {
+						const child = containment.spawn(...args);
+						child.once('close', () => {
+							monotonicTime = 1_001;
+						});
+						return child;
+					}) as typeof spawn
+				};
+			}
+		});
+
+		expect(result.status).toBe('timed-out');
+		expect(result.summary).toMatch(/wall-clock/i);
+	});
+
+	it('makes the absolute deadline win when containment close consumes the remaining budget', async () => {
+		const harness = await createHarness('success');
+		let monotonicTime = 0;
+		const baseCreateContainment = harness.io.createModelProcessContainment!;
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+			...harness.io,
+			monotonicNow: () => monotonicTime,
+			createModelProcessContainment: async (spawnFn) => {
+				const containment = await baseCreateContainment(spawnFn);
+				return {
+					...containment,
+					close: async () => {
+						const outcome = await containment.close();
+						monotonicTime = 1_001;
+						return outcome;
+					}
+				};
+			}
+		});
+
+		expect(result.status).toBe('timed-out');
+		expect(result.summary).toMatch(/wall-clock/i);
 	});
 
 	it('bounds a never-resolving workspace validation inside the one execution deadline', async () => {

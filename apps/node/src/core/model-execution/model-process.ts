@@ -22,6 +22,7 @@ export type {
 	CodexModelExecutionOptions,
 	CodexSandbox,
 	ModelCliCommand,
+	ModelExecutionAuthentication,
 	ModelExecutionProvider,
 	ModelExecutionRequest,
 	ModelExecutionResult,

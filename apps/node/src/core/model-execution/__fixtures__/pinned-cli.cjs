@@ -46,8 +46,8 @@ if (provider === 'claude-code') {
 		process.stderr.write('claude-code safe mode must not enable project setting sources');
 		process.exit(64);
 	}
-	if (!process.env.CLAUDE_CODE_OAUTH_TOKEN && !process.env.ANTHROPIC_API_KEY) {
-		process.stderr.write('missing Claude credential');
+	if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_API_KEY) {
+		process.stderr.write('raw Claude credential must not be inherited');
 		process.exit(65);
 	}
 	process.stdout.write(
@@ -56,12 +56,8 @@ if (provider === 'claude-code') {
 	process.exit(0);
 }
 
-if (process.env.CODEX_ACCESS_TOKEN) {
-	process.stderr.write('codex-cli 0.120.0 does not support CODEX_ACCESS_TOKEN for exec');
-	process.exit(65);
-}
-if (!process.env.CODEX_API_KEY) {
-	process.stderr.write('missing CODEX_API_KEY');
+if (process.env.CODEX_ACCESS_TOKEN || process.env.CODEX_API_KEY || process.env.OPENAI_API_KEY) {
+	process.stderr.write('raw Codex credential must not be inherited');
 	process.exit(65);
 }
 process.stdout.write(
