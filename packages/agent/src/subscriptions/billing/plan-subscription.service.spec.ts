@@ -22,11 +22,20 @@ import { SubscriptionStatus } from '@src/entities/user-subscription.entity';
  *     the return route) grants the same tier once.
  */
 
+// Mirrors what `SubscriptionService.seedPlans()` actually writes: code 'standard' is the tier the
+// marketing site calls "Pro", at Ever Gauzy / Ever Teams cloud Small Business pricing.
 const STANDARD_PLAN = {
     id: 'plan-standard',
     code: 'standard',
-    displayName: 'Standard',
-    monthlyPrice: '29',
+    displayName: 'Pro',
+    hosting: 'cloud',
+    monthlyPrice: '25',
+    // The YEARLY charge, not the "$17/mo" the marketing site displays.
+    annualPrice: '204',
+    lifetimePrice: null,
+    seatsIncluded: 10,
+    seatMonthlyPrice: '5',
+    monthlyCredits: 3000,
     currency: 'usd',
     active: true,
 };
@@ -154,13 +163,13 @@ describe('startPlanCheckout — the server prices everything', () => {
             url: 'https://pay.example/cs_plan_1',
             sessionId: 'cs_plan_1',
             planCode: 'standard',
-            priceCents: 2900,
+            priceCents: 2500,
             currency: 'usd',
         });
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
-        // $29.00 → 2900 cents, straight from `subscription_plans`.
+        // $25.00 → 2500 cents. The row and the shared-account catalog agree; neither comes from the body.
         expect(request.plan).toEqual(
-            expect.objectContaining({ code: 'standard', priceCents: 2900, interval: 'month' }),
+            expect.objectContaining({ code: 'standard', priceCents: 2500, interval: 'month' }),
         );
         // Server-authored correlation id, echoed back on the signed event.
         expect(request.referenceId).toBe('u1:standard');
@@ -176,8 +185,9 @@ describe('startPlanCheckout — the server prices everything', () => {
         // resolver reads as cloud — the same default the migration gives every pre-existing row.
         expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_monthly');
         // priceCents is still carried: the provider falls back to it when the account has no
-        // catalog price, so removing it would break every unsynced deployment.
-        expect(request.plan.priceCents).toBe(2900);
+        // catalog price, so removing it would break every unsynced deployment. Here the catalog
+        // and the seeded row agree, which is the invariant stripe-catalog.spec.ts guards.
+        expect(request.plan.priceCents).toBe(2500);
     });
 
     it('bills no seat line when the buyer stays inside the plan allowance', async () => {
@@ -221,6 +231,50 @@ describe('startPlanCheckout — the server prices everything', () => {
 
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
         expect(request.plan.extraSeats).toBe(0);
+    });
+
+    it('defaults to the monthly period when the caller does not name one', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout(checkoutOptions);
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.interval).toBe('month');
+        expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_monthly');
+    });
+
+    it('buys the annual SKU as a YEARLY subscription when asked for one', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout({ ...checkoutOptions, interval: 'annual' });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.interval).toBe('year');
+        expect(request.plan.lookupKey).toBe('ever_works_cloud_pro_annual');
+        // The seat line has to follow the plan's period — a monthly seat price cannot ride on a
+        // yearly subscription, Stripe rejects mixed intervals in one subscription.
+        expect(request.plan.seatLookupKey).toBeNull();
+    });
+
+    it('matches the seat period to the plan period on an annual purchase', async () => {
+        const { service, provider } = build();
+
+        await service.startPlanCheckout({ ...checkoutOptions, interval: 'annual', seats: 12 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.extraSeats).toBe(2);
+        expect(request.plan.seatLookupKey).toBe('ever_works_cloud_pro_seat_annual');
+    });
+
+    it('refuses a perpetual licence rather than quietly selling a subscription instead', async () => {
+        const { service, provider } = build();
+
+        // The Stripe price exists, but issuing the licence document is unbuilt for every Ever
+        // product — taking the money would be selling something undeliverable.
+        await expect(
+            service.startPlanCheckout({ ...checkoutOptions, interval: 'lifetime' }),
+        ).rejects.toBeInstanceOf(PlanNotPurchasableError);
+        expect(provider.createPlanCheckoutSession).not.toHaveBeenCalled();
     });
 
     it('lazily creates the provider customer + billing profile', async () => {

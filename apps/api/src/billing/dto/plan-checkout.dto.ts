@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 import { SubscriptionPlanCode } from '@ever-works/agent/entities';
 
 /**
@@ -23,6 +23,34 @@ export class CreatePlanCheckoutDto {
     @IsString()
     @MaxLength(64)
     organizationId?: string;
+
+    /**
+     * Which billing period to buy. Defaults to `monthly`, which is what every caller sent before
+     * this field existed.
+     *
+     * 🛑 This names a PERIOD, not a price. The amount for the resulting SKU is still read from the
+     * server catalog, so asking for `lifetime` on a plan that has no lifetime price is a 400 rather
+     * than a cheaper subscription. Only the self-hosted Pro Edition sells a `lifetime` licence, and
+     * it is bought as a one-off payment — never inferred from a marketing toggle position.
+     */
+    @IsOptional()
+    @IsIn(['monthly', 'annual', 'lifetime'])
+    interval?: 'monthly' | 'annual' | 'lifetime';
+
+    /**
+     * TOTAL seats (employees OR agents) the buyer wants, inclusive of the plan's included
+     * allowance — not the number of extra ones.
+     *
+     * The service clamps this against the plan row and bills only the excess, so this number can
+     * only ever cost the buyer MORE, never less: under-reporting just buys fewer seats. The upper
+     * bound is a sanity limit on a public, throttled endpoint, not a product limit; a genuinely
+     * larger deployment buys Enterprise Option 1, which is unbounded and meters nothing.
+     */
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(100_000)
+    seats?: number;
 }
 
 /**

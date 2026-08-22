@@ -956,6 +956,125 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         expect(params.line_items[0].price_data.recurring).toEqual({ interval: 'month' });
     });
 
+    it('bills the shared-account CATALOG price when the lookup key resolves', async () => {
+        const { provider, client } = build();
+        client.prices = {
+            list: jest.fn().mockResolvedValue({ data: [{ id: 'price_cat_1' }] }),
+        };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        });
+
+        expect(client.prices.list).toHaveBeenCalledWith(
+            expect.objectContaining({ lookup_keys: ['ever_works_cloud_pro_monthly'], active: true }),
+        );
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        // The catalog price object, NOT an ad-hoc amount — that is what makes the invoice line
+        // traceable back to a reviewed commit.
+        expect(params.line_items[0].price).toBe('price_cat_1');
+        expect(params.line_items[0].price_data).toBeUndefined();
+        expect(params.line_items).toHaveLength(1);
+    });
+
+    it('falls back to the inline price when the account has no such lookup key', async () => {
+        // This is what protects self-hosters, CI and local dev: a deployment that has never run
+        // the catalog sync must still be able to take a payment.
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items[0].price).toBeUndefined();
+        expect(params.line_items[0].price_data.unit_amount).toBe(2900);
+    });
+
+    it('falls back to the inline price when the lookup itself throws', async () => {
+        // A Stripe outage on the price lookup must not take checkout down with it.
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockRejectedValue(new Error('stripe down')) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items[0].price_data.unit_amount).toBe(2900);
+    });
+
+    it('adds a second line item for the seats beyond the allowance', async () => {
+        const { provider, client } = build();
+        client.prices = {
+            list: jest.fn().mockImplementation(async ({ lookup_keys }) => ({
+                data: [{ id: lookup_keys[0].includes('_seat_') ? 'price_seat_1' : 'price_cat_1' }],
+            })),
+        };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                lookupKey: 'ever_works_cloud_pro_monthly',
+                seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+                extraSeats: 17,
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items).toHaveLength(2);
+        expect(params.line_items[0]).toEqual({ quantity: 1, price: 'price_cat_1' });
+        expect(params.line_items[1]).toEqual({ quantity: 17, price: 'price_seat_1' });
+    });
+
+    it('never emits a zero-quantity seat line — Stripe rejects one', async () => {
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [{ id: 'price_cat_1' }] }) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                lookupKey: 'ever_works_cloud_pro_monthly',
+                seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+                extraSeats: 0,
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items).toHaveLength(1);
+    });
+
+    it('sells the base plan rather than inventing a seat price it cannot resolve', async () => {
+        // The per-seat amount lives in the catalog, not the plan row, so there is no honest inline
+        // fallback for it. Billing a made-up number would be worse than under-billing.
+        const { provider, client } = build();
+        client.prices = {
+            list: jest.fn().mockImplementation(async ({ lookup_keys }) => ({
+                data: lookup_keys[0].includes('_seat_') ? [] : [{ id: 'price_cat_1' }],
+            })),
+        };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                lookupKey: 'ever_works_cloud_pro_monthly',
+                seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+                extraSeats: 4,
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.line_items).toHaveLength(1);
+        expect(params.line_items[0].price).toBe('price_cat_1');
+    });
+
     it('mirrors the plan metadata onto the SUBSCRIPTION so renewals stay attributable', async () => {
         const { provider, client } = build();
 

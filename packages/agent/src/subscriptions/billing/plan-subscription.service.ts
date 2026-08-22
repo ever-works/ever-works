@@ -63,6 +63,15 @@ export interface StartPlanCheckoutOptions {
      * under-report to pay less. Absent means "just the included allowance".
      */
     seats?: number | null;
+    /**
+     * Which billing period to buy. Defaults to `monthly` — the only period this path supported
+     * before the shared catalog existed.
+     *
+     * An interval the resolved plan does not sell is refused, never silently downgraded to one it
+     * does: quietly selling a monthly subscription to someone who asked for a perpetual licence is
+     * worse than a 400.
+     */
+    interval?: CatalogInterval | null;
 }
 
 export interface PlanCheckoutStarted {
@@ -147,8 +156,26 @@ export class PlanSubscriptionService {
             throw new BillingProviderNotConfiguredError();
         }
 
-        const plan = await this.resolveSellablePlan(options.planCode);
-        const priceCents = planPriceCents(plan);
+        const interval: CatalogInterval = options.interval ?? 'monthly';
+
+        // A perpetual commercial licence is a one-off `mode: payment` purchase whose fulfilment —
+        // issuing the licence document — is not built for ANY Ever product yet. The Stripe price
+        // exists so the catalog is complete, but selling one now would take money for something the
+        // platform cannot deliver, and the activation path here only understands subscription
+        // events. Refuse loudly rather than quietly selling a monthly subscription instead.
+        if (interval === 'lifetime') {
+            throw new PlanNotPurchasableError(
+                'Perpetual licences are not sold through this endpoint yet — contact sales',
+            );
+        }
+
+        const plan = await this.resolveSellablePlan(options.planCode, interval);
+        const catalogSku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
+        // What the buyer will actually be charged. The catalog wins because the catalog price is
+        // what the provider bills; the row is the fallback for an unsynced deployment. Reading the
+        // row first would echo 0 for any period the row has no column value for — showing someone
+        // "$0" on a confirmation screen for a charge that is about to be 204.00.
+        const priceCents = catalogSku?.price.amountCents ?? planPriceCentsForInterval(plan, interval);
 
         const user = await this.userRepository.findById(options.userId);
         const existing = await this.billingProfileRepository.findByUserId(options.userId);
@@ -176,12 +203,12 @@ export class PlanSubscriptionService {
                 label: `${plan.displayName} plan`,
                 priceCents,
                 currency: plan.currency || this.billingProvider.getDefaultCurrency(),
-                interval: 'month',
+                interval: interval === 'annual' ? 'year' : 'month',
                 // Prefer the catalog price in the shared Stripe account over the row's own amount,
                 // so the invoice line carries a lookup_key that maps back to a reviewed commit.
                 // `null` here is normal on a deployment whose catalog has not been synced — the
                 // provider falls back to billing `priceCents` exactly as it did before.
-                ...this.catalogKeysFor(plan, 'monthly', options.seats ?? null),
+                ...this.catalogKeysFor(plan, interval, options.seats ?? null),
             },
             successUrl: options.successUrl,
             cancelUrl: options.cancelUrl,
@@ -432,14 +459,29 @@ export class PlanSubscriptionService {
 
     // ── Resolution helpers ───────────────────────────────────────────
 
-    private async resolveSellablePlan(planCode: string): Promise<SubscriptionPlan> {
+    private async resolveSellablePlan(
+        planCode: string,
+        interval: CatalogInterval = 'monthly',
+    ): Promise<SubscriptionPlan> {
         const plan = await this.findPlanByCode(planCode);
         if (!plan || !plan.active) {
             throw new UnknownSubscriptionPlanError(String(planCode));
         }
+        // A free tier is free on every period, so this stays keyed on the monthly price: it is the
+        // "is this plan sold at all?" question, not "does it sell this period?".
         if (planPriceCents(plan) <= 0) {
             throw new PlanNotPurchasableError(
                 'Free plans do not require checkout — switch to them directly',
+            );
+        }
+        // A period the plan does not sell must be refused, never downgraded to one it does. Both
+        // sources have to agree: the catalog decides what Stripe can charge, the row decides what
+        // an unsynced deployment charges, and selling a period only one of them knows about would
+        // bill the wrong amount on half the fleet.
+        const sku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
+        if (!sku && planPriceCentsForInterval(plan, interval) <= 0) {
+            throw new PlanNotPurchasableError(
+                `This plan is not sold on a ${interval} basis`,
             );
         }
         return plan;
@@ -498,6 +540,28 @@ function planPriceCents(plan: SubscriptionPlan): number {
         return 0;
     }
     return Math.round(price * 100);
+}
+
+/**
+ * The plan row's own price for one billing period, in cents.
+ *
+ * This is the FALLBACK amount — what gets billed on a deployment whose Stripe catalog has not been
+ * synced. When the catalog resolves, the provider bills the catalog price instead and this number
+ * only rides along on the response for the UI's confirmation copy.
+ *
+ * `annualPrice` is the YEARLY charge, not the per-month figure the marketing site displays.
+ */
+function planPriceCentsForInterval(plan: SubscriptionPlan, interval: CatalogInterval): number {
+    const raw =
+        interval === 'annual'
+            ? Number(plan.annualPrice)
+            : interval === 'lifetime'
+              ? Number(plan.lifetimePrice)
+              : Number(plan.monthlyPrice);
+    if (!Number.isFinite(raw) || raw <= 0) {
+        return 0;
+    }
+    return Math.round(raw * 100);
 }
 
 /** Map the provider id onto the entity's closed billing-provider set. */
