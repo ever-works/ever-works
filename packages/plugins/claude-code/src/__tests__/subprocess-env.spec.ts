@@ -73,10 +73,7 @@ describe('buildSubprocessEnv (C-10)', () => {
 		process.env.ANTHROPIC_API_KEY = 'sk-from-env';
 		process.env.ANTHROPIC_AUTH_TOKEN = 'anthropic-auth-token';
 
-		const env = buildSubprocessEnv(
-			{ CLAUDE_CODE_OAUTH_TOKEN: 'subscription-token' },
-			{ authMode: 'subscription' }
-		);
+		const env = buildSubprocessEnv({ CLAUDE_CODE_OAUTH_TOKEN: 'subscription-token' }, { authMode: 'subscription' });
 
 		expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('subscription-token');
 		expect(env.ANTHROPIC_API_KEY).toBeUndefined();
@@ -100,10 +97,7 @@ describe('buildSubprocessEnv (C-10)', () => {
 		process.env.CLAUDE_CODE_USE_VERTEX = '1';
 		process.env.ANTHROPIC_PROFILE = 'some-profile';
 
-		const env = buildSubprocessEnv(
-			{ CLAUDE_CODE_OAUTH_TOKEN: 'subscription-token' },
-			{ authMode: 'subscription' }
-		);
+		const env = buildSubprocessEnv({ CLAUDE_CODE_OAUTH_TOKEN: 'subscription-token' }, { authMode: 'subscription' });
 
 		expect(env.CLAUDE_CODE_USE_BEDROCK).toBeUndefined();
 		expect(env.CLAUDE_CODE_USE_VERTEX).toBeUndefined();

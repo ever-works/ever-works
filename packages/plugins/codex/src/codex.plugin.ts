@@ -1469,8 +1469,7 @@ export class CodexPlugin
 				summary: 'Codex device-auth mode is not yet supported for code-edit',
 				filesChanged: [],
 				duration: Date.now() - startTime,
-				error:
-					'Use api-key or access-token mode for code-edit runs; device-auth mode is not supported for this operation yet.'
+				error: 'Use api-key or access-token mode for code-edit runs; device-auth mode is not supported for this operation yet.'
 			};
 		}
 
