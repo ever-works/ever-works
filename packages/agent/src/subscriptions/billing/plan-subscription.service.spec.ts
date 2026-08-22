@@ -87,6 +87,12 @@ function makePlanRepository(overrides: Record<string, unknown> = {}) {
         findByCode: jest.fn().mockImplementation(async (code: string) => {
             if (code === 'standard') return STANDARD_PLAN;
             if (code === 'free') return FREE_PLAN;
+            // Seeded by `SubscriptionService.seedPlans()` in every real deployment. Without it here
+            // a licence webhook resolves no plan and activation is skipped — which is also the
+            // production failure mode if a plan code is ever added to the seed but NOT to the
+            // `SubscriptionPlanCode` enum, since `findPlanByCode` rejects unknown codes before it
+            // ever reaches the repository.
+            if (code === 'selfhosted_pro') return SELFHOSTED_PRO_PLAN;
             return null;
         }),
         ...overrides,
@@ -595,6 +601,120 @@ describe('applyWebhook — activation and revocation', () => {
             expect.objectContaining({ id: 'u1' }),
             'standard',
         );
+    });
+
+    /**
+     * A one-off perpetual licence (`mode: payment`) produces a
+     * `checkout.session.completed` with **no subscription**, so the normalized event carries
+     * `subscriptionId: null`. It is deliberately the SAME `subscription.activated` kind as a
+     * recurring purchase — the act is identical, grant this user this plan — and this is the path
+     * that runs for every $99 sale. It was reasoned to be safe because `activate()` accepts a
+     * nullable provider subscription id; these pin that rather than leaving it as reasoning.
+     */
+    it('activates a perpetual licence even though it carries NO subscription id', async () => {
+        const { service, subscriptionService, subscriptionRepository } = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+        });
+
+        await expect(
+            service.applyWebhook(
+                event({
+                    planCode: 'selfhosted_pro',
+                    referenceId: 'u1:selfhosted_pro',
+                    subscriptionId: null,
+                    amountCents: 9900,
+                    currentPeriodEnd: null,
+                }),
+            ),
+        ).resolves.toBe('subscription-activated');
+
+        // The purchase is RECORDED. It is deliberately NOT granted as the hosted tier — see the
+        // licence test below; `activate()` returns before the privileged grant for self-hosted.
+        expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
+        // The row must record that there is no provider subscription behind this plan — that null
+        // is what later makes `cancelSubscription` refuse, which is correct for a licence that
+        // never expires.
+        expect(subscriptionRepository.createOrUpdate.mock.calls[0][1]).toEqual(
+            expect.objectContaining({ providerSubscriptionId: null }),
+        );
+    });
+
+    /**
+     * 🛑 REGRESSION. A self-hosted purchase is a LICENCE, not a tier on THIS deployment.
+     * `activate()` used to grant by plan code alone, so a one-off $99 self-hosted lifetime licence
+     * permanently set the buyer's CLOUD tier to `selfhosted_pro` — 5 works and paid cadences,
+     * enforced by `work-schedule.service.ts` — against $25/mo for cloud Pro. Pure arbitrage, and
+     * the buyer would not even be doing anything wrong. The purchase must still be RECORDED so we
+     * know they hold a licence, for support and for the manual document fulfilment.
+     */
+    it('records a self-hosted licence but does NOT grant it as the hosted tier', async () => {
+        const { service, subscriptionService, subscriptionRepository } = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+        });
+
+        await expect(
+            service.applyWebhook(
+                event({
+                    planCode: 'selfhosted_pro',
+                    referenceId: 'u1:selfhosted_pro',
+                    subscriptionId: null,
+                    amountCents: 9900,
+                    currentPeriodEnd: null,
+                }),
+            ),
+        ).resolves.toBe('subscription-activated');
+
+        // Recorded: we must know the customer owns a licence.
+        expect(subscriptionRepository.createOrUpdate).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ planCode: 'selfhosted_pro' }),
+        );
+        // But NOT granted as the effective tier on this hosted deployment.
+        expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
+    });
+
+    it('still grants a CLOUD purchase as the tier — the guard must not break the paying path', async () => {
+        const { service, subscriptionService } = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+        });
+
+        await service.applyWebhook(event());
+
+        expect(subscriptionService.assignPlanToUser).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'u1' }),
+            'standard',
+        );
+    });
+
+    it('is idempotent for a licence too — a replayed delivery records it once, not twice', async () => {
+        const { service, subscriptionService, subscriptionRepository } = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+        });
+
+        const licence = event({
+            planCode: 'selfhosted_pro',
+            referenceId: 'u1:selfhosted_pro',
+            subscriptionId: null,
+            amountCents: 9900,
+            currentPeriodEnd: null,
+        });
+        await service.applyWebhook(licence);
+        await service.applyWebhook(licence);
+
+        // The licence record is re-asserted identically, and the hosted tier is never granted.
+        expect(subscriptionRepository.createOrUpdate).toHaveBeenCalledTimes(2);
+        expect(subscriptionRepository.createOrUpdate.mock.calls[0][1]).toEqual(
+            subscriptionRepository.createOrUpdate.mock.calls[1][1],
+        );
+        expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
     });
 
     it('is idempotent — a replayed delivery re-asserts the same tier', async () => {

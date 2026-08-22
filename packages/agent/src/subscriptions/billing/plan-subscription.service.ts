@@ -386,6 +386,25 @@ export class PlanSubscriptionService {
             providerSubscriptionId: input.providerSubscriptionId ?? null,
         });
 
+        // 🛑 A SELF-HOSTED purchase is a LICENCE, not a tier on this deployment.
+        //
+        // The `user_subscriptions` row above is still written — we must know the customer holds a
+        // licence, both for support and for the manual document fulfilment. But it must NOT become
+        // their effective plan here: `assignPlanToUser` → `persistDefaultPlan` sets the tier that
+        // `work-schedule.service.ts` enforces (`maxWorks`, cadence allowances). Granting it would
+        // sell permanent CLOUD entitlements for a one-off $99 self-hosted licence, against $25/mo
+        // for cloud Pro — pure arbitrage, and the buyer would not even be doing anything wrong.
+        //
+        // Same principle as the self-service gate in `SubscriptionService.changePlanSelfService`:
+        // hosting decides where a plan applies, and price alone never does.
+        if (plan.hosting === 'selfhosted') {
+            this.logger.log(
+                `Recorded a self-hosted licence for user ${input.userId} (plan '${plan.code}') — ` +
+                    `the hosted tier is deliberately left unchanged.`,
+            );
+            return true;
+        }
+
         // THE privileged grant (`assignPlanToUser`) — documented as
         // "call only from a billing-verified path", which is exactly here.
         // The `user_subscriptions` row above is written regardless so the
