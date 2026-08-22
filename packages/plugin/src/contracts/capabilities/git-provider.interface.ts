@@ -58,11 +58,40 @@ export interface GitCloneOptions {
 	readonly autoSwitchToMainBranch?: boolean;
 }
 
+/**
+ * Clone a SINGLE branch into a directory of its own.
+ *
+ * Distinct from {@link GitCloneOptions}: `branch` is required, and the
+ * implementation is expected to give every call an isolated working
+ * directory rather than a deterministic owner+repo one.
+ */
+export interface GitCloneBranchOptions {
+	readonly owner: string;
+	readonly repo: string;
+	readonly branch: string;
+	readonly token: string;
+}
+
 export interface GitPushOptions {
 	readonly dir: string;
 	readonly token: string;
 	readonly force?: boolean;
 	readonly maxRetries?: number;
+	/**
+	 * Local ref to push. When omitted the underlying git implementation
+	 * pushes whatever branch HEAD happens to point at — correct only when
+	 * the caller owns the checkout. Pass it explicitly whenever *which*
+	 * branch gets pushed is part of the caller's intent.
+	 */
+	readonly ref?: string;
+	/**
+	 * Receiving branch on the remote. When omitted it is derived from the
+	 * remote-tracking config of `ref`, falling back to `ref` itself. Pass
+	 * it to push a local branch onto a differently-named remote branch, or
+	 * to stop a `branch.<name>.merge` entry left over from the clone from
+	 * silently choosing the destination.
+	 */
+	readonly remoteRef?: string;
 }
 
 export interface CreateRepoOptions {
@@ -298,6 +327,20 @@ export interface GitDiffResult {
  */
 export interface IGitOperations {
 	cloneOrPull(options: GitCloneOptions): Promise<string>;
+	/**
+	 * Clone one branch into a working directory of its own.
+	 *
+	 * `cloneOrPull` keys its directory on owner+repo only and switches the
+	 * checkout back to the default branch, so it cannot express "give me
+	 * THIS branch" for two branches of the same repo in one run. This does:
+	 * every call gets its own directory with `branch` checked out, and the
+	 * caller removes it when finished.
+	 *
+	 * Optional so existing providers keep compiling. Callers MUST verify
+	 * the method is present before calling it — the lazy-plugin proxy
+	 * over-reports optional methods (see `GitFacadeService`).
+	 */
+	cloneBranch?(options: GitCloneBranchOptions): Promise<string>;
 	pull(dir: string, token: string, committer?: GitCommitter): Promise<void>;
 	add(dir: string, paths: string | string[]): Promise<void>;
 	addAll(dir: string): Promise<void>;

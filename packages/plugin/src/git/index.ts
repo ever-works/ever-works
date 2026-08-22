@@ -11,6 +11,7 @@ export type {
 	GitFileStatus,
 	GitFileChange,
 	GitCloneOptions,
+	GitCloneBranchOptions,
 	GitPushOptions,
 	CreateRepoOptions,
 	UpdateRepoOptions,
