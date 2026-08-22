@@ -2,6 +2,7 @@ import { BillingProviderError, BillingProviderNotConfiguredError } from './billi
 import {
     StripeBillingProvider,
     STRIPE_METADATA_KEYS,
+    STRIPE_PERPETUAL_LICENCE,
     STRIPE_PURCHASE_KINDS,
     STRIPE_SETUP_KIND,
 } from './stripe-billing.provider';
@@ -954,6 +955,67 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         expect(params.mode).toBe('subscription');
         expect(params.line_items[0].price_data.unit_amount).toBe(2900);
         expect(params.line_items[0].price_data.recurring).toEqual({ interval: 'month' });
+    });
+
+    it('buys a perpetual licence in payment mode, with no subscription_data', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, mode: 'payment', code: 'selfhosted_pro' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('payment');
+        // Stripe rejects subscription_data outright in payment mode; the one-off equivalent is
+        // payment_intent_data, and the metadata has to be mirrored there because a one-off
+        // purchase creates no subscription for it to live on.
+        expect(params.subscription_data).toBeUndefined();
+        expect(params.payment_intent_data.metadata[STRIPE_METADATA_KEYS.planCode]).toBe('selfhosted_pro');
+    });
+
+    it('marks a licence sale so manual fulfilment can find it', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, mode: 'payment' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        // Issuing the licence document is manual for now, so this marker is the only way to list
+        // who is owed one. It must be on BOTH objects.
+        expect(params.metadata[STRIPE_METADATA_KEYS.licence]).toBe(STRIPE_PERPETUAL_LICENCE);
+        expect(params.payment_intent_data.metadata[STRIPE_METADATA_KEYS.licence]).toBe(
+            STRIPE_PERPETUAL_LICENCE,
+        );
+    });
+
+    it('leaves the licence marker OFF a recurring purchase', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('subscription');
+        // A false positive here would put a recurring subscriber on the manual-fulfilment list.
+        expect(params.metadata[STRIPE_METADATA_KEYS.licence]).toBeUndefined();
+        expect(params.subscription_data.metadata[STRIPE_METADATA_KEYS.licence]).toBeUndefined();
+    });
+
+    it('keeps a licence purchase on the SAME webhook kind, so activation is one path', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, mode: 'payment' },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        // The act is identical — grant this user this plan — and `activate()` already accepts a
+        // null provider subscription id. A separate kind would need a second activation path for
+        // no reason, and the webhook gate keys on exactly this value.
+        expect(params.metadata[STRIPE_METADATA_KEYS.kind]).toBe(STRIPE_PURCHASE_KINDS.planSubscription);
     });
 
     it('bills the shared-account CATALOG price when the lookup key resolves', async () => {

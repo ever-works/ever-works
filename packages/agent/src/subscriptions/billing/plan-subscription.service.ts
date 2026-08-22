@@ -158,17 +158,6 @@ export class PlanSubscriptionService {
 
         const interval: CatalogInterval = options.interval ?? 'monthly';
 
-        // A perpetual commercial licence is a one-off `mode: payment` purchase whose fulfilment —
-        // issuing the licence document — is not built for ANY Ever product yet. The Stripe price
-        // exists so the catalog is complete, but selling one now would take money for something the
-        // platform cannot deliver, and the activation path here only understands subscription
-        // events. Refuse loudly rather than quietly selling a monthly subscription instead.
-        if (interval === 'lifetime') {
-            throw new PlanNotPurchasableError(
-                'Perpetual licences are not sold through this endpoint yet — contact sales',
-            );
-        }
-
         const plan = await this.resolveSellablePlan(options.planCode, interval);
         const catalogSku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
         // What the buyer will actually be charged. The catalog wins because the catalog price is
@@ -204,6 +193,9 @@ export class PlanSubscriptionService {
                 priceCents,
                 currency: plan.currency || this.billingProvider.getDefaultCurrency(),
                 interval: interval === 'annual' ? 'year' : 'month',
+                // A `lifetime` SKU is bought outright. Decided from the catalog SKU, never from
+                // the interval name alone — see `resolveCatalogSku`.
+                mode: catalogSku?.mode ?? (interval === 'lifetime' ? 'payment' : 'subscription'),
                 // Prefer the catalog price in the shared Stripe account over the row's own amount,
                 // so the invoice line carries a lookup_key that maps back to a reviewed commit.
                 // `null` here is normal on a deployment whose catalog has not been synced — the

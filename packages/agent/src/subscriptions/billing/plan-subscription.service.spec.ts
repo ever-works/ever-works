@@ -40,6 +40,23 @@ const STANDARD_PLAN = {
     active: true,
 };
 
+// The only row sold as a one-off perpetual commercial licence — and the only one whose "annual"
+// slot and one-time slot both exist, which is precisely the pair the catalog has to keep apart.
+const SELFHOSTED_PRO_PLAN = {
+    id: 'plan-selfhosted-pro',
+    code: 'selfhosted_pro',
+    displayName: 'Pro Edition',
+    hosting: 'selfhosted',
+    monthlyPrice: '49',
+    annualPrice: '408',
+    lifetimePrice: '99',
+    seatsIncluded: 10,
+    seatMonthlyPrice: '5',
+    monthlyCredits: 3000,
+    currency: 'usd',
+    active: true,
+};
+
 const FREE_PLAN = {
     id: 'plan-free',
     code: 'free',
@@ -266,11 +283,54 @@ describe('startPlanCheckout — the server prices everything', () => {
         expect(request.plan.seatLookupKey).toBe('ever_works_cloud_pro_seat_annual');
     });
 
-    it('refuses a perpetual licence rather than quietly selling a subscription instead', async () => {
+    it('sells a perpetual licence as a ONE-OFF payment, never a subscription', async () => {
+        const { service, provider } = build({
+            planRepository: makePlanRepository({
+                findByCode: jest.fn().mockResolvedValue(SELFHOSTED_PRO_PLAN),
+            }),
+        });
+
+        const started = await service.startPlanCheckout({
+            ...checkoutOptions,
+            planCode: 'selfhosted_pro',
+            interval: 'lifetime',
+        });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.mode).toBe('payment');
+        expect(request.plan.lookupKey).toBe('ever_works_selfhosted_pro_lifetime');
+        // $99 once. Fulfilment (issuing the licence document) is MANUAL for now.
+        expect(request.plan.priceCents).toBe(9900);
+        expect(started.priceCents).toBe(9900);
+        // A one-off purchase cannot carry a recurring seat line.
+        expect(request.plan.seatLookupKey).toBeNull();
+    });
+
+    it('never sells a recurring period as a one-off, or the reverse', async () => {
+        const { service, provider } = build({
+            planRepository: makePlanRepository({
+                findByCode: jest.fn().mockResolvedValue(SELFHOSTED_PRO_PLAN),
+            }),
+        });
+
+        // The self-hosted "annual" slot is a yearly SUBSCRIPTION on this tier even though the same
+        // tier also sells a one-time licence — the exact confusion the catalog exists to prevent.
+        await service.startPlanCheckout({
+            ...checkoutOptions,
+            planCode: 'selfhosted_pro',
+            interval: 'annual',
+        });
+        const annual = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(annual.plan.mode).toBe('subscription');
+        expect(annual.plan.interval).toBe('year');
+        expect(annual.plan.priceCents).toBe(40800);
+    });
+
+    it('refuses a period the plan does not sell rather than downgrading to one it does', async () => {
+        // Cloud Pro has no lifetime price. Selling the monthly one instead would take money for
+        // the wrong thing entirely.
         const { service, provider } = build();
 
-        // The Stripe price exists, but issuing the licence document is unbuilt for every Ever
-        // product — taking the money would be selling something undeliverable.
         await expect(
             service.startPlanCheckout({ ...checkoutOptions, interval: 'lifetime' }),
         ).rejects.toBeInstanceOf(PlanNotPurchasableError);

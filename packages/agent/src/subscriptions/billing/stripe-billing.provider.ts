@@ -49,7 +49,29 @@ export const STRIPE_METADATA_KEYS = {
      * without it a renewal could not be attributed to a tier.
      */
     planCode: 'ever_works_plan_code',
+    /**
+     * Set to `perpetual-commercial` on a one-off licence purchase, and absent on every recurring
+     * one. Fulfilment — issuing the licence document — is MANUAL for now, so this is the field that
+     * makes a sale findable after the fact:
+     *
+     *     GET /v1/payment_intents/search
+     *       ?query=metadata["ever_works_licence"]:"perpetual-commercial"
+     *
+     * 🛑 Two things that will waste your time otherwise, both confirmed against the live API:
+     * Stripe's search syntax requires DOUBLE quotes (single quotes 400 with a "properly quoted
+     * fields" error), and there is **no** `/v1/checkout/sessions/search` endpoint at all — it 400s
+     * with "Received unknown parameter: query". Search PAYMENT INTENTS, not sessions.
+     *
+     * That is exactly why this marker is mirrored onto `payment_intent_data.metadata` as well as
+     * the session: a one-off purchase creates no subscription for metadata to live on, and the
+     * session itself is not searchable. `/v1/charges/search` also works, but only once the payment
+     * has settled — an unpaid session has a payment intent and no charge yet.
+     */
+    licence: 'ever_works_licence',
 } as const;
+
+/** The only value {@link STRIPE_METADATA_KEYS.licence} ever takes. */
+export const STRIPE_PERPETUAL_LICENCE = 'perpetual-commercial' as const;
 
 /** `kind` metadata values — how a purchase at the provider originated. */
 export const STRIPE_PURCHASE_KINDS = {
@@ -236,17 +258,28 @@ export class StripeBillingProvider extends BillingProvider {
             existingCustomerId: request.customerId,
         });
 
+        // A perpetual commercial licence is bought outright, so it is `mode: payment` and there is
+        // no subscription for the metadata to live on. Everything downstream is deliberately the
+        // SAME kind — `plan-subscription` — because the act is identical: grant this user this
+        // plan. `activate()` already accepts a null provider subscription id, and a plan with no
+        // subscription id is one `cancelSubscription` correctly refuses to cancel, which is exactly
+        // right for a licence that never expires.
+        const isPerpetual = request.plan.mode === 'payment';
+
         const metadata = {
             [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
             [STRIPE_METADATA_KEYS.userId]: request.userId,
             [STRIPE_METADATA_KEYS.planCode]: request.plan.code,
             [STRIPE_METADATA_KEYS.referenceId]: request.referenceId,
+            // Only on a one-off licence — this is what makes the sale findable for the manual
+            // document fulfilment, which is not built for any Ever product yet.
+            ...(isPerpetual ? { [STRIPE_METADATA_KEYS.licence]: STRIPE_PERPETUAL_LICENCE } : {}),
         };
 
         const lineItems = await this.buildPlanLineItems(request);
 
         const session = await stripe.checkout.sessions.create({
-            mode: 'subscription',
+            mode: isPerpetual ? 'payment' : 'subscription',
             customer: customerId,
             client_reference_id: request.referenceId,
             // The seam leaves the session-identifier token to the
@@ -255,7 +288,12 @@ export class StripeBillingProvider extends BillingProvider {
             cancel_url: request.cancelUrl,
             line_items: lineItems,
             metadata,
-            subscription_data: { metadata },
+            // `subscription_data` is rejected outright in payment mode; the one-off equivalent is
+            // `payment_intent_data`, which is also where the licence marker has to be mirrored so a
+            // refund or dispute on the charge can still be traced back to the sale.
+            ...(isPerpetual
+                ? { payment_intent_data: { metadata } }
+                : { subscription_data: { metadata } }),
         });
 
         if (!session.url) {

@@ -93,8 +93,21 @@ export interface BillingPlanDescriptor {
     /** Recurring price in cents, from the server plan row. */
     readonly priceCents: number;
     readonly currency: string;
-    /** Only monthly today; widened here so the seam does not need a bump. */
+    /**
+     * The recurrence, for a recurring plan. Ignored entirely when {@link mode} is `payment` — a
+     * perpetual licence does not recur.
+     */
     readonly interval: 'month' | 'year';
+
+    /**
+     * How the plan is bought. `subscription` (the default, and what every caller sent before this
+     * field existed) recurs; `payment` is a one-off perpetual commercial licence that lifts the
+     * buyer's AGPLv3 obligations.
+     *
+     * 🛑 Read this from the SKU, never from a marketing toggle position: on self-hosted, the
+     * "annual" slot is a yearly subscription on one tier and a one-time licence on another.
+     */
+    readonly mode?: 'subscription' | 'payment' | null;
 
     /**
      * Catalog `lookup_key` for this plan, e.g. `ever_works_cloud_pro_monthly`.
