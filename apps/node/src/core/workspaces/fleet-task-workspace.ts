@@ -104,7 +104,6 @@ export class FleetTaskWorkspaceProvisioner {
 				branch: spec.branch,
 				bindingKey,
 				...(signal ? { signal } : {}),
-				...(spec.depth === undefined ? {} : { depth: spec.depth }),
 				settings: {
 					baseDir: repositoryRoot,
 					...(spec.depth === undefined ? {} : { fetchDepth: spec.depth })
@@ -350,7 +349,7 @@ function assertPluginBinding(
 ): void {
 	const actualPath = resolve(handle.path);
 	if (
-		actualPath !== expectedPath ||
+		!samePath(actualPath, expectedPath) ||
 		!isStrictDescendant(rootPath, actualPath) ||
 		handle.bindingKey !== bindingKey ||
 		handle.branch !== branch

@@ -1138,7 +1138,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		signal?: AbortSignal
 	): Promise<void> {
 		const [canonicalPool, canonicalWorktree] = await Promise.all([
-			fs.realpath(poolDir),
+			assertPlainDirectory(poolDir),
 			assertPlainDirectory(worktreeDir)
 		]);
 		if (!samePath(canonicalPool, poolDir) || !samePath(canonicalWorktree, worktreeDir)) {
