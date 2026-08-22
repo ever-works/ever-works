@@ -47,6 +47,23 @@ const MAX_NAME_LENGTH = 200;
  */
 const MAX_VISION_LENGTH = 5000;
 
+async function persistActiveOrganization(organizationSlug: string): Promise<void> {
+    const response = await fetch('/api/users/me/scope', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationSlug }),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to persist active Organization (${response.status})`);
+    }
+    const persisted = (await response.json()) as { organizationSlug?: string | null };
+    if (persisted.organizationSlug !== organizationSlug) {
+        throw new Error('The persisted active Organization did not match the selection');
+    }
+}
+
 /**
  * Teams & Prebuilt Companies (spec §4.4/§6) — one catalog entry from
  * `GET /api/org-templates` (BFF proxy of the ever-works/orgs manifest).
@@ -314,11 +331,12 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                         setCreatedOrg(org);
                         setShowUpgradeDialog(true);
                     } else {
-                        onOpenChange(false);
                         // Security: validate slug matches expected alphanumeric-dash
                         // pattern before interpolating into the router path to prevent
                         // an open redirect if the API ever returns a malformed slug.
                         if (/^[a-z0-9-]+$/.test(org.slug)) {
+                            await persistActiveOrganization(org.slug);
+                            onOpenChange(false);
                             router.push(`/${org.slug}/dashboard`);
                         }
                     }

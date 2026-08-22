@@ -17,16 +17,16 @@ import {
  * the site header." This drives the real WorkspaceSwitcher end-to-end: create
  * two orgs through the modal and confirm both become selectable entries in the
  * header switcher (the "switch" affordance), cross-checked against
- * GET /api/organizations. Selecting an org routes to its slug-scoped URL.
+ * GET /api/organizations. Selecting an org persists the scope and safely
+ * resolves the slug-scoped compatibility URL back to the legacy dashboard.
  *
  * Scope notes:
  *  - Creating the first Organization runs a tenantId backfill that used
  *    Postgres-only `$n` placeholders → 500 under the sqlite e2e DB. Fixed in
  *    organization.service.ts (query-builder placeholders); without it this
  *    flow is impossible on the e2e stack.
- *  - The slug-scoped dashboard page (`/{slug}/dashboard`) is Phase-7-pending
- *    web-side (see apps/web/src/lib/hooks/use-active-scope.ts), so we assert
- *    the switcher LISTS + routes to each org, not the destination page.
+ *  - The narrow slug-scoped compatibility page validates the persisted scope
+ *    and redirects to `/`, keeping the unprefixed dashboard tree stable.
  *  - Runs as a FRESH, isolated user (its own empty-storageState context) rather
  *    than the shared seeded storageState user. The header WorkspaceSwitcher
  *    lists EVERY org the current user owns in a single `overflow-hidden`,
@@ -107,15 +107,22 @@ test.describe('Organizations — create + switch via header', () => {
             expect(names).toContain(alpha);
             expect(names).toContain(beta);
 
-            // 6. Selecting an org from the header routes to that org's slug-scoped URL.
-            await selectOrganizationInSwitcher(page, alpha);
+            // 6. Selection persists before visiting the validated slug route.
             const alphaSlug = (await listOrganizationsViaAPI(request, token)).find(
                 (o) => o.displayName === alpha,
             )?.slug;
             expect(alphaSlug, 'alpha should have a slug').toBeTruthy();
-            // Client soft-nav (router.push) — poll the URL rather than waiting on a
-            // load event.
-            await expect(page).toHaveURL(new RegExp(`/${alphaSlug}(/|$)`), { timeout: 90_000 });
+            const slugNavigation = page.waitForRequest(
+                (candidate) =>
+                    candidate.method() === 'GET' &&
+                    new URL(candidate.url()).pathname === `/${alphaSlug}/dashboard`,
+            );
+            await selectOrganizationInSwitcher(page, alpha);
+            await slugNavigation;
+            await expect(page).toHaveURL(/\/$/, { timeout: 90_000 });
+            await expect(
+                page.getByRole('button', { name: 'Switch Organization' }).getByText(alpha),
+            ).toBeVisible();
         } finally {
             await context.close();
         }

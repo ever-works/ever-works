@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 import { useOrganizations } from './use-organizations';
@@ -20,6 +21,14 @@ export interface UseActiveScopeResult {
      * because the API only returns orgs the user can see).
      */
     activeOrganization: OrganizationResponse | null;
+    /** Update the local view only after the server confirms a persisted switch. */
+    setActiveOrganization: (organization: OrganizationResponse | null) => void;
+}
+
+interface ActiveScopeResponse {
+    tenantId: string | null;
+    organizationId: string | null;
+    organizationSlug: string | null;
 }
 
 /**
@@ -37,13 +46,49 @@ export interface UseActiveScopeResult {
 export function useActiveScope(): UseActiveScopeResult {
     const params = useParams<{ slug?: string | string[] }>();
     const { organizations } = useOrganizations();
+    const [persistedSlug, setPersistedSlug] = useState<string | null>(null);
+    const selectionVersion = useRef(0);
 
     const rawSlug = params?.slug;
-    const slug = Array.isArray(rawSlug) ? (rawSlug[0] ?? null) : (rawSlug ?? null);
+    const routeSlug = Array.isArray(rawSlug) ? (rawSlug[0] ?? null) : (rawSlug ?? null);
+
+    useEffect(() => {
+        if (routeSlug) return;
+
+        let cancelled = false;
+        const versionAtRequestStart = selectionVersion.current;
+        void (async () => {
+            try {
+                const response = await fetch('/api/users/me/scope', {
+                    method: 'GET',
+                    credentials: 'include',
+                    cache: 'no-store',
+                });
+                if (!response.ok) return;
+                const body = (await response.json()) as ActiveScopeResponse;
+                if (!cancelled && selectionVersion.current === versionAtRequestStart) {
+                    setPersistedSlug(body.organizationSlug ?? null);
+                }
+            } catch {
+                // Keep the current local selection on transient BFF/network failures.
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [routeSlug]);
+
+    const setActiveOrganization = useCallback((organization: OrganizationResponse | null) => {
+        selectionVersion.current += 1;
+        setPersistedSlug(organization?.slug ?? null);
+    }, []);
+
+    const slug = routeSlug ?? persistedSlug;
 
     const activeOrganization = slug
         ? (organizations.find((org) => org.slug === slug) ?? null)
         : null;
 
-    return { slug, activeOrganization };
+    return { slug, activeOrganization, setActiveOrganization };
 }

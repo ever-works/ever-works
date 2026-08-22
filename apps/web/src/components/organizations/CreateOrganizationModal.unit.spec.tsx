@@ -124,6 +124,16 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
                     headers: { 'Content-Type': 'application/json' },
                 });
             }
+            if (u === '/api/users/me/scope' && init?.method === 'POST') {
+                return new Response(
+                    JSON.stringify({
+                        tenantId: newOrg.tenantId,
+                        organizationId: newOrg.id,
+                        organizationSlug: newOrg.slug,
+                    }),
+                    { status: 200, headers: { 'Content-Type': 'application/json' } },
+                );
+            }
             if (u === '/api/organizations') {
                 return new Response(JSON.stringify([newOrg]), {
                     status: 200,
@@ -158,6 +168,16 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
         expect(postCall).toBeDefined();
         const body = JSON.parse((postCall![1] as RequestInit).body as string);
         expect(body).toEqual({ name: 'Globex LLC' });
+
+        const scopeCall = fetchMock.mock.calls.find(
+            ([url, init]) =>
+                String(url) === '/api/users/me/scope' &&
+                (init as RequestInit | undefined)?.method === 'POST',
+        );
+        expect(scopeCall).toBeDefined();
+        expect(JSON.parse((scopeCall![1] as RequestInit).body as string)).toEqual({
+            organizationSlug: newOrg.slug,
+        });
     });
 
     /**
