@@ -2,7 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
-import { DataRepository } from './data-repository';
+import { DataRepository, RuntimeYamlCompatibilityError } from './data-repository';
 import type { IDataConfig, PRUpdate } from './data-repository';
 import { slugifyText } from '../../utils/text.utils';
 import type { Identifiable, ItemData, Category, Collection, Tag } from '@ever-works/contracts';
@@ -184,6 +184,19 @@ export class DataGeneratorService {
         return getWorkOwner(work);
     }
 
+    private runtimeCertificationFailure(error: unknown): InitializeError {
+        const cause = error instanceof Error ? error : new Error(String(error));
+
+        return {
+            code: 'DATA_REPO_FAILED',
+            message:
+                error instanceof RuntimeYamlCompatibilityError
+                    ? error.message
+                    : 'Failed to certify data repository for runtime compatibility',
+            cause,
+        };
+    }
+
     async initialize(
         work: Work,
         user: User,
@@ -211,13 +224,28 @@ export class DataGeneratorService {
         };
         let existingItemsBeforeGeneration: ItemData[] = [];
 
-        // Get existing data if available
-        // get existing data only if we are in update mode
-        if (createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE) {
-            existingData = await this.getExistingData(work, user);
-            existingItemsBeforeGeneration = existingData.existingItems;
-        } else if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
-            existingItemsBeforeGeneration = (await this.getExistingData(work, user)).existingItems;
+        // Get existing data if available. Generation must use the strict YAML
+        // contract of the generated website even though ordinary legacy reads
+        // remain tolerant of duplicate keys.
+        try {
+            if (createItemsGeneratorDto.generation_method === GenerationMethod.CREATE_UPDATE) {
+                existingData = await this.getExistingData(work, user, {
+                    requireRuntimeCompatibility: true,
+                });
+                existingItemsBeforeGeneration = existingData.existingItems;
+            } else if (createItemsGeneratorDto.generation_method === GenerationMethod.RECREATE) {
+                // Recreate intentionally replaces the old corpus, so retain
+                // tolerant reads here to keep it available as a repair path.
+                existingItemsBeforeGeneration = (await this.getExistingData(work, user))
+                    .existingItems;
+            }
+        } catch (error) {
+            this.logger.error('Data repository failed runtime YAML certification', error);
+            return {
+                success: false,
+                error: this.runtimeCertificationFailure(error),
+                warnings: [],
+            };
         }
 
         throwIfCancelled();
@@ -1452,7 +1480,11 @@ export class DataGeneratorService {
     /**
      * Gets existing data from the repository if it exists, otherwise returns empty data
      */
-    private async getExistingData(work: Work, user: User) {
+    private async getExistingData(
+        work: Work,
+        user: User,
+        options: { requireRuntimeCompatibility?: boolean } = {},
+    ) {
         const workOwner = this.getWorkOwner(work);
         const committer = work.resolveCommitter(user);
         const repo = work.getDataRepo();
@@ -1467,6 +1499,10 @@ export class DataGeneratorService {
                 },
             );
             const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
+
+            if (options.requireRuntimeCompatibility) {
+                await data.assertRuntimeCompatible();
+            }
 
             const [categories, tags, collections, references, existingItems, config] =
                 await Promise.all([
@@ -1486,7 +1522,10 @@ export class DataGeneratorService {
                 existingReferences: references,
                 existingConfig: config,
             };
-        } catch {
+        } catch (error) {
+            if (options.requireRuntimeCompatibility) {
+                throw error;
+            }
             return {
                 existingItems: [],
                 existingCategories: [],
@@ -1895,6 +1934,7 @@ export class DataGeneratorService {
         const committer = work.resolveCommitter(user);
         const repoName = work.getDataRepo();
         const repoOwner = work.getRepoOwner();
+        let runtimeCertificationComplete = false;
 
         try {
             this.logger.log(`Syncing imported data for: ${repoOwner}/${repoName}`);
@@ -1906,6 +1946,8 @@ export class DataGeneratorService {
             );
 
             const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
+            await data.assertRuntimeCompatible();
+            runtimeCertificationComplete = true;
             await data.ensureWorksExist();
             await data.ensureDefaultConfig();
 
@@ -2089,15 +2131,19 @@ export class DataGeneratorService {
             this.logger.error('Failed to sync with imported data', error);
             return {
                 success: false,
-                error: {
-                    code: 'GENERATION_FAILED',
-                    // Security (info-leak): guard the untyped throw so a non-Error
-                    // value can't surface `message: undefined` or serialize a raw
-                    // internal object (paths/stack) into the API result `cause`.
-                    message:
-                        error instanceof Error ? error.message : 'Failed to sync data repository',
-                    cause: error instanceof Error ? error : new Error(String(error)),
-                },
+                error: !runtimeCertificationComplete
+                    ? this.runtimeCertificationFailure(error)
+                    : {
+                          code: 'GENERATION_FAILED',
+                          // Security (info-leak): guard the untyped throw so a non-Error
+                          // value can't surface `message: undefined` or serialize a raw
+                          // internal object (paths/stack) into the API result `cause`.
+                          message:
+                              error instanceof Error
+                                  ? error.message
+                                  : 'Failed to sync data repository',
+                          cause: error instanceof Error ? error : new Error(String(error)),
+                      },
             };
         }
     }

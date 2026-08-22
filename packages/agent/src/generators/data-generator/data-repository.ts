@@ -1,5 +1,6 @@
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import * as yaml from 'yaml';
 import mergeWith from 'lodash/mergeWith';
 import { format } from 'date-fns';
@@ -33,6 +34,21 @@ export type PRUpdate = {
     number?: number;
     url?: string;
 };
+
+/**
+ * Raised when a data corpus cannot be parsed by the generated website's
+ * strict YAML runtime. The repository-relative path is safe to surface in a
+ * generation result and gives the owner an actionable source file to repair.
+ */
+export class RuntimeYamlCompatibilityError extends Error {
+    constructor(
+        public readonly relativePath: string,
+        public readonly parserMessage: string,
+    ) {
+        super(`Runtime-incompatible YAML in ${relativePath}: ${parserMessage}`);
+        this.name = RuntimeYamlCompatibilityError.name;
+    }
+}
 
 export interface SettingsHeaderConfig {
     submit_enabled?: boolean;
@@ -497,6 +513,60 @@ export class DataRepository {
             });
 
         return Promise.all(promises).then((items) => items.filter(Boolean));
+    }
+
+    /**
+     * Certify the item corpus with the same strict yaml parser contract used
+     * by generated websites. Files are read and parsed sequentially so this
+     * preflight does not recreate the catalogue-sized memory spike it guards.
+     *
+     * Ordinary getItem/getItems calls intentionally remain tolerant of
+     * duplicate keys for backwards-compatible legacy reads.
+     */
+    async assertRuntimeCompatible(): Promise<void> {
+        const pendingDirectories = [this.dataDir];
+
+        while (pendingDirectories.length > 0) {
+            const currentDir = pendingDirectories.shift()!;
+            let entries: Dirent[];
+
+            try {
+                entries = await fs.readdir(currentDir, { withFileTypes: true });
+            } catch (error) {
+                if (
+                    currentDir === this.dataDir &&
+                    (error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT'
+                ) {
+                    return;
+                }
+                throw error;
+            }
+
+            entries.sort((left, right) => left.name.localeCompare(right.name));
+
+            for (const entry of entries) {
+                const filepath = path.join(currentDir, entry.name);
+                if (entry.isDirectory()) {
+                    pendingDirectories.push(filepath);
+                    continue;
+                }
+                if (!entry.isFile() || !/\.ya?ml$/i.test(entry.name)) {
+                    continue;
+                }
+
+                const content = await fs.readFile(filepath, 'utf-8');
+                try {
+                    yaml.parse(content);
+                } catch (error) {
+                    const relativePath = path
+                        .relative(this.dir, filepath)
+                        .split(path.sep)
+                        .join('/');
+                    const parserMessage = error instanceof Error ? error.message : String(error);
+                    throw new RuntimeYamlCompatibilityError(relativePath, parserMessage);
+                }
+            }
+        }
     }
 
     async countItems(): Promise<number> {
