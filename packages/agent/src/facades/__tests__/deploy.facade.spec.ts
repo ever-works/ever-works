@@ -4,6 +4,7 @@ describe('DeployFacadeService', () => {
     const createService = (args: {
         deployProvider?: string;
         settings?: Record<string, { value?: unknown }>;
+        scopedSettings?: Record<string, unknown>;
         pluginId?: string;
         pluginName?: string;
     }) => {
@@ -13,6 +14,7 @@ describe('DeployFacadeService', () => {
             name: args.pluginName ?? 'Kubernetes',
             providerName: 'kubernetes',
             capabilities: ['deployment'],
+            lookupExistingDeployment: jest.fn().mockResolvedValue({ found: false }),
         };
         const registered = {
             plugin,
@@ -32,7 +34,7 @@ describe('DeployFacadeService', () => {
         };
         const settingsService = {
             getResolvedSettings: jest.fn().mockResolvedValue(args.settings ?? {}),
-            getSettings: jest.fn().mockResolvedValue({}),
+            getSettings: jest.fn().mockResolvedValue(args.scopedSettings ?? {}),
         };
         const workRepository = {
             findById: jest.fn().mockResolvedValue({
@@ -53,8 +55,57 @@ describe('DeployFacadeService', () => {
             domainRepository as any,
         );
 
-        return { service, registry, settingsService, workRepository };
+        return { service, plugin, registry, settingsService, workRepository };
     };
+
+    describe('work-scoped deployment lookup context', () => {
+        const originalInternal = process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
+        const originalShared = process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
+
+        afterEach(() => {
+            if (originalInternal === undefined) {
+                delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
+            } else {
+                process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = originalInternal;
+            }
+            if (originalShared === undefined) {
+                delete process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
+            } else {
+                process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = originalShared;
+            }
+        });
+
+        it('uses the Work cluster and enforced namespace instead of the inherited shared context', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
+            process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'wrong-shared-cluster';
+            const scopedSettings = {
+                clusterSource: 'k8s-works',
+                namespace: 'ever-works-timetrack-prod',
+                kubeContext: 'work-context',
+            };
+            const { service, plugin } = createService({
+                deployProvider: 'ever-works',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                scopedSettings,
+            });
+
+            await service.lookupExistingDeployment('awesome-time-tracking-website', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
+                'awesome-time-tracking-website',
+                'internal-work-cluster',
+                undefined,
+                {
+                    settingsOverride: scopedSettings,
+                    namespaceOverride: 'ever-works-timetrack-prod',
+                },
+            );
+        });
+    });
 
     it('treats Kubernetes kubeconfig as the deployment credential', async () => {
         const { service } = createService({

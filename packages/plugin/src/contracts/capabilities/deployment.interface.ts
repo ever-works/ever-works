@@ -102,6 +102,21 @@ export interface AddDomainResult {
 }
 
 /**
+ * Effective context for looking up a deployment.
+ *
+ * Deployment plugins are singletons, so their PluginContext does not carry the
+ * user/Work settings used by the deploy orchestrator. Facades may provide the
+ * already-resolved Work settings and the namespace that deploy enforced.
+ * Providers that do not need this context can ignore it.
+ */
+export interface DeploymentLookupContext {
+	/** Work-scoped plugin settings, layered over singleton defaults. */
+	readonly settingsOverride?: Record<string, unknown>;
+	/** Namespace previously validated/enforced by the deploy orchestrator. */
+	readonly namespaceOverride?: string;
+}
+
+/**
  * Deployment plugin interface
  * Capability: 'deployment'
  */
@@ -135,7 +150,8 @@ export interface IDeploymentPlugin extends IPlugin {
 	lookupExistingDeployment?(
 		projectName: string,
 		token: string,
-		teamScope?: string
+		teamScope?: string,
+		context?: DeploymentLookupContext
 	): Promise<{
 		found: boolean;
 		website?: string;

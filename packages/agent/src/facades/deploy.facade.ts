@@ -6,6 +6,7 @@ import type {
     DeployFacadeTeam,
     DeployProviderInfo,
     DeploymentLookupResult,
+    DeploymentLookupContext,
     DeploymentDomain,
     AddDomainResult,
 } from '@ever-works/plugin';
@@ -307,7 +308,24 @@ export class DeployFacadeService implements IDeployFacade {
             const teamScope = settings.defaultTeamScope as string | undefined;
 
             if (plugin.lookupExistingDeployment) {
-                const result = await plugin.lookupExistingDeployment(projectName, token, teamScope);
+                const lookupToken = this.resolveLookupToken(plugin.id, token, settings);
+                const lookupContext: DeploymentLookupContext | undefined =
+                    plugin.id === KUBERNETES_DEPLOY_PROVIDER_ID
+                        ? {
+                              settingsOverride: settings,
+                              namespaceOverride:
+                                  typeof settings.namespace === 'string' &&
+                                  settings.namespace.trim()
+                                      ? settings.namespace.trim()
+                                      : undefined,
+                          }
+                        : undefined;
+                const result = await plugin.lookupExistingDeployment(
+                    projectName,
+                    lookupToken,
+                    teamScope,
+                    lookupContext,
+                );
 
                 // Update work with deployment info if found
                 if (result.found && (result.website || result.deploymentState)) {
@@ -966,6 +984,48 @@ export class DeployFacadeService implements IDeployFacade {
         }
 
         return null;
+    }
+
+    /**
+     * Resolve the same platform-managed cluster selected by the Work settings
+     * for read-back. `resolvePluginAndTokenWithWork` can inherit the managed
+     * `ever-works` provider's shared/dedicated token before the Work's k8s
+     * `clusterSource` is considered; using that token here made verification
+     * query a different cluster than deploy.
+     */
+    private resolveLookupToken(
+        pluginId: string,
+        resolvedToken: string,
+        settings: Record<string, unknown>,
+    ): string {
+        if (pluginId !== KUBERNETES_DEPLOY_PROVIDER_ID) {
+            return resolvedToken;
+        }
+
+        const clusterSource = settings.clusterSource;
+        if (clusterSource === 'k8s-works' || clusterSource === 'k8s-gauzy') {
+            const kubeconfig = process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG?.trim();
+            if (!kubeconfig) {
+                throw new DeployFacadeError(
+                    'The k8s-works cluster kubeconfig is not configured on the platform.',
+                    'lookupExistingDeployment',
+                    pluginId,
+                );
+            }
+            return kubeconfig;
+        }
+        if (clusterSource === 'k8s-works-shared') {
+            const kubeconfig = process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG?.trim();
+            if (!kubeconfig) {
+                throw new DeployFacadeError(
+                    'The k8s-works-shared cluster kubeconfig is not configured on the platform.',
+                    'lookupExistingDeployment',
+                    pluginId,
+                );
+            }
+            return kubeconfig;
+        }
+        return resolvedToken;
     }
 
     /**

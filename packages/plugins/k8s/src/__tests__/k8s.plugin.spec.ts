@@ -478,6 +478,26 @@ describe('KubernetesPlugin.getDeploymentStatus', () => {
 });
 
 describe('KubernetesPlugin.lookupExistingDeployment', () => {
+	it('uses the Work-scoped namespace and context instead of singleton defaults', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(
+			createMockContext({ namespace: 'ever-works-shared-default', kubeContext: 'shared-context' })
+		);
+
+		const result = await plugin.lookupExistingDeployment('my-site', VALID, undefined, {
+			settingsOverride: {
+				namespace: 'ever-works-timetrack-prod',
+				kubeContext: 'work-context'
+			},
+			namespaceOverride: 'ever-works-timetrack-prod'
+		});
+
+		expect(api.getDeployment).toHaveBeenCalledWith(VALID, 'ever-works-timetrack-prod', 'my-site', 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'ever-works-timetrack-prod', 'my-site', 'work-context');
+		expect(result.projectId).toBe('ever-works-timetrack-prod/my-site');
+	});
+
 	it('returns verifier-compatible terminal state and ingress website URL', async () => {
 		const api = makeMockApi({
 			readIngress: vi.fn(async () => ({

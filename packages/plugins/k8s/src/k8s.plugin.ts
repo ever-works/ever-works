@@ -3,6 +3,7 @@ import type {
 	ConnectionValidationResult,
 	DeploymentConfig,
 	DeploymentDomain,
+	DeploymentLookupContext,
 	DeploymentProject,
 	DeploymentResult,
 	IDeploymentPlugin,
@@ -691,11 +692,20 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	async lookupExistingDeployment(
 		projectName: string,
-		kubeconfig: string
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
 	): Promise<{ found: boolean; website?: string; deploymentState?: string; projectId?: string }> {
-		const settings = await this.loadSettings();
+		const settings = {
+			...(await this.loadSettings()),
+			...this.coerceSettings(context?.settingsOverride ?? {})
+		};
 		const slug = sanitiseSlug(projectName);
-		const namespace = settings.namespace?.trim() || DEFAULT_NAMESPACE;
+		const requestedNamespace = context?.namespaceOverride?.trim();
+		const namespace =
+			(requestedNamespace && isValidK8sNamespace(requestedNamespace) ? requestedNamespace : undefined) ??
+			settings.namespace?.trim() ??
+			DEFAULT_NAMESPACE;
 		try {
 			const deployment = await this.api.getDeployment(kubeconfig, namespace, slug, settings.kubeContext);
 			if (!deployment) return { found: false };
