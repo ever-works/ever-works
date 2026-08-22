@@ -24,6 +24,8 @@ import {
     type RepositoryTarget as ContractRepositoryTarget,
     type SourceRepository as ContractSourceRepository,
     type WorksConfigSnapshot as ContractWorksConfigSnapshot,
+    type WorkCurrentHealthDto,
+    type WorkLastRunDto,
 } from '@ever-works/contracts/api';
 import type {
     MergePolicyOverride,
@@ -263,6 +265,10 @@ export interface Work {
     deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;
     generateStatus?: GenerateStatus;
+    /** Historical terminal outcomes; never rewritten by current-health reconciliation. */
+    lastRun?: WorkLastRunDto;
+    /** Derived current activity and deployment availability projection. */
+    currentHealth?: WorkCurrentHealthDto;
     createdAt: string;
     updatedAt: string;
     itemsCount?: number;
