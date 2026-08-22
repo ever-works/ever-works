@@ -22,12 +22,13 @@ site — same treatment as `docs/specs/`.
 
 ## Contents
 
-| File                         | What it tracked                                                                                       |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `COVERAGE-TRACKER.md`        | Test/docs/specs 100%-coverage progress (auto-updated by the hourly scheduled task; prettier-ignored). |
-| `E2E-PLAN.md`                | E2E suite expansion plan.                                                                             |
-| `E2E-PROGRESS.md`            | E2E suite progress log.                                                                               |
-| `IMPLEMENTATION-PROGRESS.md` | Agents/Skills/Tasks implementation progress.                                                          |
-| `IMPLEMENTATION-SUMMARY.md`  | Agents/Skills/Tasks implementation summary / PR scaffold.                                             |
-| `FOLLOWUP-PROGRESS.md`       | Agents/Skills/Tasks post-PR-#1019 follow-ups progress.                                                |
-| `FOLLOWUP-SUMMARY.md`        | Agents/Skills/Tasks post-PR-#1019 follow-ups summary.                                                 |
+| File                         | What it tracked                                                                                                              |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `COVERAGE-STATUS.md`         | **Current** test/docs/specs coverage inventory + priority queue (hourly scheduled task). Supersedes the tracker's inventory. |
+| `COVERAGE-TRACKER.md`        | Historical 100%-coverage ledger through ~2026-05 / PR #600 (prettier-ignored). Inventory is stale; see `COVERAGE-STATUS.md`. |
+| `E2E-PLAN.md`                | E2E suite expansion plan.                                                                                                    |
+| `E2E-PROGRESS.md`            | E2E suite progress log.                                                                                                      |
+| `IMPLEMENTATION-PROGRESS.md` | Agents/Skills/Tasks implementation progress.                                                                                 |
+| `IMPLEMENTATION-SUMMARY.md`  | Agents/Skills/Tasks implementation summary / PR scaffold.                                                                    |
+| `FOLLOWUP-PROGRESS.md`       | Agents/Skills/Tasks post-PR-#1019 follow-ups progress.                                                                       |
+| `FOLLOWUP-SUMMARY.md`        | Agents/Skills/Tasks post-PR-#1019 follow-ups summary.                                                                        |
