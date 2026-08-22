@@ -124,16 +124,31 @@ describe('SubscriptionService', () => {
 
             await service.onModuleInit();
 
-            // Three rows: FREE, STANDARD, PREMIUM
-            expect(planRepository.upsert).toHaveBeenCalledTimes(3);
+            // Six rows: three cloud tiers and three self-hosted editions.
+            expect(planRepository.upsert).toHaveBeenCalledTimes(6);
             const codes = planRepository.upsert.mock.calls.map((call) => call[0].code).sort();
             expect(codes).toEqual(
                 [
                     SubscriptionPlanCode.FREE,
                     SubscriptionPlanCode.STANDARD,
                     SubscriptionPlanCode.PREMIUM,
+                    SubscriptionPlanCode.SELFHOSTED_COMMUNITY,
+                    SubscriptionPlanCode.SELFHOSTED_PRO,
+                    SubscriptionPlanCode.SELFHOSTED_ENTERPRISE,
                 ].sort(),
             );
+        });
+
+        it('tags every row with a hosting mode, three cloud and three self-hosted', async () => {
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const rows = planRepository.upsert.mock.calls.map((c) => c[0]);
+            expect(rows.filter((p: any) => p.hosting === 'cloud')).toHaveLength(3);
+            expect(rows.filter((p: any) => p.hosting === 'selfhosted')).toHaveLength(3);
+            // Nothing may seed without a hosting mode — the Stripe lookup_key is derived from it.
+            expect(
+                rows.every((p: any) => p.hosting === 'cloud' || p.hosting === 'selfhosted'),
+            ).toBe(true);
         });
 
         it('forwards the configured default currency on every upsert + sets active=true', async () => {
@@ -161,7 +176,7 @@ describe('SubscriptionService', () => {
             });
         });
 
-        it('STANDARD seed row pins maxWorks=5, monthlyPrice=29 + the 4 allowed cadences', async () => {
+        it('STANDARD seed row is the "Pro" tier: $25/mo, $204/yr, 10 seats at $5 + the 4 allowed cadences', async () => {
             const { service, planRepository } = makeService();
             await service.seedPlans();
             const std = planRepository.upsert.mock.calls
@@ -169,15 +184,25 @@ describe('SubscriptionService', () => {
                 .find((p: any) => p.code === SubscriptionPlanCode.STANDARD);
             expect(std).toMatchObject({
                 code: SubscriptionPlanCode.STANDARD,
-                displayName: 'Standard',
+                // The CODE stays 'standard' — it is stored on every existing subscription. Only the
+                // display name moved to the tier ever.works has always advertised.
+                displayName: 'Pro',
+                hosting: 'cloud',
                 maxWorks: 5,
-                monthlyPrice: '29',
+                // Ever Gauzy / Ever Teams cloud Small Business. annualPrice is the YEARLY charge,
+                // not the "$17/mo" the marketing site displays.
+                monthlyPrice: '25',
+                annualPrice: '204',
+                lifetimePrice: null,
+                seatsIncluded: 10,
+                seatMonthlyPrice: '5',
+                monthlyCredits: 3000,
                 overagePricePerRun: '8',
             });
             expect(std.allowedCadences).toEqual(STANDARD_ALLOWED_CADENCES);
         });
 
-        it('PREMIUM seed row pins maxWorks=15, monthlyPrice=99, overagePricePerRun=0 + ALL cadences', async () => {
+        it('PREMIUM seed row is the "Enterprise" tier: $199/mo, $1,668/yr, 10 seats at $10 + ALL cadences', async () => {
             const { service, planRepository } = makeService();
             await service.seedPlans();
             const premium = planRepository.upsert.mock.calls
@@ -185,9 +210,15 @@ describe('SubscriptionService', () => {
                 .find((p: any) => p.code === SubscriptionPlanCode.PREMIUM);
             expect(premium).toMatchObject({
                 code: SubscriptionPlanCode.PREMIUM,
-                displayName: 'Premium',
+                displayName: 'Enterprise',
+                hosting: 'cloud',
                 maxWorks: 15,
-                monthlyPrice: '99',
+                monthlyPrice: '199',
+                annualPrice: '1668',
+                lifetimePrice: null,
+                seatsIncluded: 10,
+                seatMonthlyPrice: '10',
+                monthlyCredits: 25000,
                 overagePricePerRun: '0',
             });
             // Premium has the same cadence set as the FREE "everything-allowed
@@ -195,6 +226,54 @@ describe('SubscriptionService', () => {
             // confirm it contains exactly the seven values without ordering.
             expect(new Set(premium.allowedCadences)).toEqual(new Set(ALL_CADENCES_IN_PUBLIC_ORDER));
             expect(premium.allowedCadences).toHaveLength(7);
+        });
+
+        it('SELFHOSTED_PRO seed row carries the one-time licence: $49/mo, $408/yr, $99 lifetime', async () => {
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const pro = planRepository.upsert.mock.calls
+                .map((c) => c[0])
+                .find((p: any) => p.code === SubscriptionPlanCode.SELFHOSTED_PRO);
+            expect(pro).toMatchObject({
+                displayName: 'Pro Edition',
+                hosting: 'selfhosted',
+                monthlyPrice: '49',
+                annualPrice: '408',
+                // The ONLY row sold as a perpetual commercial licence. Anything with a
+                // lifetimePrice is bought in Stripe `mode: payment`, never `subscription`.
+                lifetimePrice: '99',
+                seatsIncluded: 10,
+                seatMonthlyPrice: '5',
+                monthlyCredits: 3000,
+            });
+        });
+
+        it('SELFHOSTED_COMMUNITY is the free AGPLv3 download: unbounded seats, nothing to sell', async () => {
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const community = planRepository.upsert.mock.calls
+                .map((c) => c[0])
+                .find((p: any) => p.code === SubscriptionPlanCode.SELFHOSTED_COMMUNITY);
+            expect(community).toMatchObject({
+                displayName: 'Community Edition',
+                hosting: 'selfhosted',
+                monthlyPrice: '0',
+                annualPrice: '0',
+                lifetimePrice: null,
+                // null means UNBOUNDED — it must never be read as "zero seats included".
+                seatsIncluded: null,
+                seatMonthlyPrice: null,
+            });
+        });
+
+        it('only the self-hosted Pro Edition is sold as a one-time licence', async () => {
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const withLifetime = planRepository.upsert.mock.calls
+                .map((c) => c[0])
+                .filter((p: any) => p.lifetimePrice !== null && p.lifetimePrice !== undefined)
+                .map((p: any) => p.code);
+            expect(withLifetime).toEqual([SubscriptionPlanCode.SELFHOSTED_PRO]);
         });
 
         it('all seeds run in parallel via Promise.all (no per-row sequencing)', async () => {
@@ -205,11 +284,11 @@ describe('SubscriptionService', () => {
                     .fn()
                     .mockResolvedValueOnce(undefined)
                     .mockRejectedValueOnce(new Error('db down'))
-                    .mockResolvedValueOnce(undefined),
+                    .mockResolvedValue(undefined),
             });
 
             await expect(service.onModuleInit()).rejects.toThrow('db down');
-            expect(planRepository.upsert).toHaveBeenCalledTimes(3);
+            expect(planRepository.upsert).toHaveBeenCalledTimes(6);
         });
     });
 
