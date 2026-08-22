@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, parse } from 'node:path';
 
 /** The two local model CLIs a Fleet node currently knows how to run. */
 export type ModelExecutionProvider = 'claude-code' | 'codex';
@@ -11,10 +11,12 @@ export type ModelExecutionStatus =
 	| 'model-failed'
 	| 'process-failed'
 	| 'spawn-failed'
+	| 'incompatible-cli'
 	| 'malformed-output'
 	| 'timed-out'
 	| 'cancelled'
-	| 'output-limit';
+	| 'output-limit'
+	| 'termination-failed';
 
 export type ClaudeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type ClaudePermissionMode = 'acceptEdits' | 'dontAsk' | 'plan';
@@ -98,10 +100,18 @@ export const MODEL_EXECUTION_DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
 export const MODEL_EXECUTION_MAX_INSTRUCTIONS_BYTES = 1024 * 1024;
 /** Combined stdout + stderr retained for parsing before the process is terminated. */
 export const MODEL_EXECUTION_OUTPUT_LIMIT_BYTES = 1024 * 1024;
-/** Last-N bytes returned to the platform after parsing and secret redaction. */
+/** Shared serialized terminal-result budget after parsing and secret redaction. */
 export const MODEL_EXECUTION_EXCERPT_BYTES = 8 * 1024;
 
-const TERMINATION_SETTLE_MS = 1000;
+/** Compatibility floor shared with the currently managed generator CLI releases. */
+export const MODEL_CLI_COMPATIBILITY = {
+	'claude-code': { minimumVersion: '2.1.76' },
+	codex: { minimumVersion: '0.120.0', accessTokenMinimumVersion: '0.146.0' }
+} as const;
+
+const TERMINATION_SETTLE_MS = 2500;
+const WINDOWS_TREE_KILL_TIMEOUT_MS = 2000;
+const MODEL_CLI_VERSION_PROBE_TIMEOUT_MS = 10_000;
 const CREDENTIALED_URL_PATTERN = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
 const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
 
@@ -116,7 +126,6 @@ const PROVIDER_CREDENTIALS: Readonly<Record<ModelExecutionProvider, readonly str
  */
 const SAFE_SYSTEM_ENV_NAMES: readonly string[] = [
 	'PATH',
-	'HOME',
 	'SHELL',
 	'USER',
 	'LOGNAME',
@@ -127,23 +136,15 @@ const SAFE_SYSTEM_ENV_NAMES: readonly string[] = [
 	'TMP',
 	'LANG',
 	'LANGUAGE',
-	'XDG_CACHE_HOME',
 	'SystemRoot',
 	'SystemDrive',
 	'ComSpec',
 	'PATHEXT',
 	'windir',
-	'USERPROFILE',
-	'HOMEDRIVE',
-	'HOMEPATH',
-	'APPDATA',
-	'LOCALAPPDATA',
-	'ALLUSERSPROFILE',
 	'PROGRAMDATA',
 	'PROGRAMFILES',
 	'PROGRAMFILES(X86)',
 	'COMMONPROGRAMFILES',
-	'PUBLIC',
 	'USERNAME',
 	'COMPUTERNAME',
 	'NUMBER_OF_PROCESSORS',
@@ -181,7 +182,13 @@ interface RawProcessResult {
 	readonly stderr: string;
 	readonly outputTruncated: boolean;
 	readonly termination: 'timed-out' | 'cancelled' | 'output-limit' | null;
+	readonly terminationFailure: string | null;
 	readonly spawnError: Error | null;
+}
+
+interface ProcessTreeTermination {
+	readonly verified: boolean;
+	readonly detail?: string;
 }
 
 type ParsedModelOutput =
@@ -217,13 +224,52 @@ export async function executeModelProcess(
 	try {
 		runRoot = await mkdtemp(join(tmpdir(), 'ever-works-model-process-'));
 		const configHome = join(runRoot, request.provider === 'claude-code' ? 'claude' : 'codex');
-		await mkdir(configHome, { recursive: true });
+		const isolatedHome = join(runRoot, 'home');
+		await Promise.all(
+			[
+				configHome,
+				join(isolatedHome, 'AppData', 'Roaming'),
+				join(isolatedHome, 'AppData', 'Local'),
+				join(isolatedHome, '.cache'),
+				join(isolatedHome, '.config'),
+				join(isolatedHome, '.local', 'share'),
+				join(isolatedHome, '.local', 'state')
+			].map((path) => mkdir(path, { recursive: true }))
+		);
 
-		const env = buildModelEnvironment(request.provider, credential, configHome, io.parentEnv ?? process.env);
+		const env = buildModelEnvironment(
+			request.provider,
+			credential,
+			configHome,
+			isolatedHome,
+			io.parentEnv ?? process.env
+		);
 		const command = io.commands?.[request.provider] ?? DEFAULT_COMMANDS[request.provider];
 		if (!command.executable.trim()) {
 			throw new ModelExecutionRequestError(`No executable is configured for ${request.provider}`);
 		}
+
+		const versionRaw = await runProcess(
+			{
+				executable: command.executable,
+				args: [...(command.prefixArgs ?? []), '--version'],
+				cwd: request.workspacePath,
+				env: withoutProviderCredentials(env),
+				stdin: '',
+				timeoutMs: Math.min(timeoutMs, MODEL_CLI_VERSION_PROBE_TIMEOUT_MS),
+				signal: request.signal
+			},
+			io
+		);
+		const probeResult = resolveCliVersionProbe(
+			request.provider,
+			credential,
+			versionRaw,
+			Math.max(0, now() - startedAt),
+			secrets
+		);
+		if ('status' in probeResult) return probeResult;
+
 		const args = [...(command.prefixArgs ?? []), ...buildProviderArgs(request)];
 
 		const raw = await runProcess(
@@ -245,7 +291,7 @@ export async function executeModelProcess(
 			throw error;
 		}
 		const message = redactBounded(error instanceof Error ? error.message : String(error), secrets);
-		return {
+		return enforceTerminalBudget({
 			provider: request.provider,
 			status: 'spawn-failed',
 			exitCode: null,
@@ -253,7 +299,7 @@ export async function executeModelProcess(
 			durationMs: Math.max(0, now() - startedAt),
 			summary: message || `Failed to prepare ${request.provider}`,
 			outputTruncated: false
-		};
+		});
 	} finally {
 		if (runRoot) {
 			await rm(runRoot, { recursive: true, force: true }).catch(() => undefined);
@@ -375,6 +421,7 @@ function buildModelEnvironment(
 	provider: ModelExecutionProvider,
 	credential: SelectedCredential,
 	configHome: string,
+	isolatedHome: string,
 	parentEnv: NodeJS.ProcessEnv
 ): Record<string, string> {
 	const byUpper = new Map<string, string>();
@@ -400,12 +447,21 @@ function buildModelEnvironment(
 	if (!hasEnvironmentName(env, 'PATH') && process.platform !== 'win32') {
 		env.PATH = '/usr/local/bin:/usr/bin:/bin';
 	}
-	if (!hasEnvironmentName(env, 'HOME') && !hasEnvironmentName(env, 'USERPROFILE')) {
-		env.HOME = homedir();
-	}
 	if (!hasEnvironmentName(env, 'TMPDIR') && !hasEnvironmentName(env, 'TEMP') && !hasEnvironmentName(env, 'TMP')) {
 		env.TMPDIR = tmpdir();
 	}
+	const homeRoot = parse(isolatedHome).root;
+	const windowsDrive = /^([A-Za-z]:)[\\/]/u.exec(homeRoot)?.[1];
+	env.HOME = isolatedHome;
+	env.USERPROFILE = isolatedHome;
+	env.HOMEDRIVE = windowsDrive ?? homeRoot;
+	env.HOMEPATH = windowsDrive ? isolatedHome.slice(windowsDrive.length) : isolatedHome;
+	env.APPDATA = join(isolatedHome, 'AppData', 'Roaming');
+	env.LOCALAPPDATA = join(isolatedHome, 'AppData', 'Local');
+	env.XDG_CACHE_HOME = join(isolatedHome, '.cache');
+	env.XDG_CONFIG_HOME = join(isolatedHome, '.config');
+	env.XDG_DATA_HOME = join(isolatedHome, '.local', 'share');
+	env.XDG_STATE_HOME = join(isolatedHome, '.local', 'state');
 	env.CI = '1';
 	const childCredentialName =
 		provider === 'codex' && credential.name === 'OPENAI_API_KEY' ? 'CODEX_API_KEY' : credential.name;
@@ -415,7 +471,6 @@ function buildModelEnvironment(
 		env.CLAUDE_CONFIG_DIR = configHome;
 		env.DISABLE_AUTOUPDATER = '1';
 		env.DISABLE_TELEMETRY = '1';
-		env.CLAUDE_CODE_SAFE_MODE = '1';
 	} else {
 		env.CODEX_HOME = configHome;
 	}
@@ -435,7 +490,8 @@ function buildProviderArgs(request: ModelExecutionRequest): string[] {
 			'--output-format',
 			'json',
 			'--no-session-persistence',
-			'--safe-mode',
+			'--setting-sources',
+			'project',
 			'--strict-mcp-config'
 		];
 		if (options.dangerouslySkipPermissions) {
@@ -450,7 +506,7 @@ function buildProviderArgs(request: ModelExecutionRequest): string[] {
 	}
 
 	const options = request.options ?? {};
-	const args = ['exec', '--json', '--ephemeral', '--ignore-user-config', '--color', 'never'];
+	const args = ['exec', '--json', '--ephemeral', '--color', 'never'];
 	if (options.dangerouslyBypassApprovalsAndSandbox) {
 		args.push('--dangerously-bypass-approvals-and-sandbox');
 	} else {
@@ -459,6 +515,97 @@ function buildProviderArgs(request: ModelExecutionRequest): string[] {
 	if (request.model) args.push('--model', request.model);
 	args.push('--', '-');
 	return args;
+}
+
+function withoutProviderCredentials(env: Record<string, string>): Record<string, string> {
+	const probeEnv = { ...env };
+	for (const name of [
+		'CLAUDE_CODE_OAUTH_TOKEN',
+		'ANTHROPIC_API_KEY',
+		'CODEX_ACCESS_TOKEN',
+		'CODEX_API_KEY',
+		'OPENAI_API_KEY'
+	]) {
+		delete probeEnv[name];
+	}
+	return probeEnv;
+}
+
+function resolveCliVersionProbe(
+	provider: ModelExecutionProvider,
+	credential: SelectedCredential,
+	raw: RawProcessResult,
+	durationMs: number,
+	secrets: readonly string[]
+): ModelExecutionResult | { readonly version: string } {
+	if (raw.termination || raw.spawnError) {
+		return toTerminalResult(provider, raw, durationMs, secrets);
+	}
+	const version = parseCliVersion(raw.stdout || raw.stderr);
+	if (raw.exitCode !== 0 || !version) {
+		return {
+			provider,
+			status: 'incompatible-cli',
+			exitCode: raw.exitCode,
+			signal: raw.signal,
+			durationMs,
+			summary: raw.exitCode !== 0 ? 'Model CLI version probe failed' : 'Model CLI returned no semantic version',
+			outputTruncated: raw.outputTruncated
+		};
+	}
+
+	const contract = MODEL_CLI_COMPATIBILITY[provider];
+	if (compareSemver(version, contract.minimumVersion) < 0) {
+		return incompatibleCliResult(
+			provider,
+			raw,
+			durationMs,
+			`Detected ${provider} ${version}; minimum supported version is ${contract.minimumVersion}`
+		);
+	}
+	if (
+		provider === 'codex' &&
+		credential.name === 'CODEX_ACCESS_TOKEN' &&
+		compareSemver(version, MODEL_CLI_COMPATIBILITY.codex.accessTokenMinimumVersion) < 0
+	) {
+		return incompatibleCliResult(
+			provider,
+			raw,
+			durationMs,
+			`Detected Codex ${version}; CODEX_ACCESS_TOKEN requires ${MODEL_CLI_COMPATIBILITY.codex.accessTokenMinimumVersion} or newer`
+		);
+	}
+	return { version };
+}
+
+function parseCliVersion(output: string): string | null {
+	return output.match(/\b(\d+)\.(\d+)\.(\d+)\b/u)?.[0] ?? null;
+}
+
+function compareSemver(left: string, right: string): number {
+	const leftParts = left.split('.').map(Number);
+	const rightParts = right.split('.').map(Number);
+	for (let index = 0; index < 3; index += 1) {
+		if (leftParts[index] !== rightParts[index]) return leftParts[index] - rightParts[index];
+	}
+	return 0;
+}
+
+function incompatibleCliResult(
+	provider: ModelExecutionProvider,
+	raw: RawProcessResult,
+	durationMs: number,
+	summary: string
+): ModelExecutionResult {
+	return {
+		provider,
+		status: 'incompatible-cli',
+		exitCode: raw.exitCode,
+		signal: raw.signal,
+		durationMs,
+		summary,
+		outputTruncated: raw.outputTruncated
+	};
 }
 
 async function runProcess(
@@ -497,8 +644,11 @@ async function runProcess(
 		const stdout: Buffer[] = [];
 		const stderr: Buffer[] = [];
 		let fallbackTimer: NodeJS.Timeout | null = null;
+		let terminationAttempt: Promise<ProcessTreeTermination> | null = null;
+		let terminationFailure: string | null = null;
+		let terminationSettled = false;
 
-		const finish = (result: Omit<RawProcessResult, 'stdout' | 'stderr' | 'outputTruncated' | 'termination'>) => {
+		const finish = (result: Pick<RawProcessResult, 'exitCode' | 'signal' | 'spawnError'>): void => {
 			if (settled) return;
 			settled = true;
 			clearTimeout(timeoutTimer);
@@ -509,21 +659,61 @@ async function runProcess(
 				stdout: Buffer.concat(stdout).toString('utf8'),
 				stderr: Buffer.concat(stderr).toString('utf8'),
 				outputTruncated,
-				termination
+				termination,
+				terminationFailure
 			});
+		};
+
+		const recordTermination = (outcome: ProcessTreeTermination): void => {
+			terminationSettled = true;
+			if (!outcome.verified) {
+				terminationFailure = outcome.detail ?? 'The process tree termination outcome could not be verified';
+			}
+		};
+
+		const recordTerminationError = (error: unknown): void => {
+			recordTermination({
+				verified: false,
+				detail: `The process tree termination attempt failed: ${error instanceof Error ? error.message : String(error)}`
+			});
+		};
+
+		const finishAfterTermination = (result: Pick<RawProcessResult, 'exitCode' | 'signal' | 'spawnError'>): void => {
+			const attempt = terminationAttempt;
+			if (!attempt) {
+				finish(result);
+				return;
+			}
+			void attempt.then(
+				(outcome) => {
+					recordTermination(outcome);
+					finish(result);
+				},
+				(error) => {
+					recordTerminationError(error);
+					finish(result);
+				}
+			);
 		};
 
 		const requestTermination = (reason: NonNullable<RawProcessResult['termination']>): void => {
 			if (termination || settled) return;
 			termination = reason;
-			void terminateProcessTree(child, platform, spawnFn, io.processKill ?? process.kill, options.env).finally(
-				() => {
-					fallbackTimer = setTimeout(
-						() => finish({ exitCode: null, signal: null, spawnError: null }),
-						TERMINATION_SETTLE_MS
-					);
+			fallbackTimer = setTimeout(() => {
+				if (!terminationSettled) {
+					terminationFailure =
+						'The process tree termination attempt did not settle before its safety deadline';
 				}
+				finish({ exitCode: null, signal: null, spawnError: null });
+			}, TERMINATION_SETTLE_MS);
+			terminationAttempt = terminateProcessTree(
+				child,
+				platform,
+				spawnFn,
+				io.processKill ?? process.kill,
+				withoutProviderCredentials(options.env)
 			);
+			void terminationAttempt.then(recordTermination, recordTerminationError);
 		};
 
 		const append = (target: Buffer[], chunk: Buffer): void => {
@@ -549,7 +739,7 @@ async function runProcess(
 			finish({ exitCode: null, signal: null, spawnError: error });
 		});
 		child.once('close', (code, signal) => {
-			finish({ exitCode: code, signal, spawnError: null });
+			finishAfterTermination({ exitCode: code, signal, spawnError: null });
 		});
 
 		const onAbort = (): void => requestTermination('cancelled');
@@ -570,6 +760,7 @@ function rawSpawnFailure(error: unknown): RawProcessResult {
 		stderr: '',
 		outputTruncated: false,
 		termination: null,
+		terminationFailure: null,
 		spawnError: error instanceof Error ? error : new Error(String(error))
 	};
 }
@@ -581,11 +772,26 @@ async function terminateProcessTree(
 	spawnFn: typeof spawn,
 	processKill: typeof process.kill,
 	env: Record<string, string>
-): Promise<void> {
+): Promise<ProcessTreeTermination> {
 	const pid = child.pid;
 	if (platform === 'win32' && typeof pid === 'number') {
-		await new Promise<void>((resolve) => {
+		return new Promise<ProcessTreeTermination>((resolve) => {
 			let killer: ChildProcess;
+			let settled = false;
+			let watchdog: NodeJS.Timeout | null = null;
+			const killRoot = (): void => {
+				try {
+					child.kill('SIGKILL');
+				} catch {
+					// A root-only fallback cannot certify that descendants are gone.
+				}
+			};
+			const finish = (outcome: ProcessTreeTermination): void => {
+				if (settled) return;
+				settled = true;
+				if (watchdog) clearTimeout(watchdog);
+				resolve(outcome);
+			};
 			try {
 				killer = spawnFn('taskkill.exe', ['/PID', String(pid), '/T', '/F'], {
 					stdio: 'ignore',
@@ -593,29 +799,61 @@ async function terminateProcessTree(
 					windowsHide: true,
 					env
 				} as SpawnOptions);
-			} catch {
-				child.kill('SIGKILL');
-				resolve();
+			} catch (error) {
+				killRoot();
+				finish({
+					verified: false,
+					detail: `Windows taskkill could not be spawned: ${error instanceof Error ? error.message : String(error)}`
+				});
 				return;
 			}
-			killer.once('error', () => {
-				child.kill('SIGKILL');
-				resolve();
+			watchdog = setTimeout(() => {
+				try {
+					killer.kill('SIGKILL');
+				} catch {
+					// The watchdog outcome remains unverified either way.
+				}
+				killRoot();
+				finish({
+					verified: false,
+					detail: `Windows taskkill did not settle within ${WINDOWS_TREE_KILL_TIMEOUT_MS} ms`
+				});
+			}, WINDOWS_TREE_KILL_TIMEOUT_MS);
+			killer.once('error', (error) => {
+				killRoot();
+				finish({
+					verified: false,
+					detail: `Windows taskkill failed to start: ${error.message}`
+				});
 			});
-			killer.once('close', () => resolve());
+			killer.once('close', (code, signal) => {
+				if (code === 0) {
+					finish({ verified: true });
+					return;
+				}
+				killRoot();
+				finish({
+					verified: false,
+					detail: `Windows taskkill exited with code ${code ?? 'null'}${signal ? ` and signal ${signal}` : ''}`
+				});
+			});
 		});
-		return;
 	}
 
 	if (typeof pid === 'number') {
 		try {
 			processKill(-pid, 'SIGKILL');
-			return;
+			return { verified: true };
 		} catch {
 			// The process may have exited between the timeout and this call.
 		}
 	}
-	child.kill('SIGKILL');
+	try {
+		child.kill('SIGKILL');
+	} catch {
+		// A root-only fallback cannot certify that descendants are gone.
+	}
+	return { verified: false, detail: 'Only the root model process could be targeted' };
 }
 
 function toTerminalResult(
@@ -624,8 +862,14 @@ function toTerminalResult(
 	durationMs: number,
 	secrets: readonly string[]
 ): ModelExecutionResult {
-	const stdoutExcerpt = redactKnownSecrets(tailUtf8(raw.stdout, MODEL_EXECUTION_EXCERPT_BYTES), secrets);
-	const stderrExcerpt = redactKnownSecrets(tailUtf8(raw.stderr, MODEL_EXECUTION_EXCERPT_BYTES), secrets);
+	const stdoutExcerpt = tailUtf8(
+		redactCapturedOutput(raw.stdout, secrets, raw.outputTruncated),
+		MODEL_EXECUTION_EXCERPT_BYTES
+	);
+	const stderrExcerpt = tailUtf8(
+		redactCapturedOutput(raw.stderr, secrets, raw.outputTruncated),
+		MODEL_EXECUTION_EXCERPT_BYTES
+	);
 	const base = {
 		provider,
 		exitCode: raw.exitCode,
@@ -637,7 +881,17 @@ function toTerminalResult(
 	};
 
 	if (raw.termination) {
-		return {
+		if (raw.terminationFailure) {
+			return enforceTerminalBudget({
+				...base,
+				status: 'termination-failed',
+				summary: redactBounded(
+					`Model process tree termination was not verified: ${raw.terminationFailure}`,
+					secrets
+				)
+			});
+		}
+		return enforceTerminalBudget({
 			...base,
 			status: raw.termination,
 			summary:
@@ -646,33 +900,37 @@ function toTerminalResult(
 					: raw.termination === 'cancelled'
 						? 'Model execution was cancelled'
 						: 'Model execution exceeded its output limit'
-		};
+		});
 	}
 	if (raw.spawnError) {
-		return {
+		return enforceTerminalBudget({
 			...base,
 			status: 'spawn-failed',
 			summary: redactBounded(raw.spawnError.message, secrets)
-		};
+		});
 	}
 
 	const parsed = parseProviderOutput(provider, raw.stdout);
 	if (raw.exitCode !== 0) {
 		if (parsed.status === 'model-failed') {
-			return { ...base, status: 'model-failed', summary: redactBounded(parsed.summary, secrets) };
+			return enforceTerminalBudget({
+				...base,
+				status: 'model-failed',
+				summary: redactBounded(parsed.summary, secrets)
+			});
 		}
-		return {
+		return enforceTerminalBudget({
 			...base,
 			status: 'process-failed',
 			summary: stderrExcerpt || `Model CLI exited with code ${raw.exitCode ?? 'null'}`
-		};
+		});
 	}
 
-	return {
+	return enforceTerminalBudget({
 		...base,
 		status: parsed.status,
 		summary: redactBounded(parsed.summary, secrets)
-	};
+	});
 }
 
 function parseProviderOutput(provider: ModelExecutionProvider, stdout: string): ParsedModelOutput {
@@ -758,7 +1016,56 @@ function redactKnownSecrets(text: string, secrets: readonly string[]): string {
 }
 
 function redactBounded(text: string, secrets: readonly string[]): string {
-	return redactKnownSecrets(tailUtf8(text, MODEL_EXECUTION_EXCERPT_BYTES), secrets);
+	return tailUtf8(redactKnownSecrets(text, secrets), MODEL_EXECUTION_EXCERPT_BYTES);
+}
+
+function redactCapturedOutput(text: string, secrets: readonly string[], mayEndInsideSecret: boolean): string {
+	let redacted = redactKnownSecrets(text, secrets);
+	if (!mayEndInsideSecret) return redacted;
+
+	for (const secret of secrets) {
+		for (let length = Math.min(secret.length - 1, redacted.length); length > 0; length -= 1) {
+			if (!redacted.endsWith(secret.slice(0, length))) continue;
+			redacted = `${redacted.slice(0, -length)}[redacted]`;
+			break;
+		}
+	}
+	return redacted;
+}
+
+function enforceTerminalBudget(result: ModelExecutionResult): ModelExecutionResult {
+	let bounded = result;
+	for (let attempt = 0; attempt < 6; attempt += 1) {
+		const serializedBytes = Buffer.byteLength(JSON.stringify(bounded), 'utf8');
+		if (serializedBytes <= MODEL_EXECUTION_EXCERPT_BYTES) return bounded;
+
+		const textFields = (['summary', 'stdoutExcerpt', 'stderrExcerpt'] as const)
+			.map((field) => ({ field, value: bounded[field] }))
+			.filter((entry): entry is { field: 'summary' | 'stdoutExcerpt' | 'stderrExcerpt'; value: string } =>
+				Boolean(entry.value)
+			)
+			.sort((left, right) => Buffer.byteLength(right.value, 'utf8') - Buffer.byteLength(left.value, 'utf8'));
+		const largest = textFields[0];
+		if (!largest) break;
+
+		const fieldBytes = Buffer.byteLength(largest.value, 'utf8');
+		const excess = serializedBytes - MODEL_EXECUTION_EXCERPT_BYTES;
+		const nextBytes = Math.max(0, fieldBytes - excess - 32);
+		bounded = {
+			...bounded,
+			[largest.field]: nextBytes > 0 ? tailUtf8(largest.value, nextBytes) : undefined,
+			outputTruncated: true
+		};
+	}
+
+	return {
+		provider: bounded.provider,
+		status: bounded.status,
+		exitCode: bounded.exitCode,
+		signal: bounded.signal,
+		durationMs: bounded.durationMs,
+		outputTruncated: true
+	};
 }
 
 function terminalResult(
