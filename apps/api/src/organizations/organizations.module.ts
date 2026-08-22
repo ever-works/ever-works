@@ -32,6 +32,8 @@ import { OrgTemplatesController } from './org-templates.controller';
 import { CompanyImportService } from './company-import.service';
 import { CompanyImportController } from './company-import.controller';
 import { WorkRegisteredListener } from './work-registered.listener';
+import { UserScopeController } from '../users/controllers/user-scope.controller';
+import { ActiveScopeService } from '../users/services/active-scope.service';
 
 /**
  * EW-658 (Tenants & Organizations Phase 6) — Organizations module.
@@ -89,6 +91,7 @@ import { WorkRegisteredListener } from './work-registered.listener';
         // feature modules with `:orgId` routes (e.g. WorksModule's
         // OrgKbController) share one audited implementation.
         OrganizationMembershipService,
+        ActiveScopeService,
         // EW-711 (security-audit C2) — fail-closed `CanActivate` wrapper over
         // OrganizationMembershipService so raw `:orgId` routes are authorized
         // declaratively/by-default (closes the "a future route forgets the
@@ -114,6 +117,7 @@ import { WorkRegisteredListener } from './work-registered.listener';
         OrgTemplatesController,
         CompanyImportController,
         OrganizationInvitationsController,
+        UserScopeController,
     ],
     exports: [
         OrganizationService,

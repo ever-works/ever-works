@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 
 // next-intl — return the key path verbatim so assertions can match
@@ -70,10 +70,23 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
         __resetOrganizationsStoreForTests();
         routerPushMock.mockReset();
         paramsMock.mockReset().mockReturnValue({});
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    tenantId: 't-1',
+                    organizationId: null,
+                    organizationSlug: null,
+                }),
+            }),
+        );
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     /**
@@ -222,5 +235,60 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
         // After opening, the org list row + create row both show.
         expect(screen.getAllByText('Acme Inc').length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText('organizations.switcher.createNew')).toBeInTheDocument();
+    });
+
+    it('persists the selected Organization before navigating to its compatibility dashboard', async () => {
+        const yo = makeOrg({ id: 'o-yo', slug: 'yo-inc', displayName: 'Yo Incorporated' });
+        const ever = makeOrg({ id: 'o-ever', slug: 'ever', displayName: 'Ever' });
+        __seedOrganizationsStoreForTests({
+            data: [yo, ever],
+            isLoading: false,
+            error: null,
+        });
+
+        let resolveSwitch!: (response: unknown) => void;
+        const switchResponse = new Promise((resolve) => {
+            resolveSwitch = resolve;
+        });
+        const fetchMock = vi.mocked(fetch);
+        fetchMock.mockImplementation((_input, init) => {
+            if (init?.method === 'POST') {
+                return switchResponse as Promise<Response>;
+            }
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    tenantId: 't-1',
+                    organizationId: 'o-yo',
+                    organizationSlug: 'yo-inc',
+                }),
+            } as Response);
+        });
+
+        render(<WorkspaceSwitcher />);
+        fireEvent.click(screen.getAllByRole('button')[0]);
+        fireEvent.click(screen.getByText('Ever'));
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            '/api/users/me/scope',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ organizationSlug: 'ever' }),
+            }),
+        );
+        expect(routerPushMock).not.toHaveBeenCalled();
+
+        resolveSwitch({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                tenantId: 't-1',
+                organizationId: 'o-ever',
+                organizationSlug: 'ever',
+            }),
+        });
+
+        await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/ever/dashboard'));
     });
 });
