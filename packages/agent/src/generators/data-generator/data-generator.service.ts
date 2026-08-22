@@ -184,6 +184,19 @@ export class DataGeneratorService {
         return getWorkOwner(work);
     }
 
+    private runtimeCertificationFailure(error: unknown): InitializeError {
+        const cause = error instanceof Error ? error : new Error(String(error));
+
+        return {
+            code: 'DATA_REPO_FAILED',
+            message:
+                error instanceof RuntimeYamlCompatibilityError
+                    ? error.message
+                    : 'Failed to certify data repository for runtime compatibility',
+            cause,
+        };
+    }
+
     async initialize(
         work: Work,
         user: User,
@@ -227,19 +240,12 @@ export class DataGeneratorService {
                     .existingItems;
             }
         } catch (error) {
-            if (error instanceof RuntimeYamlCompatibilityError) {
-                this.logger.error('Data repository failed runtime YAML certification', error);
-                return {
-                    success: false,
-                    error: {
-                        code: 'DATA_REPO_FAILED',
-                        message: error.message,
-                        cause: error,
-                    },
-                    warnings: [],
-                };
-            }
-            throw error;
+            this.logger.error('Data repository failed runtime YAML certification', error);
+            return {
+                success: false,
+                error: this.runtimeCertificationFailure(error),
+                warnings: [],
+            };
         }
 
         throwIfCancelled();
@@ -1517,7 +1523,7 @@ export class DataGeneratorService {
                 existingConfig: config,
             };
         } catch (error) {
-            if (error instanceof RuntimeYamlCompatibilityError) {
+            if (options.requireRuntimeCompatibility) {
                 throw error;
             }
             return {
@@ -1928,6 +1934,7 @@ export class DataGeneratorService {
         const committer = work.resolveCommitter(user);
         const repoName = work.getDataRepo();
         const repoOwner = work.getRepoOwner();
+        let runtimeCertificationComplete = false;
 
         try {
             this.logger.log(`Syncing imported data for: ${repoOwner}/${repoName}`);
@@ -1940,6 +1947,7 @@ export class DataGeneratorService {
 
             const data = await DataRepository.create(dest, getWorkDefaultDataConfig(work));
             await data.assertRuntimeCompatible();
+            runtimeCertificationComplete = true;
             await data.ensureWorksExist();
             await data.ensureDefaultConfig();
 
@@ -2123,18 +2131,19 @@ export class DataGeneratorService {
             this.logger.error('Failed to sync with imported data', error);
             return {
                 success: false,
-                error: {
-                    code:
-                        error instanceof RuntimeYamlCompatibilityError
-                            ? 'DATA_REPO_FAILED'
-                            : 'GENERATION_FAILED',
-                    // Security (info-leak): guard the untyped throw so a non-Error
-                    // value can't surface `message: undefined` or serialize a raw
-                    // internal object (paths/stack) into the API result `cause`.
-                    message:
-                        error instanceof Error ? error.message : 'Failed to sync data repository',
-                    cause: error instanceof Error ? error : new Error(String(error)),
-                },
+                error: !runtimeCertificationComplete
+                    ? this.runtimeCertificationFailure(error)
+                    : {
+                          code: 'GENERATION_FAILED',
+                          // Security (info-leak): guard the untyped throw so a non-Error
+                          // value can't surface `message: undefined` or serialize a raw
+                          // internal object (paths/stack) into the API result `cause`.
+                          message:
+                              error instanceof Error
+                                  ? error.message
+                                  : 'Failed to sync data repository',
+                          cause: error instanceof Error ? error : new Error(String(error)),
+                      },
             };
         }
     }

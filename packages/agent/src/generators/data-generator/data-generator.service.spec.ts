@@ -90,6 +90,26 @@ describe('DataGeneratorService runtime YAML certification', () => {
         expect(pipelineOrchestrator.resumeOrExecute).not.toHaveBeenCalled();
     });
 
+    it('fails closed before the pipeline when strict preflight cannot clone the corpus', async () => {
+        gitFacade.cloneOrPull.mockRejectedValue(
+            Object.assign(new Error('permission denied while cloning'), { code: 'EACCES' }),
+        );
+
+        await expect(
+            service.initialize(work, user, {
+                name: work.name,
+                prompt: 'Update the directory',
+                generation_method: GenerationMethod.CREATE_UPDATE,
+            } as any),
+        ).resolves.toMatchObject({
+            success: false,
+            error: { code: 'DATA_REPO_FAILED' },
+        });
+
+        expect(pipelineOrchestrator.execute).not.toHaveBeenCalled();
+        expect(pipelineOrchestrator.resumeOrExecute).not.toHaveBeenCalled();
+    });
+
     it('keeps ordinary item reads tolerant by skipping generation certification', async () => {
         const assertRuntimeCompatible = jest.fn();
         const items = [{ slug: 'legacy-item', name: 'Legacy Item' }];
@@ -165,6 +185,37 @@ describe('DataGeneratorService runtime YAML certification', () => {
                 code: 'DATA_REPO_FAILED',
                 cause: compatibilityError,
             },
+        });
+
+        expect(assertRuntimeCompatible).toHaveBeenCalledTimes(1);
+        expect(getItems).not.toHaveBeenCalled();
+    });
+
+    it('classifies imported-data certification I/O failures as data-repository failures', async () => {
+        const certificationError = Object.assign(
+            new Error('permission denied while reading YAML'),
+            {
+                code: 'EACCES',
+            },
+        );
+        const assertRuntimeCompatible = jest.fn().mockRejectedValue(certificationError);
+        const getItems = jest.fn();
+        jest.spyOn(DataRepository, 'create').mockResolvedValue({
+            assertRuntimeCompatible,
+            getItems,
+            ensureWorksExist: jest.fn(),
+            ensureDefaultConfig: jest.fn(),
+        } as unknown as DataRepository);
+
+        await expect(
+            service.updateWithImportedData(work, user, {
+                items: [],
+                categories: [],
+                tags: [],
+            }),
+        ).resolves.toMatchObject({
+            success: false,
+            error: { code: 'DATA_REPO_FAILED' },
         });
 
         expect(assertRuntimeCompatible).toHaveBeenCalledTimes(1);
