@@ -650,19 +650,24 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		}
 	}
 
-	async getDeploymentStatus(deploymentId: string, kubeconfig: string): Promise<DeploymentResult> {
-		const settings = await this.loadSettings();
-		const { namespace, name } = parseDeploymentId(deploymentId);
+	async getDeploymentStatus(
+		deploymentId: string,
+		kubeconfig: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentResult> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
+		const { namespace, name } = resolveDeploymentTarget(deploymentId, context);
+		const effectiveDeploymentId = makeDeploymentId(namespace, name);
 		const createdAt = new Date().toISOString();
 
 		try {
 			const deployment = await this.api.getDeployment(kubeconfig, namespace, name, settings.kubeContext);
 			if (!deployment) {
-				return { id: deploymentId, status: 'pending', createdAt };
+				return { id: effectiveDeploymentId, status: 'pending', createdAt };
 			}
 			const status = mapDeploymentToStatus(deployment);
 			return {
-				id: deploymentId,
+				id: effectiveDeploymentId,
 				status,
 				createdAt,
 				completedAt: status === 'ready' || status === 'error' ? new Date().toISOString() : undefined
@@ -670,7 +675,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		} catch (err) {
 			const scrubbed = scrubError(err, this.runtimeScrubPatterns({ kubeconfig }));
 			return {
-				id: deploymentId,
+				id: effectiveDeploymentId,
 				status: 'error',
 				error: scrubbed.message,
 				createdAt,

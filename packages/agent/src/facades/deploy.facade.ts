@@ -291,8 +291,18 @@ export class DeployFacadeService implements IDeployFacade {
         deploymentId: string,
         options: DeployFacadeOptions,
     ): Promise<{ status: string; url?: string; error?: string }> {
-        const { plugin, token } = await this.resolvePluginAndToken(options);
-        const result = await plugin.getDeploymentStatus(deploymentId, token);
+        const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
+        const deploymentContext = await this.resolveDeploymentLookupContext(
+            plugin,
+            token,
+            work,
+            options,
+        );
+        const result = await plugin.getDeploymentStatus(
+            deploymentId,
+            deploymentContext.token,
+            deploymentContext.context,
+        );
         return {
             status: result.status,
             url: result.url,

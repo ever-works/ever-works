@@ -96,6 +96,45 @@ describe('DeployFacadeService', () => {
             }
         });
 
+        it('uses the authoritative Work context when the caller supplies a stale deployment ID', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
+            const getDeploymentStatus = jest.fn().mockImplementation(
+                async (
+                    _deploymentId: string,
+                    token: string,
+                    context?: {
+                        namespaceOverride?: string;
+                        projectNameOverride?: string;
+                        kubeContextOverride?: string | null;
+                    },
+                ) => ({
+                    id: `${context?.namespaceOverride}/${context?.projectNameOverride}`,
+                    status:
+                        token === 'internal-work-cluster' &&
+                        context?.namespaceOverride === 'ever-works-awesome-time-tracking-prod' &&
+                        context?.projectNameOverride === 'awesome-time-tracking-website' &&
+                        context?.kubeContextOverride === null
+                            ? 'ready'
+                            : 'error',
+                    createdAt: '2026-08-22T00:00:00.000Z',
+                }),
+            );
+            const { service } = createService({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                scopedSettings: { clusterSource: 'k8s-works' },
+                pluginOverrides: { getDeploymentStatus },
+            });
+
+            const result = await service.getDeploymentStatus('tenant-b/repo-b', {
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+
+            expect(result.status).toBe('ready');
+        });
+
         it('uses the Work cluster and generated internal namespace instead of singleton defaults', async () => {
             process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
             process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = 'wrong-shared-cluster';

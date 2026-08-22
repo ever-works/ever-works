@@ -139,7 +139,11 @@ export interface IDeploymentPlugin extends IPlugin {
 	/**
 	 * Get deployment status
 	 */
-	getDeploymentStatus(deploymentId: string, token: string): Promise<DeploymentResult>;
+	getDeploymentStatus(
+		deploymentId: string,
+		token: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentResult>;
 
 	/**
 	 * Validate API token

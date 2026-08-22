@@ -490,6 +490,33 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 });
 
 describe('KubernetesPlugin.getDeploymentStatus', () => {
+	it('uses the authoritative Work target and managed kubeconfig context instead of a stale deployment ID', async () => {
+		const api = makeMockApi({
+			getDeployment: vi.fn(async (_kubeconfig, namespace, name) => ({
+				metadata: { name, namespace },
+				status: {
+					conditions:
+						name === 'repo-a'
+							? [{ type: 'Available', status: 'True' }]
+							: [{ type: 'Progressing', status: 'False', reason: 'SiblingDeployment' }]
+				}
+			}))
+		});
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		const result = await (plugin as any).getDeploymentStatus('tenant-b/repo-b', VALID, {
+			settingsOverride: { clusterSource: 'k8s-works' },
+			namespaceOverride: 'tenant-a',
+			projectNameOverride: 'repo-a',
+			kubeContextOverride: null
+		});
+
+		expect(api.getDeployment).toHaveBeenCalledWith(VALID, 'tenant-a', 'repo-a', undefined);
+		expect(result.id).toBe('tenant-a/repo-a');
+		expect(result.status).toBe('ready');
+	});
+
 	it('maps Available=True to ready', async () => {
 		const api = makeMockApi();
 		const plugin = new KubernetesPlugin({ api });
