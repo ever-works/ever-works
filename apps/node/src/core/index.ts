@@ -19,6 +19,7 @@ export * from './gpu-probe';
 export * from './job-client';
 export * from './heartbeat';
 export * from './logger';
+export * from './model-execution/model-process';
 export * from './runtime';
 export * from './secret-store';
 export * from './telemetry-probe';
