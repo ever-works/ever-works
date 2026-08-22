@@ -1,0 +1,91 @@
+name: ops-diagnose (read-only k8s inspection)
+
+# Read-only kubectl inspection of the Ever Works clusters from CI, for operators
+# who have no local kubeconfig. Never prints Secret values (only key names).
+# Dispatch: gh workflow run ops-diagnose.yml --ref <branch> -f cluster=gauzy -f action=logs -f target=deploy/ever-works-api -f grep='pipeline' -f since=3h
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster:
+        description: 'Cluster'
+        required: true
+        type: choice
+        options: [gauzy, works]
+        default: gauzy
+      namespace:
+        description: 'Namespace (default: "default" for gauzy, "ever-works" for works)'
+        required: false
+        type: string
+        default: ''
+      action:
+        description: 'What to inspect'
+        required: true
+        type: choice
+        options: [pods, deployments, ingress, events, top, describe, logs, secret-keys, nodes]
+        default: pods
+      target:
+        description: 'Target for describe/logs/secret-keys, e.g. deploy/ever-works-api or pod/<name> or <secret-name>'
+        required: false
+        type: string
+        default: ''
+      grep:
+        description: 'Optional case-insensitive regex to filter output lines (logs/events)'
+        required: false
+        type: string
+        default: ''
+      since:
+        description: 'Logs lookback (kubectl --since), e.g. 3h'
+        required: false
+        type: string
+        default: '2h'
+      tail:
+        description: 'Max log lines (kubectl --tail)'
+        required: false
+        type: string
+        default: '2000'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Write kubeconfig (from repo secret, never echoed)
+        env:
+          KC_GAUZY_B64: ${{ secrets.EVER_WORKS_K8S_GAUZY_KUBECONFIG_B64 }}
+          KC_WORKS_B64: ${{ secrets.EVER_WORKS_K8S_WORKS_KUBECONFIG_B64 }}
+          CLUSTER: ${{ inputs.cluster }}
+        run: |
+          set -euo pipefail
+          if [ "$CLUSTER" = "gauzy" ]; then printf '%s' "$KC_GAUZY_B64" | base64 -d > "$RUNNER_TEMP/kubeconfig"; else printf '%s' "$KC_WORKS_B64" | base64 -d > "$RUNNER_TEMP/kubeconfig"; fi
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+          kubectl version --client=true
+      - name: Inspect
+        env:
+          CLUSTER: ${{ inputs.cluster }}
+          NS_IN: ${{ inputs.namespace }}
+          ACTION: ${{ inputs.action }}
+          TARGET: ${{ inputs.target }}
+          GREP: ${{ inputs.grep }}
+          SINCE: ${{ inputs.since }}
+          TAIL: ${{ inputs.tail }}
+        run: |
+          set -euo pipefail
+          NS="$NS_IN"; if [ -z "$NS" ]; then if [ "$CLUSTER" = "gauzy" ]; then NS=default; else NS=ever-works; fi; fi
+          filter() { if [ -n "$GREP" ]; then grep -i -E "$GREP" || true; else cat; fi; }
+          echo "### cluster=$CLUSTER ns=$NS action=$ACTION target=$TARGET"
+          case "$ACTION" in
+            nodes)       kubectl get nodes -o wide; kubectl top nodes || true; kubectl describe nodes | grep -E "Name:|Allocated resources|cpu |memory |MemoryPressure|DiskPressure|PIDPressure" || true ;;
+            pods)        kubectl -n "$NS" get pods -o wide; echo; kubectl top pods -n "$NS" || true ;;
+            deployments) kubectl -n "$NS" get deploy,rs -o wide ;;
+            ingress)     kubectl -n "$NS" get ingress -o wide; kubectl -n "$NS" get ingress -o jsonpath='{range .items[*]}{.metadata.name}{" hosts="}{.spec.rules[*].host}{"\n"}{end}' ;;
+            events)      kubectl -n "$NS" get events --sort-by=.lastTimestamp | filter | tail -n 300 ;;
+            top)         kubectl top pods -n "$NS" --sort-by=memory || true; kubectl top nodes || true ;;
+            describe)    kubectl -n "$NS" describe "$TARGET" | grep -v -i -E "token|password|secret:" ;;
+            logs)        kubectl -n "$NS" logs "$TARGET" --all-containers=true --since="$SINCE" --tail="$TAIL" --timestamps 2>&1 | filter | tail -n 800 ;;
+            secret-keys) kubectl -n "$NS" get secret "$TARGET" -o jsonpath='{range $k,$v := .data}{$k}{"\n"}{end}' 2>/dev/null || kubectl -n "$NS" get secret "$TARGET" -o json | jq -r '.data | keys[]' ;;
+          esac
