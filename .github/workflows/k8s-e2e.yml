@@ -124,12 +124,36 @@ jobs:
           echo "KUBECONFIG_E2E_PATH=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
 
       - name: Pre-pull image used by e2e Deployment
-        # Loads nginx-unprivileged into kind nodes so the Deployment's
+        # Loads nginx-unprivileged into the kind node so the Deployment's
         # imagePullPolicy: IfNotPresent path resolves immediately,
         # cutting test time by ~30s on slow runners.
+        #
+        # Why `crictl pull` INSIDE the node instead of `kind load docker-image`:
+        # on the self-hosted ARC pool the `docker:dind` sidecar runs Docker 29,
+        # whose fresh-install default is the containerd image store. There
+        # `docker save` (what `kind load docker-image` shells out to) writes the
+        # image's FULL multi-arch OCI index but only the blobs that were actually
+        # pulled, and the node-side `ctr images import --all-platforms` fails with
+        # `ctr: content digest sha256:…: not found` for the linux/arm manifest.
+        # `docker save --platform linux/amd64` is not enough either: the archive
+        # still carries the amd64 *attestation* manifest (unknown/unknown), which
+        # ctr then tries to unpack as an image and rejects with `mismatched image
+        # rootfs and manifest layers`. That made every run of this workflow red
+        # from 2026-07-17 on (the GitHub-hosted runners it ran on before use the
+        # classic overlay2 store, where `docker save` is self-contained).
+        # Upstream: kubernetes-sigs/kind#3795 (pinned, open — kind cannot fix it
+        # on its side), containerd/containerd#11344.
+        # Pulling through the node's own CRI fetches exactly what the kubelet
+        # would fetch (one platform, no attestations) and is independent of the
+        # host daemon's image store, so it behaves the same on ubuntu-latest and
+        # on ARC. The `docker info` line records the daemon mode in every run.
         run: |
-          docker pull nginxinc/nginx-unprivileged:1.27-alpine
-          kind load docker-image nginxinc/nginx-unprivileged:1.27-alpine --name ever-works-e2e
+          IMAGE=nginxinc/nginx-unprivileged:1.27-alpine
+          docker info --format 'docker {{.ServerVersion}} / storage {{.Driver}} {{range .DriverStatus}}{{index . 0}}={{index . 1}} {{end}}'
+          docker exec ever-works-e2e-control-plane crictl pull "docker.io/$IMAGE"
+          # Prove the image is on the node — a loud failure here beats a silent
+          # fallback to a registry pull inside the test.
+          docker exec ever-works-e2e-control-plane crictl images | grep -F 'nginxinc/nginx-unprivileged'             || { echo "::error::$IMAGE not present on the kind node after pull"; exit 1; }
 
       - name: Run k8s plugin e2e suite
         run: pnpm --filter @ever-works/k8s-plugin test:e2e

@@ -88,3 +88,9 @@ api-mem.log
 apps/desktop/release
 apps/desktop/bundle
 apps/desktop-node/release
+
+# CI writes registry configuration at the repo root (Configure Registry action) and removes it
+# again on the same run - but self-hosted runners check out with clean: false, so a crashed job
+# could leave one behind. Ignore them so a leftover can never be committed by a later job.
+/.npmrc
+/.yarnrc
