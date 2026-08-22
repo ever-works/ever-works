@@ -114,6 +114,13 @@ export interface DeploymentLookupContext {
 	readonly settingsOverride?: Record<string, unknown>;
 	/** Namespace previously validated/enforced by the deploy orchestrator. */
 	readonly namespaceOverride?: string;
+	/** Current website repository/project name enforced by the orchestrator. */
+	readonly projectNameOverride?: string;
+	/**
+	 * Context selected together with the effective kubeconfig. `null` means
+	 * use that kubeconfig's operator-controlled current context.
+	 */
+	readonly kubeContextOverride?: string | null;
 }
 
 /**

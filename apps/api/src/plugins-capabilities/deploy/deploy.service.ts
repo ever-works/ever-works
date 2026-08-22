@@ -43,7 +43,12 @@ import {
     WebsiteTemplateResolverService,
 } from '@ever-works/agent/generators';
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
-import type { DeploymentConfig, DeploymentResult, IDeploymentPlugin } from '@ever-works/plugin';
+import type {
+    DeploymentConfig,
+    DeploymentResult,
+    IDeploymentPlugin,
+    SettingSource,
+} from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
@@ -173,7 +178,7 @@ export class DeployService {
         options: DeployOptions = {},
     ): Promise<DeployResult> {
         const env = DeployService.buildEnvironmentOptions(options);
-        const { plugin, token, work, settings } =
+        const { plugin, token, work, settings, settingSources } =
             await this.deployFacade.getPluginAndTokenAndSettings({
                 userId,
                 workId,
@@ -207,6 +212,7 @@ export class DeployService {
             settings ?? {},
             token,
             user,
+            settingSources,
         );
         const effectiveDeployToken = effectiveContext.token;
 
@@ -307,6 +313,7 @@ export class DeployService {
                   gitToken,
                   revision: env.commitSha,
                   deploySettings: deploySettings ?? {},
+                  kubeContextOverride: effectiveContext.lookupContext?.kubeContextOverride ?? null,
                   deploymentId: deployment.id,
                   targetBranch,
               })
@@ -459,6 +466,7 @@ export class DeployService {
         settings: Record<string, unknown>,
         resolvedToken: string,
         user: User,
+        settingSources?: Readonly<Record<string, SettingSource | undefined>>,
     ): EffectiveDeploymentContext {
         try {
             return resolveEffectiveDeploymentContext({
@@ -466,7 +474,9 @@ export class DeployService {
                 pluginId,
                 resolvedToken,
                 settings,
+                settingSources,
                 websiteOwner,
+                websiteProjectName: work.getWebsiteRepo(),
                 workId: work.id,
                 workSlug: work.slug,
                 ownerUserId: user.id,
@@ -1098,6 +1108,7 @@ export class DeployService {
         kubeconfig: string;
         gitToken: string;
         deploySettings: Record<string, unknown>;
+        kubeContextOverride: string | null;
         deploymentId: string;
         targetBranch: string;
         revision?: string;
@@ -1109,6 +1120,7 @@ export class DeployService {
             kubeconfig,
             gitToken,
             deploySettings,
+            kubeContextOverride,
             deploymentId,
             targetBranch,
             revision,
@@ -1177,6 +1189,7 @@ export class DeployService {
                         githubOwner: work.getRepoOwner('website'),
                         imageName: work.getWebsiteRepo(),
                         namespaceOverride: namespace,
+                        kubeContextOverride,
                         hosts,
                         runtimeEnv,
                         // BLOCK-1: without a read:packages token the plugin

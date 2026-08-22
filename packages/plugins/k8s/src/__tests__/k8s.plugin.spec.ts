@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import type { PluginContext } from '@ever-works/plugin';
 import { KubernetesPlugin } from '../k8s.plugin';
 import { KubernetesApiService } from '../k8s-api.service';
+import { K8sPluginError } from '../errors';
 import type { IngressClassDescriptor, KubernetesClusterInfo } from '../types';
 
 const VALID = readFileSync(resolve(__dirname, 'fixtures/kubeconfig-valid.yml'), 'utf-8');
@@ -412,6 +413,33 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 		expect(api.applyService).toHaveBeenCalledTimes(1);
 	});
 
+	it('uses the managed kubeconfig current context instead of a stale singleton context', async () => {
+		await plugin.onLoad(
+			createMockContext({
+				kubeContext: 'obsolete-singleton-context',
+				registry: { kind: 'github', visibility: 'auto' }
+			})
+		);
+
+		const result = await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'k8s-works' },
+					kubeContextOverride: null
+				}
+			},
+			VALID
+		);
+
+		expect(result.status).toBe('deploying');
+		expect(api.ensureNamespace).toHaveBeenCalledWith(VALID, 'ever-works', undefined);
+		expect(api.applyDeployment).toHaveBeenCalledWith(VALID, expect.any(Object), undefined);
+	});
+
 	it('private website repo + GHCR → applies a pull secret', async () => {
 		const result = await plugin.deploy(
 			{
@@ -478,6 +506,28 @@ describe('KubernetesPlugin.getDeploymentStatus', () => {
 });
 
 describe('KubernetesPlugin.lookupExistingDeployment', () => {
+	it('uses the managed kubeconfig current context instead of a stale singleton context', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await plugin.lookupExistingDeployment('my-site', VALID, undefined, {
+			settingsOverride: { clusterSource: 'k8s-works' },
+			namespaceOverride: 'ever-works-my-site-prod',
+			kubeContextOverride: null
+		} as any);
+
+		expect(api.getDeployment).toHaveBeenCalledWith(VALID, 'ever-works-my-site-prod', 'my-site', undefined);
+	});
+
+	it('propagates typed cluster/auth failures instead of reporting not-found', async () => {
+		const failure = new K8sPluginError('UNAUTHORIZED', 'Kubernetes credentials were rejected.');
+		const api = makeMockApi({ getDeployment: vi.fn(async () => Promise.reject(failure)) });
+		const plugin = new KubernetesPlugin({ api });
+
+		await expect(plugin.lookupExistingDeployment('my-site', VALID)).rejects.toBe(failure);
+	});
+
 	it('uses the Work-scoped namespace and context instead of singleton defaults', async () => {
 		const api = makeMockApi();
 		const plugin = new KubernetesPlugin({ api });
@@ -543,6 +593,14 @@ describe('KubernetesPlugin.lookupExistingDeployment', () => {
 		expect(result.website).toBeUndefined();
 		expect(result.deploymentState).toBe('READY');
 	});
+
+	it('propagates typed ingress connectivity failures after finding the deployment', async () => {
+		const failure = new K8sPluginError('CLUSTER_UNREACHABLE', 'Ingress API is unreachable.');
+		const api = makeMockApi({ readIngress: vi.fn(async () => Promise.reject(failure)) });
+		const plugin = new KubernetesPlugin({ api });
+
+		await expect(plugin.lookupExistingDeployment('my-site', VALID)).rejects.toBe(failure);
+	});
 });
 
 describe('KubernetesPlugin Work-scoped domain context', () => {
@@ -550,17 +608,39 @@ describe('KubernetesPlugin Work-scoped domain context', () => {
 		settingsOverride: {
 			kubeContext: 'work-context',
 			ingressClass: 'nginx'
-		}
+		},
+		namespaceOverride: 'current-tenant-ns',
+		projectNameOverride: 'current-website-repo'
 	};
+
+	it('uses the managed kubeconfig current context for domain operations', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).getDomains('stale-ns/stale-site', VALID, undefined, {
+			settingsOverride: { clusterSource: 'k8s-works-shared' },
+			namespaceOverride: 'current-tenant-ns',
+			projectNameOverride: 'current-website-repo',
+			kubeContextOverride: null
+		});
+
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'current-tenant-ns', 'current-website-repo', undefined);
+	});
 
 	it('uses the Work kubeContext when listing domains', async () => {
 		const api = makeMockApi();
 		const plugin = new KubernetesPlugin({ api });
 		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
 
-		await (plugin as any).getDomains('tenant-ns/my-site', VALID, undefined, scopedContext);
+		await (plugin as any).getDomains('stale-tenant-ns/stale-site', VALID, undefined, scopedContext);
 
-		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'tenant-ns', 'my-site', 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(
+			VALID,
+			'current-tenant-ns',
+			'current-website-repo',
+			'work-context'
+		);
 	});
 
 	it('uses the Work kubeContext when adding a domain', async () => {
@@ -568,11 +648,29 @@ describe('KubernetesPlugin Work-scoped domain context', () => {
 		const plugin = new KubernetesPlugin({ api });
 		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
 
-		await (plugin as any).addDomain('tenant-ns/my-site', 'tools.example.com', VALID, undefined, scopedContext);
+		await (plugin as any).addDomain(
+			'stale-tenant-ns/stale-site',
+			'tools.example.com',
+			VALID,
+			undefined,
+			scopedContext
+		);
 
 		expect(api.listIngressClasses).toHaveBeenCalledWith(VALID, expect.any(Function), 'work-context');
-		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'tenant-ns', 'my-site', 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(
+			VALID,
+			'current-tenant-ns',
+			'current-website-repo',
+			'work-context'
+		);
 		expect(api.applyIngress).toHaveBeenCalledWith(VALID, expect.any(Object), 'work-context');
+		expect(api.applyIngress).toHaveBeenCalledWith(
+			VALID,
+			expect.objectContaining({
+				metadata: { name: 'current-website-repo', namespace: 'current-tenant-ns' }
+			}),
+			'work-context'
+		);
 	});
 
 	it('uses the Work kubeContext when removing a domain', async () => {
@@ -580,11 +678,29 @@ describe('KubernetesPlugin Work-scoped domain context', () => {
 		const plugin = new KubernetesPlugin({ api });
 		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
 
-		await (plugin as any).removeDomain('tenant-ns/my-site', 'tools.example.com', VALID, undefined, scopedContext);
+		await (plugin as any).removeDomain(
+			'stale-tenant-ns/stale-site',
+			'tools.example.com',
+			VALID,
+			undefined,
+			scopedContext
+		);
 
 		expect(api.listIngressClasses).toHaveBeenCalledWith(VALID, expect.any(Function), 'work-context');
-		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'tenant-ns', 'my-site', 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(
+			VALID,
+			'current-tenant-ns',
+			'current-website-repo',
+			'work-context'
+		);
 		expect(api.applyIngress).toHaveBeenCalledWith(VALID, expect.any(Object), 'work-context');
+		expect(api.applyIngress).toHaveBeenCalledWith(
+			VALID,
+			expect.objectContaining({
+				metadata: { name: 'current-website-repo', namespace: 'current-tenant-ns' }
+			}),
+			'work-context'
+		);
 	});
 
 	it('uses the Work kubeContext when verifying a domain', async () => {
@@ -598,9 +714,20 @@ describe('KubernetesPlugin Work-scoped domain context', () => {
 		});
 		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
 
-		await (plugin as any).verifyDomain('tenant-ns/my-site', 'tools.example.com', VALID, undefined, scopedContext);
+		await (plugin as any).verifyDomain(
+			'stale-tenant-ns/stale-site',
+			'tools.example.com',
+			VALID,
+			undefined,
+			scopedContext
+		);
 
-		expect(api.getIngressLoadBalancerHost).toHaveBeenCalledWith(VALID, 'tenant-ns', 'my-site', 'work-context');
+		expect(api.getIngressLoadBalancerHost).toHaveBeenCalledWith(
+			VALID,
+			'current-tenant-ns',
+			'current-website-repo',
+			'work-context'
+		);
 	});
 });
 

@@ -1,4 +1,4 @@
-import type { DeploymentLookupContext } from '@ever-works/plugin';
+import type { DeploymentLookupContext, SettingSource } from '@ever-works/plugin';
 import { buildEverWorksTenantNamespace } from '../ever-works-providers/ever-works-k8s-deploy.provider';
 
 export const PLATFORM_MANAGED_KUBECONFIG_SENTINEL = '__ever-works-platform-managed-kubeconfig__';
@@ -35,7 +35,9 @@ export interface EffectiveDeploymentContextInput {
     readonly pluginId?: string;
     readonly resolvedToken: string;
     readonly settings: Record<string, unknown>;
+    readonly settingSources?: Readonly<Record<string, SettingSource | undefined>>;
     readonly websiteOwner: string;
+    readonly websiteProjectName?: string;
     readonly workId: string;
     readonly workSlug?: string | null;
     readonly ownerUserId?: string | null;
@@ -220,8 +222,23 @@ export function resolveEffectiveDeploymentContext(
     }
 
     const settings = { ...input.settings };
+    const usesManagedKubeconfig = managedAlias || clusterSource !== 'custom-kubeconfig';
+    const requestedKubeContext =
+        typeof input.settings.kubeContext === 'string' && input.settings.kubeContext.trim()
+            ? input.settings.kubeContext
+            : null;
+    if (usesManagedKubeconfig) {
+        // Cluster credentials and their selected context are one trust unit.
+        // A tenant-saved context is meaningful only inside that tenant's
+        // custom kubeconfig; managed kubeconfigs must use their operator-owned
+        // current context instead of inheriting a stale/foreign tenant value.
+        delete settings.kubeContext;
+    }
     const requestedNamespace =
         typeof input.settings.namespace === 'string' ? input.settings.namespace.trim() : '';
+    const namespaceSource = input.settingSources?.namespace;
+    const namespaceIsExplicit =
+        namespaceSource === undefined ? Boolean(requestedNamespace) : namespaceSource !== 'default';
     let namespace: string | undefined;
 
     if (managedAlias || isSharedClusterSource(clusterSource)) {
@@ -229,7 +246,7 @@ export function resolveEffectiveDeploymentContext(
         const base =
             (input.env ?? process.env).EVER_WORKS_DEPLOY_NAMESPACE?.trim() || 'ever-works-tenants';
         namespace = buildEverWorksTenantNamespace(tenantId, base);
-    } else if (requestedNamespace) {
+    } else if (requestedNamespace && namespaceIsExplicit) {
         if (isReservedDeployNamespace(requestedNamespace)) {
             throw new DeploymentContextResolutionError(
                 `Namespace '${requestedNamespace}' is reserved and cannot be used as a deploy target. ` +
@@ -249,6 +266,11 @@ export function resolveEffectiveDeploymentContext(
         if (derived && !isReservedDeployNamespace(derived)) {
             namespace = derived;
         }
+    } else if (requestedNamespace) {
+        // The Kubernetes plugin's documented custom-cluster default is the
+        // legacy `ever-works` namespace. A schema default is not a user request
+        // for a reserved platform namespace, so preserve it for BYOC Works.
+        namespace = requestedNamespace;
     }
 
     if (namespace !== undefined) {
@@ -263,6 +285,8 @@ export function resolveEffectiveDeploymentContext(
         lookupContext: {
             settingsOverride: settings,
             namespaceOverride: namespace,
+            projectNameOverride: input.websiteProjectName,
+            kubeContextOverride: usesManagedKubeconfig ? null : requestedKubeContext,
         },
     };
 }

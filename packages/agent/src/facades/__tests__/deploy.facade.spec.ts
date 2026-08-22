@@ -5,6 +5,7 @@ describe('DeployFacadeService', () => {
         deployProvider?: string;
         settings?: Record<string, { value?: unknown }>;
         scopedSettings?: Record<string, unknown>;
+        scopedResolvedSettings?: Record<string, unknown>;
         pluginId?: string;
         pluginName?: string;
         pluginOverrides?: Record<string, unknown>;
@@ -38,7 +39,12 @@ describe('DeployFacadeService', () => {
             getByCapability: jest.fn(() => [registered]),
         };
         const settingsService = {
-            getResolvedSettings: jest.fn().mockResolvedValue(args.settings ?? {}),
+            getResolvedSettings: jest.fn().mockImplementation((_pluginId, options) => {
+                if (options?.includeSecrets === false && args.scopedResolvedSettings) {
+                    return Promise.resolve(args.scopedResolvedSettings);
+                }
+                return Promise.resolve(args.settings ?? {});
+            }),
             getSettings: jest.fn().mockResolvedValue(args.scopedSettings ?? {}),
         };
         const workRepository = {
@@ -115,10 +121,70 @@ describe('DeployFacadeService', () => {
                 undefined,
                 {
                     settingsOverride: {
+                        clusterSource: scopedSettings.clusterSource,
+                        namespace: 'ever-works-awesome-time-tracking-prod',
+                    },
+                    namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
+                },
+            );
+        });
+
+        it('derives the internal namespace when the reserved value is only a schema default', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
+            const scopedSettings = {
+                clusterSource: 'k8s-works',
+                namespace: 'ever-works',
+            };
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                settings: {
+                    clusterSource: {
+                        key: 'clusterSource',
+                        value: 'k8s-works',
+                        source: 'work',
+                        isFallback: false,
+                    },
+                } as any,
+                scopedSettings,
+                scopedResolvedSettings: {
+                    clusterSource: {
+                        key: 'clusterSource',
+                        value: 'k8s-works',
+                        source: 'work',
+                        isFallback: false,
+                    },
+                    namespace: {
+                        key: 'namespace',
+                        value: 'ever-works',
+                        source: 'default',
+                        isFallback: true,
+                    },
+                },
+                pluginOverrides: {
+                    lookupExistingDeployment: jest
+                        .fn()
+                        .mockResolvedValue({ found: true, projectId: 'project-1' }),
+                    getDomains: jest.fn().mockResolvedValue([]),
+                },
+            });
+
+            await service.getDomains({ userId: 'user-1', workId: 'work-1' });
+
+            expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
+                'awesome-time-tracking-website',
+                'internal-work-cluster',
+                undefined,
+                {
+                    settingsOverride: {
                         ...scopedSettings,
                         namespace: 'ever-works-awesome-time-tracking-prod',
                     },
                     namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
         });
@@ -155,6 +221,8 @@ describe('DeployFacadeService', () => {
                         namespace: 'ever-works-tenants-user-1',
                     },
                     namespaceOverride: 'ever-works-tenants-user-1',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
         });
@@ -186,6 +254,8 @@ describe('DeployFacadeService', () => {
                         namespace: 'ever-works-tenants-user-1',
                     },
                     namespaceOverride: 'ever-works-tenants-user-1',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
         });
@@ -218,6 +288,8 @@ describe('DeployFacadeService', () => {
                         namespace: 'ever-works-tenants-user-1',
                     },
                     namespaceOverride: 'ever-works-tenants-user-1',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
         });
@@ -258,6 +330,8 @@ describe('DeployFacadeService', () => {
                         namespace: 'ever-works-awesome-time-tracking-prod',
                     },
                     namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
             expect(plugin.lookupExistingDeployment).toHaveBeenCalledWith(
@@ -270,6 +344,8 @@ describe('DeployFacadeService', () => {
                         namespace: 'ever-works-awesome-time-tracking-prod',
                     },
                     namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
         });
@@ -301,6 +377,8 @@ describe('DeployFacadeService', () => {
                         namespace: 'ever-works-awesome-time-tracking-prod',
                     },
                     namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
             expect((plugin as any).getDomains).toHaveBeenCalledWith(
@@ -313,6 +391,40 @@ describe('DeployFacadeService', () => {
                         namespace: 'ever-works-awesome-time-tracking-prod',
                     },
                     namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
+                },
+            );
+        });
+
+        it('overrides a stale cached Kubernetes project ID with the current namespace and website repo', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
+            const scopedSettings = { clusterSource: 'k8s-works' };
+            const { service, plugin } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                scopedSettings,
+                work: {
+                    deployProjectId: 'stale-namespace/stale-repo',
+                    getWebsiteRepo: () => 'renamed-website-repo',
+                },
+                pluginOverrides: { getDomains: jest.fn().mockResolvedValue([]) },
+            });
+
+            await service.getDomains({ userId: 'user-1', workId: 'work-1' });
+
+            expect((plugin as any).getDomains).toHaveBeenCalledWith(
+                'stale-namespace/stale-repo',
+                'internal-work-cluster',
+                undefined,
+                {
+                    settingsOverride: {
+                        ...scopedSettings,
+                        namespace: 'ever-works-awesome-time-tracking-prod',
+                    },
+                    namespaceOverride: 'ever-works-awesome-time-tracking-prod',
+                    projectNameOverride: 'renamed-website-repo',
+                    kubeContextOverride: null,
                 },
             );
         });
@@ -353,10 +465,13 @@ describe('DeployFacadeService', () => {
                 'tenant-team',
                 {
                     settingsOverride: {
-                        ...scopedSettings,
+                        clusterSource: scopedSettings.clusterSource,
+                        defaultTeamScope: scopedSettings.defaultTeamScope,
                         namespace: 'ever-works-tenants-user-1',
                     },
                     namespaceOverride: 'ever-works-tenants-user-1',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
         });
@@ -393,12 +508,35 @@ describe('DeployFacadeService', () => {
                 undefined,
                 {
                     settingsOverride: {
-                        ...scopedSettings,
+                        clusterSource: scopedSettings.clusterSource,
                         namespace: 'ever-works-tenants-user-1',
                     },
                     namespaceOverride: 'ever-works-tenants-user-1',
+                    projectNameOverride: 'awesome-time-tracking-website',
+                    kubeContextOverride: null,
                 },
             );
+        });
+
+        it('propagates deterministic provider lookup failures instead of reporting not-found', async () => {
+            process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = 'internal-work-cluster';
+            const { service } = createService({
+                deployProvider: 'k8s',
+                settings: { clusterSource: { value: 'k8s-works' } },
+                scopedSettings: { clusterSource: 'k8s-works' },
+                pluginOverrides: {
+                    lookupExistingDeployment: jest
+                        .fn()
+                        .mockRejectedValue(new Error('cluster authentication failed')),
+                },
+            });
+
+            await expect(
+                service.lookupExistingDeployment('awesome-time-tracking-website', {
+                    userId: 'user-1',
+                    workId: 'work-1',
+                }),
+            ).rejects.toThrow('cluster authentication failed');
         });
     });
 

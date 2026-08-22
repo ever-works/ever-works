@@ -69,6 +69,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         plugin: Record<string, unknown>;
         token?: string;
         settings?: Record<string, unknown>;
+        settingSources?: Record<string, string>;
         deployProvider?: string;
         /** Owner returned by `work.getRepoOwner('website')`. Defaults to
          *  the customer-owned org `'acme'` so most tests run on the
@@ -110,6 +111,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
                 token: overrides.token ?? 'kubeconfig:::yaml',
                 work,
                 settings: overrides.settings ?? {},
+                settingSources: overrides.settingSources,
             }),
             getOtherPluginSettings: jest
                 .fn()
@@ -247,6 +249,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
     };
 
     const SHARED_KC = 'shared-cluster-kubeconfig-yaml';
+    const INTERNAL_KC = 'internal-cluster-kubeconfig-yaml';
     const managedPlugin = () => ({
         id: 'k8s',
         deploy: jest.fn().mockResolvedValue({ status: 'deploying', id: 'd', createdAt: 't' }),
@@ -256,16 +259,21 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
 
     beforeEach(() => {
         process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG = SHARED_KC;
+        process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG = INTERNAL_KC;
     });
     afterEach(() => {
         delete process.env.EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG;
+        delete process.env.EVER_WORKS_K8S_WORKS_KUBECONFIG;
     });
 
     it('managed tier → plugin.deploy applies server-side with the platform kubeconfig', async () => {
         const plugin = managedPlugin();
         const { service, githubPlugin } = buildService({
             plugin,
-            settings: { clusterSource: 'k8s-works-shared' },
+            settings: {
+                clusterSource: 'k8s-works-shared',
+                kubeContext: 'tenant-stale-context',
+            },
         });
 
         const result = await service.deploy('work-1', 'user-1');
@@ -288,8 +296,31 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         // a pull secret, and throws GITHUB_NOT_CONNECTED on an empty token
         // BEFORE applying anything.
         expect(config.options.githubReadPackagesToken).toBeTruthy();
+        expect(config.options.settingsOverride).not.toHaveProperty('kubeContext');
+        expect(config.options.kubeContextOverride).toBeNull();
         // No workflow dispatch on the managed path.
         expect(githubPlugin.dispatchWorkflow).not.toHaveBeenCalled();
+    });
+
+    it('internal managed tier derives its namespace when ever-works is only the schema default', async () => {
+        const plugin = managedPlugin();
+        const { service } = buildService({
+            plugin,
+            token: '__ever-works-platform-managed-kubeconfig__',
+            settings: { clusterSource: 'k8s-works', namespace: 'ever-works' },
+            settingSources: { clusterSource: 'work', namespace: 'default' },
+            websiteOwner: 'ever-works',
+            isPlatformAdmin: true,
+        });
+
+        await expect(service.deploy('work-1', 'user-1')).resolves.toMatchObject({
+            dispatched: true,
+        });
+
+        const [config, kubeconfig] = plugin.deploy.mock.calls[0];
+        expect(kubeconfig).toBe(INTERNAL_KC);
+        expect(config.options.namespaceOverride).toBe('ever-works-my-site-prod');
+        expect(config.options.settingsOverride.namespace).toBe('ever-works-my-site-prod');
     });
 
     it('managed tier → the platform kubeconfig is NEVER written to the repo', async () => {

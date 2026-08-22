@@ -100,6 +100,8 @@ interface DeployOptions {
 	 * workflow's toJSON(secrets) copy step; values never touch the repo.
 	 */
 	namespaceOverride?: string;
+	/** `null` selects the effective kubeconfig's current context. */
+	kubeContextOverride?: string | null;
 	imageName?: string;
 	runtimeEnv?: Record<string, string>;
 	/**
@@ -501,6 +503,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			...(await this.loadSettings()),
 			...((opts.settingsOverride ?? {}) as Partial<KubernetesSettings>)
 		} as KubernetesSettings;
+		applyKubeContextOverride(settings, opts.kubeContextOverride);
 		// `namespaceOverride` is the namespace the PLATFORM enforced server-side
 		// (per-tenant override + reserved-namespace blocklist). It must win over
 		// the plugin's own persisted `namespace`, which is free-text the user
@@ -703,19 +706,15 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			(requestedNamespace && isValidK8sNamespace(requestedNamespace) ? requestedNamespace : undefined) ??
 			settings.namespace?.trim() ??
 			DEFAULT_NAMESPACE;
-		try {
-			const deployment = await this.api.getDeployment(kubeconfig, namespace, slug, settings.kubeContext);
-			if (!deployment) return { found: false };
-			const projectId = makeDeploymentId(namespace, slug);
-			return {
-				found: true,
-				projectId,
-				website: await this.resolveWebsiteUrl(kubeconfig, namespace, slug, settings),
-				deploymentState: toVerifierDeploymentState(mapDeploymentToStatus(deployment))
-			};
-		} catch {
-			return { found: false };
-		}
+		const deployment = await this.api.getDeployment(kubeconfig, namespace, slug, settings.kubeContext);
+		if (!deployment) return { found: false };
+		const projectId = makeDeploymentId(namespace, slug);
+		return {
+			found: true,
+			projectId,
+			website: await this.resolveWebsiteUrl(kubeconfig, namespace, slug, settings),
+			deploymentState: toVerifierDeploymentState(mapDeploymentToStatus(deployment))
+		};
 	}
 
 	async getDomains(
@@ -725,7 +724,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<DeploymentDomain[]> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
-		const { namespace, name } = parseDeploymentId(projectId);
+		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
 		if (!ingress?.spec) return [];
 		const spec = ingress.spec as { rules?: Array<{ host?: string }> };
@@ -764,7 +763,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		if (!host) {
 			throw new K8sPluginError('UNKNOWN', 'Invalid domain: provide a valid hostname.');
 		}
-		const { namespace, name } = parseDeploymentId(projectId);
+		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
 
@@ -805,7 +804,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<boolean> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
-		const { namespace, name } = parseDeploymentId(projectId);
+		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
 		const existing = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
@@ -833,7 +832,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		context?: DeploymentLookupContext
 	): Promise<DeploymentDomain> {
 		const settings = await this.loadEffectiveDeploymentSettings(context);
-		const { namespace, name } = parseDeploymentId(projectId);
+		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		// Resolve the cluster's actual ingress LB host/IP. Without this, any
 		// domain with any DNS record was returned `verified: true` —
 		// including domains pointing at a completely unrelated server.
@@ -927,10 +926,12 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	}
 
 	private async loadEffectiveDeploymentSettings(context?: DeploymentLookupContext): Promise<KubernetesSettings> {
-		return {
+		const settings = {
 			...(await this.loadSettings()),
 			...this.coerceSettings(context?.settingsOverride ?? {})
 		};
+		applyKubeContextOverride(settings, context?.kubeContextOverride);
+		return settings;
 	}
 
 	private coerceSettings(raw: Record<string, unknown>): KubernetesSettings {
@@ -981,14 +982,10 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		name: string,
 		settings: KubernetesSettings
 	): Promise<string | undefined> {
-		try {
-			const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
-			const rules = (ingress?.spec as { rules?: Array<{ host?: string }> } | undefined)?.rules ?? [];
-			const host = rules.find((rule) => typeof rule.host === 'string' && rule.host.trim().length > 0)?.host;
-			return host ? `https://${host}` : undefined;
-		} catch {
-			return undefined;
-		}
+		const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
+		const rules = (ingress?.spec as { rules?: Array<{ host?: string }> } | undefined)?.rules ?? [];
+		const host = rules.find((rule) => typeof rule.host === 'string' && rule.host.trim().length > 0)?.host;
+		return host ? `https://${host}` : undefined;
 	}
 
 	private async controllerForClassName(
@@ -1052,6 +1049,34 @@ function parseDeploymentId(id: string): { namespace: string; name: string } {
 		return { namespace: DEFAULT_NAMESPACE, name: id };
 	}
 	return { namespace: id.slice(0, slash), name: id.slice(slash + 1) };
+}
+
+function resolveDeploymentTarget(
+	projectId: string,
+	context?: DeploymentLookupContext
+): { namespace: string; name: string } {
+	const parsed = parseDeploymentId(projectId);
+	const namespaceOverride = context?.namespaceOverride?.trim();
+	if (namespaceOverride && !isValidK8sNamespace(namespaceOverride)) {
+		throw new K8sPluginError('NOT_CONFIGURED', 'The effective Kubernetes namespace is invalid.');
+	}
+	const projectNameOverride = context?.projectNameOverride?.trim();
+	const name = projectNameOverride ? sanitiseSlug(projectNameOverride) : parsed.name;
+	if (!name) {
+		throw new K8sPluginError('NOT_CONFIGURED', 'The effective Kubernetes project name is invalid.');
+	}
+	return {
+		namespace: namespaceOverride || parsed.namespace,
+		name
+	};
+}
+
+function applyKubeContextOverride(settings: KubernetesSettings, override?: string | null): void {
+	if (override === null) {
+		delete settings.kubeContext;
+	} else if (typeof override === 'string') {
+		settings.kubeContext = override;
+	}
 }
 
 function sanitiseSlug(input: string): string {
