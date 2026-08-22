@@ -162,6 +162,31 @@ describe('WorkerLoop', () => {
 		await loop.stop();
 	});
 
+	it('aborts the job signal when its lease is lost and releases the controller after settlement', async () => {
+		const client = scriptedClient([[job()], []]);
+		client.heartbeat.mockResolvedValue(false);
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({ client, scheduler, leaseTtlSec: 30 });
+		let receivedSignal: AbortSignal | undefined;
+		loop.register('acceptance-checks', async (_job, signal) => {
+			receivedSignal = signal;
+			if (!signal) throw new Error('executor did not receive its job AbortSignal');
+			await new Promise<void>((_resolve, reject) => {
+				signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+			});
+		});
+
+		await loop.start();
+		await vi.waitFor(() => expect(receivedSignal).toBeInstanceOf(AbortSignal));
+		scheduler.runNext();
+		await vi.waitFor(() => expect(receivedSignal?.aborted).toBe(true));
+		await vi.waitFor(() => expect(loop.getState().failed).toBe(1));
+
+		expect(client.heartbeat).toHaveBeenCalledWith('job-1', 30);
+		expect(loop.cancelJob('job-1')).toBe(false);
+		await loop.stop();
+	});
+
 	it('survives an unreportable result — the lease expiry is the safety net', async () => {
 		const client = scriptedClient([[job()], []]);
 		client.complete.mockRejectedValue(new Error('network down'));

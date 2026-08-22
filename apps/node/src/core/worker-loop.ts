@@ -78,7 +78,7 @@ export interface JobLeaseCapableClient {
 }
 
 /** One registered executor: "this is how a job of kind X gets run here". */
-export type JobExecutor = (job: FleetJobView) => Promise<Record<string, unknown> | void>;
+export type JobExecutor = (job: FleetJobView, signal: AbortSignal) => Promise<Record<string, unknown> | void>;
 
 /**
  * `draining` is the state a paused-but-still-busy node is in: leasing
@@ -143,6 +143,7 @@ export interface WorkerLoopOptions {
 export class WorkerLoop {
 	private readonly executors = new Map<FleetJobKind, JobExecutor>();
 	private readonly inFlight = new Map<string, Promise<void>>();
+	private readonly jobControllers = new Map<string, AbortController>();
 	private readonly listeners = new Set<(state: WorkerLoopState) => void>();
 	private readonly scheduler: Scheduler;
 	private readonly concurrency: number;
@@ -293,6 +294,18 @@ export class WorkerLoop {
 		}
 	}
 
+	/**
+	 * Cancel one leased job without affecting the loop or its siblings.
+	 * The same signal is shared by workspace provisioning and, later, the
+	 * model process. A settled or unknown job has no live controller.
+	 */
+	cancelJob(jobId: string, reason = 'Fleet job was cancelled'): boolean {
+		const controller = this.jobControllers.get(jobId);
+		if (!controller || controller.signal.aborted) return false;
+		controller.abort(new Error(reason));
+		return true;
+	}
+
 	/** Run one poll now. Exposed so a UI can offer "check for work" and tests can step. */
 	async tick(): Promise<void> {
 		if (!this.running || this.stopping) return;
@@ -366,8 +379,13 @@ export class WorkerLoop {
 	}
 
 	private startJob(job: FleetJobView): void {
-		const task = this.executeJob(job).finally(() => {
+		const controller = new AbortController();
+		this.jobControllers.set(job.id, controller);
+		const task = this.executeJob(job, controller.signal).finally(() => {
 			this.inFlight.delete(job.id);
+			if (this.jobControllers.get(job.id) === controller) {
+				this.jobControllers.delete(job.id);
+			}
 			this.patch({
 				activeJobIds: [...this.inFlight.keys()],
 				state: this.nextIdleState()
@@ -415,7 +433,7 @@ export class WorkerLoop {
 	 * blows up is reported as a job failure, because a job whose node
 	 * silently swallowed the error is indistinguishable from a hung one.
 	 */
-	private async executeJob(job: FleetJobView): Promise<void> {
+	private async executeJob(job: FleetJobView, signal: AbortSignal): Promise<void> {
 		const executor = this.executors.get(job.kind);
 		if (!executor) {
 			this.options.logger?.warn(
@@ -431,7 +449,7 @@ export class WorkerLoop {
 		const keepAlive = this.startKeepAlive(job.id);
 		try {
 			this.options.logger?.info(`Executing fleet job ${job.id} (${job.kind})`);
-			const result = await executor(job);
+			const result = await executor(job, signal);
 			await this.report(job.id, {
 				success: true,
 				result: (result as Record<string, unknown> | undefined) ?? null
@@ -451,9 +469,10 @@ export class WorkerLoop {
 
 	/**
 	 * Keep the claim alive at a third of the lease TTL, re-arming after
-	 * each beat. A failed keep-alive is logged, not fatal — the job keeps
-	 * running, and if the lease does lapse the platform re-offers the
-	 * work, which is exactly the designed failure mode.
+	 * each beat. A rejected heartbeat means this node no longer owns the
+	 * job, so abort the shared job signal before another node can execute
+	 * the same work. Transport errors remain non-fatal because they do not
+	 * prove the lease was lost.
 	 */
 	private startKeepAlive(jobId: string): unknown {
 		const everyMs = Math.max(Math.floor((this.leaseTtlSec * 1000) / 3), MIN_KEEPALIVE_MS);
@@ -466,6 +485,7 @@ export class WorkerLoop {
 						this.options.logger?.warn(
 							`Lost the lease on fleet job ${jobId} — the platform may re-offer it to another node`
 						);
+						this.cancelJob(jobId, 'Fleet job lease was lost');
 					}
 				})
 				.catch((error: unknown) => {
@@ -475,7 +495,7 @@ export class WorkerLoop {
 					);
 				})
 				.finally(() => {
-					if (this.inFlight.has(jobId)) {
+					if (this.inFlight.has(jobId) && !this.jobControllers.get(jobId)?.signal.aborted) {
 						this.scheduler.setTimeout(beat, everyMs);
 					}
 				});

@@ -333,13 +333,18 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// score a gate; with it a Task's run can actually EXECUTE here when
 		// the owner's resolved job runtime is the fleet. Same seam, same
 		// protocol, same credential — exactly as the header above promised.
-		worker.register('agent-task', (job) =>
-			runAgentTaskJob(job, {
-				provisionWorkspace: (taskId, spec) => workspaceProvisioner.provision(taskId, spec),
-				...(options.agentTaskWorkspacePath !== undefined
-					? { defaultWorkspacePath: options.agentTaskWorkspacePath }
-					: {})
-			})
+		worker.register('agent-task', (job, signal) =>
+			runAgentTaskJob(
+				job,
+				{
+					provisionWorkspace: (taskId, spec, provisionSignal) =>
+						workspaceProvisioner.provision(taskId, spec, provisionSignal),
+					...(options.agentTaskWorkspacePath !== undefined
+						? { defaultWorkspacePath: options.agentTaskWorkspacePath }
+						: {})
+				},
+				signal
+			)
 		);
 		// `browser-check` is registered ONLY when this machine actually
 		// resolved a browser executable (audit A26). A node advertising

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -241,6 +241,48 @@ describe('provision (persistent pool + worktree)', () => {
 		controller.abort();
 		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
 		expect(observedSignals.every((signal) => signal === controller.signal)).toBe(true);
+	});
+
+	it('recovers the exact task workspace when cancellation lands after git worktree add', async () => {
+		const controller = new AbortController();
+		let abortedAfterAdd = false;
+		const abortingExecFile = ((
+			command: string,
+			args: readonly string[],
+			options: Record<string, unknown>,
+			callback: (error: Error | null, stdout?: string | Buffer, stderr?: string | Buffer) => void
+		) =>
+			execFile(
+				command,
+				[...args],
+				options as never,
+				((error, stdout, stderr) => {
+					if (!error && args[0] === 'worktree' && args[1] === 'add') {
+						abortedAfterAdd = true;
+						controller.abort();
+					}
+					callback(error, stdout, stderr);
+				}) as never
+			)) as unknown as typeof execFile;
+		const interruptedPlugin = new LocalWorkspacePlugin({ execFile: abortingExecFile });
+		const interruptedSpec = {
+			...spec('lw-abort-after-add', 'task/abort-after-add-12121212'),
+			signal: controller.signal
+		};
+
+		await expect(interruptedPlugin.provision(interruptedSpec)).rejects.toMatchObject({ name: 'AbortError' });
+		expect(abortedAfterAdd).toBe(true);
+		const interruptedPath = join(baseDir, 'worktrees', 'lw-abort-after-add');
+		const interruptedGitDir = git(interruptedPath, 'rev-parse', '--path-format=absolute', '--git-dir');
+		expect(existsSync(join(interruptedGitDir, 'ew-workspace.json'))).toBe(true);
+
+		const retried = await new LocalWorkspacePlugin().provision({
+			...interruptedSpec,
+			signal: undefined
+		});
+		expect(retried.path).toBe(interruptedPath);
+		expect(retried.branch).toBe('task/abort-after-add-12121212');
+		expect(git(retried.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/abort-after-add-12121212');
 	});
 });
 

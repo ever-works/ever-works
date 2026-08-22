@@ -12,7 +12,7 @@ import type {
 } from '@ever-works/plugin';
 import { WorkspaceNotProvisionedError } from '@ever-works/plugin';
 import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -20,6 +20,9 @@ import { tmpdir } from 'node:os';
 /** Binding stamp kept INSIDE the worktree's gitdir so it can never be
  *  committed and never shows up in the working tree. */
 const STAMP_FILE = 'ew-workspace.json';
+
+/** Durable proof written in the trusted bare pool before `worktree add`. */
+const INTENTS_DIR = 'ew-workspace-intents';
 
 /** Pool sub-directories under the base dir. */
 const REPOS_DIR = 'repos';
@@ -41,6 +44,16 @@ interface BindingStamp {
 	worktreePath: string;
 }
 
+interface ProvisionIntent {
+	version: 1;
+	bindingKey: string;
+	branch: string;
+	repositoryKey: string;
+	remoteKey: string;
+	poolPath: string;
+	worktreePath: string;
+}
+
 interface WorktreeRegistration {
 	path: string;
 	head: string;
@@ -49,6 +62,14 @@ interface WorktreeRegistration {
 
 interface OwnedWorktree {
 	stamp: BindingStamp;
+	registration: WorktreeRegistration;
+}
+
+interface RegisteredCheckout {
+	canonicalPool: string;
+	canonicalWorktree: string;
+	canonicalGitDir: string;
+	remoteUrl: string;
 	registration: WorktreeRegistration;
 }
 
@@ -195,7 +216,19 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			if (!(await exists(join(poolDir, 'HEAD')))) {
 				throw workspaceOwnershipError('Task workspace is not registered to the requested repository pool');
 			}
-			existing = await this.assertOwnedWorktree(poolDir, worktreeDir, spec, spec.signal);
+			try {
+				existing = await this.assertOwnedWorktree(poolDir, worktreeDir, spec, spec.signal);
+			} catch (error) {
+				if (!isWorkspaceOwnershipError(error)) throw error;
+				try {
+					existing = await this.reconcileInterruptedWorktree(poolDir, worktreeDir, spec, spec.signal);
+				} catch (reconcileError) {
+					if (isAbortError(reconcileError)) throw reconcileError;
+					// No exact intent means this was an ordinary foreign/corrupt
+					// path, so retain the original ownership diagnostic.
+					throw error;
+				}
+			}
 		}
 
 		// ── pool repo: one BARE base clone per repository ─────────────
@@ -268,6 +301,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// ── worktree: reuse only after exact stamp + Git registration ─
 		if (existing) {
 			if (existing.stamp.branch === spec.branch) {
+				await this.removeProvisionIntent(poolDir, worktreeDir, spec);
 				// The worktree persists across runs on purpose — resume in
 				// place, no re-clone, no branch re-cut.
 				return {
@@ -282,22 +316,36 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			// A different requested branch is the one supported stale-binding
 			// repair. Re-prove ownership under both locks immediately before
 			// Git removes anything; foreign/corrupt paths are never self-healed.
+			await this.removeIntentMatchingStamp(poolDir, existing.stamp);
 			await this.removeOwnedWorktree(poolDir, worktreeDir, spec, spec.signal);
 		}
 
 		const startPoint = remoteBranchExists
 			? `refs/remotes/origin/${spec.branch}`
 			: `refs/remotes/origin/${spec.baseRef}`;
-		await this.gitOrThrow(
-			['worktree', 'add', '-B', spec.branch, worktreeDir, startPoint],
-			poolDir,
-			spec.auth,
-			'worktree add failed',
-			spec.signal
-		);
+		try {
+			await this.writeProvisionIntent(poolDir, worktreeDir, spec);
+			throwIfAborted(spec.signal);
+			await this.gitOrThrow(
+				['worktree', 'add', '-B', spec.branch, worktreeDir, startPoint],
+				poolDir,
+				spec.auth,
+				'worktree add failed',
+				spec.signal
+			);
 
-		await this.writeStamp(poolDir, worktreeDir, spec, spec.signal);
-		await this.assertOwnedWorktree(poolDir, worktreeDir, spec, spec.signal);
+			await this.writeStamp(poolDir, worktreeDir, spec, spec.signal);
+			await this.assertOwnedWorktree(poolDir, worktreeDir, spec, spec.signal);
+			await this.removeProvisionIntent(poolDir, worktreeDir, spec);
+		} catch (error) {
+			if (isAbortError(error)) {
+				// The process may have completed `worktree add` just before the
+				// AbortSignal fired. Reconcile only the exact intended checkout
+				// while both locks are still held, then preserve cancellation.
+				await this.settleCancelledProvision(poolDir, worktreeDir, spec);
+			}
+			throw error;
+		}
 
 		return {
 			path: worktreeDir,
@@ -694,6 +742,177 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		return owned;
 	}
 
+	/** Recover only an unstamped checkout backed by this task's durable intent. */
+	private async reconcileInterruptedWorktree(
+		poolDir: string,
+		worktreeDir: string,
+		spec: WorkspaceProvisionSpec,
+		signal?: AbortSignal
+	): Promise<OwnedWorktree> {
+		await this.inspectIntentRegisteredCheckout(poolDir, worktreeDir, spec, signal);
+		await this.writeStamp(poolDir, worktreeDir, spec, signal);
+		const owned = await this.assertOwnedWorktree(poolDir, worktreeDir, spec, signal);
+		await this.removeProvisionIntent(poolDir, worktreeDir, spec);
+		return owned;
+	}
+
+	/**
+	 * Best-effort cancellation settlement. This runs before the original
+	 * AbortError leaves the nested repository/worktree locks. A completed,
+	 * exactly registered checkout is stamped for idempotent retry. If stamping
+	 * fails, deletion is attempted only after the intent + Git proof is repeated.
+	 */
+	private async settleCancelledProvision(
+		poolDir: string,
+		worktreeDir: string,
+		spec: WorkspaceProvisionSpec
+	): Promise<void> {
+		try {
+			if (!(await existsNoFollow(worktreeDir))) return;
+			await this.inspectIntentRegisteredCheckout(poolDir, worktreeDir, spec);
+			try {
+				await this.writeStamp(poolDir, worktreeDir, spec);
+				await this.assertOwnedWorktree(poolDir, worktreeDir, spec);
+				await this.removeProvisionIntent(poolDir, worktreeDir, spec);
+				return;
+			} catch {
+				// Re-prove immediately before the only deletion path. If a stamp
+				// appeared or any registration changed, this throws and preserves it.
+				await this.inspectIntentRegisteredCheckout(poolDir, worktreeDir, spec);
+				await this.removeRegisteredWorktree(poolDir, worktreeDir, spec.auth);
+				await this.removeProvisionIntent(poolDir, worktreeDir, spec);
+			}
+		} catch {
+			// An unprovable partial path is deliberately preserved. The durable
+			// intent remains for diagnostics; a retry will refuse the collision.
+		}
+	}
+
+	private async writeProvisionIntent(
+		poolDir: string,
+		worktreeDir: string,
+		spec: WorkspaceProvisionSpec
+	): Promise<void> {
+		const canonicalPool = await assertPlainDirectory(poolDir);
+		if (!samePath(canonicalPool, poolDir)) {
+			throw workspaceOwnershipError('Repository pool resolves through an alias');
+		}
+		const intentsDir = join(canonicalPool, INTENTS_DIR);
+		try {
+			await fs.mkdir(intentsDir, { mode: 0o700 });
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+		}
+		const canonicalIntentsDir = await assertPlainDirectory(intentsDir);
+		if (!samePath(canonicalIntentsDir, intentsDir) || !isStrictDescendant(canonicalPool, canonicalIntentsDir)) {
+			throw workspaceOwnershipError('Workspace intent directory resolves outside its repository pool');
+		}
+
+		const expected = provisionIntent(poolDir, worktreeDir, spec);
+		const existing = await this.readProvisionIntent(poolDir, spec.bindingKey);
+		if (existing) {
+			if (!sameProvisionIntent(existing, expected)) {
+				throw workspaceOwnershipError('Existing workspace intent belongs to a different task or repository');
+			}
+			return;
+		}
+
+		const target = provisionIntentPath(canonicalPool, spec.bindingKey);
+		const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
+		try {
+			await fs.writeFile(temporary, JSON.stringify(expected), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+			await fs.rename(temporary, target);
+		} finally {
+			await fs.unlink(temporary).catch((error: NodeJS.ErrnoException) => {
+				if (error.code !== 'ENOENT') throw error;
+			});
+		}
+	}
+
+	private async readProvisionIntent(poolDir: string, bindingKey: string): Promise<ProvisionIntent | null> {
+		const canonicalPool = await assertPlainDirectory(poolDir);
+		if (!samePath(canonicalPool, poolDir)) {
+			throw workspaceOwnershipError('Repository pool resolves through an alias');
+		}
+		const intentsDir = join(canonicalPool, INTENTS_DIR);
+		if (!(await existsNoFollow(intentsDir))) return null;
+		const canonicalIntentsDir = await assertPlainDirectory(intentsDir);
+		if (!samePath(canonicalIntentsDir, intentsDir) || !isStrictDescendant(canonicalPool, canonicalIntentsDir)) {
+			throw workspaceOwnershipError('Workspace intent directory resolves outside its repository pool');
+		}
+		const path = provisionIntentPath(canonicalPool, bindingKey);
+		let stats;
+		try {
+			stats = await fs.lstat(path);
+		} catch (error) {
+			if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+			throw error;
+		}
+		if (stats.isSymbolicLink() || !stats.isFile()) {
+			throw workspaceOwnershipError('Workspace intent is a link or non-file');
+		}
+		return parseProvisionIntent(await fs.readFile(path, 'utf8'));
+	}
+
+	private async removeProvisionIntent(
+		poolDir: string,
+		worktreeDir: string,
+		spec: WorkspaceProvisionSpec
+	): Promise<void> {
+		const actual = await this.readProvisionIntent(poolDir, spec.bindingKey);
+		if (!actual) return;
+		const expected = provisionIntent(poolDir, worktreeDir, spec);
+		if (!sameProvisionIntent(actual, expected)) {
+			throw workspaceOwnershipError('Workspace intent does not match the exact task binding');
+		}
+		await fs.unlink(provisionIntentPath(poolDir, spec.bindingKey));
+	}
+
+	private async removeIntentMatchingStamp(poolDir: string, stamp: BindingStamp): Promise<void> {
+		const actual = await this.readProvisionIntent(poolDir, stamp.bindingKey);
+		if (!actual) return;
+		if (
+			actual.bindingKey !== stamp.bindingKey ||
+			actual.branch !== stamp.branch ||
+			actual.repositoryKey !== stamp.repositoryKey ||
+			actual.remoteKey !== stamp.remoteKey ||
+			actual.poolPath !== stamp.poolPath ||
+			actual.worktreePath !== stamp.worktreePath
+		) {
+			throw workspaceOwnershipError('Workspace intent does not match the proven task binding');
+		}
+		await fs.unlink(provisionIntentPath(poolDir, stamp.bindingKey));
+	}
+
+	private async inspectIntentRegisteredCheckout(
+		poolDir: string,
+		worktreeDir: string,
+		spec: WorkspaceProvisionSpec,
+		signal?: AbortSignal
+	): Promise<RegisteredCheckout> {
+		const intent = await this.readProvisionIntent(poolDir, spec.bindingKey);
+		if (!intent || !sameProvisionIntent(intent, provisionIntent(poolDir, worktreeDir, spec))) {
+			throw workspaceOwnershipError('Unstamped workspace has no exact durable provisioning intent');
+		}
+		const checkout = await this.inspectRegisteredCheckout(poolDir, worktreeDir, spec.auth, signal);
+		if (
+			intent.poolPath !== normalizedPath(checkout.canonicalPool) ||
+			intent.worktreePath !== normalizedPath(checkout.canonicalWorktree) ||
+			intent.remoteKey !== remoteIdentity(checkout.remoteUrl) ||
+			checkout.registration.branch !== spec.branch
+		) {
+			throw workspaceOwnershipError('Provisioning intent does not match the exact Git registration');
+		}
+		try {
+			await fs.lstat(join(checkout.canonicalGitDir, STAMP_FILE));
+			throw workspaceOwnershipError('An existing workspace stamp cannot be replaced from an intent');
+		} catch (error) {
+			if (isWorkspaceOwnershipError(error)) throw error;
+			if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+		}
+		return checkout;
+	}
+
 	/**
 	 * Strong ownership proof shared by reuse, stale-binding removal, and
 	 * teardown. A writable stamp alone is never authority: the lexical path
@@ -707,6 +926,37 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		auth: WorkspaceProvisionSpec['auth'],
 		signal?: AbortSignal
 	): Promise<OwnedWorktree> {
+		const checkout = await this.inspectRegisteredCheckout(poolDir, worktreeDir, auth, signal);
+		const stampPath = join(checkout.canonicalGitDir, STAMP_FILE);
+		let stamp: BindingStamp;
+		try {
+			const stampStats = await fs.lstat(stampPath);
+			if (stampStats.isSymbolicLink() || !stampStats.isFile()) throw new Error('unsafe stamp');
+			stamp = parseBindingStamp(await fs.readFile(stampPath, 'utf8'));
+		} catch (error) {
+			if (isAbortError(error)) throw error;
+			throw workspaceOwnershipError('Workspace binding stamp is missing, foreign, or corrupt');
+		}
+		if (
+			stamp.poolPath !== normalizedPath(checkout.canonicalPool) ||
+			stamp.worktreePath !== normalizedPath(checkout.canonicalWorktree) ||
+			stamp.remoteKey !== remoteIdentity(checkout.remoteUrl)
+		) {
+			throw workspaceOwnershipError('Workspace binding stamp does not match its exact repository and path');
+		}
+		if (checkout.registration.branch !== stamp.branch) {
+			throw workspaceOwnershipError('Workspace has no exact path, branch, and HEAD registration in this pool');
+		}
+
+		return { stamp, registration: checkout.registration };
+	}
+
+	private async inspectRegisteredCheckout(
+		poolDir: string,
+		worktreeDir: string,
+		auth: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
+	): Promise<RegisteredCheckout> {
 		throwIfAborted(signal);
 		let canonicalPool: string;
 		let canonicalWorktree: string;
@@ -757,31 +1007,19 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			throw workspaceOwnershipError('Workspace is registered to a different repository pool');
 		}
 
-		const stampPath = join(canonicalGitDir, STAMP_FILE);
-		let stamp: BindingStamp;
-		try {
-			const stampStats = await fs.lstat(stampPath);
-			if (stampStats.isSymbolicLink() || !stampStats.isFile()) throw new Error('unsafe stamp');
-			stamp = parseBindingStamp(await fs.readFile(stampPath, 'utf8'));
-		} catch (error) {
-			if (isAbortError(error)) throw error;
-			throw workspaceOwnershipError('Workspace binding stamp is missing, foreign, or corrupt');
-		}
-		if (
-			stamp.poolPath !== normalizedPath(canonicalPool) ||
-			stamp.worktreePath !== normalizedPath(canonicalWorktree) ||
-			stamp.remoteKey !== remoteIdentity(originResult.stdout.trim())
-		) {
-			throw workspaceOwnershipError('Workspace binding stamp does not match its exact repository and path');
-		}
-
 		const registrations = parseWorktreeRegistrations(registrationsResult.stdout);
 		const matches = registrations.filter((entry) => samePath(entry.path, canonicalWorktree));
-		if (matches.length !== 1 || matches[0].branch !== stamp.branch || !/^[0-9a-f]{40,64}$/i.test(matches[0].head)) {
+		if (matches.length !== 1 || !/^[0-9a-f]{40,64}$/i.test(matches[0].head)) {
 			throw workspaceOwnershipError('Workspace has no exact path, branch, and HEAD registration in this pool');
 		}
 
-		return { stamp, registration: matches[0] };
+		return {
+			canonicalPool,
+			canonicalWorktree,
+			canonicalGitDir,
+			remoteUrl: originResult.stdout.trim(),
+			registration: matches[0]
+		};
 	}
 
 	private async writeStamp(
@@ -847,6 +1085,35 @@ function remoteIdentity(repoUrl: string): string {
 	return createHash('sha256').update('workspace-remote-v1\0').update(repoUrl).digest('hex');
 }
 
+function provisionIntent(poolDir: string, worktreeDir: string, spec: WorkspaceProvisionSpec): ProvisionIntent {
+	return {
+		version: 1,
+		bindingKey: spec.bindingKey,
+		branch: spec.branch,
+		repositoryKey: repositoryIdentity(spec),
+		remoteKey: remoteIdentity(spec.repoUrl),
+		poolPath: normalizedPath(poolDir),
+		worktreePath: normalizedPath(worktreeDir)
+	};
+}
+
+function provisionIntentPath(poolDir: string, bindingKey: string): string {
+	const key = createHash('sha256').update('workspace-intent-v1\0').update(bindingKey).digest('hex');
+	return join(poolDir, INTENTS_DIR, `${key}.json`);
+}
+
+function sameProvisionIntent(left: ProvisionIntent, right: ProvisionIntent): boolean {
+	return (
+		left.version === right.version &&
+		left.bindingKey === right.bindingKey &&
+		left.branch === right.branch &&
+		left.repositoryKey === right.repositoryKey &&
+		left.remoteKey === right.remoteKey &&
+		left.poolPath === right.poolPath &&
+		left.worktreePath === right.worktreePath
+	);
+}
+
 function normalizedPath(value: string): string {
 	const normalized = resolvePath(value);
 	return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
@@ -889,6 +1156,26 @@ function parseBindingStamp(raw: string): BindingStamp {
 	return parsed as unknown as BindingStamp;
 }
 
+function parseProvisionIntent(raw: string): ProvisionIntent {
+	const parsed = JSON.parse(raw) as Partial<Record<keyof ProvisionIntent, unknown>>;
+	if (
+		parsed.version !== 1 ||
+		typeof parsed.bindingKey !== 'string' ||
+		!parsed.bindingKey ||
+		typeof parsed.branch !== 'string' ||
+		!parsed.branch ||
+		typeof parsed.repositoryKey !== 'string' ||
+		!/^[0-9a-f]{64}$/i.test(parsed.repositoryKey) ||
+		typeof parsed.remoteKey !== 'string' ||
+		!/^[0-9a-f]{64}$/i.test(parsed.remoteKey) ||
+		typeof parsed.poolPath !== 'string' ||
+		typeof parsed.worktreePath !== 'string'
+	) {
+		throw workspaceOwnershipError('Workspace provisioning intent is corrupt');
+	}
+	return parsed as unknown as ProvisionIntent;
+}
+
 function parseWorktreeRegistrations(output: string): WorktreeRegistration[] {
 	const registrations: WorktreeRegistration[] = [];
 	let current: Partial<WorktreeRegistration> = {};
@@ -920,6 +1207,10 @@ function workspaceOwnershipError(message: string): Error {
 	const error = new Error(message);
 	error.name = 'WorkspaceOwnershipError';
 	return error;
+}
+
+function isWorkspaceOwnershipError(error: unknown): boolean {
+	return error instanceof Error && error.name === 'WorkspaceOwnershipError';
 }
 
 function abortError(): Error {

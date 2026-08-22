@@ -232,7 +232,7 @@ describe('createNodeRuntime', () => {
 		await runtime.worker?.drained();
 		await runtime.worker?.stop();
 
-		expect(provisionWorkspace).toHaveBeenCalledWith('task-1', repositoryWorkspace);
+		expect(provisionWorkspace).toHaveBeenCalledWith('task-1', repositoryWorkspace, expect.any(AbortSignal));
 		expect(completedBodies).toHaveLength(1);
 		expect(completedBodies[0]).toMatchObject({ success: true, result: { workspace: descriptor } });
 	});

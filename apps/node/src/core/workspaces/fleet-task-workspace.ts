@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
+import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from '@ever-works/contracts';
 import { LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
 import type { IWorkspacePlugin, WorkspaceHandle } from '@ever-works/plugin';
@@ -366,8 +366,7 @@ function assertPluginBinding(
  */
 async function prepareRepositoryRoot(rootPath: string, repositoryRoot: string): Promise<void> {
 	try {
-		await fs.mkdir(rootPath, { recursive: true, mode: 0o700 });
-		const canonicalRoot = await fs.realpath(rootPath);
+		const canonicalRoot = await ensurePlainConfiguredRoot(rootPath);
 		if (canonicalRoot === parse(canonicalRoot).root) {
 			throw new FleetTaskWorkspaceError('invalid-root', 'Fleet workspace root resolves to a filesystem root');
 		}
@@ -398,6 +397,53 @@ async function prepareRepositoryRoot(rootPath: string, repositoryRoot: string): 
 			'Fleet repository cache contains an unsafe path and was preserved'
 		);
 	}
+}
+
+/**
+ * Validate the nearest existing ancestor without following links, then create
+ * the configured root and prove its lexical and canonical paths are exact.
+ * This runs before any cache child or Git process can write through the root.
+ */
+async function ensurePlainConfiguredRoot(rootPath: string): Promise<string> {
+	let existing = rootPath;
+	while (true) {
+		try {
+			const stats = await fs.lstat(existing);
+			if (stats.isSymbolicLink() || !stats.isDirectory()) {
+				throw new FleetTaskWorkspaceError(
+					'invalid-root',
+					'Fleet workspace root or its nearest existing ancestor is not a plain directory'
+				);
+			}
+			const canonicalExisting = await fs.realpath(existing);
+			if (!samePath(canonicalExisting, existing)) {
+				throw new FleetTaskWorkspaceError(
+					'invalid-root',
+					'Fleet workspace root resolves through a link or reparse-point alias'
+				);
+			}
+			break;
+		} catch (error) {
+			if (error instanceof FleetTaskWorkspaceError) throw error;
+			if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+			const parent = dirname(existing);
+			if (parent === existing) {
+				throw new FleetTaskWorkspaceError('invalid-root', 'Fleet workspace root has no safe existing ancestor');
+			}
+			existing = parent;
+		}
+	}
+
+	await fs.mkdir(rootPath, { recursive: true, mode: 0o700 });
+	const rootStats = await fs.lstat(rootPath);
+	if (rootStats.isSymbolicLink() || !rootStats.isDirectory()) {
+		throw new FleetTaskWorkspaceError('invalid-root', 'Fleet workspace root is not a plain directory');
+	}
+	const canonicalRoot = await fs.realpath(rootPath);
+	if (!samePath(canonicalRoot, rootPath)) {
+		throw new FleetTaskWorkspaceError('invalid-root', 'Fleet workspace root resolves through an alias');
+	}
+	return canonicalRoot;
 }
 
 async function ensureSafeDirectory(directoryPath: string, canonicalParent: string): Promise<string> {

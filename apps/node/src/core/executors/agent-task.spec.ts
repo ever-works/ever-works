@@ -215,6 +215,7 @@ describe('runAgentTaskJob — repository workspace boundary', () => {
 
 	it('provisions before execution, runs every step in that checkout, and returns the descriptor', async () => {
 		const provisionWorkspace = vi.fn().mockResolvedValue(descriptor);
+		const controller = new AbortController();
 		const cwd: string[] = [];
 		const scriptedSpawn = fakeSpawn({ passing: 0 }) as unknown as (command: string) => unknown;
 		const spawnFn = ((command: string, options: { cwd?: string }) => {
@@ -224,11 +225,12 @@ describe('runAgentTaskJob — repository workspace boundary', () => {
 
 		const outcome = await runAgentTaskJob(
 			job({ taskId: 'task-1', workspace, steps: [{ id: 'run', command: 'passing' }] }),
-			{ directoryExists: (path) => path === ABSOLUTE, provisionWorkspace, spawnFn }
+			{ directoryExists: (path) => path === ABSOLUTE, provisionWorkspace, spawnFn },
+			controller.signal
 		);
 
 		expect(provisionWorkspace).toHaveBeenCalledOnce();
-		expect(provisionWorkspace).toHaveBeenCalledWith('task-1', workspace);
+		expect(provisionWorkspace).toHaveBeenCalledWith('task-1', workspace, controller.signal);
 		expect(cwd).toEqual([ABSOLUTE]);
 		expect(outcome.workspace).toEqual(descriptor);
 	});

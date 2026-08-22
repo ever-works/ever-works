@@ -307,6 +307,29 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 		}
 	});
 
+	it.runIf(process.platform === 'win32')(
+		'refuses a configured root junction before creating cache children or invoking Git',
+		async () => {
+			const parent = mkdtempSync(join(tmpdir(), 'ew-fleet-root-link-parent-'));
+			const foreignRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-root-link-target-'));
+			const linkedRoot = join(parent, 'fleet-root');
+			try {
+				await fs.symlink(foreignRoot, linkedRoot, 'junction');
+				const plugin = { provision: vi.fn() } as unknown as FleetWorkspacePlugin;
+				const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: linkedRoot, plugin });
+
+				await expect(provisioner.provision('task-0001', valid)).rejects.toMatchObject({
+					code: 'invalid-root'
+				});
+				expect(plugin.provision).not.toHaveBeenCalled();
+				expect(await fs.readdir(foreignRoot)).toEqual([]);
+			} finally {
+				await fs.rm(parent, { recursive: true, force: true, maxRetries: 3 });
+				await fs.rm(foreignRoot, { recursive: true, force: true, maxRetries: 3 });
+			}
+		}
+	);
+
 	it('sanitizes fetch/authentication failures without echoing a clone URL or secret', async () => {
 		const plugin: FleetWorkspacePlugin = {
 			provision: async () => {

@@ -67,7 +67,11 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	/** Directory used when the job carries no `workspacePath`. */
 	defaultWorkspacePath?: string;
 	/** Repository/worktree adapter supplied by the node composition root. */
-	provisionWorkspace?: (taskId: string, spec: FleetTaskWorkspaceSpec) => Promise<FleetTaskWorkspaceDescriptor>;
+	provisionWorkspace?: (
+		taskId: string,
+		spec: FleetTaskWorkspaceSpec,
+		signal?: AbortSignal
+	) => Promise<FleetTaskWorkspaceDescriptor>;
 }
 
 /**
@@ -78,7 +82,11 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
  * exits nonzero, times out or cannot be spawned is a normal result —
  * that is a verdict the platform asked for, not an error in the node.
  */
-export async function runAgentTaskJob(job: FleetJobView, io: AgentTaskIo = {}): Promise<AgentTaskOutcome> {
+export async function runAgentTaskJob(
+	job: FleetJobView,
+	io: AgentTaskIo = {},
+	signal?: AbortSignal
+): Promise<AgentTaskOutcome> {
 	const payload = job.payload as FleetAgentTaskPayload | null;
 	if (!payload || typeof payload !== 'object') {
 		throw new AgentTaskPayloadError('Job payload is missing');
@@ -98,7 +106,7 @@ export async function runAgentTaskJob(job: FleetJobView, io: AgentTaskIo = {}): 
 		);
 	}
 
-	const workspaceResolution = await resolveAgentTaskWorkspace(taskId, payload, io);
+	const workspaceResolution = await resolveAgentTaskWorkspace(taskId, payload, io, signal);
 
 	const results: NodeCheckResult[] = [];
 	for (const step of steps) {
@@ -118,7 +126,8 @@ export async function runAgentTaskJob(job: FleetJobView, io: AgentTaskIo = {}): 
 async function resolveAgentTaskWorkspace(
 	taskId: string,
 	payload: FleetAgentTaskPayload,
-	io: AgentTaskIo
+	io: AgentTaskIo,
+	signal?: AbortSignal
 ): Promise<{ path: string; descriptor: FleetTaskWorkspaceDescriptor | null }> {
 	if (payload.workspace != null) {
 		if (typeof payload.workspacePath === 'string' && payload.workspacePath.trim()) {
@@ -127,7 +136,7 @@ async function resolveAgentTaskWorkspace(
 		if (!io.provisionWorkspace) {
 			throw new AgentTaskPayloadError('Fleet repository workspace provisioner is not configured on this node');
 		}
-		const descriptor = await io.provisionWorkspace(taskId, payload.workspace);
+		const descriptor = await io.provisionWorkspace(taskId, payload.workspace, signal);
 		return { path: resolveWorkspacePath(descriptor.path, io), descriptor };
 	}
 	return { path: resolveWorkspacePath(payload.workspacePath, io), descriptor: null };
