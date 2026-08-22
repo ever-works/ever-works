@@ -1149,9 +1149,18 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         expect(list).toHaveBeenCalledTimes(2);
     });
 
-    it('DOES cache a definitive absence — an unsynced account is not re-queried every checkout', async () => {
+    /**
+     * 🛑 A MISS must NOT be memoised either. The catalog is published by a script that runs
+     * independently of the pods, so a pod that starts before the sync would otherwise pin every key
+     * to null for its whole lifetime — and because the seat line has no inline fallback, that pod
+     * silently stops billing seats, with nothing in the logs after the first warning.
+     */
+    it('re-checks after a MISS, so a later catalog sync is picked up without a restart', async () => {
         const { provider, client } = build();
-        const list = jest.fn().mockResolvedValue({ data: [] });
+        const list = jest
+            .fn()
+            .mockResolvedValueOnce({ data: [] }) // catalog not synced yet
+            .mockResolvedValue({ data: [{ id: 'price_cat_1' }] }); // sync ran
         client.prices = { list };
 
         const req = {
@@ -1161,8 +1170,59 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         await provider.createPlanCheckoutSession(req);
         await provider.createPlanCheckoutSession(req);
 
-        // "This account does not have it" is a real answer and the steady state for a self-hoster,
-        // so it is memoised — one call, not one per checkout.
+        expect(list).toHaveBeenCalledTimes(2);
+        // The second checkout uses the now-published catalog price rather than a cached miss.
+        expect(client.checkout.sessions.create.mock.calls[1][0].line_items[0].price).toBe(
+            'price_cat_1',
+        );
+    });
+
+    /**
+     * 🛑 REGRESSION. The resolved-price cache belongs to the KEY, not the process. The same 22
+     * `ever_works_*` lookup keys exist in BOTH test and live mode of the shared account, so a
+     * process that resolved under `sk_test_…` and rotates to `sk_live_…` would otherwise hand
+     * TEST-mode price ids to a LIVE client.
+     */
+    it('drops the price cache when the secret key rotates', async () => {
+        const { provider, client } = build();
+        const list = jest
+            .fn()
+            .mockResolvedValueOnce({ data: [{ id: 'price_TEST_mode' }] })
+            .mockResolvedValue({ data: [{ id: 'price_LIVE_mode' }] });
+        client.prices = { list };
+
+        const req = {
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        };
+
+        await provider.createPlanCheckoutSession(req);
+        expect(client.checkout.sessions.create.mock.calls[0][0].line_items[0].price).toBe(
+            'price_TEST_mode',
+        );
+
+        // Rotate the key, exactly as a Secret update would.
+        process.env.STRIPE_SECRET_KEY = 'sk_live_rotated';
+        await provider.createPlanCheckoutSession(req);
+
+        const second = client.checkout.sessions.create.mock.calls[1][0];
+        expect(second.line_items[0].price).toBe('price_LIVE_mode');
+        // Proves the cache was dropped rather than the id reused.
+        expect(list).toHaveBeenCalledTimes(2);
+    });
+
+    it('memoises a HIT, so a healthy account is queried once and not per checkout', async () => {
+        const { provider, client } = build();
+        const list = jest.fn().mockResolvedValue({ data: [{ id: 'price_cat_1' }] });
+        client.prices = { list };
+
+        const req = {
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        };
+        await provider.createPlanCheckoutSession(req);
+        await provider.createPlanCheckoutSession(req);
+
         expect(list).toHaveBeenCalledTimes(1);
     });
 
