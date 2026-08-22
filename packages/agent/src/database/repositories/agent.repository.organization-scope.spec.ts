@@ -54,10 +54,14 @@ describe('AgentRepository Organization scope', () => {
         const harness = queryHarness();
         const repository = new AgentRepository(harness.repository);
 
-        await repository.findByUserIdScoped('user-1', {}, {
-            tenantId: EVER_SCOPE.tenantId,
-            organizationId: null,
-        });
+        await repository.findByUserIdScoped(
+            'user-1',
+            {},
+            {
+                tenantId: EVER_SCOPE.tenantId,
+                organizationId: null,
+            },
+        );
 
         expect(harness.predicates.join('\n')).toContain('agent.organizationId IS NULL');
         expect(harness.predicates.join('\n')).toContain(
