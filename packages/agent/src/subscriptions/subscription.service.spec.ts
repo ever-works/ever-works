@@ -411,6 +411,48 @@ describe('SubscriptionService', () => {
             expect(planRepository.findByCode).not.toHaveBeenCalled();
         });
 
+        /**
+         * 🛑 REGRESSION — the defect a first attempt at this fix missed entirely.
+         *
+         * `resolvePlanForUser` is the single place that answers "what plan is this user on", and it
+         * reads the ACTIVE subscription BEFORE `user.defaultPlan`. So guarding only the writer was
+         * not enough: an active row pointing at a self-hosted plan still made a $99 one-off licence
+         * the buyer's effective HOSTED tier — the very arbitrage the fix was for.
+         *
+         * Guarding here covers every route: the webhook, the return path, any future writer, and
+         * any row that already exists in the database.
+         */
+        it('IGNORES an active self-hosted subscription — a licence is not a hosted tier', async () => {
+            const selfHosted = {
+                id: 'sub-licence',
+                plan: { ...PREMIUM_PLAN, code: 'selfhosted_pro', hosting: 'selfhosted' },
+            };
+            const { service } = makeService(
+                {},
+                { findActiveByUser: jest.fn().mockResolvedValue(selfHosted) },
+            );
+
+            const plan = await service.resolvePlanForUser({
+                id: 'u1',
+                defaultPlan: FREE_PLAN,
+            } as any);
+
+            // Falls through to what they actually pay for on this deployment.
+            expect(plan).toBe(FREE_PLAN);
+            expect((plan as any).code).not.toBe('selfhosted_pro');
+        });
+
+        it('still returns an active CLOUD subscription — the guard must not break the paying path', async () => {
+            const cloud = { id: 'sub-1', plan: { ...PREMIUM_PLAN, hosting: 'cloud' } };
+            const { service } = makeService(
+                {},
+                { findActiveByUser: jest.fn().mockResolvedValue(cloud) },
+            );
+
+            const plan = await service.resolvePlanForUser({ id: 'u1' } as any);
+            expect((plan as any).code).toBe(PREMIUM_PLAN.code);
+        });
+
         it('falls back to user.defaultPlan when there is no active subscription', async () => {
             const { service, userSubscriptionRepository, planRepository } = makeService(
                 {},
@@ -451,6 +493,42 @@ describe('SubscriptionService', () => {
             const plan = await service.resolvePlanForUser({ id: 'u1' } as any);
             expect(plan).toBe(STANDARD_PLAN);
             expect(planRepository.findByCode).toHaveBeenCalledWith(SubscriptionPlanCode.STANDARD);
+        });
+
+        /**
+         * 🛑 REGRESSION. `SUBSCRIPTIONS_DEFAULT_PLAN` is an operator-set env var and
+         * `normalizePlanCode` accepts ANY member of the enum — which now includes
+         * `selfhosted_community`, a row that is free AND effectively unlimited. One typo in a Helm
+         * value would hand every user with no subscription an unlimited plan, fleet-wide, with no
+         * purchase involved. Same class as the self-service escalation, reached through
+         * CONFIGURATION rather than a request.
+         */
+        it('REFUSES a self-hosted default plan and falls back to FREE', async () => {
+            process.env.SUBSCRIPTIONS_DEFAULT_PLAN = 'selfhosted_community';
+            const community = {
+                ...FREE_PLAN,
+                code: 'selfhosted_community',
+                displayName: 'Community Edition',
+                hosting: 'selfhosted',
+                maxWorks: 2_147_483_647,
+            };
+            const findByCode = jest
+                .fn()
+                .mockImplementation(async (code: string) =>
+                    code === 'selfhosted_community' ? community : FREE_PLAN,
+                );
+            const { service } = makeService(
+                { findByCode },
+                { findActiveByUser: jest.fn().mockResolvedValue(null) },
+            );
+
+            const plan = await service.resolvePlanForUser({ id: 'u1' } as any);
+
+            // The unlimited row must NOT become everyone's default.
+            expect((plan as any).code).toBe(FREE_PLAN.code);
+            expect((plan as any).maxWorks).toBe(1);
+            // It fell back rather than silently accepting the misconfiguration.
+            expect(findByCode).toHaveBeenCalledWith(SubscriptionPlanCode.FREE);
         });
 
         it('short-circuits to resolveDefaultPlan when the kill-switch is OFF (no DB lookup of active sub)', async () => {
