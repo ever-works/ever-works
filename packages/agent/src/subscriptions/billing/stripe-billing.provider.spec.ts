@@ -971,7 +971,9 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         // payment_intent_data, and the metadata has to be mirrored there because a one-off
         // purchase creates no subscription for it to live on.
         expect(params.subscription_data).toBeUndefined();
-        expect(params.payment_intent_data.metadata[STRIPE_METADATA_KEYS.planCode]).toBe('selfhosted_pro');
+        expect(params.payment_intent_data.metadata[STRIPE_METADATA_KEYS.planCode]).toBe(
+            'selfhosted_pro',
+        );
     });
 
     it('marks a licence sale so manual fulfilment can find it', async () => {
@@ -1015,7 +1017,9 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         // The act is identical — grant this user this plan — and `activate()` already accepts a
         // null provider subscription id. A separate kind would need a second activation path for
         // no reason, and the webhook gate keys on exactly this value.
-        expect(params.metadata[STRIPE_METADATA_KEYS.kind]).toBe(STRIPE_PURCHASE_KINDS.planSubscription);
+        expect(params.metadata[STRIPE_METADATA_KEYS.kind]).toBe(
+            STRIPE_PURCHASE_KINDS.planSubscription,
+        );
     });
 
     it('bills the shared-account CATALOG price when the lookup key resolves', async () => {
@@ -1030,7 +1034,10 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         });
 
         expect(client.prices.list).toHaveBeenCalledWith(
-            expect.objectContaining({ lookup_keys: ['ever_works_cloud_pro_monthly'], active: true }),
+            expect.objectContaining({
+                lookup_keys: ['ever_works_cloud_pro_monthly'],
+                active: true,
+            }),
         );
         const params = client.checkout.sessions.create.mock.calls[0][0];
         // The catalog price object, NOT an ad-hoc amount — that is what makes the invoice line

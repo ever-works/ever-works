@@ -146,7 +146,9 @@ describe('SubscriptionService', () => {
             expect(rows.filter((p: any) => p.hosting === 'cloud')).toHaveLength(3);
             expect(rows.filter((p: any) => p.hosting === 'selfhosted')).toHaveLength(3);
             // Nothing may seed without a hosting mode — the Stripe lookup_key is derived from it.
-            expect(rows.every((p: any) => p.hosting === 'cloud' || p.hosting === 'selfhosted')).toBe(true);
+            expect(
+                rows.every((p: any) => p.hosting === 'cloud' || p.hosting === 'selfhosted'),
+            ).toBe(true);
         });
 
         it('forwards the configured default currency on every upsert + sets active=true', async () => {

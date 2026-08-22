@@ -1,4 +1,14 @@
-import { IsEnum, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
+import {
+    IsEnum,
+    IsIn,
+    IsInt,
+    IsOptional,
+    IsString,
+    Matches,
+    Max,
+    MaxLength,
+    Min,
+} from 'class-validator';
 import { SubscriptionPlanCode } from '@ever-works/agent/entities';
 
 /**

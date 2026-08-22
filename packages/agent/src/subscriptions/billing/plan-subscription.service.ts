@@ -159,12 +159,17 @@ export class PlanSubscriptionService {
         const interval: CatalogInterval = options.interval ?? 'monthly';
 
         const plan = await this.resolveSellablePlan(options.planCode, interval);
-        const catalogSku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
+        const catalogSku = resolveSkuForPlanRow({
+            code: plan.code,
+            hosting: plan.hosting,
+            interval,
+        });
         // What the buyer will actually be charged. The catalog wins because the catalog price is
         // what the provider bills; the row is the fallback for an unsynced deployment. Reading the
         // row first would echo 0 for any period the row has no column value for — showing someone
         // "$0" on a confirmation screen for a charge that is about to be 204.00.
-        const priceCents = catalogSku?.price.amountCents ?? planPriceCentsForInterval(plan, interval);
+        const priceCents =
+            catalogSku?.price.amountCents ?? planPriceCentsForInterval(plan, interval);
 
         const user = await this.userRepository.findById(options.userId);
         const existing = await this.billingProfileRepository.findByUserId(options.userId);
@@ -235,8 +240,7 @@ export class PlanSubscriptionService {
         const sku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
         if (!sku) return {};
 
-        const extraSeats =
-            requestedSeats === null ? 0 : billableSeats(sku.plan, requestedSeats);
+        const extraSeats = requestedSeats === null ? 0 : billableSeats(sku.plan, requestedSeats);
 
         return {
             lookupKey: sku.lookupKey,
@@ -472,9 +476,7 @@ export class PlanSubscriptionService {
         // bill the wrong amount on half the fleet.
         const sku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
         if (!sku && planPriceCentsForInterval(plan, interval) <= 0) {
-            throw new PlanNotPurchasableError(
-                `This plan is not sold on a ${interval} basis`,
-            );
+            throw new PlanNotPurchasableError(`This plan is not sold on a ${interval} basis`);
         }
         return plan;
     }

@@ -111,7 +111,11 @@ export const INTERVALS: readonly CatalogInterval[] = ['monthly', 'annual', 'life
  * `ever_works_<hosting>_<tier>_<interval>` — the account-wide plan convention, unchanged, so an
  * Ever Works plan price resolves by exactly the same rule as a Gauzy or Teams one.
  */
-export function planLookupKey(hosting: CatalogHosting, tier: CatalogTier, interval: CatalogInterval): string {
+export function planLookupKey(
+    hosting: CatalogHosting,
+    tier: CatalogTier,
+    interval: CatalogInterval,
+): string {
     return `ever_${CATALOG_PRODUCT_KEY}_${hosting}_${tier}_${interval}`;
 }
 
@@ -123,7 +127,11 @@ export function planLookupKey(hosting: CatalogHosting, tier: CatalogTier, interv
  * infix keeps these keys unambiguous while remaining inert to the shared 5-part reader, which
  * simply will not match them. If seats are ever lifted into the shared catalog, standardise here.
  */
-export function seatLookupKey(hosting: CatalogHosting, tier: CatalogTier, interval: SeatInterval): string {
+export function seatLookupKey(
+    hosting: CatalogHosting,
+    tier: CatalogTier,
+    interval: SeatInterval,
+): string {
     return `ever_${CATALOG_PRODUCT_KEY}_${hosting}_${tier}_seat_${interval}`;
 }
 
@@ -198,7 +206,11 @@ export function resolveCatalogSku(params: {
         // to meter. Both collapse to "no seat line item".
         seatLookupKey:
             !isLifetime && hasMeterableSeats
-                ? seatLookupKey(plan.hosting, plan.tier, price.interval === 'annual' ? 'annual' : 'monthly')
+                ? seatLookupKey(
+                      plan.hosting,
+                      plan.tier,
+                      price.interval === 'annual' ? 'annual' : 'monthly',
+                  )
                 : null,
     };
 }

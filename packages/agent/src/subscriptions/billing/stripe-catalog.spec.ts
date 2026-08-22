@@ -28,7 +28,10 @@ import {
  *  - the credit-pack prices drifting from `credit-packs.ts`, which grants the credits.
  */
 describe('stripe-catalog', () => {
-    const plan = (hosting: 'cloud' | 'selfhosted', tier: 'free' | 'pro' | 'enterprise'): CatalogPlan => {
+    const plan = (
+        hosting: 'cloud' | 'selfhosted',
+        tier: 'free' | 'pro' | 'enterprise',
+    ): CatalogPlan => {
         const found = findPlan(hosting, tier);
         if (!found) throw new Error(`missing plan ${hosting}/${tier}`);
         return found;
@@ -63,12 +66,18 @@ describe('stripe-catalog', () => {
     describe('lookup keys', () => {
         it('follows ever_<product>_<hosting>_<tier>_<interval> for plans', () => {
             expect(planLookupKey('cloud', 'pro', 'monthly')).toBe('ever_works_cloud_pro_monthly');
-            expect(planLookupKey('selfhosted', 'pro', 'lifetime')).toBe('ever_works_selfhosted_pro_lifetime');
-            expect(planLookupKey('cloud', 'enterprise', 'annual')).toBe('ever_works_cloud_enterprise_annual');
+            expect(planLookupKey('selfhosted', 'pro', 'lifetime')).toBe(
+                'ever_works_selfhosted_pro_lifetime',
+            );
+            expect(planLookupKey('cloud', 'enterprise', 'annual')).toBe(
+                'ever_works_cloud_enterprise_annual',
+            );
         });
 
         it('infixes _seat_ for the per-additional-seat add-on', () => {
-            expect(seatLookupKey('cloud', 'pro', 'monthly')).toBe('ever_works_cloud_pro_seat_monthly');
+            expect(seatLookupKey('cloud', 'pro', 'monthly')).toBe(
+                'ever_works_cloud_pro_seat_monthly',
+            );
             expect(seatLookupKey('selfhosted', 'enterprise', 'annual')).toBe(
                 'ever_works_selfhosted_enterprise_seat_annual',
             );
@@ -96,26 +105,35 @@ describe('stripe-catalog', () => {
             ${'selfhosted'} | ${'pro'}        | ${'lifetime'} | ${9900}   | ${'$99 one-time'}
             ${'selfhosted'} | ${'enterprise'} | ${'monthly'}  | ${19900}  | ${'$199/mo'}
             ${'selfhosted'} | ${'enterprise'} | ${'annual'}   | ${166800} | ${'$139/mo'}
-        `('$hosting $tier $interval is $cents cents (displays $displays)', ({ hosting, tier, interval, cents }) => {
-            const sku = resolveCatalogSku({ hosting, tier, interval });
-            expect(sku).not.toBeNull();
-            expect(sku!.price.amountCents).toBe(cents);
-        });
+        `(
+            '$hosting $tier $interval is $cents cents (displays $displays)',
+            ({ hosting, tier, interval, cents }) => {
+                const sku = resolveCatalogSku({ hosting, tier, interval });
+                expect(sku).not.toBeNull();
+                expect(sku!.price.amountCents).toBe(cents);
+            },
+        );
 
         it('stores annual as the YEARLY charge, twelve times the displayed monthly figure', () => {
             // The trap this guards: writing 1700 (the "$17/mo" the site shows) instead of 20400.
-            expect(resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'annual' })!.price.amountCents).toBe(
-                1700 * 12,
-            );
             expect(
-                resolveCatalogSku({ hosting: 'cloud', tier: 'enterprise', interval: 'annual' })!.price.amountCents,
+                resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'annual' })!.price
+                    .amountCents,
+            ).toBe(1700 * 12);
+            expect(
+                resolveCatalogSku({ hosting: 'cloud', tier: 'enterprise', interval: 'annual' })!
+                    .price.amountCents,
             ).toBe(13900 * 12);
         });
     });
 
     describe('mode derivation', () => {
         it('sells a lifetime licence as a one-off payment, never a subscription', () => {
-            const sku = resolveCatalogSku({ hosting: 'selfhosted', tier: 'pro', interval: 'lifetime' })!;
+            const sku = resolveCatalogSku({
+                hosting: 'selfhosted',
+                tier: 'pro',
+                interval: 'lifetime',
+            })!;
             expect(sku.mode).toBe('payment');
             // A one-off purchase cannot carry a recurring seat line.
             expect(sku.seatLookupKey).toBeNull();
@@ -123,28 +141,43 @@ describe('stripe-catalog', () => {
 
         it('sells every other interval as a subscription', () => {
             for (const interval of ['monthly', 'annual'] as const) {
-                expect(resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval })!.mode).toBe('subscription');
-                expect(resolveCatalogSku({ hosting: 'selfhosted', tier: 'enterprise', interval })!.mode).toBe(
+                expect(resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval })!.mode).toBe(
                     'subscription',
                 );
+                expect(
+                    resolveCatalogSku({ hosting: 'selfhosted', tier: 'enterprise', interval })!
+                        .mode,
+                ).toBe('subscription');
             }
         });
 
         it('matches the seat interval to the plan interval', () => {
-            expect(resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'monthly' })!.seatLookupKey).toBe(
-                'ever_works_cloud_pro_seat_monthly',
-            );
-            expect(resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'annual' })!.seatLookupKey).toBe(
-                'ever_works_cloud_pro_seat_annual',
-            );
+            expect(
+                resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'monthly' })!
+                    .seatLookupKey,
+            ).toBe('ever_works_cloud_pro_seat_monthly');
+            expect(
+                resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'annual' })!
+                    .seatLookupKey,
+            ).toBe('ever_works_cloud_pro_seat_annual');
         });
 
         it('returns null for a combination the catalog does not have, never a fallback', () => {
             // The free download has no Stripe object at all.
-            expect(resolveCatalogSku({ hosting: 'selfhosted', tier: 'free', interval: 'monthly' })).toBeNull();
+            expect(
+                resolveCatalogSku({ hosting: 'selfhosted', tier: 'free', interval: 'monthly' }),
+            ).toBeNull();
             // Only self-hosted Pro sells a lifetime licence.
-            expect(resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'lifetime' })).toBeNull();
-            expect(resolveCatalogSku({ hosting: 'selfhosted', tier: 'enterprise', interval: 'lifetime' })).toBeNull();
+            expect(
+                resolveCatalogSku({ hosting: 'cloud', tier: 'pro', interval: 'lifetime' }),
+            ).toBeNull();
+            expect(
+                resolveCatalogSku({
+                    hosting: 'selfhosted',
+                    tier: 'enterprise',
+                    interval: 'lifetime',
+                }),
+            ).toBeNull();
         });
     });
 
@@ -203,8 +236,12 @@ describe('stripe-catalog', () => {
         });
 
         it('grants self-hosted paid editions the same allowance as their cloud twin', () => {
-            expect(plan('selfhosted', 'pro').monthlyCredits).toBe(plan('cloud', 'pro').monthlyCredits);
-            expect(plan('selfhosted', 'enterprise').monthlyCredits).toBe(plan('cloud', 'enterprise').monthlyCredits);
+            expect(plan('selfhosted', 'pro').monthlyCredits).toBe(
+                plan('cloud', 'pro').monthlyCredits,
+            );
+            expect(plan('selfhosted', 'enterprise').monthlyCredits).toBe(
+                plan('cloud', 'enterprise').monthlyCredits,
+            );
         });
 
         it('keeps the universal daily grant on the catalog, not on a plan', () => {
@@ -233,7 +270,9 @@ describe('stripe-catalog', () => {
         });
 
         it('distinguishes the seat add-on from the plan it belongs to', () => {
-            expect(seatProductName(plan('cloud', 'pro'))).toBe('Ever Works Cloud — Pro — Additional Seat');
+            expect(seatProductName(plan('cloud', 'pro'))).toBe(
+                'Ever Works Cloud — Pro — Additional Seat',
+            );
         });
     });
 });
