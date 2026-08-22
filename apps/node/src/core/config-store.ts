@@ -47,6 +47,8 @@ export interface ConfigFileSystem {
 	/** Return the file's contents, or null when it does not exist. */
 	readFile(filePath: string): Promise<string | null>;
 	writeFile(filePath: string, content: string): Promise<void>;
+	/** Atomically create a new owner-only file; reject rather than overwrite. */
+	createFileExclusive?(filePath: string, content: string): Promise<void>;
 	mkdir(dirPath: string): Promise<void>;
 	chmod(filePath: string, mode: number): Promise<void>;
 	dirname(filePath: string): string;

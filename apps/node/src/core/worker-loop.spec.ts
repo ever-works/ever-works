@@ -5,6 +5,7 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FleetJobView } from '@ever-works/contracts';
+import { execFileWithVerifiedCancellation } from '@ever-works/local-workspace-plugin';
 import { nextBackoffMs, WorkerLoop, type JobLeaseCapableClient } from './worker-loop';
 import type { Scheduler } from './heartbeat';
 import { runAgentTaskJob } from './executors/agent-task';
@@ -493,6 +494,69 @@ describe('WorkerLoop', () => {
 		await loop.stop();
 	});
 
+	it('remains fail-closed across reconstruction when config quarantine persistence rejects', async () => {
+		let activeSession: string | null = null;
+		const safetyGate = () => ({
+			acquire: vi.fn(async () => {
+				if (activeSession) {
+					return {
+						kind: 'blocked' as const,
+						state: {
+							since: '2026-08-22T23:45:00.000Z',
+							reason: 'Previous worker session did not release its safety marker'
+						}
+					};
+				}
+				activeSession = 'session-first';
+				return { kind: 'acquired' as const, sessionId: activeSession };
+			}),
+			release: vi.fn(async (sessionId: string) => {
+				if (sessionId !== activeSession) throw new Error('session does not own marker');
+				activeSession = null;
+			}),
+			inspect: vi.fn(async () => null),
+			clear: vi.fn(async () => {
+				activeSession = null;
+			})
+		});
+		const firstClient = scriptedClient([[job()], []]);
+		const persistUnsafe = vi.fn(async () => {
+			throw new Error('config write rejected');
+		});
+		const first = new WorkerLoop({
+			client: firstClient,
+			scheduler: controllableScheduler(),
+			safetyGate: safetyGate(),
+			onUnsafe: persistUnsafe
+		});
+		first.register('acceptance-checks', async () => {
+			const error = new Error('tree still alive');
+			error.name = 'ProcessTreeTerminationError';
+			throw error;
+		});
+
+		await first.start();
+		await vi.waitFor(() => expect(first.getState().state).toBe('unsafe'));
+		await vi.waitFor(() => expect(persistUnsafe).toHaveBeenCalledOnce());
+		await first.stop();
+		expect(activeSession).toBe('session-first');
+
+		const reconstructedClient = scriptedClient([[job({ id: 'must-not-lease' })]]);
+		const reconstructed = new WorkerLoop({
+			client: reconstructedClient,
+			scheduler: controllableScheduler(),
+			safetyGate: safetyGate()
+		});
+		await reconstructed.start();
+
+		expect(reconstructed.getState()).toMatchObject({
+			state: 'unsafe',
+			lastError: expect.stringMatching(/previous worker session/i)
+		});
+		expect(reconstructedClient.leaseCalls).toBe(0);
+		await reconstructed.stop();
+	});
+
 	it('persists quarantine and rejects work returned by an already-outstanding lease request', async () => {
 		const secondLease = deferred<FleetJobView[]>();
 		let leaseCalls = 0;
@@ -586,6 +650,75 @@ describe('WorkerLoop', () => {
 		);
 		await loop.stop();
 	});
+
+	it('quarantines through the production agent-task path when output overflow cannot prove helper-tree death', async () => {
+		const ownedRoot = mkdtempSync(join(tmpdir(), 'ew-worker-overflow-'));
+		const readyPath = join(ownedRoot, 'ready.txt');
+		const scriptPath = join(ownedRoot, 'overflow.cjs');
+		let capturedChild: ChildProcess | undefined;
+		let loop: WorkerLoop | undefined;
+		try {
+			writeFileSync(
+				scriptPath,
+				`require('node:fs').writeFileSync(${JSON.stringify(readyPath)},'ready');` +
+					`process.stdout.write('x'.repeat(8192));setInterval(()=>{},1000);`
+			);
+			const leased = job({
+				kind: 'agent-task',
+				payload: {
+					taskId: 'task-git-overflow-unsafe',
+					workspace: {
+						repositoryId: 'ever/repo',
+						repoUrl: 'https://github.com/ever/repo.git',
+						baseRef: 'develop',
+						branch: 'task/git-overflow-unsafe-12345678'
+					},
+					steps: [{ id: 'run', command: 'never-started' }]
+				}
+			});
+			const client = scriptedClient([[leased], []]);
+			const persistUnsafe = vi.fn(async () => undefined);
+			loop = new WorkerLoop({ client, scheduler: controllableScheduler(), onUnsafe: persistUnsafe });
+			loop.register('agent-task', (jobView, signal) =>
+				runAgentTaskJob(
+					jobView,
+					{
+						provisionWorkspace: async () => {
+							await execFileWithVerifiedCancellation(process.execPath, [scriptPath], {
+								signal,
+								maxBuffer: 64,
+								terminationTimeoutMs: 50,
+								terminateProcessTree: async (child) => {
+									capturedChild = child;
+									throw new Error('whole-tree verifier rejected');
+								}
+							});
+							throw new Error('unreachable after overflow');
+						}
+					},
+					signal
+				)
+			);
+
+			await loop.start();
+			await expect.poll(() => existsSync(readyPath), { timeout: 2_500 }).toBe(true);
+			await vi.waitFor(() => expect(loop?.getState().state).toBe('unsafe'));
+			expect(persistUnsafe).toHaveBeenCalledOnce();
+			expect(client.complete).toHaveBeenCalledWith(
+				leased.id,
+				expect.objectContaining({
+					success: false,
+					error: expect.stringMatching(/output exceeded.*could not be proven/i)
+				})
+			);
+		} finally {
+			if (capturedChild) {
+				await terminateNodeProcessTree(capturedChild).catch(() => capturedChild?.kill('SIGKILL'));
+			}
+			if (loop) await loop.stop();
+			await fs.rm(ownedRoot, { recursive: true, force: true, maxRetries: 3 });
+		}
+	}, 10_000);
 
 	it('survives an unreportable result — the lease expiry is the safety net', async () => {
 		const client = scriptedClient([[job()], []]);

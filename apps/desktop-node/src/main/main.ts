@@ -9,6 +9,7 @@ import {
 	createCommandRunner,
 	createDiskProbe,
 	createConfigFileSystem,
+	createConfigWorkerSafetyGate,
 	createNodeRuntime,
 	createResourceProbe,
 	currentEnvironment,
@@ -136,6 +137,7 @@ function bootstrap(): void {
 			limits: clampResourceLimits(connectedConfig.limits),
 			resourceProbe,
 			startPaused: pausedByOperator,
+			workerSafetyGate: createConfigWorkerSafetyGate(fs, configPath, { platform: process.platform }),
 			persistUnsafe: async (unsafe) => {
 				const currentConfig = config;
 				if (!currentConfig) throw new Error('Cannot persist worker quarantine without an enrolled node config');

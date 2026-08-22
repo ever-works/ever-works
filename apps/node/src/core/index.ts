@@ -24,6 +24,7 @@ export * from './secret-store';
 export * from './telemetry-probe';
 export * from './types';
 export * from './worker-loop';
+export * from './worker-safety-store';
 export * from './executors/acceptance-checks';
 export * from './executors/agent-task';
 export * from './executors/browser-check';

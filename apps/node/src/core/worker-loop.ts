@@ -5,6 +5,7 @@ import type { Scheduler } from './heartbeat';
 import { systemScheduler } from './heartbeat';
 import { admitByResourceLimits, hasAdmissionCeilings, type ResourceProbe } from './resource-limits';
 import { clampResourceLimits, type NodeResourceLimits } from './types';
+import type { WorkerSafetyGate } from './worker-safety-store';
 
 /**
  * The node worker host: lease → execute → report, forever, until stopped.
@@ -160,6 +161,8 @@ export interface WorkerLoopOptions {
 	startUnsafe?: WorkerUnsafeState | null;
 	/** Persist the first unsafe transition before this process may restart. */
 	onUnsafe?: (state: WorkerUnsafeState) => Promise<void> | void;
+	/** Durable write-ahead marker acquired before this loop may lease. */
+	safetyGate?: WorkerSafetyGate;
 }
 
 export class WorkerLoop {
@@ -179,6 +182,8 @@ export class WorkerLoop {
 	private stopping = false;
 	private paused = false;
 	private unsafe = false;
+	private safetySessionId: string | null = null;
+	private starting: Promise<void> | null = null;
 	private timer: unknown = null;
 	private state: WorkerLoopState = {
 		state: 'idle',
@@ -246,11 +251,17 @@ export class WorkerLoop {
 	/** Start polling. Resolves once the FIRST poll has settled. */
 	start(): Promise<void> {
 		if (this.running) {
-			return Promise.resolve();
+			return this.starting ?? Promise.resolve();
 		}
 		this.running = true;
 		this.stopping = false;
-		return this.tick();
+		const starting = this.prepareSafety().then(() => this.tick());
+		this.starting = starting;
+		const clearStarting = (): void => {
+			if (this.starting === starting) this.starting = null;
+		};
+		void starting.then(clearStarting, clearStarting);
+		return starting;
 	}
 
 	/**
@@ -264,8 +275,17 @@ export class WorkerLoop {
 		this.stopping = true;
 		this.running = false;
 		this.cancelTimer();
+		if (this.starting) await this.starting;
 		await Promise.allSettled([...this.inFlight.values()]);
-		this.patch({ state: 'stopped', activeJobIds: [] });
+		if (this.safetySessionId && !this.unsafe && this.options.safetyGate) {
+			try {
+				await this.options.safetyGate.release(this.safetySessionId);
+				this.safetySessionId = null;
+			} catch (error) {
+				this.markUnsafe(`Worker safety marker could not be released after drain: ${errorDetail(error)}`);
+			}
+		}
+		this.patch({ state: this.unsafe ? 'unsafe' : 'stopped', activeJobIds: [] });
 	}
 
 	/** True while the loop is drained (leasing stopped by `pause()`). */
@@ -537,21 +557,43 @@ export class WorkerLoop {
 
 	private async quarantine(reason: string): Promise<void> {
 		if (this.unsafe) return;
-		this.unsafe = true;
 		const durable: WorkerUnsafeState = {
 			since: new Date(this.now()).toISOString(),
 			reason
 		};
-		this.patch({ state: 'unsafe', lastError: reason });
+		this.markUnsafe(reason);
 		this.options.logger?.warn(`Fleet worker quarantined after unconfirmed process-tree termination: ${reason}`);
 		try {
 			await this.options.onUnsafe?.(durable);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);
-			this.options.logger?.warn(
-				`Fleet worker quarantine could not be persisted: ${this.options.logger?.redact(detail) ?? detail}`
-			);
+			const safeDetail = this.options.logger?.redact(detail) ?? detail;
+			const fatal =
+				`Worker quarantine config persistence failed (${safeDetail}); ` +
+				'the durable worker-session marker remains active and requires explicit operator clearance';
+			this.patch({ state: 'unsafe', lastError: fatal });
+			this.options.logger?.warn(fatal);
 		}
+	}
+
+	private async prepareSafety(): Promise<void> {
+		if (this.unsafe || !this.options.safetyGate) return;
+		try {
+			const acquisition = await this.options.safetyGate.acquire();
+			if (acquisition.kind === 'blocked') {
+				this.markUnsafe(acquisition.state.reason);
+				return;
+			}
+			this.safetySessionId = acquisition.sessionId;
+		} catch (error) {
+			this.markUnsafe(errorDetail(error));
+			this.options.logger?.warn(`Fleet worker cannot lease: ${errorDetail(error)}`);
+		}
+	}
+
+	private markUnsafe(reason: string): void {
+		this.unsafe = true;
+		this.patch({ state: 'unsafe', lastError: reason });
 	}
 
 	/**
@@ -707,4 +749,8 @@ function throwIfJobAborted(signal: AbortSignal): void {
 
 function isProcessTreeTerminationError(error: unknown): boolean {
 	return error instanceof Error && error.name === 'ProcessTreeTerminationError';
+}
+
+function errorDetail(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }

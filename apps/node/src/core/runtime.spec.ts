@@ -120,6 +120,38 @@ describe('enrollNode', () => {
 });
 
 describe('createNodeRuntime', () => {
+	it('wires the durable worker safety gate through startup and safe shutdown', async () => {
+		const { io: deps } = io(async () => ({
+			ok: true,
+			status: 200,
+			text: async () => JSON.stringify({ jobs: [] })
+		}));
+		const safetyGate = {
+			acquire: vi.fn(async () => ({ kind: 'acquired' as const, sessionId: 'runtime-session' })),
+			release: vi.fn(async () => undefined),
+			inspect: vi.fn(async () => null),
+			clear: vi.fn(async () => undefined)
+		};
+		const runtime = createNodeRuntime(
+			{
+				apiUrl: 'https://api.ever.works',
+				nodeId: NODE_ID,
+				secret: SECRET,
+				kind: 'node',
+				capabilities: ['os:linux'],
+				heartbeatIntervalMs: 30_000,
+				enrolledAt: '2026-07-25T10:00:00.000Z'
+			} as NodeConfig,
+			deps,
+			{ workerEnabled: true, workerSafetyGate: safetyGate }
+		);
+
+		await runtime.worker?.start();
+		expect(safetyGate.acquire).toHaveBeenCalledOnce();
+		await runtime.worker?.stop();
+		expect(safetyGate.release).toHaveBeenCalledWith('runtime-session');
+	});
+
 	it('restores a persisted unsafe quarantine before the worker can make a lease request', async () => {
 		const requests: string[] = [];
 		const { io: deps } = io(async (url) => {

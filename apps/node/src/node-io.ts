@@ -92,6 +92,13 @@ export function createConfigFileSystem(): ConfigFileSystem {
 				flag: fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_TRUNC
 			});
 		},
+		createFileExclusive: async (filePath, content) => {
+			await fsp.writeFile(filePath, content, {
+				encoding: 'utf8',
+				mode: 0o600,
+				flag: fsConstants.O_WRONLY | fsConstants.O_CREAT | fsConstants.O_EXCL
+			});
+		},
 		mkdir: async (dirPath) => {
 			await fsp.mkdir(dirPath, { recursive: true, mode: 0o700 });
 		},

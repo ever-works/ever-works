@@ -5,6 +5,7 @@ import type { FetchLike } from '../core/fleet-client';
 import { createLogger, type LogEntry } from '../core/logger';
 import type { SecretStore } from '../core/secret-store';
 import { DEFAULT_HEARTBEAT_INTERVAL_MS } from '../core/types';
+import { workerSafetyMarkerPath } from '../core/worker-safety-store';
 import {
 	CliError,
 	EXIT_FAILURE,
@@ -78,6 +79,10 @@ function harness(
 	const fs: ConfigFileSystem = {
 		readFile: async (filePath) => files.get(filePath) ?? null,
 		writeFile: async (filePath, content) => void files.set(filePath, content),
+		createFileExclusive: async (filePath, content) => {
+			if (files.has(filePath)) throw Object.assign(new Error('already exists'), { code: 'EEXIST' });
+			files.set(filePath, content);
+		},
 		mkdir: async () => undefined,
 		chmod: async (filePath, mode) => void chmods.push({ path: filePath, mode }),
 		remove: async (filePath) => {
@@ -416,6 +421,48 @@ describe('ever-works-node pause / resume', () => {
 
 		expect(await runCli(['start', '--work'], h.deps)).toBe(EXIT_OK);
 		expect(h.output()).toContain('Worker host PAUSED');
+	});
+
+	it('refuses every lease after restart when an orphan worker-session marker exists', async () => {
+		const markerPath = workerSafetyMarkerPath(CONFIG_PATH);
+		let leaseCalls = 0;
+		const h = harness({
+			files: {
+				[CONFIG_PATH]: storedConfig,
+				[markerPath]: JSON.stringify({
+					version: 1,
+					sessionId: 'prior-session',
+					since: '2026-08-22T23:45:00.000Z'
+				})
+			},
+			fetchFn: async (url) => {
+				if (url.endsWith('/api/fleet/jobs/lease')) {
+					leaseCalls += 1;
+					return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+				}
+				return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: apiNode }) };
+			}
+		});
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start', '--work'], h.deps)).toBe(EXIT_OK);
+		expect(leaseCalls).toBe(0);
+		expect(h.output()).toContain('Worker host QUARANTINED');
+		expect(h.files.get(CONFIG_PATH)).toBe(storedConfig);
+		expect(h.files.has(markerPath)).toBe(true);
+	});
+
+	it('clears a marker-only quarantine only after explicit process-tree confirmation', async () => {
+		const markerPath = workerSafetyMarkerPath(CONFIG_PATH);
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig, [markerPath]: '{partial-worker-session' }
+		});
+
+		expect(await runCli(['clear-quarantine'], h.deps)).toBe(EXIT_FAILURE);
+		expect(h.files.has(markerPath)).toBe(true);
+		expect(await runCli(['clear-quarantine', '--confirm-process-tree-stopped'], h.deps)).toBe(EXIT_OK);
+		expect(h.files.has(markerPath)).toBe(false);
+		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)).not.toBeNull();
 	});
 });
 

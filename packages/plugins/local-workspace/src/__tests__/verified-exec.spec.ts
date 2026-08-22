@@ -4,7 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileWithVerifiedCancellation } from '../verified-exec.js';
+import { execFileWithVerifiedCancellation, ProcessTreeTerminationError } from '../verified-exec.js';
 
 const roots: string[] = [];
 const ownedPids: number[] = [];
@@ -52,6 +52,41 @@ describe('verified Git/helper process cancellation', () => {
 		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
 		await expect.poll(() => pids.every((pid) => !isAlive(pid)), { timeout: 2_500 }).toBe(true);
 	});
+
+	it.each([
+		['rejects', () => Promise.reject(new Error('whole-tree verifier failed'))],
+		['does not settle', () => new Promise<void>(() => undefined)]
+	])(
+		'quarantines when output overflows and the injected tree terminator %s',
+		async (_description, terminateProcessTree) => {
+			const root = mkdtempSync(join(tmpdir(), 'ew-git-overflow-'));
+			roots.push(root);
+			const ready = join(root, 'pid.txt');
+			const script = join(root, 'overflow.cjs');
+			writeFileSync(
+				script,
+				`require('node:fs').writeFileSync(${JSON.stringify(ready)},String(process.pid));` +
+					`process.stdout.write('x'.repeat(8192));setInterval(()=>{},1000);`
+			);
+
+			const pending = execFileWithVerifiedCancellation(process.execPath, [script], {
+				maxBuffer: 64,
+				terminateProcessTree,
+				terminationTimeoutMs: 50
+			});
+			const rejected = expect(pending).rejects.toEqual(
+				expect.objectContaining({
+					name: ProcessTreeTerminationError.name,
+					message: expect.stringContaining('process output exceeded 64 bytes'),
+					cause: expect.objectContaining({ code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' })
+				})
+			);
+			await expect.poll(() => existsSync(ready), { timeout: 2_500 }).toBe(true);
+			ownedPids.push(Number(readFileSync(ready, 'utf8')));
+
+			await rejected;
+		}
+	);
 });
 
 function isAlive(pid: number): boolean {

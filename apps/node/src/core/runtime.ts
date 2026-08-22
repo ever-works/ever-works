@@ -11,6 +11,7 @@ import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
 import type { ResourceProbe } from './resource-limits';
 import { WorkerLoop } from './worker-loop';
+import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
@@ -252,6 +253,8 @@ export interface CreateNodeRuntimeOptions {
 	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'>;
 	/** Persist a fail-closed worker quarantine into the node config. */
 	persistUnsafe?: (state: { since: string; reason: string }) => Promise<void> | void;
+	/** Durable write-ahead crash guard; acquired before the first job lease. */
+	workerSafetyGate?: WorkerSafetyGate;
 
 	/**
 	 * Start the worker drained. The node still heartbeats (so it stays
@@ -323,6 +326,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
 			...(config.unsafe ? { startUnsafe: config.unsafe } : {}),
 			...(options.persistUnsafe ? { onUnsafe: options.persistUnsafe } : {}),
+			...(options.workerSafetyGate ? { safetyGate: options.workerSafetyGate } : {}),
 			...(io.scheduler ? { scheduler: io.scheduler } : {}),
 			...(io.now ? { now: io.now } : {})
 		});

@@ -8,6 +8,8 @@ export interface VerifiedExecOptions {
 	signal?: AbortSignal;
 	execFileFn?: typeof execFile;
 	terminateProcessTree?: (child: ChildProcess) => Promise<void>;
+	/** Bound an injected/native whole-tree verifier; a timeout is unproven death. */
+	terminationTimeoutMs?: number;
 }
 
 export interface VerifiedExecResult {
@@ -52,7 +54,7 @@ export function execFileWithVerifiedCancellation(
 		const onAbort = (): void => {
 			if (settled || aborting) return;
 			aborting = true;
-			void terminate(child).then(
+			void terminateWithDeadline(terminate, child, options.terminationTimeoutMs).then(
 				() => finish(() => reject(abortError(options.signal))),
 				(error) =>
 					finish(() =>
@@ -66,8 +68,12 @@ export function execFileWithVerifiedCancellation(
 		};
 
 		try {
-			child = startFile(command, args, options, (error, stdout, stderr) => {
+			child = startFile(command, args, options, terminate, (error, stdout, stderr) => {
 				if (aborting) return;
+				if (error instanceof ProcessTreeTerminationError) {
+					finish(() => reject(error));
+					return;
+				}
 				finish(() => resolve({ error, stdout, stderr }));
 			});
 		} catch (error) {
@@ -83,6 +89,7 @@ function startFile(
 	command: string,
 	args: readonly string[],
 	options: VerifiedExecOptions,
+	terminate: (child: ChildProcess) => Promise<void>,
 	callback: (error: Error | null, stdout: string | Buffer, stderr: string | Buffer) => void
 ): ChildProcess {
 	const processOptions = {
@@ -108,15 +115,32 @@ function startFile(
 	let size = 0;
 	let launchError: Error | null = null;
 	let finished = false;
+	let overflowed = false;
 	const maxBuffer = options.maxBuffer ?? 1024 * 1024;
+	const complete = (error: Error | null): void => {
+		if (finished) return;
+		finished = true;
+		callback(error, Buffer.concat(stdout), Buffer.concat(stderr));
+	};
 	const append = (target: Buffer[], chunk: Buffer | string): void => {
+		if (overflowed) return;
 		const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
 		size += buffer.length;
-		if (size > maxBuffer && !launchError) {
-			launchError = Object.assign(new Error(`process output exceeded ${maxBuffer} bytes`), {
+		if (size > maxBuffer) {
+			overflowed = true;
+			const overflowError = Object.assign(new Error(`process output exceeded ${maxBuffer} bytes`), {
 				code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
 			});
-			void terminateVerifiedProcessTree(child).catch(() => child.kill('SIGKILL'));
+			void terminateWithDeadline(terminate, child, options.terminationTimeoutMs).then(
+				() => complete(overflowError),
+				(error) => {
+					const unproven = new ProcessTreeTerminationError(
+						`${overflowError.message}; Git process tree could not be proven stopped: ${errorDetail(error)}`
+					);
+					Object.assign(unproven, { cause: overflowError });
+					complete(unproven);
+				}
+			);
 			return;
 		}
 		target.push(buffer);
@@ -127,8 +151,7 @@ function startFile(
 		launchError = error;
 	});
 	child.on('close', (code, signal) => {
-		if (finished) return;
-		finished = true;
+		if (finished || overflowed) return;
 		const error =
 			launchError ??
 			(code === 0
@@ -137,13 +160,37 @@ function startFile(
 						code: code ?? 1,
 						signal
 					}));
-		callback(error, Buffer.concat(stdout), Buffer.concat(stderr));
+		complete(error);
 	});
 	return child;
 }
 
 const TREE_VERIFY_TIMEOUT_MS = 2_000;
 const TREE_VERIFY_POLL_MS = 20;
+const TREE_TERMINATION_DEADLINE_MS = 6_000;
+
+async function terminateWithDeadline(
+	terminate: (child: ChildProcess) => Promise<void>,
+	child: ChildProcess,
+	timeoutMs = TREE_TERMINATION_DEADLINE_MS
+): Promise<void> {
+	const boundedMs =
+		Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : TREE_TERMINATION_DEADLINE_MS;
+	let timer: NodeJS.Timeout | undefined;
+	try {
+		await Promise.race([
+			Promise.resolve().then(() => terminate(child)),
+			new Promise<never>((_resolve, reject) => {
+				timer = setTimeout(
+					() => reject(new Error(`whole-tree termination did not settle within ${boundedMs}ms`)),
+					boundedMs
+				);
+			})
+		]);
+	} finally {
+		if (timer) clearTimeout(timer);
+	}
+}
 
 export async function terminateVerifiedProcessTree(child: ChildProcess): Promise<void> {
 	const pid = child.pid;

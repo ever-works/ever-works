@@ -13,6 +13,7 @@ import {
 } from '../core/runtime';
 import type { SecretStore } from '../core/secret-store';
 import type { ResourceProbe } from '../core/resource-limits';
+import { createConfigWorkerSafetyGate } from '../core/worker-safety-store';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -274,6 +275,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 					logger: deps.io.logger
 				}
 			),
+		workerSafetyGate: createConfigWorkerSafetyGate(deps.fs, deps.configPath, { platform: deps.platform }),
 		...(deps.resourceProbe ? { resourceProbe: deps.resourceProbe } : {})
 	});
 	loop.onChange((state) => {
@@ -283,25 +285,6 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	});
 
 	deps.out(`Starting node ${config.nodeId} → ${config.apiUrl} (every ${config.heartbeatIntervalMs / 1000}s)`);
-	if (worker?.getState().state === 'unsafe') {
-		deps.out(
-			'Worker host QUARANTINED — leasing is disabled across restarts. Verify every prior process tree is stopped, then run `ever-works-node clear-quarantine --confirm-process-tree-stopped`.'
-		);
-	} else if (worker && startPaused) {
-		// Loud, because a drained node looks identical to a broken one
-		// from the outside: it beats, it appears online, and it never
-		// picks anything up.
-		deps.out('Worker host PAUSED — heartbeating only. Run `ever-works-node resume` to take work again.');
-	} else if (worker) {
-		deps.out(
-			`Worker host enabled — leasing [${worker.registeredKinds.join(', ')}] within ${describeLimits(effectiveLimits)}`
-		);
-	} else {
-		// Say so explicitly: an operator who expected this machine to run
-		// work should not have to infer it from an absence of log lines.
-		deps.out('Worker host disabled — reporting liveness only (pass --work to execute platform work)');
-	}
-
 	// Registered BEFORE the first beat so a Ctrl-C during startup is still a
 	// graceful shutdown rather than an abrupt kill.
 	let requestShutdown: () => void = () => undefined;
@@ -322,6 +305,24 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	await loop.start();
 	if (worker) {
 		await worker.start();
+	}
+	if (worker?.getState().state === 'unsafe') {
+		deps.out(
+			'Worker host QUARANTINED — leasing is disabled across restarts. Verify every prior process tree is stopped, then run `ever-works-node clear-quarantine --confirm-process-tree-stopped`.'
+		);
+	} else if (worker && startPaused) {
+		// Loud, because a drained node looks identical to a broken one
+		// from the outside: it beats, it appears online, and it never
+		// picks anything up.
+		deps.out('Worker host PAUSED — heartbeating only. Run `ever-works-node resume` to take work again.');
+	} else if (worker) {
+		deps.out(
+			`Worker host enabled — leasing [${worker.registeredKinds.join(', ')}] within ${describeLimits(effectiveLimits)}`
+		);
+	} else {
+		// Say so explicitly: an operator who expected this machine to run
+		// work should not have to infer it from an absence of log lines.
+		deps.out('Worker host disabled — reporting liveness only (pass --work to execute platform work)');
 	}
 
 	// Block until shutdown is requested: the injected hook (tests) or a signal
@@ -425,7 +426,9 @@ export async function runClearQuarantine(
 	options: { confirmProcessTreeStopped?: boolean }
 ): Promise<void> {
 	const config = await requireConfig(deps);
-	if (!config.unsafe) {
+	const safetyGate = createConfigWorkerSafetyGate(deps.fs, deps.configPath, { platform: deps.platform });
+	const marker = await safetyGate.inspect();
+	if (!config.unsafe && !marker) {
 		deps.out('No worker quarantine is recorded.');
 		return;
 	}
@@ -434,13 +437,18 @@ export async function runClearQuarantine(
 			'Refusing to clear quarantine without --confirm-process-tree-stopped. Verify the prior Git/command process tree is no longer running first.'
 		);
 	}
-	const cleared = { ...config };
-	delete cleared.unsafe;
-	await saveConfig(deps.fs, deps.configPath, cleared, {
-		platform: deps.platform,
-		secrets: deps.secrets ?? null,
-		logger: deps.io.logger
-	});
+	if (config.unsafe) {
+		const cleared = { ...config };
+		delete cleared.unsafe;
+		// Config first, marker last: a crash between the two leaves the
+		// marker in place and therefore remains fail-closed on restart.
+		await saveConfig(deps.fs, deps.configPath, cleared, {
+			platform: deps.platform,
+			secrets: deps.secrets ?? null,
+			logger: deps.io.logger
+		});
+	}
+	await safetyGate.clear();
 	deps.out('Quarantine cleared after explicit process-tree verification. Restart the worker to take work.');
 }
 
