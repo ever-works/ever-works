@@ -335,7 +335,13 @@ export class StripeBillingProvider extends BillingProvider {
                 `Could not resolve Stripe price for lookup_key "${key}"; falling back to an inline price`,
                 error instanceof Error ? error.stack : undefined,
             );
-            resolved = null;
+            // 🛑 Return WITHOUT caching. A thrown lookup is a transient condition — a timeout, a
+            // 5xx, a rate limit — not an answer about this account. Memoising it would make one
+            // blip permanent for the lifetime of the process, and the seat line has no inline
+            // fallback (the per-seat amount lives only in the catalog), so every later checkout on
+            // this pod would silently stop billing seats. That is undercharging, and it would look
+            // like nothing at all in the logs after the first warning.
+            return null;
         }
 
         if (resolved === null) {
@@ -345,6 +351,8 @@ export class StripeBillingProvider extends BillingProvider {
             );
         }
 
+        // Only a SUCCESSFUL lookup is memoised — including a definitive "this account does not have
+        // it", which is the normal steady state for an unsynced deployment and is safe to cache.
         this.priceIdByLookupKey.set(key, resolved);
         return resolved;
     }
@@ -363,6 +371,12 @@ export class StripeBillingProvider extends BillingProvider {
     ): Promise<Stripe.Checkout.SessionCreateParams.LineItem[]> {
         const planPriceId = await this.resolvePriceId(request.plan.lookupKey);
 
+        // 🛑 The inline fallback must respect the MODE. Stripe rejects a line item carrying
+        // `recurring` in a `mode: payment` session, so attaching it unconditionally made the $99
+        // perpetual licence unbuyable on any deployment whose catalog is not synced — the exact
+        // deployments the fallback exists to serve. A one-off line item simply omits `recurring`.
+        const isPerpetualLine = request.plan.mode === 'payment';
+
         const planLine: Stripe.Checkout.SessionCreateParams.LineItem = planPriceId
             ? { quantity: 1, price: planPriceId }
             : {
@@ -371,7 +385,9 @@ export class StripeBillingProvider extends BillingProvider {
                       // Price comes from the SERVER plan row.
                       currency: request.plan.currency,
                       unit_amount: request.plan.priceCents,
-                      recurring: { interval: request.plan.interval },
+                      ...(isPerpetualLine
+                          ? {}
+                          : { recurring: { interval: request.plan.interval } }),
                       product_data: { name: request.plan.label },
                   },
               };
