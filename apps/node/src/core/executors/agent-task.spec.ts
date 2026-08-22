@@ -194,6 +194,44 @@ describe('runAgentTaskJob — verdicts', () => {
 		expect(outcome.workspace).toBeNull();
 		expect(provisionWorkspace).not.toHaveBeenCalled();
 	});
+
+	it('aborts the active command and never starts the next step after lease cancellation', async () => {
+		const controller = new AbortController();
+		const commands: string[] = [];
+		const terminateProcessTree = vi.fn(async () => undefined);
+		const spawnFn = ((command: string) => {
+			commands.push(command);
+			const handlers = new Map<string, (arg?: unknown) => void>();
+			queueMicrotask(() => {
+				controller.abort(new Error('Fleet job lease was lost'));
+				handlers.get('close')?.(0);
+			});
+			return {
+				pid: 4242,
+				stdout: { on: () => undefined, destroy: () => undefined },
+				stderr: { on: () => undefined, destroy: () => undefined },
+				on: (event: string, handler: (arg?: unknown) => void) => handlers.set(event, handler),
+				kill: () => undefined
+			};
+		}) as never;
+
+		await expect(
+			runAgentTaskJob(
+				job({
+					taskId: 'task-cancelled',
+					workspacePath: ABSOLUTE,
+					steps: [
+						{ id: 'first', command: 'first' },
+						{ id: 'must-not-run', command: 'second' }
+					]
+				}),
+				{ ...alwaysExists, spawnFn, terminateProcessTree },
+				controller.signal
+			)
+		).rejects.toMatchObject({ name: 'AbortError' });
+		expect(commands).toEqual(['first']);
+		expect(terminateProcessTree).toHaveBeenCalledOnce();
+	});
 });
 
 describe('runAgentTaskJob — repository workspace boundary', () => {

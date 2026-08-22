@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ChildProcess } from 'node:child_process';
 import type { FleetJobView } from '@ever-works/contracts';
 import { nextBackoffMs, WorkerLoop, type JobLeaseCapableClient } from './worker-loop';
 import type { Scheduler } from './heartbeat';
+import { runAgentTaskJob } from './executors/agent-task';
 
 /**
  * The node worker host.
@@ -162,27 +164,53 @@ describe('WorkerLoop', () => {
 		await loop.stop();
 	});
 
-	it('aborts the job signal when its lease is lost and releases the controller after settlement', async () => {
-		const client = scriptedClient([[job()], []]);
+	it('aborts a production agent-task command after lease loss and never reports or counts success', async () => {
+		const workspacePath = process.platform === 'win32' ? 'C:\\workspace' : '/workspace';
+		const leasedJob = job({
+			kind: 'agent-task',
+			payload: {
+				taskId: 'task-lease-loss',
+				workspacePath,
+				steps: [{ id: 'blocking', command: 'blocking', timeoutSec: 0.05 }]
+			}
+		});
+		const client = scriptedClient([[leasedJob], []]);
 		client.heartbeat.mockResolvedValue(false);
 		const scheduler = controllableScheduler();
 		const loop = new WorkerLoop({ client, scheduler, leaseTtlSec: 30 });
-		let receivedSignal: AbortSignal | undefined;
-		loop.register('acceptance-checks', async (_job, signal) => {
-			receivedSignal = signal;
-			if (!signal) throw new Error('executor did not receive its job AbortSignal');
-			await new Promise<void>((_resolve, reject) => {
-				signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-			});
+		let spawned = false;
+		const terminateProcessTree = vi.fn(async (child: ChildProcess) => {
+			child.kill('SIGKILL');
 		});
+		const spawnFn = (() => {
+			spawned = true;
+			const handlers = new Map<string, (arg?: unknown) => void>();
+			return {
+				pid: 4343,
+				stdout: { on: () => undefined, destroy: () => undefined },
+				stderr: { on: () => undefined, destroy: () => undefined },
+				on: (event: string, handler: (arg?: unknown) => void) => handlers.set(event, handler),
+				kill: () => {
+					queueMicrotask(() => {
+						handlers.get('exit')?.(null);
+						handlers.get('close')?.(null);
+					});
+				}
+			};
+		}) as never;
+		loop.register('agent-task', (leased, signal) =>
+			runAgentTaskJob(leased, { directoryExists: () => true, spawnFn, terminateProcessTree }, signal)
+		);
 
 		await loop.start();
-		await vi.waitFor(() => expect(receivedSignal).toBeInstanceOf(AbortSignal));
+		await vi.waitFor(() => expect(spawned).toBe(true));
 		scheduler.runNext();
-		await vi.waitFor(() => expect(receivedSignal?.aborted).toBe(true));
 		await vi.waitFor(() => expect(loop.getState().failed).toBe(1));
 
 		expect(client.heartbeat).toHaveBeenCalledWith('job-1', 30);
+		expect(terminateProcessTree).toHaveBeenCalledOnce();
+		expect(client.complete).not.toHaveBeenCalledWith('job-1', expect.objectContaining({ success: true }));
+		expect(loop.getState().completed).toBe(0);
 		expect(loop.cancelJob('job-1')).toBe(false);
 		await loop.stop();
 	});

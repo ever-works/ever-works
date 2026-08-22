@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { statSync } from 'fs';
 import { homedir, tmpdir } from 'os';
 import { isAbsolute, join } from 'path';
@@ -89,6 +89,8 @@ export interface WireCheck {
 /** Injected so the whole executor is testable without spawning processes. */
 export interface AcceptanceChecksIo {
 	spawnFn?: typeof spawn;
+	/** Test/embedding seam; production uses an OS-native whole-tree kill. */
+	terminateProcessTree?: (child: ReturnType<typeof spawn>) => Promise<void>;
 	/** Directory-existence probe; defaults to a real `statSync`. */
 	directoryExists?: (path: string) => boolean;
 	parentEnv?: NodeJS.ProcessEnv;
@@ -112,8 +114,10 @@ export class AcceptanceChecksPayloadError extends Error {
  */
 export async function runAcceptanceChecksJob(
 	job: FleetJobView,
-	io: AcceptanceChecksIo = {}
+	io: AcceptanceChecksIo = {},
+	signal?: AbortSignal
 ): Promise<AcceptanceChecksOutcome> {
+	throwIfCommandAborted(signal);
 	const payload = job.payload as unknown as FleetAcceptanceChecksPayload | null;
 	if (!payload || typeof payload !== 'object') {
 		throw new AcceptanceChecksPayloadError('Job payload is missing');
@@ -138,17 +142,21 @@ export async function runAcceptanceChecksJob(
 	const checks = normalizeChecks(payload.checks);
 	if (checks.length === 0) {
 		// No checks is not a pass and not a failure — it is nothing to run.
+		throwIfCommandAborted(signal);
 		return { gateStatus: 'none', results: [] };
 	}
 
 	const results: NodeCheckResult[] = [];
 	for (const check of checks) {
-		results.push(await executeCheck(check, workspacePath, io));
+		throwIfCommandAborted(signal);
+		results.push(await executeCheck(check, workspacePath, io, signal));
+		throwIfCommandAborted(signal);
 	}
 
 	const anyRequiredFailed = checks.some(
 		(check, index) => check.required !== false && results[index].status !== 'green'
 	);
+	throwIfCommandAborted(signal);
 	return { gateStatus: anyRequiredFailed ? 'red' : 'green', results };
 }
 
@@ -206,7 +214,12 @@ function defaultDirectoryExists(path: string): boolean {
  * commands. The env scrub below is what keeps that from also meaning
  * "it runs them with everything this machine has exported".
  */
-function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo): Promise<NodeCheckResult> {
+function executeCheck(
+	check: WireCheck,
+	rootCwd: string,
+	io: AcceptanceChecksIo,
+	signal?: AbortSignal
+): Promise<NodeCheckResult> {
 	const spawnFn = io.spawnFn ?? spawn;
 	const now = io.now ?? (() => Date.now());
 	const cwd = check.cwd ? join(rootCwd, check.cwd) : rootCwd;
@@ -216,16 +229,23 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 	);
 	const startedAt = now();
 
-	return new Promise<NodeCheckResult>((resolve) => {
+	return new Promise<NodeCheckResult>((resolve, reject) => {
 		let settled = false;
 		let timedOut = false;
+		let cancelled = false;
 		let tail = '';
 		let timer: ReturnType<typeof setTimeout> | undefined;
+		let abortListener: (() => void) | undefined;
+
+		const cleanup = (): void => {
+			if (timer) clearTimeout(timer);
+			if (signal && abortListener) signal.removeEventListener('abort', abortListener);
+		};
 
 		const finish = (status: NodeCheckStatus, exitCode: number | null): void => {
 			if (settled) return;
 			settled = true;
-			if (timer) clearTimeout(timer);
+			cleanup();
 			resolve({
 				id: check.id,
 				exitCode,
@@ -234,12 +254,24 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 				...(tail.length > 0 ? { logTail: tail } : {})
 			});
 		};
+		const fail = (error: Error): void => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			reject(error);
+		};
+
+		if (signal?.aborted) {
+			fail(commandAbortError(signal));
+			return;
+		}
 
 		let child: ReturnType<typeof spawn>;
 		try {
 			child = spawnFn(check.command, {
 				cwd,
 				shell: true,
+				detached: process.platform !== 'win32',
 				windowsHide: true,
 				env: buildNodeCheckEnv(check.envPassthrough, io.parentEnv)
 			});
@@ -249,13 +281,41 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 			return;
 		}
 
+		const terminate = io.terminateProcessTree ?? terminateNodeProcessTree;
+		let termination: Promise<void> | null = null;
+		const ensureTerminated = (): Promise<void> => {
+			termination ??= Promise.resolve().then(() => terminate(child));
+			return termination;
+		};
+		const destroyPipes = (): void => {
+			child.stdout?.destroy();
+			child.stderr?.destroy();
+		};
+
+		abortListener = () => {
+			if (settled || cancelled) return;
+			cancelled = true;
+			void ensureTerminated().then(
+				() => {
+					destroyPipes();
+					fail(commandAbortError(signal));
+				},
+				(error: unknown) => fail(processTreeTerminationError(error))
+			);
+		};
+		signal?.addEventListener('abort', abortListener, { once: true });
+		if (signal?.aborted) abortListener();
+
 		timer = setTimeout(() => {
 			timedOut = true;
-			try {
-				child.kill('SIGKILL');
-			} catch {
-				// Already gone — the close handler settles.
-			}
+			void ensureTerminated().then(
+				() => {
+					destroyPipes();
+					if (cancelled) fail(commandAbortError(signal));
+					else finish('timeout', null);
+				},
+				(error: unknown) => fail(processTreeTerminationError(error))
+			);
 		}, timeoutSec * 1000);
 
 		const append = (chunk: Buffer | string): void => {
@@ -269,24 +329,20 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 		// problems.
 		child.on('error', (error: Error) => {
 			append(`\n${error.message}`);
+			if (cancelled || timedOut) return;
 			finish('error', null);
 		});
 
-		// On timeout, settle on 'exit' (process death) rather than 'close'
-		// (stdio drain): a killed shell can leave a grandchild holding the
-		// pipes open, and the gate must not wait for it.
+		// Timeout/cancellation settle from the whole-tree terminator rather
+		// than process events: a killed shell can leave a grandchild holding
+		// these pipes open, and the job must not wait for it.
 		child.on('exit', () => {
-			if (timedOut) {
-				child.stdout?.destroy();
-				child.stderr?.destroy();
-				finish('timeout', null);
-			}
+			if (cancelled || timedOut) return;
 		});
 
 		child.on('close', (code: number | null) => {
-			if (timedOut) {
-				finish('timeout', null);
-			} else if (code === 0) {
+			if (cancelled || timedOut) return;
+			if (code === 0) {
 				finish('green', 0);
 			} else {
 				// Killed by an external signal (code null) is still not a pass.
@@ -308,9 +364,48 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 export function runNodeCommandStep(
 	step: WireCheck,
 	rootCwd: string,
-	io: AcceptanceChecksIo = {}
+	io: AcceptanceChecksIo = {},
+	signal?: AbortSignal
 ): Promise<NodeCheckResult> {
-	return executeCheck(step, rootCwd, io);
+	return executeCheck(step, rootCwd, io, signal);
+}
+
+/** Terminate the shell and every descendant without constructing a shell command. */
+export async function terminateNodeProcessTree(child: ReturnType<typeof spawn>): Promise<void> {
+	const pid = child.pid;
+	if (!Number.isSafeInteger(pid) || (pid ?? 0) <= 0) {
+		throw new Error('Spawned command has no valid process id for tree termination');
+	}
+	if (process.platform === 'win32') {
+		await new Promise<void>((resolve, reject) => {
+			execFile(
+				'taskkill',
+				['/PID', String(pid), '/T', '/F'],
+				{ windowsHide: true, maxBuffer: 1024 * 1024 },
+				(error) => (error ? reject(error) : resolve())
+			);
+		});
+		return;
+	}
+	process.kill(-pid!, 'SIGKILL');
+}
+
+function throwIfCommandAborted(signal?: AbortSignal): void {
+	if (signal?.aborted) throw commandAbortError(signal);
+}
+
+function commandAbortError(signal?: AbortSignal): Error {
+	const reason = signal?.reason;
+	const error = new Error(reason instanceof Error ? reason.message : 'Fleet command execution was cancelled');
+	error.name = 'AbortError';
+	return error;
+}
+
+function processTreeTerminationError(error: unknown): Error {
+	const detail = error instanceof Error ? error.message : String(error);
+	const failure = new Error(`Fleet command process tree could not be terminated: ${detail}`);
+	failure.name = 'ProcessTreeTerminationError';
+	return failure;
 }
 
 /**

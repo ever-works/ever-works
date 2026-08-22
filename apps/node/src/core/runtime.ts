@@ -328,7 +328,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			});
 		// The executor seam: a job kind is one more `register` call
 		// against the same protocol — no new endpoint, no new credential.
-		worker.register('acceptance-checks', (job) => runAcceptanceChecksJob(job));
+		worker.register('acceptance-checks', (job, signal) => runAcceptanceChecksJob(job, {}, signal));
 		// The general kind. Without it an enrolled machine could only ever
 		// score a gate; with it a Task's run can actually EXECUTE here when
 		// the owner's resolved job runtime is the fleet. Same seam, same

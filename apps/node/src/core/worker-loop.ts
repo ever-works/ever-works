@@ -450,10 +450,15 @@ export class WorkerLoop {
 		try {
 			this.options.logger?.info(`Executing fleet job ${job.id} (${job.kind})`);
 			const result = await executor(job, signal);
-			await this.report(job.id, {
+			throwIfJobAborted(signal);
+			const accepted = await this.report(job.id, {
 				success: true,
 				result: (result as Record<string, unknown> | undefined) ?? null
 			});
+			throwIfJobAborted(signal);
+			if (!accepted) {
+				throw new Error('Fleet job success settlement was rejected; the lease may no longer be owned');
+			}
 			this.patch({ completed: this.state.completed + 1 });
 			this.options.logger?.info(`Fleet job ${job.id} completed`);
 		} catch (error) {
@@ -506,9 +511,9 @@ export class WorkerLoop {
 	private async report(
 		jobId: string,
 		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null }
-	): Promise<void> {
+	): Promise<boolean> {
 		try {
-			await this.options.client.complete(jobId, outcome);
+			return await this.options.client.complete(jobId, outcome);
 		} catch (error) {
 			// The lease will expire and the job will be reclaimed — the
 			// protocol survives an unreportable result by construction.
@@ -516,6 +521,7 @@ export class WorkerLoop {
 			this.options.logger?.warn(
 				`Could not report the result of fleet job ${jobId}: ${this.options.logger?.redact(raw) ?? raw}`
 			);
+			return false;
 		}
 	}
 
@@ -559,4 +565,12 @@ export class WorkerLoop {
 			listener(snapshot);
 		}
 	}
+}
+
+function throwIfJobAborted(signal: AbortSignal): void {
+	if (!signal.aborted) return;
+	const reason = signal.reason;
+	const error = new Error(reason instanceof Error ? reason.message : 'Fleet job was cancelled');
+	error.name = 'AbortError';
+	throw error;
 }

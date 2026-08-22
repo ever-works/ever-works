@@ -87,6 +87,7 @@ export async function runAgentTaskJob(
 	io: AgentTaskIo = {},
 	signal?: AbortSignal
 ): Promise<AgentTaskOutcome> {
+	throwIfAgentTaskAborted(signal);
 	const payload = job.payload as FleetAgentTaskPayload | null;
 	if (!payload || typeof payload !== 'object') {
 		throw new AgentTaskPayloadError('Job payload is missing');
@@ -107,13 +108,17 @@ export async function runAgentTaskJob(
 	}
 
 	const workspaceResolution = await resolveAgentTaskWorkspace(taskId, payload, io, signal);
+	throwIfAgentTaskAborted(signal);
 
 	const results: NodeCheckResult[] = [];
 	for (const step of steps) {
-		results.push(await runNodeCommandStep(step, workspaceResolution.path, io));
+		throwIfAgentTaskAborted(signal);
+		results.push(await runNodeCommandStep(step, workspaceResolution.path, io, signal));
+		throwIfAgentTaskAborted(signal);
 	}
 
 	const anyRequiredFailed = steps.some((step, index) => step.required !== false && results[index].status !== 'green');
+	throwIfAgentTaskAborted(signal);
 	return {
 		status: anyRequiredFailed ? 'failed' : 'succeeded',
 		taskId,
@@ -213,4 +218,12 @@ function defaultDirectoryExists(path: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function throwIfAgentTaskAborted(signal?: AbortSignal): void {
+	if (!signal?.aborted) return;
+	const reason = signal.reason;
+	const error = new Error(reason instanceof Error ? reason.message : 'Fleet agent task was cancelled');
+	error.name = 'AbortError';
+	throw error;
 }
