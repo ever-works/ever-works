@@ -36,6 +36,13 @@ export interface ClaimJobPatch {
     queuedReason: null;
 }
 
+/** Exact claim snapshot observed by an expiry scan. */
+export interface ObservedFleetJobLease {
+    status: FleetJobStatus;
+    nodeId: string;
+    leaseExpiresAt: Date;
+}
+
 /**
  * Feature-owned repository (provided by `FleetModule`, not
  * `DatabaseModule` — same split as `FleetNodeRepository`).
@@ -162,9 +169,14 @@ export class FleetJobRepository {
      * job that completed between the scan and the write is never
      * resurrected.
      */
-    async reclaim(id: string, previousStatus: FleetJobStatus): Promise<boolean> {
+    async reclaim(id: string, observed: ObservedFleetJobLease): Promise<boolean> {
         const result = await this.repository.update(
-            { id, status: previousStatus },
+            {
+                id,
+                status: observed.status,
+                nodeId: observed.nodeId,
+                leaseExpiresAt: observed.leaseExpiresAt,
+            },
             // Reclaim returns the row to the pool as an ORDINARY queued
             // job: the reason it originally waited (no free runner) is
             // not necessarily why it is waiting now, and carrying a
@@ -178,12 +190,17 @@ export class FleetJobRepository {
     /** Fail a lapsed claim that has exhausted its attempt budget. */
     async failExhausted(
         id: string,
-        previousStatus: FleetJobStatus,
+        observed: ObservedFleetJobLease,
         error: string,
         completedAt: Date,
     ): Promise<boolean> {
         const result = await this.repository.update(
-            { id, status: previousStatus },
+            {
+                id,
+                status: observed.status,
+                nodeId: observed.nodeId,
+                leaseExpiresAt: observed.leaseExpiresAt,
+            },
             { status: 'failed', leaseExpiresAt: null, error, completedAt },
         );
         return (result.affected ?? 0) === 1;

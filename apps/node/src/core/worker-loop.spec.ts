@@ -96,12 +96,14 @@ function clockScheduler(startMs: number): Scheduler & {
 	};
 }
 
-function deferred<T>(): { promise: Promise<T>; resolve(value: T): void } {
+function deferred<T>(): { promise: Promise<T>; resolve(value: T): void; reject(error: unknown): void } {
 	let resolve!: (value: T) => void;
-	const promise = new Promise<T>((settle) => {
+	let reject!: (error: unknown) => void;
+	const promise = new Promise<T>((settle, fail) => {
 		resolve = settle;
+		reject = fail;
 	});
-	return { promise, resolve };
+	return { promise, resolve, reject };
 }
 
 function job(overrides: Partial<FleetJobView> = {}): FleetJobView {
@@ -130,7 +132,9 @@ function scriptedClient(script: Array<FleetJobView[] | Error>): JobLeaseCapableC
 } {
 	let index = 0;
 	const complete = vi.fn(async () => true);
-	const heartbeat = vi.fn(async () => true);
+	const heartbeat = vi.fn(async () =>
+		job({ status: 'running', leaseExpiresAt: new Date(Date.now() + 30_000).toISOString() })
+	);
 	const client = {
 		complete,
 		heartbeat,
@@ -229,7 +233,7 @@ describe('WorkerLoop', () => {
 			}
 		});
 		const client = scriptedClient([[leasedJob], []]);
-		client.heartbeat.mockResolvedValue(false);
+		client.heartbeat.mockResolvedValue(null);
 		const scheduler = controllableScheduler();
 		const loop = new WorkerLoop({ client, scheduler, leaseTtlSec: 30 });
 		let spawned = false;
@@ -323,12 +327,12 @@ describe('WorkerLoop', () => {
 		expect(terminateProcessTree).not.toHaveBeenCalled();
 		scheduler.advanceTo(startedAt + 20_000);
 		await vi.waitFor(() => expect(client.heartbeat).toHaveBeenCalledTimes(2));
-		await expect.poll(() => scheduler.nextDueAt()).toBe(startedAt + 30_000);
+		await expect.poll(() => scheduler.nextDueAt()).toBe(startedAt + 22_000);
 		expect(terminateProcessTree).not.toHaveBeenCalled();
-		scheduler.advanceTo(startedAt + 29_999);
+		scheduler.advanceTo(startedAt + 21_999);
 		expect(terminateProcessTree).not.toHaveBeenCalled();
 
-		scheduler.advanceTo(startedAt + 30_000);
+		scheduler.advanceTo(startedAt + 22_000);
 		await vi.waitFor(() => expect(terminateProcessTree).toHaveBeenCalledOnce());
 		await vi.waitFor(() => expect(loop.getState().failed).toBe(1));
 		expect(client.heartbeat).toHaveBeenCalledTimes(2);
@@ -337,10 +341,51 @@ describe('WorkerLoop', () => {
 		await loop.stop();
 	});
 
+	it('uses the exact renewed server lease expiry and retains it across later transport failures', async () => {
+		const startedAt = Date.parse('2026-08-22T22:00:00.000Z');
+		const scheduler = clockScheduler(startedAt);
+		const leasedJob = job({ leaseExpiresAt: new Date(startedAt + 30_000).toISOString() });
+		const client = scriptedClient([[leasedJob], []]);
+		client.heartbeat
+			.mockResolvedValueOnce(
+				job({ status: 'running', leaseExpiresAt: new Date(startedAt + 55_000).toISOString() })
+			)
+			.mockRejectedValue(new Error('transport offline'));
+		const executor = deferred<Record<string, unknown>>();
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			leaseTtlSec: 30,
+			idlePollMs: 60_000,
+			now: scheduler.now
+		});
+		loop.register('acceptance-checks', () => executor.promise);
+
+		await loop.start();
+		scheduler.advanceTo(startedAt + 10_000);
+		await vi.waitFor(() => expect(client.heartbeat).toHaveBeenCalledTimes(1));
+		await expect.poll(() => scheduler.nextDueAt()).toBe(startedAt + 20_000);
+		for (const elapsed of [20_000, 30_000, 40_000]) {
+			scheduler.advanceTo(startedAt + elapsed);
+			await vi.waitFor(() => expect(client.heartbeat).toHaveBeenCalledTimes(elapsed / 10_000));
+			await expect
+				.poll(() => scheduler.nextDueAt())
+				.toBe(startedAt + (elapsed === 40_000 ? 47_000 : elapsed + 10_000));
+		}
+		expect(loop.getState().failed).toBe(0);
+		scheduler.advanceTo(startedAt + 46_999);
+		expect(loop.getState().failed).toBe(0);
+		scheduler.advanceTo(startedAt + 47_000);
+		executor.resolve({ ok: true });
+		await vi.waitFor(() => expect(loop.getState().failed).toBe(1));
+		expect(loop.getState().completed).toBe(0);
+		await loop.stop();
+	});
+
 	it('counts one accepted success when a terminal heartbeat response races its completion response', async () => {
 		const client = scriptedClient([[job()], []]);
 		const successResponse = deferred<boolean>();
-		const heartbeatResponse = deferred<boolean>();
+		const heartbeatResponse = deferred<FleetJobView | null>();
 		client.complete.mockImplementationOnce(() => successResponse.promise).mockResolvedValue(true);
 		client.heartbeat.mockImplementationOnce(() => heartbeatResponse.promise);
 		const scheduler = controllableScheduler();
@@ -354,7 +399,7 @@ describe('WorkerLoop', () => {
 
 		// The server processed success, while a later heartbeat's terminal
 		// response reached the client first. Accepted terminal state wins.
-		heartbeatResponse.resolve(false);
+		heartbeatResponse.resolve(null);
 		successResponse.resolve(true);
 		await vi.waitFor(() => expect(loop.getState().completed).toBe(1));
 
@@ -429,6 +474,118 @@ describe('WorkerLoop', () => {
 			await fs.rm(ownedRoot, { recursive: true, force: true, maxRetries: 3 });
 		}
 	}, 10_000);
+
+	it('starts quarantined after restart and does not lease until an operator explicitly clears persisted state', async () => {
+		const client = scriptedClient([[job()]]);
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			startUnsafe: { since: '2026-08-22T23:00:00.000Z', reason: 'unverified child process tree' }
+		} as never);
+
+		await loop.start();
+		expect(loop.getState()).toMatchObject({
+			state: 'unsafe',
+			lastError: 'unverified child process tree'
+		});
+		expect(client.leaseCalls).toBe(0);
+		await loop.stop();
+	});
+
+	it('persists quarantine and rejects work returned by an already-outstanding lease request', async () => {
+		const secondLease = deferred<FleetJobView[]>();
+		let leaseCalls = 0;
+		const complete = vi.fn(async () => true);
+		const client: JobLeaseCapableClient = {
+			heartbeat: vi.fn(async () =>
+				job({ status: 'running', leaseExpiresAt: new Date(Date.now() + 30_000).toISOString() })
+			),
+			complete,
+			lease: vi.fn(async () => {
+				leaseCalls += 1;
+				return leaseCalls === 1 ? [job({ id: 'job-original' })] : secondLease.promise;
+			})
+		};
+		const scheduler = controllableScheduler();
+		const persistUnsafe = vi.fn(async () => undefined);
+		const original = deferred<Record<string, unknown>>();
+		const executed: string[] = [];
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			concurrency: 2,
+			onUnsafe: persistUnsafe
+		} as never);
+		loop.register('acceptance-checks', async (leased) => {
+			executed.push(leased.id);
+			if (leased.id === 'job-original') return original.promise;
+			return { shouldNotRun: true };
+		});
+
+		await loop.start();
+		for (let index = 0; index < 4 && leaseCalls < 2; index += 1) scheduler.runNext();
+		await vi.waitFor(() => expect(leaseCalls).toBe(2));
+		const termination = new Error('tree still alive');
+		termination.name = 'ProcessTreeTerminationError';
+		original.reject(termination);
+		await vi.waitFor(() => expect(loop.getState().state).toBe('unsafe'));
+		await vi.waitFor(() => expect(persistUnsafe).toHaveBeenCalledOnce());
+
+		secondLease.resolve([job({ id: 'job-pending' })]);
+		await vi.waitFor(() =>
+			expect(complete).toHaveBeenCalledWith(
+				'job-pending',
+				expect.objectContaining({ success: false, error: expect.stringMatching(/quarantined/i) })
+			)
+		);
+		expect(executed).toEqual(['job-original']);
+		const callsAtQuarantine = leaseCalls;
+		for (let index = 0; index < 3; index += 1) scheduler.runNext();
+		expect(leaseCalls).toBe(callsAtQuarantine);
+		await loop.stop();
+	});
+
+	it('quarantines through the production agent-task path when Git helper termination is unproven', async () => {
+		const leased = job({
+			kind: 'agent-task',
+			payload: {
+				taskId: 'task-git-unsafe',
+				workspace: {
+					repositoryId: 'ever/repo',
+					repoUrl: 'https://github.com/ever/repo.git',
+					baseRef: 'develop',
+					branch: 'task/git-unsafe-12345678'
+				},
+				steps: [{ id: 'run', command: 'never-started' }]
+			}
+		});
+		const client = scriptedClient([[leased], []]);
+		const persistUnsafe = vi.fn(async () => undefined);
+		const loop = new WorkerLoop({ client, scheduler: controllableScheduler(), onUnsafe: persistUnsafe });
+		loop.register('agent-task', (jobView, signal) =>
+			runAgentTaskJob(
+				jobView,
+				{
+					provisionWorkspace: async () => {
+						const error = new Error('Git process tree could not be proven stopped');
+						error.name = 'ProcessTreeTerminationError';
+						throw error;
+					}
+				},
+				signal
+			)
+		);
+
+		await loop.start();
+		await vi.waitFor(() => expect(loop.getState().state).toBe('unsafe'));
+		expect(persistUnsafe).toHaveBeenCalledOnce();
+		expect(client.complete).toHaveBeenCalledWith(
+			leased.id,
+			expect.objectContaining({ success: false, error: expect.stringMatching(/could not be proven stopped/i) })
+		);
+		await loop.stop();
+	});
 
 	it('survives an unreportable result — the lease expiry is the safety net', async () => {
 		const client = scriptedClient([[job()], []]);

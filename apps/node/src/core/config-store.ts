@@ -170,6 +170,19 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 	if (typeof candidate.name === 'string' && candidate.name) {
 		config.name = candidate.name;
 	}
+	if (
+		candidate.unsafe &&
+		typeof candidate.unsafe === 'object' &&
+		typeof candidate.unsafe.since === 'string' &&
+		Number.isFinite(Date.parse(candidate.unsafe.since)) &&
+		typeof candidate.unsafe.reason === 'string' &&
+		candidate.unsafe.reason.trim()
+	) {
+		config.unsafe = {
+			since: new Date(candidate.unsafe.since).toISOString(),
+			reason: candidate.unsafe.reason.trim().slice(0, 2_000)
+		};
+	}
 	return config;
 }
 

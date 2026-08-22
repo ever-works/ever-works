@@ -263,6 +263,17 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		workerEnabled,
 		startPaused,
 		limits: effectiveLimits,
+		persistUnsafe: async (unsafe) =>
+			saveConfig(
+				deps.fs,
+				deps.configPath,
+				{ ...config, unsafe },
+				{
+					platform: deps.platform,
+					secrets: deps.secrets ?? null,
+					logger: deps.io.logger
+				}
+			),
 		...(deps.resourceProbe ? { resourceProbe: deps.resourceProbe } : {})
 	});
 	loop.onChange((state) => {
@@ -272,7 +283,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	});
 
 	deps.out(`Starting node ${config.nodeId} → ${config.apiUrl} (every ${config.heartbeatIntervalMs / 1000}s)`);
-	if (worker && startPaused) {
+	if (worker?.getState().state === 'unsafe') {
+		deps.out(
+			'Worker host QUARANTINED — leasing is disabled across restarts. Verify every prior process tree is stopped, then run `ever-works-node clear-quarantine --confirm-process-tree-stopped`.'
+		);
+	} else if (worker && startPaused) {
 		// Loud, because a drained node looks identical to a broken one
 		// from the outside: it beats, it appears online, and it never
 		// picks anything up.
@@ -402,6 +417,31 @@ export async function runPause(deps: CliDeps, paused: boolean, options: PauseCom
 	if (paused) {
 		deps.out('In-flight jobs keep running and still report their results. Heartbeats continue.');
 	}
+}
+
+/** Clear only after the operator has independently verified no child survives. */
+export async function runClearQuarantine(
+	deps: CliDeps,
+	options: { confirmProcessTreeStopped?: boolean }
+): Promise<void> {
+	const config = await requireConfig(deps);
+	if (!config.unsafe) {
+		deps.out('No worker quarantine is recorded.');
+		return;
+	}
+	if (options.confirmProcessTreeStopped !== true) {
+		throw new CliError(
+			'Refusing to clear quarantine without --confirm-process-tree-stopped. Verify the prior Git/command process tree is no longer running first.'
+		);
+	}
+	const cleared = { ...config };
+	delete cleared.unsafe;
+	await saveConfig(deps.fs, deps.configPath, cleared, {
+		platform: deps.platform,
+		secrets: deps.secrets ?? null,
+		logger: deps.io.logger
+	});
+	deps.out('Quarantine cleared after explicit process-tree verification. Restart the worker to take work.');
 }
 
 /**
@@ -562,6 +602,17 @@ export function buildProgram(deps: CliDeps): Command {
 		.option('--local-only', 'Only clear the local flag; do not tell the platform')
 		.action(async (options: PauseCommandOptions) => {
 			await runPause(deps, false, options);
+		});
+
+	program
+		.command('clear-quarantine')
+		.description('Clear a persisted unsafe worker state after verifying every prior process tree is stopped')
+		.option(
+			'--confirm-process-tree-stopped',
+			'Assert that the prior Git/command process tree has been independently verified stopped'
+		)
+		.action(async (options: { confirmProcessTreeStopped?: boolean }) => {
+			await runClearQuarantine(deps, options);
 		});
 
 	program

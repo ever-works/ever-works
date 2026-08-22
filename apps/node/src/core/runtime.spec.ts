@@ -120,6 +120,30 @@ describe('enrollNode', () => {
 });
 
 describe('createNodeRuntime', () => {
+	it('restores a persisted unsafe quarantine before the worker can make a lease request', async () => {
+		const requests: string[] = [];
+		const { io: deps } = io(async (url) => {
+			requests.push(url);
+			return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+		});
+		const config = {
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z',
+			unsafe: { since: '2026-08-22T23:00:00.000Z', reason: 'unverified process tree' }
+		} as NodeConfig;
+
+		const runtime = createNodeRuntime(config, deps, { workerEnabled: true });
+		await runtime.worker?.start();
+		expect(runtime.worker?.getState()).toMatchObject({ state: 'unsafe', lastError: 'unverified process tree' });
+		expect(requests).toEqual([]);
+		await runtime.worker?.stop();
+	});
+
 	it('wires a client and a loop against the stored config, protecting the secret', async () => {
 		const {
 			io: deps,

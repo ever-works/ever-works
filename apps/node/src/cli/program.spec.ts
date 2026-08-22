@@ -344,6 +344,24 @@ describe('ever-works-node pause / resume', () => {
 		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)?.paused).toBe(false);
 	});
 
+	it('keeps an unsafe quarantine on ordinary resume and clears it only after explicit process-tree confirmation', async () => {
+		const unsafe = {
+			since: '2026-08-22T23:00:00.000Z',
+			reason: 'unverified process tree'
+		};
+		const quarantined = JSON.stringify({ ...JSON.parse(storedConfig), paused: true, unsafe });
+		const h = harness({ files: { [CONFIG_PATH]: quarantined }, fetchFn: recordingFetch().fetchFn });
+
+		expect(await runCli(['resume', '--local-only'], h.deps)).toBe(EXIT_OK);
+		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)).toMatchObject({ paused: false, unsafe });
+		expect(await runCli(['clear-quarantine'], h.deps)).toBe(EXIT_FAILURE);
+		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)).toMatchObject({ unsafe });
+
+		expect(await runCli(['clear-quarantine', '--confirm-process-tree-stopped'], h.deps)).toBe(EXIT_OK);
+		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)?.unsafe).toBeUndefined();
+		expect(h.output()).toContain('Quarantine cleared');
+	});
+
 	it('still records the drain locally when the platform is unreachable', async () => {
 		const h = harness({
 			files: { [CONFIG_PATH]: storedConfig },

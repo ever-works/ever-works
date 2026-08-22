@@ -11,11 +11,12 @@ import type {
 	WorkspaceMergeSimulation
 } from '@ever-works/plugin';
 import { WorkspaceNotProvisionedError } from '@ever-works/plugin';
-import { execFile } from 'node:child_process';
+import { execFile, type ChildProcess } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileWithVerifiedCancellation } from './verified-exec.js';
 
 /** Binding stamp kept INSIDE the worktree's gitdir so it can never be
  *  committed and never shows up in the working tree. */
@@ -85,6 +86,10 @@ interface RegisteredCheckout {
 export interface LocalWorkspacePluginOptions {
 	/** Narrow process seam for deterministic cancellation tests. */
 	readonly execFile?: typeof execFile;
+	/** Test seam; production uses native whole-tree kill + verification. */
+	readonly terminateProcessTree?: (child: ChildProcess) => Promise<void>;
+	/** Atomic same-directory replacement seam for crash-safety tests. */
+	readonly replaceFile?: (source: string, destination: string) => Promise<void>;
 }
 
 /**
@@ -161,13 +166,21 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	};
 
 	private gitAvailable: boolean | null = null;
-	private readonly execFileFn: typeof execFile;
+	private readonly execFileFn: typeof execFile | undefined;
+	private readonly replaceFile: (source: string, destination: string) => Promise<void>;
+	private readonly terminateProcessTree: ((child: ChildProcess) => Promise<void>) | undefined;
 
 	/** Per-repo promise-chain mutex — see class doc. */
 	private readonly repoLocks = new Map<string, Promise<void>>();
 
 	constructor(options: LocalWorkspacePluginOptions = {}) {
-		this.execFileFn = options.execFile ?? execFile;
+		// Leave production undefined so the verified helper uses a detached
+		// process group. The execFile seam exists only for deterministic tests;
+		// Node's execFile implementation does not reliably forward `detached`,
+		// which would make POSIX descendant verification unsound.
+		this.execFileFn = options.execFile;
+		this.replaceFile = options.replaceFile ?? ((source, destination) => fs.rename(source, destination));
+		this.terminateProcessTree = options.terminateProcessTree;
 	}
 
 	async onLoad(_context: PluginContext): Promise<void> {
@@ -267,6 +280,14 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			} else if (current.stdout.trim() !== spec.repoUrl) {
 				throw workspaceOwnershipError('Repository pool is already bound to a different token-free remote');
 			}
+		}
+
+		// A prior crash or external cleanup can remove the checkout while
+		// leaving Git's exact worktree registration behind. Reconcile only
+		// this deterministic path/branch in the already-verified pool; never
+		// prune unrelated missing worktrees globally.
+		if (!(await existsNoFollow(worktreeDir))) {
+			await this.reconcileMissingWorktreeRegistration(poolDir, worktreeDir, spec, spec.signal);
 		}
 
 		const authedUrl = this.authedUrl(spec.repoUrl, spec.auth);
@@ -649,6 +670,43 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		}
 	}
 
+	private async reconcileMissingWorktreeRegistration(
+		poolDir: string,
+		worktreeDir: string,
+		spec: WorkspaceProvisionSpec,
+		signal?: AbortSignal
+	): Promise<void> {
+		const listed = await this.gitOrThrow(
+			['worktree', 'list', '--porcelain'],
+			poolDir,
+			spec.auth,
+			'worktree registration inspection failed',
+			signal
+		);
+		const matches = parseWorktreeRegistrations(listed.stdout).filter((entry) => samePath(entry.path, worktreeDir));
+		if (matches.length === 0) return;
+		if (matches.length !== 1 || matches[0].branch !== spec.branch) {
+			throw workspaceOwnershipError('Missing workspace path has a foreign or ambiguous Git registration');
+		}
+		await this.gitOrThrow(
+			['worktree', 'remove', '--force', worktreeDir],
+			poolDir,
+			spec.auth,
+			'stale worktree registration removal failed',
+			signal
+		);
+		const confirmed = await this.gitOrThrow(
+			['worktree', 'list', '--porcelain'],
+			poolDir,
+			spec.auth,
+			'worktree registration verification failed',
+			signal
+		);
+		if (parseWorktreeRegistrations(confirmed.stdout).some((entry) => samePath(entry.path, worktreeDir))) {
+			throw workspaceOwnershipError('Stale Git worktree registration survived exact removal');
+		}
+	}
+
 	/** Inject per-operation auth into the URL of ONE command invocation. */
 	private authedUrl(repoUrl: string, auth: WorkspaceProvisionSpec['auth']): string {
 		if (!auth?.token) return repoUrl;
@@ -678,35 +736,26 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		signal?: AbortSignal
 	): Promise<GitResult> {
 		throwIfAborted(signal);
-		return new Promise((resolve, reject) => {
-			this.execFileFn(
-				'git',
-				args,
-				{
-					cwd,
-					env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-					maxBuffer: 16 * 1024 * 1024,
-					windowsHide: true,
-					...(signal ? { signal } : {})
-				},
-				(error, stdout, stderr) => {
-					if (signal?.aborted || error?.name === 'AbortError') {
-						reject(abortError());
-						return;
-					}
-					const code =
-						error && typeof (error as { code?: unknown }).code === 'number'
-							? ((error as { code?: number }).code ?? 1)
-							: error
-								? 1
-								: 0;
-					resolve({
-						code,
-						stdout: String(stdout ?? ''),
-						stderr: this.scrub(String(stderr ?? ''), auth)
-					});
-				}
-			);
+		return execFileWithVerifiedCancellation('git', args, {
+			...(cwd ? { cwd } : {}),
+			env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+			maxBuffer: 16 * 1024 * 1024,
+			windowsHide: true,
+			...(signal ? { signal } : {}),
+			...(this.execFileFn ? { execFileFn: this.execFileFn } : {}),
+			...(this.terminateProcessTree ? { terminateProcessTree: this.terminateProcessTree } : {})
+		}).then(({ error, stdout, stderr }) => {
+			const code =
+				error && typeof (error as { code?: unknown }).code === 'number'
+					? ((error as { code?: number }).code ?? 1)
+					: error
+						? 1
+						: 0;
+			return {
+				code,
+				stdout: String(stdout ?? ''),
+				stderr: this.scrub(String(stderr ?? ''), auth)
+			};
 		});
 	}
 
@@ -1112,10 +1161,29 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			poolPath: normalizedPath(canonicalPool),
 			worktreePath: normalizedPath(canonicalWorktree)
 		};
-		await fs.writeFile(join(canonicalGitDir, STAMP_FILE), JSON.stringify(stamp), {
-			encoding: 'utf8',
-			mode: 0o600
-		});
+		await this.writeStampAtomically(join(canonicalGitDir, STAMP_FILE), JSON.stringify(stamp));
+	}
+
+	/**
+	 * Crash-safe stamp publication. The old v1/v2 proof remains valid until
+	 * an owner-only sibling file is fully written and atomically replaces it.
+	 */
+	private async writeStampAtomically(target: string, content: string): Promise<void> {
+		const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
+		let handle: Awaited<ReturnType<typeof fs.open>> | null = null;
+		try {
+			handle = await fs.open(temporary, 'wx', 0o600);
+			await handle.writeFile(content, 'utf8');
+			await handle.sync();
+			await handle.close();
+			handle = null;
+			await this.replaceFile(temporary, target);
+		} finally {
+			await handle?.close().catch(() => undefined);
+			await fs.unlink(temporary).catch((error: NodeJS.ErrnoException) => {
+				if (error.code !== 'ENOENT') throw error;
+			});
+		}
 	}
 }
 

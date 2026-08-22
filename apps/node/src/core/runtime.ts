@@ -250,6 +250,8 @@ export interface CreateNodeRuntimeOptions {
 	agentTaskWorkspaceRoot?: string;
 	/** Test/embedding seam; ordinary runtimes use the local-workspace provider. */
 	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'>;
+	/** Persist a fail-closed worker quarantine into the node config. */
+	persistUnsafe?: (state: { since: string; reason: string }) => Promise<void> | void;
 
 	/**
 	 * Start the worker drained. The node still heartbeats (so it stays
@@ -319,6 +321,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
 			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
 			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
+			...(config.unsafe ? { startUnsafe: config.unsafe } : {}),
+			...(options.persistUnsafe ? { onUnsafe: options.persistUnsafe } : {}),
 			...(io.scheduler ? { scheduler: io.scheduler } : {}),
 			...(io.now ? { now: io.now } : {})
 		});

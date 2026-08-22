@@ -1,10 +1,9 @@
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from '@ever-works/contracts';
-import { LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
+import { execFileWithVerifiedCancellation, LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
 import type { IWorkspacePlugin, WorkspaceHandle } from '@ever-works/plugin';
 
 export type FleetTaskWorkspaceErrorCode =
@@ -112,6 +111,7 @@ export class FleetTaskWorkspaceProvisioner {
 				}
 			});
 		} catch (error) {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
 			if (signal?.aborted) throw cancelledError();
 			if (error instanceof Error && error.name === 'WorkspaceOwnershipError') {
 				throw new FleetTaskWorkspaceError(
@@ -159,7 +159,8 @@ export class FleetTaskWorkspaceProvisioner {
 		let headSha: string;
 		try {
 			headSha = (await this.inspectHead(canonicalPath, signal)).trim();
-		} catch {
+		} catch (error) {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
 			if (signal?.aborted) throw cancelledError();
 			throw new FleetTaskWorkspaceError('git-failed', 'Provisioned workspace HEAD could not be resolved');
 		}
@@ -548,21 +549,14 @@ function inspectGitHead(workspacePath: string, signal?: AbortSignal): Promise<st
 }
 
 function runGitOutput(args: string[], workspacePath: string, signal?: AbortSignal): Promise<string> {
-	return new Promise((resolveHead, reject) => {
-		execFile(
-			'git',
-			args,
-			{
-				cwd: workspacePath,
-				env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-				windowsHide: true,
-				maxBuffer: 1024 * 1024,
-				...(signal ? { signal } : {})
-			},
-			(error, stdout) => {
-				if (error) reject(error);
-				else resolveHead(String(stdout ?? '').trim());
-			}
-		);
+	return execFileWithVerifiedCancellation('git', args, {
+		cwd: workspacePath,
+		env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+		windowsHide: true,
+		maxBuffer: 1024 * 1024,
+		...(signal ? { signal } : {})
+	}).then(({ error, stdout }) => {
+		if (error) throw error;
+		return String(stdout ?? '').trim();
 	});
 }

@@ -135,6 +135,47 @@ describe('provision (persistent pool + worktree)', () => {
 		});
 	});
 
+	it('preserves a valid v1 stamp when the atomic replacement fails, then migrates on retry', async () => {
+		const bindingKey = 'lw-task-v1-crash';
+		const branch = 'task/v1-crash-20202020';
+		const first = await plugin.provision(spec(bindingKey, branch));
+		const gitDir = git(first.path, 'rev-parse', '--path-format=absolute', '--git-dir');
+		const stampPath = join(gitDir, 'ew-workspace.json');
+		const legacy = JSON.stringify({ bindingKey, branch });
+		writeFileSync(stampPath, legacy);
+
+		const interrupted = new LocalWorkspacePlugin({
+			replaceFile: async () => {
+				throw Object.assign(new Error('simulated atomic replace crash'), { code: 'EIO' });
+			}
+		} as never);
+		await expect(interrupted.provision(spec(bindingKey, branch))).rejects.toThrow(/replace crash|owned|binding/i);
+		await expect(fs.readFile(stampPath, 'utf8')).resolves.toBe(legacy);
+
+		const retried = await new LocalWorkspacePlugin().provision(spec(bindingKey, branch));
+		expect(retried.reused).toBe(true);
+		expect(JSON.parse(await fs.readFile(stampPath, 'utf8'))).toMatchObject({
+			version: 2,
+			bindingKey,
+			branch
+		});
+	});
+
+	it('reconciles an exact stale Git registration when its deterministic worktree path is absent', async () => {
+		const bindingKey = 'lw-task-missing-path';
+		const branch = 'task/missing-path-30303030';
+		const first = await plugin.provision(spec(bindingKey, branch));
+		const pool = poolRepoDir();
+		await fs.rm(first.path, { recursive: true, force: true, maxRetries: 3 });
+		expect(git(pool, 'worktree', 'list', '--porcelain')).toContain(bindingKey);
+
+		const retried = await new LocalWorkspacePlugin().provision(spec(bindingKey, branch));
+		expect(retried.path).toBe(first.path);
+		expect(git(retried.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(branch);
+		const registrations = git(pool, 'worktree', 'list', '--porcelain');
+		expect(registrations.match(new RegExp(bindingKey, 'g'))).toHaveLength(1);
+	});
+
 	it('self-heals a branch collision: same binding, different branch → recreate', async () => {
 		const h1 = await plugin.provision(spec('lw-task-3', 'task/heal-cccc3333'));
 		writeFileSync(join(h1.path, 'stale.txt'), 'stale\n');
@@ -255,41 +296,72 @@ describe('provision (persistent pool + worktree)', () => {
 			.toBe(0);
 	});
 
-	it('passes AbortSignal to a blocking Git process and settles promptly on cancellation', async () => {
+	it('terminates a blocking Git process tree and settles promptly on cancellation', async () => {
 		const controller = new AbortController();
-		const observedSignals: AbortSignal[] = [];
+		let blockingCalls = 0;
+		const child = { pid: 4242, kill: () => true };
 		const blockingExecFile = ((
 			_command: string,
 			args: string[],
-			options: { signal?: AbortSignal },
+			_options: Record<string, unknown>,
 			callback: (error: Error | null, stdout?: string, stderr?: string) => void
 		) => {
 			if (args[0] === '--version') {
 				queueMicrotask(() => callback(null, 'git version test', ''));
-				return {};
+				return child;
 			}
-			if (options.signal) observedSignals.push(options.signal);
-			options.signal?.addEventListener(
-				'abort',
-				() => {
-					const error = new Error('aborted');
-					error.name = 'AbortError';
-					callback(error, '', '');
-				},
-				{ once: true }
-			);
-			return {};
+			blockingCalls += 1;
+			return child;
 		}) as never;
-		const blockingPlugin = new LocalWorkspacePlugin({ execFile: blockingExecFile });
+		const terminated: unknown[] = [];
+		const blockingPlugin = new LocalWorkspacePlugin({
+			execFile: blockingExecFile,
+			terminateProcessTree: async (received) => {
+				terminated.push(received);
+			}
+		});
 		const pending = blockingPlugin.provision({
 			...spec('lw-abort', 'task/abort-99990000'),
 			signal: controller.signal
 		} as never);
 
-		await expect.poll(() => observedSignals.length, { timeout: 500 }).toBeGreaterThan(0);
+		await expect.poll(() => blockingCalls, { timeout: 500 }).toBeGreaterThan(0);
 		controller.abort();
 		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
-		expect(observedSignals.every((signal) => signal === controller.signal)).toBe(true);
+		expect(terminated).toEqual([child]);
+	});
+
+	it('surfaces an unproven Git/helper tree cancellation for worker quarantine', async () => {
+		const controller = new AbortController();
+		let blockingCalls = 0;
+		const child = { pid: 4343, kill: () => false };
+		const blockingExecFile = ((
+			_command: string,
+			args: string[],
+			_options: Record<string, unknown>,
+			callback: (error: Error | null, stdout?: string, stderr?: string) => void
+		) => {
+			if (args[0] === '--version') queueMicrotask(() => callback(null, 'git version test', ''));
+			else blockingCalls += 1;
+			return child;
+		}) as never;
+		const blockingPlugin = new LocalWorkspacePlugin({
+			execFile: blockingExecFile,
+			terminateProcessTree: async () => {
+				throw new Error('descendant still alive');
+			}
+		});
+		const pending = blockingPlugin.provision({
+			...spec('lw-abort-unproven', 'task/abort-unproven-99991111'),
+			signal: controller.signal
+		} as never);
+
+		await expect.poll(() => blockingCalls, { timeout: 500 }).toBeGreaterThan(0);
+		controller.abort();
+		await expect(pending).rejects.toMatchObject({
+			name: 'ProcessTreeTerminationError',
+			message: expect.stringMatching(/could not be proven stopped/i)
+		});
 	});
 
 	it('recovers the exact task workspace when cancellation lands after git worktree add', async () => {
@@ -313,7 +385,12 @@ describe('provision (persistent pool + worktree)', () => {
 					callback(error, stdout, stderr);
 				}) as never
 			)) as unknown as typeof execFile;
-		const interruptedPlugin = new LocalWorkspacePlugin({ execFile: abortingExecFile });
+		const interruptedPlugin = new LocalWorkspacePlugin({
+			execFile: abortingExecFile,
+			// This test owns post-add filesystem recovery. The separate live
+			// process-tree harness proves the production terminator itself.
+			terminateProcessTree: async () => undefined
+		});
 		const interruptedSpec = {
 			...spec('lw-abort-after-add', 'task/abort-after-add-12121212'),
 			signal: controller.signal

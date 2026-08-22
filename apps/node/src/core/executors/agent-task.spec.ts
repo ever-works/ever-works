@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FleetJobView } from '@ever-works/contracts';
 import { AgentTaskPayloadError, normalizeAgentTaskSteps, runAgentTaskJob } from './agent-task';
 
@@ -115,6 +119,59 @@ describe('normalizeAgentTaskSteps', () => {
 });
 
 describe('runAgentTaskJob — verdicts', () => {
+	it('confines every declared step cwd to a real descendant of the isolated worktree', async () => {
+		const owned = mkdtempSync(join(tmpdir(), 'ew-agent-cwd-'));
+		const workspace = join(owned, 'workspace');
+		const nested = join(workspace, 'apps', 'web');
+		const outside = join(owned, 'outside');
+		await fs.mkdir(nested, { recursive: true });
+		await fs.mkdir(outside, { recursive: true });
+		const alias = join(workspace, 'escape');
+		await fs.symlink(outside, alias, process.platform === 'win32' ? 'junction' : 'dir');
+		const cwd: string[] = [];
+		const passingSpawn = fakeSpawn({ passing: 0 }) as unknown as (command: string) => unknown;
+		const spawnFn = ((_command: string, options: { cwd?: string }) => {
+			cwd.push(String(options.cwd));
+			return passingSpawn('passing');
+		}) as never;
+		try {
+			await expect(
+				runAgentTaskJob(
+					job({
+						taskId: 't-cwd-traversal',
+						workspacePath: workspace,
+						steps: [{ id: 'run', command: 'passing', cwd: '../outside' }]
+					}),
+					{ spawnFn }
+				)
+			).rejects.toThrow(/cwd|workspace|descendant|escape/i);
+			await expect(
+				runAgentTaskJob(
+					job({
+						taskId: 't-cwd-link',
+						workspacePath: workspace,
+						steps: [{ id: 'run', command: 'passing', cwd: 'escape' }]
+					}),
+					{ spawnFn }
+				)
+			).rejects.toThrow(/cwd|workspace|descendant|escape|link/i);
+
+			await expect(
+				runAgentTaskJob(
+					job({
+						taskId: 't-cwd-valid',
+						workspacePath: workspace,
+						steps: [{ id: 'run', command: 'passing', cwd: 'apps/web' }]
+					}),
+					{ spawnFn }
+				)
+			).resolves.toMatchObject({ status: 'succeeded' });
+			expect(cwd).toEqual([await fs.realpath(nested)]);
+		} finally {
+			await fs.rm(owned, { recursive: true, force: true, maxRetries: 3 });
+		}
+	});
+
 	it('reports succeeded when every required step exits 0', async () => {
 		const outcome = await runAgentTaskJob(
 			job({

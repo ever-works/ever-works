@@ -1,7 +1,8 @@
 import { execFile, spawn } from 'child_process';
 import { statSync } from 'fs';
+import { promises as fs } from 'fs';
 import { homedir, tmpdir } from 'os';
-import { isAbsolute, join } from 'path';
+import { isAbsolute, relative, resolve, sep } from 'path';
 import type { FleetAcceptanceChecksPayload, FleetJobView } from '@ever-works/contracts';
 import { resolveExclusiveAgentCredentials } from '@ever-works/contracts';
 
@@ -214,7 +215,7 @@ function defaultDirectoryExists(path: string): boolean {
  * commands. The env scrub below is what keeps that from also meaning
  * "it runs them with everything this machine has exported".
  */
-function executeCheck(
+async function executeCheck(
 	check: WireCheck,
 	rootCwd: string,
 	io: AcceptanceChecksIo,
@@ -222,14 +223,14 @@ function executeCheck(
 ): Promise<NodeCheckResult> {
 	const spawnFn = io.spawnFn ?? spawn;
 	const now = io.now ?? (() => Date.now());
-	const cwd = check.cwd ? join(rootCwd, check.cwd) : rootCwd;
+	const cwd = await resolveStepCwd(rootCwd, check.cwd);
 	const timeoutSec = Math.min(
 		typeof check.timeoutSec === 'number' && check.timeoutSec > 0 ? check.timeoutSec : DEFAULT_CHECK_TIMEOUT_SEC,
 		MAX_CHECK_TIMEOUT_SEC
 	);
 	const startedAt = now();
 
-	return new Promise<NodeCheckResult>((resolve, reject) => {
+	return new Promise<NodeCheckResult>((settle, reject) => {
 		let settled = false;
 		let timedOut = false;
 		let cancelled = false;
@@ -246,7 +247,7 @@ function executeCheck(
 			if (settled) return;
 			settled = true;
 			cleanup();
-			resolve({
+			settle({
 				id: check.id,
 				exitCode,
 				status,
@@ -352,6 +353,55 @@ function executeCheck(
 	});
 }
 
+/** Resolve an explicit step directory without permitting aliases or escape. */
+async function resolveStepCwd(rootCwd: string, declared: string | undefined): Promise<string> {
+	if (!declared) return rootCwd;
+	if (isAbsolute(declared)) {
+		throw new AcceptanceChecksPayloadError('Step cwd must be relative to the isolated workspace');
+	}
+	const lexicalRoot = resolve(rootCwd);
+	const lexicalCandidate = resolve(lexicalRoot, declared);
+	if (!isStrictDescendantPath(lexicalRoot, lexicalCandidate)) {
+		throw new AcceptanceChecksPayloadError('Step cwd escapes the isolated workspace');
+	}
+
+	let canonicalRoot: string;
+	let canonicalCandidate: string;
+	try {
+		const candidateStats = await fs.lstat(lexicalCandidate);
+		if (candidateStats.isSymbolicLink() || !candidateStats.isDirectory()) {
+			throw new Error('link or non-directory');
+		}
+		[canonicalRoot, canonicalCandidate] = await Promise.all([
+			fs.realpath(lexicalRoot),
+			fs.realpath(lexicalCandidate)
+		]);
+	} catch {
+		throw new AcceptanceChecksPayloadError('Step cwd is missing, linked, or not a directory');
+	}
+	if (
+		!sameFilesystemPath(canonicalRoot, lexicalRoot) ||
+		!sameFilesystemPath(canonicalCandidate, lexicalCandidate) ||
+		!isStrictDescendantPath(canonicalRoot, canonicalCandidate)
+	) {
+		throw new AcceptanceChecksPayloadError('Step cwd resolves through a link or outside the isolated workspace');
+	}
+	return canonicalCandidate;
+}
+
+function isStrictDescendantPath(root: string, candidate: string): boolean {
+	const rel = relative(root, candidate);
+	return Boolean(rel) && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+function sameFilesystemPath(left: string, right: string): boolean {
+	const normalize = (value: string): string => {
+		const resolved = resolve(value);
+		return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+	};
+	return normalize(left) === normalize(right);
+}
+
 /**
  * THE command runner every node job kind goes through.
  *
@@ -384,7 +434,11 @@ export async function terminateNodeProcessTree(child: ReturnType<typeof spawn>):
 				execFile(
 					'taskkill',
 					['/PID', String(pid), '/T', '/F'],
-					{ windowsHide: true, maxBuffer: 1024 * 1024 },
+					{
+						windowsHide: true,
+						timeout: PROCESS_EXIT_VERIFY_TIMEOUT_MS,
+						maxBuffer: 1024 * 1024
+					},
 					(error) => (error ? reject(error) : resolve())
 				);
 			});

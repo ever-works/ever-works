@@ -104,13 +104,14 @@ export class FleetJobClient {
 	}
 
 	/**
-	 * Extend the claim on a job. Returns false rather than throwing when
+	 * Extend the claim on a job. Returns the server's refreshed job view —
+	 * including its authoritative lease expiry — or null when
 	 * the platform refuses (401 — someone else's job, already terminal,
-	 * revoked credential): a lost lease is a normal outcome the loop
-	 * handles by finishing the work and letting the complete call fail,
-	 * not an exception worth unwinding an in-flight execution for.
+	 * revoked credential). A lost lease is a protocol outcome rather than a
+	 * transport exception; the worker aborts the shared task signal before the
+	 * platform can offer that job elsewhere.
 	 */
-	async heartbeat(jobId: string, leaseTtlSec?: number): Promise<boolean> {
+	async heartbeat(jobId: string, leaseTtlSec?: number): Promise<FleetJobView | null> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
 		if (leaseTtlSec !== undefined) body.leaseTtlSec = leaseTtlSec;
 		try {
@@ -119,10 +120,13 @@ export class FleetJobClient {
 				'job-heartbeat',
 				body
 			)) as FleetJobHeartbeatResponse;
-			return Boolean(payload?.ok);
+			if (!payload?.ok || !payload.job || typeof payload.job !== 'object') {
+				throw new FleetClientError('malformed', 'Job heartbeat response did not contain the renewed job');
+			}
+			return payload.job;
 		} catch (error) {
 			if (error instanceof FleetClientError && error.kind === 'unauthorized') {
-				return false;
+				return null;
 			}
 			throw error;
 		}

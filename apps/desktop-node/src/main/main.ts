@@ -128,13 +128,21 @@ function bootstrap(): void {
 		if (!config || runtime) {
 			return;
 		}
-		const created = createNodeRuntime(config, io, {
+		const connectedConfig = config;
+		const created = createNodeRuntime(connectedConfig, io, {
 			// A desktop node exists to DO work; the ceilings the operator set
 			// in the wizard are what makes that safe to enable by default.
 			workerEnabled: true,
-			limits: clampResourceLimits(config.limits),
+			limits: clampResourceLimits(connectedConfig.limits),
 			resourceProbe,
-			startPaused: pausedByOperator
+			startPaused: pausedByOperator,
+			persistUnsafe: async (unsafe) => {
+				const currentConfig = config;
+				if (!currentConfig) throw new Error('Cannot persist worker quarantine without an enrolled node config');
+				const quarantinedConfig = { ...currentConfig, unsafe };
+				await saveConfig(fs, configPath, quarantinedConfig, { platform: process.platform });
+				config = quarantinedConfig;
+			}
 		});
 		created.loop.onChange((state) => publishStatus(toStatusView(state, workerStatus)));
 		created.worker?.onChange((state) => {

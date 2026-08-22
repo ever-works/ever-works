@@ -52,6 +52,14 @@ export const WORKER_BACKOFF_MAX_MS = 60_000;
 export const MIN_KEEPALIVE_MS = 5_000;
 
 /**
+ * Stop work before the server may reclaim it. A Windows primary attempt can
+ * spend two seconds in taskkill and two more verifying exit; the fail-closed
+ * fallback has its own two-second bound. Eight seconds covers that worst-case
+ * chain plus scheduling headroom before another node can receive the job.
+ */
+export const LEASE_TERMINATION_SAFETY_MS = 8_000;
+
+/**
  * Exponential backoff for `n` consecutive failures, capped.
  *
  * `nextBackoffMs(1)` is the base delay and each further failure doubles
@@ -70,7 +78,7 @@ export function nextBackoffMs(consecutiveFailures: number): number {
 /** Just enough of {@link FleetJobClient} for the loop — keeps tests tiny. */
 export interface JobLeaseCapableClient {
 	lease(request: { max?: number; leaseTtlSec?: number; capabilities?: string[] }): Promise<FleetJobView[]>;
-	heartbeat(jobId: string, leaseTtlSec?: number): Promise<boolean>;
+	heartbeat(jobId: string, leaseTtlSec?: number): Promise<FleetJobView | null>;
 	complete(
 		jobId: string,
 		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null }
@@ -123,6 +131,12 @@ export interface WorkerLoopState {
 	paused: boolean;
 }
 
+/** Durable fail-closed marker stored beside the node enrollment config. */
+export interface WorkerUnsafeState {
+	since: string;
+	reason: string;
+}
+
 export interface WorkerLoopOptions {
 	/** Operator-set CPU/memory ceilings. Wins over `concurrency`. */
 	limits?: NodeResourceLimits;
@@ -142,6 +156,10 @@ export interface WorkerLoopOptions {
 	capabilities?: string[];
 	/** Start drained: heartbeat only, lease nothing until `resume()`. */
 	startPaused?: boolean;
+	/** Restore a prior unverified process-tree quarantine after restart. */
+	startUnsafe?: WorkerUnsafeState | null;
+	/** Persist the first unsafe transition before this process may restart. */
+	onUnsafe?: (state: WorkerUnsafeState) => Promise<void> | void;
 }
 
 export class WorkerLoop {
@@ -184,8 +202,12 @@ export class WorkerLoop {
 		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
 		this.resourceProbe = options.resourceProbe;
 		this.paused = options.startPaused === true;
+		this.unsafe = options.startUnsafe != null;
 		this.state.paused = this.paused;
-		if (this.paused) {
+		if (this.unsafe) {
+			this.state.state = 'unsafe';
+			this.state.lastError = options.startUnsafe?.reason ?? 'Worker process-tree quarantine is active';
+		} else if (this.paused) {
 			this.state.state = 'paused';
 		}
 	}
@@ -376,6 +398,23 @@ export class WorkerLoop {
 			return;
 		}
 
+		// Another in-flight job can quarantine the worker while this network
+		// request is outstanding. The server has already leased these rows, so
+		// fail them terminally without starting any executor; do not let them
+		// lapse and get re-offered while an unverified local process may live.
+		if (this.unsafe) {
+			await Promise.allSettled(
+				jobs.map((job) =>
+					this.report(job.id, {
+						success: false,
+						error: 'Fleet worker quarantined before execution; no command was started'
+					})
+				)
+			);
+			this.patch({ state: 'unsafe' });
+			return;
+		}
+
 		this.patch({ consecutiveFailures: 0, lastError: null });
 
 		if (jobs.length === 0) {
@@ -486,17 +525,32 @@ export class WorkerLoop {
 			const raw = error instanceof Error ? error.message : String(error);
 			const message = this.options.logger?.redact(raw) ?? raw;
 			if (isProcessTreeTerminationError(error)) {
-				this.unsafe = true;
-				this.patch({ state: 'unsafe', lastError: message });
-				this.options.logger?.warn(
-					`Fleet worker quarantined after unconfirmed process-tree termination: ${message}`
-				);
+				await this.quarantine(message);
 			}
 			await this.report(job.id, { success: false, error: message });
 			this.patch({ failed: this.state.failed + 1, lastError: message });
 			this.options.logger?.warn(`Fleet job ${job.id} failed: ${message}`);
 		} finally {
 			keepAlive.stop();
+		}
+	}
+
+	private async quarantine(reason: string): Promise<void> {
+		if (this.unsafe) return;
+		this.unsafe = true;
+		const durable: WorkerUnsafeState = {
+			since: new Date(this.now()).toISOString(),
+			reason
+		};
+		this.patch({ state: 'unsafe', lastError: reason });
+		this.options.logger?.warn(`Fleet worker quarantined after unconfirmed process-tree termination: ${reason}`);
+		try {
+			await this.options.onUnsafe?.(durable);
+		} catch (error) {
+			const detail = error instanceof Error ? error.message : String(error);
+			this.options.logger?.warn(
+				`Fleet worker quarantine could not be persisted: ${this.options.logger?.redact(detail) ?? detail}`
+			);
 		}
 	}
 
@@ -512,7 +566,7 @@ export class WorkerLoop {
 		const everyMs = Math.max(Math.floor((this.leaseTtlSec * 1000) / 3), MIN_KEEPALIVE_MS);
 		const localExpiry = this.now() + this.leaseTtlSec * 1000;
 		const wireExpiry = job.leaseExpiresAt ? Date.parse(job.leaseExpiresAt) : Number.NaN;
-		let confirmedUntil = Number.isFinite(wireExpiry) ? Math.min(localExpiry, wireExpiry) : localExpiry;
+		let confirmedUntil = Number.isFinite(wireExpiry) ? wireExpiry : localExpiry;
 		let beatTimer: unknown = null;
 		let deadlineTimer: unknown = null;
 		let stopped = false;
@@ -527,7 +581,7 @@ export class WorkerLoop {
 		};
 		const scheduleDeadline = (): void => {
 			if (deadlineTimer !== null) this.scheduler.clearTimeout(deadlineTimer);
-			const remaining = Math.max(0, confirmedUntil - this.now());
+			const remaining = Math.max(0, confirmedUntil - LEASE_TERMINATION_SAFETY_MS - this.now());
 			deadlineTimer = this.scheduler.setTimeout(() => {
 				deadlineTimer = null;
 				if (stopped || !this.inFlight.has(jobId)) return;
@@ -539,7 +593,7 @@ export class WorkerLoop {
 		};
 		const scheduleBeat = (): void => {
 			if (stopped) return;
-			const remaining = Math.max(0, confirmedUntil - this.now());
+			const remaining = Math.max(0, confirmedUntil - LEASE_TERMINATION_SAFETY_MS - this.now());
 			beatTimer = this.scheduler.setTimeout(beat, Math.min(everyMs, remaining));
 		};
 		const beat = (): void => {
@@ -547,9 +601,9 @@ export class WorkerLoop {
 			if (stopped || !this.inFlight.has(jobId) || this.jobControllers.get(jobId)?.signal.aborted) return;
 			void this.options.client
 				.heartbeat(jobId, this.leaseTtlSec)
-				.then((ok) => {
+				.then((renewed) => {
 					if (stopped || !this.inFlight.has(jobId)) return;
-					if (!ok) {
+					if (!renewed) {
 						this.options.logger?.warn(
 							`Lost the lease on fleet job ${jobId} — the platform may re-offer it to another node`
 						);
@@ -557,7 +611,16 @@ export class WorkerLoop {
 						return;
 					}
 					if (this.jobControllers.get(jobId)?.signal.aborted) return;
-					confirmedUntil = this.now() + this.leaseTtlSec * 1000;
+					const renewedExpiry = renewed.leaseExpiresAt ? Date.parse(renewed.leaseExpiresAt) : Number.NaN;
+					if (
+						renewed.id !== jobId ||
+						!Number.isFinite(renewedExpiry) ||
+						renewedExpiry <= this.now() + LEASE_TERMINATION_SAFETY_MS
+					) {
+						this.cancelJob(jobId, 'Fleet job heartbeat returned an invalid lease expiry');
+						return;
+					}
+					confirmedUntil = renewedExpiry;
 					scheduleDeadline();
 				})
 				.catch((error: unknown) => {

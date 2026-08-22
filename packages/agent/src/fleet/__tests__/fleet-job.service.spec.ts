@@ -119,17 +119,39 @@ function makeRepos(stores: Stores): { jobs: FleetJobRepository; nodes: FleetNode
                 )
                 .slice(0, limit),
         ),
-        reclaim: jest.fn(async (id: string, previousStatus: string) => {
-            const row = stores.jobs.find((j) => j.id === id && j.status === previousStatus);
-            if (!row) return false;
-            row.status = 'queued';
-            row.nodeId = null;
-            row.leaseExpiresAt = null;
-            return true;
-        }),
+        reclaim: jest.fn(
+            async (
+                id: string,
+                observed: { status: string; nodeId: string; leaseExpiresAt: Date },
+            ) => {
+                const row = stores.jobs.find(
+                    (j) =>
+                        j.id === id &&
+                        j.status === observed.status &&
+                        j.nodeId === observed.nodeId &&
+                        j.leaseExpiresAt?.getTime() === observed.leaseExpiresAt.getTime(),
+                );
+                if (!row) return false;
+                row.status = 'queued';
+                row.nodeId = null;
+                row.leaseExpiresAt = null;
+                return true;
+            },
+        ),
         failExhausted: jest.fn(
-            async (id: string, previousStatus: string, error: string, completedAt: Date) => {
-                const row = stores.jobs.find((j) => j.id === id && j.status === previousStatus);
+            async (
+                id: string,
+                observed: { status: string; nodeId: string; leaseExpiresAt: Date },
+                error: string,
+                completedAt: Date,
+            ) => {
+                const row = stores.jobs.find(
+                    (j) =>
+                        j.id === id &&
+                        j.status === observed.status &&
+                        j.nodeId === observed.nodeId &&
+                        j.leaseExpiresAt?.getTime() === observed.leaseExpiresAt.getTime(),
+                );
                 if (!row) return false;
                 row.status = 'failed';
                 row.leaseExpiresAt = null;
@@ -178,12 +200,14 @@ function enrolledNode(id: string, secret: string, overrides: Partial<FleetNode> 
 describe('FleetJobService', () => {
     let stores: Stores;
     let service: FleetJobService;
+    let jobsRepo: FleetJobRepository;
     const secretA = randomBytes(32).toString('base64url');
     const secretB = randomBytes(32).toString('base64url');
 
     beforeEach(() => {
         stores = { nodes: [], jobs: [] };
         const repos = makeRepos(stores);
+        jobsRepo = repos.jobs;
         service = new FleetJobService(repos.jobs, repos.nodes);
     });
 
@@ -485,6 +509,68 @@ describe('FleetJobService', () => {
             expect(summary).toMatchObject({ requeued: 0, failed: 0 });
             expect(stores.jobs[0].status).toBe('leased');
         });
+
+        it.each([
+            { exhausted: false, transition: 'requeue' },
+            { exhausted: true, transition: 'fail' },
+        ])(
+            'does not $transition a stale scan after the holding node renews the same running lease',
+            async ({ exhausted }) => {
+                await service.enqueue({
+                    userId: 'owner-1',
+                    kind: 'acceptance-checks',
+                    maxAttempts: exhausted ? 1 : 3,
+                });
+                await service.lease({ nodeId: NODE_A, secret: secretA });
+                const expired = new Date(Date.now() - 1_000);
+                stores.jobs[0].status = 'running';
+                stores.jobs[0].leaseExpiresAt = expired;
+
+                // A database scan returns a detached snapshot. Simulate the
+                // node heartbeat winning immediately after that scan but
+                // before reclaim's conditional UPDATE executes.
+                const scanned = {
+                    ...stores.jobs[0],
+                    leaseExpiresAt: new Date(expired),
+                } as FleetJob;
+                jest.spyOn(jobsRepo, 'findExpiredLeases').mockResolvedValue([scanned]);
+                const transition = exhausted ? 'failExhausted' : 'reclaim';
+                (jest.spyOn(jobsRepo, transition) as jest.SpyInstance).mockImplementation(
+                    async (...args: unknown[]) => {
+                        const row = stores.jobs[0];
+                        row.leaseExpiresAt = new Date(Date.now() + 60_000);
+                        // Mirror the vulnerable status-only UPDATE. The new
+                        // implementation must supply the observed claim tuple,
+                        // which this fake will compare below after the red run.
+                        const observed = args[1] as {
+                            status: string;
+                            nodeId: string;
+                            leaseExpiresAt: Date;
+                        };
+                        if (
+                            row.status !== observed.status ||
+                            row.nodeId !== observed.nodeId ||
+                            row.leaseExpiresAt.getTime() !== observed.leaseExpiresAt.getTime()
+                        ) {
+                            return false;
+                        }
+                        row.status = exhausted ? 'failed' : 'queued';
+                        row.nodeId = exhausted ? row.nodeId : null;
+                        row.leaseExpiresAt = null;
+                        return true;
+                    },
+                );
+
+                const summary = await service.reclaimExpired();
+
+                expect(summary).toMatchObject({ requeued: 0, failed: 0 });
+                expect(stores.jobs[0]).toMatchObject({
+                    status: 'running',
+                    nodeId: NODE_A,
+                });
+                expect(stores.jobs[0].leaseExpiresAt!.getTime()).toBeGreaterThan(Date.now());
+            },
+        );
     });
 
     describe('loadByNodeForUser', () => {
