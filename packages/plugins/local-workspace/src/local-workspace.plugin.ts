@@ -12,8 +12,9 @@ import type {
 } from '@ever-works/plugin';
 import { WorkspaceNotProvisionedError } from '@ever-works/plugin';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
-import { join, resolve as resolvePath } from 'node:path';
+import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path';
 import { tmpdir } from 'node:os';
 
 /** Binding stamp kept INSIDE the worktree's gitdir so it can never be
@@ -31,8 +32,29 @@ interface GitResult {
 }
 
 interface BindingStamp {
+	version: 2;
 	bindingKey: string;
 	branch: string;
+	repositoryKey: string;
+	remoteKey: string;
+	poolPath: string;
+	worktreePath: string;
+}
+
+interface WorktreeRegistration {
+	path: string;
+	head: string;
+	branch: string;
+}
+
+interface OwnedWorktree {
+	stamp: BindingStamp;
+	registration: WorktreeRegistration;
+}
+
+export interface LocalWorkspacePluginOptions {
+	/** Narrow process seam for deterministic cancellation tests. */
+	readonly execFile?: typeof execFile;
 }
 
 /**
@@ -109,9 +131,14 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	};
 
 	private gitAvailable: boolean | null = null;
+	private readonly execFileFn: typeof execFile;
 
 	/** Per-repo promise-chain mutex — see class doc. */
 	private readonly repoLocks = new Map<string, Promise<void>>();
+
+	constructor(options: LocalWorkspacePluginOptions = {}) {
+		this.execFileFn = options.execFile ?? execFile;
+	}
 
 	async onLoad(_context: PluginContext): Promise<void> {
 		// Availability is probed lazily on first use — onLoad must stay
@@ -137,47 +164,66 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	}
 
 	async provision(spec: WorkspaceProvisionSpec): Promise<WorkspaceHandle> {
-		await this.ensureGit();
-		// Concurrent `git worktree add` on one clone corrupts refs —
-		// serialize ALL provision work per repo-key.
-		return this.withRepoLock(repoKey(spec.repoUrl), () => this.provisionLocked(spec));
-	}
-
-	private async provisionLocked(spec: WorkspaceProvisionSpec): Promise<WorkspaceHandle> {
+		throwIfAborted(spec.signal);
+		await this.ensureGit(spec.signal);
 		const base = this.baseDir(spec.settings);
 		const poolDir = join(base, REPOS_DIR, repoKey(spec.repoUrl));
 		const worktreeDir = join(base, WORKTREES_DIR, sanitizeSegment(spec.bindingKey));
+		// Concurrent `git worktree add` on one clone corrupts refs —
+		// serialize ALL provision work per repo-key. A second path lock also
+		// prevents two colliding repository keys from racing the same binding.
+		return this.withRepoLock(`repo:${normalizedPath(poolDir)}`, () =>
+			this.withRepoLock(`worktree:${normalizedPath(worktreeDir)}`, () =>
+				this.provisionLocked(spec, poolDir, worktreeDir)
+			)
+		);
+	}
+
+	private async provisionLocked(
+		spec: WorkspaceProvisionSpec,
+		poolDir: string,
+		worktreeDir: string
+	): Promise<WorkspaceHandle> {
 		const depth = Number(spec.settings?.fetchDepth) > 0 ? Number(spec.settings?.fetchDepth) : 1;
+		throwIfAborted(spec.signal);
+
+		// Inspect an existing binding BEFORE creating/updating/fetching the
+		// requested pool. A foreign repository must not get even its remote
+		// rewritten simply because its sanitized cache key collided.
+		let existing: OwnedWorktree | null = null;
+		if (await existsNoFollow(worktreeDir)) {
+			if (!(await exists(join(poolDir, 'HEAD')))) {
+				throw workspaceOwnershipError('Task workspace is not registered to the requested repository pool');
+			}
+			existing = await this.assertOwnedWorktree(poolDir, worktreeDir, spec, spec.signal);
+		}
 
 		// ── pool repo: one BARE base clone per repository ─────────────
 		await fs.mkdir(poolDir, { recursive: true });
 		if (!(await exists(join(poolDir, 'HEAD')))) {
-			await this.gitOrThrow(['init', '--bare'], poolDir, spec.auth, 'pool repo init failed');
+			await this.gitOrThrow(['init', '--bare'], poolDir, spec.auth, 'pool repo init failed', spec.signal);
 			await this.gitOrThrow(
 				['remote', 'add', 'origin', spec.repoUrl],
 				poolDir,
 				spec.auth,
-				'pool remote add failed'
+				'pool remote add failed',
+				spec.signal
 			);
 		} else {
-			// Keep the persisted remote token-free and current — but only
-			// touch config when the URL actually changed (a reused pool
-			// must not be rewritten on every provision).
-			const current = await this.git(['remote', 'get-url', 'origin'], poolDir, spec.auth);
+			// Read the literal persisted URL. `remote get-url` applies
+			// url.*.insteadOf rewrites and would make a token-free canonical
+			// remote appear foreign in hermetic/local Git configurations.
+			const current = await this.git(['config', '--get', 'remote.origin.url'], poolDir, spec.auth, spec.signal);
 			if (current.code !== 0) {
 				await this.gitOrThrow(
 					['remote', 'add', 'origin', spec.repoUrl],
 					poolDir,
 					spec.auth,
-					'pool remote add failed'
+					'pool remote add failed',
+					spec.signal
 				);
 			} else if (current.stdout.trim() !== spec.repoUrl) {
-				await this.gitOrThrow(
-					['remote', 'set-url', 'origin', spec.repoUrl],
-					poolDir,
-					spec.auth,
-					'pool remote set-url failed'
-				);
+				throw workspaceOwnershipError('Repository pool is already bound to a different token-free remote');
 			}
 		}
 
@@ -195,7 +241,8 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			],
 			poolDir,
 			spec.auth,
-			`fetch of base ref '${spec.baseRef}' failed`
+			`fetch of base ref '${spec.baseRef}' failed`,
+			spec.signal
 		);
 
 		// A previously pushed task branch is the durable identity — reuse
@@ -203,7 +250,8 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		const branchFetch = await this.git(
 			['fetch', authedUrl, `+refs/heads/${spec.branch}:refs/remotes/origin/${spec.branch}`],
 			poolDir,
-			spec.auth
+			spec.auth,
+			spec.signal
 		);
 		const remoteBranchExists = branchFetch.code === 0;
 
@@ -212,24 +260,14 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 				['rev-parse', `refs/remotes/origin/${spec.baseRef}`],
 				poolDir,
 				spec.auth,
-				'base ref did not resolve after fetch'
+				'base ref did not resolve after fetch',
+				spec.signal
 			)
 		).stdout.trim();
 
-		// ── worktree: reuse when the binding stamp matches ────────────
-		if (await exists(worktreeDir)) {
-			const stamp = await this.readStamp(worktreeDir, spec.auth);
-			const checkedOut =
-				stamp !== null ? await this.git(['rev-parse', '--abbrev-ref', 'HEAD'], worktreeDir, spec.auth) : null;
-			const healthy =
-				stamp !== null &&
-				stamp.bindingKey === spec.bindingKey &&
-				stamp.branch === spec.branch &&
-				checkedOut !== null &&
-				checkedOut.code === 0 &&
-				checkedOut.stdout.trim() === spec.branch;
-
-			if (healthy) {
+		// ── worktree: reuse only after exact stamp + Git registration ─
+		if (existing) {
+			if (existing.stamp.branch === spec.branch) {
 				// The worktree persists across runs on purpose — resume in
 				// place, no re-clone, no branch re-cut.
 				return {
@@ -241,10 +279,10 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 				};
 			}
 
-			// Self-heal: stale dir, corrupt/missing stamp, foreign binding
-			// or a branch collision — remove and recreate instead of
-			// bricking the workspace.
-			await this.removeWorktree(poolDir, worktreeDir, spec.auth);
+			// A different requested branch is the one supported stale-binding
+			// repair. Re-prove ownership under both locks immediately before
+			// Git removes anything; foreign/corrupt paths are never self-healed.
+			await this.removeOwnedWorktree(poolDir, worktreeDir, spec, spec.signal);
 		}
 
 		const startPoint = remoteBranchExists
@@ -254,10 +292,12 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			['worktree', 'add', '-B', spec.branch, worktreeDir, startPoint],
 			poolDir,
 			spec.auth,
-			'worktree add failed'
+			'worktree add failed',
+			spec.signal
 		);
 
-		await this.writeStamp(worktreeDir, { bindingKey: spec.bindingKey, branch: spec.branch }, spec.auth);
+		await this.writeStamp(poolDir, worktreeDir, spec, spec.signal);
+		await this.assertOwnedWorktree(poolDir, worktreeDir, spec, spec.signal);
 
 		return {
 			path: worktreeDir,
@@ -408,12 +448,20 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	}
 
 	async teardown(handle: WorkspaceHandle): Promise<void> {
+		await this.ensureGit();
 		const poolDir = await this.poolDirOf(handle.path);
-		if (poolDir) {
-			await this.removeWorktree(poolDir, handle.path, undefined);
-		} else {
-			await fs.rm(handle.path, { recursive: true, force: true, maxRetries: 3 });
+		if (!poolDir) {
+			throw workspaceOwnershipError('Workspace teardown refused because its repository pool did not resolve');
 		}
+		await this.withRepoLock(`repo:${normalizedPath(poolDir)}`, () =>
+			this.withRepoLock(`worktree:${normalizedPath(handle.path)}`, async () => {
+				const owned = await this.inspectRegisteredWorktree(poolDir, handle.path, undefined, undefined);
+				if (owned.stamp.bindingKey !== handle.bindingKey || owned.stamp.branch !== handle.branch) {
+					throw workspaceOwnershipError('Workspace teardown refused a foreign task binding');
+				}
+				await this.removeRegisteredWorktree(poolDir, handle.path, undefined, undefined);
+			})
+		);
 	}
 
 	async gc(policy: { olderThanDays: number }): Promise<{ removed: string[] }> {
@@ -483,9 +531,9 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		return run;
 	}
 
-	private async ensureGit(): Promise<void> {
+	private async ensureGit(signal?: AbortSignal): Promise<void> {
 		if (this.gitAvailable === true) return;
-		const probe = await this.git(['--version'], undefined, undefined);
+		const probe = await this.git(['--version'], undefined, undefined, signal);
 		if (probe.code !== 0) {
 			this.gitAvailable = false;
 			throw new WorkspaceNotProvisionedError(
@@ -507,19 +555,38 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		return common ? resolvePath(common) : null;
 	}
 
-	/**
-	 * Route EVERY worktree delete through git so the pool repo's
-	 * bookkeeping stays consistent; fall back to rm + prune when git
-	 * refuses (broken worktree, missing admin files).
-	 */
-	private async removeWorktree(
+	/** Final provisioning deletion gate. This runs under both repository and
+	 * worktree locks and re-proves exact ownership immediately before Git. */
+	private async removeOwnedWorktree(
 		poolDir: string,
 		worktreeDir: string,
-		auth: WorkspaceProvisionSpec['auth']
+		spec: WorkspaceProvisionSpec,
+		signal?: AbortSignal
 	): Promise<void> {
-		await this.git(['worktree', 'remove', '--force', worktreeDir], poolDir, auth);
-		await fs.rm(worktreeDir, { recursive: true, force: true, maxRetries: 3 });
-		await this.git(['worktree', 'prune'], poolDir, auth);
+		await this.assertOwnedWorktree(poolDir, worktreeDir, spec, signal);
+		await this.removeRegisteredWorktree(poolDir, worktreeDir, spec.auth, signal);
+	}
+
+	private async removeRegisteredWorktree(
+		poolDir: string,
+		worktreeDir: string,
+		auth: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
+	): Promise<void> {
+		throwIfAborted(signal);
+		await this.gitOrThrow(
+			['worktree', 'remove', '--force', worktreeDir],
+			poolDir,
+			auth,
+			'owned worktree remove failed',
+			signal
+		);
+		await this.gitOrThrow(['worktree', 'prune'], poolDir, auth, 'worktree prune failed', signal);
+		if (await existsNoFollow(worktreeDir)) {
+			throw workspaceOwnershipError(
+				'Git removed the registration but the workspace path still exists; refusing an unchecked filesystem delete'
+			);
+		}
 	}
 
 	/** Inject per-operation auth into the URL of ONE command invocation. */
@@ -544,18 +611,29 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		return out;
 	}
 
-	private git(args: string[], cwd: string | undefined, auth: WorkspaceProvisionSpec['auth']): Promise<GitResult> {
-		return new Promise((resolve) => {
-			execFile(
+	private git(
+		args: string[],
+		cwd: string | undefined,
+		auth: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
+	): Promise<GitResult> {
+		throwIfAborted(signal);
+		return new Promise((resolve, reject) => {
+			this.execFileFn(
 				'git',
 				args,
 				{
 					cwd,
 					env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
 					maxBuffer: 16 * 1024 * 1024,
-					windowsHide: true
+					windowsHide: true,
+					...(signal ? { signal } : {})
 				},
 				(error, stdout, stderr) => {
+					if (signal?.aborted || error?.name === 'AbortError') {
+						reject(abortError());
+						return;
+					}
 					const code =
 						error && typeof (error as { code?: unknown }).code === 'number'
 							? ((error as { code?: number }).code ?? 1)
@@ -576,9 +654,10 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		args: string[],
 		cwd: string | undefined,
 		auth: WorkspaceProvisionSpec['auth'],
-		what: string
+		what: string,
+		signal?: AbortSignal
 	): Promise<GitResult> {
-		const result = await this.git(args, cwd, auth);
+		const result = await this.git(args, cwd, auth, signal);
 		if (result.code !== 0) {
 			throw new Error(`${what}: ${result.stderr.trim() || `git exited ${result.code}`}`);
 		}
@@ -587,37 +666,158 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 	/** The worktree's PRIVATE gitdir (never the shared common dir, never
 	 *  the working tree — the stamp must not be committable). */
-	private async gitDirOf(worktreeDir: string, auth: WorkspaceProvisionSpec['auth']): Promise<string | null> {
-		const result = await this.git(['rev-parse', '--path-format=absolute', '--git-dir'], worktreeDir, auth);
+	private async gitDirOf(
+		worktreeDir: string,
+		auth: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
+	): Promise<string | null> {
+		const result = await this.git(['rev-parse', '--path-format=absolute', '--git-dir'], worktreeDir, auth, signal);
 		if (result.code !== 0) return null;
 		const dir = result.stdout.trim();
 		return dir ? resolvePath(dir) : null;
 	}
 
-	private async readStamp(worktreeDir: string, auth: WorkspaceProvisionSpec['auth']): Promise<BindingStamp | null> {
-		try {
-			const gitDir = await this.gitDirOf(worktreeDir, auth);
-			if (!gitDir) return null;
-			const raw = await fs.readFile(join(gitDir, STAMP_FILE), 'utf8');
-			const parsed = JSON.parse(raw) as { bindingKey?: unknown; branch?: unknown };
-			return typeof parsed.bindingKey === 'string' && typeof parsed.branch === 'string'
-				? { bindingKey: parsed.bindingKey, branch: parsed.branch }
-				: null;
-		} catch {
-			return null;
+	private async assertOwnedWorktree(
+		poolDir: string,
+		worktreeDir: string,
+		spec: WorkspaceProvisionSpec,
+		signal?: AbortSignal
+	): Promise<OwnedWorktree> {
+		const owned = await this.inspectRegisteredWorktree(poolDir, worktreeDir, spec.auth, signal);
+		if (
+			owned.stamp.bindingKey !== spec.bindingKey ||
+			owned.stamp.repositoryKey !== repositoryIdentity(spec) ||
+			owned.stamp.remoteKey !== remoteIdentity(spec.repoUrl)
+		) {
+			throw workspaceOwnershipError('Existing workspace belongs to a different task or repository');
 		}
+		return owned;
+	}
+
+	/**
+	 * Strong ownership proof shared by reuse, stale-binding removal, and
+	 * teardown. A writable stamp alone is never authority: the lexical path
+	 * must be a plain directory, its canonical path must be exact, its common
+	 * and private Git directories must belong to this pool, and the pool's
+	 * porcelain registration must name the same path, branch, and HEAD.
+	 */
+	private async inspectRegisteredWorktree(
+		poolDir: string,
+		worktreeDir: string,
+		auth: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
+	): Promise<OwnedWorktree> {
+		throwIfAborted(signal);
+		let canonicalPool: string;
+		let canonicalWorktree: string;
+		try {
+			[canonicalPool, canonicalWorktree] = await Promise.all([
+				assertPlainDirectory(poolDir),
+				assertPlainDirectory(worktreeDir)
+			]);
+		} catch (error) {
+			if (isAbortError(error)) throw error;
+			throw workspaceOwnershipError(
+				'Workspace path or repository pool is a link, reparse point, or non-directory'
+			);
+		}
+		if (!samePath(canonicalPool, poolDir) || !samePath(canonicalWorktree, worktreeDir)) {
+			throw workspaceOwnershipError('Workspace path or repository pool resolves through an alias');
+		}
+
+		const [commonResult, gitDirResult, originResult, registrationsResult] = await Promise.all([
+			this.git(['rev-parse', '--path-format=absolute', '--git-common-dir'], canonicalWorktree, auth, signal),
+			this.git(['rev-parse', '--path-format=absolute', '--git-dir'], canonicalWorktree, auth, signal),
+			this.git(['config', '--get', 'remote.origin.url'], canonicalPool, auth, signal),
+			this.git(['worktree', 'list', '--porcelain'], canonicalPool, auth, signal)
+		]);
+		if (
+			commonResult.code !== 0 ||
+			gitDirResult.code !== 0 ||
+			originResult.code !== 0 ||
+			registrationsResult.code !== 0
+		) {
+			throw workspaceOwnershipError('Workspace Git ownership metadata could not be verified');
+		}
+
+		let canonicalCommon: string;
+		let canonicalGitDir: string;
+		try {
+			[canonicalCommon, canonicalGitDir] = await Promise.all([
+				fs.realpath(commonResult.stdout.trim()),
+				fs.realpath(gitDirResult.stdout.trim())
+			]);
+		} catch {
+			throw workspaceOwnershipError('Workspace Git directories did not resolve canonically');
+		}
+		if (
+			!samePath(canonicalCommon, canonicalPool) ||
+			!isStrictDescendant(join(canonicalPool, WORKTREES_DIR), canonicalGitDir)
+		) {
+			throw workspaceOwnershipError('Workspace is registered to a different repository pool');
+		}
+
+		const stampPath = join(canonicalGitDir, STAMP_FILE);
+		let stamp: BindingStamp;
+		try {
+			const stampStats = await fs.lstat(stampPath);
+			if (stampStats.isSymbolicLink() || !stampStats.isFile()) throw new Error('unsafe stamp');
+			stamp = parseBindingStamp(await fs.readFile(stampPath, 'utf8'));
+		} catch (error) {
+			if (isAbortError(error)) throw error;
+			throw workspaceOwnershipError('Workspace binding stamp is missing, foreign, or corrupt');
+		}
+		if (
+			stamp.poolPath !== normalizedPath(canonicalPool) ||
+			stamp.worktreePath !== normalizedPath(canonicalWorktree) ||
+			stamp.remoteKey !== remoteIdentity(originResult.stdout.trim())
+		) {
+			throw workspaceOwnershipError('Workspace binding stamp does not match its exact repository and path');
+		}
+
+		const registrations = parseWorktreeRegistrations(registrationsResult.stdout);
+		const matches = registrations.filter((entry) => samePath(entry.path, canonicalWorktree));
+		if (matches.length !== 1 || matches[0].branch !== stamp.branch || !/^[0-9a-f]{40,64}$/i.test(matches[0].head)) {
+			throw workspaceOwnershipError('Workspace has no exact path, branch, and HEAD registration in this pool');
+		}
+
+		return { stamp, registration: matches[0] };
 	}
 
 	private async writeStamp(
+		poolDir: string,
 		worktreeDir: string,
-		stamp: BindingStamp,
-		auth: WorkspaceProvisionSpec['auth']
+		spec: WorkspaceProvisionSpec,
+		signal?: AbortSignal
 	): Promise<void> {
-		const gitDir = await this.gitDirOf(worktreeDir, auth);
+		const [canonicalPool, canonicalWorktree] = await Promise.all([
+			fs.realpath(poolDir),
+			assertPlainDirectory(worktreeDir)
+		]);
+		if (!samePath(canonicalPool, poolDir) || !samePath(canonicalWorktree, worktreeDir)) {
+			throw workspaceOwnershipError('New workspace resolved through a link or reparse-point alias');
+		}
+		const gitDir = await this.gitDirOf(worktreeDir, spec.auth, signal);
 		if (!gitDir) {
 			throw new Error('cannot stamp workspace: worktree gitdir did not resolve');
 		}
-		await fs.writeFile(join(gitDir, STAMP_FILE), JSON.stringify(stamp), 'utf8');
+		const canonicalGitDir = await fs.realpath(gitDir);
+		if (!isStrictDescendant(join(canonicalPool, WORKTREES_DIR), canonicalGitDir)) {
+			throw workspaceOwnershipError('New workspace private Git directory belongs to another repository');
+		}
+		const stamp: BindingStamp = {
+			version: 2,
+			bindingKey: spec.bindingKey,
+			branch: spec.branch,
+			repositoryKey: repositoryIdentity(spec),
+			remoteKey: remoteIdentity(spec.repoUrl),
+			poolPath: normalizedPath(canonicalPool),
+			worktreePath: normalizedPath(canonicalWorktree)
+		};
+		await fs.writeFile(join(canonicalGitDir, STAMP_FILE), JSON.stringify(stamp), {
+			encoding: 'utf8',
+			mode: 0o600
+		});
 	}
 }
 
@@ -634,10 +834,122 @@ function repoKey(repoUrl: string): string {
 	return sanitizeSegment(stripped);
 }
 
+function repositoryIdentity(spec: WorkspaceProvisionSpec): string {
+	return createHash('sha256')
+		.update('workspace-repository-v2\0')
+		.update(spec.repositoryId ?? '')
+		.update('\0')
+		.update(spec.repoUrl)
+		.digest('hex');
+}
+
+function remoteIdentity(repoUrl: string): string {
+	return createHash('sha256').update('workspace-remote-v1\0').update(repoUrl).digest('hex');
+}
+
+function normalizedPath(value: string): string {
+	const normalized = resolvePath(value);
+	return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
+function samePath(left: string, right: string): boolean {
+	return normalizedPath(left) === normalizedPath(right);
+}
+
+function isStrictDescendant(root: string, candidate: string): boolean {
+	const child = relative(root, candidate);
+	return child !== '' && child.split(/[\\/]/)[0] !== '..' && !isAbsolute(child);
+}
+
+async function assertPlainDirectory(path: string): Promise<string> {
+	const stats = await fs.lstat(path);
+	if (stats.isSymbolicLink() || !stats.isDirectory()) {
+		throw workspaceOwnershipError('Expected a plain directory, not a link, reparse point, or file');
+	}
+	return fs.realpath(path);
+}
+
+function parseBindingStamp(raw: string): BindingStamp {
+	const parsed = JSON.parse(raw) as Partial<Record<keyof BindingStamp, unknown>>;
+	if (
+		parsed.version !== 2 ||
+		typeof parsed.bindingKey !== 'string' ||
+		!parsed.bindingKey ||
+		typeof parsed.branch !== 'string' ||
+		!parsed.branch ||
+		typeof parsed.repositoryKey !== 'string' ||
+		!/^[0-9a-f]{64}$/i.test(parsed.repositoryKey) ||
+		typeof parsed.remoteKey !== 'string' ||
+		!/^[0-9a-f]{64}$/i.test(parsed.remoteKey) ||
+		typeof parsed.poolPath !== 'string' ||
+		typeof parsed.worktreePath !== 'string'
+	) {
+		throw workspaceOwnershipError('Workspace binding stamp is not the strong v2 format');
+	}
+	return parsed as unknown as BindingStamp;
+}
+
+function parseWorktreeRegistrations(output: string): WorktreeRegistration[] {
+	const registrations: WorktreeRegistration[] = [];
+	let current: Partial<WorktreeRegistration> = {};
+	const finish = (): void => {
+		if (typeof current.path === 'string') {
+			registrations.push({
+				path: current.path,
+				head: current.head ?? '',
+				branch: current.branch ?? ''
+			});
+		}
+		current = {};
+	};
+	for (const rawLine of `${output}\n`.split(/\r?\n/)) {
+		if (!rawLine) {
+			finish();
+			continue;
+		}
+		if (rawLine.startsWith('worktree ')) current.path = rawLine.slice('worktree '.length);
+		else if (rawLine.startsWith('HEAD ')) current.head = rawLine.slice('HEAD '.length);
+		else if (rawLine.startsWith('branch refs/heads/')) {
+			current.branch = rawLine.slice('branch refs/heads/'.length);
+		}
+	}
+	return registrations;
+}
+
+function workspaceOwnershipError(message: string): Error {
+	const error = new Error(message);
+	error.name = 'WorkspaceOwnershipError';
+	return error;
+}
+
+function abortError(): Error {
+	const error = new Error('Workspace provisioning was cancelled');
+	error.name = 'AbortError';
+	return error;
+}
+
+function isAbortError(error: unknown): boolean {
+	return error instanceof Error && error.name === 'AbortError';
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+	if (signal?.aborted) throw abortError();
+}
+
 async function exists(path: string): Promise<boolean> {
 	return fs.access(path).then(
 		() => true,
 		() => false
+	);
+}
+
+async function existsNoFollow(path: string): Promise<boolean> {
+	return fs.lstat(path).then(
+		() => true,
+		(error: NodeJS.ErrnoException) => {
+			if (error.code === 'ENOENT') return false;
+			throw error;
+		}
 	);
 }
 

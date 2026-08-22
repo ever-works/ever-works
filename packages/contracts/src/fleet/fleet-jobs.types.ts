@@ -1,3 +1,5 @@
+import type { FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
+
 /**
  * Fleet job lease protocol — the wire shapes an enrolled node and the
  * platform exchange so work can actually EXECUTE on a fleet machine.
@@ -285,6 +287,12 @@ export interface FleetAgentTaskPayload {
 	 * service was installed. When present it must be absolute and exist.
 	 */
 	workspacePath?: string;
+	/**
+	 * Repository metadata for a node-provisioned isolated task worktree.
+	 * `null` is the legacy wire representation of an absent field and falls
+	 * back to `workspacePath` (or the node default) exactly like omission.
+	 */
+	workspace?: FleetTaskWorkspaceSpec | null;
 	/** Ordered commands the node executes for this run. */
 	steps?: FleetAgentTaskStep[];
 }

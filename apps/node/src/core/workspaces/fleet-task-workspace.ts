@@ -94,23 +94,31 @@ export class FleetTaskWorkspaceProvisioner {
 		const expectedPath = resolve(repositoryRoot, 'worktrees', bindingKey);
 		await prepareRepositoryRoot(this.rootPath, repositoryRoot);
 		throwIfCancelled(signal);
-		await assertExistingWorkspaceOwned(expectedPath, repositoryRoot, bindingKey, signal);
+		await assertExistingWorkspacePathSafe(expectedPath, repositoryRoot, signal);
 
 		let handle: WorkspaceHandle;
 		try {
 			handle = await this.plugin.provision({
+				repositoryId: spec.repositoryId,
 				repoUrl: spec.repoUrl,
 				baseRef: spec.baseRef,
 				branch: spec.branch,
 				bindingKey,
+				...(signal ? { signal } : {}),
 				...(spec.depth === undefined ? {} : { depth: spec.depth }),
 				settings: {
 					baseDir: repositoryRoot,
 					...(spec.depth === undefined ? {} : { fetchDepth: spec.depth })
 				}
 			});
-		} catch {
+		} catch (error) {
 			if (signal?.aborted) throw cancelledError();
+			if (error instanceof Error && error.name === 'WorkspaceOwnershipError') {
+				throw new FleetTaskWorkspaceError(
+					'path-collision',
+					'Existing task workspace did not pass the provider ownership proof and was preserved'
+				);
+			}
 			throw new FleetTaskWorkspaceError(
 				'provision-failed',
 				`Git fetch or workspace provisioning failed for repository '${spec.repositoryId}' at '${spec.baseRef}'`
@@ -129,14 +137,22 @@ export class FleetTaskWorkspaceProvisioner {
 		let canonicalRoot: string;
 		let canonicalPath: string;
 		try {
+			const lexicalStats = await fs.lstat(handle.path);
+			if (lexicalStats.isSymbolicLink() || !lexicalStats.isDirectory()) {
+				throw new Error('link, reparse point, or non-directory');
+			}
 			[canonicalRoot, canonicalPath] = await Promise.all([fs.realpath(this.rootPath), fs.realpath(handle.path)]);
-			const stats = await fs.stat(canonicalPath);
-			if (!stats.isDirectory()) throw new Error('not a directory');
 		} catch {
 			throw new FleetTaskWorkspaceError('path-collision', 'Provisioned workspace did not resolve to a directory');
 		}
 		if (!isStrictDescendant(canonicalRoot, canonicalPath)) {
 			throw new FleetTaskWorkspaceError('path-collision', 'Provisioned workspace escapes the configured root');
+		}
+		if (!samePath(canonicalPath, expectedPath)) {
+			throw new FleetTaskWorkspaceError(
+				'path-collision',
+				'Provisioned workspace resolves through a link or reparse-point alias'
+			);
 		}
 
 		throwIfCancelled(signal);
@@ -213,7 +229,7 @@ function validateRemoteUrl(raw: string): string {
 	if (!value || value.length > 2048 || /[\0\r\n]/.test(value) || value !== raw) {
 		throw new FleetTaskWorkspaceError('invalid-spec', 'Fleet workspace clone URL is invalid');
 	}
-	if (isCrossPlatformAbsolute(value) || value.startsWith('file:')) {
+	if (isWindowsLocalPath(value) || isCrossPlatformAbsolute(value) || value.startsWith('file:')) {
 		throw new FleetTaskWorkspaceError('invalid-spec', 'Local filesystem clone URLs are not supported');
 	}
 	if (remoteUrlContainsTraversal(value)) {
@@ -371,7 +387,7 @@ async function prepareRepositoryRoot(rootPath: string, repositoryRoot: string): 
 				throw new Error('unsafe repository pool entry');
 			}
 			const canonicalEntry = await fs.realpath(entryPath);
-			if (!isStrictDescendant(canonicalRepositoryRoot, canonicalEntry)) {
+			if (!isStrictDescendant(canonicalRepositoryRoot, canonicalEntry) || !samePath(canonicalEntry, entryPath)) {
 				throw new Error('repository pool escape');
 			}
 		}
@@ -407,14 +423,14 @@ async function ensureSafeDirectory(directoryPath: string, canonicalParent: strin
  * before allowing that behavior; an arbitrary folder or junction collision is
  * preserved and reported instead of ever becoming a recursive-delete target.
  */
-async function assertExistingWorkspaceOwned(
+async function assertExistingWorkspacePathSafe(
 	expectedPath: string,
 	repositoryRoot: string,
-	bindingKey: string,
 	signal?: AbortSignal
 ): Promise<void> {
+	let stats;
 	try {
-		await fs.lstat(expectedPath);
+		stats = await fs.lstat(expectedPath);
 	} catch (error) {
 		if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
 			throwIfCancelled(signal);
@@ -424,6 +440,12 @@ async function assertExistingWorkspaceOwned(
 	}
 
 	throwIfCancelled(signal);
+	if (stats.isSymbolicLink() || !stats.isDirectory()) {
+		throw new FleetTaskWorkspaceError(
+			'path-collision',
+			'Existing task workspace is a link, reparse point, or non-directory and was preserved'
+		);
+	}
 	let canonicalRepositoryRoot: string;
 	let canonicalPath: string;
 	try {
@@ -437,25 +459,10 @@ async function assertExistingWorkspaceOwned(
 	if (!isStrictDescendant(canonicalRepositoryRoot, canonicalPath)) {
 		throw new FleetTaskWorkspaceError('path-collision', 'Existing task workspace escapes its repository cache');
 	}
-
-	try {
-		const gitDir = await runGitOutput(['rev-parse', '--path-format=absolute', '--git-dir'], canonicalPath, signal);
-		const canonicalGitDir = await fs.realpath(gitDir);
-		if (!isStrictDescendant(canonicalRepositoryRoot, canonicalGitDir)) {
-			throw new Error('foreign gitdir');
-		}
-		const stamp = JSON.parse(await fs.readFile(join(canonicalGitDir, 'ew-workspace.json'), 'utf8')) as {
-			bindingKey?: unknown;
-			branch?: unknown;
-		};
-		if (stamp.bindingKey !== bindingKey || typeof stamp.branch !== 'string') {
-			throw new Error('foreign binding');
-		}
-	} catch {
-		if (signal?.aborted) throw cancelledError();
+	if (!samePath(canonicalPath, expectedPath)) {
 		throw new FleetTaskWorkspaceError(
 			'path-collision',
-			'Existing task workspace is not a Fleet-owned binding; it was preserved'
+			'Existing task workspace resolves through a link or reparse-point alias and was preserved'
 		);
 	}
 }
@@ -467,6 +474,19 @@ function isStrictDescendant(rootPath: string, candidate: string): boolean {
 
 function isCrossPlatformAbsolute(value: string): boolean {
 	return isAbsolute(value) || posix.isAbsolute(value) || win32.isAbsolute(value);
+}
+
+/** Reject Windows local/drive-relative/device forms before SCP-like parsing. */
+function isWindowsLocalPath(value: string): boolean {
+	return /^[a-zA-Z]:/.test(value) || value.startsWith('\\\\') || value.startsWith('//');
+}
+
+function samePath(left: string, right: string): boolean {
+	const normalizedLeft = resolve(left);
+	const normalizedRight = resolve(right);
+	return process.platform === 'win32'
+		? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+		: normalizedLeft === normalizedRight;
 }
 
 function throwIfCancelled(signal?: AbortSignal): void {

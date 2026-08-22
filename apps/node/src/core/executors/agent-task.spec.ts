@@ -177,6 +177,23 @@ describe('runAgentTaskJob — verdicts', () => {
 		expect(outcome.status).toBe('succeeded');
 		expect(outcome.workspace).toBeNull();
 	});
+
+	it('treats workspace null as an absent legacy field and uses workspacePath without provisioning', async () => {
+		const provisionWorkspace = vi.fn();
+		const outcome = await runAgentTaskJob(
+			job({
+				taskId: 't1',
+				workspace: null,
+				workspacePath: ABSOLUTE,
+				steps: [{ id: 'run', command: 'passing' }]
+			}),
+			{ ...alwaysExists, provisionWorkspace, spawnFn: fakeSpawn({ passing: 0 }) }
+		);
+
+		expect(outcome.status).toBe('succeeded');
+		expect(outcome.workspace).toBeNull();
+		expect(provisionWorkspace).not.toHaveBeenCalled();
+	});
 });
 
 describe('runAgentTaskJob — repository workspace boundary', () => {

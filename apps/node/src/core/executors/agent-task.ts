@@ -79,9 +79,7 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
  * that is a verdict the platform asked for, not an error in the node.
  */
 export async function runAgentTaskJob(job: FleetJobView, io: AgentTaskIo = {}): Promise<AgentTaskOutcome> {
-	const payload = job.payload as unknown as
-		| (FleetAgentTaskPayload & { workspace?: FleetTaskWorkspaceSpec | null })
-		| null;
+	const payload = job.payload as FleetAgentTaskPayload | null;
 	if (!payload || typeof payload !== 'object') {
 		throw new AgentTaskPayloadError('Job payload is missing');
 	}
@@ -119,17 +117,17 @@ export async function runAgentTaskJob(job: FleetJobView, io: AgentTaskIo = {}): 
 
 async function resolveAgentTaskWorkspace(
 	taskId: string,
-	payload: FleetAgentTaskPayload & { workspace?: FleetTaskWorkspaceSpec | null },
+	payload: FleetAgentTaskPayload,
 	io: AgentTaskIo
 ): Promise<{ path: string; descriptor: FleetTaskWorkspaceDescriptor | null }> {
-	if (payload.workspace !== undefined) {
+	if (payload.workspace != null) {
 		if (typeof payload.workspacePath === 'string' && payload.workspacePath.trim()) {
 			throw new AgentTaskPayloadError('Fleet agent-task payload cannot carry both workspace and workspacePath');
 		}
 		if (!io.provisionWorkspace) {
 			throw new AgentTaskPayloadError('Fleet repository workspace provisioner is not configured on this node');
 		}
-		const descriptor = await io.provisionWorkspace(taskId, payload.workspace as FleetTaskWorkspaceSpec);
+		const descriptor = await io.provisionWorkspace(taskId, payload.workspace);
 		return { path: resolveWorkspacePath(descriptor.path, io), descriptor };
 	}
 	return { path: resolveWorkspacePath(payload.workspacePath, io), descriptor: null };

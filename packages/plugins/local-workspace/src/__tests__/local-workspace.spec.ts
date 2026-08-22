@@ -126,7 +126,7 @@ describe('provision (persistent pool + worktree)', () => {
 		expect(existsSync(join(h2.path, 'stale.txt'))).toBe(false);
 	});
 
-	it('self-heals a foreign/corrupt binding stamp instead of bricking', async () => {
+	it('preserves a worktree with a foreign/corrupt binding stamp instead of deleting it', async () => {
 		const h1 = await plugin.provision(spec('lw-task-4', 'task/stamp-eeee5555'));
 		writeFileSync(join(h1.path, 'stale.txt'), 'stale\n');
 
@@ -139,10 +139,49 @@ describe('provision (persistent pool + worktree)', () => {
 			JSON.stringify({ bindingKey: 'someone-else', branch: 'task/stamp-eeee5555' })
 		);
 
-		const h2 = await plugin.provision(spec('lw-task-4', 'task/stamp-eeee5555'));
-		expect(h2.path).toBe(h1.path);
-		expect(git(h2.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/stamp-eeee5555');
-		expect(existsSync(join(h2.path, 'stale.txt'))).toBe(false);
+		await expect(plugin.provision(spec('lw-task-4', 'task/stamp-eeee5555'))).rejects.toThrow(/owned|binding/i);
+		expect(git(h1.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/stamp-eeee5555');
+		expect(await fs.readFile(join(h1.path, 'stale.txt'), 'utf8')).toBe('stale\n');
+	});
+
+	it.runIf(process.platform === 'win32')(
+		'rejects a junction alias and preserves the other registered worktree it targets',
+		async () => {
+			const victimBranch = 'task/alias-victim-11112222';
+			const victim = await plugin.provision(spec('lw-alias-victim', victimBranch));
+			writeFileSync(join(victim.path, 'must-survive.txt'), 'victim data\n');
+			const victimGitDir = git(victim.path, 'rev-parse', '--path-format=absolute', '--git-dir');
+			writeFileSync(
+				join(victimGitDir, 'ew-workspace.json'),
+				JSON.stringify({ bindingKey: 'lw-alias-attacker', branch: victimBranch })
+			);
+			const aliasPath = join(baseDir, 'worktrees', 'lw-alias-attacker');
+			await fs.symlink(victim.path, aliasPath, 'junction');
+
+			await expect(plugin.provision(spec('lw-alias-attacker', 'task/alias-attacker-33334444'))).rejects.toThrow(
+				/owned|binding|path/i
+			);
+			expect(await fs.readFile(join(victim.path, 'must-survive.txt'), 'utf8')).toBe('victim data\n');
+			expect(git(victim.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(victimBranch);
+		}
+	);
+
+	it('refuses to delete a worktree registered to a different repository pool', async () => {
+		const victim = await plugin.provision(spec('lw-repo-owner', 'task/repo-owner-55556666'));
+		writeFileSync(join(victim.path, 'must-survive.txt'), 'original repository data\n');
+		const otherOriginDir = join(root, 'other-origin.git');
+		mkdirSync(otherOriginDir, { recursive: true });
+		git(otherOriginDir, 'init', '--bare', '--initial-branch', 'main');
+		const otherOriginUrl = pathToFileURL(otherOriginDir).toString();
+		git(seedDir, 'push', otherOriginUrl, 'HEAD:refs/heads/main');
+
+		await expect(
+			plugin.provision({
+				...spec('lw-repo-owner', 'task/repo-other-77778888'),
+				repoUrl: otherOriginUrl
+			})
+		).rejects.toThrow(/owned|repository|registration/i);
+		expect(await fs.readFile(join(victim.path, 'must-survive.txt'), 'utf8')).toBe('original repository data\n');
 	});
 
 	it('provisions two tasks in PARALLEL into two worktrees of ONE pool repo', async () => {
@@ -165,6 +204,43 @@ describe('provision (persistent pool + worktree)', () => {
 		const list = git(join(baseDir, 'repos', repos[0]), 'worktree', 'list');
 		expect(list).toContain('lw-par-a');
 		expect(list).toContain('lw-par-b');
+	});
+
+	it('passes AbortSignal to a blocking Git process and settles promptly on cancellation', async () => {
+		const controller = new AbortController();
+		const observedSignals: AbortSignal[] = [];
+		const blockingExecFile = ((
+			_command: string,
+			args: string[],
+			options: { signal?: AbortSignal },
+			callback: (error: Error | null, stdout?: string, stderr?: string) => void
+		) => {
+			if (args[0] === '--version') {
+				queueMicrotask(() => callback(null, 'git version test', ''));
+				return {};
+			}
+			if (options.signal) observedSignals.push(options.signal);
+			options.signal?.addEventListener(
+				'abort',
+				() => {
+					const error = new Error('aborted');
+					error.name = 'AbortError';
+					callback(error, '', '');
+				},
+				{ once: true }
+			);
+			return {};
+		}) as never;
+		const blockingPlugin = new LocalWorkspacePlugin({ execFile: blockingExecFile });
+		const pending = blockingPlugin.provision({
+			...spec('lw-abort', 'task/abort-99990000'),
+			signal: controller.signal
+		} as never);
+
+		await expect.poll(() => observedSignals.length, { timeout: 500 }).toBeGreaterThan(0);
+		controller.abort();
+		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+		expect(observedSignals.every((signal) => signal === controller.signal)).toBe(true);
 	});
 });
 

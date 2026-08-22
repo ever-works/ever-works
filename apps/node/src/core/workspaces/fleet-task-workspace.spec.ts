@@ -17,6 +17,9 @@ const git = (cwd: string, ...args: string[]): string =>
 
 const SHA = 'a'.repeat(40);
 
+const fleetBindingKey = (taskId: string, repositoryId = 'ever/repository'): string =>
+	`fleet-${createHash('sha256').update(repositoryId).update('\0').update(taskId).digest('hex').slice(0, 32)}`;
+
 describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { timeout: 20_000 }, () => {
 	let ownedRoot: string;
 	let seedDir: string;
@@ -123,6 +126,37 @@ describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { ti
 		expect(existsSync(join(healed.path, 'stale.txt'))).toBe(false);
 		expect(git(healed.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/fleet-new');
 	});
+
+	it.runIf(process.platform === 'win32')(
+		'refuses a task-path junction alias without deleting the registered target worktree',
+		async () => {
+			const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+			const victimTaskId = 'task-junction-victim';
+			const aliasTaskId = 'task-junction-alias';
+			const victimBranch = 'task/junction-victim';
+			const victim = await provisioner.provision(victimTaskId, workspace(victimBranch));
+			const marker = join(victim.path, 'must-survive.txt');
+			writeFileSync(marker, 'another task owns this worktree\n');
+
+			const aliasBinding = fleetBindingKey(aliasTaskId);
+			const aliasPath = join(victim.path, '..', aliasBinding);
+			const victimGitDir = git(victim.path, 'rev-parse', '--path-format=absolute', '--git-dir');
+			// Reproduce the reviewed exploit: the old two-field stamp was both
+			// predictable and accepted any stamped branch before following the
+			// junction to another task's registered worktree.
+			writeFileSync(
+				join(victimGitDir, 'ew-workspace.json'),
+				JSON.stringify({ bindingKey: aliasBinding, branch: victimBranch })
+			);
+			await fs.symlink(victim.path, aliasPath, 'junction');
+
+			await expect(provisioner.provision(aliasTaskId, workspace('task/junction-alias'))).rejects.toMatchObject({
+				code: 'path-collision'
+			});
+			expect(await fs.readFile(marker, 'utf8')).toBe('another task owns this worktree\n');
+			expect(git(victim.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(victimBranch);
+		}
+	);
 });
 
 describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
@@ -155,8 +189,16 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 		['option-like base ref', { ...valid, baseRef: '--upload-pack=bad' }],
 		['ref traversal', { ...valid, branch: 'task/../escape' }],
 		['local repository path', { ...valid, repoUrl: join(rootPath, 'repo.git') }],
+		['drive-relative repository path', { ...valid, repoUrl: 'C:repo.git' }],
+		['drive-relative repository path with directories', { ...valid, repoUrl: 'D:repos/repo.git' }],
+		['UNC repository path', { ...valid, repoUrl: '\\\\server\\share\\repo.git' }],
+		['Windows device repository path', { ...valid, repoUrl: '\\\\?\\C:\\repos\\repo.git' }],
+		['Windows local-device repository path', { ...valid, repoUrl: '\\\\.\\pipe\\repo.git' }],
+		['forward-slash UNC repository path', { ...valid, repoUrl: '//server/share/repo.git' }],
 		['file URL', { ...valid, repoUrl: 'file:///tmp/repo.git' }],
 		['HTTPS credentials', { ...valid, repoUrl: 'https://user:secret@github.com/ever/repository.git' }],
+		['SSH password userinfo', { ...valid, repoUrl: 'ssh://git:secret@github.com/ever/repository.git' }],
+		['SCP password-like userinfo', { ...valid, repoUrl: 'git:secret@github.com:ever/repository.git' }],
 		['URL query credentials', { ...valid, repoUrl: 'https://github.com/ever/repository.git?token=secret' }],
 		['raw URL path traversal', { ...valid, repoUrl: 'https://github.com/ever/../repository.git' }],
 		['encoded URL path traversal', { ...valid, repoUrl: 'https://github.com/ever/%2e%2e/repository.git' }]
@@ -183,6 +225,40 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 		await expect(provisioner.provision('task-0001', valid)).rejects.toMatchObject({ code: 'path-collision' });
 	});
 
+	it('rejects an in-root junction created by a provider during provisioning', async () => {
+		const ownedRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-provider-alias-'));
+		let targetPath = '';
+		try {
+			const plugin: FleetWorkspacePlugin = {
+				provision: async (received) => {
+					const repositoryRoot = String(received.settings?.baseDir);
+					const expectedPath = join(repositoryRoot, 'worktrees', received.bindingKey);
+					targetPath = join(repositoryRoot, 'worktrees', 'other-task-target');
+					await fs.mkdir(targetPath, { recursive: true });
+					await fs.writeFile(join(targetPath, 'must-survive.txt'), 'other task data\n');
+					await fs.symlink(targetPath, expectedPath, process.platform === 'win32' ? 'junction' : 'dir');
+					return {
+						path: expectedPath,
+						baseSha: SHA,
+						reused: false,
+						branch: received.branch,
+						bindingKey: received.bindingKey
+					};
+				}
+			};
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: ownedRoot,
+				plugin,
+				inspectHead: async () => SHA
+			});
+
+			await expect(provisioner.provision('task-0001', valid)).rejects.toMatchObject({ code: 'path-collision' });
+			expect(await fs.readFile(join(targetPath, 'must-survive.txt'), 'utf8')).toBe('other task data\n');
+		} finally {
+			await fs.rm(ownedRoot, { recursive: true, force: true, maxRetries: 3 });
+		}
+	});
+
 	it('preserves an unowned directory at the deterministic path instead of letting self-heal delete it', async () => {
 		const ownedRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-collision-'));
 		try {
@@ -201,11 +277,9 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 			const collisionPath = join(ownedRoot, 'repositories', repositoryKey, 'worktrees', bindingKey);
 			mkdirSync(collisionPath, { recursive: true });
 			writeFileSync(join(collisionPath, 'keep.txt'), 'not owned by Fleet\n');
-			const plugin = { provision: vi.fn() } as unknown as FleetWorkspacePlugin;
-			const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: ownedRoot, plugin });
+			const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: ownedRoot });
 
 			await expect(provisioner.provision('task-0001', valid)).rejects.toMatchObject({ code: 'path-collision' });
-			expect(plugin.provision).not.toHaveBeenCalled();
 			expect(await fs.readFile(join(collisionPath, 'keep.txt'), 'utf8')).toBe('not owned by Fleet\n');
 		} finally {
 			await fs.rm(ownedRoot, { recursive: true, force: true, maxRetries: 3 });
@@ -279,5 +353,40 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 		await expect(provisioner.provision('task-0001', valid, controller.signal)).rejects.toMatchObject({
 			code: 'cancelled'
 		});
+	});
+
+	it('propagates cancellation into a blocking workspace provider instead of waiting for it to finish', async () => {
+		const controller = new AbortController();
+		let providerEntered = false;
+		let receivedSignal: AbortSignal | undefined;
+		let observedAbort = false;
+		const plugin: FleetWorkspacePlugin = {
+			provision: (received) =>
+				new Promise((_resolve, reject) => {
+					providerEntered = true;
+					receivedSignal = received.signal;
+					if (!received.signal) {
+						setTimeout(() => reject(new Error('provider never received AbortSignal')), 25);
+						return;
+					}
+					received.signal.addEventListener(
+						'abort',
+						() => {
+							observedAbort = true;
+							reject(new DOMException('aborted', 'AbortError'));
+						},
+						{ once: true }
+					);
+				})
+		};
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath, plugin });
+
+		const pending = provisioner.provision('task-0001', valid, controller.signal);
+		await vi.waitFor(() => expect(providerEntered).toBe(true));
+		controller.abort();
+
+		await expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+		expect(receivedSignal).toBe(controller.signal);
+		expect(observedAbort).toBe(true);
 	});
 });
