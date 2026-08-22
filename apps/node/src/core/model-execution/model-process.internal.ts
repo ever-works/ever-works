@@ -386,8 +386,9 @@ export async function executeModelProcessInternal(
 			}
 			let containment: ModelProcessContainment;
 			try {
-				containment = await withinExecutionDeadline(
-					() => io.createModelProcessContainment!(io.spawnFn ?? spawn),
+				containment = await acquireModelProcessContainment(
+					io.createModelProcessContainment,
+					io.spawnFn ?? spawn,
 					deadlineAt,
 					monotonicNow,
 					request.signal
@@ -397,10 +398,6 @@ export async function executeModelProcessInternal(
 				return containmentUnavailableResult(request.provider, Math.max(0, now() - startedAt));
 			}
 			const modelBudgetMs = remainingExecutionMs(deadlineAt, monotonicNow);
-			if (modelBudgetMs <= 0) {
-				return executionDeadlineResult(request.provider, Math.max(0, now() - startedAt));
-			}
-
 			const args = buildProviderArgs(request);
 
 			const raw = await runProcess(
@@ -536,6 +533,41 @@ async function withinExecutionDeadline<T>(
 			);
 		if (signal?.aborted) onAbort();
 	});
+}
+
+async function acquireModelProcessContainment(
+	createContainment: NonNullable<ModelExecutionIo['createModelProcessContainment']>,
+	spawnFn: typeof spawn,
+	deadlineAt: number,
+	monotonicNow: () => number,
+	signal?: AbortSignal
+): Promise<ModelProcessContainment> {
+	const ownership: {
+		acquisition: Promise<ModelProcessContainment> | null;
+		transferred: boolean;
+	} = { acquisition: null, transferred: false };
+	try {
+		const containment = await withinExecutionDeadline(
+			() => {
+				ownership.acquisition = Promise.resolve(createContainment(spawnFn));
+				return ownership.acquisition;
+			},
+			deadlineAt,
+			monotonicNow,
+			signal
+		);
+		ownership.transferred = true;
+		return containment;
+	} finally {
+		if (!ownership.transferred && ownership.acquisition) {
+			void ownership.acquisition.then(
+				(containment) => {
+					void boundedProcessTreeTermination(() => containment.close());
+				},
+				() => undefined
+			);
+		}
+	}
 }
 
 function remainingExecutionMs(deadlineAt: number, now: () => number): number {

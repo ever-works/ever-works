@@ -18,6 +18,7 @@ import { executeModelProcessInternal } from './model-process.internal';
 
 const executeModelProcess = executeModelProcessInternal;
 type ModelExecutionIo = NonNullable<Parameters<typeof executeModelProcessInternal>[1]>;
+type TestContainment = Awaited<ReturnType<NonNullable<ModelExecutionIo['createModelProcessContainment']>>>;
 
 const FAKE_CLAUDE_CREDENTIAL = 'claude-oauth-test-value-123456789';
 const FAKE_CODEX_CREDENTIAL = 'codex-access-test-value-123456789';
@@ -396,6 +397,23 @@ function createVerifiedTestContainment(): NonNullable<ModelExecutionIo['createMo
 			}
 		};
 	};
+}
+
+function closedProcess(stdoutText: string): ChildProcess {
+	const stdout = new PassThrough();
+	const stderr = new PassThrough();
+	const child = Object.assign(new EventEmitter(), {
+		stdout,
+		stderr,
+		stdin: new PassThrough(),
+		kill: () => true
+	}) as unknown as ChildProcess;
+	queueMicrotask(() => {
+		stdout.end(stdoutText);
+		stderr.end();
+		child.emit('close', 0, null);
+	});
+	return child;
 }
 
 function envValue(env: Record<string, string>, name: string): string | undefined {
@@ -1487,6 +1505,163 @@ describe('executeModelProcess — request refusal', () => {
 		expect(result.status).toBe('timed-out');
 		expect(result.summary).toMatch(/wall-clock/i);
 	});
+
+	it('closes containment acquired exactly as the absolute budget expires before model spawn', async () => {
+		const harness = await createHarness('success');
+		let monotonicTime = 0;
+		let closeCalls = 0;
+		let modelSpawned = false;
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+			...harness.io,
+			monotonicNow: () => monotonicTime,
+			spawnFn: (() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn,
+			createModelProcessContainment: async () => {
+				monotonicTime = 1_001;
+				return {
+					spawn: (() => {
+						modelSpawned = true;
+						throw new Error('model must not spawn after the deadline');
+					}) as typeof spawn,
+					close: async () => {
+						closeCalls += 1;
+						return { verified: true };
+					}
+				};
+			}
+		});
+
+		expect(result.status).toBe('timed-out');
+		expect(closeCalls).toBe(1);
+		expect(modelSpawned).toBe(false);
+	});
+
+	it('closes containment that resolves after cancellation already won acquisition', async () => {
+		const harness = await createHarness('success');
+		const controller = new AbortController();
+		let resolveCreation!: (containment: TestContainment) => void;
+		let markCreationStarted!: () => void;
+		let markClosed!: () => void;
+		const creationStarted = new Promise<void>((resolvePromise) => {
+			markCreationStarted = resolvePromise;
+		});
+		const closed = new Promise<void>((resolvePromise) => {
+			markClosed = resolvePromise;
+		});
+		const execution = executeModelProcess(request('codex', harness.workspacePath, { signal: controller.signal }), {
+			...harness.io,
+			spawnFn: (() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn,
+			createModelProcessContainment: () =>
+				new Promise<TestContainment>((resolvePromise) => {
+					resolveCreation = resolvePromise;
+					markCreationStarted();
+				})
+		});
+
+		await creationStarted;
+		controller.abort();
+		const result = await execution;
+		expect(result.status).toBe('cancelled');
+
+		resolveCreation({
+			spawn: (() => {
+				throw new Error('late containment must never spawn a model');
+			}) as typeof spawn,
+			close: async () => {
+				markClosed();
+				return { verified: true };
+			}
+		});
+		const cleanupSettled = await Promise.race([
+			closed.then(() => true),
+			new Promise<false>((resolvePromise) => setTimeout(() => resolvePromise(false), 250))
+		]);
+		expect(cleanupSettled).toBe(true);
+	});
+
+	it('closes containment that resolves after the acquisition deadline already won', async () => {
+		const harness = await createHarness('success');
+		let resolveCreation!: (containment: TestContainment) => void;
+		let markCreationStarted!: () => void;
+		let markClosed!: () => void;
+		const creationStarted = new Promise<void>((resolvePromise) => {
+			markCreationStarted = resolvePromise;
+		});
+		const closed = new Promise<void>((resolvePromise) => {
+			markClosed = resolvePromise;
+		});
+		const execution = executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 500 }), {
+			...harness.io,
+			spawnFn: (() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn,
+			createModelProcessContainment: () =>
+				new Promise<TestContainment>((resolvePromise) => {
+					resolveCreation = resolvePromise;
+					markCreationStarted();
+				})
+		});
+
+		await creationStarted;
+		const result = await execution;
+		expect(result.status).toBe('timed-out');
+
+		resolveCreation({
+			spawn: (() => {
+				throw new Error('late containment must never spawn a model');
+			}) as typeof spawn,
+			close: async () => {
+				markClosed();
+				return { verified: true };
+			}
+		});
+		const cleanupSettled = await Promise.race([
+			closed.then(() => true),
+			new Promise<false>((resolvePromise) => setTimeout(() => resolvePromise(false), 250))
+		]);
+		expect(cleanupSettled).toBe(true);
+	});
+
+	it.each(['rejects', 'never settles'] as const)(
+		'fails closed and stays bounded when an acquired but unused containment close %s',
+		async (closeMode) => {
+			const harness = await createHarness('success');
+			let monotonicTime = 0;
+			let closeCalls = 0;
+			const close: TestContainment['close'] =
+				closeMode === 'rejects'
+					? async () => {
+							closeCalls += 1;
+							throw new Error('unused containment close rejected');
+						}
+					: () => {
+							closeCalls += 1;
+							return new Promise(() => undefined);
+						};
+			const execution = executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+				...harness.io,
+				monotonicNow: () => monotonicTime,
+				spawnFn: (() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn,
+				createModelProcessContainment: async () => {
+					monotonicTime = 1_001;
+					return {
+						spawn: (() => {
+							throw new Error('model must not spawn after the deadline');
+						}) as typeof spawn,
+						close
+					};
+				}
+			});
+			const outcome = await Promise.race([
+				execution.then((result) => ({ kind: 'result' as const, result })),
+				new Promise<{ kind: 'hung' }>((resolvePromise) =>
+					setTimeout(() => resolvePromise({ kind: 'hung' }), 3_500)
+				)
+			]);
+
+			expect(outcome.kind).toBe('result');
+			if (outcome.kind === 'result') expect(outcome.result.status).toBe('termination-failed');
+			expect(closeCalls).toBe(1);
+		},
+		6_000
+	);
 
 	it('bounds a never-resolving workspace validation inside the one execution deadline', async () => {
 		const harness = await createHarness('success');
