@@ -111,6 +111,11 @@ export class PlanCheckoutController {
             const session = await this.planSubscriptionService.startPlanCheckout({
                 userId: auth.userId,
                 planCode: body.planCode,
+                // Period and seat count are the only two things the caller may steer, and neither
+                // can lower the bill: an interval the plan does not sell is a 400, and seats are
+                // clamped against the plan's own allowance on the server.
+                interval: body.interval ?? 'monthly',
+                seats: body.seats ?? null,
                 // The provider appends its own session identifier — see
                 // the `successUrl` contract on `PlanCheckoutRequest`.
                 successUrl: `${base}/settings/billing?plan=success`,

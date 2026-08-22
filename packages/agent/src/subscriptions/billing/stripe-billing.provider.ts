@@ -49,7 +49,29 @@ export const STRIPE_METADATA_KEYS = {
      * without it a renewal could not be attributed to a tier.
      */
     planCode: 'ever_works_plan_code',
+    /**
+     * Set to `perpetual-commercial` on a one-off licence purchase, and absent on every recurring
+     * one. Fulfilment — issuing the licence document — is MANUAL for now, so this is the field that
+     * makes a sale findable after the fact:
+     *
+     *     GET /v1/payment_intents/search
+     *       ?query=metadata["ever_works_licence"]:"perpetual-commercial"
+     *
+     * 🛑 Two things that will waste your time otherwise, both confirmed against the live API:
+     * Stripe's search syntax requires DOUBLE quotes (single quotes 400 with a "properly quoted
+     * fields" error), and there is **no** `/v1/checkout/sessions/search` endpoint at all — it 400s
+     * with "Received unknown parameter: query". Search PAYMENT INTENTS, not sessions.
+     *
+     * That is exactly why this marker is mirrored onto `payment_intent_data.metadata` as well as
+     * the session: a one-off purchase creates no subscription for metadata to live on, and the
+     * session itself is not searchable. `/v1/charges/search` also works, but only once the payment
+     * has settled — an unpaid session has a payment intent and no charge yet.
+     */
+    licence: 'ever_works_licence',
 } as const;
+
+/** The only value {@link STRIPE_METADATA_KEYS.licence} ever takes. */
+export const STRIPE_PERPETUAL_LICENCE = 'perpetual-commercial' as const;
 
 /** `kind` metadata values — how a purchase at the provider originated. */
 export const STRIPE_PURCHASE_KINDS = {
@@ -236,41 +258,147 @@ export class StripeBillingProvider extends BillingProvider {
             existingCustomerId: request.customerId,
         });
 
+        // A perpetual commercial licence is bought outright, so it is `mode: payment` and there is
+        // no subscription for the metadata to live on. Everything downstream is deliberately the
+        // SAME kind — `plan-subscription` — because the act is identical: grant this user this
+        // plan. `activate()` already accepts a null provider subscription id, and a plan with no
+        // subscription id is one `cancelSubscription` correctly refuses to cancel, which is exactly
+        // right for a licence that never expires.
+        const isPerpetual = request.plan.mode === 'payment';
+
         const metadata = {
             [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
             [STRIPE_METADATA_KEYS.userId]: request.userId,
             [STRIPE_METADATA_KEYS.planCode]: request.plan.code,
             [STRIPE_METADATA_KEYS.referenceId]: request.referenceId,
+            // Only on a one-off licence — this is what makes the sale findable for the manual
+            // document fulfilment, which is not built for any Ever product yet.
+            ...(isPerpetual ? { [STRIPE_METADATA_KEYS.licence]: STRIPE_PERPETUAL_LICENCE } : {}),
         };
 
+        const lineItems = await this.buildPlanLineItems(request);
+
         const session = await stripe.checkout.sessions.create({
-            mode: 'subscription',
+            mode: isPerpetual ? 'payment' : 'subscription',
             customer: customerId,
             client_reference_id: request.referenceId,
             // The seam leaves the session-identifier token to the
             // implementation; this one is Stripe's.
             success_url: withSessionIdTemplate(request.successUrl),
             cancel_url: request.cancelUrl,
-            line_items: [
-                {
-                    quantity: 1,
-                    price_data: {
-                        // Price comes from the SERVER plan row.
-                        currency: request.plan.currency,
-                        unit_amount: request.plan.priceCents,
-                        recurring: { interval: request.plan.interval },
-                        product_data: { name: request.plan.label },
-                    },
-                },
-            ],
+            line_items: lineItems,
             metadata,
-            subscription_data: { metadata },
+            // `subscription_data` is rejected outright in payment mode; the one-off equivalent is
+            // `payment_intent_data`, which is also where the licence marker has to be mirrored so a
+            // refund or dispute on the charge can still be traced back to the sale.
+            ...(isPerpetual
+                ? { payment_intent_data: { metadata } }
+                : { subscription_data: { metadata } }),
         });
 
         if (!session.url) {
             throw new BillingProviderError('Checkout session did not return a redirect URL');
         }
         return { url: session.url, sessionId: session.id, customerId };
+    }
+
+    /**
+     * Resolve a catalog `lookup_key` to a Stripe Price id, or `null` if this account does not have
+     * it.
+     *
+     * 🛑 `null` is a normal answer, not an error: a self-hosted or CI deployment will not have had
+     * `scripts/stripe-sync-catalog.mjs` run against its account. Callers fall back to an inline
+     * price rather than failing the purchase.
+     *
+     * Results are memoised for the process lifetime. A price's id never changes; when an amount
+     * changes, the sync script moves the lookup_key onto a NEW price
+     * (`transfer_lookup_key`), so a long-lived process could hold a stale id — which is exactly the
+     * behaviour we want for in-flight checkouts, and is corrected on the next deploy.
+     */
+    private readonly priceIdByLookupKey = new Map<string, string | null>();
+
+    private async resolvePriceId(lookupKey: string | null | undefined): Promise<string | null> {
+        if (!nonEmpty(lookupKey)) return null;
+        const key = lookupKey as string;
+
+        const cached = this.priceIdByLookupKey.get(key);
+        if (cached !== undefined) return cached;
+
+        const stripe = this.requireClient();
+        let resolved: string | null = null;
+        try {
+            const found = await stripe.prices.list({ lookup_keys: [key], active: true, limit: 1 });
+            resolved = found.data[0]?.id ?? null;
+        } catch (error) {
+            // A lookup failure must not take a purchase down — fall back to the inline price.
+            this.logger.warn(
+                `Could not resolve Stripe price for lookup_key "${key}"; falling back to an inline price`,
+                error instanceof Error ? error.stack : undefined,
+            );
+            resolved = null;
+        }
+
+        if (resolved === null) {
+            this.logger.warn(
+                `No active Stripe price for lookup_key "${key}" in this account — billing the plan row's ` +
+                    `inline amount instead. Run scripts/stripe-sync-catalog.mjs to publish the catalog.`,
+            );
+        }
+
+        this.priceIdByLookupKey.set(key, resolved);
+        return resolved;
+    }
+
+    /**
+     * Line items for a plan checkout: the plan itself, plus a per-seat line when the buyer wants
+     * more seats than the plan includes.
+     *
+     * The plan line prefers the CATALOG price (shared Stripe account, stable `lookup_key`) and
+     * falls back to the historical inline `price_data` built from the server plan row. Both paths
+     * price from the SERVER — a client-supplied amount never reaches here; `PlanCheckoutController`
+     * rejects a body carrying one.
+     */
+    private async buildPlanLineItems(
+        request: PlanCheckoutRequest,
+    ): Promise<Stripe.Checkout.SessionCreateParams.LineItem[]> {
+        const planPriceId = await this.resolvePriceId(request.plan.lookupKey);
+
+        const planLine: Stripe.Checkout.SessionCreateParams.LineItem = planPriceId
+            ? { quantity: 1, price: planPriceId }
+            : {
+                  quantity: 1,
+                  price_data: {
+                      // Price comes from the SERVER plan row.
+                      currency: request.plan.currency,
+                      unit_amount: request.plan.priceCents,
+                      recurring: { interval: request.plan.interval },
+                      product_data: { name: request.plan.label },
+                  },
+              };
+
+        const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [planLine];
+
+        // Seats are additive and optional. A plan with unbounded seats, a plan whose buyer stays
+        // within the included allowance, and an account with no synced seat price all produce no
+        // second line — never a zero-quantity one, which Stripe rejects.
+        const extraSeats = Math.max(0, Math.floor(request.plan.extraSeats ?? 0));
+        if (extraSeats > 0) {
+            const seatPriceId = await this.resolvePriceId(request.plan.seatLookupKey);
+            if (seatPriceId) {
+                lineItems.push({ quantity: extraSeats, price: seatPriceId });
+            } else {
+                // There is deliberately no inline fallback for seats: the per-seat amount lives in
+                // the catalog, not in the plan row, so inventing one here would bill a number that
+                // no reviewed file contains. Log loudly and sell the base plan.
+                this.logger.error(
+                    `Plan checkout for user ${request.userId} asked for ${extraSeats} extra seat(s) but ` +
+                        `seat price "${request.plan.seatLookupKey}" is not available in this Stripe account. ` +
+                        `Selling the base plan only — the seats were NOT billed.`,
+                );
+            }
+        }
+
+        return lineItems;
     }
 
     /**
