@@ -1,4 +1,5 @@
 import {
+    FLEET_AGENT_CREDENTIAL_ENV_NAMES,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
@@ -236,6 +237,35 @@ export const config = {
         getAgentTaskWorkspacePath(): string | undefined {
             const raw = (process.env.FLEET_NODE_AGENT_TASK_WORKSPACE || '').trim();
             return raw ? raw : undefined;
+        },
+        /**
+         * Environment variable NAMES an `agent-task` step may read from
+         * the node's own environment.
+         *
+         * A node scrubs its subprocess env and drops secret-shaped names
+         * unless a step grants them, so without this the CLI credentials
+         * never arrive and the agent fails looking like a model problem.
+         * Only `HOME`-based logins work ungranted, which covers a person's
+         * desktop and not a headless node, a container, an API key, or a
+         * ChatGPT workspace access token.
+         *
+         * Defaults to the well-known Claude/Codex credential names. That
+         * is not an escalation: `HOME` is already allowlisted, so a step
+         * can already read `~/.claude/.credentials.json`. Granting a name
+         * a machine does not set is a no-op, which is why ONE list works
+         * for a fleet of differently-credentialled machines.
+         *
+         * Set to an empty string to grant nothing.
+         */
+        getAgentTaskEnvPassthrough(): string[] {
+            const raw = process.env.FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH;
+            if (raw === undefined) {
+                return [...FLEET_AGENT_CREDENTIAL_ENV_NAMES];
+            }
+            return raw
+                .split(',')
+                .map((name) => name.trim())
+                .filter((name) => name.length > 0);
         },
     },
 

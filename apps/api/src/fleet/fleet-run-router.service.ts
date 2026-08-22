@@ -307,6 +307,14 @@ export class FleetRunRouterService {
             runId: payload.runId,
             agentId: payload.agentId,
         });
-        return [{ id: 'agent-task', command, required: true }];
+        const step: FleetAgentTaskStep = { id: 'agent-task', command, required: true };
+        // Names only — the VALUES are read from the node's own environment and
+        // never leave the machine. Without this the node's secret-shaped-name
+        // scrub drops every CLI credential and the agent runs unauthenticated.
+        const envPassthrough = config.fleetNode.getAgentTaskEnvPassthrough();
+        if (envPassthrough.length > 0) {
+            step.envPassthrough = envPassthrough;
+        }
+        return [step];
     }
 }
