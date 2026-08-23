@@ -116,6 +116,7 @@
 				"clearedCargoProfileOverrideCount",
 				"clearedMsvcLinkOptionOverrideCount",
 				"msvcLinkerEnvironment",
+				"cargoConfigDiscovery",
 				"effective"
 			],
 			"properties": {
@@ -142,6 +143,22 @@
 						"libraryPath": { "const": "fixed-msvc-sdk" },
 						"executableSearchPath": { "const": "fixed-rust-msvc-system" },
 						"temporaryDirectory": { "const": "target/repro-linker-temp" }
+					}
+				},
+				"cargoConfigDiscovery": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"mode",
+						"workingDirectory",
+						"manifestPath",
+						"ancestorConfigFiles"
+					],
+					"properties": {
+						"mode": { "const": "controlled-cwd-explicit-manifest" },
+						"workingDirectory": { "const": "isolated-outside-source-tree" },
+						"manifestPath": { "const": "Cargo.toml" },
+						"ancestorConfigFiles": { "const": "required-absent" }
 					}
 				},
 				"effective": {

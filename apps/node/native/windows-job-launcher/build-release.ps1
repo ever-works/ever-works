@@ -9,6 +9,7 @@ $packageRoot = $PSScriptRoot
 $targetTriple = "x86_64-pc-windows-msvc"
 $artifactName = "ever-works-windows-job-launcher.exe"
 $fixedRustFlags = "-C link-arg=/Brepro"
+$manifestPath = [IO.Path]::GetFullPath((Join-Path $packageRoot "Cargo.toml"))
 $metadataDirectory = Join-Path $packageRoot $OutputDirectory
 $metadataPath = Join-Path $metadataDirectory "ever-works-windows-job-launcher.json"
 $sbomName = "ever-works-windows-job-launcher.sbom.cdx.json"
@@ -21,6 +22,17 @@ $secondTargetDirectory = Join-Path $targetRoot "repro-build-2"
 $isolatedCargoHome = Join-Path $targetRoot "repro-cargo-home"
 $isolatedLinkerTemp = Join-Path $targetRoot "repro-linker-temp"
 $canonicalBinaryPath = Join-Path $targetRoot "$targetTriple\release\$artifactName"
+$packageRootBytes = [Text.UTF8Encoding]::new($false).GetBytes($packageRoot.ToLowerInvariant())
+try {
+	$packageRootToken = [Convert]::ToHexString(
+		[Security.Cryptography.SHA256]::HashData($packageRootBytes)
+	).Substring(0, 16).ToLowerInvariant()
+} finally {
+	[Array]::Clear($packageRootBytes, 0, $packageRootBytes.Length)
+}
+$controlledCargoCwd = [IO.Path]::GetFullPath(
+	(Join-Path ([IO.Path]::GetTempPath()) "ever-works-cargo-$packageRootToken")
+)
 . (Join-Path $packageRoot "pe-authenticode-content.ps1")
 
 $cargoRustEnvironmentNames = @(
@@ -186,6 +198,40 @@ function Reset-IsolatedLinkerTemp {
 	New-Item -ItemType Directory -Path $isolatedLinkerTemp | Out-Null
 }
 
+function Assert-ControlledCargoCwd {
+	$resolved = [IO.Path]::GetFullPath($controlledCargoCwd)
+	$tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+	$prefix = $tempRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+	if (-not $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+		throw "controlled Cargo working directory escapes the OS temporary root"
+	}
+}
+
+function Reset-ControlledCargoCwd {
+	Assert-ControlledCargoCwd
+	if (Test-Path -LiteralPath $controlledCargoCwd) {
+		Remove-Item -LiteralPath $controlledCargoCwd -Recurse -Force
+	}
+	New-Item -ItemType Directory -Path $controlledCargoCwd | Out-Null
+	$current = Get-Item -LiteralPath $controlledCargoCwd
+	while ($null -ne $current) {
+		foreach ($configName in @("config", "config.toml")) {
+			$configPath = Join-Path (Join-Path $current.FullName ".cargo") $configName
+			if (Test-Path -LiteralPath $configPath -PathType Leaf) {
+				throw "controlled Cargo working-directory ancestry contains a configuration file"
+			}
+		}
+		$current = $current.Parent
+	}
+}
+
+function Remove-ControlledCargoCwd {
+	Assert-ControlledCargoCwd
+	if (Test-Path -LiteralPath $controlledCargoCwd) {
+		Remove-Item -LiteralPath $controlledCargoCwd -Recurse -Force
+	}
+}
+
 function Invoke-IsolatedReleaseBuild {
 	param(
 		[Parameter(Mandatory)] [string]$CargoPath,
@@ -196,8 +242,17 @@ function Invoke-IsolatedReleaseBuild {
 		Remove-Item -LiteralPath $TargetDirectory -Recurse -Force
 	}
 	$env:CARGO_TARGET_DIR = $TargetDirectory
-	$buildOutput = & $CargoPath build --locked --release --target $targetTriple 2>&1
-	$buildExitCode = $LASTEXITCODE
+	Push-Location $controlledCargoCwd
+	try {
+		$buildOutput = & $CargoPath build `
+			--manifest-path $manifestPath `
+			--locked `
+			--release `
+			--target $targetTriple 2>&1
+		$buildExitCode = $LASTEXITCODE
+	} finally {
+		Pop-Location
+	}
 	$buildOutput | ForEach-Object { Write-Host ([string]$_) }
 	if ($buildExitCode -ne 0) {
 		throw "isolated Cargo release build failed"
@@ -330,6 +385,7 @@ try {
 
 		Reset-IsolatedCargoHome
 		Reset-IsolatedLinkerTemp
+		Reset-ControlledCargoCwd
 		$env:CARGO_HOME = $isolatedCargoHome
 		$env:RUSTFLAGS = $fixedRustFlags
 		$env:CARGO_INCREMENTAL = "0"
@@ -370,8 +426,17 @@ try {
 			throw "canonical unsigned artifact differs from the verified reproducible build"
 		}
 
-		$cargoMetadataJson = & $cargoPath metadata --locked --format-version 1
-		if ($LASTEXITCODE -ne 0) {
+		Push-Location $controlledCargoCwd
+		try {
+			$cargoMetadataJson = & $cargoPath metadata `
+				--manifest-path $manifestPath `
+				--locked `
+				--format-version 1
+			$cargoMetadataExitCode = $LASTEXITCODE
+		} finally {
+			Pop-Location
+		}
+		if ($cargoMetadataExitCode -ne 0) {
 			throw "cargo metadata failed"
 		}
 		$cargoMetadata = ($cargoMetadataJson -join "`n") | ConvertFrom-Json
@@ -446,6 +511,12 @@ try {
 			libraryPath = "fixed-msvc-sdk"
 			executableSearchPath = "fixed-rust-msvc-system"
 			temporaryDirectory = "target/repro-linker-temp"
+		}
+		cargoConfigDiscovery = [ordered]@{
+			mode = "controlled-cwd-explicit-manifest"
+			workingDirectory = "isolated-outside-source-tree"
+			manifestPath = "Cargo.toml"
+			ancestorConfigFiles = "required-absent"
 		}
 		effective = [ordered]@{
 			rustFlags = $fixedRustFlags
@@ -584,6 +655,7 @@ try {
 	Write-DeterministicJson -Value $metadata -LiteralPath $metadataPath
 	Write-Output $metadataPath
 } finally {
+	Remove-ControlledCargoCwd
 	foreach ($name in $managedEnvironmentNames) {
 		[Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], "Process")
 	}
