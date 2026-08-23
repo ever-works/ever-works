@@ -1038,6 +1038,7 @@ export class AgentsService {
         if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
         }
+        const canonicalUploadId = uploadId.toLowerCase();
         // Security: the uploadId must reference a real upload owned by the
         // caller — without this a ghost/foreign id persisted a dangling
         // attachment edge. `user_uploads` records every upload by (userId,
@@ -1047,7 +1048,7 @@ export class AgentsService {
             // accepts /i, so normalize before the ownership lookup.
             const owned = await this.uploadsRepo.findOne({
                 where: ownershipWhereWith<UserUpload>(userId, ownershipScope, {
-                    sha256: uploadId.toLowerCase(),
+                    sha256: canonicalUploadId,
                 }),
             });
             if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
@@ -1058,11 +1059,11 @@ export class AgentsService {
             );
         }
         try {
-            return await this.agentAttachments.add(id, uploadId);
+            return await this.agentAttachments.add(id, canonicalUploadId);
         } catch (err) {
             if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
                 const existing = (await this.agentAttachments.findByAgentId(id)).find(
-                    (a) => a.uploadId === uploadId,
+                    (a) => a.uploadId === canonicalUploadId,
                 );
                 if (existing) return existing;
             }
