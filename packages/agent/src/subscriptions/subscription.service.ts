@@ -215,13 +215,25 @@ export class SubscriptionService implements OnModuleInit {
     }
 
     /**
-     * Wave 13 (Billing page) — all active seeded plans for the plan/tier
-     * switcher. Read-only; plans are seeded at boot by {@link seedPlans}
-     * regardless of the `SUBSCRIPTIONS_ENABLED` flag, so the switcher can
+     * Wave 13 (Billing page) — the active seeded plans a user on THIS deployment can actually
+     * choose, for the plan/tier switcher. Read-only; plans are seeded at boot by
+     * {@link seedPlans} regardless of the `SUBSCRIPTIONS_ENABLED` flag, so the switcher can
      * render (degraded) even on deploys where billing is off.
+     *
+     * 🛑 SELF-HOSTED editions are excluded. They are licences for the buyer's OWN deployment, and
+     * {@link changePlanSelfService} refuses them here — so listing them offered a "Community
+     * Edition" card whose only possible outcome was an error, alongside two paid editions that
+     * cannot be bought on the hosted service either. Six cards where three belong.
+     *
+     * This mirrors the guard rather than duplicating a rule: anything `changePlanSelfService`
+     * would reject must not be advertised by the switcher in the first place. If this code is ever
+     * run as part of a genuinely self-hosted distribution, BOTH places need a deployment-mode
+     * config — filtering here alone would then show no plans at all, which is why the two are
+     * deliberately written against the same condition.
      */
     async listPlans(): Promise<SubscriptionPlan[]> {
-        return this.planRepository.findAllActive();
+        const plans = await this.planRepository.findAllActive();
+        return plans.filter((plan) => plan.hosting !== 'selfhosted');
     }
 
     async getActiveSubscription(userId: string) {
@@ -234,7 +246,17 @@ export class SubscriptionService implements OnModuleInit {
         }
 
         const subscription = await this.getActiveSubscription(user.id);
-        if (subscription?.plan) {
+        // 🛑 Defence in depth: a SELF-HOSTED plan never decides the tier on THIS deployment.
+        //
+        // This is the single choke point where "what plan is this user on" is answered, and it
+        // reads the active subscription BEFORE `user.defaultPlan` — so guarding only the writer
+        // (`activate()`) is not enough on its own. Any row that already exists, or any future
+        // writer, is covered here. A self-hosted licence applies to the buyer's own deployment;
+        // on the hosted service they fall through to whatever they actually pay for.
+        if (
+            subscription?.plan &&
+            (subscription.plan as SubscriptionPlan).hosting !== 'selfhosted'
+        ) {
             return subscription.plan as SubscriptionPlan;
         }
 
@@ -442,7 +464,23 @@ export class SubscriptionService implements OnModuleInit {
         const defaultCode = this.normalizePlanCode(config.subscriptions.getDefaultPlanCode());
         const plan = await this.planRepository.findByCode(defaultCode);
 
-        if (plan) {
+        // 🛑 A self-hosted edition can never be the DEFAULT plan on a hosted deployment.
+        //
+        // `SUBSCRIPTIONS_DEFAULT_PLAN` is an operator-set env var and `normalizePlanCode` accepts
+        // any member of the enum — which now includes `selfhosted_community`, a row that is free
+        // AND effectively unlimited. One typo in a Helm value would therefore hand every user with
+        // no subscription an unlimited plan, silently and fleet-wide, with no purchase involved.
+        //
+        // This is the same class as the self-service escalation, reached through configuration
+        // rather than through a request, so it needs the same answer: hosting decides where a plan
+        // applies, and nothing else does.
+        if (plan && plan.hosting === 'selfhosted') {
+            this.logger.error(
+                `SUBSCRIPTIONS_DEFAULT_PLAN is set to '${defaultCode}', a SELF-HOSTED edition — ` +
+                    `refusing to use it as the default on a hosted deployment. Falling back to FREE. ` +
+                    `Fix the environment variable.`,
+            );
+        } else if (plan) {
             return plan;
         }
 

@@ -187,6 +187,9 @@ describe('startPlanCheckout — the server prices everything', () => {
             sessionId: 'cs_plan_1',
             planCode: 'standard',
             priceCents: 2500,
+            basePriceCents: 2500,
+            seatCents: 0,
+            extraSeats: 0,
             currency: 'usd',
         });
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
@@ -222,6 +225,56 @@ describe('startPlanCheckout — the server prices everything', () => {
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
         expect(request.plan.extraSeats).toBe(0);
         expect(request.plan.seatLookupKey).toBeNull();
+    });
+
+    // 🛑 The echoed total used to be the BASE plan amount while the seats were billed as a
+    // separate Stripe line item, so 27 seats on Pro was reported as 2500 and charged 11000.
+    // Stripe's hosted page always showed the truth, so nobody was mischarged — but any in-app
+    // confirmation built on this number understated the price. These assert the OUTCOME (the
+    // amount echoed equals the amount billed), not the mechanism that produces it.
+    it('echoes the TOTAL the buyer will pay, seats included', async () => {
+        const { service, provider } = build();
+
+        const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 27 });
+
+        // 27 requested − 10 included = 17 billable, at $5.00/mo = 8500 on top of the 2500 base.
+        expect(started.basePriceCents).toBe(2500);
+        expect(started.extraSeats).toBe(17);
+        expect(started.seatCents).toBe(8500);
+        expect(started.priceCents).toBe(11000);
+
+        // The echoed total must equal what the provider was actually asked to bill.
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(started.priceCents).toBe(request.plan.priceCents + started.seatCents);
+        expect(request.plan.extraSeats).toBe(started.extraSeats);
+    });
+
+    it('uses the ANNUAL seat rate when the buyer is billed annually', async () => {
+        const { service } = build();
+
+        const started = await service.startPlanCheckout({
+            ...checkoutOptions,
+            interval: 'annual',
+            seats: 27,
+        });
+
+        // An annual seat is 12x the monthly rate with no discount: 17 x 6000 = 102000,
+        // on top of the 20400 annual base.
+        expect(started.basePriceCents).toBe(20400);
+        expect(started.seatCents).toBe(102000);
+        expect(started.priceCents).toBe(122400);
+    });
+
+    it('never adds a seat charge to a total that carries no seat line', async () => {
+        const { service, provider } = build();
+
+        // Inside the allowance: no seat line item, so no seat money either.
+        const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 10 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.seatLookupKey).toBeNull();
+        expect(started.seatCents).toBe(0);
+        expect(started.priceCents).toBe(started.basePriceCents);
     });
 
     it('bills only the seats beyond the allowance, on the matching seat price', async () => {
@@ -607,9 +660,9 @@ describe('applyWebhook — activation and revocation', () => {
      * A one-off perpetual licence (`mode: payment`) produces a
      * `checkout.session.completed` with **no subscription**, so the normalized event carries
      * `subscriptionId: null`. It is deliberately the SAME `subscription.activated` kind as a
-     * recurring purchase — the act is identical, grant this user this plan — and this is the path
-     * that runs for every $99 sale. It was reasoned to be safe because `activate()` accepts a
-     * nullable provider subscription id; these pin that rather than leaving it as reasoning.
+     * recurring purchase, so the webhook is ACKNOWLEDGED (Stripe must not retry) — but it writes
+     * nothing and grants nothing, because a licence applies to the buyer's own deployment. This is
+     * the path that runs for every $99 sale.
      */
     it('activates a perpetual licence even though it carries NO subscription id', async () => {
         const { service, subscriptionService, subscriptionRepository } = build({
@@ -630,15 +683,10 @@ describe('applyWebhook — activation and revocation', () => {
             ),
         ).resolves.toBe('subscription-activated');
 
-        // The purchase is RECORDED. It is deliberately NOT granted as the hosted tier — see the
-        // licence test below; `activate()` returns before the privileged grant for self-hosted.
+        // Nothing is written and nothing granted — the licence lives on the Stripe payment intent
+        // (stamped ever_works_licence), which is what manual fulfilment searches.
         expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
-        // The row must record that there is no provider subscription behind this plan — that null
-        // is what later makes `cancelSubscription` refuse, which is correct for a licence that
-        // never expires.
-        expect(subscriptionRepository.createOrUpdate.mock.calls[0][1]).toEqual(
-            expect.objectContaining({ providerSubscriptionId: null }),
-        );
+        expect(subscriptionRepository.createOrUpdate).not.toHaveBeenCalled();
     });
 
     /**
@@ -649,7 +697,7 @@ describe('applyWebhook — activation and revocation', () => {
      * the buyer would not even be doing anything wrong. The purchase must still be RECORDED so we
      * know they hold a licence, for support and for the manual document fulfilment.
      */
-    it('records a self-hosted licence but does NOT grant it as the hosted tier', async () => {
+    it('writes NO subscription row and grants NO tier for a self-hosted licence', async () => {
         const { service, subscriptionService, subscriptionRepository } = build({
             profileRepository: makeProfileRepository({
                 findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
@@ -668,12 +716,14 @@ describe('applyWebhook — activation and revocation', () => {
             ),
         ).resolves.toBe('subscription-activated');
 
-        // Recorded: we must know the customer owns a licence.
-        expect(subscriptionRepository.createOrUpdate).toHaveBeenCalledWith(
-            'u1',
-            expect.objectContaining({ planCode: 'selfhosted_pro' }),
-        );
-        // But NOT granted as the effective tier on this hosted deployment.
+        // 🛑 The row must NOT be written at all. An earlier version of this guard skipped only
+        // `assignPlanToUser` and still wrote here, which was ineffective twice over:
+        //   1. `resolvePlanForUser` reads the ACTIVE subscription BEFORE `user.defaultPlan`, so
+        //      the row alone made the licence the buyer's effective hosted tier.
+        //   2. `createOrUpdate` is one-active-row-per-user and UPDATEs in place, so a paying
+        //      cloud customer who bought a licence would have their real subscription OVERWRITTEN.
+        // Assert the OUTCOME (nothing written, nothing granted), not the guard.
+        expect(subscriptionRepository.createOrUpdate).not.toHaveBeenCalled();
         expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
     });
 
@@ -709,11 +759,8 @@ describe('applyWebhook — activation and revocation', () => {
         await service.applyWebhook(licence);
         await service.applyWebhook(licence);
 
-        // The licence record is re-asserted identically, and the hosted tier is never granted.
-        expect(subscriptionRepository.createOrUpdate).toHaveBeenCalledTimes(2);
-        expect(subscriptionRepository.createOrUpdate.mock.calls[0][1]).toEqual(
-            subscriptionRepository.createOrUpdate.mock.calls[1][1],
-        );
+        // Replaying a licence delivery must stay inert: no row, no grant, however many times.
+        expect(subscriptionRepository.createOrUpdate).not.toHaveBeenCalled();
         expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
     });
 

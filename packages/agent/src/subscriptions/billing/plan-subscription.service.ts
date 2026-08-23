@@ -15,7 +15,12 @@ import {
     BillingProviderNotConfiguredError,
     type BillingWebhookEvent,
 } from './billing.provider';
-import { billableSeats, resolveSkuForPlanRow, type CatalogInterval } from './stripe-catalog';
+import {
+    billableSeats,
+    resolveSkuForPlanRow,
+    seatAmountCents,
+    type CatalogInterval,
+} from './stripe-catalog';
 
 /** A checkout was asked for with a plan code that is not sellable. */
 export class UnknownSubscriptionPlanError extends Error {
@@ -78,8 +83,24 @@ export interface PlanCheckoutStarted {
     url: string;
     sessionId: string;
     planCode: string;
-    /** Echoed for the UI's confirmation copy — from the SERVER plan row. */
+    /**
+     * What the buyer will ACTUALLY be charged for the first period: the plan price PLUS every
+     * additional seat. Echoed for the UI's confirmation copy.
+     *
+     * 🛑 This used to carry the base plan amount only, while the seats were added as a separate
+     * Stripe line item — so someone buying Pro with 17 seats was shown 2500 and charged 11000.
+     * Stripe's own hosted page always showed the true total, so nobody was ever mischarged, but
+     * any in-app confirmation built on this field understated the price. It is now the total, and
+     * it is derived from the SAME seat computation that builds the billed line item, so the two
+     * cannot drift apart.
+     */
     priceCents: number;
+    /** The plan price alone, without seats. */
+    basePriceCents: number;
+    /** The additional-seat portion of {@link priceCents}. Zero when no seats were added. */
+    seatCents: number;
+    /** Additional seats being billed, after the plan's own included allowance. */
+    extraSeats: number;
     currency: string;
 }
 
@@ -168,8 +189,18 @@ export class PlanSubscriptionService {
         // what the provider bills; the row is the fallback for an unsynced deployment. Reading the
         // row first would echo 0 for any period the row has no column value for — showing someone
         // "$0" on a confirmation screen for a charge that is about to be 204.00.
-        const priceCents =
+        const basePriceCents =
             catalogSku?.price.amountCents ?? planPriceCentsForInterval(plan, interval);
+
+        // Seats are a SEPARATE Stripe line item, so the base amount alone is not what the buyer
+        // pays. Compute them once here and reuse the same numbers for both the provider payload
+        // and the echoed total.
+        const { seatTotalCents, ...catalogKeys } = this.catalogKeysFor(
+            plan,
+            interval,
+            options.seats ?? null,
+        );
+        const priceCents = basePriceCents + seatTotalCents;
 
         const user = await this.userRepository.findById(options.userId);
         const existing = await this.billingProfileRepository.findByUserId(options.userId);
@@ -195,7 +226,11 @@ export class PlanSubscriptionService {
             plan: {
                 code: plan.code,
                 label: `${plan.displayName} plan`,
-                priceCents,
+                // 🛑 The BASE amount, never the seat-inclusive total. This becomes the
+                // `unit_amount` of the PLAN line item on deployments with no catalog price, and the
+                // seats are a SEPARATE line item — so sending the total here would bill every extra
+                // seat twice. Only the value this method RETURNS carries the total.
+                priceCents: basePriceCents,
                 currency: plan.currency || this.billingProvider.getDefaultCurrency(),
                 interval: interval === 'annual' ? 'year' : 'month',
                 // A `lifetime` SKU is bought outright. Decided from the catalog SKU, never from
@@ -205,7 +240,7 @@ export class PlanSubscriptionService {
                 // so the invoice line carries a lookup_key that maps back to a reviewed commit.
                 // `null` here is normal on a deployment whose catalog has not been synced — the
                 // provider falls back to billing `priceCents` exactly as it did before.
-                ...this.catalogKeysFor(plan, interval, options.seats ?? null),
+                ...catalogKeys,
             },
             successUrl: options.successUrl,
             cancelUrl: options.cancelUrl,
@@ -217,6 +252,9 @@ export class PlanSubscriptionService {
             sessionId: session.sessionId,
             planCode: plan.code,
             priceCents,
+            basePriceCents,
+            seatCents: seatTotalCents,
+            extraSeats: catalogKeys.extraSeats ?? 0,
             currency: plan.currency,
         };
     }
@@ -236,16 +274,31 @@ export class PlanSubscriptionService {
         plan: SubscriptionPlan,
         interval: CatalogInterval,
         requestedSeats: number | null,
-    ): { lookupKey?: string; seatLookupKey?: string | null; extraSeats?: number } {
+    ): {
+        lookupKey?: string;
+        seatLookupKey?: string | null;
+        extraSeats?: number;
+        /** The seat money, for the caller to add to the amount it echoes back. */
+        seatTotalCents: number;
+    } {
         const sku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
-        if (!sku) return {};
+        if (!sku) return { seatTotalCents: 0 };
 
         const extraSeats = requestedSeats === null ? 0 : billableSeats(sku.plan, requestedSeats);
+        const billsSeats = extraSeats > 0 && sku.seatLookupKey !== null;
+
+        // Mirror resolveCatalogSku exactly: a lifetime licence and an unbounded plan both
+        // collapse to no seat line, and an annual seat is 12x the monthly rate.
+        const seatUnitCents = billsSeats
+            ? (seatAmountCents(sku.plan, sku.price.interval === 'annual' ? 'annual' : 'monthly') ??
+              0)
+            : 0;
 
         return {
             lookupKey: sku.lookupKey,
-            seatLookupKey: extraSeats > 0 ? sku.seatLookupKey : null,
+            seatLookupKey: billsSeats ? sku.seatLookupKey : null,
             extraSeats,
+            seatTotalCents: extraSeats * seatUnitCents,
         };
     }
 
@@ -376,6 +429,32 @@ export class PlanSubscriptionService {
             return false;
         }
 
+        // 🛑 A SELF-HOSTED purchase is a LICENCE. It must not touch `user_subscriptions` AT ALL.
+        //
+        // An earlier version of this guard sat lower down and only skipped `assignPlanToUser`. That
+        // was ineffective, for two independent reasons found by re-reviewing the fix itself:
+        //
+        //  1. `assignPlanToUser` only sets `user.defaultPlan`, but `resolvePlanForUser` reads the
+        //     ACTIVE `user_subscriptions` row FIRST and only falls back to `defaultPlan`. So writing
+        //     the row below still made the licence the buyer's effective hosted tier — the exact
+        //     arbitrage the guard was supposed to stop ($99 once for what costs $25/mo).
+        //  2. `UserSubscriptionRepository.createOrUpdate` is a ONE-ACTIVE-ROW-PER-USER model: it
+        //     finds the caller's active subscription and UPDATEs it in place. So an existing paying
+        //     cloud customer who also bought a licence would have their real subscription row
+        //     OVERWRITTEN — losing the plan, the period end and the provider subscription id.
+        //
+        // The licence is still recorded where it actually matters: on the Stripe payment intent,
+        // stamped `ever_works_licence=perpetual-commercial`, which is what the manual fulfilment
+        // process searches. Nothing here needs a row to know the sale happened.
+        if (plan.hosting === 'selfhosted') {
+            this.logger.log(
+                `Recorded a self-hosted licence purchase for user ${input.userId} (plan ` +
+                    `'${plan.code}'). No hosted subscription row written and no tier granted — a ` +
+                    `licence applies to the buyer's OWN deployment, not to this one.`,
+            );
+            return true;
+        }
+
         await this.userSubscriptionRepository.createOrUpdate(input.userId, {
             planCode: plan.code,
             planId: plan.id,
@@ -385,25 +464,6 @@ export class PlanSubscriptionService {
             cancelAtPeriodEnd: input.cancelAtPeriodEnd,
             providerSubscriptionId: input.providerSubscriptionId ?? null,
         });
-
-        // 🛑 A SELF-HOSTED purchase is a LICENCE, not a tier on this deployment.
-        //
-        // The `user_subscriptions` row above is still written — we must know the customer holds a
-        // licence, both for support and for the manual document fulfilment. But it must NOT become
-        // their effective plan here: `assignPlanToUser` → `persistDefaultPlan` sets the tier that
-        // `work-schedule.service.ts` enforces (`maxWorks`, cadence allowances). Granting it would
-        // sell permanent CLOUD entitlements for a one-off $99 self-hosted licence, against $25/mo
-        // for cloud Pro — pure arbitrage, and the buyer would not even be doing anything wrong.
-        //
-        // Same principle as the self-service gate in `SubscriptionService.changePlanSelfService`:
-        // hosting decides where a plan applies, and price alone never does.
-        if (plan.hosting === 'selfhosted') {
-            this.logger.log(
-                `Recorded a self-hosted licence for user ${input.userId} (plan '${plan.code}') — ` +
-                    `the hosted tier is deliberately left unchanged.`,
-            );
-            return true;
-        }
 
         // THE privileged grant (`assignPlanToUser`) — documented as
         // "call only from a billing-verified path", which is exactly here.

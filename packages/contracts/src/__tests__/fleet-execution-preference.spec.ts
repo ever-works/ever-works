@@ -65,12 +65,14 @@ describe('resolveFleetExecutionMode', () => {
 	});
 
 	it('ignores rows with an unknown mode instead of returning garbage', () => {
-		const rows = [{ ...pref('work', 'w1', 'cloud'), mode: 'teleport' } as FleetExecutionPreferenceView];
+		const rows = [{ ...pref('work', 'w1', 'cloud'), mode: 'teleport' } as unknown as FleetExecutionPreferenceView];
 		expect(resolveFleetExecutionMode(rows, { workId: 'w1' })).toBe(DEFAULT_FLEET_EXECUTION_MODE);
 	});
 
 	it('treats an absent scopeId as the account row', () => {
-		const rows = [{ ...pref('user', null, 'local-wait'), scopeId: undefined } as FleetExecutionPreferenceView];
+		const rows = [
+			{ ...pref('user', null, 'local-wait'), scopeId: undefined } as unknown as FleetExecutionPreferenceView
+		];
 		expect(resolveFleetExecutionMode(rows, {})).toBe('local-wait');
 	});
 });

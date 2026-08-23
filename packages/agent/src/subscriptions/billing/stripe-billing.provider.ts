@@ -349,10 +349,26 @@ export class StripeBillingProvider extends BillingProvider {
                 `No active Stripe price for lookup_key "${key}" in this account — billing the plan row's ` +
                     `inline amount instead. Run scripts/stripe-sync-catalog.mjs to publish the catalog.`,
             );
+            // 🛑 A MISS is not memoised either, only a hit.
+            //
+            // An earlier version cached the definitive "this account does not have it" on the
+            // grounds that it is the steady state for an unsynced deployment. That is a footgun:
+            // the catalog is published by a script that runs INDEPENDENTLY of the pods, so a pod
+            // that happens to start before the sync pins every one of its keys to null until it is
+            // restarted. The seat line has no inline fallback, so that pod then silently stops
+            // billing seats — for its whole lifetime, with nothing in the logs after the first
+            // warning. Undercharging that heals itself on the next checkout is strictly better
+            // than undercharging that persists until someone notices.
+            //
+            // The re-check costs one `prices.list` per checkout, and checkout is throttled to 10
+            // per minute per user (`plan-checkout.controller.ts`), so this cannot become a hot loop.
+            return null;
         }
 
-        // Only a SUCCESSFUL lookup is memoised — including a definitive "this account does not have
-        // it", which is the normal steady state for an unsynced deployment and is safe to cache.
+        // Only a HIT is memoised. A price id never changes for a given lookup_key while that price
+        // is active; when an amount changes the sync script moves the key onto a NEW price via
+        // `transfer_lookup_key`, so a long-lived process can hold a stale id — which is what you
+        // want for an in-flight checkout, and is corrected on the next deploy.
         this.priceIdByLookupKey.set(key, resolved);
         return resolved;
     }
@@ -808,6 +824,15 @@ export class StripeBillingProvider extends BillingProvider {
             const factory = this.clientFactory ?? defaultStripeClient;
             this.client = factory(secretKey as string);
             this.clientKey = secretKey as string;
+            // 🛑 The resolved-price cache belongs to the KEY, not to the process.
+            //
+            // `priceIdByLookupKey` is keyed on the bare lookup_key, and the SAME 22 `ever_works_*`
+            // keys exist in BOTH test and live mode of the shared account — deliberately, so the
+            // two stay in step. So a process that resolved prices under `sk_test_…` and is then
+            // rotated to `sk_live_…` would otherwise keep handing TEST-mode `price_…` ids to a LIVE
+            // client. Dropping the cache with the client is the only thing that makes the two
+            // consistent by construction.
+            this.priceIdByLookupKey.clear();
         }
         return this.client;
     }

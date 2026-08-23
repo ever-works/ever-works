@@ -655,6 +655,16 @@ export class Work {
     @Column({ type: 'text', nullable: true })
     deployDatabaseMode?: 'shared' | 'custom' | null;
 
+    // AES-256-GCM-encrypted JSON map of the operator-managed, allow-listed
+    // per-Work runtime env (today: the Stripe payment keys the directory
+    // template reads — see `WORK_RUNTIME_ENV_ALLOWED_KEYS`). Managed by
+    // `WorkRuntimeEnvService.{get,set}RuntimeEnvVars`; merged into the
+    // `${slug}-runtime-env` k8s Secret on server-side deploys and pushed as
+    // GitHub Actions repo secrets on workflow deploys. NULL when no key is set.
+    // Same `text` + `nullable: true` shape as `deployDatabaseUrlEncrypted`.
+    @Column({ type: 'text', nullable: true })
+    deployRuntimeEnvEncrypted?: string | null;
+
     /**
      * EW-734 / EW-736 — globally-unique persisted managed subdomain claim.
      *

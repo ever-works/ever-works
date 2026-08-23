@@ -1,8 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { config } from '../config';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { Work } from '../entities/work.entity';
+import {
+    WORK_RUNTIME_ENV_ALLOWED_KEYS,
+    WORK_RUNTIME_ENV_MAX_VALUE_LENGTH,
+    isWorkRuntimeEnvKey,
+    isWorkRuntimeEnvSecretKey,
+    maskWorkRuntimeEnvValue,
+    type WorkRuntimeEnvKey,
+    type WorkRuntimeEnvVarState,
+} from './work-runtime-env.constants';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH_BYTES = 32;
@@ -107,6 +116,138 @@ export class WorkRuntimeEnvService {
     /** Set the Work's DB mode. */
     async setDatabaseMode(workId: string, mode: 'shared' | 'custom'): Promise<void> {
         await this.workRepository.setDeployDatabaseMode(workId, mode);
+    }
+
+    // ------------------------------------------------------------------
+    // Operator-managed, allow-listed per-Work env (Stripe keys & co.)
+    // ------------------------------------------------------------------
+
+    /** The keys a dashboard user may set via `setRuntimeEnvVars`, in display order. */
+    getAllowedEnvKeys(): readonly WorkRuntimeEnvKey[] {
+        return WORK_RUNTIME_ENV_ALLOWED_KEYS;
+    }
+
+    /**
+     * The decrypted per-Work env map (allow-listed keys only). Empty when the
+     * Work has none configured. Used by `DeployService` to merge the values
+     * into the k8s runtime-env Secret / push them as GitHub Actions secrets.
+     *
+     * Defensive on read: keys that are no longer allow-listed (e.g. after the
+     * list shrinks) or whose stored value is not a string are dropped rather
+     * than delivered, so the allow-list stays the single source of truth.
+     */
+    async getRuntimeEnvVars(workId: string): Promise<Record<string, string>> {
+        const work = await this.workRepository.findById(workId);
+        return this.decodeRuntimeEnvVars(work?.deployRuntimeEnvEncrypted);
+    }
+
+    /**
+     * Merge-update the per-Work env map and persist it encrypted.
+     *
+     * Semantics: every provided key overwrites the stored value; `null`,
+     * `undefined` or an empty/whitespace-only string REMOVES the key; keys not
+     * mentioned are left untouched. Values are trimmed and capped at
+     * `WORK_RUNTIME_ENV_MAX_VALUE_LENGTH`. Any key outside
+     * `WORK_RUNTIME_ENV_ALLOWED_KEYS` rejects the whole call with a 400 —
+     * nothing is written in that case, so a typo cannot half-apply.
+     *
+     * Returns the resulting (plaintext) map. Read-modify-write without a row
+     * lock: concurrent PUTs for the same Work are last-writer-wins, which is
+     * acceptable for an operator-driven settings form.
+     */
+    async setRuntimeEnvVars(
+        workId: string,
+        vars: Record<string, string | null | undefined>,
+    ): Promise<Record<string, string>> {
+        const existing = await this.workRepository.findById(workId);
+        if (!existing) {
+            throw new Error(`Work not found: ${workId}`);
+        }
+        const entries = Object.entries(vars ?? {});
+        const unknown = entries.map(([key]) => key).filter((key) => !isWorkRuntimeEnvKey(key));
+        if (unknown.length > 0) {
+            throw new BadRequestException(
+                `Unsupported runtime env key(s): ${unknown.join(', ')}. Allowed keys: ${WORK_RUNTIME_ENV_ALLOWED_KEYS.join(', ')}.`,
+            );
+        }
+
+        const next = this.decodeRuntimeEnvVars(existing.deployRuntimeEnvEncrypted);
+        for (const [key, raw] of entries) {
+            if (raw === null || raw === undefined) {
+                delete next[key];
+                continue;
+            }
+            if (typeof raw !== 'string') {
+                throw new BadRequestException(`${key} must be a string (or null to remove it).`);
+            }
+            const value = raw.trim();
+            if (!value) {
+                delete next[key];
+                continue;
+            }
+            if (value.length > WORK_RUNTIME_ENV_MAX_VALUE_LENGTH) {
+                throw new BadRequestException(
+                    `${key} exceeds the maximum length of ${WORK_RUNTIME_ENV_MAX_VALUE_LENGTH} characters.`,
+                );
+            }
+            // eslint-disable-next-line no-control-regex
+            if (/[\u0000-\u001f\u007f]/.test(value)) {
+                throw new BadRequestException(`${key} must not contain control characters.`);
+            }
+            next[key] = value;
+        }
+
+        // Persist in allow-list order so the stored JSON is deterministic.
+        const ordered: Record<string, string> = {};
+        for (const key of WORK_RUNTIME_ENV_ALLOWED_KEYS) {
+            if (next[key] !== undefined) ordered[key] = next[key];
+        }
+        await this.workRepository.update(workId, {
+            deployRuntimeEnvEncrypted:
+                Object.keys(ordered).length > 0 ? this.encrypt(JSON.stringify(ordered)) : null,
+        });
+        return ordered;
+    }
+
+    /**
+     * Masked, API-safe view of the per-Work env: one entry per allow-listed
+     * key (so the dashboard can render the whole form), never a plaintext
+     * value. Secrets collapse to `***`; non-secret values keep a short prefix.
+     */
+    async describeRuntimeEnvVars(workId: string): Promise<WorkRuntimeEnvVarState[]> {
+        const vars = await this.getRuntimeEnvVars(workId);
+        return WORK_RUNTIME_ENV_ALLOWED_KEYS.map((key) => {
+            const value = vars[key];
+            return {
+                key,
+                set: value !== undefined,
+                masked: value !== undefined ? maskWorkRuntimeEnvValue(key, value) : null,
+                secret: isWorkRuntimeEnvSecretKey(key),
+            };
+        });
+    }
+
+    /** Decrypt + parse the stored JSON map, keeping only allow-listed string values. */
+    private decodeRuntimeEnvVars(envelope: string | null | undefined): Record<string, string> {
+        if (!envelope) {
+            return {};
+        }
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(this.decrypt(envelope));
+        } catch (err) {
+            this.logger.error('Failed to decode per-Work runtime env map', err);
+            throw new Error('deploy runtime-env map is malformed.');
+        }
+        const out: Record<string, string> = {};
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+                if (isWorkRuntimeEnvKey(key) && typeof value === 'string' && value.length > 0) {
+                    out[key] = value;
+                }
+            }
+        }
+        return out;
     }
 
     /**
