@@ -152,44 +152,25 @@ export const workConcurrencyAdmission: RunAdmissionMiddleware = async (context, 
  * Raise-only makes all three moot: this can never park a run that would
  * not already have parked, so a wrong answer can only over-deliver.
  *
- * The per-Work valve bounds everything above it — but ONLY on runs that
- * carry a workId. Heartbeats pass `workId: null` and reach this valve with
- * nothing else in front of them, which is why the unlimited sentinel does
- * not switch the valve off there.
+ * The per-Work valve bounds everything above it — but only on runs that
+ * carry a workId AND when that valve is itself enabled, which is why the
+ * unlimited sentinel checks both before bypassing.
+ *
+ * The plan allowance is measured against the BUYER's own in-flight count,
+ * never the org's: the entitlement is per-user, and applying it to an org
+ * counter would share one member's paid capacity with all of them.
  */
 export const orgConcurrencyAdmission: RunAdmissionMiddleware = async (context, next) => {
     const { input, counters, logger } = context;
     const envLimit = context.resolveOrgLimit();
-    let limit = envLimit;
 
+    // Resolved up front but consulted ONLY after the env valve has decided to
+    // park. That ordering is what keeps the plan adjustment raise-only: it can
+    // exempt a run, never park one.
+    let planLimit: number | null = null;
     if (context.planLimits && context.isPlanConcurrencyEnabled()) {
         try {
-            const planLimit = await context.planLimits.resolveConcurrencyLimit(input.userId);
-            // `null` = the plan has no opinion; leave the env valve exactly as it
-            // was. Deliberately NOT folded in with the `0` case: they used to be
-            // the same branch, which let a plan with no entitlement row bypass the
-            // org valve entirely instead of falling back to it.
-            if (planLimit !== null) {
-                if (planLimit < 0) {
-                    // Unlimited tier. This lifts the PLAN ceiling, not the
-                    // operator's last line of defence: bypass only when the
-                    // per-Work valve is actually in play to bound the user.
-                    //
-                    // 🛑 On the Work-LESS path this valve is the only one in the
-                    // chain — `workConcurrencyAdmission` short-circuits on
-                    // `!input.workId`, and the heartbeat dispatcher passes
-                    // `workId: null` precisely because "the org/user valve is the
-                    // one that applies". Switching it off there would leave the
-                    // user completely unbounded, which is a capacity failure
-                    // rather than the generosity the raise-only argument assumes.
-                    if (input.workId) {
-                        return next();
-                    }
-                } else if (planLimit > 0) {
-                    limit = Math.max(envLimit, planLimit);
-                }
-                // planLimit === 0 -> an explicit "no plan ceiling"; keep envLimit.
-            }
+            planLimit = await context.planLimits.resolveConcurrencyLimit(input.userId);
         } catch (err) {
             // Fail open on the ENV limit: a broken billing lookup must never
             // change how much work the platform will accept.
@@ -200,23 +181,65 @@ export const orgConcurrencyAdmission: RunAdmissionMiddleware = async (context, n
         }
     }
 
-    if (limit <= 0) return next();
-    const inFlight = input.organizationId
-        ? await counters.countInFlightForOrganization(input.organizationId)
+    if (envLimit <= 0) return next();
+
+    const scopedToOrg = Boolean(input.organizationId);
+    const inFlight = scopedToOrg
+        ? await counters.countInFlightForOrganization(input.organizationId as string)
         : await counters.countInFlightForUser(input.userId);
-    if (inFlight < limit) return next();
-    // Name the plan when it moved the ceiling. Without this an operator who set
-    // AGENT_MAX_CONCURRENT_RUNS_PER_ORG=25 greps for their own 25 and finds a
-    // number they never configured, with nothing pointing at the entitlement.
-    const ceilingNote = limit === envLimit ? '' : ` (env ${envLimit}, raised by plan entitlement)`;
+    if (inFlight < envLimit) return next();
+
+    // The env valve would park this run. A plan entitlement may exempt the
+    // BUYER — and only the buyer.
+    //
+    // 🛑 The entitlement is per-USER (subscriptions hang off `userId`;
+    // `Organization` carries no plan at all), so it must never be measured
+    // against the ORG counter. Raising the org ceiling because one member
+    // bought Enterprise would hand that capacity to every colleague, and let
+    // them consume the allowance the buyer paid for. Their own in-flight count
+    // is the only number their plan has an opinion about.
+    if (planLimit !== null) {
+        if (planLimit < 0) {
+            // Unlimited tier. This lifts the PLAN ceiling, not the operator's
+            // last line of defence — so bypass only when a per-Work valve is
+            // genuinely still bounding this run.
+            //
+            // Both halves of that condition are load-bearing.
+            // `workConcurrencyAdmission` returns next() when EITHER there is no
+            // workId (heartbeats pass `workId: null` deliberately) OR the Work
+            // limit is `<= 0` (a supported way to disable that valve). Checking
+            // only for a workId would let an unlimited plan plus
+            // `AGENT_MAX_CONCURRENT_RUNS_PER_WORK=0` bypass every valve in the
+            // chain at once.
+            if (input.workId && context.resolveWorkLimit() > 0) {
+                return next();
+            }
+        } else if (planLimit > 0) {
+            // Reuse the count when it is already the user's own — the non-org
+            // path measures exactly that, so this costs a query only inside an
+            // org, and only on the path that was about to park anyway.
+            const ownInFlight = scopedToOrg
+                ? await counters.countInFlightForUser(input.userId)
+                : inFlight;
+            if (ownInFlight < planLimit) {
+                return next();
+            }
+        }
+        // planLimit === 0 -> an explicit "no plan ceiling"; the env valve stands.
+    }
+
+    // Name the plan when it was consulted and still did not exempt the run, so
+    // an operator who set AGENT_MAX_CONCURRENT_RUNS_PER_ORG can tell their own
+    // valve firing from an entitlement that declined to lift it.
+    const planNote =
+        planLimit !== null && planLimit !== 0 ? ` (plan allowance ${planLimit} not met)` : '';
     logger.log(
         `Dispatch gate: ${
             input.organizationId ? `org ${input.organizationId}` : `user ${input.userId}`
-        } at ${inFlight}/${limit}${ceilingNote} in-flight runs — queueing.`,
+        } at ${inFlight}/${envLimit}${planNote} in-flight runs — queueing.`,
     );
     return { admitted: false, queuedReason: QUEUED_REASON_CONCURRENCY };
 };
-
 /**
  * Soft credits enforcement (ship-dark). Runs ONLY when the kill-switch
  * is on AND the precheck token is bound. Fail-open on any error: a

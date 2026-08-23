@@ -44,7 +44,7 @@ export const creditsDailyGrantTask = schedules.task({
                     summary.monthlyAlreadyGranted > 0 ||
                     summary.monthlyFailed > 0
                 ) {
-                    logger.info('credits-daily-grant dispatched daily free credits', {
+                    logger.info('credits-daily-grant completed a credit grant sweep', {
                         ...summary,
                     });
                 }

@@ -1624,7 +1624,7 @@ describe('Stripe Tax — every session that CHARGES asks for tax', () => {
             userEmail: 'u1@example.com',
             customerId: 'cus_1',
             pack: {
-                packId: 'credits-5500',
+                id: 'credits-5500',
                 label: '5,500 credits',
                 credits: 5500,
                 priceCents: 5000,
@@ -1669,7 +1669,7 @@ describe('Stripe Tax — every session that CHARGES asks for tax', () => {
             userEmail: 'u1@example.com',
             customerId: 'cus_1',
             pack: {
-                packId: 'credits-1000',
+                id: 'credits-1000',
                 label: '1,000 credits',
                 credits: 1000,
                 priceCents: 1000,

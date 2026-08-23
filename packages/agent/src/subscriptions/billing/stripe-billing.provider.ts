@@ -536,7 +536,8 @@ export class StripeBillingProvider extends BillingProvider {
     }
 
     /**
-     * 🛑 THIS PATH COLLECTS NO TAX, AND CANNOT BE MADE TO WITHOUT RESHAPING IT.
+     * 🛑 THIS PATH COLLECTS NO TAX. It can be made to - see the flow below -
+     * but it is not wired, and the difference is real money.
      *
      * The Checkout credit-pack purchase asks for `automatic_tax`, so a German
      * buyer of the 5,500-credit pack pays $50 + $9.50 VAT. The SAME pack bought
@@ -545,14 +546,24 @@ export class StripeBillingProvider extends BillingProvider {
      * way, so the difference comes out of margin - and the two prices for one
      * product is the kind of thing an audit finds.
      *
-     * It is not an omission that can be patched here: PaymentIntents do not
-     * accept the parameter at all. Verified against the live API, 2026-08-23:
-     *   POST /v1/payment_intents  automatic_tax[enabled]=true
-     *   -> 400 "Received unknown parameter: automatic_tax"
-     * Collecting tax off-session means routing through an Invoice (invoice items
-     * + an invoice carrying `automatic_tax`, paid off-session), which changes
-     * this method's result shape and the events it emits. Deliberately left
-     * alone rather than half-done.
+     * `automatic_tax` is not the mechanism here - PaymentIntents reject it
+     * outright (verified 2026-08-23: `POST /v1/payment_intents`
+     * `automatic_tax[enabled]=true` -> 400 "Received unknown parameter"). But a
+     * supported off-session flow DOES exist, and it is smaller than an Invoice
+     * rewrite:
+     *
+     *   1. `POST /v1/tax/calculations` with the pack amount, the product tax
+     *      code and the customer's address -> `amount_total` including tax;
+     *   2. create the PaymentIntent for that total, passing the calculation id
+     *      as `hooks[inputs][tax][calculation]`;
+     *   3. after it succeeds, `POST /v1/tax/transactions/create_from_calculation`
+     *      so the collected tax is actually reported.
+     *
+     * Step 2 is confirmed accepted on this account (2026-08-23; control: a bogus
+     * `hooks[inputs][tax][not_a_field]` on the same call IS rejected, so the
+     * probe discriminates). It is left unimplemented deliberately - it changes
+     * the amount charged, and shipping a new tax path on a money route with no
+     * end-to-end test would be worse than the gap it closes.
      *
      * EXPOSURE TODAY IS ZERO, and the reason is worth knowing because it is
      * about to change: `autoRechargeEnabled` defaults false and is opt-in, and
