@@ -100,18 +100,46 @@ export function buildSubprocessEnv(
 	overrides: Record<string, string> = {},
 	options: BuildSubprocessEnvOptions = {}
 ): Record<string, string> {
+	const tmpdir = process.env.TMPDIR ?? os.tmpdir();
+
+	// Security: when the caller pins an explicit `CLAUDE_CONFIG_DIR` — which every
+	// prompt-injectable run does — point the home directory at the isolated tmpdir
+	// instead of the server user's real home. Claude Code resolves its settings,
+	// session state and credentials from `CLAUDE_CONFIG_DIR`, and this runner
+	// supplies the credential through the environment besides, so a legitimate run
+	// loses nothing. What it does lose is the ability of a hostile work prompt to
+	// walk `~` and exfiltrate `~/.aws`, `~/.ssh`, `~/.npmrc`, `~/.kube` — the CLI
+	// runs with `--dangerously-skip-permissions` on scraped web content and
+	// community-PR text, so that is not a hypothetical.
+	//
+	// Mirrors the codex plugin's `CODEX_HOME` handling, with one addition: on
+	// Windows `~` resolves from `USERPROFILE`, not `HOME`, so repointing only
+	// `HOME` would leave the hardening a no-op there.
+	//
+	// Runs without a pinned config dir (e.g. an auth probe) keep the real home so
+	// the CLI's `~/.claude` fallback still resolves and auth detection is unchanged.
+	const isolateHome = typeof overrides.CLAUDE_CONFIG_DIR === 'string' && overrides.CLAUDE_CONFIG_DIR !== '';
+	const home = isolateHome ? tmpdir : (process.env.HOME ?? os.homedir());
+
 	const env: Record<string, string> = {
 		PATH: process.env.PATH ?? '/usr/local/bin:/usr/bin:/bin',
-		HOME: process.env.HOME ?? os.homedir(),
-		TMPDIR: process.env.TMPDIR ?? os.tmpdir()
+		HOME: home,
+		TMPDIR: tmpdir
 	};
 
 	// `USERPROFILE` is the Windows equivalent of `HOME`; some Anthropic SDK
 	// versions look it up. Forward when present so the runner works on
 	// Windows dev boxes without leaking other host vars.
-	if (process.env.USERPROFILE) {
+	if (isolateHome) {
+		env.USERPROFILE = tmpdir;
+	} else if (process.env.USERPROFILE) {
 		env.USERPROFILE = process.env.USERPROFILE;
 	}
+	// `APPDATA` / `LOCALAPPDATA` stay pointed at the real profile even when the
+	// home is isolated: Node and the package managers the agent shells out to read
+	// their own machine config from there, and breaking that would fail runs rather
+	// than harden them. They are a known residual on Windows — `%APPDATA%\npm` can
+	// hold an npm token — but the deployed runner is Linux, where these are unset.
 	if (process.env.APPDATA) {
 		env.APPDATA = process.env.APPDATA;
 	}
