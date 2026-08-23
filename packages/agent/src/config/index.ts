@@ -11,6 +11,10 @@ import {
 } from '@ever-works/contracts';
 import { DatabaseType } from '@src/database';
 
+import {
+    catalogCreditsMarginPercent,
+    catalogPaygMaxMonthlyCapCredits,
+} from '../subscriptions/billing/stripe-catalog';
 type AppType = 'cli' | 'api';
 
 /**
@@ -584,21 +588,53 @@ export const config = {
             getWebhookSecret() {
                 return process.env.STRIPE_WEBHOOK_SECRET;
             },
+            /**
+             * Billing spec FR-22 — `automatic_tax.enabled` on hosted
+             * checkout and on the PAYG subscription. Targeted flag for
+             * un-provisioned external state: Stripe Tax must be activated
+             * on the (shared) account first, or Stripe rejects the session.
+             */
+            isAutomaticTaxEnabled() {
+                return process.env.STRIPE_AUTOMATIC_TAX === 'true';
+            },
+        },
+        // Pay-as-you-go (billing spec §3.5).
+        payg: {
+            /**
+             * Hard ceiling for a self-service monthly cap. Defaults to the
+             * catalog's `payg.maxMonthlyCapCredits`; raise per deployment.
+             */
+            getMaxMonthlyCapCredits() {
+                const parsed = parseInt(process.env.PAYG_MAX_MONTHLY_CAP_CREDITS || '');
+                return Number.isFinite(parsed) && parsed > 0
+                    ? parsed
+                    : catalogPaygMaxMonthlyCapCredits();
+            },
         },
         // Credits ledger (pricing Wave 9 M1) — credits are the usage
         // currency layered on the costCents metering. Every knob is
         // env-configurable per the Wave 9 house rule; defaults keep
-        // 1 credit = 1 cent with zero margin until pricing lands.
+        // 1 credit = 1 cent at the catalog margin (billing spec §3.4).
         credits: {
             /** costCents → credits conversion: credits per $1 (default 100 = 1¢/credit). */
             getCreditsPerDollar() {
                 const parsed = parseFloat(process.env.CREDITS_PER_DOLLAR || '100');
                 return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
             },
-            /** Platform margin applied at debit time, in percent (default 0). */
+            /**
+             * Platform margin applied at debit time, in percent. An explicit
+             * `CREDITS_MARGIN_PERCENT` wins (self-hosters); otherwise the
+             * catalog's `creditsMarginPercent` (billing spec §3.4) — the one
+             * number that decides whether a credit pack is sold at a loss
+             * lives next to the pack prices and ships with a test.
+             */
             getMarginPercent() {
-                const parsed = parseFloat(process.env.CREDITS_MARGIN_PERCENT || '0');
-                return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+                const raw = process.env.CREDITS_MARGIN_PERCENT;
+                if (raw !== undefined && raw !== '') {
+                    const parsed = parseFloat(raw);
+                    if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+                }
+                return catalogCreditsMarginPercent();
             },
             /**
              * When true, consumption may take a balance below zero
@@ -625,18 +661,24 @@ export const config = {
                 return Number.isFinite(parsed) && parsed > 0 ? parsed : 500;
             },
             /**
-             * Soft credits enforcement kill-switch (pricing Wave 9 M2 —
-             * ship dark). Default OFF: the dispatch gate's credits
-             * precheck only runs when `CREDITS_ENFORCEMENT=on` (or
-             * `true`). Debits/metering are unaffected by this flag —
-             * it gates ONLY whether a credit-limited plan with an
-             * exhausted balance parks new runs
-             * (`queuedReason='insufficient-credits'`) instead of
-             * dispatching them.
+             * Credits enforcement (pricing Wave 9 M2; billing spec FR-30).
+             *
+             * Explicit `CREDITS_ENFORCEMENT=on|true|1` / `off|false|0`
+             * always wins. UNSET resolves to **on when the billing
+             * provider is configured** (`STRIPE_SECRET_KEY` present —
+             * money is real, so a zero balance with no pay-as-you-go
+             * headroom parks new runs) and **off otherwise** (self-hosted,
+             * dev, CI — exactly the pre-2026-08 behaviour). Debits and
+             * metering are unaffected by this flag; it gates ONLY whether
+             * the dispatch gate parks runs
+             * (`queuedReason='insufficient-credits'`).
              */
             isEnforcementEnabled() {
                 const raw = (process.env.CREDITS_ENFORCEMENT || '').toLowerCase();
-                return raw === 'on' || raw === 'true' || raw === '1';
+                if (raw === 'on' || raw === 'true' || raw === '1') return true;
+                if (raw === 'off' || raw === 'false' || raw === '0') return false;
+                const stripeKey = process.env.STRIPE_SECRET_KEY;
+                return typeof stripeKey === 'string' && stripeKey.trim().length > 0;
             },
         },
     },

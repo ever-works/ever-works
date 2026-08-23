@@ -166,20 +166,33 @@ describe('CreditLedgerService', () => {
     });
 
     describe('consumeForRun — the costCents → credits bridge', () => {
-        it('converts costCents at the default rate (100 credits/$ → 1 credit = 1 cent)', async () => {
+        it('converts costCents at 100 credits/$ plus the CATALOG margin by default (billing spec §3.4)', async () => {
             const { service, ledgerRepository } = makeService();
 
             await service.consumeForRun({ userId: 'u1', runId: 'run-1', costCents: 250 });
 
+            // 250 cents of metered provider cost × 1.35 (catalog creditsMarginPercent) = 337.5 → 338.
             expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
                 expect.objectContaining({
                     kind: CreditLedgerKind.CONSUMPTION,
-                    amountCredits: -250,
+                    amountCredits: -338,
                     costCentsRef: 250,
                     refType: 'agent-run',
                     refId: 'run-1',
                     idempotencyKey: 'run:run-1',
                 }),
+                expect.anything(),
+            );
+        });
+
+        it('an explicit CREDITS_MARGIN_PERCENT=0 overrides the catalog margin (1 credit = 1 cent of list)', async () => {
+            process.env.CREDITS_MARGIN_PERCENT = '0';
+            const { service, ledgerRepository } = makeService();
+
+            await service.consumeForRun({ userId: 'u1', runId: 'run-1', costCents: 250 });
+
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({ amountCredits: -250 }),
                 expect.anything(),
             );
         });
@@ -250,7 +263,8 @@ describe('CreditLedgerService', () => {
             await expect(attempt).rejects.toMatchObject({
                 name: 'InsufficientCreditsError',
                 userId: 'u1',
-                requestedCredits: 900,
+                // 900 cents × 1.35 catalog margin = 1,215 credits requested.
+                requestedCredits: 1215,
                 balanceCredits: 4,
             });
         });

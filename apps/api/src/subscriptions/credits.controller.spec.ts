@@ -13,6 +13,31 @@ jest.mock('@ever-works/agent/subscriptions', () => ({
         }
     },
     USAGE_SUMMARY_GROUP_BYS: ['day', 'model', 'agent', 'work'],
+    // Billing spec FR-13 — `GET /api/credits/pricing` is a pure projection
+    // of this view; the controller adds only the `status` envelope.
+    creditsPricingView: jest.fn(() => ({
+        creditsPerDollar: 100,
+        marginPercent: 35,
+        dailyFreeCredits: 50,
+        packs: [
+            {
+                id: 'credits-1000',
+                priceCents: 1000,
+                credits: 1000,
+                currency: 'usd',
+                label: '1,000 credits',
+            },
+        ],
+        payg: {
+            tiers: [
+                { upTo: 5000, centsPerCredit: '1' },
+                { upTo: null, centsPerCredit: '0.8' },
+            ],
+            invoiceThresholdCents: 5000,
+            defaultMonthlyCapCredits: 10000,
+            maxMonthlyCapCredits: 100000,
+        },
+    })),
     USAGE_EXPORT_COLUMNS: [
         'occurredAt',
         'pluginId',
@@ -442,6 +467,21 @@ describe('CreditsController', () => {
             }
             expect(await validateQuery({ format: 'csv' })).toHaveLength(0);
             expect((await validateQuery({ format: 'xlsx' })).length).toBeGreaterThan(0);
+        });
+    });
+
+    describe('getPricing (billing spec FR-13)', () => {
+        it('returns the server-authored pricing view under the success envelope', () => {
+            const result = controller.getPricing();
+
+            expect(result).toMatchObject({
+                status: 'success',
+                creditsPerDollar: 100,
+                marginPercent: 35,
+                dailyFreeCredits: 50,
+                payg: expect.objectContaining({ defaultMonthlyCapCredits: 10000 }),
+            });
+            expect(result.packs).toHaveLength(1);
         });
     });
 

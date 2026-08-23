@@ -6,6 +6,7 @@ import { usageAPI, type AccountWideUsage } from '@/lib/api/usage';
 import {
     currentUsageMonth,
     parseUsagePeriod,
+    type CreditsPricing,
     type UsageSummaryGrouped,
     type UsageSummaryTotals,
 } from '@/lib/api/credits.shared';
@@ -81,7 +82,7 @@ export default async function UsageSettingsPage({ searchParams }: UsageSettingsP
 
     const period = parseUsagePeriod(params.period) ?? currentUsageMonth();
 
-    const [totals, byDay, byModel, byAgent, byWork, accountWide] = await Promise.all([
+    const [totals, byDay, byModel, byAgent, byWork, accountWide, pricing] = await Promise.all([
         creditsAPI.usageSummary({ period }).catch((): UsageSummaryTotals | null => null),
         creditsAPI
             .usageGrouped({ groupBy: 'day', period })
@@ -96,6 +97,9 @@ export default async function UsageSettingsPage({ searchParams }: UsageSettingsP
             .usageGrouped({ groupBy: 'work', period })
             .catch((): UsageSummaryGrouped | null => null),
         usageAPI.accountWide().catch((): AccountWideUsage | null => null),
+        // Billing spec FR-13 — how a credit is priced, so the tiles never
+        // show a number the page cannot explain.
+        creditsAPI.pricing().catch((): CreditsPricing | null => null),
     ]);
 
     return (
@@ -108,6 +112,7 @@ export default async function UsageSettingsPage({ searchParams }: UsageSettingsP
                 initialByAgent={byAgent}
                 initialByWork={byWork}
                 accountWide={accountWide}
+                pricing={pricing}
             />
         </UsageTabs>
     );

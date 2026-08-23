@@ -35,6 +35,57 @@ export interface CreditsBalance {
     balanceCredits: number;
 }
 
+/** One graduated pay-as-you-go tier (billing spec §3.5). `upTo: null` = open-ended. */
+export interface PaygTier {
+    upTo: number | null;
+    /** Cents per credit as a decimal string (Stripe `unit_amount_decimal`). */
+    centsPerCredit: string;
+}
+
+/**
+ * `GET /api/credits/pricing` — how a credit is priced on this deployment
+ * (billing spec FR-13). Server-authored, read-only.
+ */
+export interface CreditsPricing {
+    status: string;
+    creditsPerDollar: number;
+    marginPercent: number;
+    dailyFreeCredits: number;
+    packs: Array<{
+        id: string;
+        priceCents: number;
+        credits: number;
+        currency: string;
+        label: string;
+    }>;
+    payg: {
+        tiers: PaygTier[];
+        invoiceThresholdCents: number;
+        defaultMonthlyCapCredits: number;
+        maxMonthlyCapCredits: number;
+    };
+}
+
+/**
+ * What Stripe bills for `credits` in one cycle under graduated tiers, in cents
+ * (same arithmetic as the API's `estimatePaygCents`).
+ */
+export function estimatePaygCents(credits: number, tiers: readonly PaygTier[]): number {
+    if (!Number.isFinite(credits) || credits <= 0) return 0;
+    let remaining = Math.floor(credits);
+    let previousUpTo = 0;
+    let total = 0;
+    for (const tier of tiers) {
+        if (remaining <= 0) break;
+        const span = tier.upTo === null ? remaining : Math.max(0, tier.upTo - previousUpTo);
+        const inTier = Math.min(remaining, span);
+        total += inTier * Number(tier.centsPerCredit);
+        remaining -= inTier;
+        if (tier.upTo !== null) previousUpTo = tier.upTo;
+    }
+    return Math.round(total);
+}
+
 export interface CreditLedgerRow {
     id: string;
     kind: CreditLedgerKind;
