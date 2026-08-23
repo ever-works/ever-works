@@ -18,6 +18,28 @@ export class UserSubscriptionRepository {
     }
 
     /**
+     * The user's CURRENT subscription — active or trialing.
+     *
+     * Additive sibling of {@link findActiveByUser}, which matches only
+     * `ACTIVE` and is left untouched because other callers depend on that
+     * exact meaning. A trialing customer is entitled to what they are
+     * trialing, so the monthly credit grant reads THIS.
+     *
+     * Deliberately excludes `PAST_DUE`: a subscription in dunning must not
+     * keep drawing a paid allowance while Stripe retries the invoice.
+     */
+    async findCurrentByUser(userId: string): Promise<UserSubscription | null> {
+        return this.repository.findOne({
+            where: [
+                { userId, status: SubscriptionStatus.ACTIVE },
+                { userId, status: SubscriptionStatus.TRIALING },
+            ],
+            relations: ['plan'],
+            order: { createdAt: 'ASC' },
+        });
+    }
+
+    /**
      * Look a subscription up by the PROVIDER's id (audit B24 — plan
      * checkout). This is how a later `customer.subscription.*` delivery
      * finds exactly the row the hosted checkout created, without

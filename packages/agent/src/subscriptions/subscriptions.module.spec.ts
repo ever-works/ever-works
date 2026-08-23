@@ -30,6 +30,7 @@ import {
 import { CREDIT_PACKS, CREDIT_PACK_IDS } from './billing/credit-packs';
 import { CreditLedgerService, InsufficientCreditsError } from './credits/credit-ledger.service';
 import { ENTITLEMENT_KEYS, EntitlementsService } from './credits/entitlements.service';
+import { PlanRunLimitsService } from './credits/plan-run-limits.service';
 import { RunCostSettlementService } from './credits/run-cost-settlement.service';
 import {
     InvalidUsagePeriodError,
@@ -83,6 +84,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
         it('re-exports the credits surface (pricing Wave 9 M1)', () => {
             expect(subscriptionsBarrel.CreditLedgerService).toBe(CreditLedgerService);
             expect(subscriptionsBarrel.EntitlementsService).toBe(EntitlementsService);
+            expect(subscriptionsBarrel.PlanRunLimitsService).toBe(PlanRunLimitsService);
             expect(subscriptionsBarrel.InsufficientCreditsError).toBe(InsufficientCreditsError);
             expect(subscriptionsBarrel.ENTITLEMENT_KEYS).toBe(ENTITLEMENT_KEYS);
         });
@@ -168,6 +170,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                 [
                     'SubscriptionsModule',
                     'SubscriptionService',
+                    // Boot-time per-plan entitlement seed (insert-if-missing).
+                    'PLAN_ENTITLEMENT_SEED_DATA',
                     'UsageLedgerService',
                     'BillingProvider',
                     'BillingProviderError',
@@ -205,11 +209,23 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     // Credits ledger + plan entitlements (pricing Wave 9 M1)
                     'CreditLedgerService',
                     'InsufficientCreditsError',
+                    // Subscription-anniversary month arithmetic for the monthly
+                    // credit grant. Exported so the clamping rules that decide how
+                    // often a customer is paid can be tested directly.
+                    'elapsedWholeMonths',
+                    'addWholeMonths',
+                    // refType stamped on every monthly plan-allowance row. The
+                    // grant sums prior rows of this type to work out what is still
+                    // owed, so the string is load-bearing - exported so a rename
+                    // cannot happen without this list noticing.
+                    'MONTHLY_PLAN_REF_TYPE',
                     // Transcript retention sentinels (#1877).
                     'RETENTION_FOREVER',
                     'RETENTION_NONE',
                     'EntitlementsService',
                     'ENTITLEMENT_KEYS',
+                    // Plan-driven concurrency ceiling for the dispatch gate (H2)
+                    'PlanRunLimitsService',
                     // Run-cost settlement (pricing Wave 9 M2)
                     'RunCostSettlementService',
                     // Usage-summary aggregations (Wave 13 Billing/Usage UI)
@@ -253,6 +269,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             const providers = getMeta('providers');
             expect(providers).toContain(CreditLedgerService);
             expect(providers).toContain(EntitlementsService);
+            expect(providers).toContain(PlanRunLimitsService);
         });
 
         it('declares + exports RunCostSettlementService (Wave 9 M2)', () => {
@@ -360,6 +377,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             const exports = getMeta('exports');
             expect(exports).toContain(CreditLedgerService);
             expect(exports).toContain(EntitlementsService);
+            expect(exports).toContain(PlanRunLimitsService);
         });
 
         it('does NOT export ManualBillingProvider directly — consumers use the abstract token', () => {

@@ -316,6 +316,19 @@ export class StripeBillingProvider extends BillingProvider {
             line_items: lineItems,
             metadata,
             ...STRIPE_TAX_SESSION_FIELDS,
+            // A `mode: 'payment'` sale emits no `invoice.*` event unless invoice
+            // creation is asked for explicitly. Without this, a successful $99
+            // perpetual-licence payment produces NO invoice, NO ledger row and NO
+            // subscription row — by design, since a licence grants no hosted
+            // tier — so the billing page after paying is byte-identical to
+            // before, with the same enabled "$99" button. The buyer concludes it
+            // failed and pays again, and nothing on this path is idempotent
+            // (`checkout.sessions.create` carries no idempotency key here).
+            //
+            // Turning it on routes the sale through the existing
+            // `invoice.updated` -> `mirrorInvoice` path, so the buyer gets a
+            // receipt in-app through plumbing that already exists.
+            ...(isPerpetual ? { invoice_creation: { enabled: true } } : {}),
             // `subscription_data` is rejected outright in payment mode; the one-off equivalent is
             // `payment_intent_data`, which is also where the licence marker has to be mirrored so a
             // refund or dispute on the charge can still be traced back to the sale.

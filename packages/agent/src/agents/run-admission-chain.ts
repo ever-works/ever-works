@@ -1,4 +1,5 @@
 import type { RunCreditsPrecheck } from './run-credits-precheck';
+import type { RunPlanLimits } from './run-plan-limits';
 
 /**
  * Pre-run admission chain (judgment layer G15).
@@ -14,10 +15,13 @@ import type { RunCreditsPrecheck } from './run-credits-precheck';
  * {@link composeRunAdmission} folds a list into one callable, so the
  * order is data (`DEFAULT_RUN_ADMISSION_CHAIN`) rather than control flow.
  *
- * This is a STRUCTURAL change only. `DEFAULT_RUN_ADMISSION_CHAIN`
- * reproduces the previous behaviour exactly, token for token and log
- * line for log line: Work valve first, then org/user valve, then the
+ * The refactor that introduced this file was a STRUCTURAL change only.
+ * The shipped order today is: Work valve, org/user valve, then the
  * (kill-switched, fail-open) credits precheck.
+ *
+ * The org valve additionally folds in the plan's `max-concurrent-runs`
+ * entitlement as a RAISE-ONLY adjustment — see its docblock for why it
+ * may never lower a ceiling.
  */
 
 /** Stamped when the gate parks a run for concurrency. Re-exported by the gate service. */
@@ -64,6 +68,8 @@ export interface RunAdmissionContext {
     readonly resolveOrgLimit: () => number;
     readonly isCreditsEnforcementEnabled: () => boolean;
     readonly creditsPrecheck?: RunCreditsPrecheck;
+    readonly isPlanConcurrencyEnabled: () => boolean;
+    readonly planLimits?: RunPlanLimits;
 }
 
 export type RunAdmissionNext = () => Promise<RunAdmissionVerdict>;
@@ -120,10 +126,59 @@ export const workConcurrencyAdmission: RunAdmissionMiddleware = async (context, 
 /**
  * Per-org valve, falling back to per-user when the run has no org. Same
  * `<= 0` disables semantics as the Work valve.
+ *
+ * The plan's `max-concurrent-runs` entitlement is folded in here as a
+ * RAISE-ONLY adjustment — `max(envLimit, planLimit)`, and a plan whose
+ * value is `<= 0` (the "unlimited" sentinel) switches the valve off.
+ *
+ * 🛑 Raise-only is not a style choice, it is what makes this safe. Three
+ * things break if a plan may LOWER the ceiling:
+ *
+ *  1. **Parked runs would be unrecoverable.** The drain is Work-keyed:
+ *     `findOldestQueuedForConcurrency` filters `run.workId`, and every
+ *     caller passes the workId of a run that just went terminal. A valve
+ *     scoped to the USER can park a run in a Work that then has no
+ *     terminal transition to fire a drain — precisely the cross-Work case
+ *     the valve exists for. The run sits `queued` until the sweeper
+ *     mislabels it `stuck-timeout`.
+ *  2. **It would be a cut for every existing user.** Nothing read this
+ *     entitlement before, so the ENFORCED status quo is this valve's env
+ *     default (25). The `free` row seeded at 3 would take everyone from
+ *     25 to 3 on the first deploy.
+ *  3. **The plan can be resolved wrongly.** A seat-holder on someone
+ *     else's Enterprise org, and anyone whose plan row exists while
+ *     `defaultPlanId` still says free, both resolve to `free`.
+ *
+ * Raise-only makes all three moot: this can never park a run that would
+ * not already have parked, so a wrong answer can only over-deliver. The
+ * per-Work valve still bounds everything above it.
  */
 export const orgConcurrencyAdmission: RunAdmissionMiddleware = async (context, next) => {
     const { input, counters, logger } = context;
-    const limit = context.resolveOrgLimit();
+    const envLimit = context.resolveOrgLimit();
+    let limit = envLimit;
+
+    if (context.planLimits && context.isPlanConcurrencyEnabled()) {
+        try {
+            const planLimit = await context.planLimits.resolveConcurrencyLimit(input.userId);
+            if (planLimit !== null && planLimit <= 0) {
+                // "Unlimited" tier — the valve is off, and (as with a valve
+                // of 0 anywhere else) it never touches the repository.
+                return next();
+            }
+            if (planLimit !== null) {
+                limit = Math.max(envLimit, planLimit);
+            }
+        } catch (err) {
+            // Fail open on the ENV limit: a broken billing lookup must never
+            // change how much work the platform will accept.
+            logger.warn(
+                `Dispatch gate: plan concurrency lookup failed for user ${input.userId} ` +
+                    `(keeping the env limit): ${err}`,
+            );
+        }
+    }
+
     if (limit <= 0) return next();
     const inFlight = input.organizationId
         ? await counters.countInFlightForOrganization(input.organizationId)

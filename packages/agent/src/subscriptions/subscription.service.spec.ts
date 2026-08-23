@@ -55,20 +55,39 @@ function makeUserRepository(overrides: Record<string, jest.Mock> = {}) {
     };
 }
 
+function makePlanEntitlementRepository(overrides: Record<string, jest.Mock> = {}) {
+    return {
+        findByPlanAndKey: jest.fn().mockResolvedValue(null),
+        insertIfMissing: jest
+            .fn()
+            .mockImplementation(async (e: unknown) => ({ entitlement: e, created: true })),
+        ...overrides,
+    };
+}
+
 function makeService(
     plan: Record<string, jest.Mock> = {},
     userSub: Record<string, jest.Mock> = {},
     user: Record<string, jest.Mock> = {},
+    planEntitlement: Record<string, jest.Mock> = {},
 ) {
     const planRepository = makePlanRepository(plan);
     const userSubscriptionRepository = makeUserSubscriptionRepository(userSub);
     const userRepository = makeUserRepository(user);
+    const planEntitlementRepository = makePlanEntitlementRepository(planEntitlement);
     const service = new SubscriptionService(
         planRepository as any,
         userSubscriptionRepository as any,
         userRepository as any,
+        planEntitlementRepository as any,
     );
-    return { service, planRepository, userSubscriptionRepository, userRepository };
+    return {
+        service,
+        planRepository,
+        userSubscriptionRepository,
+        userRepository,
+        planEntitlementRepository,
+    };
 }
 
 const FREE_PLAN = {

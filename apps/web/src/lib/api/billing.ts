@@ -32,6 +32,20 @@ export type {
  * `API_URL`, which is normalized to end in `/api` — see the
  * double-prefix regression specs beside the other lib/api wrappers).
  */
+/**
+ * Billing cadence for a plan checkout. `lifetime` is a one-off
+ * `mode: 'payment'` purchase, and the catalog carries exactly one such SKU:
+ * the $99 perpetual self-hosted commercial licence.
+ */
+export type PlanCheckoutInterval = 'monthly' | 'annual' | 'lifetime';
+
+export interface PlanCheckoutOptions {
+    organizationId?: string | null;
+    interval?: PlanCheckoutInterval;
+    /** TOTAL seats, inclusive of the plan allowance - not the extras. */
+    seats?: number;
+}
+
 export const billingAPI = {
     /** One round-trip snapshot for the Billing page. */
     async overview(): Promise<BillingOverview> {
@@ -72,11 +86,26 @@ export const billingAPI = {
      */
     async startPlanCheckout(
         planCode: string,
-        organizationId?: string | null,
+        options: PlanCheckoutOptions = {},
     ): Promise<PlanCheckoutResponse> {
-        const body: { planCode: string; organizationId?: string } = { planCode };
-        if (organizationId) {
-            body.organizationId = organizationId;
+        const body: {
+            planCode: string;
+            organizationId?: string;
+            interval?: PlanCheckoutInterval;
+            seats?: number;
+        } = { planCode };
+        if (options.organizationId) {
+            body.organizationId = options.organizationId;
+        }
+        // Sent only when present, so the one-field body every existing caller
+        // produces stays byte-identical and the API keeps defaulting to
+        // monthly. NEVER add a price field here — the DTO is
+        // `forbidNonWhitelisted` and would 400 the whole request.
+        if (options.interval) {
+            body.interval = options.interval;
+        }
+        if (typeof options.seats === 'number') {
+            body.seats = options.seats;
         }
         return serverFetch<PlanCheckoutResponse>('/billing/checkout/plan', {
             method: 'POST',
