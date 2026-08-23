@@ -48,9 +48,14 @@ $otherHostileOverrides = [ordered]@{
 	RUSTC_WORKSPACE_WRAPPER = "C:\missing-hostile-rustc-workspace-wrapper.exe"
 	RUSTFLAGS = "-C opt-level=0"
 }
+$linkerHostileOverrides = [ordered]@{
+	LINK = "/STACK:12345678"
+	_LINK_ = "/VERSION:99.99"
+}
 $allManagedNames = @($githubHintNames) +
 	@($profileOverrides.Keys) +
 	@($otherHostileOverrides.Keys) +
+	@($linkerHostileOverrides.Keys) +
 	@("CARGO_ENCODED_RUSTFLAGS") |
 	Select-Object -Unique
 $previousEnvironment = @{}
@@ -118,6 +123,9 @@ try {
 	foreach ($entry in $otherHostileOverrides.GetEnumerator()) {
 		$hostileEnvironment[$entry.Key] = $entry.Value
 	}
+	foreach ($entry in $linkerHostileOverrides.GetEnumerator()) {
+		$hostileEnvironment[$entry.Key] = $entry.Value
+	}
 	$hostileEnvironment["CARGO_ENCODED_RUSTFLAGS"] = "-C$([char]0x1f)opt-level=0$([char]0x1f)-C$([char]0x1f)link-arg=/DEBUG"
 	$hostileEnvironment["GITHUB_ACTIONS"] = "true"
 	$hostileEnvironment["GITHUB_REPOSITORY"] = "attacker/spoofed"
@@ -138,7 +146,7 @@ try {
 	Assert-True ($hostileMetadata.reproducibility.verified -eq $true) "hostile build did not record verified reproducibility"
 	Assert-True (@($controlHashes | Select-Object -Unique).Count -eq 1) "control build executables differ"
 	Assert-True (@($hostileHashes | Select-Object -Unique).Count -eq 1) "hostile build executables differ"
-	Assert-True ($controlHashes[0] -ceq $hostileHashes[0]) "hostile Cargo/Rust environment changed the release executable"
+	Assert-True ($controlHashes[0] -ceq $hostileHashes[0]) "hostile Cargo/Rust/MSVC linker environment changed the release executable"
 	for ($index = 0; $index -lt $controlHashes.Count; $index++) {
 		$evidenceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $evidenceDirectory "control-$index.exe")).Hash.ToLowerInvariant()
 		Assert-True ($evidenceHash -ceq $controlHashes[$index]) "retained control executable $index changed"
@@ -161,6 +169,14 @@ try {
 		Assert-True (
 			$environmentPolicyProperty.Value.clearedCargoProfileOverrideCount -eq $profileOverrides.Count
 		) "not every hostile CARGO_PROFILE_* override was cleared"
+		$linkerOverrideCountProperty = $environmentPolicyProperty.Value.PSObject.Properties["clearedMsvcLinkOptionOverrideCount"]
+		if ($null -eq $linkerOverrideCountProperty) {
+			$failures.Add("MSVC linker option-environment policy evidence is missing")
+		} else {
+			Assert-True (
+				$linkerOverrideCountProperty.Value -eq $linkerHostileOverrides.Count
+			) "not every hostile LINK/_LINK_ override was cleared"
+		}
 	}
 
 	if ($failures.Count -gt 0) {
