@@ -9,7 +9,6 @@ Set-StrictMode -Version Latest
 $packageRoot = $PSScriptRoot
 $fixtureDirectory = Join-Path $packageRoot "target\signed-test-fixture"
 $fixtureArtifactPath = Join-Path $fixtureDirectory "ever-works-windows-job-launcher.exe"
-$certificatePath = Join-Path $fixtureDirectory "ever-works-windows-job-launcher-test.cer"
 $thumbprintPath = Join-Path $fixtureDirectory "certificate-thumbprint.txt"
 
 if ($Cleanup) {
@@ -61,8 +60,16 @@ try {
 		"$($certificate.Thumbprint)`n",
 		[Text.UTF8Encoding]::new($false)
 	)
-	Export-Certificate -Cert $certificate -FilePath $certificatePath -Force | Out-Null
-	Import-Certificate -FilePath $certificatePath -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
+	$rootStore = [Security.Cryptography.X509Certificates.X509Store]::new(
+		[Security.Cryptography.X509Certificates.StoreName]::Root,
+		[Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
+	)
+	try {
+		$rootStore.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+		$rootStore.Add($certificate)
+	} finally {
+		$rootStore.Close()
+	}
 	Write-Host "Trusted ephemeral certificate for this test runner only"
 	Write-Host "Signing copied test-only helper fixture"
 	$signature = Set-AuthenticodeSignature `
