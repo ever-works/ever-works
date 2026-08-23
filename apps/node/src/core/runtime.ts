@@ -11,9 +11,11 @@ import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
 import type { ResourceProbe } from './resource-limits';
 import { WorkerLoop } from './worker-loop';
+import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
+import { defaultFleetTaskWorkspaceRoot, FleetTaskWorkspaceProvisioner } from './workspaces/fleet-task-workspace';
 import type { Logger } from './logger';
 import {
 	clampResourceLimits,
@@ -245,6 +247,14 @@ export interface CreateNodeRuntimeOptions {
 	 * service's own working directory.
 	 */
 	agentTaskWorkspacePath?: string;
+	/** Persistent bare-cache/worktree root for repository-backed agent Tasks. */
+	agentTaskWorkspaceRoot?: string;
+	/** Test/embedding seam; ordinary runtimes use the local-workspace provider. */
+	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'>;
+	/** Persist a fail-closed worker quarantine into the node config. */
+	persistUnsafe?: (state: { since: string; reason: string }) => Promise<void> | void;
+	/** Durable write-ahead crash guard; acquired before the first job lease. */
+	workerSafetyGate?: WorkerSafetyGate;
 
 	/**
 	 * Start the worker drained. The node still heartbeats (so it stays
@@ -314,21 +324,36 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
 			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
 			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
-			...(io.scheduler ? { scheduler: io.scheduler } : {})
+			...(config.unsafe ? { startUnsafe: config.unsafe } : {}),
+			...(options.persistUnsafe ? { onUnsafe: options.persistUnsafe } : {}),
+			...(options.workerSafetyGate ? { safetyGate: options.workerSafetyGate } : {}),
+			...(io.scheduler ? { scheduler: io.scheduler } : {}),
+			...(io.now ? { now: io.now } : {})
 		});
+		const workspaceProvisioner =
+			options.workspaceProvisioner ??
+			new FleetTaskWorkspaceProvisioner({
+				rootPath: options.agentTaskWorkspaceRoot ?? defaultFleetTaskWorkspaceRoot()
+			});
 		// The executor seam: a job kind is one more `register` call
 		// against the same protocol — no new endpoint, no new credential.
-		worker.register('acceptance-checks', (job) => runAcceptanceChecksJob(job));
+		worker.register('acceptance-checks', (job, signal) => runAcceptanceChecksJob(job, {}, signal));
 		// The general kind. Without it an enrolled machine could only ever
 		// score a gate; with it a Task's run can actually EXECUTE here when
 		// the owner's resolved job runtime is the fleet. Same seam, same
 		// protocol, same credential — exactly as the header above promised.
-		worker.register('agent-task', (job) =>
-			runAgentTaskJob(job, {
-				...(options.agentTaskWorkspacePath !== undefined
-					? { defaultWorkspacePath: options.agentTaskWorkspacePath }
-					: {})
-			})
+		worker.register('agent-task', (job, signal) =>
+			runAgentTaskJob(
+				job,
+				{
+					provisionWorkspace: (taskId, spec, provisionSignal) =>
+						workspaceProvisioner.provision(taskId, spec, provisionSignal),
+					...(options.agentTaskWorkspacePath !== undefined
+						? { defaultWorkspacePath: options.agentTaskWorkspacePath }
+						: {})
+				},
+				signal
+			)
 		);
 		// `browser-check` is registered ONLY when this machine actually
 		// resolved a browser executable (audit A26). A node advertising

@@ -157,6 +157,8 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             getOrGenerateAuthSecret: jest.fn().mockResolvedValue('auth-secret-base64'),
             getOrGenerateCookieSecret: jest.fn().mockResolvedValue('cookie-secret-base64'),
             getDatabaseUrl: jest.fn().mockResolvedValue(null),
+            // Allow-listed per-Work env (Stripe keys & co.). Default = none.
+            getRuntimeEnvVars: jest.fn().mockResolvedValue({}),
         };
 
         // EW-617 G5: DNS automation no-ops in tests (no env vars). The
@@ -226,6 +228,7 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             funnel,
             subdomainAllocator,
             customDomainRepository,
+            workRuntimeEnvService,
         };
     };
 
@@ -233,6 +236,105 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         secrets: gh.setActionSecret.mock.calls.map((c: any[]) => c[0]),
         variables: gh.setActionVariable.mock.calls.map((c: any[]) => c[0]),
         dispatches: gh.dispatchWorkflow.mock.calls.map((c: any[]) => c[0]),
+    });
+
+    describe('per-Work allow-listed runtime env (Stripe keys & co.) — workflow path', () => {
+        it('pushes each configured per-Work env var as a repo secret, for any provider (Vercel here)', async () => {
+            const { service, githubPlugin, workRuntimeEnvService } = buildService({
+                plugin: { id: 'vercel' },
+                deployProvider: 'vercel',
+                token: 'vercel-token',
+            });
+            workRuntimeEnvService.getRuntimeEnvVars.mockResolvedValue({
+                STRIPE_SECRET_KEY: 'sk_live_abc',
+                NEXT_PUBLIC_PAYMENT_PROVIDER: 'stripe',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            expect(workRuntimeEnvService.getRuntimeEnvVars).toHaveBeenCalledWith('work-1');
+            const byKey = Object.fromEntries(
+                captureCalls(githubPlugin).secrets.map((s: any) => [s.key, s.value]),
+            );
+            expect(byKey.STRIPE_SECRET_KEY).toBe('sk_live_abc');
+            expect(byKey.NEXT_PUBLIC_PAYMENT_PROVIDER).toBe('stripe');
+            // The managed secrets still land alongside.
+            expect(byKey.WORK_ID).toBe('work-1');
+        });
+
+        it('pushes each configured per-Work env var on the k8s workflow path too', async () => {
+            const { service, githubPlugin, workRuntimeEnvService } = buildService({
+                plugin: {
+                    id: 'k8s',
+                    getWorkflowFilenames: () => ['deploy_k8s.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+                deployProvider: 'k8s',
+            });
+            workRuntimeEnvService.getRuntimeEnvVars.mockResolvedValue({
+                STRIPE_WEBHOOK_SECRET: 'whsec_123',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const keys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+            expect(keys).toContain('STRIPE_WEBHOOK_SECRET');
+            // Managed runtime env pushed by ensureRuntimeEnv is untouched.
+            expect(keys).toContain('AUTH_SECRET');
+            expect(keys).toContain('COOKIE_SECRET');
+        });
+
+        it('pushes nothing extra when no per-Work env is configured', async () => {
+            const { service, githubPlugin } = buildService({
+                plugin: { id: 'vercel' },
+                deployProvider: 'vercel',
+                token: 'vercel-token',
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            const keys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+            expect(keys.some((k: string) => k.startsWith('STRIPE_'))).toBe(false);
+        });
+
+        it('does NOT block the deploy when the per-Work env lookup throws', async () => {
+            const { service, githubPlugin, workRuntimeEnvService } = buildService({
+                plugin: { id: 'vercel' },
+                deployProvider: 'vercel',
+                token: 'vercel-token',
+            });
+            workRuntimeEnvService.getRuntimeEnvVars.mockRejectedValueOnce(
+                new Error('PLATFORM_ENCRYPTION_KEY is not set'),
+            );
+
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toMatchObject({
+                dispatched: true,
+            });
+            const keys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+            expect(keys).toContain('WORK_ID');
+        });
+
+        it('does NOT block the deploy when pushing one per-Work env secret fails', async () => {
+            const { service, githubPlugin, workRuntimeEnvService } = buildService({
+                plugin: { id: 'vercel' },
+                deployProvider: 'vercel',
+                token: 'vercel-token',
+            });
+            workRuntimeEnvService.getRuntimeEnvVars.mockResolvedValue({
+                STRIPE_SECRET_KEY: 'sk_live_abc',
+                NEXT_PUBLIC_PAYMENT_PROVIDER: 'stripe',
+            });
+            githubPlugin.setActionSecret.mockImplementation(async (args: { key: string }) => {
+                if (args.key === 'STRIPE_SECRET_KEY') throw new Error('GitHub 502');
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).resolves.toMatchObject({
+                dispatched: true,
+            });
+            const keys = captureCalls(githubPlugin).secrets.map((s: any) => s.key);
+            // The other var was still attempted; the failure is contained.
+            expect(keys).toContain('NEXT_PUBLIC_PAYMENT_PROVIDER');
+        });
     });
 
     it('writes the Vercel team scope secret name consumed by template workflows', async () => {

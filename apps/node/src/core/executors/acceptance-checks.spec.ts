@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { promises as fs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { FleetJobView } from '@ever-works/contracts';
 import {
 	AcceptanceChecksPayloadError,
 	buildNodeCheckEnv,
 	normalizeChecks,
-	runAcceptanceChecksJob
+	runAcceptanceChecksJob,
+	runNodeCommandStep
 } from './acceptance-checks';
 
 /**
@@ -188,6 +194,56 @@ describe('runAcceptanceChecksJob — verdict rules mirror the platform gate runn
 		);
 		expect(outcome.results[0].status).toBe('red');
 	});
+});
+
+describe('runNodeCommandStep — cancellation', () => {
+	it('terminates the real shell process tree and fails closed when its lease signal aborts', async () => {
+		const ownedRoot = mkdtempSync(join(tmpdir(), 'ew-node-command-cancel-'));
+		const readyPath = join(ownedRoot, 'ready.json');
+		const markerPath = join(ownedRoot, 'grandchild-survived.txt');
+		const childScript = join(ownedRoot, 'child.cjs');
+		const parentScript = join(ownedRoot, 'parent.cjs');
+		let pids: { parent?: number; child?: number } = {};
+		try {
+			writeFileSync(
+				childScript,
+				`const fs=require('node:fs');setTimeout(()=>fs.writeFileSync(${JSON.stringify(markerPath)},'alive'),750);setInterval(()=>{},1000);`
+			);
+			writeFileSync(
+				parentScript,
+				`const fs=require('node:fs');const {spawn}=require('node:child_process');const child=spawn(process.execPath,[${JSON.stringify(childScript)}],{stdio:'ignore'});fs.writeFileSync(${JSON.stringify(readyPath)},JSON.stringify({parent:process.pid,child:child.pid}));setInterval(()=>{},1000);`
+			);
+			const controller = new AbortController();
+			const command = `"${process.execPath}" "${parentScript}"`;
+			const pending = runNodeCommandStep(
+				{ id: 'real-tree', command, timeoutSec: 3 },
+				ownedRoot,
+				{},
+				controller.signal
+			);
+			await expect.poll(() => existsSync(readyPath), { timeout: 2_500 }).toBe(true);
+			pids = JSON.parse(await fs.readFile(readyPath, 'utf8')) as typeof pids;
+
+			controller.abort(new Error('Fleet job lease was lost'));
+			await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+			await new Promise((resolve) => setTimeout(resolve, 1_000));
+			expect(existsSync(markerPath)).toBe(false);
+		} finally {
+			for (const pid of [pids.parent, pids.child]) {
+				if (!pid) continue;
+				try {
+					if (process.platform === 'win32') {
+						execFileSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' });
+					} else {
+						process.kill(pid, 'SIGKILL');
+					}
+				} catch {
+					// Already terminated by the command runner.
+				}
+			}
+			await fs.rm(ownedRoot, { recursive: true, force: true, maxRetries: 3 });
+		}
+	}, 10_000);
 });
 
 describe('buildNodeCheckEnv — a check never inherits this machine', () => {

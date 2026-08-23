@@ -30,6 +30,7 @@ import {
 import { CREDIT_PACKS, CREDIT_PACK_IDS } from './billing/credit-packs';
 import { CreditLedgerService, InsufficientCreditsError } from './credits/credit-ledger.service';
 import { ENTITLEMENT_KEYS, EntitlementsService } from './credits/entitlements.service';
+import { PlanRunLimitsService } from './credits/plan-run-limits.service';
 import { RunCostSettlementService } from './credits/run-cost-settlement.service';
 import {
     InvalidUsagePeriodError,
@@ -83,6 +84,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
         it('re-exports the credits surface (pricing Wave 9 M1)', () => {
             expect(subscriptionsBarrel.CreditLedgerService).toBe(CreditLedgerService);
             expect(subscriptionsBarrel.EntitlementsService).toBe(EntitlementsService);
+            expect(subscriptionsBarrel.PlanRunLimitsService).toBe(PlanRunLimitsService);
             expect(subscriptionsBarrel.InsufficientCreditsError).toBe(InsufficientCreditsError);
             expect(subscriptionsBarrel.ENTITLEMENT_KEYS).toBe(ENTITLEMENT_KEYS);
         });
@@ -168,6 +170,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                 [
                     'SubscriptionsModule',
                     'SubscriptionService',
+                    // Boot-time per-plan entitlement seed (insert-if-missing).
+                    'PLAN_ENTITLEMENT_SEED_DATA',
                     'UsageLedgerService',
                     'BillingProvider',
                     'BillingProviderError',
@@ -188,6 +192,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'UnknownCreditPackError',
                     // Subscription lifecycle (audit B07/B08)
                     'NoActiveSubscriptionError',
+                    'PLAN_GRANT_REF_TYPE',
                     'AutoRechargeService',
                     // Paid-plan purchase (audit B24)
                     'PlanSubscriptionService',
@@ -196,6 +201,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'CheckoutSessionNotFoundError',
                     // Payment methods (audit B10/B25)
                     'PaymentMethodService',
+                    'PlanCreditGrantService',
                     'PaymentMethodNotFoundError',
                     'LastPaymentMethodError',
                     // Provider-side setup-session marker + the handle
@@ -204,16 +210,20 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'paymentMethodHandle',
                     // Credits ledger + plan entitlements (pricing Wave 9 M1)
                     'CreditLedgerService',
+                    'CreditsSweepService',
                     'InsufficientCreditsError',
                     // Transcript retention sentinels (#1877).
                     'RETENTION_FOREVER',
                     'RETENTION_NONE',
                     'EntitlementsService',
                     'ENTITLEMENT_KEYS',
+                    // Plan-driven concurrency ceiling for the dispatch gate (H2)
+                    'PlanRunLimitsService',
                     // Run-cost settlement (pricing Wave 9 M2)
                     'RunCostSettlementService',
                     // Usage-summary aggregations (Wave 13 Billing/Usage UI)
                     'UsageSummaryService',
+                    'addMonthsClamped',
                     'resolveUsageSummaryWindow',
                     'InvalidUsagePeriodError',
                     'USAGE_SUMMARY_GROUP_BYS',
@@ -253,6 +263,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             const providers = getMeta('providers');
             expect(providers).toContain(CreditLedgerService);
             expect(providers).toContain(EntitlementsService);
+            expect(providers).toContain(PlanRunLimitsService);
         });
 
         it('declares + exports RunCostSettlementService (Wave 9 M2)', () => {
@@ -360,6 +371,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             const exports = getMeta('exports');
             expect(exports).toContain(CreditLedgerService);
             expect(exports).toContain(EntitlementsService);
+            expect(exports).toContain(PlanRunLimitsService);
         });
 
         it('does NOT export ManualBillingProvider directly — consumers use the abstract token', () => {

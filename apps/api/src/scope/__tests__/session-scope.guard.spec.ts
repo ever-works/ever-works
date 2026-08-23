@@ -1,7 +1,7 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, NotFoundException } from '@nestjs/common';
 import { ScopeContextService } from '../scope-context.service';
 import { SessionScopeGuard } from '../session-scope.guard';
 
@@ -10,7 +10,10 @@ import { SessionScopeGuard } from '../session-scope.guard';
  * `getType()` returns 'http' by default; `switchToHttp().getRequest()`
  * returns the `request` object we pass in.
  */
-function makeContext(request: { user?: unknown }): ExecutionContext {
+function makeContext(request: {
+    user?: unknown;
+    headers?: Record<string, string | string[] | undefined>;
+}): ExecutionContext {
     return {
         getType: () => 'http',
         switchToHttp: () => ({
@@ -19,6 +22,36 @@ function makeContext(request: { user?: unknown }): ExecutionContext {
             getNext: <T = unknown>(): T => ({}) as T,
         }),
     } as unknown as ExecutionContext;
+}
+
+function makeGuard(
+    scopeContext: ScopeContextService,
+    userRepository: ConstructorParameters<typeof SessionScopeGuard>[1],
+): SessionScopeGuard {
+    const tenantForOrganization = (organizationId: string): string => {
+        if (organizationId === 'o-mine') return 't-mine';
+        if (organizationId === 'o-other') return 't-other';
+        if (organizationId === 'o-resolved') return 't-resolved';
+        return 't-1';
+    };
+    return new SessionScopeGuard(
+        scopeContext,
+        userRepository,
+        {
+            findById: jest.fn(async (organizationId: string) => ({
+                id: organizationId,
+                tenantId: tenantForOrganization(organizationId),
+            })),
+        } as never,
+        {
+            findByOrgAndUser: jest.fn(async (organizationId: string, userId: string) => ({
+                organizationId,
+                userId,
+                tenantId: tenantForOrganization(organizationId),
+            })),
+        } as never,
+        { findById: jest.fn(async () => ({ ownerUserId: 'tenant-owner' })) } as never,
+    );
 }
 
 type FindByIdResult = {
@@ -37,7 +70,7 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
         const userRepository = { findById } as unknown as ConstructorParameters<
             typeof SessionScopeGuard
         >[1];
-        guard = new SessionScopeGuard(scopeContext, userRepository);
+        guard = makeGuard(scopeContext, userRepository);
     });
 
     it('returns true and makes no DB call for non-HTTP contexts', async () => {
@@ -80,7 +113,7 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
         expect(findById).not.toHaveBeenCalled();
     });
 
-    it('seeds { tenantId, organizationId } for a user with both set', async () => {
+    it('treats a headerless unprefixed request as personal and never reads the mutable pointer', async () => {
         findById.mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-1' });
         const ctx = makeContext({ user: { userId: 'u-1' } });
 
@@ -93,7 +126,25 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
         );
 
         expect(findById).toHaveBeenCalledWith('u-1');
-        expect(observed).toEqual({ tenantId: 't-1', organizationId: 'o-1' });
+        expect(observed).toEqual({ tenantId: 't-1', organizationId: null });
+    });
+
+    it('keeps explicit @personal personal even when another tab persisted an Organization', async () => {
+        findById.mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-yo' });
+        const ctx = makeContext({
+            user: { userId: 'u-1' },
+            headers: { 'x-scope-slug': '@personal' },
+        });
+
+        const observed = await scopeContext.runWith(
+            { tenantId: null, organizationId: null },
+            async () => {
+                await guard.canActivate(ctx);
+                return scopeContext.getScope();
+            },
+        );
+
+        expect(observed).toEqual({ tenantId: 't-1', organizationId: null });
     });
 
     it('seeds { tenantId, organizationId: null } when lastScopeOrganizationId is null', async () => {
@@ -143,6 +194,98 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
 
         expect(reqUser.tenantId).toBe('t-1');
     });
+
+    it.each([
+        [
+            'a removed Ever membership while Yo membership keeps the Tenant active',
+            { id: 'o-ever', tenantId: 't-1' },
+        ],
+        ['an Organization that no longer exists', null],
+    ])('returns the same opaque 404 for %s', async (_label, organization) => {
+        findById.mockResolvedValue({
+            tenantId: 't-1',
+            lastScopeOrganizationId: 'o-yo',
+        });
+        const organizationRepository = {
+            findById: jest.fn().mockResolvedValue(organization),
+        };
+        const organizationMembers = {
+            // The user still belongs to Yo, but their Ever roster row was revoked.
+            findByOrgAndUser: jest.fn().mockResolvedValue(null),
+        };
+        const tenants = {
+            findById: jest.fn().mockResolvedValue({ ownerUserId: 'tenant-owner' }),
+        };
+        const membershipGuard = new (SessionScopeGuard as any)(
+            scopeContext,
+            { findById },
+            organizationRepository,
+            organizationMembers,
+            tenants,
+        );
+        const ctx = makeContext({ user: { userId: 'u-1' } });
+
+        await expect(
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-ever' }, () =>
+                membershipGuard.canActivate(ctx),
+            ),
+        ).rejects.toMatchObject({
+            constructor: NotFoundException,
+            message: 'Organization not found',
+        });
+    });
+
+    it('a revoked last-active membership never affects a headerless request: personal scope, no roster lookup', async () => {
+        findById.mockResolvedValue({
+            tenantId: 't-1',
+            lastScopeOrganizationId: 'o-ever',
+        });
+        const organizationRepository = {
+            findById: jest.fn().mockResolvedValue({ id: 'o-ever', tenantId: 't-1' }),
+        };
+        const organizationMembers = { findByOrgAndUser: jest.fn().mockResolvedValue(null) };
+        const membershipGuard = new SessionScopeGuard(
+            scopeContext,
+            { findById } as never,
+            organizationRepository as never,
+            organizationMembers as never,
+            { findById: jest.fn().mockResolvedValue({ ownerUserId: 'tenant-owner' }) } as never,
+        );
+        const ctx = makeContext({ user: { userId: 'u-1' } });
+
+        const observed = await scopeContext.runWith(
+            { tenantId: null, organizationId: null },
+            async () => {
+                await membershipGuard.canActivate(ctx);
+                return scopeContext.getScope();
+            },
+        );
+
+        // The mutable pointer is a fresh-login navigation default only; it is
+        // never read as request authority, so revocation cannot lock the user
+        // out of their own personal scope and no Organization lookup happens.
+        expect(observed).toEqual({ tenantId: 't-1', organizationId: null });
+        expect(organizationRepository.findById).not.toHaveBeenCalled();
+        expect(organizationMembers.findByOrgAndUser).not.toHaveBeenCalled();
+    });
+
+    it('keeps Tenant-owner access even though owners intentionally have no roster row', async () => {
+        findById.mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-ever' });
+        const membershipGuard = new SessionScopeGuard(
+            scopeContext,
+            { findById } as never,
+            { findById: jest.fn().mockResolvedValue({ id: 'o-ever', tenantId: 't-1' }) } as never,
+            { findByOrgAndUser: jest.fn().mockResolvedValue(null) } as never,
+            { findById: jest.fn().mockResolvedValue({ ownerUserId: 'u-1' }) } as never,
+        );
+        const ctx = makeContext({ user: { userId: 'u-1' } });
+
+        await expect(
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-ever' }, () =>
+                membershipGuard.canActivate(ctx),
+            ),
+        ).resolves.toBe(true);
+    });
 });
 
 /**
@@ -168,12 +311,12 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
         } as unknown as ExecutionContext;
     }
 
-    it('legacy route: session guard seeds scope + hydrates user, ownership guard then allows', async () => {
+    it('personal route: session guard seeds bare scope + hydrates user, ownership guard then allows', async () => {
         const scopeContext = new ScopeContextService();
         const findById = jest
             .fn()
             .mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-1' });
-        const sessionGuard = new SessionScopeGuard(scopeContext, { findById } as never);
+        const sessionGuard = makeGuard(scopeContext, { findById } as never);
         const ownershipGuard = new ScopeOwnershipGuard(scopeContext);
 
         const reqUser: { userId: string; tenantId?: string | null } = { userId: 'u-1' };
@@ -192,7 +335,7 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
 
         // Before the fix this threw 403 in ownershipGuard.
         expect(allowed).toBe(true);
-        expect(observed).toEqual({ tenantId: 't-1', organizationId: 'o-1' });
+        expect(observed).toEqual({ tenantId: 't-1', organizationId: null });
     });
 
     it('slug route to OWN tenant: ownership guard allows after hydration', async () => {
@@ -200,7 +343,7 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
         const findById = jest
             .fn()
             .mockResolvedValue({ tenantId: 't-mine', lastScopeOrganizationId: null });
-        const sessionGuard = new SessionScopeGuard(scopeContext, { findById } as never);
+        const sessionGuard = makeGuard(scopeContext, { findById } as never);
         const ownershipGuard = new ScopeOwnershipGuard(scopeContext);
         const ctx = makeHttpContext({ user: { userId: 'u-1' } });
 
@@ -221,7 +364,7 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
         const findById = jest
             .fn()
             .mockResolvedValue({ tenantId: 't-mine', lastScopeOrganizationId: null });
-        const sessionGuard = new SessionScopeGuard(scopeContext, { findById } as never);
+        const sessionGuard = makeGuard(scopeContext, { findById } as never);
         const ownershipGuard = new ScopeOwnershipGuard(scopeContext);
         const ctx = makeHttpContext({ user: { userId: 'u-1' } });
 

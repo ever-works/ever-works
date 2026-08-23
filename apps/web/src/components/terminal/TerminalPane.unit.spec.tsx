@@ -8,6 +8,7 @@ vi.mock('next-intl', () => ({
 
 import { TerminalPane } from './TerminalPane';
 import type { TerminalRenderer } from './terminal-renderer';
+import { BROWSER_WORKSPACE_SCOPE_HEADER } from '@/lib/workspace-scope';
 
 /**
  * Injected-seam suite: a fake renderer (never mount real xterm in
@@ -136,6 +137,42 @@ describe('TerminalPane', () => {
         );
         return renderer;
     }
+
+    it('stamps the default transcript and attach transport from the visible Organization route', async () => {
+        window.history.replaceState({}, '', '/org/ever/agents/agent-1');
+        const fetchMock = vi.fn(
+            async (input: RequestInfo | URL, _init?: RequestInit) =>
+                new Response(
+                    String(input).includes('/attach-token')
+                        ? JSON.stringify({
+                              token: 'tok',
+                              wsUrl: 'ws://x/ws/terminal/r',
+                              role: 'driver',
+                              expiresInSec: 60,
+                          })
+                        : JSON.stringify({ chunks: [], lastSeq: null, hasMore: false, total: 0 }),
+                    { status: 200 },
+                ),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+
+        render(
+            <TerminalPane
+                agentId={AGENT}
+                runId={RUN}
+                createRenderer={async () => makeFakeRenderer()}
+                attachDeps={{ webSocketImpl: ScriptedSocket as unknown as typeof WebSocket }}
+            />,
+        );
+
+        await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+        for (const call of fetchMock.mock.calls) {
+            const init = call[1] as RequestInit;
+            expect(new Headers(init.headers).get(BROWSER_WORKSPACE_SCOPE_HEADER)).toBe('org:ever');
+        }
+        window.history.replaceState({}, '', '/');
+        vi.unstubAllGlobals();
+    });
 
     it('reaches attached, keeps the mount node React-child-free, and renders live bytes', async () => {
         const renderer = renderPane(okTokenFetch());

@@ -28,6 +28,75 @@ import { WorkRuntimeEnvService } from '../services/work-runtime-env.service';
  * role owns the database it can create the `drizzle`/`public` schema objects
  * that migrate-on-boot needs.
  */
+
+/**
+ * Turn a shared-DB provisioning failure into a short, operator-actionable token
+ * that is SAFE to return to an API caller: only the Postgres SQLSTATE / Node
+ * errno class plus a generic label — never the raw error message, which can
+ * embed the admin connection's host, user or database name.
+ */
+export function summarizeDbProvisionError(error: unknown): string {
+    const rawCode = (error as { code?: unknown } | null | undefined)?.code;
+    const code = typeof rawCode === 'string' ? rawCode : '';
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    const labels: Record<string, string> = {
+        ECONNREFUSED: 'connection refused',
+        ECONNRESET: 'connection reset',
+        ETIMEDOUT: 'connection timed out',
+        ENOTFOUND: 'host not found',
+        EAI_AGAIN: 'DNS lookup failed',
+        EHOSTUNREACH: 'host unreachable',
+        ENETUNREACH: 'network unreachable',
+        '28P01': 'password authentication failed',
+        '28000': 'authentication failed',
+        '42501': 'insufficient privilege (admin role cannot CREATE ROLE / CREATE DATABASE)',
+        '3D000': 'admin database does not exist',
+        '53300': 'too many connections',
+        '57P03': 'server not accepting connections',
+        '08001': 'could not connect',
+        '08006': 'connection failure',
+    };
+    if (code && labels[code]) return `${labels[code]} [${code}]`;
+    if (code) return `error code ${code}`;
+    if (/timeout/i.test(message)) return 'connection timed out';
+    if (/self[- ]signed|certificate/i.test(message)) return 'TLS certificate rejected';
+    if (/\bssl\b|\btls\b/i.test(message)) return 'TLS negotiation failed';
+    return 'unknown error';
+}
+
+/**
+ * Connection options for the `pg` Client given a libpq-style connection string.
+ *
+ * `sslmode=require` / `prefer` mean "encrypt, but do NOT verify the CA" (libpq
+ * semantics; the managed shared cluster uses a self-signed CA). Newer `pg` /
+ * `pg-connection-string` releases parse `sslmode=require` from the URL into a
+ * VERIFYING TLS config, which overrides the explicit `ssl` option and makes every
+ * connection fail with `self-signed certificate in certificate chain` — that is
+ * what broke shared-DB provisioning (`CREATE ROLE` / `CREATE DATABASE` never ran,
+ * `PUT …/runtime-env {mode:"shared"}` answered 500/503) even though the host was
+ * reachable. So: strip `sslmode` from the URL we hand to `pg` and express the
+ * intent through `ssl` ourselves. `verify-ca` / `verify-full` keep full verification.
+ */
+export function pgClientOptions(url: string): {
+    connectionString: string;
+    ssl: { rejectUnauthorized: boolean } | undefined;
+} {
+    const m = /[?&]sslmode=([^&#]*)/i.exec(url);
+    const mode = m ? decodeURIComponent(m[1]).toLowerCase() : '';
+    if (!mode || mode === 'disable' || mode === 'allow') {
+        return { connectionString: url, ssl: undefined };
+    }
+    const stripped = url
+        .replace(/([?&])sslmode=[^&#]*&?/i, '$1')
+        .replace(/[?&]$/, '')
+        .replace(/\?&/, '?');
+    if (mode === 'verify-ca' || mode === 'verify-full') {
+        return { connectionString: stripped, ssl: { rejectUnauthorized: true } };
+    }
+    // require / prefer (and anything unknown): encrypt without CA verification.
+    return { connectionString: stripped, ssl: { rejectUnauthorized: false } };
+}
+
 @Injectable()
 export class EverWorksDbProvisionService {
     private readonly logger = new Logger(EverWorksDbProvisionService.name);
@@ -138,8 +207,7 @@ export class EverWorksDbProvisionService {
         const hex = workId.replace(/-/g, '').toLowerCase();
         const dbName = `${config.everWorks.sharedDb.getNamePrefix()}_${hex}`;
         const client = new Client({
-            connectionString: serverUrl,
-            ssl: this.sslFor(serverUrl),
+            ...pgClientOptions(serverUrl),
             connectionTimeoutMillis: 10000,
         });
         try {
@@ -180,8 +248,7 @@ export class EverWorksDbProvisionService {
             };
         }
         const client = new Client({
-            connectionString: databaseUrl,
-            ssl: this.sslFor(databaseUrl),
+            ...pgClientOptions(databaseUrl),
             connectionTimeoutMillis: 8000,
             statement_timeout: 8000,
         });
@@ -208,8 +275,7 @@ export class EverWorksDbProvisionService {
         password: string,
     ): Promise<void> {
         const client = new Client({
-            connectionString: adminUrl,
-            ssl: this.sslFor(adminUrl),
+            ...pgClientOptions(adminUrl),
             connectionTimeoutMillis: 10000,
         });
         await client.connect();
@@ -241,14 +307,6 @@ export class EverWorksDbProvisionService {
         const sslmode = shared.getSslMode();
         const auth = `${encodeURIComponent(role)}:${encodeURIComponent(password)}`;
         return `postgresql://${auth}@${host}:${port}/${dbName}?sslmode=${sslmode}`;
-    }
-
-    private sslFor(url: string): { rejectUnauthorized: boolean } | undefined {
-        // Managed cluster uses a self-signed CA; `sslmode=require` means encrypt
-        // without CA verification (matches libpq's `require`).
-        return /sslmode=(require|prefer|verify)/i.test(url)
-            ? { rejectUnauthorized: false }
-            : undefined;
     }
 
     private randomPassword(): string {

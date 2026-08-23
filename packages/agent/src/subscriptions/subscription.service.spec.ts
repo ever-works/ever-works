@@ -3,6 +3,8 @@ import { SubscriptionService } from './subscription.service';
 import { SubscriptionPlanCode } from '@src/entities/types';
 import { WorkScheduleBillingMode, WorkScheduleCadence } from '@ever-works/contracts/api';
 
+type SubscriptionServiceDependencies = ConstructorParameters<typeof SubscriptionService>;
+
 /**
  * SubscriptionService is the agent-package gateway between user accounts and
  * the seeded `SubscriptionPlan` rows. It owns: idempotent plan seeding from
@@ -55,20 +57,39 @@ function makeUserRepository(overrides: Record<string, jest.Mock> = {}) {
     };
 }
 
+function makePlanEntitlementRepository(overrides: Record<string, jest.Mock> = {}) {
+    return {
+        findByPlanAndKey: jest.fn().mockResolvedValue(null),
+        insertIfMissing: jest
+            .fn()
+            .mockImplementation(async (e: unknown) => ({ entitlement: e, created: true })),
+        ...overrides,
+    };
+}
+
 function makeService(
     plan: Record<string, jest.Mock> = {},
     userSub: Record<string, jest.Mock> = {},
     user: Record<string, jest.Mock> = {},
+    planEntitlement: Record<string, jest.Mock> = {},
 ) {
     const planRepository = makePlanRepository(plan);
     const userSubscriptionRepository = makeUserSubscriptionRepository(userSub);
     const userRepository = makeUserRepository(user);
+    const planEntitlementRepository = makePlanEntitlementRepository(planEntitlement);
     const service = new SubscriptionService(
-        planRepository as any,
-        userSubscriptionRepository as any,
-        userRepository as any,
+        planRepository as unknown as SubscriptionServiceDependencies[0],
+        userSubscriptionRepository as unknown as SubscriptionServiceDependencies[1],
+        userRepository as unknown as SubscriptionServiceDependencies[2],
+        planEntitlementRepository as unknown as SubscriptionServiceDependencies[3],
     );
-    return { service, planRepository, userSubscriptionRepository, userRepository };
+    return {
+        service,
+        planRepository,
+        userSubscriptionRepository,
+        userRepository,
+        planEntitlementRepository,
+    };
 }
 
 const FREE_PLAN = {
@@ -653,7 +674,7 @@ describe('SubscriptionService', () => {
                 expect(byCadence[cadence].reason).toBeUndefined();
             }
 
-            // The three NOT-allowed cadences should recommend Premium
+            // The three NOT-allowed cadences should recommend Enterprise (the catalog name of `premium`)
             for (const cadence of [
                 WorkScheduleCadence.EVERY_8_HOURS,
                 WorkScheduleCadence.EVERY_3_HOURS,
@@ -661,7 +682,7 @@ describe('SubscriptionService', () => {
             ]) {
                 expect(byCadence[cadence].allowed).toBe(false);
                 expect(byCadence[cadence].payPerUse).toBe(true);
-                expect(byCadence[cadence].reason).toBe('Upgrade to Premium for this cadence');
+                expect(byCadence[cadence].reason).toBe('Upgrade to Enterprise for this cadence');
             }
         });
 
@@ -688,12 +709,12 @@ describe('SubscriptionService', () => {
         // Validated by emitting a pure-payPerUse plan (allowedCadences: []) so
         // EVERY cadence triggers the reason field.
         it.each([
-            [WorkScheduleCadence.HOURLY, 'Premium'],
-            [WorkScheduleCadence.EVERY_3_HOURS, 'Premium'],
-            [WorkScheduleCadence.EVERY_8_HOURS, 'Premium'],
-            [WorkScheduleCadence.EVERY_12_HOURS, 'Standard'],
-            [WorkScheduleCadence.DAILY, 'Standard'],
-            [WorkScheduleCadence.WEEKLY, 'Standard'],
+            [WorkScheduleCadence.HOURLY, 'Enterprise'],
+            [WorkScheduleCadence.EVERY_3_HOURS, 'Enterprise'],
+            [WorkScheduleCadence.EVERY_8_HOURS, 'Enterprise'],
+            [WorkScheduleCadence.EVERY_12_HOURS, 'Pro'],
+            [WorkScheduleCadence.DAILY, 'Pro'],
+            [WorkScheduleCadence.WEEKLY, 'Pro'],
             [WorkScheduleCadence.MONTHLY, 'Free'],
         ] as const)('%s cadence → recommend %s', async (cadence, recommended) => {
             const emptyPlan = { ...FREE_PLAN, allowedCadences: [] };
@@ -1049,5 +1070,76 @@ describe('SubscriptionService', () => {
                 expect(a.allowed).toBe(true);
             }
         });
+    });
+});
+
+// H7: #2160 added three SELF-HOSTED editions to the seed. `listPlans()` returned
+// `findAllActive()` unfiltered, so the hosted Billing page's plan switcher rendered six
+// cards instead of three — including a "Community Edition" whose only possible outcome
+// was an error, because `changePlanSelfService` (correctly) refuses self-hosted here.
+// Found by an adversarial audit of the SHIPPED system, not by this suite.
+describe('listPlans — the switcher only offers what this deployment can actually grant', () => {
+    const cloudPlan = (code: string, name: string) =>
+        ({ code, displayName: name, hosting: 'cloud' }) as any;
+    const selfHostedPlan = (code: string, name: string) =>
+        ({ code, displayName: name, hosting: 'selfhosted' }) as any;
+
+    const ALL_SIX = [
+        cloudPlan('free', 'Free'),
+        cloudPlan('standard', 'Pro'),
+        cloudPlan('premium', 'Enterprise'),
+        selfHostedPlan('selfhosted_community', 'Community Edition'),
+        selfHostedPlan('selfhosted_pro', 'Pro Edition'),
+        selfHostedPlan('selfhosted_enterprise', 'Enterprise Edition'),
+    ];
+
+    it('excludes every self-hosted edition', async () => {
+        const { service } = makeService({
+            findAllActive: jest.fn().mockResolvedValue(ALL_SIX),
+        });
+
+        const plans = await service.listPlans();
+
+        // Guard against a vacuous pass: the repository really did offer all six.
+        expect(ALL_SIX).toHaveLength(6);
+        expect(plans.map((p) => p.code)).toEqual(['free', 'standard', 'premium']);
+        expect(plans.every((p) => p.hosting !== 'selfhosted')).toBe(true);
+    });
+
+    it('agrees with the self-hosted guard about what is selectable here', async () => {
+        // The invariant is about HOSTING specifically: the switcher must not advertise a
+        // plan the guard rejects for being self-hosted. (Self-service separately allows
+        // only FREE — EW-711 #23 — which is why this asserts the hosting rule, not that
+        // every offered plan is freely assignable.)
+        const { service } = makeService({
+            findAllActive: jest.fn().mockResolvedValue(ALL_SIX),
+            findByCode: jest.fn(async (code: string) => ALL_SIX.find((p) => p.code === code)),
+        });
+
+        const offered = await service.listPlans();
+        expect(offered.length).toBeGreaterThan(0);
+        expect(offered.every((p) => p.hosting === 'cloud')).toBe(true);
+
+        // ...and the guard really does refuse the ones now withheld — so the two agree
+        // rather than merely happening not to collide.
+        for (const code of ['selfhosted_community', 'selfhosted_pro', 'selfhosted_enterprise']) {
+            expect(offered.some((p) => p.code === code)).toBe(false);
+            await expect(
+                service.changePlanSelfService({ id: 'u1' } as any, code as any),
+            ).rejects.toThrow();
+        }
+    });
+
+    it('passes through when the catalog has no self-hosted rows at all', async () => {
+        const cloudOnly = ALL_SIX.filter((p) => p.hosting === 'cloud');
+        const { service } = makeService({
+            findAllActive: jest.fn().mockResolvedValue(cloudOnly),
+        });
+
+        expect((await service.listPlans()).map((p) => p.code)).toEqual([
+            'free',
+            'standard',
+            'premium',
+        ]);
     });
 });

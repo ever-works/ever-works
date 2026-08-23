@@ -1,5 +1,6 @@
 import { PipelineOrchestratorService } from './pipeline-orchestrator.service';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { createLazyPluginProxy } from '../plugins/services/lazy-plugin-proxy';
 
 describe('PipelineOrchestratorService', () => {
     let stepExecutor: any;
@@ -150,6 +151,93 @@ describe('PipelineOrchestratorService', () => {
                 undefined,
             );
             expect(stepExecutor.execute).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('lazy plugin stubs (PLUGIN_LAZY_LOAD default)', () => {
+        const work = { id: 'w1', user: { id: 'u1' } } as any;
+        const existing = { items: [] } as any;
+
+        /** A real lazy proxy (what the registry holds before first use) around `real`. */
+        function makeLazyStub(id: string, real: any, loader = jest.fn(async () => real)) {
+            const manifest: any = {
+                id,
+                name: id,
+                version: '1.0.0',
+                category: 'pipeline',
+                capabilities: ['pipeline'],
+            };
+            return { stub: createLazyPluginProxy(manifest, loader), loader };
+        }
+
+        it('materialises the stub before routing so a self-managed pipeline is NOT misrouted to step mode', async () => {
+            // Before the fix the stub answered `executeStep`/`registerStepExecutor` with
+            // forwarding functions, `isStepOrchestratablePipeline()` said "step", and the
+            // step executor then died on `plugin.createContext()` (agent-pipeline: "has no
+            // method createContext"; standard-pipeline: createContext() returned a Promise so
+            // `context.work` was undefined). That was every generation run on the Trigger worker.
+            const real = makePlugin('agent-pipeline', { stepOrchestratable: false });
+            const { stub, loader } = makeLazyStub('agent-pipeline', real);
+            registry.get.mockImplementation((id: string) =>
+                id === 'agent-pipeline' ? makeRegistered(stub) : null,
+            );
+
+            await service.execute(
+                work,
+                { providers: { pipeline: 'agent-pipeline' } } as any,
+                existing,
+            );
+
+            expect(loader).toHaveBeenCalledTimes(1);
+            expect(fullExecutor.execute).toHaveBeenCalledWith(
+                real,
+                work,
+                expect.any(Object),
+                existing,
+                undefined,
+                undefined,
+            );
+            expect(stepExecutor.execute).not.toHaveBeenCalled();
+        });
+
+        it('hands the REAL step-orchestratable plugin (not the stub) to the step executor', async () => {
+            const real = makePlugin('standard', { stepOrchestratable: true });
+            const { stub } = makeLazyStub('standard', real);
+            registry.getByCapability.mockReturnValue([
+                makeRegistered(stub, { defaultForCapabilities: ['pipeline'] }),
+            ]);
+
+            await service.execute(work, { providers: { pipeline: undefined } } as any, existing);
+
+            expect(stepExecutor.execute).toHaveBeenCalledWith(
+                real,
+                work,
+                expect.any(Object),
+                existing,
+                undefined,
+                undefined,
+            );
+        });
+
+        it('getRecommendedMode / hasFullPipelinePlugin probe the materialised plugin surface', async () => {
+            const real = makePlugin('claude-code', { stepOrchestratable: false });
+            const { stub } = makeLazyStub('claude-code', real);
+            registry.getByCapability.mockReturnValue([makeRegistered(stub)]);
+
+            await expect(service.hasFullPipelinePlugin()).resolves.toBe(true);
+            await expect(service.getRecommendedMode()).resolves.toMatchObject({
+                mode: 'full',
+                plugin: 'claude-code',
+            });
+        });
+
+        it('passes real (already materialised / eager) plugins through untouched', async () => {
+            const plugin = makePlugin('standard', { stepOrchestratable: true });
+            registry.getByCapability.mockReturnValue([
+                makeRegistered(plugin, { defaultForCapabilities: ['pipeline'] }),
+            ]);
+            await service.execute(work, { providers: { pipeline: undefined } } as any, existing);
+            expect(stepExecutor.execute.mock.calls[0][0]).toBe(plugin);
         });
     });
 

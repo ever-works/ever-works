@@ -105,6 +105,40 @@ describe('buildSubprocessEnv (C-10)', () => {
 		expect(env.CLAUDE_CODE_OAUTH_TOKEN).toBe('subscription-token');
 	});
 
+	it('isolates HOME and USERPROFILE when a config dir is pinned', () => {
+		// The CLI runs with --dangerously-skip-permissions over scraped web content,
+		// so a hostile prompt must not be able to walk `~` into ~/.aws or ~/.ssh.
+		process.env.HOME = '/home/appuser';
+		process.env.USERPROFILE = 'C:\\Users\\appuser';
+		process.env.TMPDIR = '/tmp/isolated';
+
+		const env = buildSubprocessEnv({ CLAUDE_CONFIG_DIR: '/tmp/cc-run-1' });
+
+		expect(env.HOME).toBe('/tmp/isolated');
+		expect(env.USERPROFILE).toBe('/tmp/isolated');
+		expect(env.HOME).not.toBe('/home/appuser');
+	});
+
+	it('keeps the real HOME when no config dir is pinned, so auth probes still resolve ~/.claude', () => {
+		process.env.HOME = '/home/appuser';
+		process.env.USERPROFILE = 'C:\\Users\\appuser';
+		process.env.TMPDIR = '/tmp/isolated';
+
+		const env = buildSubprocessEnv();
+
+		expect(env.HOME).toBe('/home/appuser');
+		expect(env.USERPROFILE).toBe('C:\\Users\\appuser');
+	});
+
+	it('treats an empty CLAUDE_CONFIG_DIR as not pinned rather than isolating on a blank path', () => {
+		process.env.HOME = '/home/appuser';
+		process.env.TMPDIR = '/tmp/isolated';
+
+		const env = buildSubprocessEnv({ CLAUDE_CONFIG_DIR: '' });
+
+		expect(env.HOME).toBe('/home/appuser');
+	});
+
 	it('drops arbitrary ANTHROPIC_*/CLAUDE_CODE_*-prefixed vars not on the allow-list', () => {
 		// Regression guard: the env was previously built by matching any key that
 		// merely STARTED WITH `ANTHROPIC_` or `CLAUDE_CODE_`, which silently

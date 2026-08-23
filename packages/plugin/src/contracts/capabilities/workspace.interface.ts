@@ -27,6 +27,8 @@ import type { FacadeOptions } from '../../facades/facade-options.interface.js';
  * (remote URLs, files) because the checkout runs untrusted repo code.
  */
 export interface WorkspaceProvisionSpec {
+	/** Stable repository identity supplied by the caller when available. */
+	readonly repositoryId?: string;
 	/** Resolved clone URL (token-free; auth injected per operation). */
 	readonly repoUrl: string;
 	/** Base ref to branch FROM — always fetched fresh before branching. */
@@ -40,6 +42,8 @@ export interface WorkspaceProvisionSpec {
 	readonly depth?: number;
 	/** Per-operation auth injected by the facade (short-lived token). */
 	readonly auth?: { username?: string; token?: string };
+	/** Cancels every Git process started while this workspace is provisioning. */
+	readonly signal?: AbortSignal;
 	readonly settings?: PluginSettings;
 	/**
 	 * Repository registry (Feature G) — ADVISORY list of additional

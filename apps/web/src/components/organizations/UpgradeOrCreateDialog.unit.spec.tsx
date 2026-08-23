@@ -131,6 +131,24 @@ describe('UpgradeOrCreateDialog — EW-661 Phase 9', () => {
             );
             expect(onClose).toHaveBeenCalledWith(true);
         });
+        const init = fetchMock.mock.calls[0][1] as RequestInit;
+        expect(new Headers(init.headers).get('x-ever-workspace')).toBe('personal');
+    });
+
+    it('keeps the dialog open and reports a parent completion failure', async () => {
+        vi.spyOn(global, 'fetch').mockResolvedValue(
+            new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }),
+        );
+        const onClose = vi.fn().mockRejectedValue(new Error('Active scope was not persisted'));
+        render(<UpgradeOrCreateDialog open={true} organization={fakeOrg} onClose={onClose} />);
+
+        fireEvent.click(screen.getByText('organizations.upgrade.confirm'));
+
+        await waitFor(() => {
+            expect(screen.getByRole('alert')).toHaveTextContent('Active scope was not persisted');
+        });
+        expect(onClose).toHaveBeenCalledWith(true);
+        expect(screen.getByText('organizations.upgrade.title')).toBeInTheDocument();
     });
 
     /**

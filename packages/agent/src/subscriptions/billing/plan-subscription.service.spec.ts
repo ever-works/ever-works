@@ -142,6 +142,7 @@ function build(
         profileRepository?: any;
         userRepository?: any;
         subscriptionService?: any;
+        planCreditGrantService?: any;
     } = {},
 ) {
     const provider = overrides.provider ?? makeProvider();
@@ -150,6 +151,7 @@ function build(
     const profileRepository = overrides.profileRepository ?? makeProfileRepository();
     const userRepository = overrides.userRepository ?? makeUserRepository();
     const subscriptionService = overrides.subscriptionService ?? makeSubscriptionService();
+    const planCreditGrantService = overrides.planCreditGrantService;
     const service = new PlanSubscriptionService(
         provider,
         planRepository,
@@ -157,6 +159,7 @@ function build(
         profileRepository,
         userRepository,
         subscriptionService,
+        planCreditGrantService,
     );
     return {
         service,
@@ -166,6 +169,7 @@ function build(
         profileRepository,
         userRepository,
         subscriptionService,
+        planCreditGrantService,
     };
 }
 
@@ -187,6 +191,9 @@ describe('startPlanCheckout — the server prices everything', () => {
             sessionId: 'cs_plan_1',
             planCode: 'standard',
             priceCents: 2500,
+            basePriceCents: 2500,
+            seatCents: 0,
+            extraSeats: 0,
             currency: 'usd',
         });
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
@@ -222,6 +229,56 @@ describe('startPlanCheckout — the server prices everything', () => {
         const request = provider.createPlanCheckoutSession.mock.calls[0][0];
         expect(request.plan.extraSeats).toBe(0);
         expect(request.plan.seatLookupKey).toBeNull();
+    });
+
+    // 🛑 The echoed total used to be the BASE plan amount while the seats were billed as a
+    // separate Stripe line item, so 27 seats on Pro was reported as 2500 and charged 11000.
+    // Stripe's hosted page always showed the truth, so nobody was mischarged — but any in-app
+    // confirmation built on this number understated the price. These assert the OUTCOME (the
+    // amount echoed equals the amount billed), not the mechanism that produces it.
+    it('echoes the TOTAL the buyer will pay, seats included', async () => {
+        const { service, provider } = build();
+
+        const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 27 });
+
+        // 27 requested − 10 included = 17 billable, at $5.00/mo = 8500 on top of the 2500 base.
+        expect(started.basePriceCents).toBe(2500);
+        expect(started.extraSeats).toBe(17);
+        expect(started.seatCents).toBe(8500);
+        expect(started.priceCents).toBe(11000);
+
+        // The echoed total must equal what the provider was actually asked to bill.
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(started.priceCents).toBe(request.plan.priceCents + started.seatCents);
+        expect(request.plan.extraSeats).toBe(started.extraSeats);
+    });
+
+    it('uses the ANNUAL seat rate when the buyer is billed annually', async () => {
+        const { service } = build();
+
+        const started = await service.startPlanCheckout({
+            ...checkoutOptions,
+            interval: 'annual',
+            seats: 27,
+        });
+
+        // An annual seat is 12x the monthly rate with no discount: 17 x 6000 = 102000,
+        // on top of the 20400 annual base.
+        expect(started.basePriceCents).toBe(20400);
+        expect(started.seatCents).toBe(102000);
+        expect(started.priceCents).toBe(122400);
+    });
+
+    it('never adds a seat charge to a total that carries no seat line', async () => {
+        const { service, provider } = build();
+
+        // Inside the allowance: no seat line item, so no seat money either.
+        const started = await service.startPlanCheckout({ ...checkoutOptions, seats: 10 });
+
+        const request = provider.createPlanCheckoutSession.mock.calls[0][0];
+        expect(request.plan.seatLookupKey).toBeNull();
+        expect(started.seatCents).toBe(0);
+        expect(started.priceCents).toBe(started.basePriceCents);
     });
 
     it('bills only the seats beyond the allowance, on the matching seat price', async () => {
@@ -601,6 +658,60 @@ describe('applyWebhook — activation and revocation', () => {
             expect.objectContaining({ id: 'u1' }),
             'standard',
         );
+    });
+
+    /**
+     * Billing spec FR-4 — the allowance month's credits land on activation,
+     * not at the next sweep. Best-effort: a failing grant never un-activates
+     * the tier (the daily sweep shares the idempotency key and catches up).
+     */
+    it('grants the current plan allowance on activation, and a grant failure does not un-activate', async () => {
+        const granting = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+            planCreditGrantService: {
+                grantCurrentAllowance: jest.fn().mockResolvedValue('granted'),
+            },
+        });
+        await expect(granting.service.applyWebhook(event())).resolves.toBe(
+            'subscription-activated',
+        );
+        expect(granting.planCreditGrantService.grantCurrentAllowance).toHaveBeenCalledWith('u1');
+
+        const failing = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+            planCreditGrantService: {
+                grantCurrentAllowance: jest.fn().mockRejectedValue(new Error('ledger down')),
+            },
+        });
+        await expect(failing.service.applyWebhook(event())).resolves.toBe('subscription-activated');
+        expect(failing.subscriptionService.assignPlanToUser).toHaveBeenCalled();
+    });
+
+    it('does not grant an allowance for a self-hosted licence purchase', async () => {
+        const { service, planCreditGrantService } = build({
+            planRepository: makePlanRepository({
+                findByCode: jest.fn().mockResolvedValue({
+                    ...STANDARD_PLAN,
+                    code: 'selfhosted_pro',
+                    hosting: 'selfhosted',
+                }),
+            }),
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+            planCreditGrantService: {
+                grantCurrentAllowance: jest.fn().mockResolvedValue('granted'),
+            },
+        });
+
+        await expect(
+            service.applyWebhook(event({ planCode: 'selfhosted_pro', subscriptionId: null })),
+        ).resolves.toBe('subscription-activated');
+        expect(planCreditGrantService.grantCurrentAllowance).not.toHaveBeenCalled();
     });
 
     /**

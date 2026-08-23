@@ -1,4 +1,8 @@
-import { CreditLedgerService, InsufficientCreditsError } from './credit-ledger.service';
+import { Logger } from '@nestjs/common';
+import {
+    CreditLedgerService,
+    InsufficientCreditsError,
+} from './credit-ledger.service';
 import { CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
 
 /**
@@ -20,6 +24,9 @@ function makeLedgerRepository(overrides: Record<string, jest.Mock> = {}) {
         getBalance: jest.fn().mockResolvedValue(0),
         findForUser: jest.fn().mockResolvedValue({ entries: [], total: 0 }),
         findByIdempotencyKey: jest.fn().mockResolvedValue(null),
+        sumByRefTypeInWindow: jest.fn().mockResolvedValue(0),
+        expireDueBuckets: jest.fn().mockResolvedValue([]),
+        findUsersWithDueBuckets: jest.fn().mockResolvedValue([]),
         ...overrides,
     };
 }
@@ -53,7 +60,12 @@ function makeService(
         entitlementsService as any,
         userRepository as any,
     );
-    return { service, ledgerRepository, entitlementsService, userRepository };
+    return {
+        service,
+        ledgerRepository,
+        entitlementsService,
+        userRepository,
+    };
 }
 
 describe('CreditLedgerService', () => {
@@ -316,9 +328,20 @@ describe('CreditLedgerService', () => {
                     amountCredits: 50,
                     idempotencyKey: 'daily:u1:2026-07-25',
                 }),
-                expect.objectContaining({ maxBalanceAfter: 50 }),
+                // Was `{ maxBalanceAfter: 50 }` — the top-up-to-N ceiling. It is
+                // gone on purpose: the ceiling clamps against the WHOLE balance,
+                // so it silently denied the advertised daily credits to every
+                // paid tier AND to any free user who had bought a credit pack.
+                // The UNIQUE daily key is what limits this to one grant a day.
+                expect.objectContaining({ maxBalanceAfter: null }),
             );
-            expect(summary).toEqual({ granted: 1, skipped: 0, alreadyGranted: 0, scanned: 1 });
+            expect(summary).toEqual({
+                granted: 1,
+                skipped: 0,
+                alreadyGranted: 0,
+                scanned: 1,
+                failed: 0,
+            });
         });
 
         it('is a no-op on re-run: an existing daily key counts as alreadyGranted', async () => {
@@ -332,7 +355,13 @@ describe('CreditLedgerService', () => {
             const summary = await service.dispatchDailyGrants(NOW);
 
             expect(ledgerRepository.recordAtomic).not.toHaveBeenCalled();
-            expect(summary).toEqual({ granted: 0, skipped: 0, alreadyGranted: 1, scanned: 1 });
+            expect(summary).toEqual({
+                granted: 0,
+                skipped: 0,
+                alreadyGranted: 1,
+                scanned: 1,
+                failed: 0,
+            });
         });
 
         it('skips users whose plan has no daily-free entitlement and counts ceiling clamps as skipped', async () => {
@@ -357,7 +386,13 @@ describe('CreditLedgerService', () => {
 
             const summary = await service.dispatchDailyGrants(NOW);
 
-            expect(summary).toEqual({ granted: 0, skipped: 2, alreadyGranted: 0, scanned: 2 });
+            expect(summary).toEqual({
+                granted: 0,
+                skipped: 2,
+                alreadyGranted: 0,
+                scanned: 2,
+                failed: 0,
+            });
         });
 
         it('keeps sweeping when one user fails (best-effort per user)', async () => {
@@ -378,7 +413,293 @@ describe('CreditLedgerService', () => {
 
             const summary = await service.dispatchDailyGrants(NOW);
 
-            expect(summary).toEqual({ granted: 1, skipped: 1, alreadyGranted: 0, scanned: 2 });
+            expect(summary).toEqual({
+                granted: 1,
+                skipped: 1,
+                alreadyGranted: 0,
+                scanned: 2,
+                // A thrown grant is now visible instead of being indistinguishable
+                // from a healthy no-op: `failed` is a subset of `skipped`.
+                failed: 1,
+            });
+        });
+
+        /**
+         * H3 (a) — the advertised daily allowance is universal.
+         *
+         * The sweep used to pass `planCode === 'free' ? fallback : 0` as the
+         * entitlement fallback, so ANY plan without an explicit
+         * `daily-free-credits` row resolved to zero and received nothing,
+         * while the pricing page promised 50/day on every tier.
+         *
+         * This asserts the OUTCOME (a paid user with no row is granted), not
+         * the argument passed to a mock: `getNumber` here behaves like the real
+         * service when no row exists, i.e. it returns the fallback it is given.
+         */
+        it('grants the daily allowance on a PAID plan that has no entitlement row', async () => {
+            const users = [{ id: 'pro-user', defaultPlan: { code: 'standard' } }];
+            const { service, ledgerRepository } = makeService(
+                {},
+                {
+                    // "no row" — the real EntitlementsService returns the fallback.
+                    getNumber: jest
+                        .fn()
+                        .mockImplementation(async (_plan: string, _key: string, fb: number) => fb),
+                },
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
+            );
+
+            const summary = await service.dispatchDailyGrants(NOW);
+
+            expect(summary.granted).toBe(1);
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'pro-user',
+                    kind: CreditLedgerKind.DAILY_FREE,
+                    amountCredits: 50,
+                }),
+                expect.anything(),
+            );
+        });
+
+        /**
+         * H3 (c) — THE hidden blocker, and the correction the attack found.
+         *
+         * `maxBalanceAfter` makes the daily grant a top-up-to-N, which is right
+         * for a free user and catastrophic for a paid one: a Pro balance of
+         * 3,000 monthly credits leaves negative headroom against a level of 50,
+         * so the repository clamps to nothing and writes no row. Every test
+         * passes and the paid tiers silently receive ZERO daily credits.
+         *
+         * Revert-check: change the ceiling back to an unconditional `level` and
+         * this test must go RED (the repository stub reports `skipped`, so
+         * `granted` drops to 0). If it stays green it is asserting nothing.
+         */
+        it('passes NO balance ceiling, so daily credits are always additive', async () => {
+            const users = [
+                { id: 'pro-user', defaultPlan: { code: 'standard', monthlyCredits: 3000 } },
+            ];
+            const { service, ledgerRepository } = makeService(
+                {},
+                {},
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
+            );
+
+            const summary = await service.dispatchDailyGrants(NOW);
+
+            expect(summary.granted).toBe(1);
+            const [, options] = ledgerRepository.recordAtomic.mock.calls[0];
+            expect(options).not.toHaveProperty('maxBalanceAfter', expect.any(Number));
+            expect(options.maxBalanceAfter ?? null).toBeNull();
+        });
+
+        /**
+         * The case that killed the first attempt at a conditional ceiling.
+         *
+         * `maxBalanceAfter` clamps against the WHOLE balance, and `sumBalance`
+         * sums every kind — purchases included. So any ceiling denies the
+         * advertised daily credits to a free user who bought a credit pack:
+         * 25,000 purchased credits against a level of 50 is negative headroom,
+         * the repository writes nothing, and the sweep logs `skipped` exactly
+         * as it does for a healthy user. ~500 days of silence, for the one
+         * free-tier user who actually paid.
+         *
+         * Revert-check: reinstate `maxBalanceAfter: level` and this goes RED.
+         */
+        it('still grants a FREE user who has bought a large credit pack', async () => {
+            const users = [{ id: 'free-buyer', defaultPlan: { code: 'free', monthlyCredits: 0 } }];
+            const { service, ledgerRepository } = makeService(
+                {
+                    // Faithful to the repository: a ceiling below the current
+                    // balance clamps the grant to nothing and writes NO row.
+                    recordAtomic: jest.fn().mockImplementation(async (write: any, opts: any) => {
+                        const balance = 25000; // bought the $200 pack
+                        const ceiling = opts?.maxBalanceAfter;
+                        if (
+                            typeof ceiling === 'number' &&
+                            balance + write.amountCredits > ceiling
+                        ) {
+                            return { status: 'skipped', balance };
+                        }
+                        return {
+                            status: 'created',
+                            entry: {
+                                id: 'e1',
+                                ...write,
+                                balanceAfter: balance + write.amountCredits,
+                            },
+                        };
+                    }),
+                },
+                {},
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
+            );
+
+            const summary = await service.dispatchDailyGrants(NOW);
+
+            expect(summary.granted).toBe(1);
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({ kind: CreditLedgerKind.DAILY_FREE, amountCredits: 50 }),
+                expect.anything(),
+            );
+        });
+    });
+
+    describe('dispatchDailyGrants — universal allowance (billing spec FR-1)', () => {
+        const NOW = new Date('2026-08-25T00:05:00.000Z');
+
+        it('applies the platform fallback to EVERY plan code, not just free', async () => {
+            const users = [
+                { id: 'free-user', defaultPlan: { code: 'free' } },
+                { id: 'pro-user', defaultPlan: { code: 'standard' } },
+                { id: 'ent-user', defaultPlan: { code: 'premium' } },
+            ];
+            const { service, ledgerRepository, entitlementsService } = makeService(
+                {},
+                {
+                    // No entitlement rows: every plan resolves the caller's fallback.
+                    getNumber: jest
+                        .fn()
+                        .mockImplementation(async (_plan: string, _key: string, fb: number) => fb),
+                },
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
+            );
+
+            const summary = await service.dispatchDailyGrants(NOW);
+
+            for (const code of ['free', 'standard', 'premium']) {
+                expect(entitlementsService.getNumber).toHaveBeenCalledWith(
+                    code,
+                    'daily-free-credits',
+                    50,
+                );
+            }
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledTimes(3);
+            expect(summary).toEqual({
+                granted: 3,
+                skipped: 0,
+                alreadyGranted: 0,
+                scanned: 3,
+                failed: 0,
+            });
+        });
+
+        it('honours CREDITS_DAILY_FREE as the universal fallback level', async () => {
+            process.env.CREDITS_DAILY_FREE = '75';
+            const users = [{ id: 'pro-user', defaultPlan: { code: 'standard' } }];
+            const { service, ledgerRepository } = makeService(
+                {},
+                {
+                    getNumber: jest
+                        .fn()
+                        .mockImplementation(async (_plan: string, _key: string, fb: number) => fb),
+                },
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
+            );
+
+            await service.dispatchDailyGrants(NOW);
+
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({ amountCredits: 75 }),
+                expect.objectContaining({ maxBalanceAfter: null }),
+            );
+        });
+    });
+
+    describe('grantDailyForUser — lazy per-user grant (billing spec FR-3)', () => {
+        const NOW = new Date('2026-08-25T13:00:00.000Z');
+
+        it('writes the same daily key the sweep would, so the two can never double-grant', async () => {
+            const { service, ledgerRepository } = makeService();
+
+            expect(await service.grantDailyForUser('u1', 'standard', NOW)).toBe('granted');
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    kind: CreditLedgerKind.DAILY_FREE,
+                    amountCredits: 50,
+                    idempotencyKey: 'daily:u1:2026-08-25',
+                }),
+                expect.objectContaining({ maxBalanceAfter: null }),
+            );
+        });
+
+        it("reports already-granted when today's key exists and skipped when the ceiling clamps", async () => {
+            const already = makeService({
+                findByIdempotencyKey: jest.fn().mockResolvedValue({ id: 'prior' }),
+            });
+            expect(await already.service.grantDailyForUser('u1', 'free', NOW)).toBe(
+                'already-granted',
+            );
+            expect(already.ledgerRepository.recordAtomic).not.toHaveBeenCalled();
+
+            const clamped = makeService({
+                recordAtomic: jest.fn().mockResolvedValue({ status: 'skipped', balance: 900 }),
+            });
+            expect(await clamped.service.grantDailyForUser('u1', 'free', NOW)).toBe('skipped');
+        });
+    });
+
+    describe('expireDueCredits — expiry sweep (billing spec FR-7)', () => {
+        const NOW = new Date('2026-09-23T00:05:00.000Z');
+
+        it("closes one user's due buckets and tallies them", async () => {
+            const { service, ledgerRepository } = makeService({
+                expireDueBuckets: jest.fn().mockResolvedValue([
+                    { entryId: 'a', expiredCredits: 300, expiryEntry: {} },
+                    { entryId: 'b', expiredCredits: 200, expiryEntry: {} },
+                ]),
+            });
+
+            const summary = await service.expireDueCredits('u1', NOW);
+
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u1', NOW);
+            expect(ledgerRepository.findUsersWithDueBuckets).not.toHaveBeenCalled();
+            expect(summary).toEqual({ users: 1, buckets: 2, credits: 500 });
+        });
+
+        it('without a user, walks every user with a due bucket until the work list is empty', async () => {
+            const { service, ledgerRepository } = makeService({
+                findUsersWithDueBuckets: jest
+                    .fn()
+                    .mockResolvedValueOnce(['u1', 'u2'])
+                    .mockResolvedValue([]),
+                expireDueBuckets: jest
+                    .fn()
+                    .mockResolvedValueOnce([{ entryId: 'a', expiredCredits: 10, expiryEntry: {} }])
+                    .mockResolvedValueOnce([]),
+            });
+
+            const summary = await service.expireDueCredits(undefined, NOW);
+
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u1', NOW);
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u2', NOW);
+            // u2 had nothing left by the time it was visited → not counted as a user.
+            expect(summary).toEqual({ users: 1, buckets: 1, credits: 10 });
+        });
+
+        it('record forwards expiresAt for a positive write only', async () => {
+            const { service, ledgerRepository } = makeService();
+            const expiresAt = new Date('2026-10-23T00:00:00.000Z');
+
+            await service.record({
+                userId: 'u1',
+                kind: CreditLedgerKind.GRANT,
+                amountCredits: 3000,
+                expiresAt,
+            });
+            await service.record({
+                userId: 'u1',
+                kind: CreditLedgerKind.CONSUMPTION,
+                amountCredits: -5,
+                expiresAt,
+                allowNegativeBalance: true,
+            });
+
+            expect(ledgerRepository.recordAtomic.mock.calls[0][0]).toEqual(
+                expect.objectContaining({ expiresAt }),
+            );
+            expect(ledgerRepository.recordAtomic.mock.calls[1][0].expiresAt).toBeUndefined();
         });
     });
 

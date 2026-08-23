@@ -7,7 +7,12 @@ import { Link, usePathname } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import type { Work } from '@/lib/api/work';
-import { WorkMemberRole, WorkScheduleStatus, WorkScheduleCadence } from '@/lib/api/enums';
+import {
+    GenerateStatusType,
+    WorkMemberRole,
+    WorkScheduleStatus,
+    WorkScheduleCadence,
+} from '@/lib/api/enums';
 import { Github, Users, FolderClosed, AlertTriangle, AlertCircle } from 'lucide-react';
 import { WorkErrorPopup } from './WorkErrorPopup';
 import { ShowDateTime } from '../ui/show-datetime';
@@ -103,6 +108,7 @@ function StatusBadge({
                             role="button"
                             tabIndex={0}
                             className={badgeClasses}
+                            data-testid="work-last-run"
                         >
                             {badgeContent}
                         </span>
@@ -117,7 +123,9 @@ function StatusBadge({
                     />
                 </HoverPopup>
             ) : (
-                <span className={badgeClasses}>{badgeContent}</span>
+                <span className={badgeClasses} data-testid="work-last-run">
+                    {badgeContent}
+                </span>
             )}
 
             {/* Config-sync error badge — when generation is OK but works_config.sync_failed */}
@@ -160,23 +168,40 @@ const formatScheduledDate = (date: string, locale: string) => {
 export function WorkCard({ work }: WorkCardProps) {
     const t = useTranslations('dashboard.workCard');
     const tStatus = useTranslations('dashboard.workDetail.status');
+    const tSchedule = useTranslations('dashboard.workDetail.schedule.card.summary');
     const pathname = usePathname();
     const [isOpening, setIsOpening] = useState(false);
 
-    const status = work.generateStatus?.status;
+    const status = work.lastRun?.generation?.status ?? work.generateStatus?.status;
     const hasWarnings = !!work.generateStatus?.warnings?.length;
     const statusConfig = getGenerationStatusConfig(status, { hasWarnings });
     const isScheduled = work.scheduledStatus === WorkScheduleStatus.ACTIVE;
     const userRole = work.userRole;
     const isShared = userRole && userRole !== WorkMemberRole.OWNER;
-    const isGenerating = statusConfig.labelKey === 'generating' || isOpening;
-    const showStatusBadge = !isScheduled || isGenerating || isOpening;
-    const showScheduledBadge = isScheduled && !isOpening && !isGenerating;
-    const baseStatusLabel = isOpening
+    const currentHealthState =
+        work.currentHealth?.state ??
+        (status === 'generating'
+            ? 'running'
+            : work.scheduledStatus === WorkScheduleStatus.PAUSED
+              ? 'paused'
+              : 'idle');
+    const isGenerating = currentHealthState === 'running' || isOpening;
+    const showLastRunBadge = !isGenerating && !!status;
+    const showScheduledBadge = isScheduled && !isOpening;
+    const lastRunStatusLabel =
+        statusConfig.labelKey === 'generatedWithWarnings'
+            ? tStatus('generated')
+            : tStatus(statusConfig.labelKey);
+    const currentStatusLabel = isOpening
         ? t('status.opening')
-        : statusConfig.labelKey === 'generatedWithWarnings'
-          ? tStatus('generated')
-          : tStatus(statusConfig.labelKey);
+        : currentHealthState === 'running'
+          ? tStatus('generating')
+          : currentHealthState === 'paused'
+            ? tSchedule('statusMap.paused')
+            : t('status.idle');
+    const currentStatusConfig = getGenerationStatusConfig(
+        currentHealthState === 'running' ? GenerateStatusType.GENERATING : null,
+    );
 
     useEffect(() => {
         if (!isOpening) {
@@ -309,13 +334,29 @@ export function WorkCard({ work }: WorkCardProps) {
 
                 <div className="flex items-center justify-between text-[11px] pt-4 border-t border-border dark:border-border-dark mt-auto">
                     <div className="flex items-center gap-1.5">
-                        {showStatusBadge && (
+                        <span
+                            data-testid="work-current-health"
+                            className={cn(
+                                'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-normal whitespace-nowrap shrink-0',
+                                isOpening
+                                    ? 'bg-primary/15 text-primary dark:bg-white/12 dark:text-white'
+                                    : currentStatusConfig.badge,
+                                isGenerating && 'animate-pulse bg-gray-100',
+                            )}
+                        >
+                            {isGenerating || isOpening ? (
+                                <ShinyText text={currentStatusLabel} />
+                            ) : (
+                                currentStatusLabel
+                            )}
+                        </span>
+                        {showLastRunBadge && (
                             <StatusBadge
                                 work={work}
                                 statusConfig={statusConfig}
                                 isOpening={isOpening}
                                 isGenerating={isGenerating}
-                                baseStatusLabel={baseStatusLabel}
+                                baseStatusLabel={lastRunStatusLabel}
                             />
                         )}
                         {showScheduledBadge && (
@@ -326,7 +367,7 @@ export function WorkCard({ work }: WorkCardProps) {
                                 )}
                             >
                                 {hasWarnings && <AlertTriangle className="w-3 h-3" />}
-                                {baseStatusLabel}
+                                {t('status.active')}
                                 <AnimatedClock className="w-3 h-3" />
                             </span>
                         )}

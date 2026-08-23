@@ -12,6 +12,7 @@ import {
     resolveKubeconfigForClusterSource,
     validateClusterSourceForOwner,
 } from './cluster-source-matrix';
+import { resolveEffectiveDeploymentContext } from '@ever-works/agent/deployment-context';
 
 describe('cluster-source-matrix — deploy matrix (renamed: k8s-works internal, k8s-works-shared shared)', () => {
     describe('isEverWorksSharedOrg', () => {
@@ -290,6 +291,130 @@ describe('cluster-source-matrix — deploy matrix (renamed: k8s-works internal, 
 
         it('normalises the legacy k8s-gauzy alias (→ internal, not shared)', () => {
             expect(isSharedClusterSource('k8s-gauzy' as ClusterSource)).toBe(false);
+        });
+    });
+
+    describe('effective namespace provenance', () => {
+        it('derives the internal namespace when ever-works comes only from the schema default', () => {
+            const result = resolveEffectiveDeploymentContext({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                resolvedToken: '__ever-works-platform-managed-kubeconfig__',
+                settings: { clusterSource: 'k8s-works', namespace: 'ever-works' },
+                settingSources: { clusterSource: 'work', namespace: 'default' },
+                websiteOwner: 'ever-works',
+                workId: 'work-1',
+                workSlug: 'awesome-time-tracking',
+                ownerUserId: 'user-1',
+                isPlatformAdmin: true,
+                env: { EVER_WORKS_K8S_WORKS_KUBECONFIG: 'internal-kubeconfig' },
+            } as any);
+
+            expect(result.namespace).toBe('ever-works-awesome-time-tracking-prod');
+            expect(result.settings.namespace).toBe('ever-works-awesome-time-tracking-prod');
+        });
+
+        it('keeps the documented ever-works default for a legacy custom cluster', () => {
+            const result = resolveEffectiveDeploymentContext({
+                deployProvider: 'k8s',
+                pluginId: 'k8s',
+                resolvedToken: 'customer-kubeconfig',
+                settings: { clusterSource: 'custom-kubeconfig', namespace: 'ever-works' },
+                settingSources: { clusterSource: 'default', namespace: 'default' },
+                websiteOwner: 'customer-org',
+                workId: 'work-1',
+                workSlug: 'customer-site',
+                ownerUserId: 'user-1',
+                isPlatformAdmin: false,
+                env: {},
+            } as any);
+
+            expect(result.namespace).toBe('ever-works');
+            expect(result.settings.namespace).toBe('ever-works');
+        });
+
+        it('still rejects an explicitly saved reserved namespace', () => {
+            expect(() =>
+                resolveEffectiveDeploymentContext({
+                    deployProvider: 'k8s',
+                    pluginId: 'k8s',
+                    resolvedToken: 'customer-kubeconfig',
+                    settings: { clusterSource: 'custom-kubeconfig', namespace: 'ever-works' },
+                    settingSources: { clusterSource: 'work', namespace: 'work' },
+                    websiteOwner: 'customer-org',
+                    workId: 'work-1',
+                    workSlug: 'customer-site',
+                    ownerUserId: 'user-1',
+                    isPlatformAdmin: false,
+                    env: {},
+                } as any),
+            ).toThrow(/reserved/i);
+        });
+    });
+
+    describe('effective managed kubeconfig context', () => {
+        const baseInput = {
+            pluginId: 'k8s',
+            websiteOwner: 'ever-works',
+            workId: 'work-1',
+            workSlug: 'awesome-time-tracking',
+            ownerUserId: 'user-1',
+            isPlatformAdmin: true,
+        } as const;
+
+        it.each([
+            ['k8s-works', 'EVER_WORKS_K8S_WORKS_KUBECONFIG'],
+            ['k8s-works-shared', 'EVER_WORKS_K8S_WORKS_SHARED_KUBECONFIG'],
+        ] as const)(
+            'drops a stale tenant kubeContext when %s selects an operator kubeconfig',
+            (clusterSource, envKey) => {
+                const result = resolveEffectiveDeploymentContext({
+                    ...baseInput,
+                    deployProvider: 'k8s',
+                    resolvedToken: '__ever-works-platform-managed-kubeconfig__',
+                    settings: { clusterSource, kubeContext: 'tenant-stale-context' },
+                    env: { [envKey]: 'operator-kubeconfig' },
+                });
+
+                expect(result.token).toBe('operator-kubeconfig');
+                expect(result.settings).not.toHaveProperty('kubeContext');
+                expect(result.lookupContext?.settingsOverride).not.toHaveProperty('kubeContext');
+                expect(result.lookupContext?.kubeContextOverride).toBeNull();
+            },
+        );
+
+        it('drops a stale tenant kubeContext for the managed provider alias', () => {
+            const result = resolveEffectiveDeploymentContext({
+                ...baseInput,
+                deployProvider: 'ever-works',
+                resolvedToken: 'dedicated-managed-kubeconfig',
+                settings: {
+                    clusterSource: 'custom-kubeconfig',
+                    kubeContext: 'tenant-stale-context',
+                },
+            });
+
+            expect(result.token).toBe('dedicated-managed-kubeconfig');
+            expect(result.settings).not.toHaveProperty('kubeContext');
+            expect(result.lookupContext?.kubeContextOverride).toBeNull();
+        });
+
+        it('preserves kubeContext only with the tenant custom kubeconfig', () => {
+            const result = resolveEffectiveDeploymentContext({
+                ...baseInput,
+                deployProvider: 'k8s',
+                websiteOwner: 'customer-org',
+                isPlatformAdmin: false,
+                resolvedToken: 'tenant-kubeconfig',
+                settings: {
+                    clusterSource: 'custom-kubeconfig',
+                    kubeContext: 'tenant-current-context',
+                },
+            });
+
+            expect(result.token).toBe('tenant-kubeconfig');
+            expect(result.settings.kubeContext).toBe('tenant-current-context');
+            expect(result.lookupContext?.kubeContextOverride).toBe('tenant-current-context');
         });
     });
 });

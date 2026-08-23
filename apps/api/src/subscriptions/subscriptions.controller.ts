@@ -82,9 +82,10 @@ export class SubscriptionsController {
     @ApiResponse({ status: 200, description: 'Active plans + current plan code' })
     async listPlans(@CurrentUser() auth: AuthenticatedUser) {
         const user = await this.authService.getUser(auth.userId);
-        const [summary, plans] = await Promise.all([
+        const [summary, plans, licences] = await Promise.all([
             this.subscriptionService.summarizePlan(user),
             this.subscriptionService.listPlans(),
+            this.subscriptionService.listSelfHostedPlans(),
         ]);
         const currentPlanCode = summary.enabled ? summary.plan.code : 'free';
 
@@ -94,9 +95,22 @@ export class SubscriptionsController {
             plans.map(async (plan) => ({
                 code: plan.code,
                 name: plan.displayName,
+                // Echoed so the response is self-describing: the switcher can tell a hosted tier
+                // from a self-hosted licence instead of inferring it from the plan name. Today
+                // `listPlans` only returns cloud plans, so this is always 'cloud' — it exists so a
+                // future self-hosted build does not have to guess, and so the omission that caused
+                // six undifferentiated cards cannot silently recur.
+                hosting: plan.hosting,
                 maxWorks: plan.maxWorks,
                 allowedCadences: plan.allowedCadences ?? [],
                 monthlyPrice: plan.monthlyPrice,
+                // The yearly total, NOT a per-month figure (cloud Pro stores
+                // '204'). Rendering it against a '/mo' suffix shows $204/mo.
+                annualPrice: plan.annualPrice,
+                lifetimePrice: plan.lifetimePrice,
+                seatsIncluded: plan.seatsIncluded,
+                seatMonthlyPrice: plan.seatMonthlyPrice,
+                monthlyCredits: plan.monthlyCredits,
                 overagePricePerRun: plan.overagePricePerRun,
                 currency: plan.currency,
                 isCurrent: plan.code === currentPlanCode,
@@ -108,11 +122,36 @@ export class SubscriptionsController {
             })),
         );
 
+        // Self-hosted editions ship as a SEPARATE array, never merged into
+        // `plans`. They are purchasable but not self-assignable, so a card in
+        // the switcher would be a button whose only outcome is a 403 from
+        // `changePlanSelfService`. The switcher keeps its three cards; the
+        // licence surface renders from this.
+        const licenceItems = licences.map((plan) => ({
+            code: plan.code,
+            name: plan.displayName,
+            hosting: plan.hosting,
+            maxWorks: plan.maxWorks,
+            allowedCadences: plan.allowedCadences ?? [],
+            monthlyPrice: plan.monthlyPrice,
+            annualPrice: plan.annualPrice,
+            lifetimePrice: plan.lifetimePrice,
+            seatsIncluded: plan.seatsIncluded,
+            seatMonthlyPrice: plan.seatMonthlyPrice,
+            monthlyCredits: plan.monthlyCredits,
+            overagePricePerRun: plan.overagePricePerRun,
+            currency: plan.currency,
+            // A licence never becomes "your current plan" on this deployment.
+            isCurrent: false,
+            dailyFreeCredits: 0,
+        }));
+
         return {
             status: 'success',
             enabled: summary.enabled,
             currentPlanCode,
             plans: items,
+            licences: licenceItems,
         };
     }
 

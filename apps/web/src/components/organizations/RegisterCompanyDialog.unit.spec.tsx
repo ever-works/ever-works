@@ -34,7 +34,26 @@ vi.mock('@/i18n/navigation', () => ({
     getPathname: ({ href }: { href: string }) => href,
 }));
 
+const { navigateToWorkspaceDashboardMock } = vi.hoisted(() => ({
+    navigateToWorkspaceDashboardMock: vi.fn(),
+}));
+vi.mock('@/lib/workspace-navigation', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/workspace-navigation')>()),
+    navigateToWorkspaceDashboard: navigateToWorkspaceDashboardMock,
+}));
+
+vi.mock('@/lib/auth/cookies', () => ({
+    getAuthAccessCookie: vi.fn(async () => 'fake-jwt'),
+}));
+
+vi.mock('@/lib/constants', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/constants')>()),
+    API_URL: 'http://api.example',
+}));
+
 import { RegisterCompanyDialog } from './RegisterCompanyDialog';
+import { POST as registerCompanyPost } from '@/app/api/organizations/register-company/route';
+import { POST as persistScopePost } from '@/app/api/users/me/scope/route';
 import {
     __resetOrganizationsStoreForTests,
     __seedOrganizationsStoreForTests,
@@ -59,15 +78,90 @@ function org(overrides: Partial<OrganizationResponse> = {}): OrganizationRespons
     };
 }
 
+interface UpstreamCall {
+    kind: 'register' | 'persist';
+    init: RequestInit;
+}
+
+function installRealBffBoundary(
+    newOrganization: OrganizationResponse,
+    options: { persistStatus?: number; events?: string[] } = {},
+) {
+    const upstreamCalls: UpstreamCall[] = [];
+    const events = options.events ?? [];
+
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = String(input);
+            if (url === '/api/organizations/register-company' && init?.method === 'POST') {
+                const headers = new Headers(init.headers);
+                // A hostile browser may try to send the internal API header.
+                // The actual BFF handler below must overwrite it from the
+                // browser selector derived from the visible URL.
+                headers.set('x-scope-slug', 'spoofed-yo');
+                return registerCompanyPost(
+                    new Request('http://web.example/api/organizations/register-company', {
+                        ...init,
+                        headers,
+                    }) as Parameters<typeof registerCompanyPost>[0],
+                );
+            }
+            if (url === '/api/users/me/scope' && init?.method === 'POST') {
+                const headers = new Headers(init.headers);
+                headers.set('x-scope-slug', 'spoofed-yo');
+                return persistScopePost(
+                    new Request('http://web.example/api/users/me/scope', {
+                        ...init,
+                        headers,
+                    }) as Parameters<typeof persistScopePost>[0],
+                );
+            }
+            if (url === '/api/organizations' && init?.method === 'GET') {
+                return Response.json([newOrganization]);
+            }
+            if (url === 'http://api.example/organizations/register-company') {
+                events.push('register');
+                upstreamCalls.push({ kind: 'register', init: init ?? {} });
+                return Response.json(newOrganization, { status: 201 });
+            }
+            if (url === 'http://api.example/users/me/scope') {
+                events.push('persist');
+                upstreamCalls.push({ kind: 'persist', init: init ?? {} });
+                const status = options.persistStatus ?? 200;
+                if (status !== 200) {
+                    return Response.json({ error: 'Membership revoked' }, { status });
+                }
+                return Response.json({
+                    tenantId: newOrganization.tenantId,
+                    organizationId: newOrganization.id,
+                    organizationSlug: newOrganization.slug,
+                });
+            }
+            throw new Error(`Unexpected fetch: ${url}`);
+        }),
+    );
+
+    navigateToWorkspaceDashboardMock.mockImplementation(() => {
+        events.push('navigate');
+    });
+
+    return { upstreamCalls, events };
+}
+
 describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
     beforeEach(() => {
         __resetOrganizationsStoreForTests();
         __seedOrganizationsStoreForTests({ data: [], isLoading: false, error: null });
         routerPushMock.mockReset();
+        navigateToWorkspaceDashboardMock.mockReset();
+        window.history.replaceState({}, '', '/dashboard');
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+        window.history.replaceState({}, '', '/');
     });
 
     it('disables submit when name is empty and never fires the POST', () => {
@@ -102,27 +196,15 @@ describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
      * register-company endpoint, navigates to the new Org's dashboard,
      * and closes the modal.
      */
-    it('calls POST /api/organizations/register-company and navigates after success (2nd Org)', async () => {
+    it('uses the visible Organization scope, persists, then canonically navigates after a later-Org create', async () => {
         __seedOrganizationsStoreForTests({
             data: [org({ id: 'o-existing', slug: 'existing' })],
             isLoading: false,
             error: null,
         });
+        window.history.replaceState({}, '', '/org/ever/works');
         const newOrg = org({ id: 'o-2', slug: 'globex', displayName: 'Globex LLC' });
-        const fetchMock = vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
-            const u = String(url);
-            if (u === '/api/organizations/register-company' && init?.method === 'POST') {
-                return new Response(JSON.stringify(newOrg), {
-                    status: 201,
-                    headers: { 'Content-Type': 'application/json' },
-                });
-            }
-            if (u === '/api/organizations') {
-                // best-effort `mutate()` after success.
-                return new Response(JSON.stringify([newOrg]), { status: 200 });
-            }
-            throw new Error(`Unexpected fetch: ${u}`);
-        });
+        const { upstreamCalls, events } = installRealBffBoundary(newOrg);
 
         const onOpenChange = vi.fn();
         render(<RegisterCompanyDialog open={true} onOpenChange={onOpenChange} />);
@@ -137,19 +219,25 @@ describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
 
         await waitFor(() => {
             expect(onOpenChange).toHaveBeenCalledWith(false);
-            expect(routerPushMock).toHaveBeenCalledWith(`/${newOrg.slug}/dashboard`);
+            expect(navigateToWorkspaceDashboardMock).toHaveBeenCalledWith({
+                kind: 'organization',
+                slug: newOrg.slug,
+            });
         });
 
-        const postCall = fetchMock.mock.calls.find(
-            ([u, init]) =>
-                String(u) === '/api/organizations/register-company' &&
-                (init as RequestInit | undefined)?.method === 'POST',
-        );
-        expect(postCall).toBeDefined();
-        const body = JSON.parse((postCall![1] as RequestInit).body as string);
+        expect(routerPushMock).not.toHaveBeenCalled();
+        expect(events).toEqual(['register', 'persist', 'navigate']);
+        const registerCall = upstreamCalls.find((call) => call.kind === 'register');
+        const persistCall = upstreamCalls.find((call) => call.kind === 'persist');
+        expect(new Headers(registerCall?.init.headers).get('x-scope-slug')).toBe('ever');
+        expect(new Headers(persistCall?.init.headers).get('x-scope-slug')).toBe('ever');
+        const body = JSON.parse(String(registerCall?.init.body));
         // countryCode is sent raw; the server normalizes (single source of
         // truth — Greptile P2 on PR #1071).
         expect(body).toEqual({ name: 'Globex LLC', countryCode: 'de' });
+        expect(JSON.parse(String(persistCall?.init.body))).toEqual({
+            organizationSlug: newOrg.slug,
+        });
     });
 
     /**
@@ -181,13 +269,7 @@ describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
     it('chains into the UpgradeOrCreateDialog when this is the user first Org', async () => {
         __seedOrganizationsStoreForTests({ data: [], isLoading: false, error: null });
         const newOrg = org({ id: 'o-first', slug: 'first-co', displayName: 'First Company' });
-        vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
-            const u = String(url);
-            if (u === '/api/organizations/register-company' && init?.method === 'POST') {
-                return new Response(JSON.stringify(newOrg), { status: 201 });
-            }
-            return new Response(JSON.stringify([newOrg]), { status: 200 });
-        });
+        installRealBffBoundary(newOrg);
 
         render(<RegisterCompanyDialog open={true} onOpenChange={vi.fn()} />);
 
@@ -204,6 +286,99 @@ describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
         expect(routerPushMock).not.toHaveBeenCalled();
     });
 
+    it('persists personal scope before completing a first-Org empty create and navigating', async () => {
+        __seedOrganizationsStoreForTests({ data: [], isLoading: false, error: null });
+        window.history.replaceState({}, '', '/dashboard');
+        const newOrg = org({ id: 'o-first', slug: 'first-co', displayName: 'First Company' });
+        const { upstreamCalls, events } = installRealBffBoundary(newOrg);
+        const onOpenChange = vi.fn();
+        render(<RegisterCompanyDialog open={true} onOpenChange={onOpenChange} />);
+
+        fireEvent.change(screen.getByTestId('register-company-name'), {
+            target: { value: 'First Company' },
+        });
+        fireEvent.click(screen.getByTestId('register-company-submit'));
+        await screen.findByText('organizations.upgrade.title');
+        fireEvent.click(document.getElementById('upgrade-or-create-empty') as HTMLInputElement);
+        fireEvent.click(screen.getByText('organizations.upgrade.confirm'));
+
+        await waitFor(() =>
+            expect(navigateToWorkspaceDashboardMock).toHaveBeenCalledWith({
+                kind: 'organization',
+                slug: newOrg.slug,
+            }),
+        );
+        expect(events).toEqual(['register', 'persist', 'navigate']);
+        for (const call of upstreamCalls) {
+            expect(new Headers(call.init.headers).get('x-scope-slug')).toBe('@personal');
+        }
+        expect(onOpenChange).toHaveBeenCalledWith(false);
+        expect(routerPushMock).not.toHaveBeenCalled();
+    });
+
+    it('does not close or navigate when active-Organization persistence rejects membership', async () => {
+        __seedOrganizationsStoreForTests({
+            data: [org({ id: 'o-existing', slug: 'ever' })],
+            isLoading: false,
+            error: null,
+        });
+        window.history.replaceState({}, '', '/org/ever/works');
+        const newOrg = org({ id: 'o-revoked', slug: 'revoked-co' });
+        const { events } = installRealBffBoundary(newOrg, { persistStatus: 404 });
+        const onOpenChange = vi.fn();
+        render(<RegisterCompanyDialog open={true} onOpenChange={onOpenChange} />);
+
+        fireEvent.change(screen.getByTestId('register-company-name'), {
+            target: { value: 'Revoked Company' },
+        });
+        fireEvent.click(screen.getByTestId('register-company-submit'));
+
+        await screen.findByText('Failed to persist active Organization (404)');
+        expect(events).toEqual(['register', 'persist']);
+        expect(navigateToWorkspaceDashboardMock).not.toHaveBeenCalled();
+        expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    });
+
+    it('keeps the first-Org completion dialog open when persistence fails', async () => {
+        __seedOrganizationsStoreForTests({ data: [], isLoading: false, error: null });
+        const newOrg = org({ id: 'o-first', slug: 'first-co' });
+        const { events } = installRealBffBoundary(newOrg, { persistStatus: 404 });
+        const onOpenChange = vi.fn();
+        render(<RegisterCompanyDialog open={true} onOpenChange={onOpenChange} />);
+
+        fireEvent.change(screen.getByTestId('register-company-name'), {
+            target: { value: 'First Company' },
+        });
+        fireEvent.click(screen.getByTestId('register-company-submit'));
+        await screen.findByText('organizations.upgrade.title');
+        fireEvent.click(document.getElementById('upgrade-or-create-empty') as HTMLInputElement);
+        fireEvent.click(screen.getByText('organizations.upgrade.confirm'));
+
+        await screen.findByText('Failed to persist active Organization (404)');
+        expect(events).toEqual(['register', 'persist']);
+        expect(screen.getByText('organizations.upgrade.title')).toBeInTheDocument();
+        expect(navigateToWorkspaceDashboardMock).not.toHaveBeenCalled();
+        expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    });
+
+    it('proves register-company BFF rejects a missing browser selector before upstream', async () => {
+        const newOrg = org();
+        const { upstreamCalls } = installRealBffBoundary(newOrg);
+        const response = await registerCompanyPost(
+            new Request('http://web.example/api/organizations/register-company', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-scope-slug': 'spoofed-yo',
+                },
+                body: JSON.stringify({ name: 'Must fail closed' }),
+            }) as Parameters<typeof registerCompanyPost>[0],
+        );
+
+        expect(response.status).toBe(400);
+        expect(upstreamCalls).toHaveLength(0);
+    });
+
     /**
      * Regression — when the org-list GET errored, `organizations` is `[]`
      * but unreliable, so the user must NOT be treated as first-org (which
@@ -218,13 +393,7 @@ describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
             error: new Error('GET /api/organizations failed'),
         });
         const newOrg = org({ id: 'o-3', slug: 'initech', displayName: 'Initech' });
-        vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
-            const u = String(url);
-            if (u === '/api/organizations/register-company' && init?.method === 'POST') {
-                return new Response(JSON.stringify(newOrg), { status: 201 });
-            }
-            return new Response(JSON.stringify([newOrg]), { status: 200 });
-        });
+        installRealBffBoundary(newOrg);
 
         const onOpenChange = vi.fn();
         render(<RegisterCompanyDialog open={true} onOpenChange={onOpenChange} />);
@@ -236,7 +405,10 @@ describe('RegisterCompanyDialog — EW-662 Phase 10', () => {
 
         await waitFor(() => {
             expect(onOpenChange).toHaveBeenCalledWith(false);
-            expect(routerPushMock).toHaveBeenCalledWith(`/${newOrg.slug}/dashboard`);
+            expect(navigateToWorkspaceDashboardMock).toHaveBeenCalledWith({
+                kind: 'organization',
+                slug: newOrg.slug,
+            });
         });
         // The upgrade dialog (first-org path) must NOT appear.
         expect(screen.queryByText('organizations.upgrade.title')).toBeNull();

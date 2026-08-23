@@ -3,9 +3,10 @@ import { AuthModule } from '@src/auth';
 import {
     SubscriptionsModule as AgentSubscriptionsModule,
     RunCostSettlementService,
+    PlanRunLimitsService,
 } from '@ever-works/agent/subscriptions';
 import { RUN_COST_SETTLER } from '@ever-works/agent/database';
-import { RUN_CREDITS_PRECHECK } from '@ever-works/agent/agents';
+import { RUN_CREDITS_PRECHECK, RUN_PLAN_LIMITS } from '@ever-works/agent/agents';
 import { SubscriptionsController } from './subscriptions.controller';
 import { CreditsController } from './credits.controller';
 import { CostsController } from './costs.controller';
@@ -36,7 +37,14 @@ import { CostsController } from './costs.controller';
         // instance behind both tokens (useExisting keeps it a singleton).
         { provide: RUN_COST_SETTLER, useExisting: RunCostSettlementService },
         { provide: RUN_CREDITS_PRECHECK, useExisting: RunCostSettlementService },
+        // H2 — the per-user PLAN concurrency ceiling. Same @Global()
+        // reasoning as the two above: RunDispatchGateService lives in the
+        // agent-side AgentsModule and consults this token through an
+        // @Optional() @Inject(), which would silently resolve to undefined
+        // (and leave `max-concurrent-runs` unread, exactly as before) if
+        // this binding were not global.
+        { provide: RUN_PLAN_LIMITS, useExisting: PlanRunLimitsService },
     ],
-    exports: [RUN_COST_SETTLER, RUN_CREDITS_PRECHECK],
+    exports: [RUN_COST_SETTLER, RUN_CREDITS_PRECHECK, RUN_PLAN_LIMITS],
 })
 export class SubscriptionsModule {}

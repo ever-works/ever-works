@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { BillingProfileRepository } from '@src/database/repositories/billing-profile.repository';
 import { SubscriptionPlanRepository } from '@src/database/repositories/subscription-plan.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
@@ -10,12 +10,18 @@ import {
     SubscriptionStatus,
 } from '@src/entities/user-subscription.entity';
 import { SubscriptionService } from '../subscription.service';
+import { PlanCreditGrantService } from '../credits/plan-credit-grant.service';
 import {
     BillingProvider,
     BillingProviderNotConfiguredError,
     type BillingWebhookEvent,
 } from './billing.provider';
-import { billableSeats, resolveSkuForPlanRow, type CatalogInterval } from './stripe-catalog';
+import {
+    billableSeats,
+    resolveSkuForPlanRow,
+    seatAmountCents,
+    type CatalogInterval,
+} from './stripe-catalog';
 
 /** A checkout was asked for with a plan code that is not sellable. */
 export class UnknownSubscriptionPlanError extends Error {
@@ -78,8 +84,24 @@ export interface PlanCheckoutStarted {
     url: string;
     sessionId: string;
     planCode: string;
-    /** Echoed for the UI's confirmation copy — from the SERVER plan row. */
+    /**
+     * What the buyer will ACTUALLY be charged for the first period: the plan price PLUS every
+     * additional seat. Echoed for the UI's confirmation copy.
+     *
+     * 🛑 This used to carry the base plan amount only, while the seats were added as a separate
+     * Stripe line item — so someone buying Pro with 17 seats was shown 2500 and charged 11000.
+     * Stripe's own hosted page always showed the true total, so nobody was ever mischarged, but
+     * any in-app confirmation built on this field understated the price. It is now the total, and
+     * it is derived from the SAME seat computation that builds the billed line item, so the two
+     * cannot drift apart.
+     */
     priceCents: number;
+    /** The plan price alone, without seats. */
+    basePriceCents: number;
+    /** The additional-seat portion of {@link priceCents}. Zero when no seats were added. */
+    seatCents: number;
+    /** Additional seats being billed, after the plan's own included allowance. */
+    extraSeats: number;
     currency: string;
 }
 
@@ -140,6 +162,15 @@ export class PlanSubscriptionService {
         private readonly billingProfileRepository: BillingProfileRepository,
         private readonly userRepository: UserRepository,
         private readonly subscriptionService: SubscriptionService,
+        /**
+         * Monthly plan-allowance grants (billing spec FR-4). Appended
+         * LAST + `@Optional()` so every positional construction in the
+         * specs keeps working and a deployment without the credits path
+         * still activates tiers; a missing collaborator means the daily
+         * sweep grants the allowance instead of activation doing it.
+         */
+        @Optional()
+        private readonly planCreditGrantService?: PlanCreditGrantService,
     ) {}
 
     /**
@@ -168,8 +199,18 @@ export class PlanSubscriptionService {
         // what the provider bills; the row is the fallback for an unsynced deployment. Reading the
         // row first would echo 0 for any period the row has no column value for — showing someone
         // "$0" on a confirmation screen for a charge that is about to be 204.00.
-        const priceCents =
+        const basePriceCents =
             catalogSku?.price.amountCents ?? planPriceCentsForInterval(plan, interval);
+
+        // Seats are a SEPARATE Stripe line item, so the base amount alone is not what the buyer
+        // pays. Compute them once here and reuse the same numbers for both the provider payload
+        // and the echoed total.
+        const { seatTotalCents, ...catalogKeys } = this.catalogKeysFor(
+            plan,
+            interval,
+            options.seats ?? null,
+        );
+        const priceCents = basePriceCents + seatTotalCents;
 
         const user = await this.userRepository.findById(options.userId);
         const existing = await this.billingProfileRepository.findByUserId(options.userId);
@@ -195,7 +236,11 @@ export class PlanSubscriptionService {
             plan: {
                 code: plan.code,
                 label: `${plan.displayName} plan`,
-                priceCents,
+                // 🛑 The BASE amount, never the seat-inclusive total. This becomes the
+                // `unit_amount` of the PLAN line item on deployments with no catalog price, and the
+                // seats are a SEPARATE line item — so sending the total here would bill every extra
+                // seat twice. Only the value this method RETURNS carries the total.
+                priceCents: basePriceCents,
                 currency: plan.currency || this.billingProvider.getDefaultCurrency(),
                 interval: interval === 'annual' ? 'year' : 'month',
                 // A `lifetime` SKU is bought outright. Decided from the catalog SKU, never from
@@ -205,7 +250,7 @@ export class PlanSubscriptionService {
                 // so the invoice line carries a lookup_key that maps back to a reviewed commit.
                 // `null` here is normal on a deployment whose catalog has not been synced — the
                 // provider falls back to billing `priceCents` exactly as it did before.
-                ...this.catalogKeysFor(plan, interval, options.seats ?? null),
+                ...catalogKeys,
             },
             successUrl: options.successUrl,
             cancelUrl: options.cancelUrl,
@@ -217,6 +262,9 @@ export class PlanSubscriptionService {
             sessionId: session.sessionId,
             planCode: plan.code,
             priceCents,
+            basePriceCents,
+            seatCents: seatTotalCents,
+            extraSeats: catalogKeys.extraSeats ?? 0,
             currency: plan.currency,
         };
     }
@@ -236,16 +284,31 @@ export class PlanSubscriptionService {
         plan: SubscriptionPlan,
         interval: CatalogInterval,
         requestedSeats: number | null,
-    ): { lookupKey?: string; seatLookupKey?: string | null; extraSeats?: number } {
+    ): {
+        lookupKey?: string;
+        seatLookupKey?: string | null;
+        extraSeats?: number;
+        /** The seat money, for the caller to add to the amount it echoes back. */
+        seatTotalCents: number;
+    } {
         const sku = resolveSkuForPlanRow({ code: plan.code, hosting: plan.hosting, interval });
-        if (!sku) return {};
+        if (!sku) return { seatTotalCents: 0 };
 
         const extraSeats = requestedSeats === null ? 0 : billableSeats(sku.plan, requestedSeats);
+        const billsSeats = extraSeats > 0 && sku.seatLookupKey !== null;
+
+        // Mirror resolveCatalogSku exactly: a lifetime licence and an unbounded plan both
+        // collapse to no seat line, and an annual seat is 12x the monthly rate.
+        const seatUnitCents = billsSeats
+            ? (seatAmountCents(sku.plan, sku.price.interval === 'annual' ? 'annual' : 'monthly') ??
+              0)
+            : 0;
 
         return {
             lookupKey: sku.lookupKey,
-            seatLookupKey: extraSeats > 0 ? sku.seatLookupKey : null,
+            seatLookupKey: billsSeats ? sku.seatLookupKey : null,
             extraSeats,
+            seatTotalCents: extraSeats * seatUnitCents,
         };
     }
 
@@ -421,6 +484,22 @@ export class PlanSubscriptionService {
             const user = await this.userRepository.findById(input.userId);
             if (user) {
                 await this.subscriptionService.assignPlanToUser(user, plan.code);
+            }
+        }
+
+        // Billing spec FR-4 — the allowance month's credits land right
+        // after checkout instead of at the next 00:05 UTC sweep. Best
+        // effort and idempotent (`grant:plan:{userId}:{monthStart}`): a
+        // failure here is logged, never un-activates the tier, and the
+        // sweep catches up.
+        if (this.planCreditGrantService) {
+            try {
+                await this.planCreditGrantService.grantCurrentAllowance(input.userId);
+            } catch (error) {
+                this.logger.warn(
+                    `Plan allowance grant on activation failed for user ${input.userId} ` +
+                        `(sweep will retry): ${(error as Error).message}`,
+                );
             }
         }
         return true;

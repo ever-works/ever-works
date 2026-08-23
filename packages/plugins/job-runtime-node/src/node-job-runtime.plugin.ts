@@ -139,6 +139,13 @@ export class NodeJobRuntimePlugin implements IJobRuntimeProvider {
 				description:
 					'Absolute directory ON THE NODE that `agent-task` steps run in. Blank lets the node use its own working directory.',
 				'x-envVar': 'FLEET_NODE_AGENT_TASK_WORKSPACE'
+			},
+			agentTaskEnvPassthrough: {
+				type: 'string',
+				title: 'Agent task credential env names',
+				description:
+					'Comma-separated environment variable NAMES an `agent-task` step may read from the node’s own environment. A node drops secret-shaped names unless granted, so without this a machine whose Claude or Codex credential lives in an environment variable authenticates with nothing. Only the NAME travels — the value is read on the node and never leaves it, which is why one list works for a fleet of differently-credentialled machines: granting a name a machine does not set is a no-op. Blank inherits the default (the four well-known Claude/Codex names); set it to a single space to grant none.',
+				'x-envVar': 'FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH'
 			}
 		}
 	};

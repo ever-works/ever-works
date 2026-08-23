@@ -13,8 +13,9 @@ import {
 } from '../database/repositories/task-side.repositories';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { ownershipScopeOf, type OwnershipScope } from '../database/ownership-scope';
 import type { TaskChatMessage } from '../entities/task-chat-message.entity';
-import type { TaskActorType } from '../entities/task.entity';
+import type { Task, TaskActorType } from '../entities/task.entity';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
@@ -97,8 +98,9 @@ export class TaskChatService {
         userId: string,
         taskId: string,
         opts: { limit?: number; offset?: number } = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<TaskChatMessage[]> {
-        await this.requireOwnedTask(userId, taskId);
+        await this.requireOwnedTask(userId, taskId, ownershipScope);
         return this.messages.findByTaskId(taskId, opts.limit ?? 50, opts.offset ?? 0);
     }
 
@@ -106,8 +108,9 @@ export class TaskChatService {
         userId: string,
         input: PostChatInput,
         lookups: MentionLookups = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<TaskChatMessage> {
-        const task = await this.requireOwnedTask(userId, input.taskId);
+        const task = await this.requireOwnedTask(userId, input.taskId, ownershipScope);
         this.assertBody(input.body);
 
         const mentions = this.parseMentions(input.body, lookups);
@@ -163,7 +166,15 @@ export class TaskChatService {
             for (const mention of agentMentions) {
                 const dedupKey = `${task.id}:${mention.id}:${row.id}`;
                 void (async () => {
-                    if (await this.trySteerLiveRun(task.id, mention.id, userId, input.body)) {
+                    if (
+                        await this.trySteerLiveRun(
+                            task.id,
+                            mention.id,
+                            userId,
+                            input.body,
+                            ownershipScopeOf(task),
+                        )
+                    ) {
                         return;
                     }
                     let run: { id: string } | null = null;
@@ -190,6 +201,8 @@ export class TaskChatService {
                                       // chat-triggered runs count toward (and show
                                       // under) their Work like task runs do.
                                       workId: task.workId ?? null,
+                                      tenantId: task.tenantId ?? null,
+                                      organizationId: task.organizationId ?? null,
                                       queuedReason: verdict.admitted
                                           ? null
                                           : (verdict.queuedReason ?? null),
@@ -295,11 +308,12 @@ export class TaskChatService {
         messageId: string,
         newBody: string,
         lookups: MentionLookups = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<TaskChatMessage> {
         const msg = await this.messages.findById(messageId);
         if (!msg) throw new NotFoundException(`Chat message ${messageId} not found.`);
 
-        await this.requireOwnedTask(userId, msg.taskId);
+        await this.requireOwnedTask(userId, msg.taskId, ownershipScope);
 
         // Authorship — only the original author can edit (when author
         // is a user; agent-authored messages are not user-editable).
@@ -415,10 +429,16 @@ export class TaskChatService {
         agentId: string,
         userId: string,
         body: string,
+        ownershipScope: OwnershipScope,
     ): Promise<boolean> {
         if (!this.steering || !this.runs) return false;
         try {
-            const live = await this.runs.findInFlightForTaskAgent(taskId, agentId);
+            const live = await this.runs.findInFlightForTaskAgent(
+                taskId,
+                agentId,
+                userId,
+                ownershipScope,
+            );
             if (!live) return false;
             const outcome = await this.steering.steer({ runId: live.id, userId, message: body });
             if (outcome.dispatched !== 'injected') return false;
@@ -434,8 +454,12 @@ export class TaskChatService {
         }
     }
 
-    private async requireOwnedTask(userId: string, taskId: string) {
-        const task = await this.tasks.findByIdAndUser(taskId, userId);
+    private async requireOwnedTask(
+        userId: string,
+        taskId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        const task = await this.tasks.findByIdAndUser(taskId, userId, ownershipScope);
         if (!task) throw new NotFoundException(`Task ${taskId} not found.`);
         return task;
     }

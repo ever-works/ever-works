@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -27,6 +28,7 @@ import { BudgetOwnerType } from '@ever-works/agent/entities';
 import { GoalsService, type MissionGoalLinkDto } from '@ever-works/agent/goals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { ScopeContextService } from '../scope';
 import { LinkMissionGoalDto } from '../goals/dto/goal.dto';
 import {
     AddMissionAttachmentDto,
@@ -82,6 +84,7 @@ export class MissionsController {
         // GoalsService validates ownership of BOTH sides (Mission and
         // Goal) with 404-no-leak semantics.
         private readonly goalsService: GoalsService,
+        @Optional() private readonly scopeContext?: ScopeContextService,
     ) {}
 
     @Get()
@@ -94,12 +97,16 @@ export class MissionsController {
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
     ): Promise<MissionDto[]> {
-        return this.service.listForUser(auth.userId, {
-            status: this.parseStatus(status),
-            search: this.parseSearch(search),
-            limit: this.parseLimit(limit),
-            offset: this.parseOffset(offset),
-        });
+        return this.service.listForUser(
+            auth.userId,
+            {
+                status: this.parseStatus(status),
+                search: this.parseSearch(search),
+                limit: this.parseLimit(limit),
+                offset: this.parseOffset(offset),
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Post()
@@ -110,17 +117,22 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateMissionDto,
     ): Promise<MissionDto> {
-        return this.service.create(auth.userId, {
-            title: body.title,
-            description: body.description,
-            type: body.type,
-            schedule: body.schedule ?? null,
-            autoBuildWorks: body.autoBuildWorks,
-            outstandingIdeasCap: body.outstandingIdeasCap ?? null,
-            guardrailsOverride:
-                (body.guardrailsOverride as MissionGuardrailsOverride | null | undefined) ?? null,
-            missionTemplateRepo: body.missionTemplateRepo ?? null,
-        });
+        return this.service.create(
+            auth.userId,
+            {
+                title: body.title,
+                description: body.description,
+                type: body.type,
+                schedule: body.schedule ?? null,
+                autoBuildWorks: body.autoBuildWorks,
+                outstandingIdeasCap: body.outstandingIdeasCap ?? null,
+                guardrailsOverride:
+                    (body.guardrailsOverride as MissionGuardrailsOverride | null | undefined) ??
+                    null,
+                missionTemplateRepo: body.missionTemplateRepo ?? null,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Get(':id')
@@ -130,7 +142,7 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<MissionDto> {
-        return this.service.getForUser(auth.userId, id);
+        return this.service.getForUser(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Get(':id/budget')
@@ -148,7 +160,7 @@ export class MissionsController {
         // service.getForUser call 404s when the Mission belongs to
         // another user, which translates to the standard NestJS
         // 404 response shape.
-        await this.service.getForUser(auth.userId, id);
+        await this.service.getForUser(auth.userId, id, this.scopeContext?.getScope());
         return this.budgetService.summarizeForOwner({
             ownerType: BudgetOwnerType.MISSION,
             ownerId: id,
@@ -164,19 +176,24 @@ export class MissionsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateMissionDto,
     ): Promise<MissionDto> {
-        return this.service.update(auth.userId, id, {
-            title: body.title,
-            description: body.description,
-            type: body.type,
-            schedule: body.schedule,
-            autoBuildWorks: body.autoBuildWorks,
-            outstandingIdeasCap: body.outstandingIdeasCap,
-            guardrailsOverride: body.guardrailsOverride as
-                | MissionGuardrailsOverride
-                | null
-                | undefined,
-            missionTemplateRepo: body.missionTemplateRepo,
-        });
+        return this.service.update(
+            auth.userId,
+            id,
+            {
+                title: body.title,
+                description: body.description,
+                type: body.type,
+                schedule: body.schedule,
+                autoBuildWorks: body.autoBuildWorks,
+                outstandingIdeasCap: body.outstandingIdeasCap,
+                guardrailsOverride: body.guardrailsOverride as
+                    | MissionGuardrailsOverride
+                    | null
+                    | undefined,
+                missionTemplateRepo: body.missionTemplateRepo,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Delete(':id')
@@ -187,7 +204,7 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<{ deleted: true }> {
-        return this.service.delete(auth.userId, id);
+        return this.service.delete(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/pause')
@@ -198,7 +215,7 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<MissionDto> {
-        return this.service.pause(auth.userId, id);
+        return this.service.pause(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/resume')
@@ -209,7 +226,7 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<MissionDto> {
-        return this.service.resume(auth.userId, id);
+        return this.service.resume(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/complete')
@@ -225,6 +242,7 @@ export class MissionsController {
             auth.userId,
             id,
             (body?.outcome ?? null) as MissionOutcome | null,
+            this.scopeContext?.getScope(),
         );
     }
 
@@ -240,9 +258,12 @@ export class MissionsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: CloneMissionDto,
     ): Promise<CloneMissionResult> {
-        return this.cloneService.cloneForUser(auth.userId, id, {
-            title: body.title,
-        });
+        return this.cloneService.cloneForUser(
+            auth.userId,
+            id,
+            { title: body.title },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Post(':id/run-now')
@@ -269,7 +290,7 @@ export class MissionsController {
         ideasQueued?: number;
         message?: string;
     }> {
-        return this.service.runNow(auth.userId, id);
+        return this.service.runNow(auth.userId, id, this.scopeContext?.getScope());
     }
 
     /**
@@ -286,7 +307,9 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        return { relations: await this.service.listWorks(auth.userId, id) };
+        return {
+            relations: await this.service.listWorks(auth.userId, id, this.scopeContext?.getScope()),
+        };
     }
 
     @Post(':id/works')
@@ -299,7 +322,13 @@ export class MissionsController {
         @Body() body: AttachMissionWorkDto,
     ) {
         return {
-            relations: await this.service.attachWork(auth.userId, id, body.workId, body.relation),
+            relations: await this.service.attachWork(
+                auth.userId,
+                id,
+                body.workId,
+                body.relation,
+                this.scopeContext?.getScope(),
+            ),
         };
     }
 
@@ -317,7 +346,13 @@ export class MissionsController {
                 `Invalid relation "${relation}". Allowed: ${MISSION_WORK_RELATIONS.join(', ')}.`,
             );
         }
-        return this.service.detachWork(auth.userId, id, workId, relation as MissionWorkRelation);
+        return this.service.detachWork(
+            auth.userId,
+            id,
+            workId,
+            relation as MissionWorkRelation,
+            this.scopeContext?.getScope(),
+        );
     }
 
     /**
@@ -332,7 +367,13 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('workId', ParseUUIDPipe) workId: string,
     ) {
-        return { relations: await this.service.listMissionsForWork(auth.userId, workId) };
+        return {
+            relations: await this.service.listMissionsForWork(
+                auth.userId,
+                workId,
+                this.scopeContext?.getScope(),
+            ),
+        };
     }
 
     /**
@@ -351,7 +392,7 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        return this.service.listAttachments(auth.userId, id);
+        return this.service.listAttachments(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/attachments')
@@ -363,7 +404,12 @@ export class MissionsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: AddMissionAttachmentDto,
     ) {
-        return this.service.addAttachment(auth.userId, id, body?.uploadId);
+        return this.service.addAttachment(
+            auth.userId,
+            id,
+            body?.uploadId,
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Delete(':id/attachments/:attachmentId')
@@ -374,7 +420,12 @@ export class MissionsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
     ) {
-        return this.service.removeAttachment(auth.userId, id, attachmentId);
+        return this.service.removeAttachment(
+            auth.userId,
+            id,
+            attachmentId,
+            this.scopeContext?.getScope(),
+        );
     }
 
     /**
@@ -394,7 +445,7 @@ export class MissionsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<MissionGoalLinkDto[]> {
-        return this.goalsService.listForMission(auth.userId, id);
+        return this.goalsService.listForMission(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/goals')
@@ -414,6 +465,7 @@ export class MissionsController {
             id,
             body.goalId,
             body.isPrimary ?? false,
+            this.scopeContext?.getScope(),
         );
     }
 
@@ -426,7 +478,12 @@ export class MissionsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('goalId', ParseUUIDPipe) goalId: string,
     ): Promise<{ deleted: true }> {
-        return this.goalsService.unlinkFromMission(auth.userId, id, goalId);
+        return this.goalsService.unlinkFromMission(
+            auth.userId,
+            id,
+            goalId,
+            this.scopeContext?.getScope(),
+        );
     }
 
     private parseStatus(value?: string): MissionStatus | undefined {

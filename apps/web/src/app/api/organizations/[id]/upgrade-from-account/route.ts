@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 /**
  * EW-661 (Tenants & Organizations Phase 9) — web BFF proxy for
@@ -12,7 +13,7 @@ import { getAuthAccessCookie } from '@/lib/auth/cookies';
  * with `UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS` — we pass that body
  * through verbatim so the dialog can surface the right copy.
  */
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     const token = await getAuthAccessCookie();
     if (!token) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -23,9 +24,15 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         return NextResponse.json({ error: 'Missing organization id' }, { status: 400 });
     }
 
-    const headers = new Headers();
-    headers.set('Authorization', `Bearer ${token}`);
-    headers.set('Content-Type', 'application/json');
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
 
     try {
         const upstream = await fetch(
