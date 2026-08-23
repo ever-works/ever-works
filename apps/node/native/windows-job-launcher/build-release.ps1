@@ -753,14 +753,9 @@ try {
 			-Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Kits\Installed Roots" `
 			-ErrorAction Stop
 		$windowsSdkRoot = [IO.Path]::GetFullPath(([string]$windowsKits.KitsRoot10).TrimEnd("\"))
-		$expectedWindowsSdkRoot = [IO.Path]::GetFullPath((Join-Path $osProgramFilesX86 "Windows Kits\10"))
-		if ($windowsSdkRoot -ine $expectedWindowsSdkRoot) {
-			throw "Windows SDK registry root does not match the trusted OS installation root"
-		}
-		Assert-PathUnderRoot `
+		Assert-LocalCanonicalPath `
 			-LiteralPath $windowsSdkRoot `
-			-RootPath $osProgramFilesX86 `
-			-Name "Windows SDK" | Out-Null
+			-Name "Windows SDK registry installation root" | Out-Null
 		$sdkVersionDirectory = Get-LatestVersionDirectory `
 			-LiteralPath (Join-Path $windowsSdkRoot "Lib") `
 			-Name "Windows SDK x64 libraries" `
