@@ -59,6 +59,7 @@ import {
     subscriptionStatusTone,
     type BillingOverview,
     type InvoiceListPage,
+    type PlanCheckoutReturnResponse,
     type SubscriptionState,
 } from '@/lib/api/billing.shared';
 
@@ -71,6 +72,11 @@ interface BillingSettingsProps {
     /** Money path (billing PRD B5). Null ⇒ the overview call failed. */
     initialOverview: BillingOverview | null;
     initialInvoices: InvoiceListPage | null;
+    /**
+     * Result of finalising a checkout the provider just redirected back from.
+     * Null when this is an ordinary page load.
+     */
+    checkoutReturn?: PlanCheckoutReturnResponse | null;
 }
 
 const LEDGER_PAGE_SIZE = 10;
@@ -162,6 +168,7 @@ export function BillingSettings({
     initialLedger,
     initialOverview,
     initialInvoices,
+    checkoutReturn,
 }: BillingSettingsProps) {
     const t = useTranslations('dashboard.settings.billing');
     const [isPending, startTransition] = useTransition();
@@ -175,6 +182,14 @@ export function BillingSettings({
     const licences = (initialPlans?.licences ?? []).filter(
         (licence) => Number(licence.lifetimePrice ?? 0) > 0,
     );
+
+    // What was just bought, if anything. `ignored` means a credit top-up came
+    // back through the plan route — not an error, and not something to announce.
+    const justPurchased =
+        checkoutReturn && checkoutReturn.status !== 'ignored' ? checkoutReturn : null;
+    const purchasedLicence = justPurchased?.planCode
+        ? (licences.find((l) => l.code === justPurchased.planCode) ?? null)
+        : null;
     const currentPlan =
         plans.find((p) => p.isCurrent) ?? plans.find((p) => p.code === currentPlanCode) ?? null;
     const balanceCredits =
@@ -434,6 +449,35 @@ export function BillingSettings({
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
+
+            {/* ── Just-completed checkout ──────────────────────────────────
+                A perpetual licence deliberately writes no subscription row and
+                grants no tier, so without this the page after a settled $99
+                payment is identical to the page before it — same enabled "Buy"
+                button, no invoice yet, nothing. That reads as a failed payment,
+                and the obvious next action is to pay again. */}
+            {justPurchased ? (
+                <div
+                    data-testid="billing-checkout-return"
+                    className="flex items-start gap-2 rounded-lg border border-success/40 bg-success/5 p-4 text-sm text-text dark:text-text-dark"
+                >
+                    <Check className="w-4 h-4 shrink-0 mt-0.5 text-success" />
+                    <div className="space-y-1">
+                        <p className="font-medium">
+                            {justPurchased.status === 'active'
+                                ? t('checkoutReturn.confirmed')
+                                : t('checkoutReturn.settling')}
+                        </p>
+                        {purchasedLicence ? (
+                            <p className="text-text-muted dark:text-text-muted-dark">
+                                {t('checkoutReturn.licenceBody', {
+                                    name: purchasedLicence.name,
+                                })}
+                            </p>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
 
             {dataUnavailable ? (
                 <div
