@@ -8,6 +8,7 @@ import type {
 	GitAuth,
 	GitCommitter,
 	GitCloneOptions,
+	GitCloneBranchOptions,
 	GitPushOptions,
 	GitFileChange,
 	GitFileStatus
@@ -146,7 +147,7 @@ export class GitOperations implements IGitOperations {
 	}
 
 	async push(options: GitPushOptions): Promise<void> {
-		const { dir, token, force = false, maxRetries = 3 } = options;
+		const { dir, token, force = false, maxRetries = 3, ref, remoteRef } = options;
 
 		if (!token) {
 			throw new Error('Git token is required for push operation');
@@ -157,11 +158,17 @@ export class GitOperations implements IGitOperations {
 
 		for (let attempt = 1; attempt <= maxRetries; attempt++) {
 			try {
+				// `ref`/`remoteRef` are forwarded as-is: leaving them undefined
+				// keeps isomorphic-git's existing defaults (current branch →
+				// its tracking branch), so callers that don't pass them are
+				// unaffected.
 				await git.push({
 					onAuth: () => auth,
 					fs,
 					http,
 					dir,
+					ref,
+					remoteRef,
 					force
 				});
 				return;
@@ -266,7 +273,7 @@ export class GitOperations implements IGitOperations {
 		await this.removeDirSafe(this.getLocalDir(owner, repo));
 	}
 
-	async cloneBranch(params: { owner: string; repo: string; branch: string; token: string }): Promise<string> {
+	async cloneBranch(params: GitCloneBranchOptions): Promise<string> {
 		const { owner, repo, branch, token } = params;
 		const url = this.getCloneUrl(owner, repo);
 		const auth = this.getAuth(token);
