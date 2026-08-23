@@ -60,6 +60,9 @@ const RETRY_SAFE_REMOTE_METHODS: ReadonlySet<string> = new Set<string>([
     'AgentEscalationService.record',
     // Per-user `daily:<userId>:<date>` idempotency key checked before the write.
     'CreditLedgerService.dispatchDailyGrants',
+    // Three idempotent passes (`expiry:<entryId>`, `daily:<userId>:<date>`,
+    // `grant:plan:<userId>:<monthStart>`), each checked before its write.
+    'CreditsSweepService.runDailySweep',
     // Explicit already-marked guard / absolute SET recomputed from the anchor.
     'WorkScheduleService.markRunCompleted',
     'WorkScheduleService.markRunFailed',

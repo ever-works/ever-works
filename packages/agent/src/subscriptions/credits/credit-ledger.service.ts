@@ -45,6 +45,13 @@ export interface RecordCreditEntryOptions {
     allowNegativeBalance?: boolean;
     /** Ceiling for non-accumulating grants; a full clamp returns null. */
     maxBalanceAfter?: number | null;
+    /**
+     * Bucket expiry for a positive write (plan allowance grants carry
+     * their allowance-month end). Ignored on debits; absent = never.
+     */
+    expiresAt?: Date | null;
+    /** Clock override for tests. */
+    now?: Date;
 }
 
 export interface CreditLedgerListOptions {
@@ -77,6 +84,18 @@ export interface DailyGrantSummary {
     /** Users scanned. */
     scanned: number;
 }
+
+export interface ExpirySweepSummary {
+    /** Users that had at least one due bucket. */
+    users: number;
+    /** Buckets closed. */
+    buckets: number;
+    /** Credits written off as `expiry` rows. */
+    credits: number;
+}
+
+/** Outcome of the lazy per-user daily grant (dispatch-gate path). */
+export type DailyGrantOutcome = 'granted' | 'already-granted' | 'skipped';
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -137,9 +156,14 @@ export class CreditLedgerService {
             idempotencyKey: options.idempotencyKey ?? null,
         };
 
+        if (options.expiresAt && options.amountCredits > 0) {
+            write.expiresAt = options.expiresAt;
+        }
+
         const result = await this.creditLedgerRepository.recordAtomic(write, {
             minBalanceAfter: options.amountCredits < 0 && !allowNegative ? 0 : null,
             maxBalanceAfter: options.maxBalanceAfter ?? null,
+            now: options.now,
         });
 
         switch (result.status) {
@@ -157,9 +181,60 @@ export class CreditLedgerService {
         }
     }
 
-    /** Authoritative balance: SUM of all signed movements for the user. */
+    /** True when a movement with this idempotency key was already written. */
+    async hasEntry(idempotencyKey: string): Promise<boolean> {
+        return (await this.creditLedgerRepository.findByIdempotencyKey(idempotencyKey)) !== null;
+    }
+
+    /**
+     * Available balance: SUM of all signed movements for the user, minus
+     * the unconsumed part of buckets that lapsed but are not swept yet.
+     */
     async getBalance(userId: string): Promise<number> {
         return this.creditLedgerRepository.getBalance(userId);
+    }
+
+    /**
+     * Close lapsed buckets (billing spec §3.2 FR-7). With a `userId`,
+     * just that user (the settlement/gate path); without, every user
+     * with a due bucket, in bounded batches (the daily sweep). Each
+     * expiry is an `expiry` row keyed `expiry:{entryId}`, so re-running
+     * is a no-op.
+     */
+    async expireDueCredits(userId?: string, now: Date = new Date()): Promise<ExpirySweepSummary> {
+        const summary: ExpirySweepSummary = { users: 0, buckets: 0, credits: 0 };
+        const expireOne = async (id: string) => {
+            const expired = await this.creditLedgerRepository.expireDueBuckets(id, now);
+            if (expired.length > 0) {
+                summary.users += 1;
+                summary.buckets += expired.length;
+                summary.credits += expired.reduce((sum, item) => sum + item.expiredCredits, 0);
+            }
+        };
+
+        if (userId) {
+            await expireOne(userId);
+            return summary;
+        }
+
+        const batchSize = config.billing.credits.getDailyGrantBatchSize();
+        // Each pass closes the buckets it found, so the next read returns
+        // a strictly smaller set; the guard stops a pathological loop.
+        for (let pass = 0; pass < 1000; pass += 1) {
+            const users = await this.creditLedgerRepository.findUsersWithDueBuckets(now, batchSize);
+            if (users.length === 0) break;
+            for (const id of users) {
+                try {
+                    await expireOne(id);
+                } catch (error) {
+                    this.logger.warn(
+                        `Credit expiry failed for user ${id}: ${(error as Error).message}`,
+                    );
+                }
+            }
+            if (users.length < batchSize) break;
+        }
+        return summary;
     }
 
     /** Owner-scoped paginated ledger with period + kind filters. */
@@ -241,9 +316,9 @@ export class CreditLedgerService {
 
     /**
      * Daily free-credit sweep (RPC target of the `credits-daily-grant`
-     * cron, 00:05 UTC). For every active user whose plan carries the
-     * `daily-free-credits` entitlement (> 0), tops the balance back UP TO
-     * that level — non-accumulating per the PRD: a balance already at or
+     * cron, 00:05 UTC). For every active user, on EVERY plan, tops the
+     * balance back UP TO the plan's `daily-free-credits` level (platform
+     * default 50) — non-accumulating per the PRD: a balance already at or
      * above the level receives nothing. Idempotency key
      * `daily:{userId}:{date}` makes cron re-runs a no-op.
      */
@@ -268,37 +343,16 @@ export class CreditLedgerService {
             for (const user of users) {
                 summary.scanned += 1;
                 const planCode = (user.defaultPlan?.code as string) || defaultPlanCode;
-                const level = await this.entitlementsService.getNumber(
-                    planCode,
-                    ENTITLEMENT_KEYS.DAILY_FREE_CREDITS,
-                    planCode === 'free' ? fallbackDailyFree : 0,
-                );
-                if (level <= 0) {
-                    summary.skipped += 1;
-                    continue;
-                }
-
                 try {
-                    const idempotencyKey = `daily:${user.id}:${date}`;
-                    const existing =
-                        await this.creditLedgerRepository.findByIdempotencyKey(idempotencyKey);
-                    if (existing) {
-                        summary.alreadyGranted += 1;
-                        continue;
-                    }
-                    const entry = await this.record({
-                        userId: user.id,
-                        kind: CreditLedgerKind.DAILY_FREE,
-                        amountCredits: level,
-                        maxBalanceAfter: level,
-                        description: `Daily free credits (${date})`,
-                        idempotencyKey,
-                    });
-                    if (entry) {
-                        summary.granted += 1;
-                    } else {
-                        summary.skipped += 1;
-                    }
+                    const outcome = await this.grantDailyForPlan(
+                        user.id,
+                        planCode,
+                        date,
+                        fallbackDailyFree,
+                    );
+                    if (outcome === 'granted') summary.granted += 1;
+                    else if (outcome === 'already-granted') summary.alreadyGranted += 1;
+                    else summary.skipped += 1;
                 } catch (error) {
                     // Best-effort per user — one failure must not starve the
                     // rest of the sweep; the idempotency key retries tomorrow.
@@ -315,5 +369,64 @@ export class CreditLedgerService {
         }
 
         return summary;
+    }
+
+    /**
+     * Lazy daily grant for ONE user (billing spec FR-3) — the dispatch
+     * gate calls this before evaluating the balance so a deployment whose
+     * cron has not run today never parks a user who is owed free
+     * credits. Same idempotency key as the sweep, so the two can never
+     * double-grant.
+     */
+    async grantDailyForUser(
+        userId: string,
+        planCode: string,
+        now: Date = new Date(),
+    ): Promise<DailyGrantOutcome> {
+        const date = now.toISOString().slice(0, 10);
+        return this.grantDailyForPlan(
+            userId,
+            planCode,
+            date,
+            config.billing.credits.getDailyFreeCredits(),
+        );
+    }
+
+    /**
+     * The universal daily allowance (billing spec FR-1): every plan code
+     * resolves its `daily-free-credits` entitlement, and a plan without a
+     * row falls back to the platform default (`CREDITS_DAILY_FREE`, 50).
+     * Earlier code granted the fallback to the free plan only, which is
+     * why paid subscribers received no daily credits while the catalog
+     * and the marketing site said 50/day on every tier.
+     */
+    private async grantDailyForPlan(
+        userId: string,
+        planCode: string,
+        date: string,
+        fallbackDailyFree: number,
+    ): Promise<DailyGrantOutcome> {
+        const level = await this.entitlementsService.getNumber(
+            planCode,
+            ENTITLEMENT_KEYS.DAILY_FREE_CREDITS,
+            fallbackDailyFree,
+        );
+        if (level <= 0) {
+            return 'skipped';
+        }
+        const idempotencyKey = `daily:${userId}:${date}`;
+        const existing = await this.creditLedgerRepository.findByIdempotencyKey(idempotencyKey);
+        if (existing) {
+            return 'already-granted';
+        }
+        const entry = await this.record({
+            userId,
+            kind: CreditLedgerKind.DAILY_FREE,
+            amountCredits: level,
+            maxBalanceAfter: level,
+            description: `Daily free credits (${date})`,
+            idempotencyKey,
+        });
+        return entry ? 'granted' : 'skipped';
     }
 }

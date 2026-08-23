@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { BillingProfileRepository } from '@src/database/repositories/billing-profile.repository';
 import { SubscriptionPlanRepository } from '@src/database/repositories/subscription-plan.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
@@ -10,6 +10,7 @@ import {
     SubscriptionStatus,
 } from '@src/entities/user-subscription.entity';
 import { SubscriptionService } from '../subscription.service';
+import { PlanCreditGrantService } from '../credits/plan-credit-grant.service';
 import {
     BillingProvider,
     BillingProviderNotConfiguredError,
@@ -161,6 +162,15 @@ export class PlanSubscriptionService {
         private readonly billingProfileRepository: BillingProfileRepository,
         private readonly userRepository: UserRepository,
         private readonly subscriptionService: SubscriptionService,
+        /**
+         * Monthly plan-allowance grants (billing spec FR-4). Appended
+         * LAST + `@Optional()` so every positional construction in the
+         * specs keeps working and a deployment without the credits path
+         * still activates tiers; a missing collaborator means the daily
+         * sweep grants the allowance instead of activation doing it.
+         */
+        @Optional()
+        private readonly planCreditGrantService?: PlanCreditGrantService,
     ) {}
 
     /**
@@ -474,6 +484,22 @@ export class PlanSubscriptionService {
             const user = await this.userRepository.findById(input.userId);
             if (user) {
                 await this.subscriptionService.assignPlanToUser(user, plan.code);
+            }
+        }
+
+        // Billing spec FR-4 — the allowance month's credits land right
+        // after checkout instead of at the next 00:05 UTC sweep. Best
+        // effort and idempotent (`grant:plan:{userId}:{monthStart}`): a
+        // failure here is logged, never un-activates the tier, and the
+        // sweep catches up.
+        if (this.planCreditGrantService) {
+            try {
+                await this.planCreditGrantService.grantCurrentAllowance(input.userId);
+            } catch (error) {
+                this.logger.warn(
+                    `Plan allowance grant on activation failed for user ${input.userId} ` +
+                        `(sweep will retry): ${(error as Error).message}`,
+                );
             }
         }
         return true;

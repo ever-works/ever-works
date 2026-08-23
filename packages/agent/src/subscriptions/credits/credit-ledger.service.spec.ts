@@ -20,6 +20,8 @@ function makeLedgerRepository(overrides: Record<string, jest.Mock> = {}) {
         getBalance: jest.fn().mockResolvedValue(0),
         findForUser: jest.fn().mockResolvedValue({ entries: [], total: 0 }),
         findByIdempotencyKey: jest.fn().mockResolvedValue(null),
+        expireDueBuckets: jest.fn().mockResolvedValue([]),
+        findUsersWithDueBuckets: jest.fn().mockResolvedValue([]),
         ...overrides,
     };
 }
@@ -379,6 +381,158 @@ describe('CreditLedgerService', () => {
             const summary = await service.dispatchDailyGrants(NOW);
 
             expect(summary).toEqual({ granted: 1, skipped: 1, alreadyGranted: 0, scanned: 2 });
+        });
+    });
+
+    describe('dispatchDailyGrants — universal allowance (billing spec FR-1)', () => {
+        const NOW = new Date('2026-08-25T00:05:00.000Z');
+
+        it('applies the platform fallback to EVERY plan code, not just free', async () => {
+            const users = [
+                { id: 'free-user', defaultPlan: { code: 'free' } },
+                { id: 'pro-user', defaultPlan: { code: 'standard' } },
+                { id: 'ent-user', defaultPlan: { code: 'premium' } },
+            ];
+            const { service, ledgerRepository, entitlementsService } = makeService(
+                {},
+                {
+                    // No entitlement rows: every plan resolves the caller's fallback.
+                    getNumber: jest
+                        .fn()
+                        .mockImplementation(async (_plan: string, _key: string, fb: number) => fb),
+                },
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
+            );
+
+            const summary = await service.dispatchDailyGrants(NOW);
+
+            for (const code of ['free', 'standard', 'premium']) {
+                expect(entitlementsService.getNumber).toHaveBeenCalledWith(
+                    code,
+                    'daily-free-credits',
+                    50,
+                );
+            }
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledTimes(3);
+            expect(summary).toEqual({ granted: 3, skipped: 0, alreadyGranted: 0, scanned: 3 });
+        });
+
+        it('honours CREDITS_DAILY_FREE as the universal fallback level', async () => {
+            process.env.CREDITS_DAILY_FREE = '75';
+            const users = [{ id: 'pro-user', defaultPlan: { code: 'standard' } }];
+            const { service, ledgerRepository } = makeService(
+                {},
+                {
+                    getNumber: jest
+                        .fn()
+                        .mockImplementation(async (_plan: string, _key: string, fb: number) => fb),
+                },
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
+            );
+
+            await service.dispatchDailyGrants(NOW);
+
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({ amountCredits: 75 }),
+                expect.objectContaining({ maxBalanceAfter: 75 }),
+            );
+        });
+    });
+
+    describe('grantDailyForUser — lazy per-user grant (billing spec FR-3)', () => {
+        const NOW = new Date('2026-08-25T13:00:00.000Z');
+
+        it('writes the same daily key the sweep would, so the two can never double-grant', async () => {
+            const { service, ledgerRepository } = makeService();
+
+            expect(await service.grantDailyForUser('u1', 'standard', NOW)).toBe('granted');
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    kind: CreditLedgerKind.DAILY_FREE,
+                    amountCredits: 50,
+                    idempotencyKey: 'daily:u1:2026-08-25',
+                }),
+                expect.objectContaining({ maxBalanceAfter: 50 }),
+            );
+        });
+
+        it("reports already-granted when today's key exists and skipped when the ceiling clamps", async () => {
+            const already = makeService({
+                findByIdempotencyKey: jest.fn().mockResolvedValue({ id: 'prior' }),
+            });
+            expect(await already.service.grantDailyForUser('u1', 'free', NOW)).toBe(
+                'already-granted',
+            );
+            expect(already.ledgerRepository.recordAtomic).not.toHaveBeenCalled();
+
+            const clamped = makeService({
+                recordAtomic: jest.fn().mockResolvedValue({ status: 'skipped', balance: 900 }),
+            });
+            expect(await clamped.service.grantDailyForUser('u1', 'free', NOW)).toBe('skipped');
+        });
+    });
+
+    describe('expireDueCredits — expiry sweep (billing spec FR-7)', () => {
+        const NOW = new Date('2026-09-23T00:05:00.000Z');
+
+        it("closes one user's due buckets and tallies them", async () => {
+            const { service, ledgerRepository } = makeService({
+                expireDueBuckets: jest.fn().mockResolvedValue([
+                    { entryId: 'a', expiredCredits: 300, expiryEntry: {} },
+                    { entryId: 'b', expiredCredits: 200, expiryEntry: {} },
+                ]),
+            });
+
+            const summary = await service.expireDueCredits('u1', NOW);
+
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u1', NOW);
+            expect(ledgerRepository.findUsersWithDueBuckets).not.toHaveBeenCalled();
+            expect(summary).toEqual({ users: 1, buckets: 2, credits: 500 });
+        });
+
+        it('without a user, walks every user with a due bucket until the work list is empty', async () => {
+            const { service, ledgerRepository } = makeService({
+                findUsersWithDueBuckets: jest
+                    .fn()
+                    .mockResolvedValueOnce(['u1', 'u2'])
+                    .mockResolvedValue([]),
+                expireDueBuckets: jest
+                    .fn()
+                    .mockResolvedValueOnce([{ entryId: 'a', expiredCredits: 10, expiryEntry: {} }])
+                    .mockResolvedValueOnce([]),
+            });
+
+            const summary = await service.expireDueCredits(undefined, NOW);
+
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u1', NOW);
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u2', NOW);
+            // u2 had nothing left by the time it was visited → not counted as a user.
+            expect(summary).toEqual({ users: 1, buckets: 1, credits: 10 });
+        });
+
+        it('record forwards expiresAt for a positive write only', async () => {
+            const { service, ledgerRepository } = makeService();
+            const expiresAt = new Date('2026-10-23T00:00:00.000Z');
+
+            await service.record({
+                userId: 'u1',
+                kind: CreditLedgerKind.GRANT,
+                amountCredits: 3000,
+                expiresAt,
+            });
+            await service.record({
+                userId: 'u1',
+                kind: CreditLedgerKind.CONSUMPTION,
+                amountCredits: -5,
+                expiresAt,
+                allowNegativeBalance: true,
+            });
+
+            expect(ledgerRepository.recordAtomic.mock.calls[0][0]).toEqual(
+                expect.objectContaining({ expiresAt }),
+            );
+            expect(ledgerRepository.recordAtomic.mock.calls[1][0].expiresAt).toBeUndefined();
         });
     });
 

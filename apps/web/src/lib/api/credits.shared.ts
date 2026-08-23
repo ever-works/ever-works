@@ -88,6 +88,8 @@ export interface UsageSummaryTotals {
     balanceCredits: number;
     creditsConsumed: number;
     creditsAdded: number;
+    /** Allowance credits that lapsed in the window (billing spec §3.2). Optional for older API builds. */
+    creditsExpired?: number;
     spendCents: number;
     tasksCompleted: number;
     worksActive: number;

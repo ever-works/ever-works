@@ -13,6 +13,8 @@ import { AutoRechargeService } from './billing/auto-recharge.service';
 import { PlanSubscriptionService } from './billing/plan-subscription.service';
 import { PaymentMethodService } from './billing/payment-method.service';
 import { CreditLedgerService } from './credits/credit-ledger.service';
+import { PlanCreditGrantService } from './credits/plan-credit-grant.service';
+import { CreditsSweepService } from './credits/credits-sweep.service';
 import { EntitlementsService } from './credits/entitlements.service';
 import { RunCostSettlementService } from './credits/run-cost-settlement.service';
 import { UsageSummaryService } from './credits/usage-summary.service';
@@ -41,6 +43,10 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         // additive beside the existing plan/usage-ledger services.
         CreditLedgerService,
         EntitlementsService,
+        // Monthly plan-allowance grants + the daily sweep orchestrator
+        // (billing spec §3.2): expiries → daily free → plan allowance.
+        PlanCreditGrantService,
+        CreditsSweepService,
         // Run-cost settlement + gate precheck (pricing Wave 9 M2) — the
         // api-side @Global() SubscriptionsModule binds this instance to
         // the RUN_COST_SETTLER + RUN_CREDITS_PRECHECK tokens.
@@ -87,6 +93,8 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         UsageLedgerService,
         CreditLedgerService,
         EntitlementsService,
+        PlanCreditGrantService,
+        CreditsSweepService,
         RunCostSettlementService,
         UsageSummaryService,
         CostsSummaryService,

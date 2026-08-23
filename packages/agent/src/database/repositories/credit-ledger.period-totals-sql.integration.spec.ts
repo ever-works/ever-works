@@ -119,7 +119,7 @@ describe('CreditLedgerRepository.getPeriodTotals — emitted SQL (integration)',
 
         const totals = await repository.getPeriodTotals(USER, from, to);
 
-        expect(totals).toEqual({ consumedCredits: 42, addedCredits: 100 });
+        expect(totals).toEqual({ consumedCredits: 42, addedCredits: 100, expiredCredits: 0 });
     });
 
     it('honours the half-open window and excludes other users', async () => {
@@ -133,7 +133,7 @@ describe('CreditLedgerRepository.getPeriodTotals — emitted SQL (integration)',
 
         const totals = await repository.getPeriodTotals(USER, from, to);
 
-        expect(totals).toEqual({ consumedCredits: 11, addedCredits: 0 });
+        expect(totals).toEqual({ consumedCredits: 11, addedCredits: 0, expiredCredits: 0 });
     });
 
     it('returns zeros rather than NaN when the window holds no rows', async () => {
@@ -143,6 +143,6 @@ describe('CreditLedgerRepository.getPeriodTotals — emitted SQL (integration)',
             new Date('2026-02-01T00:00:00.000Z'),
         );
 
-        expect(totals).toEqual({ consumedCredits: 0, addedCredits: 0 });
+        expect(totals).toEqual({ consumedCredits: 0, addedCredits: 0, expiredCredits: 0 });
     });
 });

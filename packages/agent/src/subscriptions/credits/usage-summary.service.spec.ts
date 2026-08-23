@@ -94,7 +94,7 @@ describe('UsageSummaryService', () => {
             getBalance: jest.fn().mockResolvedValue(500),
             getPeriodTotals: jest
                 .fn()
-                .mockResolvedValue({ consumedCredits: 260, addedCredits: 300 }),
+                .mockResolvedValue({ consumedCredits: 260, addedCredits: 300, expiredCredits: 40 }),
         } as any;
         service = new UsageSummaryService(
             pluginUsageRepository as unknown as PluginUsageRepository,
@@ -110,6 +110,7 @@ describe('UsageSummaryService', () => {
             balanceCredits: 500,
             creditsConsumed: 260,
             creditsAdded: 300,
+            creditsExpired: 40,
             spendCents: 240,
             tasksCompleted: 3,
             worksActive: 2,

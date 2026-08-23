@@ -32,6 +32,21 @@ export class UserSubscriptionRepository {
         });
     }
 
+    /**
+     * Active subscriptions in stable (createdAt, id) order for the daily
+     * plan-allowance sweep (billing spec FR-5). `plan` is eager on the
+     * entity; loaded explicitly anyway so the batch never depends on that.
+     */
+    async findActiveBatch(skip: number, take: number): Promise<UserSubscription[]> {
+        return this.repository.find({
+            where: { status: SubscriptionStatus.ACTIVE },
+            order: { createdAt: 'ASC', id: 'ASC' },
+            relations: ['plan'],
+            skip,
+            take,
+        });
+    }
+
     async listByUser(userId: string): Promise<UserSubscription[]> {
         return this.repository.find({
             where: { userId },
