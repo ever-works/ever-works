@@ -48,12 +48,11 @@ $otherHostileOverrides = [ordered]@{
 	RUSTC_WORKSPACE_WRAPPER = "C:\missing-hostile-rustc-workspace-wrapper.exe"
 	RUSTFLAGS = "-C opt-level=0"
 }
-$allManagedNames = @(
-	$githubHintNames
-	$profileOverrides.Keys
-	$otherHostileOverrides.Keys
-	"CARGO_ENCODED_RUSTFLAGS"
-) | Select-Object -Unique
+$allManagedNames = @($githubHintNames) +
+	@($profileOverrides.Keys) +
+	@($otherHostileOverrides.Keys) +
+	@("CARGO_ENCODED_RUSTFLAGS") |
+	Select-Object -Unique
 $previousEnvironment = @{}
 foreach ($name in $allManagedNames) {
 	$previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
@@ -62,7 +61,7 @@ foreach ($name in $allManagedNames) {
 function Set-TestEnvironment {
 	param([Parameter(Mandatory)] [Collections.IDictionary]$Values)
 	foreach ($name in $allManagedNames) {
-		[Environment]::SetEnvironmentVariable($name, $null, "Process")
+		Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
 	}
 	foreach ($entry in $Values.GetEnumerator()) {
 		[Environment]::SetEnvironmentVariable([string]$entry.Key, [string]$entry.Value, "Process")
@@ -160,6 +159,10 @@ try {
 	Write-Output "Build environment contract passed: $($hostileHashes[0])"
 } finally {
 	foreach ($name in $allManagedNames) {
-		[Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], "Process")
+		if ($null -eq $previousEnvironment[$name]) {
+			Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+		} else {
+			[Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], "Process")
+		}
 	}
 }
