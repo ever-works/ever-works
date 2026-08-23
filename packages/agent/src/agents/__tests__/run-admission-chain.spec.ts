@@ -124,6 +124,101 @@ describe('run admission chain', () => {
             expect(counters.countInFlightForOrganization).not.toHaveBeenCalled();
         });
 
+        /**
+         * 🛑 THE SENTINEL COLLISION.
+         *
+         * The producer returns `0` for a plan with NO entitlement row, documented
+         * as "no plan-level ceiling, only the env valves apply". This middleware
+         * used to read anything `<= 0` as UNLIMITED and `return next()` — so a plan
+         * with no row escaped the org valve completely and had no concurrency
+         * ceiling of any kind. Producer and consumer must agree: only a NEGATIVE
+         * value means unlimited.
+         *
+         * Revert-check: change the guard back to `planLimit <= 0` and this goes RED.
+         */
+        it('treats 0 as "no plan ceiling", NOT as unlimited', async () => {
+            const counters = {
+                countInFlightForWork: jest.fn().mockResolvedValue(0),
+                countInFlightForOrganization: jest.fn().mockResolvedValue(0),
+                countInFlightForUser: jest.fn().mockResolvedValue(9999),
+            };
+            const context = planCtx(0, { resolveOrgLimit: () => 25, counters });
+
+            const verdict = await orgConcurrencyAdmission(
+                context,
+                async () => RUN_ADMISSION_ADMITTED,
+            );
+
+            // The env valve must still bite at 25.
+            expect(verdict).toEqual({ admitted: false, queuedReason: QUEUED_REASON_CONCURRENCY });
+            expect(counters.countInFlightForUser).toHaveBeenCalled();
+        });
+
+        it('leaves the env ceiling untouched when the plan has no opinion (null)', async () => {
+            const counters = {
+                countInFlightForWork: jest.fn().mockResolvedValue(0),
+                countInFlightForOrganization: jest.fn().mockResolvedValue(0),
+                countInFlightForUser: jest.fn().mockResolvedValue(9999),
+            };
+            const context = planCtx(null, { resolveOrgLimit: () => 25, counters });
+
+            const verdict = await orgConcurrencyAdmission(
+                context,
+                async () => RUN_ADMISSION_ADMITTED,
+            );
+
+            expect(verdict).toEqual({ admitted: false, queuedReason: QUEUED_REASON_CONCURRENCY });
+        });
+
+        /**
+         * The docblock used to justify the unlimited bypass with "the per-Work
+         * valve still bounds everything above it". That is only true when the run
+         * carries a workId — `workConcurrencyAdmission` short-circuits on
+         * `!input.workId`, and the heartbeat dispatcher passes `workId: null`
+         * deliberately, because the org/user valve is meant to be the one that
+         * applies. Bypassing there left the user with NO valve at all.
+         */
+        it('keeps the valve armed for an unlimited plan on a Work-LESS run', async () => {
+            const counters = {
+                countInFlightForWork: jest.fn().mockResolvedValue(0),
+                countInFlightForOrganization: jest.fn().mockResolvedValue(0),
+                countInFlightForUser: jest.fn().mockResolvedValue(9999),
+            };
+            const context = planCtx(-1, {
+                input: { userId: 'user-1', workId: null, organizationId: null },
+                resolveOrgLimit: () => 25,
+                counters,
+            });
+
+            const verdict = await orgConcurrencyAdmission(
+                context,
+                async () => RUN_ADMISSION_ADMITTED,
+            );
+
+            expect(verdict).toEqual({ admitted: false, queuedReason: QUEUED_REASON_CONCURRENCY });
+        });
+
+        it('still lets an unlimited plan through when a Work valve is in play', async () => {
+            const counters = {
+                countInFlightForWork: jest.fn().mockResolvedValue(0),
+                countInFlightForOrganization: jest.fn().mockResolvedValue(9999),
+                countInFlightForUser: jest.fn().mockResolvedValue(9999),
+            };
+            const context = planCtx(-1, {
+                input: { userId: 'user-1', workId: 'work-1', organizationId: null },
+                resolveOrgLimit: () => 25,
+                counters,
+            });
+
+            const verdict = await orgConcurrencyAdmission(
+                context,
+                async () => RUN_ADMISSION_ADMITTED,
+            );
+
+            expect(verdict).toEqual(RUN_ADMISSION_ADMITTED);
+            expect(counters.countInFlightForUser).not.toHaveBeenCalled();
+        });
+
         it('keeps the env ceiling when the lookup throws (fail-open)', async () => {
             const context = makeContext({
                 isPlanConcurrencyEnabled: () => true,

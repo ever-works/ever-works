@@ -36,10 +36,18 @@ export interface RunPlanLimits {
     /**
      * The user's plan concurrency ceiling.
      *
-     * `<= 0` means UNLIMITED, matching the contract the two env valves
-     * already publish (a limit of 0 disables that valve and skips its
-     * count query entirely). Return `null` when no plan-level ceiling
-     * applies, which is also treated as unlimited.
+     * Three distinct answers, and they must stay distinct:
+     *
+     *   `null`     the plan has no opinion (no entitlement row). The env
+     *              valves apply unchanged.
+     *   negative   unlimited — the plan lifts its own ceiling. `-1` is what
+     *              the seed writes (`ENTITLEMENT_UNLIMITED`).
+     *   positive   a real ceiling, applied RAISE-ONLY against the env valve.
+     *
+     * 🛑 `0` is NOT unlimited here. Elsewhere in the gate a limit of 0 disables
+     * a valve, but a plan entitlement of 0 is an operator writing "no plan
+     * ceiling", and collapsing the two once meant a plan with no row escaped
+     * the org valve completely.
      */
     resolveConcurrencyLimit(userId: string): Promise<number | null>;
 }
