@@ -6,9 +6,14 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
+import {
+    findCustomDomainCaseInsensitive,
+    isSqliteBusyOrLockedError,
+    isWorkCustomDomainUniqueConstraintError,
+} from '@ever-works/agent/database';
 import { DomainEnvironment, Work, WorkCustomDomain } from '@ever-works/agent/entities';
 import { WorkOwnershipService } from '@ever-works/agent/services';
-import { DataSource, FindOneOptions } from 'typeorm';
+import { DataSource, FindOneOptions, IsNull, Repository } from 'typeorm';
 import { ScopeContextService } from '../scope';
 import {
     ExistingWebsiteLinkResponseDto,
@@ -17,6 +22,7 @@ import {
 
 @Injectable()
 export class ExistingWebsiteLinkService {
+    private static readonly SQLITE_MAX_ATTEMPTS = 6;
     private readonly locklessWorkQueues = new Map<string, Promise<void>>();
 
     constructor(
@@ -86,9 +92,58 @@ export class ExistingWebsiteLinkService {
                     }
                 }
 
-                let domainRecord = await domainRepository.findOne({
-                    where: { workId, domain },
-                });
+                if (!work.website) {
+                    const claim = await workRepository.update(
+                        {
+                            id: workId,
+                            tenantId,
+                            organizationId,
+                            userId,
+                            website: IsNull(),
+                        },
+                        { website: url },
+                    );
+                    if ((claim.affected ?? 0) === 0) {
+                        await this.assertCurrentWebsite(
+                            workRepository,
+                            workId,
+                            userId,
+                            tenantId,
+                            organizationId,
+                            url,
+                        );
+                    }
+                } else if (work.website !== url) {
+                    // Preserve the old canonicalization behavior, but compare-and-set
+                    // the exact value observed above so a concurrent different link can
+                    // never be overwritten.
+                    const normalization = await workRepository.update(
+                        {
+                            id: workId,
+                            tenantId,
+                            organizationId,
+                            userId,
+                            website: work.website,
+                        },
+                        { website: url },
+                    );
+                    if ((normalization.affected ?? 0) === 0) {
+                        await this.assertCurrentWebsite(
+                            workRepository,
+                            workId,
+                            userId,
+                            tenantId,
+                            organizationId,
+                            url,
+                        );
+                    }
+                }
+
+                let domainRecord = await findCustomDomainCaseInsensitive(
+                    domainRepository,
+                    workId,
+                    domain,
+                );
                 let created = false;
 
                 if (!domainRecord) {
@@ -102,11 +157,6 @@ export class ExistingWebsiteLinkService {
                     created = true;
                 }
 
-                if (work.website !== url) {
-                    work.website = url;
-                    await workRepository.save(work);
-                }
-
                 return {
                     workId,
                     url,
@@ -116,7 +166,52 @@ export class ExistingWebsiteLinkService {
                 };
             });
 
-        return this.serializeLocklessWork(workId, operation);
+        return this.serializeLocklessWork(workId, () => this.withSqliteRetry(operation));
+    }
+
+    private async assertCurrentWebsite(
+        workRepository: Repository<Work>,
+        workId: string,
+        userId: string,
+        tenantId: string,
+        organizationId: string,
+        requestedUrl: string,
+    ): Promise<void> {
+        const current = await workRepository.findOne({
+            where: { id: workId, tenantId, organizationId },
+            loadEagerRelations: false,
+        });
+        if (!current || current.userId !== userId) throw this.workNotFound();
+
+        if (!current.website) throw this.websiteConflict();
+        try {
+            if (parseExistingWebsiteUrl(current.website).url === requestedUrl) return;
+        } catch {
+            // Fall through to the same opaque website conflict response.
+        }
+        throw this.websiteConflict();
+    }
+
+    private async withSqliteRetry<T>(operation: () => Promise<T>): Promise<T> {
+        if (!this.isSqliteFamily()) return operation();
+
+        for (let attempt = 0; ; attempt += 1) {
+            try {
+                return await operation();
+            } catch (error) {
+                const retryable =
+                    isSqliteBusyOrLockedError(error) ||
+                    isWorkCustomDomainUniqueConstraintError(error);
+                if (!retryable || attempt + 1 >= ExistingWebsiteLinkService.SQLITE_MAX_ATTEMPTS) {
+                    throw error;
+                }
+                await this.delay(5 * 2 ** attempt);
+            }
+        }
+    }
+
+    private delay(milliseconds: number): Promise<void> {
+        return new Promise((resolve) => setTimeout(resolve, milliseconds));
     }
 
     private async serializeLocklessWork<T>(
@@ -147,8 +242,12 @@ export class ExistingWebsiteLinkService {
     }
 
     private supportsPessimisticWriteLock(): boolean {
+        return !this.isSqliteFamily();
+    }
+
+    private isSqliteFamily(): boolean {
         const type = String(this.dataSource.options.type);
-        return !['better-sqlite3', 'sqlite', 'sqljs', 'expo', 'cordova', 'react-native'].includes(
+        return ['better-sqlite3', 'sqlite', 'sqljs', 'expo', 'cordova', 'react-native'].includes(
             type,
         );
     }

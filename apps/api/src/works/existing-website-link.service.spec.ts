@@ -60,10 +60,16 @@ describe('ExistingWebsiteLinkService', () => {
         };
         const workRepository = {
             findOne: jest.fn().mockResolvedValue(transactionWork),
+            update: jest.fn().mockImplementation(async (_criteria, patch) => {
+                if (transactionWork) transactionWork.website = patch.website;
+                return { affected: 1, raw: {}, generatedMaps: [] };
+            }),
             save: jest.fn().mockImplementation(async (value) => value),
         };
         const domainRepository = {
-            findOne: jest.fn().mockResolvedValue(options.existingDomain ?? null),
+            find: jest
+                .fn()
+                .mockResolvedValue(options.existingDomain ? [options.existingDomain] : []),
             create: jest.fn().mockImplementation((value) => ({ id: 'domain-1', ...value })),
             save: jest.fn().mockImplementation(async (value) => value),
         };
@@ -114,16 +120,25 @@ describe('ExistingWebsiteLinkService', () => {
         };
         const workRepository = {
             findOne: jest.fn().mockImplementation(async () => ({ ...ownedWork, website })),
+            update: jest.fn().mockImplementation(async (_criteria, patch) => {
+                if (website !== null) return { affected: 0, raw: {}, generatedMaps: [] };
+                website = patch.website;
+                return { affected: 1, raw: {}, generatedMaps: [] };
+            }),
             save: jest.fn().mockImplementation(async (work) => {
                 website = work.website;
                 return work;
             }),
         };
         const domainRepository = {
-            findOne: jest.fn().mockImplementation(async ({ where }) => {
-                const snapshot = domains.get(where.domain) ?? null;
+            find: jest.fn().mockImplementation(async ({ where }) => {
+                const raw = where.domain as {
+                    _objectLiteralParameters?: { canonicalDomain?: string };
+                };
+                const canonicalDomain = raw._objectLiteralParameters?.canonicalDomain ?? '';
+                const snapshot = domains.get(canonicalDomain);
                 await domainReadGate;
-                return snapshot;
+                return snapshot ? [snapshot] : [];
             }),
             create: jest.fn().mockImplementation((value) => ({
                 id: `domain-${value.domain}`,
@@ -185,9 +200,11 @@ describe('ExistingWebsiteLinkService', () => {
             loadEagerRelations: false,
             lock: { mode: 'pessimistic_write' },
         });
-        expect(h.domainRepository.findOne).toHaveBeenCalledWith({
-            where: { workId, domain: 'ever.works' },
-        });
+        expect(h.domainRepository.find).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ workId }),
+            }),
+        );
         expect(h.domainRepository.create).toHaveBeenCalledWith({
             workId,
             domain: 'ever.works',
@@ -195,8 +212,15 @@ describe('ExistingWebsiteLinkService', () => {
             verified: false,
         });
         expect(h.domainRepository.save).toHaveBeenCalledTimes(1);
-        expect(h.workRepository.save).toHaveBeenCalledWith(
-            expect.objectContaining({ website: 'https://ever.works' }),
+        expect(h.workRepository.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: workId,
+                userId,
+                tenantId,
+                organizationId,
+                website: expect.anything(),
+            }),
+            { website: 'https://ever.works' },
         );
     });
 
@@ -230,7 +254,7 @@ describe('ExistingWebsiteLinkService', () => {
         });
         expect(h.domainRepository.create).not.toHaveBeenCalled();
         expect(h.domainRepository.save).not.toHaveBeenCalled();
-        expect(h.workRepository.save).not.toHaveBeenCalled();
+        expect(h.workRepository.update).not.toHaveBeenCalled();
     });
 
     it('adds only the website URL when the Work already has the domain record', async () => {
@@ -247,8 +271,9 @@ describe('ExistingWebsiteLinkService', () => {
 
         expect(h.domainRepository.create).not.toHaveBeenCalled();
         expect(h.domainRepository.save).not.toHaveBeenCalled();
-        expect(h.workRepository.save).toHaveBeenCalledWith(
-            expect.objectContaining({ website: 'https://ever.works' }),
+        expect(h.workRepository.update).toHaveBeenCalledWith(
+            expect.objectContaining({ id: workId, userId, tenantId, organizationId }),
+            { website: 'https://ever.works' },
         );
     });
 
@@ -266,9 +291,9 @@ describe('ExistingWebsiteLinkService', () => {
         await expect(
             h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
         ).rejects.toBeInstanceOf(ConflictException);
-        expect(h.domainRepository.findOne).not.toHaveBeenCalled();
+        expect(h.domainRepository.find).not.toHaveBeenCalled();
         expect(h.domainRepository.save).not.toHaveBeenCalled();
-        expect(h.workRepository.save).not.toHaveBeenCalled();
+        expect(h.workRepository.update).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -326,7 +351,7 @@ describe('ExistingWebsiteLinkService', () => {
             status: 404,
             response: expect.objectContaining({ message: 'Work not found' }),
         });
-        expect(h.domainRepository.findOne).not.toHaveBeenCalled();
+        expect(h.domainRepository.find).not.toHaveBeenCalled();
     });
 
     it('keeps an ownership transfer opaque at the locked transactional reread', async () => {
@@ -346,9 +371,130 @@ describe('ExistingWebsiteLinkService', () => {
             status: 404,
             response: expect.objectContaining({ message: 'Work not found' }),
         });
-        expect(h.domainRepository.findOne).not.toHaveBeenCalled();
+        expect(h.domainRepository.find).not.toHaveBeenCalled();
         expect(h.domainRepository.save).not.toHaveBeenCalled();
-        expect(h.workRepository.save).not.toHaveBeenCalled();
+        expect(h.workRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('rereads after a lost null-website claim and returns idempotent success', async () => {
+        const unclaimed = { id: workId, userId, tenantId, organizationId, website: null };
+        const winner = {
+            id: workId,
+            userId,
+            tenantId,
+            organizationId,
+            website: 'https://ever.works',
+        };
+        const h = createHarness({ transactionWork: unclaimed });
+        h.workRepository.findOne.mockResolvedValueOnce(unclaimed).mockResolvedValueOnce(winner);
+        h.workRepository.update.mockResolvedValueOnce({
+            affected: 0,
+            raw: {},
+            generatedMaps: [],
+        });
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).resolves.toMatchObject({ url: 'https://ever.works' });
+        expect(h.workRepository.findOne).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps lost ownership opaque after a zero-row website claim', async () => {
+        const unclaimed = { id: workId, userId, tenantId, organizationId, website: null };
+        const h = createHarness({ transactionWork: unclaimed });
+        h.workRepository.findOne.mockResolvedValueOnce(unclaimed).mockResolvedValueOnce({
+            ...unclaimed,
+            userId: '00000000-0000-0000-0000-0000000000ee',
+        });
+        h.workRepository.update.mockResolvedValueOnce({
+            affected: 0,
+            raw: {},
+            generatedMaps: [],
+        });
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).rejects.toMatchObject({
+            status: 404,
+            response: expect.objectContaining({ message: 'Work not found' }),
+        });
+        expect(h.domainRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 after a zero-row claim when a different URL won', async () => {
+        const unclaimed = { id: workId, userId, tenantId, organizationId, website: null };
+        const h = createHarness({ transactionWork: unclaimed });
+        h.workRepository.findOne
+            .mockResolvedValueOnce(unclaimed)
+            .mockResolvedValueOnce({ ...unclaimed, website: 'https://other.works' });
+        h.workRepository.update.mockResolvedValueOnce({
+            affected: 0,
+            raw: {},
+            generatedMaps: [],
+        });
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(h.domainRepository.find).not.toHaveBeenCalled();
+    });
+
+    it('retries a SQLite BUSY failure and rereads through a fresh transaction', async () => {
+        const h = createHarness();
+        h.dataSource.options.type = 'better-sqlite3';
+        h.dataSource.transaction.mockRejectedValueOnce(
+            Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' }),
+        );
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).resolves.toMatchObject({ url: 'https://ever.works' });
+        expect(h.dataSource.transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries only the expected WorkCustomDomain SQLite uniqueness race', async () => {
+        const h = createHarness();
+        h.dataSource.options.type = 'better-sqlite3';
+        h.dataSource.transaction.mockRejectedValueOnce(
+            Object.assign(
+                new Error(
+                    'UNIQUE constraint failed: work_custom_domains.workId, work_custom_domains.domain',
+                ),
+                { code: 'SQLITE_CONSTRAINT_UNIQUE' },
+            ),
+        );
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).resolves.toMatchObject({ url: 'https://ever.works' });
+        expect(h.dataSource.transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry an unrelated SQLite constraint failure', async () => {
+        const h = createHarness();
+        h.dataSource.options.type = 'better-sqlite3';
+        const error = Object.assign(new Error('CHECK constraint failed: unrelated_column'), {
+            code: 'SQLITE_CONSTRAINT_CHECK',
+        });
+        h.dataSource.transaction.mockRejectedValue(error);
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).rejects.toBe(error);
+        expect(h.dataSource.transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('bounds SQLite lock retries and surfaces exhaustion without a write', async () => {
+        const h = createHarness();
+        h.dataSource.options.type = 'better-sqlite3';
+        const error = Object.assign(new Error('database is locked'), { code: 'SQLITE_LOCKED' });
+        h.dataSource.transaction.mockRejectedValue(error);
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).rejects.toBe(error);
+        expect(h.dataSource.transaction).toHaveBeenCalledTimes(6);
+        expect(h.workRepository.update).not.toHaveBeenCalled();
     });
 
     it('converges identical concurrent links on a lockless driver', async () => {
