@@ -79,11 +79,14 @@ jobs:
       - name: Build Node workspace dependencies
         run: pnpm --filter "ever-works-node^..." build
 
-      - name: Test and build trusted adapter and model factory
-        run: |
-          pnpm --filter ever-works-node test -- src/core/windows-job-launcher src/core/model-execution
-          pnpm --filter ever-works-node type-check
-          pnpm --filter ever-works-node build
+      - name: Test trusted adapter and model factory
+        run: pnpm --filter ever-works-node test -- src/core/windows-job-launcher src/core/model-execution
+
+      - name: Type-check trusted adapter and model factory
+        run: pnpm --filter ever-works-node type-check
+
+      - name: Build trusted adapter and model factory
+        run: pnpm --filter ever-works-node build
 
       - name: Prepare ephemeral self-signed test helper
         timeout-minutes: 3

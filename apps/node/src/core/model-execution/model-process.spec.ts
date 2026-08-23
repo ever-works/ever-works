@@ -263,7 +263,10 @@ afterEach(async () => {
 });
 
 async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = process.env): Promise<Harness> {
-	const root = await mkdtemp(join(tmpdir(), 'ever works model process '));
+	// GitHub Windows runners may expose TEMP through an 8.3 alias. Build every
+	// trusted fixture path from the handle-resolved root so the production
+	// canonical-path checks are exercised rather than tripped by the harness.
+	const root = await realpath(await mkdtemp(join(tmpdir(), 'ever works model process ')));
 	roots.push(root);
 	const workspacePath = join(root, 'task workspace with spaces');
 	const stubPath = join(root, 'stub cli with spaces.cjs');

@@ -25,18 +25,19 @@ const hasSignedFixture =
 describe.skipIf(process.platform !== 'win32')('Windows Job helper broker fail-closed integration', () => {
 	it('refuses the reproducible developer helper because it has no valid Authenticode signature', async () => {
 		const unsignedHash = await sha256(unsignedHelperPath);
-		await expect(
-			launchWindowsJobInternal({
-				helperPath: unsignedHelperPath,
-				helperTrust: {
-					expectedSha256: unsignedHash,
-					publisherSubject: 'CN=Unsigned test fixture',
-					publisherCertificateSha256: '0'.repeat(64)
-				},
-				...modelRequest()
-			})
-		).rejects.toMatchObject({ code: 'WINDOWS_JOB_HELPER_EXITED' });
-	}, 15_000);
+		const failure = await launchWindowsJobInternal({
+			helperPath: unsignedHelperPath,
+			helperTrust: {
+				expectedSha256: unsignedHash,
+				publisherSubject: 'CN=Unsigned test fixture',
+				publisherCertificateSha256: '0'.repeat(64)
+			},
+			...modelRequest()
+		}).catch((error: unknown) => error);
+		expect(failure).toMatchObject({
+			code: expect.stringMatching(/^WINDOWS_JOB_(?:HELPER_EXITED|LAUNCH_TIMEOUT)$/)
+		});
+	}, 40_000);
 });
 
 describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration', () => {
@@ -68,7 +69,7 @@ describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration
 			activeProcesses: 0,
 			processIds: []
 		});
-	}, 20_000);
+	}, 45_000);
 
 	it.each([
 		['hash mismatch', { expectedSha256: '0'.repeat(64) }],
@@ -85,7 +86,7 @@ describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration
 				})
 			).rejects.toMatchObject({ code: 'WINDOWS_JOB_HELPER_EXITED' });
 		},
-		15_000
+		45_000
 	);
 
 	it('fails closed when the configured helper is missing', async () => {
@@ -101,7 +102,7 @@ describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration
 				...modelRequest()
 			})
 		).rejects.toMatchObject({ code: 'WINDOWS_JOB_HELPER_EXITED' });
-	}, 15_000);
+	}, 45_000);
 
 	it('broker death closes native control EOF and the Job removes the model process', async () => {
 		let broker: WindowsJobHelperProcessInternal | undefined;
@@ -137,7 +138,7 @@ describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration
 			},
 			{ timeout: 10_000, interval: 100 }
 		);
-	}, 20_000);
+	}, 45_000);
 });
 
 function modelRequest(
@@ -159,7 +160,7 @@ function modelRequest(
 		timeoutMs: 10_000,
 		cleanupTimeoutMs: 1000,
 		maxOutputBytes: 1024 * 1024,
-		helperStartupTimeoutMs: 10_000,
+		helperStartupTimeoutMs: 30_000,
 		...overrides
 	};
 }

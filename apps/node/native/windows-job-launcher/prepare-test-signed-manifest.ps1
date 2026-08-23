@@ -60,15 +60,24 @@ try {
 		"$($certificate.Thumbprint)`n",
 		[Text.UTF8Encoding]::new($false)
 	)
+	$publicCertificateBytes = $certificate.Export(
+		[Security.Cryptography.X509Certificates.X509ContentType]::Cert
+	)
+	$publicCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
+		$publicCertificateBytes
+	)
 	$rootStore = [Security.Cryptography.X509Certificates.X509Store]::new(
 		[Security.Cryptography.X509Certificates.StoreName]::Root,
 		[Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
 	)
 	try {
+		Write-Host "Opening ephemeral CurrentUser Root test store"
 		$rootStore.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-		$rootStore.Add($certificate)
+		Write-Host "Adding public-only ephemeral certificate to test trust store"
+		$rootStore.Add($publicCertificate)
 	} finally {
 		$rootStore.Close()
+		$publicCertificate.Dispose()
 	}
 	Write-Host "Trusted ephemeral certificate for this test runner only"
 	Write-Host "Signing copied test-only helper fixture"
