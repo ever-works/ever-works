@@ -58,18 +58,25 @@ describe('ActiveScopeService', () => {
             organizationId: 'org-ever',
             organizationSlug: 'ever',
         });
-        expect(membership.ensureMember).toHaveBeenCalledWith(ever.id, user.id);
+        expect(membership.ensureMember).toHaveBeenCalledTimes(1);
+        expect(membership.ensureMember).toHaveBeenCalledWith(user.lastScopeOrganizationId, user.id);
+        expect(organizations.findById).not.toHaveBeenCalled();
+        expect(organizations.findBySlug).not.toHaveBeenCalled();
         expect(users.update).not.toHaveBeenCalled();
     });
 
     it('returns an opaque 404 for a revoked persisted login default without mutating on GET', async () => {
         users.findById.mockResolvedValue(user as never);
-        membership.ensureMember.mockRejectedValue(new NotFoundException('not found'));
+        membership.ensureMember.mockRejectedValue(new NotFoundException('membership revoked'));
 
         await expect(service.getActiveScope(user.id)).rejects.toMatchObject({
             status: 404,
             message: 'Organization not found',
         });
+        expect(membership.ensureMember).toHaveBeenCalledTimes(1);
+        expect(membership.ensureMember).toHaveBeenCalledWith(user.lastScopeOrganizationId, user.id);
+        expect(organizations.findById).not.toHaveBeenCalled();
+        expect(organizations.findBySlug).not.toHaveBeenCalled();
         expect(users.update).not.toHaveBeenCalled();
     });
 

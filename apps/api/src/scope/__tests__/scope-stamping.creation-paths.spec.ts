@@ -32,17 +32,26 @@ describe('Scope stamping across Mission/Goal/Work/Agent creation paths', () => {
 
     it.each(TIER_C_ENTITIES)(
         '%s exposes the real nullable scope columns and is stamped through the subscriber',
-        (domain, Entity) => {
-            const columns = getMetadataArgsStorage()
-                .filterColumns(Entity)
-                .map((column) => column.propertyName);
-            expect(columns).toEqual(expect.arrayContaining(['tenantId', 'organizationId']));
+        (domain, entityClass) => {
+            const columns = getMetadataArgsStorage().filterColumns(entityClass);
+            expect(columns).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        propertyName: 'tenantId',
+                        options: expect.objectContaining({ nullable: true }),
+                    }),
+                    expect.objectContaining({
+                        propertyName: 'organizationId',
+                        options: expect.objectContaining({ nullable: true }),
+                    }),
+                ]),
+            );
 
             // Use an actual entity prototype so this is a runtime contract, not
             // a source-signature search tied to a service method's formatting.
-            const row = Object.assign(Object.create(Entity.prototype), {
+            const row = Object.assign(Object.create(entityClass.prototype), {
                 id: `${domain.toLowerCase()}-1`,
-            }) as InstanceType<typeof Entity> & {
+            }) as InstanceType<typeof entityClass> & {
                 tenantId?: string | null;
                 organizationId?: string | null;
             };

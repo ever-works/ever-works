@@ -182,6 +182,9 @@ describe('login — which failure the user is told about', () => {
         const result = await login('someone@example.com', 'wrong', null);
 
         expect(result).toEqual({ success: false, error: 'invalidCredentials' });
+        expect(setAuthCookiesMock).not.toHaveBeenCalled();
+        expect(getLoginDefaultWorkspaceHrefMock).not.toHaveBeenCalled();
+        expect(redirectMock).not.toHaveBeenCalled();
     });
 
     it('still reports a suspended account', async () => {
@@ -221,6 +224,27 @@ describe('login — which failure the user is told about', () => {
             href: '/org/ever/dashboard',
         });
     });
+
+    it.each([
+        ['a transient scope API failure', new Error('scope API unavailable')],
+        ['a malformed persisted Organization slug', new Error('Invalid workspace scope')],
+    ])(
+        'preserves successful authentication and falls back to personal for %s',
+        async (_scenario, lookupError) => {
+            const authResponse = { access_token: 'token', user: {} };
+            loginMock.mockResolvedValue(authResponse);
+            getLoginDefaultWorkspaceHrefMock.mockRejectedValue(lookupError);
+
+            const { login } = await import('./auth');
+            const result = await login('someone@example.com', 'correct-horse', null);
+
+            expect(setAuthCookiesMock).toHaveBeenCalledWith('token');
+            expect(getLoginDefaultWorkspaceHrefMock).toHaveBeenCalledTimes(1);
+            expect(getRedirectUrlMock).toHaveBeenCalledWith(authResponse, '/');
+            expect(redirectMock).toHaveBeenCalledWith({ locale: 'en', href: '/' });
+            expect(result).toEqual({ success: true });
+        },
+    );
 
     it('does not let the mutable preference override an explicit login redirect', async () => {
         loginMock.mockResolvedValue({ access_token: 'token', user: {} });

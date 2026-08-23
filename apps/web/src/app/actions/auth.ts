@@ -85,6 +85,21 @@ function isAccountLockedError(error: unknown): boolean {
     return /account .*lock|temporarily locked/i.test(message);
 }
 
+/**
+ * Workspace preference resolution is post-authentication navigation only.
+ * Once the API has authenticated the user and the session cookie is written,
+ * a stale preference, revoked membership, or transient scope lookup failure
+ * must not turn that successful authentication into an action error.
+ */
+async function resolveLoginDefaultWorkspaceHref(): Promise<string> {
+    try {
+        return await getLoginDefaultWorkspaceHref();
+    } catch (error) {
+        console.error('Unable to resolve the login workspace default', error);
+        return ROUTES.DASHBOARD;
+    }
+}
+
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
     // `validation.auth` has no key for an unverified email; the message already
@@ -163,7 +178,7 @@ export async function login(identifier: string, password: string, redirectUrl: s
     } else if (authResponse) {
         // The mutable preference is navigation convenience only. Resolve it
         // once after authentication, then let an explicit redirect cookie win.
-        href = await getLoginDefaultWorkspaceHref();
+        href = await resolveLoginDefaultWorkspaceHref();
         href = await getRedirectUrl(authResponse, href);
     }
 
@@ -668,7 +683,7 @@ export async function redeemMagicLink(token: string, redirectUrl: string | null)
     ) {
         href = redirectUrl;
     } else if (authResponse) {
-        href = await getLoginDefaultWorkspaceHref();
+        href = await resolveLoginDefaultWorkspaceHref();
         href = await getRedirectUrl(authResponse, href);
     }
 
