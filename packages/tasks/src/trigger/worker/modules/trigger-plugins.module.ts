@@ -13,6 +13,7 @@ import {
     PluginVersionCheckerService,
     PluginClassValidatorService,
     PluginLifecycleManagerService,
+    PluginSecretEncService,
     PluginSettingsService,
     PluginContextFactoryService,
     CustomCapabilityRegistryService,
@@ -79,6 +80,15 @@ export class TriggerPluginsModule {
                 PluginRegistryService,
                 PluginLoaderService,
                 PluginLifecycleManagerService,
+                // C-08: plugin secrets (API keys & co.) are stored AES-GCM-encrypted
+                // (`enc::v1::…`). PluginSettingsService takes this service as an OPTIONAL
+                // dependency and passes envelopes through untouched when it is missing —
+                // which is exactly what happened here: the worker sent
+                // `Authorization: Bearer enc::v1::…` to OpenRouter ("Missing Authentication
+                // header") and every generation failed. Must be registered BEFORE
+                // PluginSettingsService; needs PLUGIN_SECRET_ENCRYPTION_KEY in the worker env
+                // (same key as the API).
+                PluginSecretEncService,
                 PluginSettingsService,
                 PluginContextFactoryService,
                 CustomCapabilityRegistryService,
@@ -92,6 +102,7 @@ export class TriggerPluginsModule {
                 PluginRegistryService,
                 PluginLoaderService,
                 PluginLifecycleManagerService,
+                PluginSecretEncService,
                 PluginSettingsService,
                 PluginContextFactoryService,
                 CustomCapabilityRegistryService,
