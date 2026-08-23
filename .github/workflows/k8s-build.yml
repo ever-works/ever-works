@@ -11,7 +11,17 @@ permissions:
   packages: write
 jobs:
   build:
-    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    # 🛑 Deliberately the x64-16 pool, not x64-4. `ever-works-linux-x64-4` is ORG-scoped with
+    # maxRunners=4 and is referenced by 29 of the 30 workflows in this org, so it serves every
+    # repo's CI as well as every deploy. Measured 2026-08-23: ~420 queued jobs, ~285 of them
+    # created before the production image build, draining at ~18.5 jobs/h against ~48-62 jobs/h
+    # of arrivals. Because this workflow also sets cancel-in-progress, the queue lag (2h46m)
+    # exceeded the push cadence to main (~1h48m) and EVERY run was killed by its successor
+    # before a runner ever reached it - the prod image lane was dead for ~10 hours.
+    # x64-16 (maxRunners=5) is referenced by no other workflow and was completely idle.
+    # The chain falls back to x64-4 and then ubuntu-latest, so nothing breaks if the
+    # variable is unset.
+    runs-on: ${{ vars.RUNNER_LINUX_X64_16 || vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
