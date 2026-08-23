@@ -705,10 +705,18 @@ try {
 			-Arguments @("-latest", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationVersion") `
 			-Name "vswhere installation version").Trim()
 		$visualStudioPath = [IO.Path]::GetFullPath($visualStudioPath.Trim())
-		Assert-PathUnderRoot `
+		Assert-LocalCanonicalPath `
 			-LiteralPath $visualStudioPath `
-			-RootPath $osProgramFiles `
 			-Name "Visual Studio installation" | Out-Null
+		$visualStudioTrustedRoot = @($osProgramFiles, $osProgramFilesX86) |
+			Where-Object {
+				$prefix = $_.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+				$visualStudioPath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)
+			} |
+			Select-Object -First 1
+		if ($null -eq $visualStudioTrustedRoot) {
+			throw "Visual Studio installation escapes the trusted OS Program Files roots"
+		}
 		$msvcToolsRoot = Join-Path $visualStudioPath "VC\Tools\MSVC"
 		$msvcToolset = Get-LatestVersionDirectory `
 			-LiteralPath $msvcToolsRoot `
