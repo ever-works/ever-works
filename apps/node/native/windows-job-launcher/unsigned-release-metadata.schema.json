@@ -14,7 +14,10 @@
 		"sourceCommit",
 		"binarySize",
 		"unsignedBuildSha256",
+		"authenticodeContentSha256",
 		"cargoLockSha256",
+		"buildInputs",
+		"reproducibility",
 		"sbom",
 		"sbomSha256",
 		"provenance",
@@ -22,16 +25,19 @@
 		"authenticode"
 	],
 	"properties": {
-		"schemaVersion": { "const": 2 },
+		"schemaVersion": { "const": 3 },
 		"productionEligible": { "const": false },
 		"artifact": { "const": "ever-works-windows-job-launcher.exe" },
 		"targetTriple": { "const": "x86_64-pc-windows-msvc" },
-		"rustToolchain": { "type": "string", "minLength": 1 },
+		"rustToolchain": { "const": "1.88.0" },
 		"cargoLocked": { "const": true },
 		"sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
 		"binarySize": { "type": "integer", "minimum": 1 },
 		"unsignedBuildSha256": { "$ref": "#/$defs/sha256" },
+		"authenticodeContentSha256": { "$ref": "#/$defs/sha256" },
 		"cargoLockSha256": { "$ref": "#/$defs/sha256" },
+		"buildInputs": { "$ref": "#/$defs/buildInputs" },
+		"reproducibility": { "$ref": "#/$defs/reproducibility" },
 		"sbom": { "const": "ever-works-windows-job-launcher.sbom.cdx.json" },
 		"sbomSha256": { "$ref": "#/$defs/sha256" },
 		"provenance": { "const": "ever-works-windows-job-launcher.provenance.intoto.json" },
@@ -47,6 +53,176 @@
 		}
 	},
 	"$defs": {
-		"sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+		"sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+		"tool": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["version", "verboseVersion", "sha256"],
+			"properties": {
+				"version": { "type": "string", "minLength": 1 },
+				"verboseVersion": { "type": "string", "minLength": 1 },
+				"sha256": { "$ref": "#/$defs/sha256" }
+			}
+		},
+		"builder": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"kind",
+				"id",
+				"workflowRef",
+				"runnerOs",
+				"runnerArch",
+				"runnerEnvironment",
+				"imageOs",
+				"imageVersion"
+			],
+			"properties": {
+				"kind": { "enum": ["github-actions", "local"] },
+				"id": { "type": "string", "minLength": 1 },
+				"workflowRef": { "type": "string", "minLength": 1 },
+				"runnerOs": { "type": "string", "minLength": 1 },
+				"runnerArch": { "type": "string", "minLength": 1 },
+				"runnerEnvironment": { "type": "string", "minLength": 1 },
+				"imageOs": { "type": "string", "minLength": 1 },
+				"imageVersion": { "type": "string", "minLength": 1 }
+			},
+			"allOf": [
+				{
+					"if": { "properties": { "kind": { "const": "local" } } },
+					"then": {
+						"properties": {
+							"id": { "const": "urn:ever-works:builder:local-untrusted" },
+							"workflowRef": { "const": "unmanaged" },
+							"runnerEnvironment": { "const": "unmanaged" },
+							"imageOs": { "const": "unmanaged" },
+							"imageVersion": { "const": "unmanaged" }
+						}
+					}
+				},
+				{
+					"if": { "properties": { "kind": { "const": "github-actions" } } },
+					"then": {
+						"properties": {
+							"id": {
+								"pattern": "^https://github\\.com/[^/]+/[^/]+/actions/runs/[0-9]+/attempts/[0-9]+$"
+							},
+							"runnerEnvironment": { "const": "github-hosted" },
+							"imageOs": { "pattern": "^win" }
+						}
+					}
+				}
+			]
+		},
+		"buildInputs": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"rustFlags",
+				"rustc",
+				"cargo",
+				"targetTriple",
+				"msvcToolset",
+				"linker",
+				"windowsSdk",
+				"builder"
+			],
+			"properties": {
+				"rustFlags": { "const": "-C link-arg=/Brepro" },
+				"rustc": { "$ref": "#/$defs/tool" },
+				"cargo": { "$ref": "#/$defs/tool" },
+				"targetTriple": { "const": "x86_64-pc-windows-msvc" },
+				"msvcToolset": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"version",
+						"visualStudioVersion",
+						"runtimeLibrarySha256",
+						"libraryCount",
+						"librarySetSha256"
+					],
+					"properties": {
+						"version": { "type": "string", "pattern": "^\\d+(\\.\\d+)+$" },
+						"visualStudioVersion": { "type": "string", "pattern": "^\\d+(\\.\\d+)+$" },
+						"runtimeLibrarySha256": { "$ref": "#/$defs/sha256" },
+						"libraryCount": { "type": "integer", "minimum": 1 },
+						"librarySetSha256": { "$ref": "#/$defs/sha256" }
+					}
+				},
+				"linker": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["name", "fileVersion", "productVersion", "sha256"],
+					"properties": {
+						"name": { "const": "link.exe" },
+						"fileVersion": { "type": "string", "minLength": 1 },
+						"productVersion": { "type": "string", "minLength": 1 },
+						"sha256": { "$ref": "#/$defs/sha256" }
+					}
+				},
+				"windowsSdk": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"version",
+						"kernel32LibrarySha256",
+						"ucrtLibrarySha256",
+						"umLibraryCount",
+						"umLibrarySetSha256",
+						"ucrtLibraryCount",
+						"ucrtLibrarySetSha256"
+					],
+					"properties": {
+						"version": { "type": "string", "pattern": "^\\d+(\\.\\d+)+$" },
+						"kernel32LibrarySha256": { "$ref": "#/$defs/sha256" },
+						"ucrtLibrarySha256": { "$ref": "#/$defs/sha256" },
+						"umLibraryCount": { "type": "integer", "minimum": 1 },
+						"umLibrarySetSha256": { "$ref": "#/$defs/sha256" },
+						"ucrtLibraryCount": { "type": "integer", "minimum": 1 },
+						"ucrtLibrarySetSha256": { "$ref": "#/$defs/sha256" }
+					}
+				},
+				"builder": { "$ref": "#/$defs/builder" }
+			}
+		},
+		"reproducibility": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"verified",
+				"buildCount",
+				"buildSha256",
+				"buildArtifacts",
+				"isolatedTargetDirectories",
+				"incremental",
+				"compilerCache"
+			],
+			"properties": {
+				"verified": { "const": true },
+				"buildCount": { "const": 2 },
+				"buildSha256": {
+					"type": "array",
+					"minItems": 2,
+					"maxItems": 2,
+					"items": { "$ref": "#/$defs/sha256" }
+				},
+				"buildArtifacts": {
+					"type": "array",
+					"items": {
+						"enum": [
+							"target/repro-build-1/x86_64-pc-windows-msvc/release/ever-works-windows-job-launcher.exe",
+							"target/repro-build-2/x86_64-pc-windows-msvc/release/ever-works-windows-job-launcher.exe"
+						]
+					},
+					"minItems": 2,
+					"maxItems": 2,
+					"uniqueItems": true
+				},
+				"isolatedTargetDirectories": { "const": true },
+				"incremental": { "const": false },
+				"compilerCache": { "const": "disabled" }
+			}
+		}
 	}
 }

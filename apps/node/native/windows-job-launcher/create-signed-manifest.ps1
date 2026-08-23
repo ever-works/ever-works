@@ -10,6 +10,7 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $packageRoot = $PSScriptRoot
+. (Join-Path $packageRoot "pe-authenticode-content.ps1")
 
 function Resolve-PackagePath {
 	param([Parameter(Mandatory)] [string]$Path)
@@ -41,8 +42,25 @@ $unsignedMetadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Js
 if ($unsignedMetadata.productionEligible -ne $false -or $unsignedMetadata.authenticode.status -ne "unsigned") {
 	throw "signed manifest requires unsigned build metadata that is explicitly production-ineligible"
 }
-foreach ($hashName in @("unsignedBuildSha256", "sbomSha256", "provenanceSha256")) {
+foreach ($hashName in @("unsignedBuildSha256", "authenticodeContentSha256", "sbomSha256", "provenanceSha256")) {
 	Assert-Sha256 ([string]$unsignedMetadata.$hashName) $hashName
+}
+if (
+	$unsignedMetadata.binarySize -isnot [long] -and
+	$unsignedMetadata.binarySize -isnot [int]
+) {
+	throw "unsigned binary size must be an integer"
+}
+$unsignedBinarySize = [long]$unsignedMetadata.binarySize
+if ($unsignedBinarySize -lt 1) {
+	throw "unsigned binary size must be positive"
+}
+
+$signedIdentity = Get-PeAuthenticodeContentIdentity `
+	-LiteralPath $artifactPath `
+	-ExpectedUnsignedSize $unsignedBinarySize
+if ($signedIdentity.ContentSha256 -cne [string]$unsignedMetadata.authenticodeContentSha256) {
+	throw "signed artifact canonical Authenticode content hash does not match the recorded unsigned PE"
 }
 
 $signature = Get-AuthenticodeSignature -LiteralPath $artifactPath
@@ -81,6 +99,9 @@ $manifest = [ordered]@{
 	releaseApproval = "required"
 	artifact = [IO.Path]::GetFileName($artifactPath)
 	signedArtifactSha256 = $signedArtifactSha256
+	authenticodeContentSha256 = [string]$unsignedMetadata.authenticodeContentSha256
+	unsignedBinarySize = $unsignedBinarySize
+	signedBinarySize = $signedIdentity.FileSize
 	publisherSubject = $ExpectedPublisherSubject
 	publisherCertificateSha256 = $certificateSha256.ToLowerInvariant()
 	authenticodeStatus = "Valid"
