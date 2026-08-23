@@ -5,7 +5,7 @@ This package builds one `win32-x64` native helper. Phase 2 wires it into the pri
 ## Reproducible unsigned build
 
 - `rust-toolchain.toml`, the exact `windows-sys` dependency, and committed `Cargo.lock` pin the Rust inputs.
-- `build-release.ps1` removes every inherited `CARGO_*` and `RUST*` environment input before toolchain discovery, then applies one recorded allowlist. This clears all present and future `CARGO_PROFILE_*` overrides, encoded/target Rust flags, target overrides, compiler and wrapper selections. It uses a clean isolated `CARGO_HOME`, pins the resolved Rust 1.88 compiler and explicitly resolved MSVC linker, disables compiler caches and incremental compilation, sets `SOURCE_DATE_EPOCH` from the source commit, and passes exactly `-C link-arg=/Brepro`.
+- `build-release.ps1` removes every inherited `CARGO_*` and `RUST*` environment input before toolchain discovery, then applies one recorded allowlist. This clears all present and future `CARGO_PROFILE_*` overrides, encoded/target Rust flags, target overrides, compiler and wrapper selections. It also clears the native MSVC `LINK` and `_LINK_` option inputs while fixing the documented linker library, executable-search, and temporary-directory inputs. Cargo runs from a clean directory outside the source tree with an absolute manifest path and rejects any config in that controlled directory's ancestor chain, so repository or higher-level `.cargo/config*` files cannot alter either build. The script uses a clean isolated `CARGO_HOME`, pins the resolved Rust 1.88 compiler and explicitly resolved MSVC linker, disables compiler caches and incremental compilation, sets `SOURCE_DATE_EPOCH` from the source commit, and passes exactly `-C link-arg=/Brepro`.
 - One invocation deletes and builds two separate target trees (`target/repro-build-1` and `target/repro-build-2`). It hashes both executables directly and emits `reproducible: true` only after their raw SHA-256 values are identical. CI verifies both retained executables against that evidence rather than rerunning a cached build or comparing JSON alone.
 - Generated JSON uses stable ordering, UTF-8 without BOM, and no timestamp or host path.
 - The generated unsigned metadata records `productionEligible: false`, both reproducibility hashes, a canonical PE content hash, the lockfile SHA-256, source commit, target, size, SBOM digest, and provenance digest. Build inputs bind the exact Rust/Cargo executables, fixed Rust flags, normalized environment policy, MSVC toolset and linker, and MSVC/Windows SDK library-set digests.
@@ -17,15 +17,17 @@ The unsigned build SHA-256 is reproducibility metadata only. It is never valid a
 
 ## Post-sign manifest contract
 
-Signing happens outside this repository with an externally controlled code-signing identity. `create-signed-manifest.ps1` does not sign anything. It accepts an already-signed artifact and fails closed unless:
+Signing happens outside this repository with an externally controlled code-signing identity. `create-signed-manifest.ps1` does not sign anything. It requires both the actual unsigned artifact and the already-signed artifact, holds no-write/no-delete leases while inspecting each, and fails closed unless:
 
-1. `Get-AuthenticodeSignature` returns `Status=Valid`;
-2. the leaf certificate subject exactly equals the configured publisher subject;
-3. the leaf certificate SHA-256 exactly equals the configured pin;
-4. the recorded unsigned size and canonical PE content hash prove that the signed file is the exact recorded unsigned binary with only the PE checksum, security-directory entry, zero alignment padding, and appended Authenticode certificate table changed;
+1. the unsigned metadata passes the checked-in JSON schema;
+2. the actual unsigned artifact's raw SHA-256, size, unsigned canonical PE identity, and both clean-build hashes match that metadata;
+3. the SBOM and provenance file digests match, and the in-toto provenance subject and both reproducibility hashes identify that same verified unsigned artifact;
+4. the recorded unsigned size and canonical PE content hash prove that the signed file is the exact verified unsigned binary with only the PE checksum, security-directory entry, zero alignment padding, and appended Authenticode certificate table changed;
 5. the certificate table is the sole aligned append and ends exactly at EOF;
-6. the signed artifact SHA-256 differs from the unsigned build hash; and
-7. the SBOM and provenance still match the unsigned build metadata.
+6. `Get-AuthenticodeSignature` returns `Status=Valid`;
+7. the leaf certificate subject exactly equals the configured publisher subject;
+8. the leaf certificate SHA-256 exactly equals the configured pin; and
+9. the signed artifact SHA-256 differs from the verified unsigned build hash.
 
 The canonical derivation deliberately excludes only fields Authenticode signing is allowed to change. It rejects a different PE signed by the same pinned certificate, nonzero alignment padding, overlays after the certificate table, and mutations anywhere else in the recorded unsigned bytes. Signature validity remains a separate fail-closed requirement; canonical equivalence alone never establishes trust.
 

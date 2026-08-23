@@ -93,6 +93,7 @@ try {
 	Write-Host "Verifying test-only signed manifest contract"
 	$manifestPath = & (Join-Path $packageRoot "create-signed-manifest.ps1") `
 		-SignedArtifactPath $fixtureArtifactPath `
+		-UnsignedArtifactPath $unsignedArtifactPath `
 		-ExpectedPublisherSubject $certificate.Subject `
 		-ExpectedPublisherCertificateSha256 $certificateSha256 `
 		-UnsignedMetadataPath $unsignedMetadataPath `

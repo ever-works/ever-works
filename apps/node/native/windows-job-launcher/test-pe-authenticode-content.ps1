@@ -75,6 +75,80 @@ function Write-TestMetadataBundle {
 	return $metadataPath
 }
 
+function Invoke-TestSignedManifest {
+	param(
+		[Parameter(Mandatory)] [string]$ManifestScript,
+		[Parameter(Mandatory)] [string]$SignedArtifactPath,
+		[Parameter(Mandatory)] [string]$UnsignedArtifactPath,
+		[Parameter(Mandatory)] [string]$ExpectedPublisherSubject,
+		[Parameter(Mandatory)] [string]$ExpectedPublisherCertificateSha256,
+		[Parameter(Mandatory)] [string]$UnsignedMetadataPath,
+		[Parameter(Mandatory)] [string]$OutputPath
+	)
+	$pwshPath = @(
+		Get-Command pwsh.exe -CommandType Application -ErrorAction Stop
+	)[0].Source
+	$testEnvironment = [ordered]@{
+		EVER_WORKS_TEST_MANIFEST_SCRIPT = $ManifestScript
+		EVER_WORKS_TEST_SIGNED_ARTIFACT = $SignedArtifactPath
+		EVER_WORKS_TEST_UNSIGNED_ARTIFACT = $UnsignedArtifactPath
+		EVER_WORKS_TEST_PUBLISHER_SUBJECT = $ExpectedPublisherSubject
+		EVER_WORKS_TEST_PUBLISHER_CERTIFICATE = $ExpectedPublisherCertificateSha256
+		EVER_WORKS_TEST_UNSIGNED_METADATA = $UnsignedMetadataPath
+		EVER_WORKS_TEST_MANIFEST_OUTPUT = $OutputPath
+	}
+	$previousEnvironment = @{}
+	try {
+		foreach ($entry in $testEnvironment.GetEnumerator()) {
+			$previousEnvironment[$entry.Key] = [Environment]::GetEnvironmentVariable(
+				$entry.Key,
+				[EnvironmentVariableTarget]::Process
+			)
+			[Environment]::SetEnvironmentVariable(
+				$entry.Key,
+				$entry.Value,
+				[EnvironmentVariableTarget]::Process
+			)
+		}
+		$command = @'
+$ErrorActionPreference = [Management.Automation.ActionPreference]::Stop
+try {
+	& $env:EVER_WORKS_TEST_MANIFEST_SCRIPT `
+		-SignedArtifactPath $env:EVER_WORKS_TEST_SIGNED_ARTIFACT `
+		-UnsignedArtifactPath $env:EVER_WORKS_TEST_UNSIGNED_ARTIFACT `
+		-ExpectedPublisherSubject $env:EVER_WORKS_TEST_PUBLISHER_SUBJECT `
+		-ExpectedPublisherCertificateSha256 $env:EVER_WORKS_TEST_PUBLISHER_CERTIFICATE `
+		-UnsignedMetadataPath $env:EVER_WORKS_TEST_UNSIGNED_METADATA `
+		-OutputPath $env:EVER_WORKS_TEST_MANIFEST_OUTPUT
+} catch {
+	[Console]::Error.WriteLine($_.Exception.Message)
+	exit 1
+}
+'@
+		$nativeOutput = & $pwshPath -NoLogo -NoProfile -NonInteractive -Command $command 2>&1
+		if ($LASTEXITCODE -ne 0) {
+			$nativeFailure = @($nativeOutput | ForEach-Object {
+				$failureLines = @($_.ToString())
+				if ($_ -is [Management.Automation.ErrorRecord]) {
+					$failureLines += $_.Exception.Message
+					$failureLines += $_.ErrorDetails.Message
+				}
+				$failureLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+			}) -join "`n"
+			throw $nativeFailure
+		}
+		return $nativeOutput
+	} finally {
+		foreach ($entry in $previousEnvironment.GetEnumerator()) {
+			[Environment]::SetEnvironmentVariable(
+				$entry.Key,
+				$entry.Value,
+				[EnvironmentVariableTarget]::Process
+			)
+		}
+	}
+}
+
 function Set-TestUInt16 {
 	param([byte[]]$Bytes, [int]$Offset, [uint16]$Value)
 	[Array]::Copy([BitConverter]::GetBytes($Value), 0, $Bytes, $Offset, 2)
@@ -422,9 +496,64 @@ try {
 	).ToLowerInvariant()
 	$manifestScript = Join-Path $packageRoot "create-signed-manifest.ps1"
 	$manifestArguments = @{
+		ManifestScript = $manifestScript
 		ExpectedPublisherSubject = $certificate.Subject
 		ExpectedPublisherCertificateSha256 = $certificateSha256
-		UnsignedMetadataPath = $testMetadataPath
+		UnsignedArtifactPath = $artifactPath
+	}
+
+	$fabricatedSizeMetadata = Copy-TestJsonObject $unsignedMetadata
+	$fabricatedSizeMetadata.binarySize = [long]$fabricatedSizeMetadata.binarySize + 1
+	$fabricatedSizeProvenance = Get-Content `
+		-Raw `
+		-LiteralPath (Join-Path $testMetadataDirectory ([string]$unsignedMetadata.provenance)) |
+		ConvertFrom-Json
+	$fabricatedSizeMetadataPath = Write-TestMetadataBundle `
+		-Directory (Join-Path $fixtureRoot "fabricated-size") `
+		-Metadata $fabricatedSizeMetadata `
+		-Provenance $fabricatedSizeProvenance `
+		-SourceMetadataDirectory $sourceMetadataDirectory
+	Assert-ScriptFailsLike -Pattern "*unsigned artifact size does not match unsigned release metadata*" -Message "fabricated unsigned artifact size must be rejected" -Action {
+		Invoke-TestSignedManifest @manifestArguments `
+			-SignedArtifactPath $goodPath `
+			-UnsignedMetadataPath $fabricatedSizeMetadataPath `
+			-OutputPath (Join-Path $fixtureRoot "fabricated-size.json")
+	}
+
+	$signedAsUnsignedSha256 = (
+		Get-FileHash -Algorithm SHA256 -LiteralPath $goodPath
+	).Hash.ToLowerInvariant()
+	$signedAsUnsignedMetadata = Copy-TestJsonObject $unsignedMetadata
+	$signedAsUnsignedMetadata.binarySize = (Get-Item -LiteralPath $goodPath).Length
+	$signedAsUnsignedMetadata.unsignedBuildSha256 = $signedAsUnsignedSha256
+	$signedAsUnsignedMetadata.reproducibility.buildSha256 = @(
+		$signedAsUnsignedSha256,
+		$signedAsUnsignedSha256
+	)
+	$signedAsUnsignedProvenance = Get-Content `
+		-Raw `
+		-LiteralPath (Join-Path $testMetadataDirectory ([string]$unsignedMetadata.provenance)) |
+		ConvertFrom-Json
+	$signedAsUnsignedProvenance.subject[0].digest.sha256 = $signedAsUnsignedSha256
+	$signedAsUnsignedProvenance.predicate.runDetails.metadata.reproducibilityEvidence.buildSha256 = @(
+		$signedAsUnsignedSha256,
+		$signedAsUnsignedSha256
+	)
+	$signedAsUnsignedMetadataPath = Write-TestMetadataBundle `
+		-Directory (Join-Path $fixtureRoot "signed-as-unsigned") `
+		-Metadata $signedAsUnsignedMetadata `
+		-Provenance $signedAsUnsignedProvenance `
+		-SourceMetadataDirectory $sourceMetadataDirectory
+	$signedAsUnsignedArguments = @{}
+	foreach ($entry in $manifestArguments.GetEnumerator()) {
+		$signedAsUnsignedArguments[$entry.Key] = $entry.Value
+	}
+	$signedAsUnsignedArguments.UnsignedArtifactPath = $goodPath
+	Assert-ScriptFailsLike -Pattern "*unsigned PE unexpectedly contains an attribute-certificate table*" -Message "signed input must not impersonate the required unsigned artifact" -Action {
+		Invoke-TestSignedManifest @signedAsUnsignedArguments `
+			-SignedArtifactPath $goodPath `
+			-UnsignedMetadataPath $signedAsUnsignedMetadataPath `
+			-OutputPath (Join-Path $fixtureRoot "signed-as-unsigned.json")
 	}
 
 	$fabricatedHash = "1".PadLeft(64, "1")
@@ -446,10 +575,8 @@ try {
 		-Provenance $fabricatedProvenance `
 		-SourceMetadataDirectory $sourceMetadataDirectory
 	Assert-ScriptFailsLike -Pattern "*unsigned artifact SHA-256 does not match unsigned release metadata*" -Message "fabricated unsigned metadata and consistently rehashed provenance must be rejected" -Action {
-		& $manifestScript `
+		Invoke-TestSignedManifest @manifestArguments `
 			-SignedArtifactPath $goodPath `
-			-ExpectedPublisherSubject $certificate.Subject `
-			-ExpectedPublisherCertificateSha256 $certificateSha256 `
 			-UnsignedMetadataPath $fabricatedMetadataPath `
 			-OutputPath (Join-Path $fixtureRoot "fabricated-metadata.json")
 	}
@@ -466,10 +593,8 @@ try {
 		-Provenance $mismatchedProvenance `
 		-SourceMetadataDirectory $sourceMetadataDirectory
 	Assert-ScriptFailsLike -Pattern "*provenance subject does not match the verified unsigned artifact*" -Message "rehashed provenance with a fabricated subject must be rejected" -Action {
-		& $manifestScript `
+		Invoke-TestSignedManifest @manifestArguments `
 			-SignedArtifactPath $goodPath `
-			-ExpectedPublisherSubject $certificate.Subject `
-			-ExpectedPublisherCertificateSha256 $certificateSha256 `
 			-UnsignedMetadataPath $mismatchedProvenanceMetadataPath `
 			-OutputPath (Join-Path $fixtureRoot "mismatched-provenance.json")
 	}
@@ -486,27 +611,28 @@ try {
 		-Provenance $invalidSchemaProvenance `
 		-SourceMetadataDirectory $sourceMetadataDirectory
 	Assert-ScriptFailsLike -Pattern "*unsigned release metadata failed schema validation*" -Message "unsigned metadata outside the checked-in schema must be rejected" -Action {
-		& $manifestScript `
+		Invoke-TestSignedManifest @manifestArguments `
 			-SignedArtifactPath $goodPath `
-			-ExpectedPublisherSubject $certificate.Subject `
-			-ExpectedPublisherCertificateSha256 $certificateSha256 `
 			-UnsignedMetadataPath $invalidSchemaMetadataPath `
 			-OutputPath (Join-Path $fixtureRoot "invalid-schema.json")
 	}
 
 	Assert-ScriptFailsLike -Pattern "*canonical Authenticode content hash does not match*" -Message "same-signer different PE must be rejected by source derivation" -Action {
-		& $manifestScript @manifestArguments `
+		Invoke-TestSignedManifest @manifestArguments `
 			-SignedArtifactPath $differentPath `
+			-UnsignedMetadataPath $testMetadataPath `
 			-OutputPath (Join-Path $fixtureRoot "different.json")
 	}
 	Assert-ScriptFailsLike -Pattern "*canonical Authenticode content hash does not match*" -Message "mutation outside the certificate table must be rejected by source derivation" -Action {
-		& $manifestScript @manifestArguments `
+		Invoke-TestSignedManifest @manifestArguments `
 			-SignedArtifactPath $contentMutationPath `
+			-UnsignedMetadataPath $testMetadataPath `
 			-OutputPath (Join-Path $fixtureRoot "content-mutation.json")
 	}
 	Assert-ScriptFailsLike -Pattern "*Authenticode status is not Valid*" -Message "certificate-table mutation must reach signature verification" -Action {
-		& $manifestScript @manifestArguments `
+		Invoke-TestSignedManifest @manifestArguments `
 			-SignedArtifactPath $certificateMutationPath `
+			-UnsignedMetadataPath $testMetadataPath `
 			-OutputPath (Join-Path $fixtureRoot "certificate-mutation.json")
 	}
 

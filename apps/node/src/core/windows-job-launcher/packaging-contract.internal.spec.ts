@@ -109,9 +109,15 @@ describe('Windows Job launcher packaging contract', () => {
 		expect(invocationHints.properties.trust.const).toBe('untrusted-environment');
 	});
 
-	it('creates a signed manifest only after Status=Valid and exact subject/certificate verification', async () => {
+	it('binds a signed manifest to the schema-valid unsigned artifact and its exact provenance before trust verification', async () => {
 		const source = await readFile(join(packageRoot, 'create-signed-manifest.ps1'), 'utf8');
 		for (const required of [
+			'[Parameter(Mandatory)] [string]$UnsignedArtifactPath',
+			'Test-Json -SchemaFile $schemaPath',
+			'unsigned artifact SHA-256 does not match unsigned release metadata',
+			'-RequireUnsigned',
+			'provenance subject does not match the verified unsigned artifact',
+			'provenance reproducibility evidence does not match the verified unsigned artifact',
 			'Get-AuthenticodeSignature -LiteralPath',
 			'$signature.Status -ne "Valid"',
 			'$signature.SignerCertificate.Subject',
@@ -130,6 +136,7 @@ describe('Windows Job launcher packaging contract', () => {
 		const source = await readFile(join(packageRoot, 'prepare-test-signed-manifest.ps1'), 'utf8');
 		expect(source).toContain('New-SelfSignedCertificate');
 		expect(source).toContain('EVER_WORKS_TEST_SIGNED_HELPER_PATH');
+		expect(source).toContain('-UnsignedArtifactPath $unsignedArtifactPath');
 		expect(source).toContain('testOnly = $true');
 		expect(source).toContain('productionEligible = $false');
 		expect(source).toContain('Remove-Item -LiteralPath');
