@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 $packageRoot = $PSScriptRoot
 . (Join-Path $packageRoot "pe-authenticode-content.ps1")
+$expectedFailureTestFailures = [Collections.Generic.List[string]]::new()
 
 function Assert-Equal {
 	param(
@@ -14,7 +15,7 @@ function Assert-Equal {
 		[Parameter(Mandatory)] [object]$Expected,
 		[Parameter(Mandatory)] [string]$Message
 	)
-	if ([string]$Actual -cne [string]$Expected) {
+	if ("$Actual" -cne "$Expected") {
 		throw "$Message (actual=$Actual expected=$Expected)"
 	}
 }
@@ -25,7 +26,7 @@ function Assert-NotEqual {
 		[Parameter(Mandatory)] [object]$Expected,
 		[Parameter(Mandatory)] [string]$Message
 	)
-	if ([string]$Actual -ceq [string]$Expected) {
+	if ("$Actual" -ceq "$Expected") {
 		throw "$Message (both=$Actual)"
 	}
 }
@@ -38,12 +39,162 @@ function Assert-ScriptFailsLike {
 	)
 	try {
 		& $Action | Out-Null
-		throw "$Message (script unexpectedly succeeded)"
+		$expectedFailureTestFailures.Add("$Message (script unexpectedly succeeded)")
 	} catch {
 		if ($_.Exception.Message -notlike $Pattern) {
-			throw "$Message (unexpected failure: $($_.Exception.Message))"
+			$expectedFailureTestFailures.Add("$Message (unexpected failure: $($_.Exception.Message))")
 		}
 	}
+}
+
+function Set-TestUInt16 {
+	param([byte[]]$Bytes, [int]$Offset, [uint16]$Value)
+	[Array]::Copy([BitConverter]::GetBytes($Value), 0, $Bytes, $Offset, 2)
+}
+
+function Set-TestUInt32 {
+	param([byte[]]$Bytes, [int]$Offset, [uint32]$Value)
+	[Array]::Copy([BitConverter]::GetBytes($Value), 0, $Bytes, $Offset, 4)
+}
+
+function New-TestPe32Fixture {
+	param(
+		[Parameter(Mandatory)] [string]$LiteralPath,
+		[int]$OverlaySize = 0
+	)
+	$bytes = [byte[]]::new(0x600 + $OverlaySize)
+	$bytes[0] = 0x4d
+	$bytes[1] = 0x5a
+	Set-TestUInt32 $bytes 0x3c 0x80
+	$bytes[0x80] = 0x50
+	$bytes[0x81] = 0x45
+	Set-TestUInt16 $bytes 0x84 0x14c
+	Set-TestUInt16 $bytes 0x86 2
+	Set-TestUInt16 $bytes 0x94 0xe0
+	Set-TestUInt16 $bytes 0x96 0x0102
+	$optional = 0x98
+	Set-TestUInt16 $bytes $optional 0x10b
+	Set-TestUInt32 $bytes ($optional + 4) 0x200
+	Set-TestUInt32 $bytes ($optional + 8) 0x200
+	Set-TestUInt32 $bytes ($optional + 16) 0x1000
+	Set-TestUInt32 $bytes ($optional + 20) 0x1000
+	Set-TestUInt32 $bytes ($optional + 24) 0x2000
+	Set-TestUInt32 $bytes ($optional + 28) 0x00400000
+	Set-TestUInt32 $bytes ($optional + 32) 0x1000
+	Set-TestUInt32 $bytes ($optional + 36) 0x200
+	Set-TestUInt16 $bytes ($optional + 40) 6
+	Set-TestUInt16 $bytes ($optional + 48) 6
+	Set-TestUInt32 $bytes ($optional + 56) 0x3000
+	Set-TestUInt32 $bytes ($optional + 60) 0x200
+	Set-TestUInt16 $bytes ($optional + 68) 3
+	Set-TestUInt32 $bytes ($optional + 72) 0x100000
+	Set-TestUInt32 $bytes ($optional + 76) 0x1000
+	Set-TestUInt32 $bytes ($optional + 80) 0x100000
+	Set-TestUInt32 $bytes ($optional + 84) 0x1000
+	Set-TestUInt32 $bytes ($optional + 92) 16
+	$firstSection = 0x178
+	[Text.Encoding]::ASCII.GetBytes(".text") | ForEach-Object -Begin { $index = 0 } -Process {
+		$bytes[$firstSection + $index] = $_
+		$index++
+	}
+	Set-TestUInt32 $bytes ($firstSection + 8) 1
+	Set-TestUInt32 $bytes ($firstSection + 12) 0x1000
+	Set-TestUInt32 $bytes ($firstSection + 16) 0x200
+	Set-TestUInt32 $bytes ($firstSection + 20) 0x200
+	Set-TestUInt32 $bytes ($firstSection + 36) 0x60000020
+	$secondSection = $firstSection + 40
+	[Text.Encoding]::ASCII.GetBytes(".data") | ForEach-Object -Begin { $index = 0 } -Process {
+		$bytes[$secondSection + $index] = $_
+		$index++
+	}
+	Set-TestUInt32 $bytes ($secondSection + 8) 1
+	Set-TestUInt32 $bytes ($secondSection + 12) 0x2000
+	Set-TestUInt32 $bytes ($secondSection + 16) 0x200
+	Set-TestUInt32 $bytes ($secondSection + 20) 0x400
+	Set-TestUInt32 $bytes ($secondSection + 36) 3221225536
+	$bytes[0x200] = 0xc3
+	$bytes[0x400] = 0x7f
+	for ($offset = 0; $offset -lt $OverlaySize; $offset++) {
+		$bytes[0x600 + $offset] = [byte](0xa0 + $offset)
+	}
+	[IO.File]::WriteAllBytes($LiteralPath, $bytes)
+}
+
+function New-TestPe32SigningFixture {
+	param(
+		[Parameter(Mandatory)] [string]$LiteralPath,
+		[int]$OverlaySize = 0
+	)
+	$sourcePath = Join-Path $env:SystemRoot "SysWOW64\notepad.exe"
+	if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
+		throw "Windows PE32 fixture source is unavailable"
+	}
+	$layout = Get-TestPeLayout $sourcePath
+	if ($layout.Magic -ne 0x10b) {
+		throw "Windows fixture source is not PE32"
+	}
+	$bytes = $layout.Bytes
+	$certificateOffset = [BitConverter]::ToUInt32($bytes, $layout.SecurityDirectoryOffset)
+	$certificateSize = [BitConverter]::ToUInt32($bytes, $layout.SecurityDirectoryOffset + 4)
+	if ($certificateOffset -ne 0 -or $certificateSize -ne 0) {
+		if ($certificateOffset -eq 0 -or $certificateOffset + $certificateSize -ne $bytes.Length) {
+			throw "Windows PE32 fixture has an unsupported certificate layout"
+		}
+		[Array]::Resize([ref]$bytes, [int]$certificateOffset)
+	}
+	[Array]::Clear($bytes, $layout.OptionalOffset + 64, 4)
+	[Array]::Clear($bytes, $layout.SecurityDirectoryOffset, 8)
+	$originalSize = $bytes.Length
+	[Array]::Resize([ref]$bytes, $originalSize + $OverlaySize)
+	for ($offset = 0; $offset -lt $OverlaySize; $offset++) {
+		$bytes[$originalSize + $offset] = [byte](0xa0 + $offset)
+	}
+	[IO.File]::WriteAllBytes($LiteralPath, $bytes)
+}
+
+function Get-TestPeLayout {
+	param([Parameter(Mandatory)] [string]$LiteralPath)
+	$bytes = [IO.File]::ReadAllBytes($LiteralPath)
+	$peOffset = [int][BitConverter]::ToUInt32($bytes, 0x3c)
+	$optionalOffset = $peOffset + 24
+	$magic = [BitConverter]::ToUInt16($bytes, $optionalOffset)
+	$directoryOffset = if ($magic -eq 0x10b) { $optionalOffset + 96 } else { $optionalOffset + 112 }
+	$sectionCount = [BitConverter]::ToUInt16($bytes, $peOffset + 6)
+	$optionalSize = [BitConverter]::ToUInt16($bytes, $peOffset + 20)
+	$sections = @(
+		for ($index = 0; $index -lt $sectionCount; $index++) {
+			$offset = $optionalOffset + $optionalSize + ($index * 40)
+			[pscustomobject]@{
+				HeaderOffset = $offset
+				RawSize = [uint32][BitConverter]::ToUInt32($bytes, $offset + 16)
+				RawOffset = [uint32][BitConverter]::ToUInt32($bytes, $offset + 20)
+			}
+		}
+	)
+	[pscustomobject]@{
+		Bytes = $bytes
+		Magic = $magic
+		PeOffset = $peOffset
+		OptionalOffset = $optionalOffset
+		NumberOfSectionsOffset = $peOffset + 6
+		SectionAlignmentOffset = $optionalOffset + 32
+		FileAlignmentOffset = $optionalOffset + 36
+		SizeOfHeadersOffset = $optionalOffset + 60
+		SectionTableOffset = $optionalOffset + $optionalSize
+		SecurityDirectoryOffset = $directoryOffset + 32
+		Sections = $sections
+	}
+}
+
+function Copy-TestPeMutation {
+	param(
+		[Parameter(Mandatory)] [string]$Source,
+		[Parameter(Mandatory)] [string]$Destination,
+		[Parameter(Mandatory)] [scriptblock]$Mutation
+	)
+	$layout = Get-TestPeLayout $Source
+	& $Mutation $layout
+	[IO.File]::WriteAllBytes($Destination, $layout.Bytes)
 }
 
 $artifactPath = [IO.Path]::GetFullPath((Join-Path $packageRoot $UnsignedArtifactPath))
@@ -57,18 +208,67 @@ $differentPath = Join-Path $fixtureRoot "different\ever-works-windows-job-launch
 $certificateMutationPath = Join-Path $fixtureRoot "certificate-mutation\ever-works-windows-job-launcher.exe"
 $contentMutationPath = Join-Path $fixtureRoot "content-mutation\ever-works-windows-job-launcher.exe"
 $checksumMutationPath = Join-Path $fixtureRoot "checksum-mutation\ever-works-windows-job-launcher.exe"
+$syntheticPe32Path = Join-Path $fixtureRoot "pe32\synthetic-sections.exe"
+$pe32Path = Join-Path $fixtureRoot "pe32\legal-overlay.exe"
+$pe32SignedPath = Join-Path $fixtureRoot "pe32\legal-overlay-signed.exe"
+$pe32TrailingPath = Join-Path $fixtureRoot "pe32\trailing-after-certificate.exe"
+$structureFixtureRoot = Join-Path $fixtureRoot "structure"
 $certificate = $null
 
 try {
 	if (Test-Path -LiteralPath $fixtureRoot) {
 		Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
 	}
-	foreach ($path in @($goodPath, $differentPath, $certificateMutationPath, $contentMutationPath, $checksumMutationPath)) {
+	foreach ($path in @($goodPath, $differentPath, $certificateMutationPath, $contentMutationPath, $checksumMutationPath, $syntheticPe32Path, $pe32Path)) {
 		New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null
 	}
+	New-Item -ItemType Directory -Force -Path $structureFixtureRoot | Out-Null
 
 	$unsignedIdentity = Get-PeAuthenticodeContentIdentity -LiteralPath $artifactPath -RequireUnsigned
 	Assert-Equal $unsignedIdentity.FileSize $unsignedIdentity.UnsignedContentSize "unsigned identity must cover the whole file"
+	$pe32PlusLayout = Get-TestPeLayout $artifactPath
+	if ([uint16]$pe32PlusLayout.Magic -ne [uint16]0x20b) {
+		throw "release helper must exercise PE32+ layout"
+	}
+	New-TestPe32Fixture -LiteralPath $syntheticPe32Path
+	New-TestPe32SigningFixture -LiteralPath $pe32Path -OverlaySize 7
+	$pe32Identity = Get-PeAuthenticodeContentIdentity -LiteralPath $pe32Path -RequireUnsigned
+	Assert-Equal $pe32Identity.FileSize ((Get-Item -LiteralPath $pe32Path).Length) "PE32 overlay must be part of recorded unsigned content"
+
+	$pe32Mutations = @(
+		@{ Name = "pe32-huge-section-count"; Pattern = "*section count*"; Change = { param($layout) Set-TestUInt16 $layout.Bytes $layout.NumberOfSectionsOffset 0xffff } },
+		@{ Name = "pe32-truncated-section-table"; Pattern = "*section table*SizeOfHeaders*"; Change = { param($layout) Set-TestUInt16 $layout.Bytes $layout.NumberOfSectionsOffset 4 } },
+		@{ Name = "pe32-overlapping-sections"; Pattern = "*section raw-data ranges overlap*"; Change = { param($layout) Set-TestUInt32 $layout.Bytes ($layout.Sections[1].HeaderOffset + 20) $layout.Sections[0].RawOffset } },
+		@{ Name = "pe32-raw-range-past-eof"; Pattern = "*section raw data lies outside*"; Change = { param($layout) Set-TestUInt32 $layout.Bytes ($layout.Sections[1].HeaderOffset + 20) 0x600 } },
+		@{ Name = "pe32-invalid-file-alignment"; Pattern = "*FileAlignment*"; Change = { param($layout) Set-TestUInt32 $layout.Bytes $layout.FileAlignmentOffset 0x300 } },
+		@{ Name = "pe32-header-does-not-cover-table"; Pattern = "*section table*SizeOfHeaders*"; Change = { param($layout) Set-TestUInt32 $layout.Bytes $layout.SectionAlignmentOffset 0x80; Set-TestUInt32 $layout.Bytes $layout.FileAlignmentOffset 0x80; Set-TestUInt32 $layout.Bytes $layout.SizeOfHeadersOffset 0x180 } },
+		@{ Name = "pe32-header-past-eof"; Pattern = "*SizeOfHeaders*recorded unsigned*"; Change = { param($layout) Set-TestUInt32 $layout.Bytes $layout.SizeOfHeadersOffset 0x800 } }
+	)
+	foreach ($case in $pe32Mutations) {
+		$path = Join-Path $structureFixtureRoot "$($case.Name).exe"
+		Copy-TestPeMutation -Source $syntheticPe32Path -Destination $path -Mutation $case.Change
+		Assert-ScriptFailsLike -Pattern $case.Pattern -Message $case.Name -Action {
+			Get-PeAuthenticodeContentIdentity -LiteralPath $path -RequireUnsigned
+		}
+	}
+
+	$nonemptyPe32PlusSections = @($pe32PlusLayout.Sections | Where-Object { $_.RawSize -gt 0 })
+	if ($nonemptyPe32PlusSections.Count -lt 2) {
+		throw "release helper must have at least two nonempty PE32+ sections"
+	}
+	$pe32PlusMutations = @(
+		@{ Name = "pe32plus-huge-section-count"; Pattern = "*section count*"; Change = { param($layout) Set-TestUInt16 $layout.Bytes $layout.NumberOfSectionsOffset 0xffff } },
+		@{ Name = "pe32plus-overlapping-sections"; Pattern = "*section raw-data ranges overlap*"; Change = { param($layout) $nonempty = @($layout.Sections | Where-Object { $_.RawSize -gt 0 }); Set-TestUInt32 $layout.Bytes ($nonempty[1].HeaderOffset + 20) $nonempty[0].RawOffset } },
+		@{ Name = "pe32plus-raw-range-past-eof"; Pattern = "*section raw data lies outside*"; Change = { param($layout) $nonempty = @($layout.Sections | Where-Object { $_.RawSize -gt 0 }); $fileAlignment = [BitConverter]::ToUInt32($layout.Bytes, $layout.FileAlignmentOffset); $past = [uint32]([Math]::Ceiling($layout.Bytes.Length / [double]$fileAlignment) * $fileAlignment); Set-TestUInt32 $layout.Bytes ($nonempty[0].HeaderOffset + 20) $past } },
+		@{ Name = "pe32plus-invalid-table-bound"; Pattern = "*section table*SizeOfHeaders*"; Change = { param($layout) Set-TestUInt32 $layout.Bytes $layout.SectionAlignmentOffset 0x80; Set-TestUInt32 $layout.Bytes $layout.FileAlignmentOffset 0x80; $truncated = [uint32]([Math]::Floor(($layout.SectionTableOffset + 39) / 128.0) * 128); Set-TestUInt32 $layout.Bytes $layout.SizeOfHeadersOffset $truncated } }
+	)
+	foreach ($case in $pe32PlusMutations) {
+		$path = Join-Path $structureFixtureRoot "$($case.Name).exe"
+		Copy-TestPeMutation -Source $artifactPath -Destination $path -Mutation $case.Change
+		Assert-ScriptFailsLike -Pattern $case.Pattern -Message $case.Name -Action {
+			Get-PeAuthenticodeContentIdentity -LiteralPath $path -RequireUnsigned
+		}
+	}
 
 	Copy-Item -LiteralPath $artifactPath -Destination $checksumMutationPath
 	$checksumBytes = [IO.File]::ReadAllBytes($checksumMutationPath)
@@ -92,13 +292,31 @@ try {
 		-HashAlgorithm SHA256 `
 		-KeyExportPolicy NonExportable `
 		-NotAfter (Get-Date).AddHours(1)
+	if ($certificate -is [array]) {
+		throw "test certificate creation returned $($certificate.Count) objects: $($certificate | ForEach-Object { $_.GetType().FullName })"
+	}
 	$goodSignature = Set-AuthenticodeSignature -LiteralPath $goodPath -Certificate $certificate -HashAlgorithm SHA256
 	$differentSignature = Set-AuthenticodeSignature `
 		-LiteralPath $differentPath `
 		-Certificate $certificate `
 		-HashAlgorithm SHA256
-	Assert-Equal $goodSignature.SignerCertificate.Thumbprint $certificate.Thumbprint "good fixture must use the fixture certificate"
-	Assert-Equal $differentSignature.SignerCertificate.Thumbprint $certificate.Thumbprint "adversarial fixture must use the same certificate"
+	Copy-Item -LiteralPath $pe32Path -Destination $pe32SignedPath
+	$pe32Signature = Set-AuthenticodeSignature `
+		-LiteralPath $pe32SignedPath `
+		-Certificate $certificate `
+		-HashAlgorithm SHA256
+	if ($null -eq $goodSignature.SignerCertificate) {
+		throw "good PE32+ fixture could not be Authenticode signed (status=$($goodSignature.Status); message=$($goodSignature.StatusMessage))"
+	}
+	if ($null -eq $differentSignature.SignerCertificate) {
+		throw "different PE32+ fixture could not be Authenticode signed (status=$($differentSignature.Status); message=$($differentSignature.StatusMessage))"
+	}
+	Assert-Equal ($goodSignature.SignerCertificate.GetCertHashString()) ($certificate.GetCertHashString()) "good fixture must use the fixture certificate"
+	Assert-Equal ($differentSignature.SignerCertificate.GetCertHashString()) ($certificate.GetCertHashString()) "adversarial fixture must use the same certificate"
+	if ($null -eq $pe32Signature.SignerCertificate) {
+		throw "legal PE32 fixture could not be Authenticode signed (status=$($pe32Signature.Status); message=$($pe32Signature.StatusMessage))"
+	}
+	Assert-Equal ($pe32Signature.SignerCertificate.GetCertHashString()) ($certificate.GetCertHashString()) "legal PE32 fixture must be signed"
 
 	$goodIdentity = Get-PeAuthenticodeContentIdentity `
 		-LiteralPath $goodPath `
@@ -109,6 +327,32 @@ try {
 		-LiteralPath $differentPath `
 		-ExpectedUnsignedSize $unsignedIdentity.FileSize
 	Assert-NotEqual $differentIdentity.ContentSha256 $unsignedIdentity.ContentSha256 "a different PE signed by the same certificate must not match"
+	$pe32SignedIdentity = Get-PeAuthenticodeContentIdentity `
+		-LiteralPath $pe32SignedPath `
+		-ExpectedUnsignedSize $pe32Identity.FileSize
+	Assert-Equal $pe32SignedIdentity.ContentSha256 $pe32Identity.ContentSha256 "legal signed PE32 overlay derivation must preserve canonical content"
+
+	Copy-Item -LiteralPath $pe32SignedPath -Destination $pe32TrailingPath
+	$pe32TrailingBytes = [IO.File]::ReadAllBytes($pe32TrailingPath)
+	[Array]::Resize([ref]$pe32TrailingBytes, $pe32TrailingBytes.Length + 1)
+	$pe32TrailingBytes[$pe32TrailingBytes.Length - 1] = 0x5a
+	[IO.File]::WriteAllBytes($pe32TrailingPath, $pe32TrailingBytes)
+	Assert-ScriptFailsLike -Pattern "*bytes outside the recorded unsigned content and certificate table*" -Message "signed PE32 trailing overlay must be rejected" -Action {
+		Get-PeAuthenticodeContentIdentity -LiteralPath $pe32TrailingPath -ExpectedUnsignedSize $pe32Identity.FileSize
+	}
+
+	$certificateOverlapPath = Join-Path $structureFixtureRoot "pe32plus-section-into-certificate.exe"
+	Copy-TestPeMutation -Source $goodPath -Destination $certificateOverlapPath -Mutation {
+		param($layout)
+		$nonempty = @($layout.Sections | Where-Object { $_.RawSize -gt 0 })
+		$certificateOffset = [BitConverter]::ToUInt32($layout.Bytes, $layout.SecurityDirectoryOffset)
+		$fileAlignment = [BitConverter]::ToUInt32($layout.Bytes, $layout.FileAlignmentOffset)
+		Set-TestUInt32 $layout.Bytes ($nonempty[0].HeaderOffset + 16) $fileAlignment
+		Set-TestUInt32 $layout.Bytes ($nonempty[0].HeaderOffset + 20) $certificateOffset
+	}
+	Assert-ScriptFailsLike -Pattern "*section raw data overlaps the certificate table*" -Message "PE32+ section range into certificate table must be rejected" -Action {
+		Get-PeAuthenticodeContentIdentity -LiteralPath $certificateOverlapPath -ExpectedUnsignedSize $unsignedIdentity.FileSize
+	}
 
 	Copy-Item -LiteralPath $goodPath -Destination $certificateMutationPath
 	$certificateBytes = [IO.File]::ReadAllBytes($certificateMutationPath)
@@ -170,10 +414,13 @@ try {
 			-OutputPath (Join-Path $fixtureRoot "certificate-mutation.json")
 	}
 
+	if ($expectedFailureTestFailures.Count -gt 0) {
+		throw ("PE Authenticode content test failures:`n- " + ($expectedFailureTestFailures -join "`n- "))
+	}
 	Write-Output "PE Authenticode content tests passed"
 } finally {
-	if ($null -ne $certificate) {
-		$certificatePath = "Cert:\CurrentUser\My\$($certificate.Thumbprint)"
+	if ($null -ne $certificate -and $null -ne $certificate.PSObject.Methods["GetCertHashString"]) {
+		$certificatePath = "Cert:\CurrentUser\My\$($certificate.GetCertHashString())"
 		if (Test-Path -LiteralPath $certificatePath) {
 			Remove-Item -LiteralPath $certificatePath -Force
 		}

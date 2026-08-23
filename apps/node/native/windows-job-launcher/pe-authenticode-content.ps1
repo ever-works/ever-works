@@ -40,6 +40,10 @@ function Get-PeAuthenticodeContentIdentity {
 	}
 
 	$optionalHeaderSize = [long][BitConverter]::ToUInt16($bytes, [int]($peOffset + 20))
+	$numberOfSections = [long][BitConverter]::ToUInt16($bytes, [int]($peOffset + 6))
+	if ($numberOfSections -lt 1 -or $numberOfSections -gt 96) {
+		throw "PE COFF section count must be between 1 and 96"
+	}
 	$optionalHeaderOffset = $peOffset + 24
 	Assert-ByteRange $optionalHeaderOffset $optionalHeaderSize "PE optional header"
 	$optionalMagic = [BitConverter]::ToUInt16($bytes, [int]$optionalHeaderOffset)
@@ -55,8 +59,14 @@ function Get-PeAuthenticodeContentIdentity {
 		default { throw "artifact has an unsupported PE optional-header magic" }
 	}
 	$checksumOffset = $optionalHeaderOffset + 64
+	$sectionAlignmentOffset = $optionalHeaderOffset + 32
+	$fileAlignmentOffset = $optionalHeaderOffset + 36
+	$sizeOfHeadersOffset = $optionalHeaderOffset + 60
 	$securityDirectoryOffset = $dataDirectoriesOffset + (4 * 8)
 	Assert-ByteRange $checksumOffset 4 "PE checksum"
+	Assert-ByteRange $sectionAlignmentOffset 4 "PE SectionAlignment"
+	Assert-ByteRange $fileAlignmentOffset 4 "PE FileAlignment"
+	Assert-ByteRange $sizeOfHeadersOffset 4 "PE SizeOfHeaders"
 	Assert-ByteRange $numberOfDirectoriesOffset 4 "PE data-directory count"
 	Assert-ByteRange $securityDirectoryOffset 8 "PE security directory"
 	if ($securityDirectoryOffset + 8 -gt $optionalHeaderOffset + $optionalHeaderSize) {
@@ -66,6 +76,32 @@ function Get-PeAuthenticodeContentIdentity {
 	if ($numberOfDirectories -lt 5) {
 		throw "PE optional header does not declare a security directory"
 	}
+	$sectionAlignment = [long][BitConverter]::ToUInt32($bytes, [int]$sectionAlignmentOffset)
+	$fileAlignment = [long][BitConverter]::ToUInt32($bytes, [int]$fileAlignmentOffset)
+	$sizeOfHeaders = [long][BitConverter]::ToUInt32($bytes, [int]$sizeOfHeadersOffset)
+	$isFileAlignmentPowerOfTwo = $fileAlignment -gt 0 -and ($fileAlignment -band ($fileAlignment - 1)) -eq 0
+	if (-not $isFileAlignmentPowerOfTwo) {
+		throw "PE FileAlignment must be a nonzero power of two"
+	}
+	if ($sectionAlignment -lt 0x1000) {
+		if ($fileAlignment -ne $sectionAlignment) {
+			throw "PE FileAlignment must equal sub-page SectionAlignment"
+		}
+	} elseif ($fileAlignment -lt 0x200 -or $fileAlignment -gt 0x10000) {
+		throw "PE FileAlignment must be between 512 and 65536 bytes"
+	}
+	if ($sectionAlignment -lt $fileAlignment) {
+		throw "PE SectionAlignment must not be smaller than FileAlignment"
+	}
+	if ($sizeOfHeaders -eq 0 -or $sizeOfHeaders % $fileAlignment -ne 0) {
+		throw "PE SizeOfHeaders must be a nonzero FileAlignment multiple"
+	}
+	$sectionTableOffset = $optionalHeaderOffset + $optionalHeaderSize
+	$sectionTableSize = $numberOfSections * 40
+	if ($sectionTableOffset -gt $sizeOfHeaders - $sectionTableSize) {
+		throw "PE section table is not fully contained within SizeOfHeaders"
+	}
+	Assert-ByteRange $sectionTableOffset $sectionTableSize "PE section table"
 
 	$certificateTableOffset = [long][BitConverter]::ToUInt32($bytes, [int]$securityDirectoryOffset)
 	$certificateTableSize = [long][BitConverter]::ToUInt32($bytes, [int]($securityDirectoryOffset + 4))
@@ -114,6 +150,53 @@ function Get-PeAuthenticodeContentIdentity {
 		}
 		$unsignedContentSize = $bytes.LongLength
 	}
+	if ($sizeOfHeaders -gt $unsignedContentSize) {
+		throw "PE SizeOfHeaders lies outside the recorded unsigned content"
+	}
+
+	$sectionRanges = [Collections.Generic.List[object]]::new()
+	for ($sectionIndex = 0; $sectionIndex -lt $numberOfSections; $sectionIndex++) {
+		$sectionHeaderOffset = $sectionTableOffset + ($sectionIndex * 40)
+		$rawDataSize = [long][BitConverter]::ToUInt32($bytes, [int]($sectionHeaderOffset + 16))
+		$rawDataOffset = [long][BitConverter]::ToUInt32($bytes, [int]($sectionHeaderOffset + 20))
+		if ($rawDataSize -eq 0) {
+			continue
+		}
+		if ($rawDataOffset -eq 0 -or $rawDataOffset % $fileAlignment -ne 0) {
+			throw "PE section raw-data offset is not FileAlignment-aligned"
+		}
+		if ($rawDataSize % $fileAlignment -ne 0) {
+			throw "PE section raw-data size is not FileAlignment-aligned"
+		}
+		if ($rawDataOffset -lt $sizeOfHeaders) {
+			throw "PE section raw data overlaps SizeOfHeaders"
+		}
+		$rawDataEnd = $rawDataOffset + $rawDataSize
+		if ($rawDataEnd -gt ([long][uint32]::MaxValue + 1)) {
+			throw "PE section raw-data range overflows the 32-bit file address space"
+		}
+		if (
+			$hasCertificateTable -and
+			$rawDataOffset -lt $certificateTableOffset + $certificateTableSize -and
+			$rawDataEnd -gt $certificateTableOffset
+		) {
+			throw "PE section raw data overlaps the certificate table"
+		}
+		if ($rawDataEnd -gt $unsignedContentSize) {
+			throw "PE section raw data lies outside the recorded unsigned content"
+		}
+		$sectionRanges.Add([pscustomobject]@{
+			Start = $rawDataOffset
+			End = $rawDataEnd
+			Index = $sectionIndex
+		})
+	}
+	$orderedSectionRanges = @($sectionRanges | Sort-Object -Property Start, End, Index)
+	for ($rangeIndex = 1; $rangeIndex -lt $orderedSectionRanges.Count; $rangeIndex++) {
+		if ($orderedSectionRanges[$rangeIndex].Start -lt $orderedSectionRanges[$rangeIndex - 1].End) {
+			throw "PE section raw-data ranges overlap"
+		}
+	}
 
 	$canonicalContent = [byte[]]::new([int]$unsignedContentSize)
 	[Array]::Copy($bytes, 0, $canonicalContent, 0, [int]$unsignedContentSize)
@@ -143,5 +226,8 @@ function Get-PeAuthenticodeContentIdentity {
 		CertificateTableOffset = [long]$certificateTableOffset
 		CertificateTableSize = [long]$certificateTableSize
 		HasCertificateTable = [bool]$hasCertificateTable
+		NumberOfSections = [int]$numberOfSections
+		FileAlignment = [long]$fileAlignment
+		SizeOfHeaders = [long]$sizeOfHeaders
 	}
 }
