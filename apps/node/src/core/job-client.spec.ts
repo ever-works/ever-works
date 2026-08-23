@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { FleetJobView } from '@ever-works/contracts';
 import { FleetJobClient } from './job-client';
 import type { FetchLike } from './fleet-client';
@@ -55,5 +55,36 @@ describe('FleetJobClient heartbeat lease proof', () => {
 		});
 
 		await expect(client.heartbeat('job-1', 30)).resolves.toBeNull();
+	});
+});
+
+describe('FleetJobClient lease cancellation', () => {
+	it('composes the worker AbortSignal with the request timeout for a real lease fetch', async () => {
+		let observedSignal: AbortSignal | undefined;
+		const fetchFn: FetchLike = vi.fn(async (_url, init) => {
+			observedSignal = init.signal;
+			return new Promise<never>((_resolve, reject) => {
+				init.signal?.addEventListener(
+					'abort',
+					() => reject(Object.assign(new Error('fetch aborted'), { name: 'AbortError' })),
+					{ once: true }
+				);
+			});
+		});
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 60_000
+		});
+		const controller = new AbortController();
+		const pending = client.lease({}, controller.signal);
+		await expect.poll(() => observedSignal).toBeInstanceOf(AbortSignal);
+
+		expect(observedSignal).not.toBe(controller.signal);
+		controller.abort(new Error('worker stopping'));
+		await expect(pending).rejects.toMatchObject({ kind: 'network' });
+		expect(observedSignal?.aborted).toBe(true);
 	});
 });

@@ -89,14 +89,15 @@ export class FleetJobClient {
 	 * response, so an empty array must not be treated as an error.
 	 */
 	async lease(
-		request: { max?: number; leaseTtlSec?: number; capabilities?: string[] } = {}
+		request: { max?: number; leaseTtlSec?: number; capabilities?: string[] } = {},
+		signal?: AbortSignal
 	): Promise<FleetJobView[]> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
 		if (request.max !== undefined) body.max = request.max;
 		if (request.leaseTtlSec !== undefined) body.leaseTtlSec = request.leaseTtlSec;
 		if (request.capabilities !== undefined) body.capabilities = request.capabilities;
 
-		const payload = (await this.post('api/fleet/jobs/lease', 'lease', body)) as FleetJobLeaseResponse;
+		const payload = (await this.post('api/fleet/jobs/lease', 'lease', body, signal)) as FleetJobLeaseResponse;
 		if (!payload || !Array.isArray(payload.jobs)) {
 			throw new FleetClientError('malformed', 'Lease response did not contain a job list');
 		}
@@ -153,7 +154,12 @@ export class FleetJobClient {
 		return Boolean(payload?.ok);
 	}
 
-	private async post(path: string, operation: string, body: Record<string, unknown>): Promise<unknown> {
+	private async post(
+		path: string,
+		operation: string,
+		body: Record<string, unknown>,
+		signal?: AbortSignal
+	): Promise<unknown> {
 		const url = joinUrl(this.apiUrl, path);
 		const init: FetchRequestInit = {
 			method: 'POST',
@@ -164,9 +170,14 @@ export class FleetJobClient {
 			},
 			body: JSON.stringify(body)
 		};
-		if (this.timeoutMs > 0 && typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-			init.signal = AbortSignal.timeout(this.timeoutMs);
-		}
+		const timeoutSignal =
+			this.timeoutMs > 0 && typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+				? AbortSignal.timeout(this.timeoutMs)
+				: undefined;
+		init.signal =
+			signal && timeoutSignal && typeof AbortSignal.any === 'function'
+				? AbortSignal.any([signal, timeoutSignal])
+				: (signal ?? timeoutSignal);
 
 		let response;
 		try {

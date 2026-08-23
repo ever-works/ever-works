@@ -26,6 +26,13 @@ export class ProcessTreeTerminationError extends Error {
 	}
 }
 
+interface TerminationCoordinator {
+	noteAbort(error: Error): void;
+	noteOverflow(error: Error): void;
+	request(child: ChildProcess): Promise<void>;
+	unproven(error: unknown): ProcessTreeTerminationError;
+}
+
 /**
  * Shell-free execFile with whole-tree cancellation. Git may launch SSH,
  * credential, askpass, and remote helpers; aborting only the Git parent can
@@ -39,6 +46,7 @@ export function execFileWithVerifiedCancellation(
 ): Promise<VerifiedExecResult> {
 	if (options.signal?.aborted) return Promise.reject(abortError(options.signal));
 	const terminate = options.terminateProcessTree ?? terminateVerifiedProcessTree;
+	const termination = createTerminationCoordinator(terminate, options.terminationTimeoutMs);
 
 	return new Promise((resolve, reject) => {
 		let settled = false;
@@ -54,21 +62,16 @@ export function execFileWithVerifiedCancellation(
 		const onAbort = (): void => {
 			if (settled || aborting) return;
 			aborting = true;
-			void terminateWithDeadline(terminate, child, options.terminationTimeoutMs).then(
-				() => finish(() => reject(abortError(options.signal))),
-				(error) =>
-					finish(() =>
-						reject(
-							new ProcessTreeTerminationError(
-								`Git process tree could not be proven stopped: ${errorDetail(error)}`
-							)
-						)
-					)
+			const cancellation = abortError(options.signal);
+			termination.noteAbort(cancellation);
+			void termination.request(child).then(
+				() => finish(() => reject(cancellation)),
+				(error) => finish(() => reject(termination.unproven(error)))
 			);
 		};
 
 		try {
-			child = startFile(command, args, options, terminate, (error, stdout, stderr) => {
+			child = startFile(command, args, options, termination, (error, stdout, stderr) => {
 				if (aborting) return;
 				if (error instanceof ProcessTreeTerminationError) {
 					finish(() => reject(error));
@@ -89,7 +92,7 @@ function startFile(
 	command: string,
 	args: readonly string[],
 	options: VerifiedExecOptions,
-	terminate: (child: ChildProcess) => Promise<void>,
+	termination: TerminationCoordinator,
 	callback: (error: Error | null, stdout: string | Buffer, stderr: string | Buffer) => void
 ): ChildProcess {
 	const processOptions = {
@@ -131,15 +134,10 @@ function startFile(
 			const overflowError = Object.assign(new Error(`process output exceeded ${maxBuffer} bytes`), {
 				code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
 			});
-			void terminateWithDeadline(terminate, child, options.terminationTimeoutMs).then(
+			termination.noteOverflow(overflowError);
+			void termination.request(child).then(
 				() => complete(overflowError),
-				(error) => {
-					const unproven = new ProcessTreeTerminationError(
-						`${overflowError.message}; Git process tree could not be proven stopped: ${errorDetail(error)}`
-					);
-					Object.assign(unproven, { cause: overflowError });
-					complete(unproven);
-				}
+				(error) => complete(termination.unproven(error))
 			);
 			return;
 		}
@@ -168,6 +166,36 @@ function startFile(
 const TREE_VERIFY_TIMEOUT_MS = 2_000;
 const TREE_VERIFY_POLL_MS = 20;
 const TREE_TERMINATION_DEADLINE_MS = 6_000;
+
+function createTerminationCoordinator(
+	terminate: (child: ChildProcess) => Promise<void>,
+	timeoutMs?: number
+): TerminationCoordinator {
+	let attempt: Promise<void> | null = null;
+	let abort: Error | null = null;
+	let overflow: Error | null = null;
+	return {
+		noteAbort(error): void {
+			abort ??= error;
+		},
+		noteOverflow(error): void {
+			overflow ??= error;
+		},
+		request(child): Promise<void> {
+			attempt ??= terminateWithDeadline(terminate, child, timeoutMs);
+			return attempt;
+		},
+		unproven(error): ProcessTreeTerminationError {
+			const context: string[] = [];
+			if (overflow) context.push(overflow.message);
+			if (abort) context.push(`cancellation requested: ${abort.message}`);
+			context.push(`Git process tree could not be proven stopped: ${errorDetail(error)}`);
+			const unproven = new ProcessTreeTerminationError(context.join('; '));
+			Object.assign(unproven, { cause: overflow ?? abort ?? error });
+			return unproven;
+		}
+	};
+}
 
 async function terminateWithDeadline(
 	terminate: (child: ChildProcess) => Promise<void>,

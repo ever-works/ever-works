@@ -87,6 +87,50 @@ describe('verified Git/helper process cancellation', () => {
 			await rejected;
 		}
 	);
+
+	it.each(['rejects', 'does not settle'] as const)(
+		'coordinates overflow plus AbortSignal when the first tree terminator %s',
+		async (mode) => {
+			const root = mkdtempSync(join(tmpdir(), 'ew-git-overflow-abort-'));
+			roots.push(root);
+			const ready = join(root, 'pid.txt');
+			const script = join(root, 'overflow-abort.cjs');
+			writeFileSync(
+				script,
+				`require('node:fs').writeFileSync(${JSON.stringify(ready)},String(process.pid));` +
+					`process.stdout.write('x'.repeat(8192));setInterval(()=>{},1000);`
+			);
+			const controller = new AbortController();
+			let terminationCalls = 0;
+			const pending = execFileWithVerifiedCancellation(process.execPath, [script], {
+				signal: controller.signal,
+				maxBuffer: 64,
+				terminationTimeoutMs: 50,
+				terminateProcessTree: async () => {
+					terminationCalls += 1;
+					if (terminationCalls > 1) return;
+					controller.abort(new Error('operator abort during overflow'));
+					if (mode === 'rejects') throw new Error('whole-tree verifier rejected');
+					await new Promise<void>(() => undefined);
+				}
+			});
+			const captured = pending.catch((caught: unknown) => caught);
+
+			await expect.poll(() => existsSync(ready), { timeout: 2_500 }).toBe(true);
+			ownedPids.push(Number(readFileSync(ready, 'utf8')));
+			const error = await captured;
+
+			expect(error).toEqual(
+				expect.objectContaining({
+					name: ProcessTreeTerminationError.name,
+					message: expect.stringContaining('process output exceeded 64 bytes'),
+					cause: expect.objectContaining({ code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' })
+				})
+			);
+			expect((error as Error).message).toContain('operator abort during overflow');
+			expect(terminationCalls).toBe(1);
+		}
+	);
 });
 
 function isAlive(pid: number): boolean {

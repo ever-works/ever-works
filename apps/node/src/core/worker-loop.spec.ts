@@ -656,6 +656,7 @@ describe('WorkerLoop', () => {
 		const readyPath = join(ownedRoot, 'ready.txt');
 		const scriptPath = join(ownedRoot, 'overflow.cjs');
 		let capturedChild: ChildProcess | undefined;
+		let terminationCalls = 0;
 		let loop: WorkerLoop | undefined;
 		try {
 			writeFileSync(
@@ -690,7 +691,12 @@ describe('WorkerLoop', () => {
 								terminationTimeoutMs: 50,
 								terminateProcessTree: async (child) => {
 									capturedChild = child;
-									throw new Error('whole-tree verifier rejected');
+									terminationCalls += 1;
+									if (terminationCalls === 1) {
+										loop?.cancelJob(leased.id, 'operator abort during overflow');
+										throw new Error('whole-tree verifier rejected');
+									}
+									child.kill('SIGKILL');
 								}
 							});
 							throw new Error('unreachable after overflow');
@@ -704,11 +710,14 @@ describe('WorkerLoop', () => {
 			await expect.poll(() => existsSync(readyPath), { timeout: 2_500 }).toBe(true);
 			await vi.waitFor(() => expect(loop?.getState().state).toBe('unsafe'));
 			expect(persistUnsafe).toHaveBeenCalledOnce();
+			expect(terminationCalls).toBe(1);
 			expect(client.complete).toHaveBeenCalledWith(
 				leased.id,
 				expect.objectContaining({
 					success: false,
-					error: expect.stringMatching(/output exceeded.*could not be proven/i)
+					error: expect.stringMatching(
+						/output exceeded.*operator abort during overflow.*could not be proven/i
+					)
 				})
 			);
 		} finally {
@@ -842,6 +851,136 @@ describe('WorkerLoop', () => {
 		// resurrect polling after a stop.
 		scheduler.runNext();
 		expect(client.leaseCalls).toBe(callsAtStop);
+	});
+
+	it('drains a scheduled lease poll before releasing its marker and refuses a job returned after stop', async () => {
+		const secondLease = deferred<FleetJobView[]>();
+		let leaseCalls = 0;
+		const release = vi.fn(async () => undefined);
+		const complete = vi.fn(async () => true);
+		const client: JobLeaseCapableClient = {
+			heartbeat: vi.fn(async () =>
+				job({ status: 'running', leaseExpiresAt: new Date(Date.now() + 30_000).toISOString() })
+			),
+			complete,
+			lease: vi.fn(async () => {
+				leaseCalls += 1;
+				return leaseCalls === 1 ? [] : secondLease.promise;
+			})
+		};
+		const scheduler = controllableScheduler();
+		const executor = vi.fn(async () => ({ shouldNotRun: true }));
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			safetyGate: {
+				acquire: vi.fn(async () => ({ kind: 'acquired' as const, sessionId: 'session-stop-race' })),
+				release,
+				inspect: vi.fn(async () => null),
+				clear: vi.fn(async () => undefined)
+			}
+		});
+		loop.register('acceptance-checks', executor);
+
+		await loop.start();
+		scheduler.runNext();
+		await vi.waitFor(() => expect(leaseCalls).toBe(2));
+		const stopping = loop.stop();
+		await Promise.resolve();
+		await Promise.resolve();
+		const releasesBeforePollSettled = release.mock.calls.length;
+
+		secondLease.resolve([job({ id: 'job-returned-after-stop' })]);
+		await stopping;
+		await vi.waitFor(() => expect(complete).toHaveBeenCalledTimes(1));
+
+		expect(releasesBeforePollSettled).toBe(0);
+		expect(executor).not.toHaveBeenCalled();
+		expect(complete).toHaveBeenCalledWith(
+			'job-returned-after-stop',
+			expect.objectContaining({ success: false, error: expect.stringMatching(/stopped before execution/i) })
+		);
+		expect(release).toHaveBeenCalledOnce();
+		expect(complete.mock.invocationCallOrder[0]).toBeLessThan(release.mock.invocationCallOrder[0]!);
+	});
+
+	it('retains the safety marker and returns from stop when an aborted lease poll never settles', async () => {
+		let leaseCalls = 0;
+		let observedSignal: AbortSignal | undefined;
+		const release = vi.fn(async () => undefined);
+		const client: JobLeaseCapableClient = {
+			heartbeat: vi.fn(async () => null),
+			complete: vi.fn(async () => true),
+			lease: vi.fn(async (_request, signal) => {
+				leaseCalls += 1;
+				if (leaseCalls === 1) return [];
+				observedSignal = signal;
+				return new Promise<FleetJobView[]>(() => undefined);
+			})
+		};
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			leasePollDrainTimeoutMs: 25,
+			safetyGate: {
+				acquire: vi.fn(async () => ({ kind: 'acquired' as const, sessionId: 'session-hung-poll' })),
+				release,
+				inspect: vi.fn(async () => null),
+				clear: vi.fn(async () => undefined)
+			}
+		});
+
+		await loop.start();
+		scheduler.runNext();
+		await vi.waitFor(() => expect(leaseCalls).toBe(2));
+		const stopping = loop.stop();
+		await vi.waitFor(() => expect(observedSignal?.aborted).toBe(true));
+		scheduler.runNext();
+		await stopping;
+
+		expect(loop.getState()).toMatchObject({
+			state: 'unsafe',
+			lastError: expect.stringMatching(/lease poll.*did not settle/i)
+		});
+		expect(release).not.toHaveBeenCalled();
+	});
+
+	it('awaits a rejected scheduled lease poll before releasing its marker', async () => {
+		const secondLease = deferred<FleetJobView[]>();
+		let leaseCalls = 0;
+		const release = vi.fn(async () => undefined);
+		const client: JobLeaseCapableClient = {
+			heartbeat: vi.fn(async () => null),
+			complete: vi.fn(async () => true),
+			lease: vi.fn(async () => {
+				leaseCalls += 1;
+				return leaseCalls === 1 ? [] : secondLease.promise;
+			})
+		};
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			safetyGate: {
+				acquire: vi.fn(async () => ({ kind: 'acquired' as const, sessionId: 'session-rejected-poll' })),
+				release,
+				inspect: vi.fn(async () => null),
+				clear: vi.fn(async () => undefined)
+			}
+		});
+
+		await loop.start();
+		scheduler.runNext();
+		await vi.waitFor(() => expect(leaseCalls).toBe(2));
+		const stopping = loop.stop();
+		await Promise.resolve();
+		expect(release).not.toHaveBeenCalled();
+
+		secondLease.reject(new Error('lease transport closed after abort'));
+		await stopping;
+		expect(release).toHaveBeenCalledOnce();
+		expect(loop.getState().state).toBe('stopped');
 	});
 
 	it('is idempotent on stop', async () => {

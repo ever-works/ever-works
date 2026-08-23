@@ -60,6 +60,9 @@ export const MIN_KEEPALIVE_MS = 5_000;
  */
 export const LEASE_TERMINATION_SAFETY_MS = 8_000;
 
+/** Maximum shutdown wait for a lease transport that ignores cancellation. */
+export const DEFAULT_LEASE_POLL_DRAIN_TIMEOUT_MS = 5_000;
+
 /**
  * Exponential backoff for `n` consecutive failures, capped.
  *
@@ -78,7 +81,10 @@ export function nextBackoffMs(consecutiveFailures: number): number {
 
 /** Just enough of {@link FleetJobClient} for the loop — keeps tests tiny. */
 export interface JobLeaseCapableClient {
-	lease(request: { max?: number; leaseTtlSec?: number; capabilities?: string[] }): Promise<FleetJobView[]>;
+	lease(
+		request: { max?: number; leaseTtlSec?: number; capabilities?: string[] },
+		signal?: AbortSignal
+	): Promise<FleetJobView[]>;
 	heartbeat(jobId: string, leaseTtlSec?: number): Promise<FleetJobView | null>;
 	complete(
 		jobId: string,
@@ -163,12 +169,16 @@ export interface WorkerLoopOptions {
 	onUnsafe?: (state: WorkerUnsafeState) => Promise<void> | void;
 	/** Durable write-ahead marker acquired before this loop may lease. */
 	safetyGate?: WorkerSafetyGate;
+	/** Bound shutdown if a lease transport does not settle after abort. */
+	leasePollDrainTimeoutMs?: number;
 }
 
 export class WorkerLoop {
 	private readonly executors = new Map<FleetJobKind, JobExecutor>();
 	private readonly inFlight = new Map<string, Promise<void>>();
 	private readonly jobControllers = new Map<string, AbortController>();
+	private readonly activePolls = new Set<Promise<void>>();
+	private readonly pollControllers = new Set<AbortController>();
 	private readonly listeners = new Set<(state: WorkerLoopState) => void>();
 	private readonly scheduler: Scheduler;
 	private readonly concurrency: number;
@@ -177,6 +187,7 @@ export class WorkerLoop {
 	private readonly limits: NodeResourceLimits;
 	private readonly resourceProbe: ResourceProbe | undefined;
 	private readonly now: () => number;
+	private readonly leasePollDrainTimeoutMs: number;
 
 	private running = false;
 	private stopping = false;
@@ -184,6 +195,7 @@ export class WorkerLoop {
 	private unsafe = false;
 	private safetySessionId: string | null = null;
 	private starting: Promise<void> | null = null;
+	private stopTask: Promise<void> | null = null;
 	private timer: unknown = null;
 	private state: WorkerLoopState = {
 		state: 'idle',
@@ -202,6 +214,10 @@ export class WorkerLoop {
 		this.leaseTtlSec = clampLeaseTtlSec(options.leaseTtlSec ?? FLEET_JOB_DEFAULT_LEASE_TTL_SEC);
 		this.idlePollMs = options.idlePollMs ?? DEFAULT_IDLE_POLL_MS;
 		this.now = options.now ?? (() => Date.now());
+		this.leasePollDrainTimeoutMs =
+			Number.isFinite(options.leasePollDrainTimeoutMs) && (options.leasePollDrainTimeoutMs ?? 0) > 0
+				? Math.floor(options.leasePollDrainTimeoutMs!)
+				: DEFAULT_LEASE_POLL_DRAIN_TIMEOUT_MS;
 		// `limits` wins over the legacy `concurrency` option so there is
 		// exactly one number in play once an operator has set limits.
 		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
@@ -270,12 +286,32 @@ export class WorkerLoop {
 	 * second Ctrl-C while the first drain is in flight must not start a
 	 * concurrent teardown.
 	 */
-	async stop(): Promise<void> {
-		if (!this.running) return;
+	stop(): Promise<void> {
+		if (this.stopTask) return this.stopTask;
+		if (!this.running) return Promise.resolve();
+		const task = this.performStop();
+		this.stopTask = task;
+		const clearStopTask = (): void => {
+			if (this.stopTask === task) this.stopTask = null;
+		};
+		void task.then(clearStopTask, clearStopTask);
+		return task;
+	}
+
+	private async performStop(): Promise<void> {
 		this.stopping = true;
 		this.running = false;
 		this.cancelTimer();
-		if (this.starting) await this.starting;
+		for (const controller of this.pollControllers) {
+			if (!controller.signal.aborted) controller.abort(new Error('Fleet worker is stopping'));
+		}
+		const polls = new Set(this.activePolls);
+		if (this.starting) polls.add(this.starting);
+		if (!(await this.waitForPollDrain(polls))) {
+			this.markUnsafe(
+				`Outstanding lease poll did not settle within ${this.leasePollDrainTimeoutMs}ms after cancellation`
+			);
+		}
 		await Promise.allSettled([...this.inFlight.values()]);
 		if (this.safetySessionId && !this.unsafe && this.options.safetyGate) {
 			try {
@@ -360,7 +396,17 @@ export class WorkerLoop {
 	}
 
 	/** Run one poll now. Exposed so a UI can offer "check for work" and tests can step. */
-	async tick(): Promise<void> {
+	tick(): Promise<void> {
+		const poll = this.pollOnce();
+		this.activePolls.add(poll);
+		const clearPoll = (): void => {
+			this.activePolls.delete(poll);
+		};
+		void poll.then(clearPoll, clearPoll);
+		return poll;
+	}
+
+	private async pollOnce(): Promise<void> {
 		if (!this.running || this.stopping) return;
 		this.cancelTimer();
 		if (this.unsafe) {
@@ -390,6 +436,7 @@ export class WorkerLoop {
 		// call so an over-loaded machine never claims work it then has to
 		// run badly — the platform re-offers it to a node with headroom.
 		const admission = await this.checkResourceAdmission();
+		if (!this.running || this.stopping) return;
 		if (!admission.admit) {
 			this.patch({
 				state: this.inFlight.size > 0 ? 'working' : 'throttled',
@@ -405,16 +452,33 @@ export class WorkerLoop {
 		this.patch({ state: this.inFlight.size > 0 ? 'working' : 'polling' });
 
 		let jobs: FleetJobView[];
+		const pollController = new AbortController();
+		this.pollControllers.add(pollController);
 		try {
 			const request: { max: number; leaseTtlSec: number; capabilities?: string[] } = {
 				max: capacity,
 				leaseTtlSec: this.leaseTtlSec
 			};
 			if (this.options.capabilities) request.capabilities = this.options.capabilities;
-			jobs = await this.options.client.lease(request);
+			jobs = await this.options.client.lease(request, pollController.signal);
 		} catch (error) {
+			if (pollController.signal.aborted || this.stopping || !this.running) return;
 			this.onPollFailure(error);
 			this.scheduleNext(nextBackoffMs(this.state.consecutiveFailures));
+			return;
+		} finally {
+			this.pollControllers.delete(pollController);
+		}
+
+		if (!this.running || this.stopping) {
+			await Promise.allSettled(
+				jobs.map((job) =>
+					this.report(job.id, {
+						success: false,
+						error: 'Fleet worker stopped before execution; no command was started'
+					})
+				)
+			);
 			return;
 		}
 
@@ -444,6 +508,13 @@ export class WorkerLoop {
 		}
 
 		for (const job of jobs) {
+			if (!this.running || this.stopping || this.unsafe) {
+				await this.report(job.id, {
+					success: false,
+					error: 'Fleet worker stopped or quarantined before execution; no command was started'
+				});
+				continue;
+			}
 			this.startJob(job);
 		}
 		this.patch({ state: 'working', activeJobIds: [...this.inFlight.keys()] });
@@ -713,6 +784,22 @@ export class WorkerLoop {
 			lastError: message
 		});
 		this.options.logger?.warn(`Lease poll failed (attempt ${failures}): ${message}`);
+	}
+
+	private waitForPollDrain(polls: ReadonlySet<Promise<void>>): Promise<boolean> {
+		if (polls.size === 0) return Promise.resolve(true);
+		return new Promise((resolve) => {
+			let settled = false;
+			let timeout: unknown = null;
+			const finish = (drained: boolean): void => {
+				if (settled) return;
+				settled = true;
+				if (timeout !== null) this.scheduler.clearTimeout(timeout);
+				resolve(drained);
+			};
+			timeout = this.scheduler.setTimeout(() => finish(false), this.leasePollDrainTimeoutMs);
+			void Promise.allSettled([...polls]).then(() => finish(true));
+		});
 	}
 
 	private scheduleNext(delayMs: number): void {
