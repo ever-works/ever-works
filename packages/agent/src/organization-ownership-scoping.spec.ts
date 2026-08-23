@@ -277,9 +277,16 @@ describe('Organization ownership scoping', () => {
                 uploads as never,
             );
 
-            await expect(
-                service.listAttachments('user-1', ownedAgent.id, EVER_SCOPE),
-            ).rejects.toBeInstanceOf(NotFoundException);
+            // The Agent endpoint was ownership-validated; the edge row itself
+            // carries only the hash the caller attached. The Yo upload's
+            // metadata must not leak, but the list must not fail either
+            // (legacy pre-stamping uploads would otherwise 404 the owner's
+            // whole list) - the row comes back UN-ENRICHED.
+            const rows = await service.listAttachments('user-1', ownedAgent.id, EVER_SCOPE);
+            expect(rows).toHaveLength(1);
+            expect(rows[0]).toMatchObject({ id: 'edge-1', uploadId: uploadSha });
+            expect(rows[0]).not.toHaveProperty('url');
+            expect(rows[0]).not.toHaveProperty('filename');
         });
 
         it('404s an Ever Mission attachment whose upload hash belongs to Yo', async () => {
@@ -336,9 +343,45 @@ describe('Organization ownership scoping', () => {
                 uploads as never,
             );
 
+            // Same contract as the Agent twin: the validated Mission is the
+            // authority; a same-user upload row that is invisible in the
+            // CURRENT scope neither leaks metadata (none is joined here) nor
+            // fails the owner's whole attachment list.
             await expect(
                 service.listAttachments('user-1', ownedMission.id, EVER_SCOPE),
-            ).rejects.toBeInstanceOf(NotFoundException);
+            ).resolves.toEqual([expect.objectContaining({ id: 'edge-yo', uploadId: uploadSha })]);
+        });
+
+        it('persists a canonical lowercase Mission attachment hash for an uppercase input', async () => {
+            const ownedMission = mission({ id: 'mission-ever', ...EVER_SCOPE });
+            const edge = { id: 'edge-up', missionId: ownedMission.id, uploadId: uploadSha };
+            const attachments = { add: jest.fn(async () => edge) };
+            const ownedUpload = { sha256: uploadSha, userId: 'user-1', ...EVER_SCOPE };
+            const uploads = {
+                findOne: jest.fn(
+                    async (options: { where?: FindOptionsWhere<typeof ownedUpload> }) =>
+                        matchesWhere(ownedUpload, options.where) ? ownedUpload : null,
+                ),
+            };
+            const service = new MissionsService(
+                { findOne: jest.fn(async () => ownedMission) } as never,
+                new TitlerService(),
+                undefined,
+                attachments as never,
+                uploads as never,
+            );
+
+            await service.addAttachment(
+                'user-1',
+                ownedMission.id,
+                uploadSha.toUpperCase(),
+                EVER_SCOPE,
+            );
+
+            // user_uploads.sha256 is stored lowercase; persisting the raw
+            // uppercase input would create an edge the upload join (and the
+            // duplicate-recovery re-read) could never resolve again.
+            expect(attachments.add).toHaveBeenCalledWith(ownedMission.id, uploadSha);
         });
 
         it('keeps legacy personal Agent attachment metadata and URL readable', async () => {
