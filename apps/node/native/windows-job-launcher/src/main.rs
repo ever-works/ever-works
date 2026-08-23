@@ -20,7 +20,7 @@ use ever_works_windows_job_launcher::{
         ClientMessage, Completion, CompletionStatus, FailureStage, FrameDecoder, LaunchRequest,
         ServerMessage, TestFailure, encode_server_message,
     },
-    runtime::{JobQueryKernel, JobSnapshot, JobVerification, verify_job_empty},
+    runtime::{JobQueryKernel, JobVerification, verify_job_empty},
     windows::WindowsKernel,
 };
 use windows_sys::Win32::{
@@ -113,28 +113,30 @@ fn run_prepared(
     let stderr = unsafe { File::from_raw_handle(prepared.parent_stderr_read.0 as _) };
     let stdin_sender = spawn_stdin_writer(stdin);
     let output_overflow = Arc::new(AtomicBool::new(false));
-    let (output, output_streams_closed) =
-        spawn_output_readers(stdout, stderr, Arc::clone(&output_overflow));
+    let output_reader_start_delay = test_output_reader_start_delay(&request);
+    let (output, output_streams_closed) = spawn_output_readers(
+        stdout,
+        stderr,
+        Arc::clone(&output_overflow),
+        output_reader_start_delay,
+    );
     let started = Instant::now();
     let deadline = started + Duration::from_millis(u64::from(request.timeout_ms));
-    let mut root_exited = false;
     let mut root_exit_code = None;
-    let mut consecutive_empty = 0_u8;
-    let mut last_snapshot = JobSnapshot::default();
     let mut output_bytes = 0_u64;
     let mut output_limit_hit = false;
     let mut stdin_closed = false;
 
     let stop = loop {
-        if writer.failed.load(Ordering::SeqCst) {
-            break StopReason::ParentOutputClosed;
-        }
         if output_overflow.load(Ordering::SeqCst) {
             break StopReason::OutputLimit;
         }
 
         if let Some(reason) = consume_control(&control, &stdin_sender, &mut stdin_closed) {
             break reason;
+        }
+        if writer.failed.load(Ordering::SeqCst) {
+            break StopReason::ParentOutputClosed;
         }
 
         loop {
@@ -172,28 +174,9 @@ fn run_prepared(
             break StopReason::ParentOutputClosed;
         }
 
-        if !root_exited && process_has_exited(prepared.process) {
-            root_exited = true;
+        if process_has_exited(prepared.process) {
             root_exit_code = process_exit_code(prepared.process);
-        }
-        if root_exited {
-            match kernel.query_job(prepared.job) {
-                Ok(snapshot) => {
-                    let empty = snapshot.active_processes == 0 && snapshot.process_ids.is_empty();
-                    last_snapshot = snapshot;
-                    if empty {
-                        consecutive_empty += 1;
-                        if consecutive_empty >= 2
-                            && output_streams_closed.load(Ordering::SeqCst) >= 2
-                        {
-                            break StopReason::Exited;
-                        }
-                    } else {
-                        consecutive_empty = 0;
-                    }
-                }
-                Err(error) => break StopReason::RuntimeError(error),
-            }
+            break StopReason::Exited;
         }
         if Instant::now() >= deadline {
             break StopReason::TimedOut;
@@ -202,14 +185,12 @@ fn run_prepared(
     };
 
     drop(stdin_sender);
-    let (status, verification, failure_stage, os_error) = match stop {
-        StopReason::Exited => (
+    let (mut status, mut verification, failure_stage, os_error) = match stop {
+        StopReason::Exited => terminate_and_verify(
+            kernel,
+            prepared.job,
+            request.cleanup_timeout_ms,
             CompletionStatus::Exited,
-            JobVerification {
-                verified: true,
-                snapshot: last_snapshot,
-                os_error: 0,
-            },
             FailureStage::None,
             0,
         ),
@@ -245,64 +226,174 @@ fn run_prepared(
             FailureStage::Protocol,
             0,
         ),
-        StopReason::RuntimeError(error) => terminate_and_verify(
+        StopReason::ParentEof => terminate_and_verify(
             kernel,
             prepared.job,
             request.cleanup_timeout_ms,
-            CompletionStatus::ProtocolError,
-            FailureStage::Runtime,
-            error,
+            CompletionStatus::Cancelled,
+            FailureStage::None,
+            0,
         ),
-        StopReason::ParentEof | StopReason::ParentOutputClosed => {
-            let _ = kernel.terminate_job(prepared.job, TERMINATION_EXIT_CODE);
-            let _ = verify_job_empty(
+        StopReason::ParentOutputClosed => {
+            let _cleanup = terminate_and_verify(
                 kernel,
                 prepared.job,
                 request.cleanup_timeout_ms,
-                LOOP_POLL_MS as u32,
+                CompletionStatus::Cancelled,
+                FailureStage::None,
+                0,
             );
             kernel.close_handle(prepared.process);
             kernel.close_handle(prepared.job);
-            return Ok(());
+            return Err(());
         }
     };
+
+    match drain_output_after_cleanup(
+        &output,
+        &output_streams_closed,
+        &output_overflow,
+        &writer,
+        &mut output_bytes,
+        request.max_output_bytes,
+        request.cleanup_timeout_ms,
+    ) {
+        OutputDrainResult::Complete => {}
+        OutputDrainResult::OutputLimit => status = CompletionStatus::OutputLimit,
+        OutputDrainResult::WriterFailed => {
+            kernel.close_handle(prepared.process);
+            kernel.close_handle(prepared.job);
+            return Err(());
+        }
+        OutputDrainResult::TimedOut => {
+            verification.verified = false;
+            verification.os_error = 0;
+        }
+    }
 
     if root_exit_code.is_none() {
         root_exit_code = process_exit_code(prepared.process);
     }
-    let completion_status = if verification.verified {
-        status
+    let completion = build_completion(
+        status,
+        verification,
+        failure_stage,
+        os_error,
+        prepared.process_id,
+        root_exit_code,
+    );
+    let completion_status = completion.status;
+    let queued = writer.queue_bounded(ServerMessage::Completed(completion), Duration::from_secs(1));
+    kernel.close_handle(prepared.process);
+    kernel.close_handle(prepared.job);
+    let flushed = queued && writer.flush_bounded(Duration::from_secs(1));
+    if !flushed || completion_status == CompletionStatus::TerminationUnverified {
+        Err(())
     } else {
-        CompletionStatus::TerminationUnverified
-    };
-    let completion = Completion {
-        status: completion_status,
+        Ok(())
+    }
+}
+
+fn build_completion(
+    status: CompletionStatus,
+    verification: JobVerification,
+    failure_stage: FailureStage,
+    os_error: u32,
+    root_pid: u32,
+    root_exit_code: Option<i32>,
+) -> Completion {
+    let verified = verification.verified;
+    Completion {
+        status: if verified {
+            status
+        } else {
+            CompletionStatus::TerminationUnverified
+        },
         exit_code: root_exit_code,
-        root_pid: prepared.process_id,
-        termination_verified: verification.verified,
+        root_pid,
+        termination_verified: verified,
         active_processes: verification.snapshot.active_processes,
         process_ids: verification.snapshot.process_ids,
-        failure_stage: if verification.verified {
+        failure_stage: if verified {
             failure_stage
         } else {
             FailureStage::Cleanup
         },
-        os_error: if verification.verified {
+        os_error: if verified {
             os_error
         } else {
             verification.os_error
         },
-    };
-    let queued = writer.queue(ServerMessage::Completed(completion));
-    kernel.close_handle(prepared.process);
-    kernel.close_handle(prepared.job);
-    if queued {
-        writer.flush_bounded(Duration::from_secs(1));
     }
-    if completion_status == CompletionStatus::TerminationUnverified {
-        Err(())
-    } else {
-        Ok(())
+}
+
+enum OutputDrainResult {
+    Complete,
+    OutputLimit,
+    WriterFailed,
+    TimedOut,
+}
+
+fn drain_output_after_cleanup(
+    output: &Receiver<OutputEvent>,
+    streams_closed: &AtomicUsize,
+    overflow: &AtomicBool,
+    writer: &ProtocolWriter,
+    output_bytes: &mut u64,
+    max_output_bytes: u64,
+    cleanup_timeout_ms: u32,
+) -> OutputDrainResult {
+    let deadline = Instant::now() + Duration::from_millis(u64::from(cleanup_timeout_ms));
+    loop {
+        let mut disconnected = false;
+        loop {
+            match output.try_recv() {
+                Ok(OutputEvent::Bytes(stream, bytes)) => {
+                    let remaining = max_output_bytes.saturating_sub(*output_bytes);
+                    if bytes.len() as u64 > remaining {
+                        if remaining > 0 {
+                            let prefix = bytes[..remaining as usize].to_vec();
+                            if !writer.queue(stream.message(prefix)) {
+                                return if writer.failed.load(Ordering::SeqCst) {
+                                    OutputDrainResult::WriterFailed
+                                } else {
+                                    OutputDrainResult::OutputLimit
+                                };
+                            }
+                            *output_bytes = max_output_bytes;
+                        }
+                        return OutputDrainResult::OutputLimit;
+                    }
+                    *output_bytes += bytes.len() as u64;
+                    if !writer.queue(stream.message(bytes)) {
+                        return if writer.failed.load(Ordering::SeqCst) {
+                            OutputDrainResult::WriterFailed
+                        } else {
+                            OutputDrainResult::OutputLimit
+                        };
+                    }
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    disconnected = true;
+                    break;
+                }
+            }
+        }
+
+        if overflow.load(Ordering::SeqCst) || writer.backpressured.load(Ordering::SeqCst) {
+            return OutputDrainResult::OutputLimit;
+        }
+        if writer.failed.load(Ordering::SeqCst) {
+            return OutputDrainResult::WriterFailed;
+        }
+        if disconnected || streams_closed.load(Ordering::SeqCst) >= 2 {
+            return OutputDrainResult::Complete;
+        }
+        if Instant::now() >= deadline {
+            return OutputDrainResult::TimedOut;
+        }
+        thread::sleep(Duration::from_millis(1));
     }
 }
 
@@ -336,16 +427,32 @@ fn consume_control(
     }
 }
 
-fn terminate_and_verify(
-    kernel: &mut WindowsKernel,
+trait CleanupKernel: JobQueryKernel {
+    fn terminate_for_cleanup(&mut self, job: NativeHandle, exit_code: u32) -> Result<(), u32>;
+}
+
+impl CleanupKernel for WindowsKernel {
+    fn terminate_for_cleanup(&mut self, job: NativeHandle, exit_code: u32) -> Result<(), u32> {
+        LaunchKernel::terminate_job(self, job, exit_code)
+    }
+}
+
+fn terminate_and_verify<K: CleanupKernel>(
+    kernel: &mut K,
     job: NativeHandle,
     cleanup_timeout_ms: u32,
     status: CompletionStatus,
     failure_stage: FailureStage,
     os_error: u32,
 ) -> (CompletionStatus, JobVerification, FailureStage, u32) {
-    let _ = kernel.terminate_job(job, TERMINATION_EXIT_CODE);
-    let verification = verify_job_empty(kernel, job, cleanup_timeout_ms, LOOP_POLL_MS as u32);
+    let termination_error = kernel
+        .terminate_for_cleanup(job, TERMINATION_EXIT_CODE)
+        .err();
+    let mut verification = verify_job_empty(kernel, job, cleanup_timeout_ms, LOOP_POLL_MS as u32);
+    if let Some(os_error) = termination_error {
+        verification.verified = false;
+        verification.os_error = os_error;
+    }
     (status, verification, failure_stage, os_error)
 }
 
@@ -494,6 +601,7 @@ fn spawn_output_readers(
     stdout: File,
     stderr: File,
     overflow: Arc<AtomicBool>,
+    start_delay: Duration,
 ) -> (Receiver<OutputEvent>, Arc<AtomicUsize>) {
     let (sender, receiver) = mpsc::sync_channel(OUTPUT_QUEUE_CAPACITY);
     let closed = Arc::new(AtomicUsize::new(0));
@@ -503,6 +611,7 @@ fn spawn_output_readers(
         sender.clone(),
         Arc::clone(&overflow),
         Arc::clone(&closed),
+        start_delay,
     );
     spawn_output_reader(
         stderr,
@@ -510,6 +619,7 @@ fn spawn_output_readers(
         sender,
         overflow,
         Arc::clone(&closed),
+        start_delay,
     );
     (receiver, closed)
 }
@@ -520,9 +630,13 @@ fn spawn_output_reader(
     sender: SyncSender<OutputEvent>,
     overflow: Arc<AtomicBool>,
     closed: Arc<AtomicUsize>,
+    start_delay: Duration,
 ) {
     thread::spawn(move || {
         let _close_signal = OutputReaderCloseSignal(closed);
+        if !start_delay.is_zero() {
+            thread::sleep(start_delay);
+        }
         let mut buffer = [0_u8; PIPE_CHUNK_SIZE];
         loop {
             match file.read(&mut buffer) {
@@ -541,6 +655,20 @@ fn spawn_output_reader(
             }
         }
     });
+}
+
+#[cfg(feature = "test-fixtures")]
+fn test_output_reader_start_delay(request: &LaunchRequest) -> Duration {
+    const NAME: &str = "EWJL_TEST_OUTPUT_READER_DELAY_MS";
+    if let Some((_, value)) = request.environment.iter().find(|(name, _)| name == NAME) {
+        return Duration::from_millis(value.parse::<u64>().unwrap_or(0).min(1_000));
+    }
+    Duration::ZERO
+}
+
+#[cfg(not(feature = "test-fixtures"))]
+fn test_output_reader_start_delay(_request: &LaunchRequest) -> Duration {
+    Duration::ZERO
 }
 
 struct OutputReaderCloseSignal(Arc<AtomicUsize>);
@@ -612,6 +740,33 @@ impl ProtocolWriter {
         }
     }
 
+    fn queue_bounded(&self, message: ServerMessage, timeout: Duration) -> bool {
+        let Ok(mut frame) = encode_server_message(&message) else {
+            return false;
+        };
+        let deadline = Instant::now() + timeout;
+        loop {
+            match self.sender.try_send(frame) {
+                Ok(()) => {
+                    self.queued.fetch_add(1, Ordering::SeqCst);
+                    return true;
+                }
+                Err(TrySendError::Full(returned)) => {
+                    frame = returned;
+                    if self.failed.load(Ordering::SeqCst) || Instant::now() >= deadline {
+                        self.backpressured.store(true, Ordering::SeqCst);
+                        return false;
+                    }
+                    thread::sleep(Duration::from_millis(1));
+                }
+                Err(TrySendError::Disconnected(_)) => {
+                    self.failed.store(true, Ordering::SeqCst);
+                    return false;
+                }
+            }
+        }
+    }
+
     fn flush_bounded(&self, timeout: Duration) -> bool {
         let deadline = Instant::now() + timeout;
         let target = self.queued.load(Ordering::SeqCst);
@@ -632,7 +787,6 @@ enum StopReason {
     TimedOut,
     OutputLimit,
     ProtocolError,
-    RuntimeError(u32),
     ParentEof,
     ParentOutputClosed,
 }
@@ -650,6 +804,151 @@ fn process_exit_code(process: NativeHandle) -> Option<i32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ever_works_windows_job_launcher::runtime::JobSnapshot;
+    use std::collections::VecDeque;
+
+    struct FakeCleanupKernel {
+        now_ms: u64,
+        terminate_result: Result<(), u32>,
+        snapshots: VecDeque<Result<JobSnapshot, u32>>,
+        last_snapshot: Result<JobSnapshot, u32>,
+    }
+
+    impl FakeCleanupKernel {
+        fn new(
+            terminate_result: Result<(), u32>,
+            snapshots: Vec<Result<JobSnapshot, u32>>,
+        ) -> Self {
+            let last_snapshot = snapshots.last().cloned().unwrap();
+            Self {
+                now_ms: 0,
+                terminate_result,
+                snapshots: snapshots.into(),
+                last_snapshot,
+            }
+        }
+    }
+
+    impl CleanupKernel for FakeCleanupKernel {
+        fn terminate_for_cleanup(
+            &mut self,
+            _job: NativeHandle,
+            _exit_code: u32,
+        ) -> Result<(), u32> {
+            self.terminate_result
+        }
+    }
+
+    impl JobQueryKernel for FakeCleanupKernel {
+        fn monotonic_millis(&self) -> u64 {
+            self.now_ms
+        }
+
+        fn wait_millis(&mut self, milliseconds: u32) {
+            self.now_ms += u64::from(milliseconds);
+        }
+
+        fn query_job(&mut self, _job: NativeHandle) -> Result<JobSnapshot, u32> {
+            self.snapshots
+                .pop_front()
+                .unwrap_or_else(|| self.last_snapshot.clone())
+        }
+    }
+
+    #[test]
+    fn cleanup_verified_control_loss_is_reported_as_cancelled() {
+        let completion = control_loss_completion(FakeCleanupKernel::new(
+            Ok(()),
+            vec![Ok(empty_snapshot()), Ok(empty_snapshot())],
+        ));
+
+        assert_eq!(completion.status, CompletionStatus::Cancelled);
+        assert!(completion.termination_verified);
+        assert_eq!(completion.failure_stage, FailureStage::None);
+        assert_eq!(completion.os_error, 0);
+    }
+
+    #[test]
+    fn cleanup_termination_failure_is_never_reported_as_verified_control_loss() {
+        let completion = control_loss_completion(FakeCleanupKernel::new(
+            Err(5),
+            vec![Ok(empty_snapshot()), Ok(empty_snapshot())],
+        ));
+
+        assert_eq!(completion.status, CompletionStatus::TerminationUnverified);
+        assert!(!completion.termination_verified);
+        assert_eq!(completion.failure_stage, FailureStage::Cleanup);
+        assert_eq!(completion.os_error, 5);
+    }
+
+    #[test]
+    fn cleanup_query_failure_is_reported_as_unverified_with_only_its_numeric_error() {
+        let completion = control_loss_completion(FakeCleanupKernel::new(Ok(()), vec![Err(87)]));
+
+        assert_eq!(completion.status, CompletionStatus::TerminationUnverified);
+        assert!(!completion.termination_verified);
+        assert_eq!(completion.failure_stage, FailureStage::Cleanup);
+        assert_eq!(completion.os_error, 87);
+    }
+
+    #[test]
+    fn cleanup_verification_timeout_never_reports_success() {
+        let completion = control_loss_completion(FakeCleanupKernel::new(
+            Ok(()),
+            vec![Ok(JobSnapshot {
+                active_processes: 1,
+                process_ids: vec![41],
+            })],
+        ));
+
+        assert_eq!(completion.status, CompletionStatus::TerminationUnverified);
+        assert!(!completion.termination_verified);
+        assert_eq!(completion.failure_stage, FailureStage::Cleanup);
+        assert_eq!(completion.active_processes, 1);
+        assert_eq!(completion.process_ids, vec![41]);
+        assert_eq!(completion.os_error, 0);
+    }
+
+    #[test]
+    fn cleanup_output_overflow_wins_over_a_simultaneous_stream_disconnect() {
+        let (sender, output) = mpsc::sync_channel(1);
+        drop(sender);
+        let streams_closed = AtomicUsize::new(2);
+        let overflow = AtomicBool::new(true);
+        let writer = ProtocolWriter::spawn();
+        let mut output_bytes = 0;
+
+        let result = drain_output_after_cleanup(
+            &output,
+            &streams_closed,
+            &overflow,
+            &writer,
+            &mut output_bytes,
+            1_024,
+            10,
+        );
+
+        assert!(matches!(result, OutputDrainResult::OutputLimit));
+    }
+
+    fn control_loss_completion(mut kernel: FakeCleanupKernel) -> Completion {
+        let (status, verification, failure_stage, os_error) = terminate_and_verify(
+            &mut kernel,
+            NativeHandle(1),
+            10,
+            CompletionStatus::Cancelled,
+            FailureStage::None,
+            0,
+        );
+        build_completion(status, verification, failure_stage, os_error, 42, None)
+    }
+
+    fn empty_snapshot() -> JobSnapshot {
+        JobSnapshot {
+            active_processes: 0,
+            process_ids: Vec::new(),
+        }
+    }
 
     #[test]
     fn ordinary_launches_never_require_failure_injection() {

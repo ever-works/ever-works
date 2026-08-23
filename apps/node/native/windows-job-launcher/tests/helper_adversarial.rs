@@ -63,6 +63,20 @@ fn fixture_floods_stdout() {
 }
 
 #[test]
+fn fixture_trickles_stdout() {
+    if fixture_mode() != Some("trickle") {
+        return;
+    }
+    write_pid_marker();
+    let mut stdout = std::io::stdout().lock();
+    loop {
+        stdout.write_all(b"x").unwrap();
+        stdout.flush().unwrap();
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+#[test]
 fn fixture_echoes_stdin() {
     if fixture_mode() != Some("echo") {
         return;
@@ -173,6 +187,39 @@ fn reports_streams_and_completion_only_after_the_real_job_is_verified_empty() {
     assert!(completion.termination_verified);
     assert_eq!(completion.active_processes, 0);
     assert!(completion.process_ids.is_empty());
+    assert_eq!(helper.wait().unwrap().code(), Some(0));
+}
+
+#[test]
+fn root_exit_drains_both_streams_before_the_terminal_completion_frame() {
+    let mut helper = spawn_helper();
+    let mut launch = request(
+        "exit",
+        "fixture_exits_after_writing_both_streams",
+        10_000,
+        1_048_576,
+        TestFailure::None,
+    );
+    launch.environment.push((
+        "EWJL_TEST_OUTPUT_READER_DELAY_MS".to_owned(),
+        "250".to_owned(),
+    ));
+    send_launch(&mut helper, launch);
+
+    let messages = read_to_completion(&mut helper, Duration::from_secs(10));
+
+    assert!(contains_bytes(
+        &collect_stream(&messages, true),
+        "stdout-λ".as_bytes()
+    ));
+    assert!(contains_bytes(
+        &collect_stream(&messages, false),
+        "stderr-งาน".as_bytes()
+    ));
+    assert!(matches!(messages.last(), Some(ServerMessage::Completed(_))));
+    let completion = completion(&messages);
+    assert_eq!(completion.status, CompletionStatus::Exited);
+    assert!(completion.termination_verified);
     assert_eq!(helper.wait().unwrap().code(), Some(0));
 }
 
@@ -299,15 +346,16 @@ fn forwards_framed_unicode_stdin_and_close_without_a_shell() {
 }
 
 #[test]
-fn detached_new_process_group_descendants_remain_in_the_job_and_are_killed_on_timeout() {
+fn root_exit_immediately_kills_detached_descendants_and_reports_the_root_exit_code() {
     let marker = unique_marker("detached");
     let mut helper = spawn_helper();
+    let started = Instant::now();
     send_launch(
         &mut helper,
         request_with_marker(
             "spawn-detached",
             "fixture_spawns_a_detached_process_group",
-            350,
+            30_000,
             1_048_576,
             TestFailure::None,
             &marker,
@@ -315,11 +363,18 @@ fn detached_new_process_group_descendants_remain_in_the_job_and_are_killed_on_ti
     );
     let messages = read_to_completion(&mut helper, Duration::from_secs(10));
     let completion = completion(&messages);
-    assert_eq!(completion.status, CompletionStatus::TimedOut);
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "descendant cleanup waited for the global request timeout"
+    );
+    assert_eq!(completion.status, CompletionStatus::Exited);
+    assert_eq!(completion.exit_code, Some(0));
     assert!(completion.termination_verified);
     assert_eq!(completion.active_processes, 0);
     assert!(completion.process_ids.is_empty());
     assert_eq!(helper.wait().unwrap().code(), Some(0));
+    let descendant_pid = fs::read_to_string(&marker).unwrap().parse().unwrap();
+    assert_process_exited(descendant_pid, Duration::from_secs(5));
     let _ = fs::remove_file(marker);
 }
 
@@ -345,7 +400,7 @@ fn output_limit_and_transport_backpressure_fail_closed() {
 }
 
 #[test]
-fn parent_control_eof_closes_the_only_job_handle_and_kills_the_child() {
+fn parent_control_eof_emits_verified_cancellation_after_killing_the_child() {
     let marker = unique_marker("eof");
     let mut helper = spawn_helper();
     send_launch(
@@ -365,8 +420,49 @@ fn parent_control_eof_closes_the_only_job_handle_and_kills_the_child() {
         ServerMessage::Launched { .. }
     ));
     wait_for_marker(&marker, Duration::from_secs(5));
+    let root_pid = fs::read_to_string(&marker).unwrap().parse().unwrap();
     drop(helper.stdin.take());
-    assert!(helper.wait_timeout(Duration::from_secs(10)).is_some());
+    let messages = reader.read_completion(Duration::from_secs(10));
+    let completion = completion(&messages);
+    assert_eq!(completion.status, CompletionStatus::Cancelled);
+    assert!(completion.termination_verified);
+    assert_eq!(completion.active_processes, 0);
+    assert!(completion.process_ids.is_empty());
+    assert_eq!(helper.wait().unwrap().code(), Some(0));
+    assert_process_exited(root_pid, Duration::from_secs(5));
+    let _ = fs::remove_file(marker);
+}
+
+#[test]
+fn parent_protocol_output_close_kills_the_child_and_makes_the_helper_fail() {
+    let marker = unique_marker("output-close");
+    let mut helper = spawn_helper();
+    send_launch(
+        &mut helper,
+        request_with_marker(
+            "trickle",
+            "fixture_trickles_stdout",
+            30_000,
+            1_048_576,
+            TestFailure::None,
+            &marker,
+        ),
+    );
+    let mut reader = MessageReader::new(helper.stdout.take().unwrap());
+    assert!(matches!(
+        reader.next(Duration::from_secs(10)),
+        ServerMessage::Launched { .. }
+    ));
+    wait_for_marker(&marker, Duration::from_secs(5));
+    let root_pid = fs::read_to_string(&marker).unwrap().parse().unwrap();
+    drop(reader);
+
+    let status = helper
+        .wait_timeout(Duration::from_secs(10))
+        .expect("helper did not fail after its protocol output closed");
+
+    assert!(!status.success());
+    assert_process_exited(root_pid, Duration::from_secs(5));
     let _ = fs::remove_file(marker);
 }
 
@@ -692,6 +788,7 @@ fn fixture_mode() -> Option<&'static str> {
         Some("exit") => Some("exit"),
         Some("wait") => Some("wait"),
         Some("flood") => Some("flood"),
+        Some("trickle") => Some("trickle"),
         Some("echo") => Some("echo"),
         Some("spawn-detached") => Some("spawn-detached"),
         Some("detached-wait") => Some("detached-wait"),
