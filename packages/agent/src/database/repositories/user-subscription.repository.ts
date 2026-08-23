@@ -35,7 +35,7 @@ export class UserSubscriptionRepository {
                 { userId, status: SubscriptionStatus.TRIALING },
             ],
             relations: ['plan'],
-            order: { createdAt: 'ASC' },
+            order: { createdAt: 'DESC' },
         });
     }
 

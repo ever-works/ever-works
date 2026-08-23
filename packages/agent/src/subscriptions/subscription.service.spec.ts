@@ -3,6 +3,8 @@ import { SubscriptionService } from './subscription.service';
 import { SubscriptionPlanCode } from '@src/entities/types';
 import { WorkScheduleBillingMode, WorkScheduleCadence } from '@ever-works/contracts/api';
 
+type SubscriptionServiceDependencies = ConstructorParameters<typeof SubscriptionService>;
+
 /**
  * SubscriptionService is the agent-package gateway between user accounts and
  * the seeded `SubscriptionPlan` rows. It owns: idempotent plan seeding from
@@ -76,10 +78,10 @@ function makeService(
     const userRepository = makeUserRepository(user);
     const planEntitlementRepository = makePlanEntitlementRepository(planEntitlement);
     const service = new SubscriptionService(
-        planRepository as any,
-        userSubscriptionRepository as any,
-        userRepository as any,
-        planEntitlementRepository as any,
+        planRepository as unknown as SubscriptionServiceDependencies[0],
+        userSubscriptionRepository as unknown as SubscriptionServiceDependencies[1],
+        userRepository as unknown as SubscriptionServiceDependencies[2],
+        planEntitlementRepository as unknown as SubscriptionServiceDependencies[3],
     );
     return {
         service,
