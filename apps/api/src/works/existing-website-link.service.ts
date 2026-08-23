@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import {
-    findCustomDomainCaseInsensitive,
+    getOrCreateWorkCustomDomain,
     isSqliteBusyOrLockedError,
     isWorkCustomDomainUniqueConstraintError,
 } from '@ever-works/agent/database';
@@ -139,30 +139,21 @@ export class ExistingWebsiteLinkService {
                     }
                 }
 
-                let domainRecord = await findCustomDomainCaseInsensitive(
+                const domainResult = await getOrCreateWorkCustomDomain(
                     domainRepository,
                     workId,
                     domain,
-                );
-                let created = false;
-
-                if (!domainRecord) {
-                    domainRecord = domainRepository.create({
-                        workId,
-                        domain,
+                    {
                         environment: DomainEnvironment.PRODUCTION,
-                        verified: false,
-                    });
-                    domainRecord = await domainRepository.save(domainRecord);
-                    created = true;
-                }
+                    },
+                );
 
                 return {
                     workId,
                     url,
                     domain,
-                    created,
-                    verified: Boolean(domainRecord.verified),
+                    created: domainResult.created,
+                    verified: Boolean(domainResult.record.verified),
                 };
             });
 

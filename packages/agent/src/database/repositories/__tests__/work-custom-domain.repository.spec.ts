@@ -3,7 +3,10 @@ import { WorkCustomDomainRepository } from '../work-custom-domain.repository';
 import { WorkCustomDomain } from '../../../entities/work-custom-domain.entity';
 
 type Mocked = jest.Mocked<
-    Pick<Repository<WorkCustomDomain>, 'find' | 'findOne' | 'create' | 'save' | 'delete' | 'update'>
+    Pick<
+        Repository<WorkCustomDomain>,
+        'find' | 'findOne' | 'create' | 'save' | 'delete' | 'update' | 'createQueryBuilder'
+    >
 >;
 
 describe('WorkCustomDomainRepository', () => {
@@ -18,6 +21,7 @@ describe('WorkCustomDomainRepository', () => {
             save: jest.fn(),
             delete: jest.fn(),
             update: jest.fn(),
+            createQueryBuilder: jest.fn(),
         };
         service = new WorkCustomDomainRepository(
             repository as unknown as Repository<WorkCustomDomain>,
@@ -165,6 +169,77 @@ describe('WorkCustomDomainRepository', () => {
             repository.save.mockRejectedValueOnce(error);
 
             await expect(service.addDomain('work-1', 'Ever.Works')).rejects.toBe(error);
+        });
+
+        it('uses a target-specific PostgreSQL conflict insert and rereads the winner', async () => {
+            const raced = {
+                id: 'd1',
+                workId: 'work-1',
+                domain: 'ever.works',
+                verified: true,
+            } as WorkCustomDomain;
+            const builder = {
+                insert: jest.fn(),
+                into: jest.fn(),
+                values: jest.fn(),
+                onConflict: jest.fn(),
+                returning: jest.fn(),
+                execute: jest.fn().mockResolvedValue({
+                    identifiers: [],
+                    generatedMaps: [],
+                    raw: [],
+                }),
+            };
+            builder.insert.mockReturnValue(builder);
+            builder.into.mockReturnValue(builder);
+            builder.values.mockReturnValue(builder);
+            builder.onConflict.mockReturnValue(builder);
+            builder.returning.mockReturnValue(builder);
+            Object.assign(repository, {
+                manager: { connection: { options: { type: 'postgres' } } },
+            });
+            repository.find.mockResolvedValueOnce([]).mockResolvedValueOnce([raced]);
+            repository.create.mockReturnValueOnce({ domain: 'ever.works' } as WorkCustomDomain);
+            repository.createQueryBuilder.mockReturnValueOnce(builder as never);
+
+            await expect(service.addDomain('work-1', 'Ever.Works', 'manual')).resolves.toBe(raced);
+
+            expect(builder.onConflict).toHaveBeenCalledWith('("workId", "domain") DO NOTHING');
+            expect(builder.returning).toHaveBeenCalledWith(['id']);
+            expect(repository.find).toHaveBeenCalledTimes(2);
+            expect(repository.save).not.toHaveBeenCalled();
+        });
+
+        it('surfaces unrelated PostgreSQL insert constraints without a recovery reread', async () => {
+            const error = Object.assign(new Error('violates unrelated check constraint'), {
+                code: '23514',
+                table: 'work_custom_domains',
+                constraint: 'CHK_unrelated',
+            });
+            const builder = {
+                insert: jest.fn(),
+                into: jest.fn(),
+                values: jest.fn(),
+                onConflict: jest.fn(),
+                returning: jest.fn(),
+                execute: jest.fn().mockRejectedValue(error),
+            };
+            builder.insert.mockReturnValue(builder);
+            builder.into.mockReturnValue(builder);
+            builder.values.mockReturnValue(builder);
+            builder.onConflict.mockReturnValue(builder);
+            builder.returning.mockReturnValue(builder);
+            Object.assign(repository, {
+                manager: { connection: { options: { type: 'postgres' } } },
+            });
+            repository.find.mockResolvedValueOnce([]);
+            repository.create.mockReturnValueOnce({ domain: 'ever.works' } as WorkCustomDomain);
+            repository.createQueryBuilder.mockReturnValueOnce(builder as never);
+
+            await expect(service.addDomain('work-1', 'Ever.Works')).rejects.toBe(error);
+
+            expect(repository.find).toHaveBeenCalledTimes(1);
+            expect(repository.save).not.toHaveBeenCalled();
         });
 
         it('rereads and retries a bounded SQLite BUSY write', async () => {

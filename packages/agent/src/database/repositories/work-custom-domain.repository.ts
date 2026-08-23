@@ -3,6 +3,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Raw, Repository } from 'typeorm';
 import { WorkCustomDomain } from '../../entities/work-custom-domain.entity';
 
+const SQLITE_MAX_ATTEMPTS = 6;
+
+export interface WorkCustomDomainCreateOptions {
+    environment?: WorkCustomDomain['environment'];
+    provider?: string;
+}
+
+export interface WorkCustomDomainGetOrCreateResult {
+    record: WorkCustomDomain;
+    created: boolean;
+}
+
 export function canonicalizeCustomDomain(domain: string): string {
     return domain.trim().toLowerCase();
 }
@@ -83,10 +95,109 @@ export function isSqliteBusyOrLockedError(error: unknown): boolean {
     return code.startsWith('SQLITE_BUSY') || code.startsWith('SQLITE_LOCKED');
 }
 
+/**
+ * Create or reuse the canonical domain identity without aborting a PostgreSQL
+ * transaction when another supported writer wins the same insert race.
+ *
+ * The explicit conflict target is intentional: unrelated constraints must
+ * still fail. The deterministic reread also preserves verified-first reuse of
+ * legacy mixed-case rows without rewriting or deleting them.
+ */
+export async function getOrCreateWorkCustomDomain(
+    repository: Repository<WorkCustomDomain>,
+    workId: string,
+    domain: string,
+    options: WorkCustomDomainCreateOptions = {},
+): Promise<WorkCustomDomainGetOrCreateResult> {
+    const canonicalDomain = canonicalizeCustomDomain(domain);
+    const existing = await findCustomDomainCaseInsensitive(repository, workId, canonicalDomain);
+    if (existing) return { record: existing, created: false };
+
+    const record = repository.create({
+        workId,
+        domain: canonicalDomain,
+        ...(options.environment === undefined ? {} : { environment: options.environment }),
+        verified: false,
+        provider: options.provider,
+    });
+
+    if (getRepositoryDatabaseType(repository) === 'postgres') {
+        const insert = await repository
+            .createQueryBuilder()
+            .insert()
+            .into(WorkCustomDomain)
+            .values(record)
+            // Target only the declared WorkCustomDomain identity. Unlike a
+            // blanket DO NOTHING, FK/check/other unique failures remain fatal.
+            .onConflict('("workId", "domain") DO NOTHING')
+            .returning(['id'])
+            .execute();
+        const selected = await findCustomDomainCaseInsensitive(repository, workId, canonicalDomain);
+        if (!selected) {
+            throw new Error('Custom domain insert completed without a readable identity row');
+        }
+        return {
+            record: selected,
+            created: Array.isArray(insert.raw) && insert.raw.length > 0,
+        };
+    }
+
+    for (let attempt = 0; ; attempt += 1) {
+        try {
+            return { record: await repository.save(record), created: true };
+        } catch (error) {
+            if (isWorkCustomDomainUniqueConstraintError(error)) {
+                const raced = await findCustomDomainCaseInsensitive(
+                    repository,
+                    workId,
+                    canonicalDomain,
+                );
+                if (raced) return { record: raced, created: false };
+                throw error;
+            }
+
+            const retryableBusy =
+                isSqliteBusyOrLockedError(error) && isSqliteFamilyRepository(repository);
+            if (!retryableBusy || attempt + 1 >= SQLITE_MAX_ATTEMPTS) {
+                throw error;
+            }
+
+            await delay(5 * 2 ** attempt);
+            try {
+                const raced = await findCustomDomainCaseInsensitive(
+                    repository,
+                    workId,
+                    canonicalDomain,
+                );
+                if (raced) return { record: raced, created: false };
+            } catch (rereadError) {
+                if (
+                    !isSqliteBusyOrLockedError(rereadError) ||
+                    !isSqliteFamilyRepository(repository)
+                ) {
+                    throw rereadError;
+                }
+            }
+        }
+    }
+}
+
+function getRepositoryDatabaseType(repository: Repository<WorkCustomDomain>): string {
+    return String(repository.manager?.connection?.options?.type ?? '');
+}
+
+function isSqliteFamilyRepository(repository: Repository<WorkCustomDomain>): boolean {
+    return ['better-sqlite3', 'sqlite', 'sqljs', 'expo', 'cordova', 'react-native'].includes(
+        getRepositoryDatabaseType(repository),
+    );
+}
+
+function delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 @Injectable()
 export class WorkCustomDomainRepository {
-    private static readonly SQLITE_MAX_ATTEMPTS = 6;
-
     constructor(
         @InjectRepository(WorkCustomDomain)
         private readonly repository: Repository<WorkCustomDomain>,
@@ -113,57 +224,10 @@ export class WorkCustomDomainRepository {
      * Add a custom domain to a work.
      */
     async addDomain(workId: string, domain: string, provider?: string): Promise<WorkCustomDomain> {
-        const canonicalDomain = canonicalizeCustomDomain(domain);
-        const existing = await findCustomDomainCaseInsensitive(
-            this.repository,
-            workId,
-            canonicalDomain,
-        );
-        if (existing) return existing;
-
-        const record = this.repository.create({
-            workId,
-            domain: canonicalDomain,
-            verified: false,
+        const result = await getOrCreateWorkCustomDomain(this.repository, workId, domain, {
             provider,
         });
-        for (let attempt = 0; ; attempt += 1) {
-            try {
-                return await this.repository.save(record);
-            } catch (error) {
-                if (isWorkCustomDomainUniqueConstraintError(error)) {
-                    const raced = await findCustomDomainCaseInsensitive(
-                        this.repository,
-                        workId,
-                        canonicalDomain,
-                    );
-                    if (raced) return raced;
-                    throw error;
-                }
-
-                const retryableBusy = isSqliteBusyOrLockedError(error) && this.isSqliteFamily();
-                if (
-                    !retryableBusy ||
-                    attempt + 1 >= WorkCustomDomainRepository.SQLITE_MAX_ATTEMPTS
-                ) {
-                    throw error;
-                }
-
-                await this.delay(5 * 2 ** attempt);
-                try {
-                    const raced = await findCustomDomainCaseInsensitive(
-                        this.repository,
-                        workId,
-                        canonicalDomain,
-                    );
-                    if (raced) return raced;
-                } catch (rereadError) {
-                    if (!isSqliteBusyOrLockedError(rereadError) || !this.isSqliteFamily()) {
-                        throw rereadError;
-                    }
-                }
-            }
-        }
+        return result.record;
     }
 
     /**
@@ -192,16 +256,5 @@ export class WorkCustomDomainRepository {
         const record = await this.findOne(workId, domain);
         if (!record) return;
         await this.repository.update({ id: record.id }, { provider });
-    }
-
-    private isSqliteFamily(): boolean {
-        const type = String(this.repository.manager.connection.options.type);
-        return ['better-sqlite3', 'sqlite', 'sqljs', 'expo', 'cordova', 'react-native'].includes(
-            type,
-        );
-    }
-
-    private delay(milliseconds: number): Promise<void> {
-        return new Promise((resolve) => setTimeout(resolve, milliseconds));
     }
 }

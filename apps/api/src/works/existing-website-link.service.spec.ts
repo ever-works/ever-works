@@ -66,12 +66,42 @@ describe('ExistingWebsiteLinkService', () => {
             }),
             save: jest.fn().mockImplementation(async (value) => value),
         };
+        const dataSourceOptions = { type: 'postgres' };
+        let storedDomain = options.existingDomain ?? null;
+        let pendingDomain: Record<string, unknown> | undefined;
+        const insertBuilder = {
+            insert: jest.fn(),
+            into: jest.fn(),
+            values: jest.fn(),
+            onConflict: jest.fn(),
+            returning: jest.fn(),
+            execute: jest.fn(),
+        };
+        insertBuilder.insert.mockReturnValue(insertBuilder);
+        insertBuilder.into.mockReturnValue(insertBuilder);
+        insertBuilder.values.mockImplementation((value) => {
+            pendingDomain = value;
+            return insertBuilder;
+        });
+        insertBuilder.onConflict.mockReturnValue(insertBuilder);
+        insertBuilder.returning.mockReturnValue(insertBuilder);
+        insertBuilder.execute.mockImplementation(async () => {
+            storedDomain = { id: 'domain-1', ...pendingDomain };
+            return {
+                identifiers: [{ id: 'domain-1' }],
+                generatedMaps: [{ id: 'domain-1' }],
+                raw: [{ id: 'domain-1' }],
+            };
+        });
         const domainRepository = {
-            find: jest
-                .fn()
-                .mockResolvedValue(options.existingDomain ? [options.existingDomain] : []),
+            manager: { connection: { options: dataSourceOptions } },
+            find: jest.fn().mockImplementation(async () => (storedDomain ? [storedDomain] : [])),
             create: jest.fn().mockImplementation((value) => ({ id: 'domain-1', ...value })),
-            save: jest.fn().mockImplementation(async (value) => value),
+            save: jest.fn().mockImplementation(async (value) => {
+                storedDomain = value;
+                return value;
+            }),
+            createQueryBuilder: jest.fn().mockReturnValue(insertBuilder),
         };
         const manager = {
             getRepository: jest.fn().mockImplementation((entity) => {
@@ -81,7 +111,7 @@ describe('ExistingWebsiteLinkService', () => {
             }),
         };
         const dataSource = {
-            options: { type: 'postgres' },
+            options: dataSourceOptions,
             transaction: jest.fn().mockImplementation(async (callback) => callback(manager)),
         };
         const service = new ExistingWebsiteLinkService(
@@ -93,6 +123,7 @@ describe('ExistingWebsiteLinkService', () => {
         return {
             dataSource,
             domainRepository,
+            insertBuilder,
             manager,
             ownedWork,
             ownership,
@@ -210,8 +241,10 @@ describe('ExistingWebsiteLinkService', () => {
             domain: 'ever.works',
             environment: 'production',
             verified: false,
+            provider: undefined,
         });
-        expect(h.domainRepository.save).toHaveBeenCalledTimes(1);
+        expect(h.insertBuilder.onConflict).toHaveBeenCalledWith('("workId", "domain") DO NOTHING');
+        expect(h.domainRepository.save).not.toHaveBeenCalled();
         expect(h.workRepository.update).toHaveBeenCalledWith(
             expect.objectContaining({
                 id: workId,
@@ -275,6 +308,38 @@ describe('ExistingWebsiteLinkService', () => {
             expect.objectContaining({ id: workId, userId, tenantId, organizationId }),
             { website: 'https://ever.works' },
         );
+    });
+
+    it('keeps a PostgreSQL transaction usable when the canonical domain writer wins', async () => {
+        const h = createHarness();
+        const racedDomain = {
+            id: 'domain-race-winner',
+            workId,
+            domain: 'ever.works',
+            verified: true,
+            provider: 'manual',
+        };
+        h.domainRepository.find.mockResolvedValueOnce([]).mockResolvedValueOnce([racedDomain]);
+        h.insertBuilder.execute.mockResolvedValueOnce({
+            identifiers: [],
+            generatedMaps: [],
+            raw: [],
+        });
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).resolves.toEqual({
+            workId,
+            url: 'https://ever.works',
+            domain: 'ever.works',
+            created: false,
+            verified: true,
+        });
+        expect(h.workRepository.update).toHaveBeenCalledWith(
+            expect.objectContaining({ id: workId, userId, tenantId, organizationId }),
+            { website: 'https://ever.works' },
+        );
+        expect(h.domainRepository.save).not.toHaveBeenCalled();
     });
 
     it('refuses to overwrite a different existing website', async () => {
