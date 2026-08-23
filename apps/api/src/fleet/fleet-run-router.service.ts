@@ -209,7 +209,15 @@ export class FleetRunRouterService {
         }
         try {
             const mode = await this.preferences.resolveForUser(payload.userId, scope);
-            const availability = await this.runners.availability(payload.userId);
+            // Target-aware: when this Agent is pinned to one node, that
+            // node's state IS the fleet's state for this run, because it
+            // is the only machine the lease protocol will give the job
+            // to. Asking the fleet-wide question here would route a
+            // pinned run onto a fleet that cannot execute it.
+            const availability = await this.runners.availabilityForAgentTask(
+                payload.userId,
+                payload.agentId,
+            );
             return decideFleetRouting(mode, availability);
         } catch (err) {
             this.logger.warn(

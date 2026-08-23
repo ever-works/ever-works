@@ -121,19 +121,7 @@ export class FleetRunnerStatusService {
     async availability(userId: string): Promise<FleetRunnerAvailability> {
         try {
             const status = await this.snapshot(userId);
-            const free = status.loadUnavailable
-                ? []
-                : status.nodes.filter(
-                      (node) =>
-                          node.status === 'online' &&
-                          !FLEET_NODE_NON_LEASABLE_STATUSES.includes(node.status) &&
-                          !node.busy,
-                  );
-            return {
-                total: status.total,
-                online: status.online,
-                free: free.length,
-            };
+            return countAvailability(status, status.nodes);
         } catch (err) {
             this.logger.warn(
                 `Runner availability lookup failed for user ${userId} — treating the fleet as unavailable: ${
@@ -143,6 +131,70 @@ export class FleetRunnerStatusService {
             return { total: 0, online: 0, free: 0 };
         }
     }
+
+    /**
+     * Availability for ONE dispatch of `agentId`'s work — the question the
+     * run router actually has to answer once Agents can be pinned to a
+     * node.
+     *
+     * An unbound Agent gets the fleet-wide count, byte-for-byte as
+     * before. A BOUND Agent gets the count for its node alone, because
+     * that is the only machine `FleetJobService.lease` will ever hand its
+     * job to. Counting the whole fleet for a bound Agent is what makes
+     * the two layers disagree: the router sees a free runner somewhere,
+     * dispatches to the fleet, and the job then sits queued forever
+     * because the one node allowed to take it is offline — no cloud
+     * fallback for `local-fallback`, and no `waiting-for-runner` token
+     * for `local-wait`. The whole point of {@link snapshot} being shared
+     * is that the pill and the router never disagree about a machine;
+     * this keeps that true per-Agent.
+     *
+     * A binding to a node that no longer exists (the owner deleted or
+     * re-enrolled the PC) collapses to `total: 0` — "no runners" — which
+     * is exactly what it is, and which the modes already handle.
+     */
+    async availabilityForAgentTask(
+        userId: string,
+        agentId: string | null | undefined,
+    ): Promise<FleetRunnerAvailability> {
+        try {
+            const targetNodeId = await this.jobs.resolveAgentTaskTarget(userId, agentId);
+            const status = await this.snapshot(userId);
+            if (!targetNodeId) {
+                return countAvailability(status, status.nodes);
+            }
+            return countAvailability(
+                status,
+                status.nodes.filter((node) => node.id === targetNodeId),
+            );
+        } catch (err) {
+            this.logger.warn(
+                `Runner availability lookup failed for user ${userId} — treating the fleet as unavailable: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return { total: 0, online: 0, free: 0 };
+        }
+    }
+}
+
+/**
+ * The three counts the router reads, over an arbitrary subset of the
+ * snapshot's nodes. `loadUnavailable` zeroes `free` for the same reason
+ * {@link FleetRunnerStatusService.availability} documents: `busy: false`
+ * on an unread load table is "unknown", not "idle".
+ */
+function countAvailability(
+    status: FleetRunnerStatusView,
+    nodes: FleetRunnerNodeView[],
+): FleetRunnerAvailability {
+    const online = nodes.filter((node) => node.status === 'online');
+    const free = status.loadUnavailable
+        ? []
+        : online.filter(
+              (node) => !FLEET_NODE_NON_LEASABLE_STATUSES.includes(node.status) && !node.busy,
+          );
+    return { total: nodes.length, online: online.length, free: free.length };
 }
 
 function toRunnerView(node: FleetNodeView, load: FleetNodeLoadView | null): FleetRunnerNodeView {

@@ -34,11 +34,16 @@ const node = (overrides: Partial<FleetNodeView> = {}): FleetNodeView => ({
  */
 describe('FleetRunnerStatusService', () => {
     let fleet: { listEnrolledForUser: jest.Mock };
-    let jobs: { loadByNodeForUser: jest.Mock };
+    let jobs: { loadByNodeForUser: jest.Mock; resolveAgentTaskTarget: jest.Mock };
 
     beforeEach(() => {
         fleet = { listEnrolledForUser: jest.fn(async () => []) };
-        jobs = { loadByNodeForUser: jest.fn(async () => ({})) };
+        jobs = {
+            loadByNodeForUser: jest.fn(async () => ({})),
+            // Unbound by default: the fleet-wide answer must stay the
+            // default for every Agent nobody pinned.
+            resolveAgentTaskTarget: jest.fn(async () => null),
+        };
     });
 
     const build = () =>
@@ -180,6 +185,93 @@ describe('FleetRunnerStatusService', () => {
             // cloud and a `local-wait` run queues. Both are safe; claiming
             // capacity we could not verify is not.
             await expect(build().availability('user-1')).resolves.toEqual({
+                total: 0,
+                online: 0,
+                free: 0,
+            });
+        });
+    });
+
+    describe('availabilityForAgentTask (Agent pinned to one node)', () => {
+        const fleetOfThree = () => {
+            fleet.listEnrolledForUser.mockResolvedValue([
+                node({ id: 'bound-offline', status: 'offline' }),
+                node({ id: 'other-idle', status: 'online' }),
+                node({ id: 'other-busy', status: 'online' }),
+            ]);
+            jobs.loadByNodeForUser.mockResolvedValue({
+                'other-busy': {
+                    activeJobCount: 1,
+                    currentJobKind: 'agent-task',
+                    currentJobId: 'j',
+                },
+            });
+        };
+
+        it('falls through to the fleet-wide count for an UNBOUND Agent', async () => {
+            fleetOfThree();
+
+            await expect(build().availabilityForAgentTask('user-1', 'agent-1')).resolves.toEqual({
+                total: 3,
+                online: 2,
+                free: 1,
+            });
+        });
+
+        it('counts ONLY the bound node — a free machine elsewhere is not capacity for this run', async () => {
+            fleetOfThree();
+            jobs.resolveAgentTaskTarget.mockResolvedValue('bound-offline');
+
+            // The fleet-wide answer would be {3,2,1} and would route this
+            // run onto a fleet that can never execute it.
+            await expect(build().availabilityForAgentTask('user-1', 'agent-1')).resolves.toEqual({
+                total: 1,
+                online: 0,
+                free: 0,
+            });
+            expect(jobs.resolveAgentTaskTarget).toHaveBeenCalledWith('user-1', 'agent-1');
+        });
+
+        it('reports a bound-but-BUSY node as online-yet-not-free', async () => {
+            fleetOfThree();
+            jobs.resolveAgentTaskTarget.mockResolvedValue('other-busy');
+
+            await expect(build().availabilityForAgentTask('user-1', 'agent-1')).resolves.toEqual({
+                total: 1,
+                online: 1,
+                free: 0,
+            });
+        });
+
+        it('reports a bound node that no longer exists as "no runners"', async () => {
+            fleetOfThree();
+            jobs.resolveAgentTaskTarget.mockResolvedValue('deleted-node');
+
+            await expect(build().availabilityForAgentTask('user-1', 'agent-1')).resolves.toEqual({
+                total: 0,
+                online: 0,
+                free: 0,
+            });
+        });
+
+        it('claims no capacity it could not verify when the load table is unreadable', async () => {
+            fleetOfThree();
+            jobs.resolveAgentTaskTarget.mockResolvedValue('other-idle');
+            jobs.loadByNodeForUser.mockRejectedValue(new Error('job runtime down'));
+
+            // Node is online, but "not known to be busy" is not "idle".
+            await expect(build().availabilityForAgentTask('user-1', 'agent-1')).resolves.toEqual({
+                total: 1,
+                online: 1,
+                free: 0,
+            });
+        });
+
+        it('degrades to an unavailable fleet when the binding lookup itself throws', async () => {
+            fleetOfThree();
+            jobs.resolveAgentTaskTarget.mockRejectedValue(new Error('db down'));
+
+            await expect(build().availabilityForAgentTask('user-1', 'agent-1')).resolves.toEqual({
                 total: 0,
                 online: 0,
                 free: 0,

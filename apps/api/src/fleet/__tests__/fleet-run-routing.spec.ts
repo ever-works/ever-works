@@ -52,7 +52,7 @@ describe('fleet run routing (local-runner preference matrix)', () => {
     let store: { enqueue: jest.Mock; findById: jest.Mock };
     let delegate: AgentTaskExecuteDispatcher & { enqueue: jest.Mock };
     let preferences: { resolveForUser: jest.Mock };
-    let runners: { availability: jest.Mock };
+    let runners: { availability: jest.Mock; availabilityForAgentTask: jest.Mock };
     let notifications: { notifyFleetRunnerFallback: jest.Mock };
     let scopeResolver: { resolve: jest.Mock };
 
@@ -95,7 +95,13 @@ describe('fleet run routing (local-runner preference matrix)', () => {
         };
         delegate = { enqueue: jest.fn(async () => ({ runId: 'trigger-run-1' })) };
         preferences = { resolveForUser: jest.fn(async () => 'local-fallback') };
-        runners = { availability: jest.fn(async () => availability()) };
+        // The router asks the AGENT-aware question; `availability` stays
+        // mocked so a regression that reverts to the fleet-wide call is
+        // visible rather than silently passing.
+        runners = {
+            availability: jest.fn(async () => availability()),
+            availabilityForAgentTask: jest.fn(async () => availability()),
+        };
         notifications = { notifyFleetRunnerFallback: jest.fn(async () => undefined) };
         scopeResolver = { resolve: jest.fn(async () => ({ workId: WORK_ID, goalId: null })) };
     });
@@ -138,7 +144,7 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             ['every runner offline', availability({ online: 0, free: 0 })],
             ['no runner enrolled', availability({ total: 0, online: 0, free: 0 })],
         ])('WAITS on the fleet when %s', async (_label, current) => {
-            runners.availability.mockResolvedValue(current);
+            runners.availabilityForAgentTask.mockResolvedValue(current);
 
             const result = await buildDispatcher().enqueue(payload());
 
@@ -158,7 +164,7 @@ describe('fleet run routing (local-runner preference matrix)', () => {
     describe('local-fallback', () => {
         beforeEach(() => {
             preferences.resolveForUser.mockResolvedValue('local-fallback');
-            runners.availability.mockResolvedValue(availability({ free: 0 }));
+            runners.availabilityForAgentTask.mockResolvedValue(availability({ free: 0 }));
         });
 
         it('runs in the cloud and emits the fallback notice naming the reason', async () => {
@@ -180,7 +186,9 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             // ("not no-runners, so say 1"), which stored a fabricated
             // figure on a durable notification row for every owner with
             // more than one machine.
-            runners.availability.mockResolvedValue(availability({ total: 4, online: 4, free: 0 }));
+            runners.availabilityForAgentTask.mockResolvedValue(
+                availability({ total: 4, online: 4, free: 0 }),
+            );
 
             await buildDispatcher().enqueue(payload());
 
@@ -190,7 +198,9 @@ describe('fleet run routing (local-runner preference matrix)', () => {
         });
 
         it('distinguishes "no runners enrolled" from "runners busy"', async () => {
-            runners.availability.mockResolvedValue(availability({ total: 0, online: 0, free: 0 }));
+            runners.availabilityForAgentTask.mockResolvedValue(
+                availability({ total: 0, online: 0, free: 0 }),
+            );
 
             await buildDispatcher().enqueue(payload());
 
@@ -221,6 +231,63 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             expect(store.enqueue).not.toHaveBeenCalled();
             // An explicit opt-out is not a fallback — the owner chose it.
             expect(notifications.notifyFleetRunnerFallback).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('an Agent pinned to one node', () => {
+        // The lease protocol will only ever hand a pinned job to its own
+        // node, so the router has to judge THAT node — not the fleet.
+        it('asks about the dispatched Agent, not the whole fleet', async () => {
+            await buildDispatcher().enqueue(payload({ agentId: 'agent-7' }));
+
+            expect(runners.availabilityForAgentTask).toHaveBeenCalledWith('user-1', 'agent-7');
+            expect(runners.availability).not.toHaveBeenCalled();
+        });
+
+        it('WAITS visibly instead of stranding the run when the bound node is offline (local-wait)', async () => {
+            preferences.resolveForUser.mockResolvedValue('local-wait');
+            // The bound node is the only one that counts, and it is down —
+            // even though other machines in the fleet are free.
+            runners.availabilityForAgentTask.mockResolvedValue(
+                availability({ total: 1, online: 0, free: 0 }),
+            );
+
+            const result = await buildDispatcher().enqueue(payload());
+
+            expect(result).toEqual({ runId: 'fleet-job-1' });
+            expect(store.enqueue.mock.calls[0][0].queuedReason).toBe(
+                QUEUED_REASON_WAITING_FOR_RUNNER,
+            );
+        });
+
+        it('falls back to the cloud and says why when the bound node is offline (local-fallback)', async () => {
+            preferences.resolveForUser.mockResolvedValue('local-fallback');
+            runners.availabilityForAgentTask.mockResolvedValue(
+                availability({ total: 1, online: 0, free: 0 }),
+            );
+
+            const result = await buildDispatcher().enqueue(payload());
+
+            // The mode's own promise is honoured for a pinned Agent too:
+            // relocating to the CLOUD is not relocating to another PC.
+            expect(result).toEqual({ runId: 'trigger-run-1' });
+            expect(store.enqueue).not.toHaveBeenCalled();
+            expect(notifications.notifyFleetRunnerFallback).toHaveBeenCalledWith(
+                expect.objectContaining({ reason: 'runners-offline' }),
+            );
+        });
+
+        it('treats a binding to a node that no longer exists as "no runners"', async () => {
+            preferences.resolveForUser.mockResolvedValue('local-fallback');
+            runners.availabilityForAgentTask.mockResolvedValue(
+                availability({ total: 0, online: 0, free: 0 }),
+            );
+
+            await buildDispatcher().enqueue(payload());
+
+            expect(notifications.notifyFleetRunnerFallback).toHaveBeenCalledWith(
+                expect.objectContaining({ reason: 'no-runners' }),
+            );
         });
     });
 

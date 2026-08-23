@@ -17,9 +17,9 @@ Add a durable `FleetAgentNodeAffinity` row keyed by owner, active Organization, 
 - The Fleet node must belong to the authenticated user. Nodes remain user-owned and can be reused across Organizations the user can access.
 - Unknown and foreign Agent/node identifiers are rejected through the same non-enumerating not-found path.
 - The binding endpoint is Organization-only. Personal scope cannot create or read an Organization binding.
-- This pilot exposes set/read operations only. It does not delete bindings or any existing Fleet data.
+- The pilot exposes set / read / clear operations on the binding itself. It never deletes an Agent, a node, a job, or any other existing Fleet data.
 
-When `FleetJobService.enqueue` receives an `agent-task` job, it resolves `payload.agentId` against the job owner and `organizationId`. A matching affinity is copied into the new nullable `FleetJob.targetNodeId` field. Other job kinds, malformed/missing Agent identifiers, personal-scope jobs, and unbound Agents keep `targetNodeId = null` and preserve current scheduling behavior.
+When `FleetJobService.enqueue` receives an `agent-task` job, it resolves `payload.agentId` against the job owner and **the Agent's own `organizationId`** — deliberately not the scope the job or Task carries. A Task is stamped with whatever scope was active when it was created, and a cron-spawned recurrence instance carries none at all, so keying the scheduling lookup on the job's scope would silently un-pin exactly the runs the owner bound. An Agent belongs to exactly one Organization, and the binding was validated against that Organization when it was written, so the Agent is the authoritative side of the lookup. A matching affinity is copied into the new nullable `FleetJob.targetNodeId` field. Other job kinds, malformed/missing Agent identifiers, Agents owned by someone other than the job owner, Agents with no Organization, and unbound Agents keep `targetNodeId = null` and preserve current scheduling behavior.
 
 The snapshot is intentional:
 
@@ -29,7 +29,18 @@ The snapshot is intentional:
 
 During leasing, a candidate is eligible only when `targetNodeId` is null or equals the authenticated node id. This check runs before capability filtering and before the existing compare-and-swap claim. The repository CAS remains the final authority for races.
 
-If a bound node is offline, paused, disabled, or otherwise unavailable, its targeted job remains queued. There is no fallback to a different node. This is strict affinity and prevents repository credentials or worktrees from appearing on an unintended PC.
+If a bound node is offline, paused, disabled, or otherwise unavailable, its targeted job remains queued. There is no fallback to a different node — not on lease, not on reclaim of a lapsed lease, and not when an operator drains the bound node. This is strict affinity and prevents repository credentials or worktrees from appearing on an unintended PC.
+
+### Interaction with execution preferences
+
+Strict affinity answers _which_ machine; the owner's execution preference (`local-wait` / `local-fallback` / `cloud`) answers _what to do when that machine cannot take the work right now_. The two compose, and the router must judge the bound node rather than the fleet:
+
+- `FleetRunnerStatusService.availabilityForAgentTask` resolves the dispatched Agent's binding and, when one exists, counts **only that node**. An unbound Agent still gets the fleet-wide count, unchanged.
+- `local-wait` with an unavailable bound node enqueues onto the fleet and stamps `waiting-for-runner`, so the wait is visible instead of a run that merely never starts.
+- `local-fallback` with an unavailable bound node relocates to the **cloud** with the usual notification. That is not a fallback "to a different PC" — no other node ever sees the job — so it does not weaken strict affinity. Owners who need the work to happen on that machine or not at all choose `local-wait`.
+- A binding pointing at a node that no longer exists (the owner deleted or re-enrolled the PC) counts as `total: 0`, i.e. "no runners", and each mode handles it exactly as it already handles an empty fleet.
+
+Without this, the router would see a free machine _somewhere_, dispatch to the fleet, and the job would sit queued forever with no queued reason, no cloud fallback and no notification — the one silent-stall failure mode this design is otherwise built to avoid.
 
 ## Data Model
 
@@ -62,8 +73,13 @@ Authenticated, session-scoped endpoints:
 
 - `GET /api/fleet/agents/:agentId/node-affinity`
 - `PUT /api/fleet/agents/:agentId/node-affinity` with `{ "nodeId": "<uuid>" }`
+- `DELETE /api/fleet/agents/:agentId/node-affinity`
 
-Both require an active Organization. The response contains `agentId`, `nodeId`, `organizationId`, and timestamps. A missing binding returns `null` from GET; foreign and unknown Agent identifiers use the same not-found response. PUT is an upsert for the authenticated owner and active Organization.
+All three require an active Organization. The response of GET/PUT contains `agentId`, `nodeId`, `organizationId`, and timestamps. A missing binding returns `null` from GET; foreign and unknown Agent identifiers use the same not-found response. PUT is an upsert for the authenticated owner and active Organization.
+
+DELETE returns the Agent to "any of my nodes" and answers `204`. It is idempotent — clearing an unbound Agent is a no-op rather than an error — and it runs the same ownership and Organization validation as PUT, so a foreign Agent is a not-found whether or not a binding exists. It removes only the binding row: jobs already queued keep the node they were enqueued for, exactly as when a binding is changed.
+
+Clearing matters beyond convenience. Nodes are hard-deleted by `DELETE /api/fleet/nodes/:id` and by node-side unenrollment, and re-enrolling the same PC mints a new node id. Without a way to clear, an owner whose bound PC is gone would have no path back to unbound scheduling for that Agent.
 
 ## Failure and Security Semantics
 
@@ -73,7 +89,9 @@ Both require an active Organization. The response contains `agentId`, `nodeId`, 
 - Never accept a Fleet node owned by another user.
 - Never retarget an existing job when a binding changes.
 - Never let a non-target node claim a targeted job, even when its capabilities match.
-- Never fall back to another node when the target is unavailable.
+- Never fall back to another node when the target is unavailable — the owner's execution preference may still route to the cloud, which is not another node.
+- Never resolve a binding from a job's or Task's scope; always from the Agent's own Organization.
+- Never let a foreign owner's Agent id produce a target node.
 - Preserve the existing owner-scoped candidate query and CAS claim predicates.
 
 ## Compatibility
