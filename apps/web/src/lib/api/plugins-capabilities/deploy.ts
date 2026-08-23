@@ -98,6 +98,20 @@ export type VerifyDomainResponseDto = APIResponse<{
     domain: DeploymentDomain;
 }>;
 
+/**
+ * One allow-listed per-Work env var (Stripe keys & co.) as returned by
+ * `GET/PUT /api/deploy/works/:id/runtime-env` — masked, never plaintext.
+ */
+export interface RuntimeEnvVarState {
+    key: string;
+    /** Whether a value is currently stored for this key. */
+    set: boolean;
+    /** `***` for secrets, a short prefix otherwise; null when unset. */
+    masked: string | null;
+    /** True for credential keys that are always fully masked. */
+    secret: boolean;
+}
+
 export interface RuntimeEnvState {
     /** Where the site DATABASE_URL comes from: managed shared DB vs BYO URL. */
     mode?: 'shared' | 'custom';
@@ -106,9 +120,24 @@ export interface RuntimeEnvState {
     databaseUrl: { configured: boolean; masked: string | null };
     /** Secrets auto-managed by the deploy feature (not user-editable). */
     managed: string[];
+    /** The per-Work env keys the user may set (allow-list, display order). */
+    allowedEnvKeys?: string[];
+    /** Masked state of every allow-listed per-Work env key. */
+    env?: RuntimeEnvVarState[];
 }
 
 export type RuntimeEnvResponseDto = APIResponse<RuntimeEnvState>;
+
+/**
+ * Body for `PUT /api/deploy/works/:id/runtime-env`. `mode`/`databaseUrl` and
+ * `env` are independent sections — send either or both. `env` is a
+ * merge-patch: provided keys overwrite, `null` removes, omitted keys persist.
+ */
+export interface SetRuntimeEnvBody {
+    mode?: 'shared' | 'custom';
+    databaseUrl?: string;
+    env?: Record<string, string | null>;
+}
 
 /**
  * EW-740 — per-Work managed subdomain ("Site URL / Subdomain") state surfaced
@@ -269,11 +298,13 @@ export const deployAPI = {
     },
 
     /**
-     * Set the per-Work database config (applied on next deploy). `mode: 'shared'`
-     * selects the managed Ever Works DB (no `databaseUrl` needed); `mode: 'custom'`
-     * (the default) sets a BYO connection string.
+     * Set the per-Work runtime env (applied on next deploy). Database section:
+     * `mode: 'shared'` selects the managed Ever Works DB (no `databaseUrl`
+     * needed); `mode: 'custom'` (the default) sets a BYO connection string.
+     * `env` merge-patches the allow-listed per-Work env vars (Stripe keys &
+     * co.) and may be sent on its own without touching the DB config.
      */
-    setRuntimeEnv(workId: string, body: { mode?: 'shared' | 'custom'; databaseUrl?: string }) {
+    setRuntimeEnv(workId: string, body: SetRuntimeEnvBody) {
         return serverMutation<RuntimeEnvResponseDto>({
             // Security: encode workId to prevent path-segment injection
             endpoint: `/deploy/works/${encodeURIComponent(workId)}/runtime-env`,

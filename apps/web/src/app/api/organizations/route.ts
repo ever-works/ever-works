@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 /**
  * EW-660 (Tenants & Organizations Phase 8) — web BFF proxy for
@@ -15,14 +16,20 @@ import { getAuthAccessCookie } from '@/lib/auth/cookies';
  * `useOrganizations()` hook can surface a sensible `error` value without
  * mistaking the auth-failure for an empty-orgs list.
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
     const token = await getAuthAccessCookie();
     if (!token) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const headers = new Headers();
-    headers.set('Authorization', `Bearer ${token}`);
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Authorization: `Bearer ${token}`,
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
 
     try {
         const upstream = await fetch(`${API_URL}/organizations`, {
@@ -71,9 +78,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    const headers = new Headers();
-    headers.set('Authorization', `Bearer ${token}`);
-    headers.set('Content-Type', 'application/json');
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
 
     try {
         const upstream = await fetch(`${API_URL}/organizations`, {

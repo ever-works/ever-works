@@ -6,8 +6,10 @@ import type {
     DeployFacadeTeam,
     DeployProviderInfo,
     DeploymentLookupResult,
+    DeploymentLookupContext,
     DeploymentDomain,
     AddDomainResult,
+    SettingSource,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES, isDnsProvider } from '@ever-works/plugin';
 import type { IDnsProvider } from '@ever-works/plugin';
@@ -21,6 +23,10 @@ import { EverWorksK8sDeployProvider } from '../ever-works-providers';
 import { FacadeError, NoProviderError, ProviderNotFoundError } from './base.facade';
 import type { Work } from '../entities/work.entity';
 import type { User } from '../entities/user.entity';
+import {
+    PLATFORM_MANAGED_KUBECONFIG_SENTINEL,
+    resolveEffectiveDeploymentContext,
+} from './deployment-context.resolver';
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
@@ -78,6 +84,12 @@ export class NoDeployCredentialsError extends DeployFacadeError {
 export interface DeployFacadeFullOptions extends DeployFacadeOptions {
     /** Override the provider (instead of using work.deployProvider) */
     providerOverride?: string;
+}
+
+interface EffectiveDeploymentOperationContext {
+    readonly token: string;
+    readonly teamScope: string | undefined;
+    readonly context: DeploymentLookupContext;
 }
 
 /**
@@ -279,8 +291,18 @@ export class DeployFacadeService implements IDeployFacade {
         deploymentId: string,
         options: DeployFacadeOptions,
     ): Promise<{ status: string; url?: string; error?: string }> {
-        const { plugin, token } = await this.resolvePluginAndToken(options);
-        const result = await plugin.getDeploymentStatus(deploymentId, token);
+        const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
+        const deploymentContext = await this.resolveDeploymentLookupContext(
+            plugin,
+            token,
+            work,
+            options,
+        );
+        const result = await plugin.getDeploymentStatus(
+            deploymentId,
+            deploymentContext.token,
+            deploymentContext.context,
+        );
         return {
             status: result.status,
             url: result.url,
@@ -295,35 +317,29 @@ export class DeployFacadeService implements IDeployFacade {
         projectName: string,
         options: DeployFacadeOptions,
     ): Promise<DeploymentLookupResult> {
-        try {
-            const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
+        const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
 
-            // Get team scope from settings
-            const settings = await this.settingsService.getSettings(plugin.id, {
-                userId: options.userId,
-                workId: options.workId,
-                includeSecrets: false,
-            });
-            const teamScope = settings.defaultTeamScope as string | undefined;
+        if (plugin.lookupExistingDeployment) {
+            const lookup = await this.resolveDeploymentLookupContext(plugin, token, work, options);
+            const result = await plugin.lookupExistingDeployment(
+                projectName,
+                lookup.token,
+                lookup.teamScope,
+                lookup.context,
+            );
 
-            if (plugin.lookupExistingDeployment) {
-                const result = await plugin.lookupExistingDeployment(projectName, token, teamScope);
-
-                // Update work with deployment info if found
-                if (result.found && (result.website || result.deploymentState)) {
-                    await this.workRepository.update(work.id, {
-                        website: result.website ?? undefined,
-                        deploymentState: result.deploymentState ?? work.deploymentState,
-                    });
-                }
-
-                return result;
+            // Update work with deployment info if found
+            if (result.found && (result.website || result.deploymentState)) {
+                await this.workRepository.update(work.id, {
+                    website: result.website ?? undefined,
+                    deploymentState: result.deploymentState ?? work.deploymentState,
+                });
             }
 
-            return { found: false };
-        } catch {
-            return { found: false };
+            return result;
         }
+
+        return { found: false };
     }
 
     /**
@@ -386,14 +402,15 @@ export class DeployFacadeService implements IDeployFacade {
         token: string;
         work: Work;
         settings: Record<string, unknown>;
+        settingSources: Record<string, SettingSource | undefined>;
     }> {
         const result = await this.resolvePluginAndTokenWithWork(options);
-        const settings = await this.settingsService.getSettings(result.plugin.id, {
-            userId: options.userId,
-            workId: options.workId,
-            includeSecrets: true,
-        });
-        return { ...result, settings };
+        const { settings, settingSources } = await this.getDeploymentSettingsSnapshot(
+            result.plugin.id,
+            options,
+            true,
+        );
+        return { ...result, settings, settingSources };
     }
 
     /**
@@ -472,9 +489,25 @@ export class DeployFacadeService implements IDeployFacade {
             const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
             providerId = plugin.id;
             if (plugin.getDomains) {
-                const projectId = await this.resolveProjectId(plugin, token, work, options);
-                const teamScope = await this.getTeamScope(plugin.id, options);
-                providerDomains = await plugin.getDomains(projectId, token, teamScope);
+                const deploymentContext = await this.resolveDeploymentLookupContext(
+                    plugin,
+                    token,
+                    work,
+                    options,
+                );
+                const projectId = await this.resolveProjectId(
+                    plugin,
+                    token,
+                    work,
+                    options,
+                    deploymentContext,
+                );
+                providerDomains = await plugin.getDomains(
+                    projectId,
+                    deploymentContext.token,
+                    deploymentContext.teamScope,
+                    deploymentContext.context,
+                );
                 if (shouldAutoImportProviderDomains) {
                     await this.reconcileProviderDomains(options.workId, plugin.id, providerDomains);
                 }
@@ -565,16 +598,26 @@ export class DeployFacadeService implements IDeployFacade {
             );
         }
 
-        const projectId = await this.resolveProjectId(plugin, token, work, options);
-        const teamScope = await this.getTeamScope(plugin.id, options);
+        const deploymentContext = await this.resolveDeploymentLookupContext(
+            plugin,
+            token,
+            work,
+            options,
+        );
+        const projectId = await this.resolveProjectId(
+            plugin,
+            token,
+            work,
+            options,
+            deploymentContext,
+        );
         const existing = await this.domainRepository.findOne(options.workId, domain);
 
         if (plugin.getDomains) {
             const providerDomain = await this.findProviderDomain(
                 plugin,
                 projectId,
-                token,
-                teamScope,
+                deploymentContext,
                 domain,
             );
 
@@ -601,7 +644,13 @@ export class DeployFacadeService implements IDeployFacade {
         // Push to provider
         let result: AddDomainResult;
         try {
-            result = await plugin.addDomain(projectId, domain, token, teamScope);
+            result = await plugin.addDomain(
+                projectId,
+                domain,
+                deploymentContext.token,
+                deploymentContext.teamScope,
+                deploymentContext.context,
+            );
         } catch (error) {
             throw error;
         }
@@ -704,14 +753,18 @@ export class DeployFacadeService implements IDeployFacade {
     private async findProviderDomain(
         plugin: IDeploymentPlugin,
         projectId: string,
-        token: string,
-        teamScope: string | undefined,
+        deploymentContext: EffectiveDeploymentOperationContext,
         domain: string,
     ): Promise<DeploymentDomain | undefined> {
         if (!plugin.getDomains) return undefined;
 
         try {
-            const providerDomains = await plugin.getDomains(projectId, token, teamScope);
+            const providerDomains = await plugin.getDomains(
+                projectId,
+                deploymentContext.token,
+                deploymentContext.teamScope,
+                deploymentContext.context,
+            );
             return providerDomains.find((item) => item.name === domain);
         } catch (error) {
             this.logger.warn(
@@ -786,14 +839,36 @@ export class DeployFacadeService implements IDeployFacade {
      */
     async removeDomain(domain: string, options: DeployFacadeOptions): Promise<boolean> {
         const { plugin, token, work } = await this.resolvePluginAndTokenWithWork(options);
+        let deploymentContext: EffectiveDeploymentOperationContext | undefined;
+        const getDeploymentContext = async (): Promise<EffectiveDeploymentOperationContext> => {
+            deploymentContext ??= await this.resolveDeploymentLookupContext(
+                plugin,
+                token,
+                work,
+                options,
+            );
+            return deploymentContext;
+        };
 
         // If provider supports removal and domain is synced, remove from provider
         const dbRecord = await this.domainRepository.findOne(options.workId, domain);
         if (dbRecord?.provider && plugin.removeDomain) {
             try {
-                const projectId = await this.resolveProjectId(plugin, token, work, options);
-                const teamScope = await this.getTeamScope(plugin.id, options);
-                await plugin.removeDomain(projectId, domain, token, teamScope);
+                const effective = await getDeploymentContext();
+                const projectId = await this.resolveProjectId(
+                    plugin,
+                    token,
+                    work,
+                    options,
+                    effective,
+                );
+                await plugin.removeDomain(
+                    projectId,
+                    domain,
+                    effective.token,
+                    effective.teamScope,
+                    effective.context,
+                );
             } catch (error) {
                 this.logger.warn(
                     `Failed to remove domain from provider, removing from DB anyway: ${error}`,
@@ -807,12 +882,13 @@ export class DeployFacadeService implements IDeployFacade {
         // If the removed domain was the current website URL, re-lookup to update
         if (removed && work.website === `https://${domain}`) {
             try {
-                const teamScope = await this.getTeamScope(plugin.id, options);
                 if (plugin.lookupExistingDeployment) {
+                    const lookupContext = await getDeploymentContext();
                     const lookup = await plugin.lookupExistingDeployment(
-                        work.slug,
-                        token,
-                        teamScope,
+                        work.getWebsiteRepo(),
+                        lookupContext.token,
+                        lookupContext.teamScope,
+                        lookupContext.context,
                     );
                     await this.workRepository.update(work.id, {
                         website: lookup.website ?? undefined,
@@ -839,9 +915,26 @@ export class DeployFacadeService implements IDeployFacade {
                 plugin.id,
             );
         }
-        const projectId = await this.resolveProjectId(plugin, token, work, options);
-        const teamScope = await this.getTeamScope(plugin.id, options);
-        const result = await plugin.verifyDomain(projectId, domain, token, teamScope);
+        const deploymentContext = await this.resolveDeploymentLookupContext(
+            plugin,
+            token,
+            work,
+            options,
+        );
+        const projectId = await this.resolveProjectId(
+            plugin,
+            token,
+            work,
+            options,
+            deploymentContext,
+        );
+        const result = await plugin.verifyDomain(
+            projectId,
+            domain,
+            deploymentContext.token,
+            deploymentContext.teamScope,
+            deploymentContext.context,
+        );
 
         // Update DB with verification result
         await this.domainRepository.updateVerified(options.workId, domain, result.verified);
@@ -968,6 +1061,62 @@ export class DeployFacadeService implements IDeployFacade {
         return null;
     }
 
+    private async resolveDeploymentLookupContext(
+        plugin: IDeploymentPlugin,
+        resolvedToken: string,
+        work: Work,
+        options: DeployFacadeOptions,
+    ): Promise<EffectiveDeploymentOperationContext> {
+        const { settings, settingSources } = await this.getDeploymentSettingsSnapshot(
+            plugin.id,
+            options,
+            false,
+        );
+        const owner = work.user as User | undefined;
+        const effective = resolveEffectiveDeploymentContext({
+            deployProvider: work.deployProvider,
+            pluginId: plugin.id,
+            resolvedToken,
+            settings,
+            settingSources,
+            websiteOwner: work.getRepoOwner('website'),
+            websiteProjectName: work.getWebsiteRepo(),
+            workId: work.id,
+            workSlug: work.slug,
+            ownerUserId: owner?.id,
+            isPlatformAdmin: Boolean(owner?.isPlatformAdmin),
+        });
+        return {
+            token: effective.token,
+            teamScope: effective.settings.defaultTeamScope as string | undefined,
+            context: effective.lookupContext,
+        };
+    }
+
+    private async getDeploymentSettingsSnapshot(
+        pluginId: string,
+        options: DeployFacadeOptions,
+        includeSecrets: boolean,
+    ): Promise<{
+        settings: Record<string, unknown>;
+        settingSources: Record<string, SettingSource | undefined>;
+    }> {
+        const resolutionOptions = {
+            userId: options.userId,
+            workId: options.workId,
+            includeSecrets,
+        };
+        const [settings, resolved] = await Promise.all([
+            this.settingsService.getSettings(pluginId, resolutionOptions),
+            this.settingsService.getResolvedSettings(pluginId, resolutionOptions),
+        ]);
+        const settingSources: Record<string, SettingSource | undefined> = {};
+        for (const [key, value] of Object.entries(resolved)) {
+            settingSources[key] = value.source;
+        }
+        return { settings, settingSources };
+    }
+
     /**
      * Resolve the deployment projectId for a work.
      * Uses the cached deployProjectId when available to avoid redundant API calls.
@@ -977,18 +1126,22 @@ export class DeployFacadeService implements IDeployFacade {
         token: string,
         work: Work,
         options: DeployFacadeOptions,
+        effectiveContext?: EffectiveDeploymentOperationContext,
     ): Promise<string> {
         // Use cached value if available
         if (work.deployProjectId) {
             return work.deployProjectId;
         }
 
-        const teamScope = await this.getTeamScope(plugin.id, options);
         if (plugin.lookupExistingDeployment) {
+            const lookupContext =
+                effectiveContext ??
+                (await this.resolveDeploymentLookupContext(plugin, token, work, options));
             const result = await plugin.lookupExistingDeployment(
                 work.getWebsiteRepo(),
-                token,
-                teamScope,
+                lookupContext.token,
+                lookupContext.teamScope,
+                lookupContext.context,
             );
             if (result.found && result.projectId) {
                 // Cache the projectId for future calls
@@ -1003,21 +1156,6 @@ export class DeployFacadeService implements IDeployFacade {
             'resolveProjectId',
             plugin.id,
         );
-    }
-
-    /**
-     * Get team scope from plugin settings
-     */
-    private async getTeamScope(
-        pluginId: string,
-        options: DeployFacadeOptions,
-    ): Promise<string | undefined> {
-        const settings = await this.settingsService.getSettings(pluginId, {
-            userId: options.userId,
-            workId: options.workId,
-            includeSecrets: false,
-        });
-        return settings.defaultTeamScope as string | undefined;
     }
 
     /**
@@ -1075,15 +1213,4 @@ export class DeployFacadeService implements IDeployFacade {
     }
 }
 
-/**
- * Sentinel value returned by `getTokenFromSettings` for k8s deploys
- * targeting a platform-managed cluster (`k8s-works` / `k8s-works-shared`).
- * The deploy facade only checks that a token is non-empty before
- * deciding the work is "configured", so any unique string works.
- * `DeployService.resolveDeployToken()` discards this sentinel and
- * substitutes the real platform kubeconfig from
- * `EVER_WORKS_K8S_*_KUBECONFIG` env vars at deploy time.
- *
- * Exported so callers (or tests) can pattern-match on it if needed.
- */
-export const PLATFORM_MANAGED_KUBECONFIG_SENTINEL = '__ever-works-platform-managed-kubeconfig__';
+export { PLATFORM_MANAGED_KUBECONFIG_SENTINEL } from './deployment-context.resolver';

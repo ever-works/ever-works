@@ -9,6 +9,11 @@ import {
 } from '../entities/work-proposal.entity';
 import { parseCron } from './cron-matcher';
 import { toMissionDto, type MissionDto } from './types';
+import {
+    ownershipStamp,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../database/ownership-scope';
 
 /**
  * Optional caller-supplied overrides for the cloned Mission.
@@ -117,6 +122,7 @@ export class MissionCloneService {
         userId: string,
         sourceMissionId: string,
         overrides: CloneMissionOverrides = {},
+        scope?: OwnershipScope,
     ): Promise<CloneMissionResult> {
         // The whole clone runs inside a single transaction so the
         // "new Mission + N copied Ideas" pair is atomic — partial
@@ -126,7 +132,7 @@ export class MissionCloneService {
         // TypeORM's data source is configured for.
         return this.missions.manager.transaction(async (tx) => {
             const source = await tx.findOne(Mission, {
-                where: { id: sourceMissionId, userId },
+                where: ownershipWhereWith<Mission>(userId, scope, { id: sourceMissionId }),
             });
             if (!source) {
                 throw new NotFoundException(`Mission not found`);
@@ -165,6 +171,7 @@ export class MissionCloneService {
             const newMission = await tx.save(
                 tx.create(Mission, {
                     userId,
+                    ...ownershipStamp(scope),
                     title: clonedTitle,
                     description: source.description,
                     type: source.type,
@@ -193,7 +200,9 @@ export class MissionCloneService {
             // metric below (just DISMISSED), so the caller can
             // surface a "we skipped N dismissed Ideas" hint.
             const sourceIdeas = await tx.find(WorkProposal, {
-                where: { missionId: source.id, userId },
+                where: ownershipWhereWith<WorkProposal>(userId, scope, {
+                    missionId: source.id,
+                }),
             });
             const eligible = sourceIdeas.filter(
                 (idea) => idea.status !== WorkProposalStatus.DISMISSED,
@@ -204,6 +213,7 @@ export class MissionCloneService {
                 const newIdeaRows = eligible.map((src) =>
                     tx.create(WorkProposal, {
                         userId,
+                        ...ownershipStamp(scope),
                         missionId: newMission.id,
                         // Fresh-slate status + cleared failure cols + no
                         // acceptedWorkId. The clone is a new chance, not
@@ -257,13 +267,16 @@ export class MissionCloneService {
      * FK schema permits them but the writer never sets them, and
      * counting them would be misleading.
      */
-    async countClonesOf(userId: string, sourceMissionId: string): Promise<number> {
+    async countClonesOf(
+        userId: string,
+        sourceMissionId: string,
+        scope?: OwnershipScope,
+    ): Promise<number> {
         return this.missions.count({
-            where: {
-                userId,
+            where: ownershipWhereWith<Mission>(userId, scope, {
                 sourceMissionId,
                 id: Not(sourceMissionId),
-            },
+            }),
         });
     }
 }

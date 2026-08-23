@@ -1,8 +1,9 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 import { useOrganizations } from './use-organizations';
+import { parseWorkspacePath } from '../workspace-scope';
 
 export interface UseActiveScopeResult {
     /**
@@ -35,11 +36,10 @@ export interface UseActiveScopeResult {
  * empty-state logo.
  */
 export function useActiveScope(): UseActiveScopeResult {
-    const params = useParams<{ slug?: string | string[] }>();
+    const pathname = usePathname();
     const { organizations } = useOrganizations();
-
-    const rawSlug = params?.slug;
-    const slug = Array.isArray(rawSlug) ? (rawSlug[0] ?? null) : (rawSlug ?? null);
+    const workspace = parseWorkspacePath(pathname);
+    const slug = workspace.kind === 'organization' ? workspace.slug : null;
 
     const activeOrganization = slug
         ? (organizations.find((org) => org.slug === slug) ?? null)

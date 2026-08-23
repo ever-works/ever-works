@@ -25,6 +25,7 @@ import type {
 	ListRepositoriesOptions,
 	ListPullRequestsOptions,
 	GitCloneOptions,
+	GitCloneBranchOptions,
 	GitPushOptions,
 	GitCommitter,
 	GitFileChange,
@@ -386,6 +387,11 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	async cloneOrPull(options: GitCloneOptions): Promise<string> {
 		this.ensureGitOps();
 		return this.gitOps!.cloneOrPull(options);
+	}
+
+	async cloneBranch(options: GitCloneBranchOptions): Promise<string> {
+		this.ensureGitOps();
+		return this.gitOps!.cloneBranch(options);
 	}
 
 	async pull(dir: string, token: string, committer?: GitCommitter): Promise<void> {

@@ -9,6 +9,7 @@ import {
 import { RunDispatchGateService } from './run-dispatch-gate.service';
 import { AgentEscalationService } from './agent-escalation.service';
 import { NotificationService } from '../notifications/notification.service';
+import type { AgentRun } from '../entities/agent-run.entity';
 
 /**
  * Error message prefix for a swept run.
@@ -395,13 +396,17 @@ export class AgentRunSweeperService {
         waitedMinutes: number,
     ): Promise<void> {
         if (!this.escalations) return;
+        const persisted = await this.findPersistedRunForEscalation(run.id);
+        if (!persisted) return;
         await this.escalations.record({
-            userId: run.userId,
+            userId: persisted.userId,
             reasonCode: 'queued-too-long',
-            runId: run.id,
-            taskId: run.taskId ?? null,
-            workId: run.workId ?? null,
-            agentId: run.agentId,
+            runId: persisted.id,
+            taskId: persisted.taskId ?? null,
+            workId: persisted.workId ?? null,
+            agentId: persisted.agentId,
+            tenantId: persisted.tenantId ?? null,
+            organizationId: persisted.organizationId ?? null,
             summary: `Run has been queued for ${waitedMinutes} minutes without starting.`,
             decisionNeeded:
                 'Decide whether to raise the concurrency limit for this Work/org, cancel the ' +
@@ -409,8 +414,8 @@ export class AgentRunSweeperService {
             attempted: [
                 {
                     label: 'dispatch',
-                    outcome: run.queuedReason
-                        ? `parked with reason '${run.queuedReason}'`
+                    outcome: persisted.queuedReason
+                        ? `parked with reason '${persisted.queuedReason}'`
                         : 'queued, never handed to the job runtime',
                 },
             ],
@@ -422,24 +427,17 @@ export class AgentRunSweeperService {
         cutoffMinutes: number,
     ): Promise<void> {
         if (!this.escalations) return;
-        // The stuck-scan projection is deliberately narrow (it does not
-        // select userId), so resolve the owner only when we actually have
-        // an escalation sink. A miss is not an error — the park itself
-        // already landed.
-        let userId: string | null = null;
-        try {
-            const full = await this.runs.findById(run.id);
-            userId = full?.userId ?? null;
-        } catch {
-            userId = null;
-        }
-        if (!userId) return;
+        const persisted = await this.findPersistedRunForEscalation(run.id);
+        if (!persisted) return;
         await this.escalations.record({
-            userId,
+            userId: persisted.userId,
             reasonCode: 'run-parked',
-            runId: run.id,
-            workId: run.workId ?? null,
-            agentId: run.agentId,
+            runId: persisted.id,
+            taskId: persisted.taskId ?? null,
+            workId: persisted.workId ?? null,
+            agentId: persisted.agentId,
+            tenantId: persisted.tenantId ?? null,
+            organizationId: persisted.organizationId ?? null,
             summary: `Run was parked after ${cutoffMinutes} minutes with no worker checkpoint.`,
             decisionNeeded:
                 'The conversation was kept and can be resumed. Decide whether to resume this ' +
@@ -451,6 +449,30 @@ export class AgentRunSweeperService {
                 },
             ],
         });
+    }
+
+    /**
+     * The sweeper projections intentionally omit ownership columns. Escalations
+     * are a best-effort side effect, so re-read the authoritative row and skip
+     * the card when it cannot be loaded instead of guessing a Task's scope.
+     */
+    private async findPersistedRunForEscalation(runId: string): Promise<AgentRun | null> {
+        try {
+            const run = await this.runs.findById(runId);
+            if (!run) {
+                this.logger.warn(
+                    `AgentRun escalation skipped for ${runId}: persisted run was not found.`,
+                );
+            }
+            return run;
+        } catch (error) {
+            this.logger.warn(
+                `AgentRun escalation skipped for ${runId}: persisted run lookup failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
     }
 }
 

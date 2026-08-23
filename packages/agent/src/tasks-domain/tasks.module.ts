@@ -56,6 +56,7 @@ import { PolicyModule } from '../policy/policy.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { DatabaseModule } from '../database/database.module';
 
 /**
  * Tasks feature — Phases 11 + 12 + 13.
@@ -66,6 +67,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
  */
 @Module({
     imports: [
+        DatabaseModule,
         TypeOrmModule.forFeature([
             Task,
             TaskAssignee,

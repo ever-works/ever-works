@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import type { PluginContext } from '@ever-works/plugin';
 import { KubernetesPlugin } from '../k8s.plugin';
 import { KubernetesApiService } from '../k8s-api.service';
+import { K8sPluginError } from '../errors';
 import type { IngressClassDescriptor, KubernetesClusterInfo } from '../types';
 
 const VALID = readFileSync(resolve(__dirname, 'fixtures/kubeconfig-valid.yml'), 'utf-8');
@@ -177,6 +178,14 @@ describe('KubernetesPlugin metadata', () => {
 		expect(ic?.['x-widget']).toBe('cluster-ingress-class');
 	});
 
+	it('publishes measured memory defaults without narrowing Kubernetes quantity syntax', () => {
+		const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+		expect(props.memoryRequest?.default).toBeUndefined();
+		expect(props.memoryLimit?.default).toBe('2Gi');
+		expect(props.memoryRequest?.pattern).toBeUndefined();
+		expect(props.memoryLimit?.pattern).toBeUndefined();
+	});
+
 	it('manifest hints verifiesOnSave so the UI labels the save button "Save & verify" and shows cluster info on success', () => {
 		const m = plugin.getManifest();
 		expect(m.uiHints?.verifiesOnSave).toBe(true);
@@ -187,6 +196,113 @@ describe('KubernetesPlugin metadata', () => {
 		expect(m.uiHints?.includeInOnboarding).toBe(true);
 		expect(m.uiHints?.onboardingPriority).toBe(4);
 		expect(m.uiHints?.onboardingDescription).toBeDefined();
+	});
+});
+
+describe('KubernetesPlugin.validateSettings', () => {
+	const plugin = new KubernetesPlugin();
+
+	it('accepts the managed minimum and preserves smaller requests for custom clusters', () => {
+		expect(
+			plugin.validateSettings({ clusterSource: 'k8s-works', memoryRequest: '512Mi', memoryLimit: '2Gi' })
+		).toEqual({ valid: true });
+		expect(
+			plugin.validateSettings({ clusterSource: 'k8s-works', memoryRequest: '0.5Gi', memoryLimit: '1e9' })
+		).toEqual({ valid: true });
+		expect(
+			plugin.validateSettings({ clusterSource: 'custom-kubeconfig', memoryRequest: '256Mi', memoryLimit: '2Gi' })
+		).toEqual({ valid: true });
+		expect(
+			plugin.validateSettings({ clusterSource: 'custom-kubeconfig', memoryRequest: '500M', memoryLimit: '1G' })
+		).toEqual({ valid: true });
+	});
+
+	it('rejects malformed memory quantities on a platform-managed cluster', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: 'not-a-quantity',
+			memoryLimit: '2Gi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'INVALID_MEMORY_QUANTITY' })
+			])
+		);
+	});
+
+	it('rejects unsupported quantity suffixes on a platform-managed cluster', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: '500K',
+			memoryLimit: '2Gi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'INVALID_MEMORY_QUANTITY' })
+			])
+		);
+	});
+
+	it('rejects a request larger than the limit', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: '3Gi',
+			memoryLimit: '2Gi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'MEMORY_REQUEST_EXCEEDS_LIMIT' })
+			])
+		);
+	});
+
+	it('rejects new sub-512Mi requests on platform-managed clusters', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works-shared',
+			memoryRequest: '256Mi',
+			memoryLimit: '2Gi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'MANAGED_MEMORY_REQUEST_TOO_LOW' })
+			])
+		);
+	});
+
+	it('validates a legacy low request and low limit as one invalid managed pair', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: '256Mi',
+			memoryLimit: '384Mi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'MANAGED_MEMORY_REQUEST_TOO_LOW' }),
+				expect.objectContaining({ path: 'memoryLimit', code: 'MANAGED_MEMORY_LIMIT_TOO_LOW' })
+			])
+		);
+	});
+
+	it('recognizes valid DecimalSI quantities while applying the managed admission floor', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: '500M',
+			memoryLimit: '1G'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'MANAGED_MEMORY_REQUEST_TOO_LOW' })
+			])
+		);
+		expect(result.errors).not.toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_MEMORY_QUANTITY' })])
+		);
 	});
 });
 
@@ -412,6 +528,33 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 		expect(api.applyService).toHaveBeenCalledTimes(1);
 	});
 
+	it('uses the managed kubeconfig current context instead of a stale singleton context', async () => {
+		await plugin.onLoad(
+			createMockContext({
+				kubeContext: 'obsolete-singleton-context',
+				registry: { kind: 'github', visibility: 'auto' }
+			})
+		);
+
+		const result = await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'k8s-works' },
+					kubeContextOverride: null
+				}
+			},
+			VALID
+		);
+
+		expect(result.status).toBe('deploying');
+		expect(api.ensureNamespace).toHaveBeenCalledWith(VALID, 'ever-works', undefined);
+		expect(api.applyDeployment).toHaveBeenCalledWith(VALID, expect.any(Object), undefined);
+	});
+
 	it('private website repo + GHCR → applies a pull secret', async () => {
 		const result = await plugin.deploy(
 			{
@@ -459,9 +602,114 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 		expect(result.status).toBe('error');
 		expect(result.error).not.toContain('leak-12345');
 	});
+
+	it('normalizes a legacy managed 256Mi request to the 512Mi admission floor', async () => {
+		await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'k8s-works', memoryRequest: '256Mi' }
+				}
+			},
+			VALID
+		);
+
+		const manifest = vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>;
+		expect(manifest.spec.template.spec.containers[0].resources.requests.memory).toBe('512Mi');
+	});
+
+	it('fails before any API write when a legacy managed limit is below the normalized request floor', async () => {
+		const result = await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: {
+						clusterSource: 'k8s-works',
+						memoryRequest: '256Mi',
+						memoryLimit: '384Mi'
+					}
+				}
+			},
+			VALID
+		);
+
+		expect(result.status).toBe('error');
+		expect(result.error).toMatch(/limit.*512Mi admission floor/i);
+		expect(api.ensureNamespace).not.toHaveBeenCalled();
+		expect(api.applyDeployment).not.toHaveBeenCalled();
+	});
+
+	it('preserves an explicit 256Mi request for a custom cluster', async () => {
+		await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'custom-kubeconfig', memoryRequest: '256Mi' }
+				}
+			},
+			VALID
+		);
+
+		const manifest = vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>;
+		expect(manifest.spec.template.spec.containers[0].resources.requests.memory).toBe('256Mi');
+	});
+
+	it('preserves the historical 256Mi fallback for a custom cluster without an override', async () => {
+		await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'custom-kubeconfig' }
+				}
+			},
+			VALID
+		);
+
+		const manifest = vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>;
+		expect(manifest.spec.template.spec.containers[0].resources.requests.memory).toBe('256Mi');
+	});
 });
 
 describe('KubernetesPlugin.getDeploymentStatus', () => {
+	it('uses the authoritative Work target and managed kubeconfig context instead of a stale deployment ID', async () => {
+		const api = makeMockApi({
+			getDeployment: vi.fn(async (_kubeconfig, namespace, name) => ({
+				metadata: { name, namespace },
+				status: {
+					conditions:
+						name === 'repo-a'
+							? [{ type: 'Available', status: 'True' }]
+							: [{ type: 'Progressing', status: 'False', reason: 'SiblingDeployment' }]
+				}
+			}))
+		});
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		const result = await (plugin as any).getDeploymentStatus('tenant-b/repo-b', VALID, {
+			settingsOverride: { clusterSource: 'k8s-works' },
+			namespaceOverride: 'tenant-a',
+			projectNameOverride: 'repo-a',
+			kubeContextOverride: null
+		});
+
+		expect(api.getDeployment).toHaveBeenCalledWith(VALID, 'tenant-a', 'repo-a', undefined);
+		expect(result.id).toBe('tenant-a/repo-a');
+		expect(result.status).toBe('ready');
+	});
+
 	it('maps Available=True to ready', async () => {
 		const api = makeMockApi();
 		const plugin = new KubernetesPlugin({ api });
@@ -478,6 +726,82 @@ describe('KubernetesPlugin.getDeploymentStatus', () => {
 });
 
 describe('KubernetesPlugin.lookupExistingDeployment', () => {
+	it('uses the authoritative Work repository when the positional project name is stale', async () => {
+		const api = makeMockApi({
+			getDeployment: vi.fn(async (_kubeconfig, namespace, name) => ({
+				metadata: { name, namespace },
+				status: {
+					conditions:
+						name === 'current-website-repo'
+							? [{ type: 'Progressing', status: 'True' }]
+							: [{ type: 'Available', status: 'True' }],
+					replicas: 1
+				}
+			})),
+			readIngress: vi.fn(async (_kubeconfig, _namespace, name) => ({
+				metadata: { name },
+				spec: { rules: [{ host: `${name}.example.com` }] }
+			}))
+		});
+		const plugin = new KubernetesPlugin({ api });
+
+		const result = await plugin.lookupExistingDeployment('stale-sibling-repo', VALID, undefined, {
+			namespaceOverride: 'current-tenant-ns',
+			projectNameOverride: 'current-website-repo'
+		});
+
+		expect(api.getDeployment).toHaveBeenCalledWith(VALID, 'current-tenant-ns', 'current-website-repo', undefined);
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'current-tenant-ns', 'current-website-repo', undefined);
+		expect(result).toEqual({
+			found: true,
+			projectId: 'current-tenant-ns/current-website-repo',
+			website: 'https://current-website-repo.example.com',
+			deploymentState: 'BUILDING'
+		});
+	});
+
+	it('uses the managed kubeconfig current context instead of a stale singleton context', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await plugin.lookupExistingDeployment('my-site', VALID, undefined, {
+			settingsOverride: { clusterSource: 'k8s-works' },
+			namespaceOverride: 'ever-works-my-site-prod',
+			kubeContextOverride: null
+		} as any);
+
+		expect(api.getDeployment).toHaveBeenCalledWith(VALID, 'ever-works-my-site-prod', 'my-site', undefined);
+	});
+
+	it('propagates typed cluster/auth failures instead of reporting not-found', async () => {
+		const failure = new K8sPluginError('UNAUTHORIZED', 'Kubernetes credentials were rejected.');
+		const api = makeMockApi({ getDeployment: vi.fn(async () => Promise.reject(failure)) });
+		const plugin = new KubernetesPlugin({ api });
+
+		await expect(plugin.lookupExistingDeployment('my-site', VALID)).rejects.toBe(failure);
+	});
+
+	it('uses the Work-scoped namespace and context instead of singleton defaults', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(
+			createMockContext({ namespace: 'ever-works-shared-default', kubeContext: 'shared-context' })
+		);
+
+		const result = await plugin.lookupExistingDeployment('my-site', VALID, undefined, {
+			settingsOverride: {
+				namespace: 'ever-works-timetrack-prod',
+				kubeContext: 'work-context'
+			},
+			namespaceOverride: 'ever-works-timetrack-prod'
+		});
+
+		expect(api.getDeployment).toHaveBeenCalledWith(VALID, 'ever-works-timetrack-prod', 'my-site', 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'ever-works-timetrack-prod', 'my-site', 'work-context');
+		expect(result.projectId).toBe('ever-works-timetrack-prod/my-site');
+	});
+
 	it('returns verifier-compatible terminal state and ingress website URL', async () => {
 		const api = makeMockApi({
 			readIngress: vi.fn(async () => ({
@@ -522,6 +846,142 @@ describe('KubernetesPlugin.lookupExistingDeployment', () => {
 		expect(result.found).toBe(true);
 		expect(result.website).toBeUndefined();
 		expect(result.deploymentState).toBe('READY');
+	});
+
+	it('propagates typed ingress connectivity failures after finding the deployment', async () => {
+		const failure = new K8sPluginError('CLUSTER_UNREACHABLE', 'Ingress API is unreachable.');
+		const api = makeMockApi({ readIngress: vi.fn(async () => Promise.reject(failure)) });
+		const plugin = new KubernetesPlugin({ api });
+
+		await expect(plugin.lookupExistingDeployment('my-site', VALID)).rejects.toBe(failure);
+	});
+});
+
+describe('KubernetesPlugin Work-scoped domain context', () => {
+	const scopedContext = {
+		settingsOverride: {
+			kubeContext: 'work-context',
+			ingressClass: 'nginx'
+		},
+		namespaceOverride: 'current-tenant-ns',
+		projectNameOverride: 'current-website-repo'
+	};
+
+	it('uses the managed kubeconfig current context for domain operations', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).getDomains('stale-ns/stale-site', VALID, undefined, {
+			settingsOverride: { clusterSource: 'k8s-works-shared' },
+			namespaceOverride: 'current-tenant-ns',
+			projectNameOverride: 'current-website-repo',
+			kubeContextOverride: null
+		});
+
+		expect(api.readIngress).toHaveBeenCalledWith(VALID, 'current-tenant-ns', 'current-website-repo', undefined);
+	});
+
+	it('uses the Work kubeContext when listing domains', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).getDomains('stale-tenant-ns/stale-site', VALID, undefined, scopedContext);
+
+		expect(api.readIngress).toHaveBeenCalledWith(
+			VALID,
+			'current-tenant-ns',
+			'current-website-repo',
+			'work-context'
+		);
+	});
+
+	it('uses the Work kubeContext when adding a domain', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).addDomain(
+			'stale-tenant-ns/stale-site',
+			'tools.example.com',
+			VALID,
+			undefined,
+			scopedContext
+		);
+
+		expect(api.listIngressClasses).toHaveBeenCalledWith(VALID, expect.any(Function), 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(
+			VALID,
+			'current-tenant-ns',
+			'current-website-repo',
+			'work-context'
+		);
+		expect(api.applyIngress).toHaveBeenCalledWith(VALID, expect.any(Object), 'work-context');
+		expect(api.applyIngress).toHaveBeenCalledWith(
+			VALID,
+			expect.objectContaining({
+				metadata: { name: 'current-website-repo', namespace: 'current-tenant-ns' }
+			}),
+			'work-context'
+		);
+	});
+
+	it('uses the Work kubeContext when removing a domain', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({ api });
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).removeDomain(
+			'stale-tenant-ns/stale-site',
+			'tools.example.com',
+			VALID,
+			undefined,
+			scopedContext
+		);
+
+		expect(api.listIngressClasses).toHaveBeenCalledWith(VALID, expect.any(Function), 'work-context');
+		expect(api.readIngress).toHaveBeenCalledWith(
+			VALID,
+			'current-tenant-ns',
+			'current-website-repo',
+			'work-context'
+		);
+		expect(api.applyIngress).toHaveBeenCalledWith(VALID, expect.any(Object), 'work-context');
+		expect(api.applyIngress).toHaveBeenCalledWith(
+			VALID,
+			expect.objectContaining({
+				metadata: { name: 'current-website-repo', namespace: 'current-tenant-ns' }
+			}),
+			'work-context'
+		);
+	});
+
+	it('uses the Work kubeContext when verifying a domain', async () => {
+		const api = makeMockApi();
+		const plugin = new KubernetesPlugin({
+			api,
+			dnsResolver: {
+				resolveCname: vi.fn(async () => ['lb.cluster.example.com']),
+				resolve4: vi.fn(async () => [])
+			}
+		});
+		await plugin.onLoad(createMockContext({ kubeContext: 'obsolete-singleton-context' }));
+
+		await (plugin as any).verifyDomain(
+			'stale-tenant-ns/stale-site',
+			'tools.example.com',
+			VALID,
+			undefined,
+			scopedContext
+		);
+
+		expect(api.getIngressLoadBalancerHost).toHaveBeenCalledWith(
+			VALID,
+			'current-tenant-ns',
+			'current-website-repo',
+			'work-context'
+		);
 	});
 });
 

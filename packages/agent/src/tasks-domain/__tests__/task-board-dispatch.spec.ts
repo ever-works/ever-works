@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { TaskTransitionService } from '../task-transition.service';
 import {
     TasksService,
@@ -10,6 +10,15 @@ import {
 } from '../tasks.service';
 import { TaskStatus, TaskPriority } from '../../entities/task.entity';
 import type { Task } from '../../entities/task.entity';
+
+const everScope = {
+    tenantId: '11111111-1111-4111-8111-111111111111',
+    organizationId: '22222222-2222-4222-8222-222222222222',
+};
+const yoScope = {
+    tenantId: everScope.tenantId,
+    organizationId: '33333333-3333-4333-8333-333333333333',
+};
 
 /**
  * Board dispatch (kanban M3 / M4).
@@ -45,6 +54,8 @@ function makeTask(over: Partial<Task> = {}): Task {
         completedAt: null,
         isRecurring: false,
         recurrenceOccurredCount: 0,
+        tenantId: null,
+        organizationId: null,
         createdAt: new Date('2026-01-01'),
         updatedAt: new Date('2026-01-01'),
         ...over,
@@ -61,6 +72,7 @@ describe('TaskTransitionService.dispatchAgentRun — the one dispatch path', () 
     let dispatcher: any;
     let runDenorm: any;
     let dispatchGate: any;
+    let agents: any;
 
     beforeEach(() => {
         tasks = { casUpdateStatus: jest.fn().mockResolvedValue(true), findById: jest.fn() };
@@ -78,6 +90,13 @@ describe('TaskTransitionService.dispatchAgentRun — the one dispatch path', () 
             recordTerminal: jest.fn().mockResolvedValue(undefined),
         };
         dispatchGate = { admit: jest.fn().mockResolvedValue({ admitted: true }) };
+        agents = {
+            findByIdAndUser: jest.fn(async (id: string, userId: string, scope: unknown) => ({
+                id,
+                userId,
+                ...(scope as object),
+            })),
+        };
     });
 
     const makeSvc = () =>
@@ -91,6 +110,9 @@ describe('TaskTransitionService.dispatchAgentRun — the one dispatch path', () 
             undefined,
             runDenorm,
             dispatchGate,
+            undefined,
+            undefined,
+            agents,
         );
 
     it('consults the dispatch gate, creates the queued run, mirrors it on the board and enqueues', async () => {
@@ -114,6 +136,19 @@ describe('TaskTransitionService.dispatchAgentRun — the one dispatch path', () 
         expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
         expect(runs.setTriggerRunId).toHaveBeenCalledWith('r1', 'trd-1');
         expect(result).toEqual({ runId: 'r1', dispatched: true, parked: false });
+    });
+
+    it('persists the Task tenant and Organization on the queued AgentRun', async () => {
+        await makeSvc().dispatchAgentRun(makeTask({ workId: 'w1', ...everScope }), 'agent-ever');
+
+        expect(runs.createQueued).toHaveBeenCalledWith(
+            expect.objectContaining({
+                agentId: 'agent-ever',
+                taskId: 't1',
+                workId: 'w1',
+                ...everScope,
+            }),
+        );
     });
 
     it('parks the run WITHOUT enqueuing when the concurrency gate refuses', async () => {
@@ -237,6 +272,57 @@ describe('TasksService.runTask — board dispatch', () => {
         expect(result).toMatchObject({ taskId: 't1', agentId: 'agent-x', dispatched: true });
     });
 
+    it('opaque-404s a same-user known Task UUID from Yo in the active Ever scope', async () => {
+        taskRepo.findByIdAndUser.mockResolvedValueOnce(makeTask({ ...yoScope }));
+
+        await expect(
+            (build().runTask as any)('u1', 't1', { agentId: 'agent-x' }, everScope),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+    });
+
+    it('rejects a same-user known Yo Agent UUID in the active Ever scope', async () => {
+        taskRepo.findByIdAndUser.mockResolvedValue(makeTask({ ...everScope }));
+        const yoAgent = { id: 'agent-yo', userId: 'u1', name: 'Yo Agent', ...yoScope };
+        agents.findByIdAndUser.mockImplementation(
+            async (_id: string, _userId: string, scope?: typeof everScope) =>
+                !scope || scope.organizationId === yoScope.organizationId ? yoAgent : null,
+        );
+
+        const error = await (build().runTask as any)(
+            'u1',
+            't1',
+            { agentId: 'agent-yo' },
+            everScope,
+        ).catch((e: unknown) => e);
+
+        expect(error).toBeInstanceOf(BadRequestException);
+        expect((error as BadRequestException).getResponse()).toMatchObject({
+            code: RUN_AGENT_NOT_FOUND,
+        });
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith('agent-yo', 'u1', everScope);
+        expect(agentRuns.findInFlightForTaskAgent).not.toHaveBeenCalled();
+    });
+
+    it('uses user + exact scope for same-Task in-flight dedup', async () => {
+        taskRepo.findByIdAndUser.mockResolvedValue(makeTask({ ...everScope }));
+        agents.findByIdAndUser.mockResolvedValue({
+            id: 'agent-ever',
+            userId: 'u1',
+            name: 'Ever Agent',
+            ...everScope,
+        });
+
+        await (build().runTask as any)('u1', 't1', { agentId: 'agent-ever' }, everScope);
+
+        expect(agentRuns.findInFlightForTaskAgent).toHaveBeenCalledWith(
+            't1',
+            'agent-ever',
+            'u1',
+            everScope,
+        );
+    });
+
     it('refuses with 409 RUN_ALREADY_IN_FLIGHT when that (task, agent) pair is already running', async () => {
         agentRuns.findInFlightForTaskAgent.mockResolvedValue({ id: 'run-live', status: 'running' });
         const error = await build()
@@ -275,6 +361,7 @@ describe('TasksService.runTask — board dispatch', () => {
         expect(agents.findByUserIdScoped).toHaveBeenCalledWith(
             'u1',
             expect.objectContaining({ workId: 'w1' }),
+            undefined,
         );
         expect(result.agentId).toBe('agent-work');
     });
@@ -362,13 +449,35 @@ describe('TasksService.listRunCandidates', () => {
             build(taskRepo, assignees, agents).listRunCandidates('u1', 't1'),
         ).resolves.toEqual([]);
     });
+
+    it('does not offer same-user Yo assignees as Ever run candidates', async () => {
+        const taskRepo = {
+            findByIdAndUser: jest.fn().mockResolvedValue(makeTask({ ...everScope })),
+        };
+        const assignees = {
+            findAgentAssignees: jest.fn().mockResolvedValue([{ assigneeId: 'agent-yo' }]),
+        };
+        const yoAgent = { id: 'agent-yo', userId: 'u1', name: 'Yo Agent', ...yoScope };
+        const agents = {
+            findByIdAndUser: jest.fn(
+                async (_id: string, _userId: string, scope?: typeof everScope) =>
+                    !scope || scope.organizationId === yoScope.organizationId ? yoAgent : null,
+            ),
+            findByUserIdScoped: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
+        };
+
+        await expect(
+            (build(taskRepo, assignees, agents).listRunCandidates as any)('u1', 't1', everScope),
+        ).resolves.toEqual([]);
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith('agent-yo', 'u1', everScope);
+    });
 });
 
 describe('TasksService.runTasksBatch', () => {
     /* eslint-disable @typescript-eslint/no-explicit-any */
-    const build = () =>
+    const build = (taskRepo: any = { findByIdAndUser: jest.fn().mockResolvedValue(makeTask()) }) =>
         new TasksService(
-            { findByIdAndUser: jest.fn().mockResolvedValue(makeTask()) } as any,
+            taskRepo,
             { findAgentAssignees: jest.fn().mockResolvedValue([]) } as any,
             {} as any,
             {} as any,
@@ -420,5 +529,20 @@ describe('TasksService.runTasksBatch', () => {
         await expect(service.runTasksBatch('u1', tooMany)).rejects.toBeInstanceOf(
             BadRequestException,
         );
+    });
+
+    it('keeps every batch item inside the same active Ever scope', async () => {
+        const taskRepo = {
+            findByIdAndUser: jest.fn().mockResolvedValue(makeTask({ ...yoScope })),
+        };
+        const service = build(taskRepo);
+
+        const { results } = await (service.runTasksBatch as any)(
+            'u1',
+            [{ taskId: 't1', agentId: 'agent-ever' }],
+            everScope,
+        );
+
+        expect(results[0]).toMatchObject({ taskId: 't1', ok: false });
     });
 });

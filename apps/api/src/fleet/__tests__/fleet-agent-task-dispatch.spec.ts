@@ -88,6 +88,21 @@ describe('fleet agent-task dispatch (AUDIT A46/A24 producer wiring)', () => {
             undefined,
             runs as never,
             dispatcher,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            {
+                findByIdAndUser: jest.fn().mockImplementation((id, userId, scope) =>
+                    Promise.resolve({
+                        id,
+                        userId,
+                        tenantId: scope.tenantId,
+                        organizationId: scope.organizationId,
+                    }),
+                ),
+            } as never,
         );
 
     beforeEach(() => {
@@ -177,6 +192,50 @@ describe('fleet agent-task dispatch (AUDIT A46/A24 producer wiring)', () => {
         const enqueued = fleetJobs.enqueue.mock.calls[0][0];
         expect(enqueued.requiredCapabilities).toEqual(['git', 'docker']);
         expect(enqueued.payload.workspacePath).toBe('/srv/ever-works');
+    });
+
+    it('grants the well-known CLI credential names to the agent-task step by default', async () => {
+        // A node builds its subprocess env from scratch and drops secret-SHAPED
+        // names unless the step grants them. Without this the credential never
+        // arrives and the agent runs unauthenticated — failing in a way that
+        // reads as a model problem rather than a config one.
+        process.env.EVER_WORKS_JOB_RUNTIME = 'node';
+        process.env.FLEET_NODE_AGENT_TASK_COMMAND = 'ever-works agent run --task {taskId}';
+
+        await buildTransition().dispatchAgentRun(buildTask(), 'agent-1');
+
+        const step = fleetJobs.enqueue.mock.calls[0][0].payload.steps[0];
+        expect(step.envPassthrough).toEqual([
+            'CLAUDE_CODE_OAUTH_TOKEN',
+            'ANTHROPIC_API_KEY',
+            'CODEX_ACCESS_TOKEN',
+            'OPENAI_API_KEY',
+        ]);
+    });
+
+    it('honours an operator override of the granted credential names', async () => {
+        process.env.EVER_WORKS_JOB_RUNTIME = 'node';
+        process.env.FLEET_NODE_AGENT_TASK_COMMAND = 'ever-works agent run --task {taskId}';
+        process.env.FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH = ' MY_WRAPPER_TOKEN , OTHER_KEY ';
+
+        await buildTransition().dispatchAgentRun(buildTask(), 'agent-1');
+
+        const step = fleetJobs.enqueue.mock.calls[0][0].payload.steps[0];
+        expect(step.envPassthrough).toEqual(['MY_WRAPPER_TOKEN', 'OTHER_KEY']);
+    });
+
+    it('omits envPassthrough entirely when the operator grants nothing', async () => {
+        // Opting out must leave the field ABSENT rather than an empty array, so a
+        // node sees "no grant" instead of "granted nothing", and the step shape
+        // stays identical to what shipped before this setting existed.
+        process.env.EVER_WORKS_JOB_RUNTIME = 'node';
+        process.env.FLEET_NODE_AGENT_TASK_COMMAND = 'ever-works agent run --task {taskId}';
+        process.env.FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH = '';
+
+        await buildTransition().dispatchAgentRun(buildTask(), 'agent-1');
+
+        const step = fleetJobs.enqueue.mock.calls[0][0].payload.steps[0];
+        expect(step.envPassthrough).toBeUndefined();
     });
 
     it('keeps the platform dispatcher when no fleet runtime is selected', async () => {

@@ -8,6 +8,7 @@ import { FleetJob } from '../entities/fleet-job.entity';
 export interface CreateFleetJobData {
     userId: string;
     organizationId?: string | null;
+    targetNodeId?: string | null;
     kind: FleetJobKind;
     payload?: Record<string, unknown> | null;
     requiredCapabilities?: string[];
@@ -88,6 +89,23 @@ export class FleetJobRepository {
     async findQueuedForUser(userId: string, limit: number): Promise<FleetJob[]> {
         return this.repository.find({
             where: { userId, status: 'queued' },
+            order: { createdAt: 'ASC' },
+            take: limit,
+        });
+    }
+
+    /**
+     * Owner-scoped lease scan that excludes work explicitly targeted at
+     * another node before applying the result limit. Without this predicate,
+     * another PC's targeted backlog could fill the over-fetch window and hide
+     * later unbound work from an otherwise idle node.
+     */
+    async findQueuedForNode(userId: string, nodeId: string, limit: number): Promise<FleetJob[]> {
+        return this.repository.find({
+            where: [
+                { userId, status: 'queued', targetNodeId: IsNull() },
+                { userId, status: 'queued', targetNodeId: nodeId },
+            ],
             order: { createdAt: 'ASC' },
             take: limit,
         });

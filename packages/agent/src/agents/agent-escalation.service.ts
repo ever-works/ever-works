@@ -10,6 +10,7 @@ import type { AgentEscalation } from '../entities/agent-escalation.entity';
 // Leaf token file — no runtime graph (see inbox-producer.port.ts).
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import { EscalationConfidenceService } from './escalation-confidence';
+import type { OwnershipScope } from '../database/ownership-scope';
 
 /**
  * Judgment layer G3 — the ONE place an agent's give-up becomes a record.
@@ -134,6 +135,16 @@ export class AgentEscalationService {
      */
     async resolve(id: string, userId: string, note?: string | null): Promise<boolean> {
         return this.repository.resolve(id, userId, note ?? null);
+    }
+
+    async resolveForTask(
+        id: string,
+        userId: string,
+        taskId: string,
+        scope: OwnershipScope,
+        note?: string | null,
+    ): Promise<boolean> {
+        return this.repository.resolveForTask(id, userId, taskId, scope, note ?? null);
     }
 
     /** Mirror one recorded escalation into the owner's inbox. Best-effort. */

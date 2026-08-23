@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 type RouteContext = { params: Promise<{ id: string; runId: string }> };
 
@@ -38,11 +39,21 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     // from being the place a new role could be smuggled in.
     const roleQuery = request.nextUrl.searchParams.get('role') === 'viewer' ? '?role=viewer' : '';
 
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
+
     const upstream = await fetch(
         `${API_URL}/agents/${id}/runs/${runId}/terminal/attach-token${roleQuery}`,
         {
             method: 'POST',
-            headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            headers,
             cache: 'no-store',
         },
     );

@@ -49,11 +49,17 @@ import {
 // five canonical Agent files), so a secret-like value is hard-rejected
 // rather than redacted.
 import { assertNoSecrets } from '../utils/secret-scan';
+import {
+    ownershipStamp,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../database/ownership-scope';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
 // (Codex + Greptile P1 on PR #1044).
 const SHA256_RE = /^[0-9a-f]{64}$/i;
+const SUPPORTED_AGENT_TARGET_TYPES = new Set(['mission', 'idea', 'work', 'wildcard']);
 
 /**
  * Create-Agent input — writable subset of the entity. Validation
@@ -258,22 +264,32 @@ export class AgentsService {
     async list(
         userId: string,
         filter: ListAgentsFilter = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<{
         rows: AgentDto[];
         total: number;
     }> {
-        const { rows, total } = await this.agents.findByUserIdScoped(userId, filter);
+        const { rows, total } = await this.agents.findByUserIdScoped(
+            userId,
+            filter,
+            ownershipScope,
+        );
         return { rows: rows.map(toAgentDto), total };
     }
 
-    async getOne(userId: string, id: string): Promise<AgentDto> {
-        const agent = await this.requireOwned(userId, id);
+    async getOne(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
         return toAgentDto(agent);
     }
 
-    async create(userId: string, input: CreateAgentInput): Promise<AgentDto> {
+    async create(
+        userId: string,
+        input: CreateAgentInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
         this.validateScopeOwnership(input);
-        await this.assertScopeParentExists(userId, input);
+        await this.assertScopeParentExists(userId, input, ownershipScope);
+        await this.assertTargetsExist(userId, input.targets, ownershipScope);
 
         const slug = slugifyText(input.name);
         // `slugifyText('---')` returns `-` (dash), not the empty string,
@@ -286,11 +302,17 @@ export class AgentsService {
             );
         }
 
-        const conflict = await this.agents.findByUserIdAndSlug(userId, input.scope, slug, {
-            missionId: input.scope === AgentScope.MISSION ? (input.missionId ?? null) : null,
-            ideaId: input.scope === AgentScope.IDEA ? (input.ideaId ?? null) : null,
-            workId: input.scope === AgentScope.WORK ? (input.workId ?? null) : null,
-        });
+        const conflict = await this.agents.findByUserIdAndSlug(
+            userId,
+            input.scope,
+            slug,
+            {
+                missionId: input.scope === AgentScope.MISSION ? (input.missionId ?? null) : null,
+                ideaId: input.scope === AgentScope.IDEA ? (input.ideaId ?? null) : null,
+                workId: input.scope === AgentScope.WORK ? (input.workId ?? null) : null,
+            },
+            ownershipScope,
+        );
         if (conflict) {
             throw new ConflictException(
                 `An Agent named "${input.name}" already exists in this scope.`,
@@ -314,12 +336,13 @@ export class AgentsService {
         );
         this.validateHeartbeatCadence(input.heartbeatCadence ?? null);
         if (input.environmentId) {
-            await this.assertAssignableEnvironment(userId, input.environmentId);
+            await this.assertAssignableEnvironment(userId, input.environmentId, ownershipScope);
         }
 
         const created = await this.agents
             .create({
                 userId,
+                ...ownershipStamp(ownershipScope),
                 scope: input.scope,
                 missionId: input.scope === AgentScope.MISSION ? (input.missionId ?? null) : null,
                 ideaId: input.scope === AgentScope.IDEA ? (input.ideaId ?? null) : null,
@@ -385,8 +408,13 @@ export class AgentsService {
         return toAgentDto(created);
     }
 
-    async update(userId: string, id: string, input: UpdateAgentInput): Promise<AgentDto> {
-        const agent = await this.requireOwned(userId, id);
+    async update(
+        userId: string,
+        id: string,
+        input: UpdateAgentInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
 
         const patch: Partial<Agent> = {};
 
@@ -398,11 +426,17 @@ export class AgentsService {
                 );
             }
             if (slug !== agent.slug) {
-                const conflict = await this.agents.findByUserIdAndSlug(userId, agent.scope, slug, {
-                    missionId: agent.missionId ?? null,
-                    ideaId: agent.ideaId ?? null,
-                    workId: agent.workId ?? null,
-                });
+                const conflict = await this.agents.findByUserIdAndSlug(
+                    userId,
+                    agent.scope,
+                    slug,
+                    {
+                        missionId: agent.missionId ?? null,
+                        ideaId: agent.ideaId ?? null,
+                        workId: agent.workId ?? null,
+                    },
+                    ownershipScope,
+                );
                 if (conflict && conflict.id !== agent.id) {
                     throw new ConflictException(
                         `An Agent named "${input.name}" already exists in this scope.`,
@@ -424,7 +458,7 @@ export class AgentsService {
         // tool/import callers can't bypass the UI filter).
         if (input.environmentId !== undefined) {
             if (input.environmentId !== null) {
-                await this.assertAssignableEnvironment(userId, input.environmentId);
+                await this.assertAssignableEnvironment(userId, input.environmentId, ownershipScope);
             }
             patch.environmentId = input.environmentId;
         }
@@ -455,12 +489,18 @@ export class AgentsService {
         }
 
         if (input.targets !== undefined) {
+            await this.assertTargetsExist(userId, input.targets, ownershipScope);
             patch.targets = input.targets;
         }
 
         if (input.reportsToAgentId !== undefined) {
             if (input.reportsToAgentId !== null) {
-                await this.assertValidReportsTo(userId, agent, input.reportsToAgentId);
+                await this.assertValidReportsTo(
+                    userId,
+                    agent,
+                    input.reportsToAgentId,
+                    ownershipScope,
+                );
             }
             patch.reportsToAgentId = input.reportsToAgentId;
         }
@@ -586,9 +626,14 @@ export class AgentsService {
      * to the parent it is ALREADY pinned to, which would record reach it
      * has by scope and then let `removeTarget` appear to revoke it.
      */
-    async addTarget(userId: string, id: string, target: AgentTarget): Promise<AgentDto> {
-        let agent = await this.requireOwned(userId, id);
-        await this.assertTargetExists(userId, target);
+    async addTarget(
+        userId: string,
+        id: string,
+        target: AgentTarget,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        let agent = await this.requireOwned(userId, id, ownershipScope);
+        await this.assertTargetExists(userId, target, ownershipScope);
 
         for (let attempt = 0; attempt < AgentsService.TARGETS_CAS_ATTEMPTS; attempt++) {
             this.assertNotOwnScopeParent(agent, target);
@@ -627,7 +672,7 @@ export class AgentsService {
                 return true;
             });
             if (!won) {
-                agent = await this.requireOwned(userId, id);
+                agent = await this.requireOwned(userId, id, ownershipScope);
                 continue;
             }
 
@@ -645,8 +690,14 @@ export class AgentsService {
      * Remove ONE reach target from an Agent (idempotent — removing a
      * target the Agent never had is a no-op, not a 404).
      */
-    async removeTarget(userId: string, id: string, target: AgentTarget): Promise<AgentDto> {
-        let agent = await this.requireOwned(userId, id);
+    async removeTarget(
+        userId: string,
+        id: string,
+        target: AgentTarget,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        let agent = await this.requireOwned(userId, id, ownershipScope);
+        this.assertTargetShape(target);
 
         for (let attempt = 0; attempt < AgentsService.TARGETS_CAS_ATTEMPTS; attempt++) {
             const current = agent.targets ?? [];
@@ -685,7 +736,7 @@ export class AgentsService {
                 return true;
             });
             if (!won) {
-                agent = await this.requireOwned(userId, id);
+                agent = await this.requireOwned(userId, id, ownershipScope);
                 continue;
             }
 
@@ -722,30 +773,77 @@ export class AgentsService {
      * `findOne({ id, userId })` returning null is also how we avoid
      * confirming that another user's Work exists).
      */
-    private async assertTargetExists(userId: string, target: AgentTarget): Promise<void> {
+    private async assertTargetExists(
+        userId: string,
+        target: AgentTarget,
+        ownershipScope?: OwnershipScope,
+    ): Promise<void> {
+        this.assertTargetShape(target);
         switch (target.type) {
             case 'work':
-                await this.assertScopeParentExists(userId, {
-                    scope: AgentScope.WORK,
-                    workId: target.id,
-                });
+                await this.assertScopeParentExists(
+                    userId,
+                    {
+                        scope: AgentScope.WORK,
+                        workId: target.id,
+                    },
+                    ownershipScope,
+                );
                 break;
             case 'mission':
-                await this.assertScopeParentExists(userId, {
-                    scope: AgentScope.MISSION,
-                    missionId: target.id,
-                });
+                await this.assertScopeParentExists(
+                    userId,
+                    {
+                        scope: AgentScope.MISSION,
+                        missionId: target.id,
+                    },
+                    ownershipScope,
+                );
                 break;
             case 'idea':
-                await this.assertScopeParentExists(userId, {
-                    scope: AgentScope.IDEA,
-                    ideaId: target.id,
-                });
+                await this.assertScopeParentExists(
+                    userId,
+                    {
+                        scope: AgentScope.IDEA,
+                        ideaId: target.id,
+                    },
+                    ownershipScope,
+                );
+                break;
+            case 'wildcard':
                 break;
             default:
-                // `wildcard` has no row to validate.
-                break;
+                throw new BadRequestException('Agent target type is invalid.');
         }
+    }
+
+    private assertTargetShape(target: AgentTarget): void {
+        if (
+            !target ||
+            typeof target !== 'object' ||
+            typeof target.type !== 'string' ||
+            !SUPPORTED_AGENT_TARGET_TYPES.has(target.type)
+        ) {
+            throw new BadRequestException('Agent target type is invalid.');
+        }
+        if (
+            target.type !== 'wildcard' &&
+            (typeof target.id !== 'string' || target.id.trim().length === 0)
+        ) {
+            throw new BadRequestException(`Agent ${target.type} target requires an id.`);
+        }
+    }
+
+    /** Bulk create/PATCH targets must pass the same exact-scope gate as addTarget. */
+    private async assertTargetsExist(
+        userId: string,
+        targets: AgentTarget[] | null | undefined,
+        ownershipScope?: OwnershipScope,
+    ): Promise<void> {
+        if (!targets?.length) return;
+        await Promise.all(
+            targets.map((target) => this.assertTargetExists(userId, target, ownershipScope)),
+        );
     }
 
     /**
@@ -761,8 +859,9 @@ export class AgentsService {
         userId: string,
         id: string,
         guardrails: AgentGuardrails | null,
+        ownershipScope?: OwnershipScope,
     ): Promise<AgentDto> {
-        await this.requireOwned(userId, id);
+        await this.requireOwned(userId, id, ownershipScope);
         if (guardrails !== null) {
             const violation = validateGuardrails(guardrails);
             if (violation) {
@@ -775,8 +874,13 @@ export class AgentsService {
         return toAgentDto(refreshed);
     }
 
-    async transition(userId: string, id: string, to: AgentStatus): Promise<AgentDto> {
-        const agent = await this.requireOwned(userId, id);
+    async transition(
+        userId: string,
+        id: string,
+        to: AgentStatus,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
         const allowed = USER_TRANSITIONS[agent.status] ?? [];
         if (!allowed.includes(to)) {
             throw new BadRequestException(`Cannot transition Agent from ${agent.status} to ${to}.`);
@@ -808,12 +912,12 @@ export class AgentsService {
         return toAgentDto(refreshed);
     }
 
-    async pause(userId: string, id: string): Promise<AgentDto> {
-        return this.transition(userId, id, AgentStatus.PAUSED);
+    async pause(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<AgentDto> {
+        return this.transition(userId, id, AgentStatus.PAUSED, ownershipScope);
     }
 
-    async resume(userId: string, id: string): Promise<AgentDto> {
-        return this.transition(userId, id, AgentStatus.ACTIVE);
+    async resume(userId: string, id: string, ownershipScope?: OwnershipScope): Promise<AgentDto> {
+        return this.transition(userId, id, AgentStatus.ACTIVE, ownershipScope);
     }
 
     /**
@@ -825,8 +929,12 @@ export class AgentsService {
      * heartbeats as a side effect of being pulled out of the archive —
      * the operator activates it deliberately afterwards.
      */
-    async unarchive(userId: string, id: string): Promise<AgentDto> {
-        const agent = await this.requireOwned(userId, id);
+    async unarchive(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id, ownershipScope);
         if (agent.status !== AgentStatus.ARCHIVED) {
             throw new BadRequestException('Only archived Agents can be unarchived.');
         }
@@ -839,14 +947,22 @@ export class AgentsService {
         return toAgentDto(refreshed);
     }
 
-    async archive(userId: string, id: string): Promise<{ archived: true }> {
-        await this.requireOwned(userId, id);
+    async archive(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<{ archived: true }> {
+        await this.requireOwned(userId, id, ownershipScope);
         await this.agents.archiveById(id);
         return { archived: true };
     }
 
-    async deleteHard(userId: string, id: string): Promise<{ deleted: true }> {
-        await this.requireOwned(userId, id);
+    async deleteHard(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<{ deleted: true }> {
+        await this.requireOwned(userId, id, ownershipScope);
         await this.budgets.deleteByAgentId(id).catch(() => undefined); // FK CASCADE handles it; tolerate
         await this.memberships.deleteByAgentId(id).catch(() => undefined);
         await this.agents.deleteById(id);
@@ -861,8 +977,12 @@ export class AgentsService {
      * after a page refresh (the client-side filename/MIME cache only
      * covers in-session uploads).
      */
-    async listAttachments(userId: string, id: string): Promise<AgentAttachmentListRow[]> {
-        await this.requireOwned(userId, id);
+    async listAttachments(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentAttachmentListRow[]> {
+        await this.requireOwned(userId, id, ownershipScope);
         if (!this.agentAttachments) return [];
         const rows = await this.agentAttachments.findByAgentId(id);
         if (rows.length === 0 || !this.uploadsRepo) return rows;
@@ -870,9 +990,14 @@ export class AgentsService {
         // already enforces the upload is owned by the caller, so the
         // owner-scoped lookup resolves every attachable upload.
         const uploads = await this.uploadsRepo.find({
-            where: { userId, sha256: In(rows.map((r) => r.uploadId)) },
+            where: ownershipWhereWith<UserUpload>(userId, ownershipScope, {
+                sha256: In(rows.map((r) => r.uploadId)),
+            }),
         });
         const bySha = new Map(uploads.map((u) => [u.sha256, u]));
+        if (new Set(rows.map((row) => row.uploadId)).size !== bySha.size) {
+            throw new NotFoundException(`Attachment not found`);
+        }
         return rows.map((r) => {
             const u = bySha.get(r.uploadId);
             if (!u) return r;
@@ -903,11 +1028,17 @@ export class AgentsService {
     }
 
     /** Attach an uploaded file to an Agent. Idempotent. */
-    async addAttachment(userId: string, id: string, uploadId: string): Promise<AgentAttachment> {
-        await this.requireOwned(userId, id);
+    async addAttachment(
+        userId: string,
+        id: string,
+        uploadId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentAttachment> {
+        await this.requireOwned(userId, id, ownershipScope);
         if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
         }
+        const canonicalUploadId = uploadId.toLowerCase();
         // Security: the uploadId must reference a real upload owned by the
         // caller — without this a ghost/foreign id persisted a dangling
         // attachment edge. `user_uploads` records every upload by (userId,
@@ -916,7 +1047,9 @@ export class AgentsService {
             // sha256 is a case-insensitive content hash stored lowercase; the DTO
             // accepts /i, so normalize before the ownership lookup.
             const owned = await this.uploadsRepo.findOne({
-                where: { sha256: uploadId.toLowerCase(), userId },
+                where: ownershipWhereWith<UserUpload>(userId, ownershipScope, {
+                    sha256: canonicalUploadId,
+                }),
             });
             if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
         }
@@ -926,11 +1059,11 @@ export class AgentsService {
             );
         }
         try {
-            return await this.agentAttachments.add(id, uploadId);
+            return await this.agentAttachments.add(id, canonicalUploadId);
         } catch (err) {
             if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
                 const existing = (await this.agentAttachments.findByAgentId(id)).find(
-                    (a) => a.uploadId === uploadId,
+                    (a) => a.uploadId === canonicalUploadId,
                 );
                 if (existing) return existing;
             }
@@ -943,8 +1076,9 @@ export class AgentsService {
         userId: string,
         id: string,
         attachmentId: string,
+        ownershipScope?: OwnershipScope,
     ): Promise<{ deleted: true }> {
-        await this.requireOwned(userId, id);
+        await this.requireOwned(userId, id, ownershipScope);
         if (!this.agentAttachments) {
             throw new NotFoundException(`Attachment not found`);
         }
@@ -958,8 +1092,12 @@ export class AgentsService {
 
     // ── internals ─────────────────────────────────────────────────
 
-    private async requireOwned(userId: string, id: string): Promise<Agent> {
-        const agent = await this.agents.findByIdAndUser(id, userId);
+    private async requireOwned(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent> {
+        const agent = await this.agents.findByIdAndUser(id, userId, ownershipScope);
         if (!agent) {
             // 404 (not 403) — don't leak existence.
             throw new NotFoundException(`Agent ${id} not found.`);
@@ -979,11 +1117,12 @@ export class AgentsService {
         userId: string,
         agent: Agent,
         reportsToAgentId: string,
+        ownershipScope?: OwnershipScope,
     ): Promise<void> {
         if (reportsToAgentId === agent.id) {
             throw new ConflictException('An Agent cannot report to itself.');
         }
-        const manager = await this.agents.findByIdAndUser(reportsToAgentId, userId);
+        const manager = await this.agents.findByIdAndUser(reportsToAgentId, userId, ownershipScope);
         if (!manager) {
             throw new NotFoundException(`Agent ${reportsToAgentId} not found.`);
         }
@@ -993,7 +1132,7 @@ export class AgentsService {
                 throw new ConflictException('This reporting line would create a cycle.');
             }
             cursor = cursor.reportsToAgentId
-                ? await this.agents.findByIdAndUser(cursor.reportsToAgentId, userId)
+                ? await this.agents.findByIdAndUser(cursor.reportsToAgentId, userId, ownershipScope)
                 : null;
         }
     }
@@ -1048,12 +1187,15 @@ export class AgentsService {
     private async assertScopeParentExists(
         userId: string,
         input: Pick<CreateAgentInput, 'scope' | 'missionId' | 'ideaId' | 'workId'>,
+        ownershipScope?: OwnershipScope,
     ): Promise<void> {
         switch (input.scope) {
             case AgentScope.WORK: {
                 if (!input.workId || !this.workRepo) return;
                 const work = await this.workRepo.findOne({
-                    where: { id: input.workId, userId },
+                    where: ownershipWhereWith<Work>(userId, ownershipScope, {
+                        id: input.workId,
+                    }),
                 });
                 if (!work) throw new NotFoundException(`Work ${input.workId} not found.`);
                 break;
@@ -1061,7 +1203,9 @@ export class AgentsService {
             case AgentScope.MISSION: {
                 if (!input.missionId || !this.missionRepo) return;
                 const mission = await this.missionRepo.findOne({
-                    where: { id: input.missionId, userId },
+                    where: ownershipWhereWith<Mission>(userId, ownershipScope, {
+                        id: input.missionId,
+                    }),
                 });
                 if (!mission) throw new NotFoundException(`Mission ${input.missionId} not found.`);
                 break;
@@ -1069,7 +1213,9 @@ export class AgentsService {
             case AgentScope.IDEA: {
                 if (!input.ideaId || !this.ideaRepo) return;
                 const idea = await this.ideaRepo.findOne({
-                    where: { id: input.ideaId, userId },
+                    where: ownershipWhereWith<WorkProposal>(userId, ownershipScope, {
+                        id: input.ideaId,
+                    }),
                 });
                 if (!idea) throw new NotFoundException(`Idea ${input.ideaId} not found.`);
                 break;
@@ -1114,6 +1260,7 @@ export class AgentsService {
     private async assertAssignableEnvironment(
         userId: string,
         environmentId: string,
+        ownershipScope?: OwnershipScope,
     ): Promise<void> {
         if (!this.environmentRepo) {
             // Hand-rolled unit-test surface without the repo wired;
@@ -1122,7 +1269,9 @@ export class AgentsService {
             return;
         }
         const environment = await this.environmentRepo.findOne({
-            where: { id: environmentId, userId },
+            where: ownershipWhereWith<Environment>(userId, ownershipScope, {
+                id: environmentId,
+            }),
         });
         if (!environment) {
             throw new NotFoundException('Environment not found');

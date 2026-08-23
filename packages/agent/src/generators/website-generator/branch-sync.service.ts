@@ -50,27 +50,32 @@ function isSafeGitBranchName(name: unknown): name is string {
  * code (and any beta branch overrides, when `Work.websiteTemplateUseBeta`
  * is set).
  *
- * **Single-flight on purpose — do not parallelise.** The shared
- * `gitFacade.cloneOrPull` uses a deterministic working directory keyed on
- * owner+repo (not on branch), so two concurrent calls into the same
- * work's repo would race against the same `.git` checkout and corrupt
- * each other (mid-pull index, half-written packfiles, branch HEAD
- * pointing into the wrong tree). `MAX_CONCURRENT_SYNCS = 1` enforces a
- * sequential pipeline at the service level. Callers that fan out across
- * MANY works are responsible for serialising per-work; this class only
- * serialises within a single `syncFromTemplate()` invocation.
+ * **Every branch is cloned into a directory of its own** via
+ * `gitFacade.cloneBranch`. `cloneOrPull` cannot be used here: its working
+ * directory is keyed on owner+repo (not on branch) AND it switches the
+ * checkout back to the default branch, so syncing `['main','stage',
+ * 'develop']` from one template resolved to the same `main` checkout three
+ * times and pushed `main` three times — while reporting three successes.
+ * See the verification guard in `syncBranch` for why that stayed invisible.
+ *
+ * `MAX_CONCURRENT_SYNCS = 1` is retained: per-branch directories mean it is
+ * no longer required for correctness, but sequential syncing keeps the
+ * provider API call rate and the pure-JS git CPU cost predictable. Raising
+ * it is a separate, measured change.
  *
  * Return shape: `BranchSyncSummary` (or `null` when there's no template
  * resolved for the work). Each branch's outcome is one of `synced` /
  * `skipped` / `error`; the summary's `errors` count drives the calling
- * service's "did the deploy refresh succeed" gate.
+ * service's "did the deploy refresh succeed" gate — so a branch whose push
+ * cannot be VERIFIED to have landed is reported as `error`, never `synced`.
  */
 @Injectable()
 export class BranchSyncService {
     private readonly logger = new Logger(BranchSyncService.name);
 
-    // Syncs must run sequentially: cloneOrPull uses a deterministic dir
-    // based on owner+repo (not branch), so parallel syncs corrupt each other.
+    // Kept at 1 deliberately. `cloneBranch` gives each branch its own dir,
+    // so this is no longer load-bearing for correctness — it now just keeps
+    // provider API calls and pure-JS git work sequential.
     private readonly MAX_CONCURRENT_SYNCS = 1;
 
     constructor(
@@ -338,6 +343,11 @@ export class BranchSyncService {
         targetRepo: string;
         template: WebsiteTemplateConfig;
         userId: string;
+        /**
+         * Kept on the signature so existing callers are unaffected. It is no
+         * longer read here: the sync is a fresh single-branch clone followed
+         * by a push, which never authors a merge commit.
+         */
         committer: GitCommitter;
         forcePush?: boolean;
         providerId?: string;
@@ -350,7 +360,6 @@ export class BranchSyncService {
             targetRepo,
             template,
             userId,
-            committer,
             forcePush = true,
             providerId,
             workId,
@@ -364,13 +373,33 @@ export class BranchSyncService {
         let tempDir: string | null = null;
 
         try {
-            // Clone template branch
-            tempDir = await this.gitFacade.cloneOrPull(
+            // The sha the target branch has to end up at. Read BEFORE the
+            // clone: if the template moves mid-run the guard below fires
+            // (loud, one branch) instead of comparing the new head against
+            // itself and rubber-stamping whatever happened.
+            const expectedSha = await this.resolveRemoteBranchSha(
+                template.owner,
+                template.repo,
+                branchName,
+                { userId, providerId },
+            );
+            if (!expectedSha) {
+                return {
+                    branch: branchName,
+                    status: 'error',
+                    message: `Template branch '${branchName}' not found on ${template.owner}/${template.repo}; nothing to sync`,
+                };
+            }
+
+            // Clone the template branch into a directory of its own.
+            // NOT cloneOrPull: that keys its dir on owner+repo only and
+            // switches the checkout back to the default branch, so every
+            // branch of one template collapsed onto the same main checkout.
+            tempDir = await this.gitFacade.cloneBranch(
                 {
                     owner: template.owner,
                     repo: template.repo,
                     branch: branchName,
-                    committer,
                 },
                 { userId, providerId, workId },
             );
@@ -384,11 +413,39 @@ export class BranchSyncService {
             const targetRepoUrl = this.gitFacade.getCloneUrl(providerId, targetOwner, targetRepo);
             await this.gitFacade.replaceRemote(providerId, tempDir, 'origin', targetRepoUrl);
 
-            // Push to target
+            // Push to target. `ref`/`remoteRef` are explicit on purpose:
+            // without them the push follows HEAD and whatever
+            // `branch.<name>.merge` the clone left in the config, which is
+            // exactly how a 'develop' sync used to land on 'main'.
             await this.gitFacade.push(
-                { dir: tempDir, force: forcePush },
+                {
+                    dir: tempDir,
+                    force: forcePush,
+                    ref: targetBranch,
+                    remoteRef: targetBranch,
+                },
                 { userId, providerId, workId },
             );
+
+            // Verification guard. A push that resolves without throwing is
+            // NOT proof the remote branch moved — it is proof the transport
+            // did not error. Read the ref back and compare; a mismatch (or
+            // a branch that still doesn't exist) is an `error`, so the
+            // caller's `errors` gate can see it. Without this, the next
+            // regression in the git layer is silent all over again.
+            const actualSha = await this.resolveRemoteBranchSha(
+                targetOwner,
+                targetRepo,
+                targetBranch,
+                { userId, providerId },
+            );
+            if (actualSha !== expectedSha) {
+                const message =
+                    `Push reported success but ${targetOwner}/${targetRepo}@${targetBranch} is at ` +
+                    `${actualSha ?? '(branch missing)'}, expected ${expectedSha}`;
+                this.logger.error(message);
+                return { branch: branchName, status: 'error', message };
+            }
 
             return {
                 branch: branchName,
@@ -408,5 +465,30 @@ export class BranchSyncService {
                 await fs.rm(tempDir, { recursive: true, force: true }).catch(() => {});
             }
         }
+    }
+
+    /**
+     * Head sha of `branch` on `owner/repo`, straight from the provider API,
+     * or `null` when the repo has no such branch.
+     *
+     * Uses `listBranches` on purpose. It is a REQUIRED capability, whereas
+     * `getLatestCommit` is optional and the facade answers `null` for a
+     * provider that lacks it — a verification guard built on that would
+     * quietly degrade into a no-op, which is the failure mode this whole
+     * change exists to remove. Errors are deliberately NOT swallowed: an
+     * unverifiable sync must surface as `error`, not as success.
+     */
+    private async resolveRemoteBranchSha(
+        owner: string,
+        repo: string,
+        branch: string,
+        options: { userId: string; providerId?: string },
+    ): Promise<string | null> {
+        const branches = await this.gitFacade.listBranches(owner, repo, {
+            userId: options.userId,
+            providerId: options.providerId,
+        });
+        const match = branches.find((b) => b.name === branch);
+        return match?.commit ? match.commit.toLowerCase() : null;
     }
 }

@@ -195,6 +195,8 @@ export class AgentScheduleDispatcherService {
                     agentId: agent.id,
                     userId: agent.userId,
                     triggerKind: 'heartbeat',
+                    tenantId: agent.tenantId ?? null,
+                    organizationId: agent.organizationId ?? null,
                 });
                 createdRun = run ?? null;
 
@@ -323,6 +325,8 @@ export class AgentScheduleDispatcherService {
                 agentId: agent.id,
                 userId: agent.userId,
                 triggerKind: 'manual',
+                tenantId: agent.tenantId ?? null,
+                organizationId: agent.organizationId ?? null,
             });
             createdRun = run ?? null;
             const handle = await trigger.enqueue({

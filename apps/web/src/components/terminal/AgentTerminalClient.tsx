@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import { TerminalPane } from './TerminalPane';
 
 interface RunRow {
@@ -45,9 +46,12 @@ export function AgentTerminalClient({
         setStarting(true);
         setStartError(null);
         try {
-            const res = await fetch(`/api/agents/${agentId}/runs/${selected}/terminal/start`, {
-                method: 'POST',
-            });
+            const res = await browserApiFetch(
+                `/api/agents/${agentId}/runs/${selected}/terminal/start`,
+                {
+                    method: 'POST',
+                },
+            );
             if (!res.ok) {
                 // The API's 409 messages ("already live", "run has finished")
                 // are the useful ones — surface them verbatim when present.

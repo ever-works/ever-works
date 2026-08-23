@@ -22,6 +22,12 @@ jest.mock('../../entities/fleet-job.entity', () => ({
 jest.mock('../../entities/fleet-execution-preference.entity', () => ({
     FleetExecutionPreference: class FleetExecutionPreference {},
 }));
+jest.mock('../../entities/agent.entity', () => ({
+    Agent: class Agent {},
+}));
+jest.mock('../../entities/fleet-agent-node-affinity.entity', () => ({
+    FleetAgentNodeAffinity: class FleetAgentNodeAffinity {},
+}));
 jest.mock('../../plugins/services/plugin-registry.service', () => ({
     PluginRegistryService: class PluginRegistryService {},
 }));
@@ -37,6 +43,9 @@ jest.mock('../fleet-job.repository', () => ({
 jest.mock('../fleet-execution-preference.repository', () => ({
     FleetExecutionPreferenceRepository: class FleetExecutionPreferenceRepository {},
 }));
+jest.mock('../fleet-agent-node-affinity.repository', () => ({
+    FleetAgentNodeAffinityRepository: class FleetAgentNodeAffinityRepository {},
+}));
 jest.mock('../fleet.service', () => ({
     FleetService: class FleetService {},
 }));
@@ -45,6 +54,9 @@ jest.mock('../fleet-job.service', () => ({
 }));
 jest.mock('../fleet-execution-preference.service', () => ({
     FleetExecutionPreferenceService: class FleetExecutionPreferenceService {},
+}));
+jest.mock('../fleet-agent-node-affinity.service', () => ({
+    FleetAgentNodeAffinityService: class FleetAgentNodeAffinityService {},
 }));
 
 import 'reflect-metadata';
@@ -55,6 +67,8 @@ import { FleetService } from '../fleet.service';
 import { FleetJobService } from '../fleet-job.service';
 import { FleetExecutionPreferenceRepository } from '../fleet-execution-preference.repository';
 import { FleetExecutionPreferenceService } from '../fleet-execution-preference.service';
+import { FleetAgentNodeAffinityRepository } from '../fleet-agent-node-affinity.repository';
+import { FleetAgentNodeAffinityService } from '../fleet-agent-node-affinity.service';
 
 describe('FleetModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, FleetModule) ?? [];
@@ -64,9 +78,11 @@ describe('FleetModule', () => {
             FleetNodeRepository,
             FleetJobRepository,
             FleetExecutionPreferenceRepository,
+            FleetAgentNodeAffinityRepository,
             FleetService,
             FleetJobService,
             FleetExecutionPreferenceService,
+            FleetAgentNodeAffinityService,
         ]);
     });
 
@@ -75,9 +91,11 @@ describe('FleetModule', () => {
             FleetNodeRepository,
             FleetJobRepository,
             FleetExecutionPreferenceRepository,
+            FleetAgentNodeAffinityRepository,
             FleetService,
             FleetJobService,
             FleetExecutionPreferenceService,
+            FleetAgentNodeAffinityService,
         ]);
     });
 
@@ -98,6 +116,8 @@ describe('fleet barrel', () => {
         expect(barrel.FleetJobRepository).toBe(FleetJobRepository);
         expect(barrel.FleetExecutionPreferenceService).toBe(FleetExecutionPreferenceService);
         expect(barrel.FleetExecutionPreferenceRepository).toBe(FleetExecutionPreferenceRepository);
+        expect(barrel.FleetAgentNodeAffinityService).toBe(FleetAgentNodeAffinityService);
+        expect(barrel.FleetAgentNodeAffinityRepository).toBe(FleetAgentNodeAffinityRepository);
         expect(typeof barrel.buildFleetTools).toBe('function');
     });
 

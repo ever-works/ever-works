@@ -10,6 +10,11 @@ import {
 } from '../../entities/agent.entity';
 import type { Agent } from '../../entities/agent.entity';
 
+const everScope = {
+    tenantId: '11111111-1111-4111-8111-111111111111',
+    organizationId: '22222222-2222-4222-8222-222222222222',
+};
+
 function makeAgent(over: Partial<Agent> = {}): Agent {
     return {
         id: 'a1',
@@ -53,6 +58,8 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
         toolsMd: null,
         agentYml: null,
         contentHash: null,
+        tenantId: null,
+        organizationId: null,
         createdAt: new Date('2026-01-01'),
         updatedAt: new Date('2026-01-01'),
         ...over,
@@ -107,6 +114,35 @@ describe('AgentScheduleDispatcherService', () => {
         );
         expect(trigger.enqueue).toHaveBeenCalledWith(
             expect.objectContaining({ agentId: 'a1', userId: 'u1', runId: 'run-1' }),
+        );
+    });
+
+    it('persists the due Agent tenant and Organization on its heartbeat run', async () => {
+        const agent = makeAgent({ ...everScope });
+        agentRepo.findDueForHeartbeat.mockResolvedValueOnce([agent]);
+        agentRepo.tryClaimForRun.mockResolvedValueOnce(agent.nextHeartbeatAt);
+
+        await svc.dispatchDue(trigger);
+
+        expect(runRepo.createQueued).toHaveBeenCalledWith(
+            expect.objectContaining({
+                agentId: 'a1',
+                userId: 'u1',
+                triggerKind: 'heartbeat',
+                ...everScope,
+            }),
+        );
+    });
+
+    it('keeps a legacy personal heartbeat run explicitly personal', async () => {
+        const agent = makeAgent({ tenantId: null, organizationId: null });
+        agentRepo.findDueForHeartbeat.mockResolvedValueOnce([agent]);
+        agentRepo.tryClaimForRun.mockResolvedValueOnce(agent.nextHeartbeatAt);
+
+        await svc.dispatchDue(trigger);
+
+        expect(runRepo.createQueued).toHaveBeenCalledWith(
+            expect.objectContaining({ tenantId: null, organizationId: null }),
         );
     });
 

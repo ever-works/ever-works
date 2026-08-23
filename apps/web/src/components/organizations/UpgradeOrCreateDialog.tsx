@@ -14,6 +14,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 type UpgradeChoice = 'upgrade' | 'empty';
 
@@ -24,9 +25,10 @@ export interface UpgradeOrCreateDialogProps {
      * Fired when the dialog finishes (either branch completes, or the
      * user cancels). `didUpgrade=true` means the upgrade API call ran
      * and succeeded — the caller may want to refresh data tied to the
-     * promoted Tenant.
+     * promoted Tenant. Async callers are awaited; rejection leaves this
+     * dialog open and surfaces the error so completion can be retried.
      */
-    onClose: (didUpgrade: boolean) => void;
+    onClose: (didUpgrade: boolean) => void | Promise<void>;
 }
 
 /**
@@ -54,6 +56,7 @@ export function UpgradeOrCreateDialog({ open, organization, onClose }: UpgradeOr
     const t = useTranslations('organizations.upgrade');
     const [choice, setChoice] = useState<UpgradeChoice>('upgrade');
     const [error, setError] = useState<string | null>(null);
+    const [upgradeCompleted, setUpgradeCompleted] = useState(false);
     const [pending, startTransition] = useTransition();
     const upgradeRadioRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +67,7 @@ export function UpgradeOrCreateDialog({ open, organization, onClose }: UpgradeOr
         if (open) {
             setChoice('upgrade');
             setError(null);
+            setUpgradeCompleted(false);
             const id = window.setTimeout(() => {
                 upgradeRadioRef.current?.focus();
             }, 0);
@@ -73,15 +77,23 @@ export function UpgradeOrCreateDialog({ open, organization, onClose }: UpgradeOr
 
     const handleConfirm = () => {
         setError(null);
-        if (choice === 'empty') {
-            // No API call — just close. Parent handles navigation.
-            onClose(false);
+        if (choice === 'empty' && !upgradeCompleted) {
+            // No upgrade API call — the parent still persists active scope
+            // before it closes and navigates.
+            startTransition(async () => {
+                try {
+                    await onClose(false);
+                } catch (err) {
+                    setError(err instanceof Error ? err.message : t('errors.generic'));
+                }
+            });
             return;
         }
-        startTransition(() => {
-            void (async () => {
-                try {
-                    const res = await fetch(
+
+        startTransition(async () => {
+            try {
+                if (!upgradeCompleted) {
+                    const res = await browserApiFetch(
                         `/api/organizations/${encodeURIComponent(organization.id)}/upgrade-from-account`,
                         {
                             method: 'POST',
@@ -107,17 +119,25 @@ export function UpgradeOrCreateDialog({ open, organization, onClose }: UpgradeOr
                         }
                         return;
                     }
-                    onClose(true);
-                } catch (err) {
-                    setError(err instanceof Error ? err.message : t('errors.generic'));
+                    setUpgradeCompleted(true);
                 }
-            })();
+                await onClose(true);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : t('errors.generic'));
+            }
         });
     };
 
     const handleCancel = () => {
         if (pending) return;
-        onClose(false);
+        setError(null);
+        startTransition(async () => {
+            try {
+                await onClose(upgradeCompleted);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : t('errors.generic'));
+            }
+        });
     };
 
     return (
@@ -139,7 +159,7 @@ export function UpgradeOrCreateDialog({ open, organization, onClose }: UpgradeOr
                         onChange={() => setChoice('upgrade')}
                         label={t('upgradeOption')}
                         help={t('upgradeHelp')}
-                        disabled={pending}
+                        disabled={pending || upgradeCompleted}
                     />
                     <ChoiceRow
                         id="upgrade-or-create-empty"
@@ -147,7 +167,7 @@ export function UpgradeOrCreateDialog({ open, organization, onClose }: UpgradeOr
                         onChange={() => setChoice('empty')}
                         label={t('emptyOption')}
                         help={t('emptyHelp')}
-                        disabled={pending}
+                        disabled={pending || upgradeCompleted}
                     />
                 </div>
 

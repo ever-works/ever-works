@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 type RouteContext = { params: Promise<{ id: string; runId: string }> };
 
@@ -19,7 +20,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * No request body is forwarded: the session argv is operator configuration
  * resolved server-side, never something the browser gets to choose.
  */
-export async function POST(_request: NextRequest, ctx: RouteContext) {
+export async function POST(request: NextRequest, ctx: RouteContext) {
     const { id, runId } = await ctx.params;
     if (!UUID.test(id) || !UUID.test(runId)) {
         return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
@@ -30,9 +31,19 @@ export async function POST(_request: NextRequest, ctx: RouteContext) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
+
     const upstream = await fetch(`${API_URL}/agents/${id}/runs/${runId}/terminal/start`, {
         method: 'POST',
-        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        headers,
         cache: 'no-store',
     });
 

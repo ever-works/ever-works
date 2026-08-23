@@ -47,6 +47,7 @@ import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
 @Entity({ name: 'fleet_jobs' })
 @Index('idx_fleet_jobs_user_status', ['userId', 'status'])
 @Index('idx_fleet_jobs_node_status', ['nodeId', 'status'])
+@Index('idx_fleet_jobs_target_status', ['targetNodeId', 'status'])
 @Index('idx_fleet_jobs_lease_expiry', ['status', 'leaseExpiresAt'])
 export class FleetJob {
     @PrimaryGeneratedColumn('uuid')
@@ -65,6 +66,13 @@ export class FleetJob {
      */
     @Column({ type: 'uuid', nullable: true })
     nodeId?: string | null;
+
+    /**
+     * Node selected when the job was enqueued. Unlike `nodeId`, this is
+     * scheduling intent, not a lease holder, and survives reclaim.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    targetNodeId?: string | null;
 
     /** What the node should do. `varchar(32)`, not an enum — new kinds ship without schema changes. */
     @Column({ type: 'varchar', length: 32 })

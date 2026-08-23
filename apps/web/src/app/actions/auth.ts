@@ -4,7 +4,12 @@ import { z } from 'zod';
 import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { ALLOWED_REDIRECT_URLS, ROUTES, withAppUrl } from '@/lib/constants';
 import { PASSWORD_RULES, VALIDATION_RULES } from './validation';
-import { authAPI, AuthResponse, type TermsAcceptanceClaim } from '@/lib/api';
+import {
+    authAPI,
+    AuthResponse,
+    getLoginDefaultWorkspaceHref,
+    type TermsAcceptanceClaim,
+} from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
@@ -78,6 +83,21 @@ function isEmailNotVerifiedError(error: unknown): boolean {
 function isAccountLockedError(error: unknown): boolean {
     const message = error instanceof Error ? error.message : String(error ?? '');
     return /account .*lock|temporarily locked/i.test(message);
+}
+
+/**
+ * Workspace preference resolution is post-authentication navigation only.
+ * Once the API has authenticated the user and the session cookie is written,
+ * a stale preference, revoked membership, or transient scope lookup failure
+ * must not turn that successful authentication into an action error.
+ */
+async function resolveLoginDefaultWorkspaceHref(): Promise<string> {
+    try {
+        return await getLoginDefaultWorkspaceHref();
+    } catch (error) {
+        console.error('Unable to resolve the login workspace default', error);
+        return ROUTES.DASHBOARD;
+    }
 }
 
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
@@ -156,7 +176,9 @@ export async function login(identifier: string, password: string, redirectUrl: s
     ) {
         href = redirectUrl;
     } else if (authResponse) {
-        // Check if we have a redirect URL in a cookie
+        // The mutable preference is navigation convenience only. Resolve it
+        // once after authentication, then let an explicit redirect cookie win.
+        href = await resolveLoginDefaultWorkspaceHref();
         href = await getRedirectUrl(authResponse, href);
     }
 
@@ -661,6 +683,7 @@ export async function redeemMagicLink(token: string, redirectUrl: string | null)
     ) {
         href = redirectUrl;
     } else if (authResponse) {
+        href = await resolveLoginDefaultWorkspaceHref();
         href = await getRedirectUrl(authResponse, href);
     }
 

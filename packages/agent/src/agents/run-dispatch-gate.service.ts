@@ -9,6 +9,7 @@ import {
     type AgentTaskExecuteDispatcher,
 } from '../tasks-domain/task-dispatcher';
 import { RUN_CREDITS_PRECHECK, type RunCreditsPrecheck } from './run-credits-precheck';
+import { RUN_PLAN_LIMITS, type RunPlanLimits } from './run-plan-limits';
 import {
     composeRunAdmission,
     DEFAULT_RUN_ADMISSION_CHAIN,
@@ -183,6 +184,15 @@ export class RunDispatchGateService {
         @Optional()
         @Inject(AGENT_CHAT_REPLY_DISPATCHER)
         private readonly chatDispatcher?: AgentChatReplyDispatcher,
+        // H2 — the per-user PLAN concurrency ceiling. Bound (to
+        // PlanRunLimitsService) by the api-side @Global()
+        // SubscriptionsModule; absent in unit tests and installs without
+        // the subscriptions stack, where the plan valve simply never runs.
+        // Same @Optional() + appended-LAST posture as every other seam
+        // here (the positional-spec arity rule).
+        @Optional()
+        @Inject(RUN_PLAN_LIMITS)
+        private readonly planLimits?: RunPlanLimits,
     ) {}
 
     /** Env default today; per-Work override column when it lands. */
@@ -252,7 +262,9 @@ export class RunDispatchGateService {
             resolveWorkLimit: () => this.resolveWorkLimit(),
             resolveOrgLimit: () => this.resolveOrgLimit(),
             isCreditsEnforcementEnabled: () => config.billing.credits.isEnforcementEnabled(),
+            isPlanConcurrencyEnabled: () => config.agents.isPlanConcurrencyEnforcementEnabled(),
             ...(this.creditsPrecheck ? { creditsPrecheck: this.creditsPrecheck } : {}),
+            ...(this.planLimits ? { planLimits: this.planLimits } : {}),
         });
     }
 

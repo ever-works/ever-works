@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 /**
  * Teams & Prebuilt Companies (spec §6) — web BFF proxy for
@@ -10,14 +11,20 @@ import { getAuthAccessCookie } from '@/lib/auth/cookies';
  * ANY failure returns `[]` so the modal simply skips its template step
  * (guaranteed no-regression fallback, same posture as agent templates).
  */
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
     const token = await getAuthAccessCookie();
     if (!token) {
         return NextResponse.json([], { status: 200 });
     }
 
-    const headers = new Headers();
-    headers.set('Authorization', `Bearer ${token}`);
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Authorization: `Bearer ${token}`,
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
 
     try {
         const upstream = await fetch(`${API_URL}/org-templates`, {

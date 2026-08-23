@@ -302,7 +302,7 @@ export class DeploymentVerifierService {
             return result;
         } catch (error) {
             this.logger.error(`Failed to lookup existing deployment for work ${work.id}:`, error);
-            return { found: false };
+            throw error;
         }
     }
 }

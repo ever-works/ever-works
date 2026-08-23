@@ -76,7 +76,7 @@ export class PipelineOrchestratorService {
 
         if (mode === 'full') {
             // Find a self-managed (non-step-orchestratable) pipeline plugin
-            const fullPlugin = this.getAvailablePipelinePlugins().find(
+            const fullPlugin = (await this.getMaterializedPipelinePlugins()).find(
                 (p) => !isStepOrchestratablePipeline(p),
             );
             if (fullPlugin) {
@@ -108,7 +108,7 @@ export class PipelineOrchestratorService {
         plugin?: string;
     }> {
         // Check if any self-managed (non-step-orchestratable) pipeline is available
-        const fullPlugin = this.getAvailablePipelinePlugins().find(
+        const fullPlugin = (await this.getMaterializedPipelinePlugins()).find(
             (p) => !isStepOrchestratablePipeline(p),
         );
         if (fullPlugin) {
@@ -126,7 +126,37 @@ export class PipelineOrchestratorService {
     }
 
     async hasFullPipelinePlugin(): Promise<boolean> {
-        return this.getAvailablePipelinePlugins().some((p) => !isStepOrchestratablePipeline(p));
+        return (await this.getMaterializedPipelinePlugins()).some(
+            (p) => !isStepOrchestratablePipeline(p),
+        );
+    }
+
+    /**
+     * Same as {@link getAvailablePipelinePlugins} but with every lazy stub
+     * materialised, so capability probes (`isStepOrchestratablePipeline`) see
+     * the real plugin surface.
+     */
+    private async getMaterializedPipelinePlugins(): Promise<IPipelinePlugin[]> {
+        return Promise.all(this.getAvailablePipelinePlugins().map((p) => this.materialize(p)));
+    }
+
+    /**
+     * Lazy-mode registries (`PLUGIN_LAZY_LOAD`, the default) hand out proxies
+     * that answer EVERY property with an async forwarding function until the
+     * real module has been imported. On such a stub capability probes like
+     * `isStepOrchestratablePipeline()` are meaningless (every method "exists")
+     * and the pipeline contract's synchronous calls — `createContext()`,
+     * `getStepDefinitions()`, `getState()` — come back as Promises. The
+     * orchestrator always *executes* the pipeline it resolves (never just
+     * inspects it), so materialising here costs nothing extra and restores the
+     * real plugin surface for routing + execution. No-op for eager/real plugins.
+     */
+    private async materialize(plugin: IPipelinePlugin): Promise<IPipelinePlugin> {
+        const stub = plugin as unknown as { __materialize?: () => Promise<unknown> };
+        if (typeof stub.__materialize === 'function') {
+            return (await stub.__materialize()) as IPipelinePlugin;
+        }
+        return plugin;
     }
 
     getAvailablePipelinePlugins(): IPipelinePlugin[] {
@@ -218,7 +248,7 @@ export class PipelineOrchestratorService {
                     userId,
                 );
                 if (isEnabled) {
-                    return registered.plugin;
+                    return this.materialize(registered.plugin);
                 }
             }
             this.logger.warn(
@@ -240,7 +270,7 @@ export class PipelineOrchestratorService {
                 workId,
                 userId,
             );
-            if (isEnabled) return registered.plugin;
+            if (isEnabled) return this.materialize(registered.plugin);
         }
 
         // Fallback: first loaded and enabled pipeline
@@ -252,7 +282,7 @@ export class PipelineOrchestratorService {
                 workId,
                 userId,
             );
-            if (isEnabled) return registered.plugin;
+            if (isEnabled) return this.materialize(registered.plugin);
         }
 
         throw new Error(

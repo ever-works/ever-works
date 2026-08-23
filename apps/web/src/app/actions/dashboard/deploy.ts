@@ -1,6 +1,7 @@
 'use server';
 
 import { workAPI, websiteAPI, deployAPI } from '@/lib/api';
+import type { RuntimeEnvVarState } from '@/lib/api/plugins-capabilities/deploy';
 import { getAuthFromCookie } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -199,6 +200,8 @@ export async function getWorkRuntimeEnv(workId: string) {
             sharedAvailable: response.sharedAvailable ?? false,
             databaseUrl: response.databaseUrl ?? { configured: false, masked: null },
             managed: response.managed ?? [],
+            allowedEnvKeys: response.allowedEnvKeys ?? [],
+            env: response.env ?? [],
         };
     } catch (error) {
         console.error('Get runtime env error:', error);
@@ -208,7 +211,48 @@ export async function getWorkRuntimeEnv(workId: string) {
             sharedAvailable: false,
             databaseUrl: { configured: false, masked: null as string | null },
             managed: [] as string[],
+            allowedEnvKeys: [] as string[],
+            env: [] as RuntimeEnvVarState[],
             error: error instanceof Error ? error.message : 'Failed to get runtime env',
+        };
+    }
+}
+
+/**
+ * Merge-patch the allow-listed per-Work env vars (Stripe keys & co.) via
+ * `PUT /api/deploy/works/:id/runtime-env { env }`. Provided keys overwrite,
+ * `null` removes, omitted keys persist. Leaves the DB mode/URL untouched.
+ * Returns the masked state of every allow-listed key (never plaintext).
+ */
+export async function setWorkRuntimeEnvVars(workId: string, env: Record<string, string | null>) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const keys = Object.keys(env);
+    if (keys.length === 0) {
+        return {
+            success: false,
+            env: [] as RuntimeEnvVarState[],
+            error: 'No environment variable provided',
+        };
+    }
+
+    try {
+        const response = await deployAPI.setRuntimeEnv(workId, { env });
+        revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
+        return {
+            success: response.status === 'success',
+            allowedEnvKeys: response.allowedEnvKeys ?? [],
+            env: response.env ?? [],
+        };
+    } catch (error) {
+        console.error('Set runtime env vars error:', error);
+        return {
+            success: false,
+            env: [] as RuntimeEnvVarState[],
+            error: error instanceof Error ? error.message : 'Failed to set environment variables',
         };
     }
 }

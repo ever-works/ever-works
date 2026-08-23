@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
+import { browserApiFetch } from '../api/browser-api';
 
 /**
  * EW-660 (Tenants & Organizations Phase 8) — client-side hook fetching
@@ -76,7 +77,7 @@ async function fetchOrganizations(): Promise<void> {
     if (inFlight) return inFlight;
     inFlight = (async () => {
         try {
-            const response = await fetch('/api/organizations', {
+            const response = await browserApiFetch('/api/organizations', {
                 method: 'GET',
                 credentials: 'include',
                 cache: 'no-store',

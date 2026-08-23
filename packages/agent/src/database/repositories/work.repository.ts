@@ -358,6 +358,43 @@ export class WorkRepository {
     }
 
     /**
+     * Reconcile a health-probed deployment projection without overwriting a
+     * deployment that started after the poller captured its candidate list.
+     */
+    async markDeploymentReadyIfCurrent(
+        workId: string,
+        expected: Pick<Work, 'deploymentState' | 'deploymentStartedAt' | 'lastDeployCorrelationId'>,
+    ): Promise<boolean> {
+        const query = this.repository
+            .createQueryBuilder()
+            .update(Work)
+            .set({ deploymentState: 'READY' })
+            .where('id = :id', { id: workId })
+            .andWhere('deploymentState = :deploymentState', {
+                deploymentState: expected.deploymentState,
+            });
+
+        if (expected.lastDeployCorrelationId == null) {
+            query.andWhere('lastDeployCorrelationId IS NULL');
+        } else {
+            query.andWhere('lastDeployCorrelationId = :lastDeployCorrelationId', {
+                lastDeployCorrelationId: expected.lastDeployCorrelationId,
+            });
+        }
+
+        if (expected.deploymentStartedAt == null) {
+            query.andWhere('deploymentStartedAt IS NULL');
+        } else {
+            query.andWhere('deploymentStartedAt = :deploymentStartedAt', {
+                deploymentStartedAt: expected.deploymentStartedAt,
+            });
+        }
+
+        const result = await query.execute();
+        return (result.affected ?? 0) === 1;
+    }
+
+    /**
      * Conditional UPDATE for the lazy bootstrap of `platformSyncSecretEncrypted`
      * (EW-120 pull transport). Two concurrent deploys can both call
      * `getOrGenerate` and both generate fresh plaintext; this method makes
