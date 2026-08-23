@@ -1,4 +1,4 @@
-import { summarizeDbProvisionError } from './ever-works-db-provision.service';
+import { pgClientOptions, summarizeDbProvisionError } from './ever-works-db-provision.service';
 
 describe('summarizeDbProvisionError', () => {
     it('maps Node network errno codes to a label + code and drops the host', () => {
@@ -42,5 +42,44 @@ describe('summarizeDbProvisionError', () => {
             'unknown error',
         );
         expect(summarizeDbProvisionError(null)).toBe('unknown error');
+    });
+});
+
+describe('pgClientOptions', () => {
+    it('strips sslmode=require from the URL and disables CA verification (libpq semantics)', () => {
+        const out = pgClientOptions(
+            'postgresql://u:p@pg-rw.databases.svc.cluster.local:5432/postgres?sslmode=require',
+        );
+        expect(out.connectionString).toBe(
+            'postgresql://u:p@pg-rw.databases.svc.cluster.local:5432/postgres',
+        );
+        expect(out.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('keeps other query params and handles sslmode in the middle of the query', () => {
+        const out = pgClientOptions(
+            'postgresql://u:p@h:5432/db?application_name=x&sslmode=prefer&connect_timeout=5',
+        );
+        expect(out.connectionString).toBe(
+            'postgresql://u:p@h:5432/db?application_name=x&connect_timeout=5',
+        );
+        expect(out.ssl).toEqual({ rejectUnauthorized: false });
+    });
+
+    it('keeps full verification for verify-ca / verify-full', () => {
+        expect(pgClientOptions('postgresql://u:p@h/db?sslmode=verify-full').ssl).toEqual({
+            rejectUnauthorized: true,
+        });
+        expect(pgClientOptions('postgresql://u:p@h/db?sslmode=verify-ca').ssl).toEqual({
+            rejectUnauthorized: true,
+        });
+    });
+
+    it('leaves URLs without sslmode (or disable) untouched and unencrypted', () => {
+        expect(pgClientOptions('postgresql://u:p@h/db')).toEqual({
+            connectionString: 'postgresql://u:p@h/db',
+            ssl: undefined,
+        });
+        expect(pgClientOptions('postgresql://u:p@h/db?sslmode=disable').ssl).toBeUndefined();
     });
 });

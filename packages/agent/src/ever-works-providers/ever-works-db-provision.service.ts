@@ -64,6 +64,39 @@ export function summarizeDbProvisionError(error: unknown): string {
     return 'unknown error';
 }
 
+/**
+ * Connection options for the `pg` Client given a libpq-style connection string.
+ *
+ * `sslmode=require` / `prefer` mean "encrypt, but do NOT verify the CA" (libpq
+ * semantics; the managed shared cluster uses a self-signed CA). Newer `pg` /
+ * `pg-connection-string` releases parse `sslmode=require` from the URL into a
+ * VERIFYING TLS config, which overrides the explicit `ssl` option and makes every
+ * connection fail with `self-signed certificate in certificate chain` — that is
+ * what broke shared-DB provisioning (`CREATE ROLE` / `CREATE DATABASE` never ran,
+ * `PUT …/runtime-env {mode:"shared"}` answered 500/503) even though the host was
+ * reachable. So: strip `sslmode` from the URL we hand to `pg` and express the
+ * intent through `ssl` ourselves. `verify-ca` / `verify-full` keep full verification.
+ */
+export function pgClientOptions(url: string): {
+    connectionString: string;
+    ssl: { rejectUnauthorized: boolean } | undefined;
+} {
+    const m = /[?&]sslmode=([^&#]*)/i.exec(url);
+    const mode = m ? decodeURIComponent(m[1]).toLowerCase() : '';
+    if (!mode || mode === 'disable' || mode === 'allow') {
+        return { connectionString: url, ssl: undefined };
+    }
+    const stripped = url
+        .replace(/([?&])sslmode=[^&#]*&?/i, '$1')
+        .replace(/[?&]$/, '')
+        .replace(/\?&/, '?');
+    if (mode === 'verify-ca' || mode === 'verify-full') {
+        return { connectionString: stripped, ssl: { rejectUnauthorized: true } };
+    }
+    // require / prefer (and anything unknown): encrypt without CA verification.
+    return { connectionString: stripped, ssl: { rejectUnauthorized: false } };
+}
+
 @Injectable()
 export class EverWorksDbProvisionService {
     private readonly logger = new Logger(EverWorksDbProvisionService.name);
@@ -174,8 +207,7 @@ export class EverWorksDbProvisionService {
         const hex = workId.replace(/-/g, '').toLowerCase();
         const dbName = `${config.everWorks.sharedDb.getNamePrefix()}_${hex}`;
         const client = new Client({
-            connectionString: serverUrl,
-            ssl: this.sslFor(serverUrl),
+            ...pgClientOptions(serverUrl),
             connectionTimeoutMillis: 10000,
         });
         try {
@@ -216,8 +248,7 @@ export class EverWorksDbProvisionService {
             };
         }
         const client = new Client({
-            connectionString: databaseUrl,
-            ssl: this.sslFor(databaseUrl),
+            ...pgClientOptions(databaseUrl),
             connectionTimeoutMillis: 8000,
             statement_timeout: 8000,
         });
@@ -244,8 +275,7 @@ export class EverWorksDbProvisionService {
         password: string,
     ): Promise<void> {
         const client = new Client({
-            connectionString: adminUrl,
-            ssl: this.sslFor(adminUrl),
+            ...pgClientOptions(adminUrl),
             connectionTimeoutMillis: 10000,
         });
         await client.connect();
@@ -277,14 +307,6 @@ export class EverWorksDbProvisionService {
         const sslmode = shared.getSslMode();
         const auth = `${encodeURIComponent(role)}:${encodeURIComponent(password)}`;
         return `postgresql://${auth}@${host}:${port}/${dbName}?sslmode=${sslmode}`;
-    }
-
-    private sslFor(url: string): { rejectUnauthorized: boolean } | undefined {
-        // Managed cluster uses a self-signed CA; `sslmode=require` means encrypt
-        // without CA verification (matches libpq's `require`).
-        return /sslmode=(require|prefer|verify)/i.test(url)
-            ? { rejectUnauthorized: false }
-            : undefined;
     }
 
     private randomPassword(): string {
