@@ -1,5 +1,16 @@
-import { CanActivate, ExecutionContext, Injectable, Logger, Optional } from '@nestjs/common';
-import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
+import {
+    CanActivate,
+    ExecutionContext,
+    Injectable,
+    Logger,
+    NotFoundException,
+} from '@nestjs/common';
+import {
+    OrganizationMemberRepository,
+    OrganizationRepository,
+    TenantRepository,
+    UserRepository,
+} from '@ever-works/agent/database';
 import { ScopeContextService } from './scope-context.service';
 
 /**
@@ -27,13 +38,16 @@ import { ScopeContextService } from './scope-context.service';
  * and, on legacy routes, seeds the default scope in place via
  * [`ScopeContextService.setScope`](./scope-context.service.ts).
  *
- * **Behavior** (always returns `true` — this guard never blocks):
+ * **Behavior:**
  *
  *   - Non-HTTP context (RPC / WS) → allow, do nothing.
  *   - No `request.user` → unauthenticated; nothing to hydrate → allow.
  *   - Otherwise: load the user row once and HYDRATE
  *     `req.user.tenantId` (the auth layer never sets it). This happens
  *     on BOTH legacy and slug-prefixed routes — see below.
+ *   - An Organization scope must still have an exact roster membership;
+ *     the Tenant owner is the sole row-less exception. A revoked/missing
+ *     Organization is an opaque 404.
  *   - Then SEED scope only if no slug already resolved one
  *     (`scope.tenantId === null`) AND the user has a Tenant →
  *     `{ tenantId, organizationId: lastScopeOrganizationId ?? null }`.
@@ -58,9 +72,9 @@ export class SessionScopeGuard implements CanActivate {
     constructor(
         private readonly scopeContext: ScopeContextService,
         private readonly userRepository: UserRepository,
-        // Security: @Optional keeps tests that construct the guard directly (without DI)
-        // working; in production the DI container always provides this via DatabaseModule.
-        @Optional() private readonly organizationRepository?: OrganizationRepository,
+        private readonly organizationRepository: OrganizationRepository,
+        private readonly organizationMembers: OrganizationMemberRepository,
+        private readonly tenants: TenantRepository,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -102,24 +116,23 @@ export class SessionScopeGuard implements CanActivate {
         // ownership guard then verifies it belongs to this user's
         // hydrated tenant.
         const scope = this.scopeContext.getScope();
+        if (
+            scope.organizationId !== null &&
+            scope.tenantId !== null &&
+            scope.tenantId === tenantId
+        ) {
+            await this.requireActiveOrganization(user.userId, scope.tenantId, scope.organizationId);
+        }
         if (scope.tenantId === null && tenantId !== null) {
             // Security: validate that lastScopeOrganizationId still belongs to
             // this user's tenant before seeding it as the active scope.
-            // If the org is missing or owned by a different tenant (e.g. stale
-            // pointer after a data migration or future membership-removal feature),
-            // fall back to bare-tenant scope (organizationId: null) rather than
-            // stamping rows under a foreign org's scope.
-            let resolvedOrganizationId: string | null = dbUser?.lastScopeOrganizationId ?? null;
-            if (resolvedOrganizationId !== null && this.organizationRepository) {
-                const org = await this.organizationRepository.findById(resolvedOrganizationId);
-                if (!org || org.tenantId !== tenantId) {
-                    this.logger.warn(
-                        `Stale lastScopeOrganizationId ${resolvedOrganizationId} for user ${user.userId} ` +
-                            `(expected tenantId=${tenantId}, got tenantId=${org?.tenantId ?? 'null'}). ` +
-                            `Falling back to bare-tenant scope.`,
-                    );
-                    resolvedOrganizationId = null;
-                }
+            // Missing, foreign, or revoked last-active Organizations fail with
+            // the same opaque 404 as an explicit slug request. Falling back to
+            // bare personal scope here would make revocation grant a different
+            // data surface that the caller did not explicitly select.
+            const resolvedOrganizationId: string | null = dbUser?.lastScopeOrganizationId ?? null;
+            if (resolvedOrganizationId !== null) {
+                await this.requireActiveOrganization(user.userId, tenantId, resolvedOrganizationId);
             }
             this.scopeContext.setScope({
                 tenantId,
@@ -129,5 +142,34 @@ export class SessionScopeGuard implements CanActivate {
         }
 
         return true;
+    }
+
+    /**
+     * Exact active-Organization authorization. Organization slugs are public,
+     * so missing rows and revoked roster membership deliberately collapse to
+     * the same non-enumerating 404.
+     */
+    private async requireActiveOrganization(
+        userId: string,
+        tenantId: string,
+        organizationId: string,
+    ): Promise<void> {
+        const organization = await this.organizationRepository.findById(organizationId);
+        if (!organization || organization.tenantId !== tenantId) {
+            throw new NotFoundException('Organization not found');
+        }
+
+        const [membership, tenant] = await Promise.all([
+            this.organizationMembers.findByOrgAndUser(organizationId, userId),
+            this.tenants.findById(tenantId),
+        ]);
+        if (
+            tenant?.ownerUserId === userId ||
+            (membership !== null && membership.tenantId === tenantId)
+        ) {
+            return;
+        }
+
+        throw new NotFoundException('Organization not found');
     }
 }

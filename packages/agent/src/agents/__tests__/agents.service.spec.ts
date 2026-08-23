@@ -447,6 +447,17 @@ describe('AgentsService', () => {
     });
 
     describe('addTarget / removeTarget (assign an existing Agent to a Work)', () => {
+        it('rejects an unknown target discriminant instead of treating it as a wildcard', async () => {
+            const agent = makeAgent({ scope: AgentScope.TENANT, targets: null });
+            agents.findByIdAndUser.mockResolvedValue(agent);
+
+            await expect(
+                svc.addTarget('u1', 'a1', { type: 'galaxy', id: 'target-1' } as never),
+            ).rejects.toThrow(BadRequestException);
+            expect(agents.casUpdateTargets).not.toHaveBeenCalled();
+            expect(memberships.addMembership).not.toHaveBeenCalled();
+        });
+
         it('appends the target and materializes the membership row', async () => {
             const agent = makeAgent({ scope: AgentScope.TENANT, targets: null });
             agents.findByIdAndUser.mockResolvedValue(agent);
@@ -634,6 +645,65 @@ describe('AgentsService', () => {
             await expect(svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' })).rejects.toThrow(
                 'unique violation',
             );
+        });
+    });
+
+    describe('addAttachment — canonical upload hashes', () => {
+        it('normalizes uppercase hashes before persistence and duplicate recovery', async () => {
+            const uppercaseSha256 = 'A'.repeat(64);
+            const canonicalSha256 = uppercaseSha256.toLowerCase();
+            const persisted: Array<{ id: string; agentId: string; uploadId: string }> = [];
+            const agentAttachments = {
+                add: jest.fn(async (agentId: string, uploadId: string) => {
+                    if (
+                        persisted.some(
+                            (attachment) =>
+                                attachment.agentId === agentId && attachment.uploadId === uploadId,
+                        )
+                    ) {
+                        throw new Error('duplicate key value violates unique constraint');
+                    }
+                    const attachment = {
+                        id: `attachment-${persisted.length + 1}`,
+                        agentId,
+                        uploadId,
+                    };
+                    persisted.push(attachment);
+                    return attachment;
+                }),
+                findByAgentId: jest.fn(async (agentId: string) =>
+                    persisted.filter((attachment) => attachment.agentId === agentId),
+                ),
+            };
+            const uploadsRepo = {
+                findOne: jest.fn().mockResolvedValue({ sha256: canonicalSha256 }),
+            };
+            agents.findByIdAndUser.mockResolvedValue(makeAgent());
+            svc = new AgentsService(
+                agents,
+                memberships,
+                budgets,
+                agentAttachments as never,
+                undefined,
+                undefined,
+                undefined,
+                uploadsRepo as never,
+            );
+
+            const first = await svc.addAttachment('u1', 'a1', uppercaseSha256);
+            const duplicate = await svc.addAttachment('u1', 'a1', canonicalSha256);
+
+            expect(persisted).toEqual([
+                expect.objectContaining({ agentId: 'a1', uploadId: canonicalSha256 }),
+            ]);
+            expect(first).toBe(duplicate);
+            expect(agentAttachments.add).toHaveBeenNthCalledWith(1, 'a1', canonicalSha256);
+            expect(agentAttachments.add).toHaveBeenNthCalledWith(2, 'a1', canonicalSha256);
+            expect(agentAttachments.findByAgentId).toHaveBeenCalledWith('a1');
+            expect(uploadsRepo.findOne).toHaveBeenCalledTimes(2);
+            for (const [options] of uploadsRepo.findOne.mock.calls) {
+                expect(options.where).toEqual(expect.objectContaining({ sha256: canonicalSha256 }));
+            }
         });
     });
 

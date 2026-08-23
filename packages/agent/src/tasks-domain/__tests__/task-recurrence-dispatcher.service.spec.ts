@@ -59,7 +59,10 @@ describe('TaskRecurrenceDispatcherService', () => {
     });
 
     it('happy path — claims template, advances nextOccurrenceAt, spawns instance with fresh slug', async () => {
-        const template = makeTemplate();
+        const template = makeTemplate({
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        });
         tasks.findDueRecurringTemplates.mockResolvedValueOnce([template]);
         tasks.casClaimRecurrence.mockResolvedValueOnce(true);
         tasks.create.mockResolvedValueOnce({ id: 'inst-1', slug: 'T-42' });
@@ -74,12 +77,26 @@ describe('TaskRecurrenceDispatcherService', () => {
                 slug: 'T-42',
                 parentRecurringTaskId: 'tmpl-1',
                 isRecurring: false,
+                tenantId: template.tenantId,
+                organizationId: template.organizationId,
             }),
         );
         // CAS-claim advanced nextOccurrenceAt to a future Date.
         const casArgs = tasks.casClaimRecurrence.mock.calls[0];
         expect(casArgs[0]).toBe('tmpl-1');
         expect(casArgs[1]).toEqual(template.nextOccurrenceAt);
+    });
+
+    it('preserves a legacy personal template as personal', async () => {
+        const template = makeTemplate({ tenantId: null, organizationId: null });
+        tasks.findDueRecurringTemplates.mockResolvedValueOnce([template]);
+        tasks.create.mockResolvedValueOnce({ id: 'inst-personal', slug: 'T-42' });
+
+        await svc.dispatchDue();
+
+        expect(tasks.create).toHaveBeenCalledWith(
+            expect.objectContaining({ tenantId: null, organizationId: null }),
+        );
     });
 
     it('CAS-claim loss → outcome=skipped, no spawn', async () => {

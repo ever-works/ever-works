@@ -22,6 +22,9 @@ import type {
 import { RunDispatchGateService } from './run-dispatch-gate.service';
 import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
+import type { OwnershipScope } from '../database/ownership-scope';
+
+type ScopedRunSteerInput = RunSteerInput & { ownershipScope?: OwnershipScope };
 
 /**
  * `terminalEndedReason` values that make a finished run resumable: the
@@ -196,9 +199,9 @@ export class RunSteeringService implements RunSteeringPort {
 
     // ── steer ──────────────────────────────────────────────────────
 
-    async steer(input: RunSteerInput): Promise<RunSteerOutcome> {
+    async steer(input: ScopedRunSteerInput): Promise<RunSteerOutcome> {
         const message = this.assertMessage(input.message);
-        const run = await this.requireOwnedRun(input.runId, input.userId);
+        const run = await this.requireOwnedRun(input.runId, input.userId, input.ownershipScope);
 
         if (!RunSteeringService.isLive(run)) {
             // Terminal run — nothing to inject into. The caller (task chat,
@@ -233,8 +236,12 @@ export class RunSteeringService implements RunSteeringPort {
 
     // ── interrupt ──────────────────────────────────────────────────
 
-    async interrupt(runId: string, userId: string): Promise<RunInterruptOutcome> {
-        const run = await this.requireOwnedRun(runId, userId);
+    async interrupt(
+        runId: string,
+        userId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<RunInterruptOutcome> {
+        const run = await this.requireOwnedRun(runId, userId, ownershipScope);
         if (!RunSteeringService.isLive(run)) {
             throw new ConflictException(
                 `AgentRun ${runId} is ${run.status} — only a queued or running run can be interrupted.`,
@@ -258,10 +265,11 @@ export class RunSteeringService implements RunSteeringPort {
         runId: string,
         userId: string,
         message?: string | null,
+        ownershipScope?: OwnershipScope,
     ): Promise<RunResumeOutcome> {
         const trimmed =
             message == null || message.trim().length === 0 ? null : this.assertMessage(message);
-        const run = await this.requireOwnedRun(runId, userId);
+        const run = await this.requireOwnedRun(runId, userId, ownershipScope);
 
         if (!RunSteeringService.isResumable(run)) {
             throw new ConflictException(
@@ -294,6 +302,7 @@ export class RunSteeringService implements RunSteeringPort {
                 triggerKind: 'task',
                 taskId: run.taskId!,
                 workId: run.workId ?? null,
+                tenantId: run.tenantId ?? null,
                 organizationId: run.organizationId ?? null,
                 runnerKind: run.runnerKind ?? null,
                 queuedReason: verdict.admitted ? null : (verdict.queuedReason ?? null),
@@ -483,8 +492,14 @@ export class RunSteeringService implements RunSteeringPort {
         }
     }
 
-    private async requireOwnedRun(runId: string, userId: string): Promise<AgentRun> {
-        const run = await this.runs.findByIdAndUser(runId, userId);
+    private async requireOwnedRun(
+        runId: string,
+        userId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentRun> {
+        const run = ownershipScope
+            ? await this.runs.findByIdAndUser(runId, userId, ownershipScope)
+            : await this.runs.findByIdAndUser(runId, userId);
         if (!run) throw new NotFoundException(`AgentRun ${runId} not found.`);
         return run;
     }

@@ -47,10 +47,82 @@ const fakeFile = (
     originalname: overrides.originalname ?? 'probe.png',
 });
 
+const serviceWithMetadata = (backend: unknown) =>
+    new UploadsService(
+        backend as never,
+        undefined,
+        { record: jest.fn().mockResolvedValue({ id: 'upload-row' }) } as never,
+        { getScope: () => ({ tenantId: null, organizationId: null }) } as never,
+    );
+
 describe('UploadsService', () => {
     let root: string;
     let service: UploadsService;
     const userId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+
+    describe('authoritative scoped metadata', () => {
+        const everScope = {
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        };
+        const backend = {
+            providerName: 'metadata-test',
+            putObject: jest.fn(async (input: { ownerId: string; filename: string }) => ({
+                key: `${input.ownerId}/${input.filename}`,
+                url: 'ignored',
+            })),
+            getObject: jest.fn(),
+            deleteObject: jest.fn(),
+            isAvailable: jest.fn().mockResolvedValue(true),
+        };
+
+        it('records the active Ever scope before returning upload success', async () => {
+            const userUploads = { record: jest.fn().mockResolvedValue({ id: 'row-ever' }) };
+            const scoped = new (UploadsService as any)(backend, undefined, userUploads, {
+                getScope: () => everScope,
+            }) as UploadsService;
+
+            await expect(scoped.saveImage(userId, fakeFile({}))).resolves.toBeDefined();
+            expect(userUploads.record).toHaveBeenCalledWith(
+                expect.objectContaining({ userId, ...everScope }),
+            );
+        });
+
+        it('does not report success when authoritative metadata persistence fails', async () => {
+            const userUploads = {
+                record: jest.fn().mockRejectedValue(new Error('metadata database unavailable')),
+            };
+            const scoped = new (UploadsService as any)(backend, undefined, userUploads, {
+                getScope: () => everScope,
+            }) as UploadsService;
+
+            await expect(scoped.saveImage(userId, fakeFile({}))).rejects.toThrow(
+                /metadata database unavailable/,
+            );
+        });
+
+        it.each(['saveImage', 'saveFile'] as const)(
+            'uses the explicit ownership scope for %s even when request ALS is stale',
+            async (method) => {
+                const yoScope = {
+                    tenantId: everScope.tenantId,
+                    organizationId: '33333333-3333-4333-8333-333333333333',
+                };
+                const userUploads = { record: jest.fn().mockResolvedValue({ id: 'row-ever' }) };
+                const scoped = new (UploadsService as any)(backend, undefined, userUploads, {
+                    getScope: () => yoScope,
+                }) as UploadsService;
+
+                await (scoped[method] as any)(userId, fakeFile({}), {
+                    ownershipScope: everScope,
+                });
+
+                expect(userUploads.record).toHaveBeenCalledWith(
+                    expect.objectContaining({ userId, ...everScope }),
+                );
+            },
+        );
+    });
 
     beforeEach(async () => {
         root = resolve(
@@ -65,7 +137,7 @@ describe('UploadsService', () => {
         // by passing the plugin directly to the service constructor.
         const backend = new LocalFsStoragePlugin();
         await backend.onLoad(stubContext('local-fs'));
-        service = new UploadsService(backend);
+        service = serviceWithMetadata(backend);
     });
 
     afterEach(async () => {
@@ -194,7 +266,7 @@ describe('UploadsService', () => {
             process.env.UPLOADS_MAX_BYTES = '100';
             const localBackend = new LocalFsStoragePlugin();
             await localBackend.onLoad(stubContext('local-fs'));
-            const s = new UploadsService(localBackend);
+            const s = serviceWithMetadata(localBackend);
             const big = Buffer.concat([TINY_PNG, Buffer.alloc(200)]);
             await expect(
                 s.saveImage(userId, {
@@ -277,7 +349,7 @@ describe('UploadsService', () => {
                     /* noop */
                 },
             };
-            svc = new UploadsService(spyBackend as never);
+            svc = serviceWithMetadata(spyBackend);
         });
 
         it('does not set workId on the backend by default', async () => {
@@ -389,7 +461,7 @@ describe('UploadsService', () => {
                     return `uploads/${ownerId}/${filename}`;
                 },
             };
-            const svc = new UploadsService(fakeBackend as never);
+            const svc = serviceWithMetadata(fakeBackend);
             const r = await svc.saveImage(userId, fakeFile({}));
 
             // Codex P1 #2: response URL is the API-routed path regardless of
@@ -428,7 +500,7 @@ describe('UploadsService', () => {
                 },
                 // intentionally NO deriveKey
             };
-            const svc = new UploadsService(backendNoDerive as never);
+            const svc = serviceWithMetadata(backendNoDerive);
             const r = await svc.saveImage(userId, fakeFile({}));
             await svc.readFile(userId, r.filename);
             expect(lastSeenKey).toEqual([`${userId}/${r.filename}`]);

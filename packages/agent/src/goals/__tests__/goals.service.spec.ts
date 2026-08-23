@@ -27,8 +27,22 @@ interface AnyRow {
 function makeRepo(prefix: string) {
     const rows: AnyRow[] = [];
     let counter = 0;
-    const matches = (row: AnyRow, where: Record<string, unknown> = {}) =>
-        Object.entries(where).every(([k, v]) => row[k] === v);
+    const matches = (
+        row: AnyRow,
+        where: Record<string, unknown> | Record<string, unknown>[] = {},
+    ) => {
+        if (Array.isArray(where)) return where.some((branch) => matches(row, branch));
+        return Object.entries(where).every(([k, value]) => {
+            if (
+                typeof value === 'object' &&
+                value !== null &&
+                (value as { _type?: string })._type === 'isNull'
+            ) {
+                return row[k] == null;
+            }
+            return row[k] === value;
+        });
+    };
     const repo = {
         find: jest.fn(async (opts: any = {}) => {
             let result = rows.filter((r) => matches(r, opts.where));
@@ -388,6 +402,40 @@ describe('GoalsService', () => {
             await expect(service.linkToMission('u1', 'm1', 'ghost', false)).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+        });
+
+        it('does not link a known Goal UUID from another active Organization', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            missionsRepo._rows[0] = { ...missionsRepo._rows[0], ...everScope };
+            goalsRepo._rows[0] = { ...goalsRepo._rows[0], ...everScope };
+            goalsRepo._rows[1] = {
+                ...goalsRepo._rows[1],
+                tenantId: everScope.tenantId,
+                organizationId: '33333333-3333-4333-8333-333333333333',
+            };
+
+            await expect(
+                (service.linkToMission as any)('u1', 'm1', 'gB', true, everScope),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(missionGoalsRepo._rows).toHaveLength(0);
+        });
+
+        it('stamps a Mission-Goal edge with the exact active Organization', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            missionsRepo._rows[0] = { ...missionsRepo._rows[0], ...everScope };
+            goalsRepo._rows[0] = { ...goalsRepo._rows[0], ...everScope };
+
+            const linked = await (service.linkToMission as any)('u1', 'm1', 'gA', true, everScope);
+
+            expect(missionGoalsRepo._rows[0]).toMatchObject(everScope);
+            expect(linked).toMatchObject(everScope);
+            expect(linked.goal).toMatchObject(everScope);
         });
     });
 });

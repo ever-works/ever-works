@@ -10,8 +10,9 @@ import {
     AgentCollaboratorRepository,
     AgentRepository,
     AgentRunRepository,
+    ownershipScopeOf,
 } from '@ever-works/agent/database';
-import { TasksService, TaskTransitionService } from '@ever-works/agent/tasks-domain';
+import { TasksService, TaskTransitionService, type Task } from '@ever-works/agent/tasks-domain';
 
 /**
  * The real sub-agent delegation runner (judgment layer G9).
@@ -97,9 +98,14 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         if (!parent) {
             return this.failure(request, 'parent agent no longer exists');
         }
+        const ownershipScope = ownershipScopeOf(parent);
 
         const childAgentId = request.childAgentId ?? parent.id;
-        const child = await this.agents.findById(childAgentId);
+        const child = await this.agents.findByIdAndUser(
+            childAgentId,
+            parent.userId,
+            ownershipScope,
+        );
         if (!child) {
             return this.failure(request, `child agent ${childAgentId} not found`);
         }
@@ -165,36 +171,47 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         // supplies `parentTaskId` — it only knows the run — so without
         // this recovery every delegated Task would be an orphan.
         const parentTaskId = await this.resolveParentTaskId(request);
+        if (parentTaskId) {
+            try {
+                await this.tasks.getOne(parent.userId, parentTaskId, ownershipScope);
+            } catch {
+                return this.failure(request, 'parent Task not found');
+            }
+        }
 
-        let childTask: { id: string };
+        let childTask: Task;
         try {
-            childTask = await this.tasks.create(parent.userId, {
-                title: this.titleFor(request),
-                description: this.describe(request),
-                parentTaskId,
-                workId: request.scope.workId ?? null,
-                // The child is raised BY an agent, not by a person. That
-                // provenance is what lets the UI (and any later audit)
-                // tell a delegated unit of work apart from one a human
-                // filed.
-                createdByType: 'agent',
-                // The PARENT agent is the author of the delegation; the
-                // child is merely assigned to execute it. Recording the
-                // child here would lose who actually decided this work
-                // should exist.
-                createdById: request.parentAgentId,
-                agentId: request.childAgentId ?? null,
-                // Judgment layer G9 — the recursion bound, written by the
-                // platform rather than declared by a caller.
-                //
-                // `request.depth` is the depth of THIS delegation (already
-                // raised to the server-derived value by
-                // `SubAgentDelegationService`), so the child sits one
-                // deeper. This stamp is what the depth resolver reads back
-                // on the next hop; without it the chain has no record of
-                // itself and the cap is unenforceable.
-                delegationDepth: (Number.isInteger(request.depth) ? request.depth : 0) + 1,
-            });
+            childTask = await this.tasks.create(
+                parent.userId,
+                {
+                    title: this.titleFor(request),
+                    description: this.describe(request),
+                    parentTaskId,
+                    workId: request.scope.workId ?? null,
+                    // The child is raised BY an agent, not by a person. That
+                    // provenance is what lets the UI (and any later audit)
+                    // tell a delegated unit of work apart from one a human
+                    // filed.
+                    createdByType: 'agent',
+                    // The PARENT agent is the author of the delegation; the
+                    // child is merely assigned to execute it. Recording the
+                    // child here would lose who actually decided this work
+                    // should exist.
+                    createdById: request.parentAgentId,
+                    agentId: request.childAgentId ?? null,
+                    // Judgment layer G9 — the recursion bound, written by the
+                    // platform rather than declared by a caller.
+                    //
+                    // `request.depth` is the depth of THIS delegation (already
+                    // raised to the server-derived value by
+                    // `SubAgentDelegationService`), so the child sits one
+                    // deeper. This stamp is what the depth resolver reads back
+                    // on the next hop; without it the chain has no record of
+                    // itself and the cap is unenforceable.
+                    delegationDepth: (Number.isInteger(request.depth) ? request.depth : 0) + 1,
+                },
+                ownershipScope,
+            );
         } catch (error) {
             return this.failure(
                 request,
@@ -202,7 +219,7 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
             );
         }
 
-        const dispatch = await this.transitions.dispatchAgentRun(childTask as never, childAgentId, {
+        const dispatch = await this.transitions.dispatchAgentRun(childTask, childAgentId, {
             dedupKey: `delegation:${request.delegationId}`,
             // The EFFECTIVE scope — `SubAgentDelegationService` already
             // narrowed it against the parent, and the port contract says
