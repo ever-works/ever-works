@@ -7,6 +7,9 @@ jest.mock('node:fs/promises', () => ({
 
 const fsMock = jest.requireMock('node:fs/promises') as { rm: jest.Mock };
 
+/** Sha every branch of every repo reports in the default happy-path stub. */
+const IN_SYNC_SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
 describe('BranchSyncService', () => {
     let gitFacade: any;
     let websiteTemplateResolver: any;
@@ -22,13 +25,28 @@ describe('BranchSyncService', () => {
         betaBranch: null,
     };
 
+    /**
+     * Default readback: every branch on every repo is already at
+     * IN_SYNC_SHA, so the post-push verification guard passes. Tests that
+     * care about the guard override this per repo.
+     */
+    function stubBranchesInSync() {
+        gitFacade.listBranches.mockImplementation(async () =>
+            ['main', 'stage', 'develop', 'next'].map((name) => ({
+                name,
+                commit: IN_SYNC_SHA,
+                isDefault: name === 'main',
+            })),
+        );
+    }
+
     beforeEach(() => {
         jest.useFakeTimers();
         fsMock.rm.mockClear();
         fsMock.rm.mockResolvedValue(undefined);
 
         gitFacade = {
-            cloneOrPull: jest.fn(),
+            cloneBranch: jest.fn(),
             renameBranch: jest.fn(),
             getCloneUrl: jest.fn(),
             replaceRemote: jest.fn(),
@@ -39,6 +57,7 @@ describe('BranchSyncService', () => {
         websiteTemplateResolver = {
             resolveForWork: jest.fn(),
         };
+        stubBranchesInSync();
 
         service = new BranchSyncService(gitFacade, websiteTemplateResolver);
     });
@@ -63,8 +82,8 @@ describe('BranchSyncService', () => {
     }
 
     describe('syncBranch', () => {
-        it('clones the template, pushes to target, and cleans up the temp dir', async () => {
-            gitFacade.cloneOrPull.mockResolvedValue('/tmp/work-dir');
+        it('clones the template branch, pushes to target, and cleans up the temp dir', async () => {
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/work-dir');
             gitFacade.getCloneUrl.mockReturnValue(
                 'https://github.com/target-owner/target-repo.git',
             );
@@ -82,12 +101,11 @@ describe('BranchSyncService', () => {
                 workId: 'work-1',
             });
 
-            expect(gitFacade.cloneOrPull).toHaveBeenCalledWith(
+            expect(gitFacade.cloneBranch).toHaveBeenCalledWith(
                 {
                     owner: 'ever-works',
                     repo: 'directory-web-template',
                     branch: 'main',
-                    committer: { name: 'ever', email: 'ever@x.test' },
                 },
                 { userId: 'user-1', providerId: 'github', workId: 'work-1' },
             );
@@ -104,7 +122,7 @@ describe('BranchSyncService', () => {
                 'https://github.com/target-owner/target-repo.git',
             );
             expect(gitFacade.push).toHaveBeenCalledWith(
-                { dir: '/tmp/work-dir', force: true },
+                { dir: '/tmp/work-dir', force: true, ref: 'main', remoteRef: 'main' },
                 { userId: 'user-1', providerId: 'github', workId: 'work-1' },
             );
             expect(fsMock.rm).toHaveBeenCalledWith('/tmp/work-dir', {
@@ -119,7 +137,7 @@ describe('BranchSyncService', () => {
         });
 
         it('renames branch when targetBranch differs from branchName', async () => {
-            gitFacade.cloneOrPull.mockResolvedValue('/tmp/work-dir');
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/work-dir');
             gitFacade.getCloneUrl.mockReturnValue('https://example.test/owner/repo.git');
 
             const result = await service.syncBranch({
@@ -143,8 +161,28 @@ describe('BranchSyncService', () => {
             expect(result.message).toBe("Successfully synced branch 'stage' (mapped to 'main')");
         });
 
+        it('pushes a mapped branch to the MAPPED remote ref, not the source ref', async () => {
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/work-dir');
+            gitFacade.getCloneUrl.mockReturnValue('url');
+
+            await service.syncBranch({
+                branchName: 'stage',
+                targetBranch: 'main',
+                targetOwner: 'owner',
+                targetRepo: 'repo',
+                template: baseTemplate,
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+            });
+
+            expect(gitFacade.push).toHaveBeenCalledWith(
+                expect.objectContaining({ ref: 'main', remoteRef: 'main' }),
+                expect.any(Object),
+            );
+        });
+
         it('honours forcePush=false', async () => {
-            gitFacade.cloneOrPull.mockResolvedValue('/tmp/d');
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
             gitFacade.getCloneUrl.mockReturnValue('url');
 
             await service.syncBranch({
@@ -158,13 +196,13 @@ describe('BranchSyncService', () => {
             });
 
             expect(gitFacade.push).toHaveBeenCalledWith(
-                { dir: '/tmp/d', force: false },
+                { dir: '/tmp/d', force: false, ref: 'main', remoteRef: 'main' },
                 expect.any(Object),
             );
         });
 
         it('forwards undefined providerId/workId verbatim', async () => {
-            gitFacade.cloneOrPull.mockResolvedValue('/tmp/d');
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
             gitFacade.getCloneUrl.mockReturnValue('url');
 
             await service.syncBranch({
@@ -176,7 +214,7 @@ describe('BranchSyncService', () => {
                 committer: { name: 'n', email: 'e' },
             });
 
-            expect(gitFacade.cloneOrPull).toHaveBeenCalledWith(expect.any(Object), {
+            expect(gitFacade.cloneBranch).toHaveBeenCalledWith(expect.any(Object), {
                 userId: 'u',
                 providerId: undefined,
                 workId: undefined,
@@ -190,7 +228,7 @@ describe('BranchSyncService', () => {
         });
 
         it('returns error result and still cleans up tempDir on failure after clone', async () => {
-            gitFacade.cloneOrPull.mockResolvedValue('/tmp/d');
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
             gitFacade.getCloneUrl.mockReturnValue('url');
             gitFacade.replaceRemote.mockRejectedValue(new Error('replace failed'));
 
@@ -212,7 +250,7 @@ describe('BranchSyncService', () => {
         });
 
         it('does not call fs.rm when clone fails before tempDir is set', async () => {
-            gitFacade.cloneOrPull.mockRejectedValue(new Error('clone failed'));
+            gitFacade.cloneBranch.mockRejectedValue(new Error('clone failed'));
 
             const result = await service.syncBranch({
                 branchName: 'main',
@@ -234,7 +272,7 @@ describe('BranchSyncService', () => {
         });
 
         it('swallows fs.rm cleanup failure silently', async () => {
-            gitFacade.cloneOrPull.mockResolvedValue('/tmp/d');
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
             gitFacade.getCloneUrl.mockReturnValue('url');
             fsMock.rm.mockRejectedValueOnce(new Error('fs unavailable'));
 
@@ -251,9 +289,141 @@ describe('BranchSyncService', () => {
         });
     });
 
+    // ── Verification guard ────────────────────────────────────────────
+    //
+    // The regression these cover: a push that resolves without throwing
+    // was treated as proof the remote branch moved. It is not — it is
+    // proof the transport did not error. Every test here reports
+    // status:'synced' against a service that does not read the ref back.
+    describe('syncBranch verification guard', () => {
+        function stubRepoBranches(shas: {
+            template: Record<string, string>;
+            target: Record<string, string>;
+        }) {
+            gitFacade.listBranches.mockImplementation(async (owner: string) => {
+                const table = owner === 'ever-works' ? shas.template : shas.target;
+                return Object.entries(table).map(([name, commit]) => ({ name, commit }));
+            });
+        }
+
+        it('reports error when the target ref did NOT move to the pushed sha', async () => {
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
+            gitFacade.getCloneUrl.mockReturnValue('url');
+            gitFacade.push.mockResolvedValue(undefined);
+            stubRepoBranches({
+                template: { develop: 'dddddddddddddddddddddddddddddddddddddddd' },
+                // Frozen exactly the way the 11 stale sites were: the push
+                // "succeeded" and develop stayed where it was.
+                target: { develop: '1eb0424f1eb0424f1eb0424f1eb0424f1eb0424f' },
+            });
+
+            const result = await service.syncBranch({
+                branchName: 'develop',
+                targetOwner: 'o',
+                targetRepo: 'r',
+                template: baseTemplate,
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+            });
+
+            expect(gitFacade.push).toHaveBeenCalled();
+            expect(result.status).toBe('error');
+            expect(result.message).toContain('1eb0424f1eb0424f1eb0424f1eb0424f1eb0424f');
+            expect(result.message).toContain('dddddddddddddddddddddddddddddddddddddddd');
+        });
+
+        it('reports error when the target branch does not exist after the push', async () => {
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
+            gitFacade.getCloneUrl.mockReturnValue('url');
+            stubRepoBranches({
+                template: { stage: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+                target: { main: 'cccccccccccccccccccccccccccccccccccccccc' },
+            });
+
+            const result = await service.syncBranch({
+                branchName: 'stage',
+                targetOwner: 'o',
+                targetRepo: 'r',
+                template: baseTemplate,
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+            });
+
+            expect(result.status).toBe('error');
+            expect(result.message).toContain('(branch missing)');
+        });
+
+        it('does NOT pass when both sides are missing the branch', async () => {
+            // Guards the vacuous case: `undefined === undefined` must not
+            // read as "in sync". The template lookup fails first, so the
+            // clone is never attempted.
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
+            stubRepoBranches({ template: { main: 'x' }, target: { main: 'x' } });
+
+            const result = await service.syncBranch({
+                branchName: 'develop',
+                targetOwner: 'o',
+                targetRepo: 'r',
+                template: baseTemplate,
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+            });
+
+            expect(result.status).toBe('error');
+            expect(result.message).toContain("Template branch 'develop' not found");
+            expect(gitFacade.cloneBranch).not.toHaveBeenCalled();
+            expect(gitFacade.push).not.toHaveBeenCalled();
+        });
+
+        it('reports error when the readback itself cannot be performed', async () => {
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
+            gitFacade.getCloneUrl.mockReturnValue('url');
+            gitFacade.listBranches
+                .mockResolvedValueOnce([{ name: 'main', commit: IN_SYNC_SHA }])
+                .mockRejectedValueOnce(new Error('rate limited'));
+
+            const result = await service.syncBranch({
+                branchName: 'main',
+                targetOwner: 'o',
+                targetRepo: 'r',
+                template: baseTemplate,
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+            });
+
+            expect(result).toEqual({
+                branch: 'main',
+                status: 'error',
+                message: 'rate limited',
+            });
+        });
+
+        it('accepts a sha that differs only in case', async () => {
+            gitFacade.cloneBranch.mockResolvedValue('/tmp/d');
+            gitFacade.getCloneUrl.mockReturnValue('url');
+            stubRepoBranches({
+                template: { main: 'ABCDEF0123456789abcdef0123456789ABCDEF01' },
+                target: { main: 'abcdef0123456789abcdef0123456789abcdef01' },
+            });
+
+            const result = await service.syncBranch({
+                branchName: 'main',
+                targetOwner: 'o',
+                targetRepo: 'r',
+                template: baseTemplate,
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+            });
+
+            expect(result.status).toBe('synced');
+        });
+    });
+
     describe('syncAllBranches', () => {
         function stubSyncSuccess() {
-            gitFacade.cloneOrPull.mockResolvedValue('/tmp/d');
+            // A distinct directory per call — the whole point of cloneBranch.
+            let n = 0;
+            gitFacade.cloneBranch.mockImplementation(async () => `/tmp/d-${++n}`);
             gitFacade.getCloneUrl.mockReturnValue('url');
             gitFacade.replaceRemote.mockResolvedValue(undefined);
             gitFacade.push.mockResolvedValue(undefined);
@@ -274,8 +444,8 @@ describe('BranchSyncService', () => {
             await jest.runAllTimersAsync();
             const summary = await promise;
 
-            expect(gitFacade.cloneOrPull).toHaveBeenCalledTimes(3);
-            const cloneBranches = gitFacade.cloneOrPull.mock.calls.map((c: any[]) => c[0].branch);
+            expect(gitFacade.cloneBranch).toHaveBeenCalledTimes(3);
+            const cloneBranches = gitFacade.cloneBranch.mock.calls.map((c: any[]) => c[0].branch);
             expect(cloneBranches).toEqual(['main', 'stage', 'develop']);
             expect(summary).toEqual({
                 totalBranches: 3,
@@ -288,6 +458,87 @@ describe('BranchSyncService', () => {
                     expect.objectContaining({ branch: 'develop', status: 'synced' }),
                 ],
             });
+        });
+
+        it('pushes ONE remote ref per branch instead of main three times', async () => {
+            // The original defect, asserted as an effect rather than as the
+            // arguments handed to a mocked clone: syncing main/stage/develop
+            // used to push the same checked-out `main` three times and still
+            // report "3 synced, 0 errors".
+            stubSyncSuccess();
+
+            const promise = service.syncAllBranches({
+                targetOwner: 'o',
+                targetRepo: 'r',
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+                template: baseTemplate,
+            });
+
+            await jest.runAllTimersAsync();
+            await promise;
+
+            const pushedRefs = gitFacade.push.mock.calls.map((c: any[]) => c[0].ref);
+            expect(pushedRefs).toEqual(['main', 'stage', 'develop']);
+            expect(new Set(pushedRefs).size).toBe(3);
+
+            const pushedRemoteRefs = gitFacade.push.mock.calls.map((c: any[]) => c[0].remoteRef);
+            expect(pushedRemoteRefs).toEqual(['main', 'stage', 'develop']);
+        });
+
+        it('gives each branch its own working directory and removes it', async () => {
+            stubSyncSuccess();
+
+            const promise = service.syncAllBranches({
+                targetOwner: 'o',
+                targetRepo: 'r',
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+                template: baseTemplate,
+            });
+
+            await jest.runAllTimersAsync();
+            await promise;
+
+            const pushedDirs = gitFacade.push.mock.calls.map((c: any[]) => c[0].dir);
+            expect(new Set(pushedDirs).size).toBe(3);
+            for (const dir of pushedDirs) {
+                expect(fsMock.rm).toHaveBeenCalledWith(dir, { recursive: true, force: true });
+            }
+        });
+
+        it('counts a branch whose push did not land as an error, not a success', async () => {
+            stubSyncSuccess();
+            gitFacade.listBranches.mockImplementation(async (owner: string, _repo: string) => {
+                if (owner === 'ever-works') {
+                    return [
+                        { name: 'main', commit: IN_SYNC_SHA },
+                        { name: 'stage', commit: IN_SYNC_SHA },
+                        { name: 'develop', commit: IN_SYNC_SHA },
+                    ];
+                }
+                // Target: main tracked the template, stage/develop froze.
+                return [
+                    { name: 'main', commit: IN_SYNC_SHA },
+                    { name: 'stage', commit: '7e237a8c7e237a8c7e237a8c7e237a8c7e237a8c' },
+                    { name: 'develop', commit: '1eb0424f1eb0424f1eb0424f1eb0424f1eb0424f' },
+                ];
+            });
+
+            const promise = service.syncAllBranches({
+                targetOwner: 'o',
+                targetRepo: 'r',
+                userId: 'u',
+                committer: { name: 'n', email: 'e' },
+                template: baseTemplate,
+            });
+
+            await jest.runAllTimersAsync();
+            const summary = await promise;
+
+            expect(summary.synced).toBe(1);
+            expect(summary.errors).toBe(2);
+            expect(summary.results.map((r) => r.status)).toEqual(['synced', 'error', 'error']);
         });
 
         it('expands branchMapping into an additional sync target without skipping the original', async () => {
@@ -305,16 +556,21 @@ describe('BranchSyncService', () => {
             await jest.runAllTimersAsync();
             const summary = await promise;
 
-            expect(gitFacade.cloneOrPull).toHaveBeenCalledTimes(2);
+            expect(gitFacade.cloneBranch).toHaveBeenCalledTimes(2);
             expect(summary.totalBranches).toBe(1);
             expect(summary.synced).toBe(2);
             expect(gitFacade.renameBranch).toHaveBeenCalledTimes(1);
             expect(gitFacade.renameBranch).toHaveBeenCalledWith(
                 undefined,
-                '/tmp/d',
+                '/tmp/d-2',
                 'stage',
                 'main',
             );
+            // stage→stage then stage→main: two ops, two different remote refs.
+            expect(gitFacade.push.mock.calls.map((c: any[]) => c[0].remoteRef)).toEqual([
+                'stage',
+                'main',
+            ]);
         });
 
         it('skips a branch that is the mapped target of another branch', async () => {
@@ -336,8 +592,8 @@ describe('BranchSyncService', () => {
 
             // Two ops: stage→stage and stage→main. The standalone 'main'
             // entry is skipped because it's a mapped target.
-            expect(gitFacade.cloneOrPull).toHaveBeenCalledTimes(2);
-            const branchesCloned = gitFacade.cloneOrPull.mock.calls.map((c: any[]) => c[0].branch);
+            expect(gitFacade.cloneBranch).toHaveBeenCalledTimes(2);
+            const branchesCloned = gitFacade.cloneBranch.mock.calls.map((c: any[]) => c[0].branch);
             expect(branchesCloned).toEqual(['stage', 'stage']);
             expect(summary.totalBranches).toBe(2);
         });
@@ -360,7 +616,7 @@ describe('BranchSyncService', () => {
             const summary = await promise;
 
             // One op: main→main (the additional 'main !== main' branch is suppressed).
-            expect(gitFacade.cloneOrPull).toHaveBeenCalledTimes(1);
+            expect(gitFacade.cloneBranch).toHaveBeenCalledTimes(1);
             expect(summary.synced).toBe(1);
             expect(gitFacade.renameBranch).not.toHaveBeenCalled();
         });
@@ -644,8 +900,15 @@ describe('BranchSyncService', () => {
     });
 
     describe('contracts', () => {
-        it('exposes MAX_CONCURRENT_SYNCS=1 (sequential to avoid cloneOrPull dir collisions)', () => {
+        it('exposes MAX_CONCURRENT_SYNCS=1 (kept sequential for API/CPU pacing)', () => {
             expect((service as any).MAX_CONCURRENT_SYNCS).toBe(1);
+        });
+
+        it('never falls back to the branch-blind cloneOrPull', () => {
+            // cloneOrPull resolves a directory keyed on owner+repo and
+            // switches the checkout back to main. If it reappears in this
+            // service, the per-branch guarantee is gone again.
+            expect(gitFacade.cloneOrPull).toBeUndefined();
         });
 
         it('logger context is the service name', () => {

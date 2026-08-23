@@ -58,10 +58,26 @@ export interface FacadeCloneOptions {
     readonly autoSwitchToMainBranch?: boolean;
 }
 
+/**
+ * Clone ONE branch into a directory of its own — see
+ * `GitFacadeService.cloneBranch`. `branch` is required (that is the whole
+ * point) and there is no `autoSwitchToMainBranch`: the requested branch is
+ * what stays checked out.
+ */
+export interface FacadeCloneBranchOptions {
+    readonly owner: string;
+    readonly repo: string;
+    readonly branch: string;
+}
+
 export interface FacadePushOptions {
     readonly dir: string;
     readonly force?: boolean;
     readonly maxRetries?: number;
+    /** Local ref to push. Omitted → whatever branch HEAD points at. */
+    readonly ref?: string;
+    /** Receiving branch on the remote. Omitted → derived from `ref`. */
+    readonly remoteRef?: string;
 }
 
 export class GitFacadeError extends FacadeError {
@@ -1046,6 +1062,31 @@ export class GitFacadeService implements IGitFacade {
         this.cloneOrPullRequests.set(key, request);
 
         return request;
+    }
+
+    /**
+     * Clone ONE branch into an isolated working directory.
+     *
+     * Deliberately NOT coalesced the way `cloneOrPull` is: the value of
+     * this call is that every caller gets a directory nobody else touches,
+     * and sharing one in-flight promise would hand two callers the same
+     * path again. Callers own the returned directory and must remove it.
+     *
+     * OPTIONAL on the contract, so the absence path is an explicit
+     * `GitOperationNotSupportedError` (→ 409) and the method is
+     * materialised off the resolved plugin first — the lazy-plugin proxy
+     * over-reports optional methods (see the class doc above).
+     */
+    async cloneBranch(
+        cloneOptions: FacadeCloneBranchOptions,
+        options: GitFacadeOptions,
+    ): Promise<string> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.cloneBranch;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('cloneBranch', plugin.id);
+        }
+        return impl.call(plugin, { ...cloneOptions, token });
     }
 
     async pull(
