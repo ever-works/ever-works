@@ -18,10 +18,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { useRouter } from '@/i18n/navigation';
 import { useOrganizations } from '@/lib/hooks/use-organizations';
 import { UpgradeOrCreateDialog } from './UpgradeOrCreateDialog';
 import { browserApiFetch } from '@/lib/api/browser-api';
+import { navigateToWorkspaceDashboard } from '@/lib/workspace-navigation';
 
 /**
  * Mirror of `User.deriveSlugIfMissing` (and the server-side
@@ -111,16 +111,15 @@ type SlugStatus =
  *   - First Org (organizations.length === 0 before submit) → hands off
  *     to `<UpgradeOrCreateDialog>` so the user can choose the upgrade
  *     vs empty branch.
- *   - 2nd+ Org → close modal and navigate to `/{slug}/dashboard`
+ *   - 2nd+ Org → close modal and navigate to `/org/{slug}/dashboard`
  *     directly. Subsequent Orgs skip the upgrade dialog entirely
  *     (spec §5.3).
  *
  * Wires into `useOrganizations().mutate()` on success so the
- * `<WorkspaceSwitcher>` populates without a full page reload.
+ * `<WorkspaceSwitcher>` has fresh data before the workspace reload.
  */
 export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizationModalProps) {
     const t = useTranslations('organizations.create');
-    const router = useRouter();
     const { organizations, mutate } = useOrganizations();
 
     const [name, setName] = useState('');
@@ -338,7 +337,10 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                         if (/^[a-z0-9-]+$/.test(org.slug)) {
                             await persistActiveOrganization(org.slug);
                             onOpenChange(false);
-                            router.push(`/org/${org.slug}/dashboard`);
+                            navigateToWorkspaceDashboard({
+                                kind: 'organization',
+                                slug: org.slug,
+                            });
                         }
                     }
                 } catch (err) {
@@ -346,7 +348,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                 }
             })();
         });
-    }, [name, vision, selectedTemplate, organizations.length, mutate, onOpenChange, router, t]);
+    }, [name, vision, selectedTemplate, organizations.length, mutate, onOpenChange, t]);
 
     const handlePickTemplate = useCallback(
         (slug: string | null) => {
@@ -376,12 +378,12 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
             setShowUpgradeDialog(false);
             setCreatedOrg(null);
             onOpenChange(false);
-            router.push(`/org/${target.slug}/dashboard`);
+            navigateToWorkspaceDashboard({ kind: 'organization', slug: target.slug });
             // Pull the freshly-upgraded org list (tenantId is now set on
             // the user, so subsequent fetches reflect that).
             if (didUpgrade) void mutate();
         },
-        [createdOrg, mutate, onOpenChange, router, t],
+        [createdOrg, mutate, onOpenChange, t],
     );
 
     // Hide the modal panel while the upgrade dialog is visible so the

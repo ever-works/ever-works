@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Building2, Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { toast } from 'sonner';
-import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import {
     DropdownMenu,
@@ -21,6 +20,7 @@ import { CreateOrganizationModal } from '../organizations/CreateOrganizationModa
 import type { WorkConfig } from '@/lib/api';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 import { browserApiFetch } from '@/lib/api/browser-api';
+import { navigateToWorkspaceDashboard } from '@/lib/workspace-navigation';
 
 interface WorkspaceSwitcherProps {
     /** Site config passed through to the inline logo / favicon. */
@@ -100,7 +100,6 @@ export function WorkspaceSwitcher({
     isCollapsed = false,
 }: WorkspaceSwitcherProps) {
     const t = useTranslations('organizations.switcher');
-    const router = useRouter();
     const { organizations, isLoading } = useOrganizations();
     const { activeOrganization } = useActiveScope();
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -133,7 +132,7 @@ export function WorkspaceSwitcher({
             if (persisted.organizationSlug !== org.slug) {
                 throw new Error('The persisted active Organization did not match the selection');
             }
-            router.push(`/org/${org.slug}/dashboard`);
+            navigateToWorkspaceDashboard({ kind: 'organization', slug: org.slug });
         } catch {
             toast.error('Could not switch Organization. Please try again.');
         } finally {

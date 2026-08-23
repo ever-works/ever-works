@@ -26,6 +26,13 @@ vi.mock('@/i18n/navigation', () => ({
     useRouter: () => ({ push: routerPushMock }),
 }));
 
+const { navigateToWorkspaceDashboardMock } = vi.hoisted(() => ({
+    navigateToWorkspaceDashboardMock: vi.fn(),
+}));
+vi.mock('@/lib/workspace-navigation', () => ({
+    navigateToWorkspaceDashboard: navigateToWorkspaceDashboardMock,
+}));
+
 // Mock the image-only logo variants to simple sentinels — we don't want
 // to render real Next.js Image components in jsdom, and we want stable
 // test selectors for the empty-state assertion.
@@ -69,6 +76,7 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
     beforeEach(() => {
         __resetOrganizationsStoreForTests();
         routerPushMock.mockReset();
+        navigateToWorkspaceDashboardMock.mockReset();
         pathnameMock.mockReset().mockReturnValue('/dashboard');
         vi.stubGlobal(
             'fetch',
@@ -280,7 +288,7 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
         );
         const switchHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
         expect(switchHeaders.get('x-ever-workspace')).toBe('org:yo-inc');
-        expect(routerPushMock).not.toHaveBeenCalled();
+        expect(navigateToWorkspaceDashboardMock).not.toHaveBeenCalled();
 
         resolveSwitch({
             ok: true,
@@ -292,6 +300,12 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
             }),
         });
 
-        await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/org/ever/dashboard'));
+        await waitFor(() =>
+            expect(navigateToWorkspaceDashboardMock).toHaveBeenCalledWith({
+                kind: 'organization',
+                slug: 'ever',
+            }),
+        );
+        expect(routerPushMock).not.toHaveBeenCalled();
     });
 });
