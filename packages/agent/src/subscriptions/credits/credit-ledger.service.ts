@@ -6,6 +6,8 @@ import {
 } from '@src/database/repositories/credit-ledger.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { UserSubscriptionRepository } from '@src/database/repositories/user-subscription.repository';
+import { BillingProfileRepository } from '@src/database/repositories/billing-profile.repository';
+import { isPastDueSubscriptionStatus } from '@src/entities/billing-profile.entity';
 import { CreditLedgerEntry, CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
 import type { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
 import type { ClassToObject } from '@src/entities/types';
@@ -87,8 +89,14 @@ export interface DailyGrantSummary {
     failed: number;
     /** Users that received a monthly plan allowance (or a top-up) this run. */
     monthlyGranted: number;
-    /** Users whose monthly allowance for this calendar month already existed. */
+    /** Users whose monthly allowance for this period already existed. */
     monthlyAlreadyGranted: number;
+    /**
+     * Users whose MONTHLY grant threw. Counted for exactly the same reason as
+     * {@link failed}: without it, a sweep in which every paying subscriber
+     * failed to be paid is byte-identical to a healthy one.
+     */
+    monthlyFailed: number;
 }
 
 /**
@@ -126,6 +134,7 @@ export class CreditLedgerService {
         private readonly entitlementsService: EntitlementsService,
         private readonly userRepository: UserRepository,
         private readonly userSubscriptionRepository: UserSubscriptionRepository,
+        private readonly billingProfileRepository: BillingProfileRepository,
     ) {}
 
     /**
@@ -279,6 +288,7 @@ export class CreditLedgerService {
             failed: 0,
             monthlyGranted: 0,
             monthlyAlreadyGranted: 0,
+            monthlyFailed: 0,
         };
         const date = now.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
         const batchSize = config.billing.credits.getDailyGrantBatchSize();
@@ -324,6 +334,8 @@ export class CreditLedgerService {
                     summary.monthlyGranted += 1;
                 } else if (monthly === 'already') {
                     summary.monthlyAlreadyGranted += 1;
+                } else if (monthly === 'failed') {
+                    summary.monthlyFailed += 1;
                 }
             }
             if (users.length < batchSize) {
@@ -408,11 +420,17 @@ export class CreditLedgerService {
      * Resolved from the user's CURRENT subscription row, never from
      * `user.defaultPlan`. Two independent reasons, both live today:
      *
-     *  - **Dunning.** A failed invoice moves the subscription to `past_due`,
-     *    but the webhook handler deliberately neither grants nor revokes, so
-     *    `defaultPlanId` stays on the paid tier through Stripe's whole retry
-     *    window. A `defaultPlan` reader would keep paying out 3,000 / 25,000
-     *    credits a month for invoices that never cleared.
+     *  - **Dunning.** A failed invoice leaves `defaultPlanId` on the paid tier
+     *    for the whole of Stripe's retry window, because the webhook handler
+     *    deliberately neither grants nor revokes. A `defaultPlan` reader would
+     *    keep paying out 3,000 / 25,000 credits a month for invoices that never
+     *    cleared.
+     *
+     *    🛑 Reading the subscription row is NOT by itself enough to stop that.
+     *    `SubscriptionStatus.PAST_DUE` exists in the enum and is never assigned
+     *    anywhere — the dunning state is persisted on a different table,
+     *    `billing_profiles.subscriptionStatus`. So the grant consults the billing
+     *    profile too, and skips while the provider cannot collect.
      *  - **Divergence.** The subscription row is written unconditionally,
      *    while `assignPlanToUser` (the only writer of `defaultPlanId`) is
      *    gated on `SUBSCRIPTIONS_ENABLED`. On a deployment where that flag
@@ -462,6 +480,16 @@ export class CreditLedgerService {
             const plan = subscription.plan ?? null;
             const allowance = Number(plan?.monthlyCredits ?? 0);
             if (!Number.isInteger(allowance) || allowance <= 0) {
+                return 'skipped';
+            }
+
+            // The real dunning signal. `user_subscriptions.status` never becomes
+            // `past_due` — nothing writes it — so without this a customer whose
+            // invoice has been failing for weeks keeps drawing the full monthly
+            // allowance. A missing profile is treated as "collecting fine", which
+            // is the pre-existing posture everywhere else that reads this state.
+            const profile = await this.billingProfileRepository.findByUserId(userId);
+            if (isPastDueSubscriptionStatus(profile?.subscriptionStatus)) {
                 return 'skipped';
             }
 

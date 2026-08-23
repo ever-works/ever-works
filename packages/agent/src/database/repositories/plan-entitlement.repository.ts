@@ -54,8 +54,20 @@ export class PlanEntitlementRepository {
             // hits 23505 - inside onModuleInit, which means that pod NEVER
             // finishes booting. Recover by re-reading, the same shape the ledger
             // uses for its own unique-key race.
+            // SQLSTATE first, message second. PostgreSQL translates error text
+            // according to `lc_messages`, so a server with a non-English locale
+            // would fail the regex and let a boot-time race become a pod that never
+            // starts. `23505` is locale-independent. This mirrors
+            // `CreditLedgerRepository.isUniqueViolation`, which this comment used to
+            // claim to match while testing strictly less.
+            const code =
+                (error as { code?: string; driverError?: { code?: string } })?.code ??
+                (error as { driverError?: { code?: string } })?.driverError?.code;
             const message = String((error as Error)?.message ?? '');
-            if (/duplicate key|UNIQUE constraint failed|Duplicate entry/i.test(message)) {
+            if (
+                code === '23505' ||
+                /duplicate key|UNIQUE constraint failed|Duplicate entry/i.test(message)
+            ) {
                 const raced = await this.findByPlanAndKey(entitlement.planId, entitlement.key);
                 if (raced) {
                     return { entitlement: raced, created: false };

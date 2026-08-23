@@ -53,21 +53,32 @@ function makeSubscriptionRepository(overrides: Record<string, jest.Mock> = {}) {
     };
 }
 
+function makeBillingProfileRepository(overrides: Record<string, jest.Mock> = {}) {
+    return {
+        // "collecting fine" by default.
+        findByUserId: jest.fn().mockResolvedValue({ subscriptionStatus: 'active' }),
+        ...overrides,
+    };
+}
+
 function makeService(
     ledger: Record<string, jest.Mock> = {},
     entitlements: Record<string, jest.Mock> = {},
     users: Record<string, jest.Mock> = {},
     subscriptions: Record<string, jest.Mock> = {},
+    billingProfiles: Record<string, jest.Mock> = {},
 ) {
     const ledgerRepository = makeLedgerRepository(ledger);
     const entitlementsService = makeEntitlements(entitlements);
     const userRepository = makeUserRepository(users);
     const subscriptionRepository = makeSubscriptionRepository(subscriptions);
+    const billingProfileRepository = makeBillingProfileRepository(billingProfiles);
     const service = new CreditLedgerService(
         ledgerRepository as any,
         entitlementsService as any,
         userRepository as any,
         subscriptionRepository as any,
+        billingProfileRepository as any,
     );
     return {
         service,
@@ -75,6 +86,7 @@ function makeService(
         entitlementsService,
         userRepository,
         subscriptionRepository,
+        billingProfileRepository,
     };
 }
 
@@ -353,6 +365,7 @@ describe('CreditLedgerService', () => {
                 failed: 0,
                 monthlyGranted: 0,
                 monthlyAlreadyGranted: 0,
+                monthlyFailed: 0,
             });
         });
 
@@ -375,6 +388,7 @@ describe('CreditLedgerService', () => {
                 failed: 0,
                 monthlyGranted: 0,
                 monthlyAlreadyGranted: 0,
+                monthlyFailed: 0,
             });
         });
 
@@ -408,6 +422,7 @@ describe('CreditLedgerService', () => {
                 failed: 0,
                 monthlyGranted: 0,
                 monthlyAlreadyGranted: 0,
+                monthlyFailed: 0,
             });
         });
 
@@ -439,6 +454,7 @@ describe('CreditLedgerService', () => {
                 failed: 1,
                 monthlyGranted: 0,
                 monthlyAlreadyGranted: 0,
+                monthlyFailed: 0,
             });
         });
 
@@ -620,12 +636,17 @@ describe('CreditLedgerService', () => {
         };
         const anyUser = [{ id: 'u1', defaultPlan: { code: 'free', monthlyCredits: 0 } }];
 
-        const withUser = (subscription: unknown, ledger: Record<string, jest.Mock> = {}) =>
+        const withUser = (
+            subscription: unknown,
+            ledger: Record<string, jest.Mock> = {},
+            billingProfiles: Record<string, jest.Mock> = {},
+        ) =>
             makeService(
                 ledger,
                 {},
                 { findActiveBatch: jest.fn().mockResolvedValueOnce(anyUser).mockResolvedValue([]) },
                 { findCurrentByUser: jest.fn().mockResolvedValue(subscription) },
+                billingProfiles,
             );
 
         it('grants the full allowance, keyed by subscription + elapsed month + plan', async () => {
@@ -682,6 +703,68 @@ describe('CreditLedgerService', () => {
                 ([write]: any[]) => write.kind === CreditLedgerKind.GRANT,
             );
             expect(grants).toHaveLength(0);
+        });
+
+        /**
+         * 🛑 THE DUNNING GUARD THAT ALMOST WAS NOT.
+         *
+         * Reading the subscription row looks like it excludes dunning — the
+         * repository even documents that it 'deliberately excludes PAST_DUE'. But
+         * `SubscriptionStatus.PAST_DUE` is declared in the enum and assigned
+         * NOWHERE: the provider maps a failed invoice onto
+         * `billing_profiles.subscriptionStatus`, a different table entirely. So a
+         * subscription-row-only check leaves the customer 'active' for the whole of
+         * Stripe's retry window and pays out every month against invoices that
+         * never cleared.
+         *
+         * Revert-check: delete the billing-profile lookup and this goes RED.
+         */
+        it('pays NOTHING while the provider cannot collect (past_due / unpaid)', async () => {
+            for (const status of ['past_due', 'unpaid']) {
+                const { service, ledgerRepository } = withUser(
+                    proSubscription,
+                    {},
+                    { findByUserId: jest.fn().mockResolvedValue({ subscriptionStatus: status }) },
+                );
+
+                const summary = await service.dispatchDailyGrants(NOW);
+
+                expect(summary.monthlyGranted).toBe(0);
+                const grants = ledgerRepository.recordAtomic.mock.calls.filter(
+                    ([write]: any[]) => write.kind === CreditLedgerKind.GRANT,
+                );
+                expect(grants).toHaveLength(0);
+            }
+        });
+
+        it('still pays when there is no billing profile at all', async () => {
+            // A missing profile means "nothing has gone wrong yet", which is the
+            // posture every other reader of this state already takes.
+            const { service } = withUser(
+                proSubscription,
+                {},
+                { findByUserId: jest.fn().mockResolvedValue(null) },
+            );
+
+            const summary = await service.dispatchDailyGrants(NOW);
+
+            expect(summary.monthlyGranted).toBe(1);
+        });
+
+        /**
+         * The same defect the daily path had: a thrown grant vanished into the
+         * gaps of the summary, so a sweep in which EVERY paying subscriber failed
+         * to be paid reported exactly like a healthy one.
+         */
+        it('counts a thrown monthly grant instead of losing it', async () => {
+            const { service } = withUser(proSubscription, {
+                sumByRefTypeInWindow: jest.fn().mockRejectedValue(new Error('db down')),
+            });
+
+            const summary = await service.dispatchDailyGrants(NOW);
+
+            expect(summary.monthlyFailed).toBe(1);
+            expect(summary.monthlyGranted).toBe(0);
         });
 
         it('grants only the DIFFERENCE after a mid-cycle upgrade', async () => {

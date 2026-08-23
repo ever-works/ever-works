@@ -49,6 +49,16 @@ export class WidenCreditLedgerRefId1787500000000 implements MigrationInterface {
         if (column.type !== 'uuid') {
             return;
         }
+        // `uuid` -> `varchar` is not binary-coercible in PostgreSQL, so this is a
+        // full heap rewrite plus an index rebuild, holding ACCESS EXCLUSIVE for the
+        // duration. It runs at POD BOOT, so a lock it cannot get would queue every
+        // reader of the credits path behind it while the pod sits in startup.
+        //
+        // Bound the wait instead: on timeout the migration transaction rolls back,
+        // the pod restarts, and the next boot retries — a loud, recoverable retry
+        // rather than a silent stall. SET LOCAL is scoped to this transaction and
+        // needs no cleanup.
+        await queryRunner.query("SET LOCAL lock_timeout = '5s'");
         await queryRunner.query(
             'ALTER TABLE "credit_ledger_entries" ALTER COLUMN "refId" TYPE character varying(128)',
         );
