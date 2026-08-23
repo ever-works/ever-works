@@ -13,7 +13,7 @@ import {
 import { Agent, AgentScope, AgentStatus, type AgentTarget } from '../../entities/agent.entity';
 import { AgentMembership } from '../../entities/agent-membership.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
-import { ownershipWhere, type OwnershipScope } from '../ownership-scope';
+import { ownershipSqlPredicate, ownershipWhere, type OwnershipScope } from '../ownership-scope';
 
 /**
  * Filter shape for `findByUserIdScoped`. All fields optional — caller
@@ -129,23 +129,9 @@ export class AgentRepository {
             .createQueryBuilder('agent')
             .where('agent.userId = :userId', { userId });
 
-        if (ownershipScope?.organizationId) {
-            qb.andWhere(
-                'agent.tenantId = :scopeTenantId AND agent.organizationId = :scopeOrganizationId',
-                {
-                    scopeTenantId: ownershipScope.tenantId,
-                    scopeOrganizationId: ownershipScope.organizationId,
-                },
-            );
-        } else if (ownershipScope) {
-            qb.andWhere('agent.organizationId IS NULL');
-            if (ownershipScope.tenantId) {
-                qb.andWhere('(agent.tenantId = :scopeTenantId OR agent.tenantId IS NULL)', {
-                    scopeTenantId: ownershipScope.tenantId,
-                });
-            } else {
-                qb.andWhere('agent.tenantId IS NULL');
-            }
+        const ownership = ownershipSqlPredicate('agent', ownershipScope);
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
         }
 
         if (!wantsArchived) {

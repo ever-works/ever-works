@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MissionWork, type MissionWorkRelation } from '../../entities/mission-work.entity';
-import { ownershipWhere, type OwnershipScope } from '../ownership-scope';
+import {
+    ownershipSqlPredicate,
+    ownershipWhere,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../ownership-scope';
 
 /** A mission_works row hydrated with the Work's display fields. */
 export interface MissionWorkWithWork {
@@ -75,16 +80,17 @@ export class MissionWorkRepository {
         scope?: OwnershipScope;
     }): Promise<boolean> {
         if (input.scope) {
-            const query = this.repository
-                .createQueryBuilder('rel')
+            const where = ownershipWhereWith<MissionWork>(input.userId, input.scope, {
+                missionId: input.missionId,
+                workId: input.workId,
+                relation: input.relation,
+            });
+            const res = await this.repository
+                .createQueryBuilder()
                 .delete()
                 .from(MissionWork)
-                .where(
-                    'missionId = :missionId AND workId = :workId AND userId = :userId AND relation = :relation',
-                    input,
-                );
-            this.applyOwnershipScope(query, ['mission_works'], input.scope, false);
-            const res = await query.execute();
+                .where(where)
+                .execute();
             return (res.affected ?? 0) > 0;
         }
         const res = await this.repository.delete({
@@ -170,30 +176,11 @@ export class MissionWorkRepository {
         query: { andWhere(predicate: string, parameters?: Record<string, unknown>): unknown },
         aliases: string[],
         scope?: OwnershipScope,
-        qualified = true,
     ): void {
         if (!scope) return;
-        const column = (alias: string, name: string) => (qualified ? `${alias}.${name}` : name);
         for (const alias of aliases) {
-            if (scope.organizationId) {
-                query.andWhere(
-                    `${column(alias, 'tenantId')} = :scopeTenantId AND ${column(alias, 'organizationId')} = :scopeOrganizationId`,
-                    {
-                        scopeTenantId: scope.tenantId,
-                        scopeOrganizationId: scope.organizationId,
-                    },
-                );
-            } else {
-                query.andWhere(`${column(alias, 'organizationId')} IS NULL`);
-                if (scope.tenantId) {
-                    query.andWhere(
-                        `(${column(alias, 'tenantId')} = :scopeTenantId OR ${column(alias, 'tenantId')} IS NULL)`,
-                        { scopeTenantId: scope.tenantId },
-                    );
-                } else {
-                    query.andWhere(`${column(alias, 'tenantId')} IS NULL`);
-                }
-            }
+            const ownership = ownershipSqlPredicate(alias, scope, 'scope');
+            if (ownership) query.andWhere(ownership.clause, ownership.parameters);
         }
     }
 }

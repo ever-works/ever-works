@@ -151,6 +151,8 @@ describe('Organization ownership controller wiring', () => {
             id: 'mission-ever',
             ...scope,
         });
+        expect(service.listForUser).toHaveBeenCalledWith('user-1', expect.any(Object), scope);
+        expect(service.getForUser).toHaveBeenCalledWith('user-1', 'mission-ever', scope);
     });
 
     it('passes the active request scope to Goal list and get', async () => {
@@ -170,6 +172,8 @@ describe('Organization ownership controller wiring', () => {
             id: 'goal-ever',
             ...scope,
         });
+        expect(service.listForUser).toHaveBeenCalledWith('user-1', expect.any(Object), scope);
+        expect(service.getForUser).toHaveBeenCalledWith('user-1', 'goal-ever', scope);
     });
 
     it('passes the active request scope to Agent list and get', async () => {
@@ -196,5 +200,7 @@ describe('Organization ownership controller wiring', () => {
             id: 'agent-ever',
             ...scope,
         });
+        expect(service.list).toHaveBeenCalledWith('user-1', expect.any(Object), scope);
+        expect(service.getOne).toHaveBeenCalledWith('user-1', 'agent-ever', scope);
     });
 });

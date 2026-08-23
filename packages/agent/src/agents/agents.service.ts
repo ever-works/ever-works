@@ -59,6 +59,7 @@ import {
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
 // (Codex + Greptile P1 on PR #1044).
 const SHA256_RE = /^[0-9a-f]{64}$/i;
+const SUPPORTED_AGENT_TARGET_TYPES = new Set(['mission', 'idea', 'work', 'wildcard']);
 
 /**
  * Create-Agent input — writable subset of the entity. Validation
@@ -696,6 +697,7 @@ export class AgentsService {
         ownershipScope?: OwnershipScope,
     ): Promise<AgentDto> {
         let agent = await this.requireOwned(userId, id, ownershipScope);
+        this.assertTargetShape(target);
 
         for (let attempt = 0; attempt < AgentsService.TARGETS_CAS_ATTEMPTS; attempt++) {
             const current = agent.targets ?? [];
@@ -776,6 +778,7 @@ export class AgentsService {
         target: AgentTarget,
         ownershipScope?: OwnershipScope,
     ): Promise<void> {
+        this.assertTargetShape(target);
         switch (target.type) {
             case 'work':
                 await this.assertScopeParentExists(
@@ -807,9 +810,27 @@ export class AgentsService {
                     ownershipScope,
                 );
                 break;
-            default:
-                // `wildcard` has no row to validate.
+            case 'wildcard':
                 break;
+            default:
+                throw new BadRequestException('Agent target type is invalid.');
+        }
+    }
+
+    private assertTargetShape(target: AgentTarget): void {
+        if (
+            !target ||
+            typeof target !== 'object' ||
+            typeof target.type !== 'string' ||
+            !SUPPORTED_AGENT_TARGET_TYPES.has(target.type)
+        ) {
+            throw new BadRequestException('Agent target type is invalid.');
+        }
+        if (
+            target.type !== 'wildcard' &&
+            (typeof target.id !== 'string' || target.id.trim().length === 0)
+        ) {
+            throw new BadRequestException(`Agent ${target.type} target requires an id.`);
         }
     }
 

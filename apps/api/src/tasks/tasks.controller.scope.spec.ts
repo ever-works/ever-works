@@ -20,8 +20,21 @@ jest.mock('@ever-works/agent/services', () => ({ DecisionConflictService: class 
 jest.mock('@ever-works/agent/activity-log', () => ({ ActivityLogService: class {} }));
 jest.mock('@ever-works/agent/agents', () => ({ AgentEscalationService: class {} }));
 
-import { TasksController } from './tasks.controller';
 import { NotFoundException } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import {
+    TaskChatService,
+    TaskPrStatusService,
+    TaskReviewRejectionService,
+    TasksService,
+    TaskWorkspaceService,
+} from '@ever-works/agent/tasks-domain';
+import { AgentRepository, PluginUsageRepository } from '@ever-works/agent/database';
+import { DecisionConflictService } from '@ever-works/agent/services';
+import { ActivityLogService } from '@ever-works/agent/activity-log';
+import { AgentEscalationService } from '@ever-works/agent/agents';
+import { ScopeContextService } from '../scope/scope-context.service';
+import { TasksController } from './tasks.controller';
 
 describe('TasksController — board-run active scope', () => {
     const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -33,7 +46,7 @@ describe('TasksController — board-run active scope', () => {
         organizationId: '22222222-2222-4222-8222-222222222222',
     };
 
-    function build() {
+    async function build() {
         const service = {
             list: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
             create: jest.fn().mockResolvedValue({ id: taskId }),
@@ -66,23 +79,31 @@ describe('TasksController — board-run active scope', () => {
         };
         const agents = { findByUserIdScoped: jest.fn().mockResolvedValue({ rows: [] }) };
         const escalations = { resolveForTask: jest.fn().mockResolvedValue(true) };
-        const controller = new TasksController(
-            service as never,
-            chat as never,
-            { getTotalSpendCentsForTask: jest.fn().mockResolvedValue(0) } as never,
-            agents as never,
-            {} as never,
-            {} as never,
-            {} as never,
-            escalations as never,
-            {} as never,
-            { getScope: () => everScope } as never,
-        );
+        const moduleRef = await Test.createTestingModule({
+            controllers: [TasksController],
+            providers: [
+                { provide: TasksService, useValue: service },
+                { provide: TaskChatService, useValue: chat },
+                {
+                    provide: PluginUsageRepository,
+                    useValue: { getTotalSpendCentsForTask: jest.fn().mockResolvedValue(0) },
+                },
+                { provide: AgentRepository, useValue: agents },
+                { provide: TaskWorkspaceService, useValue: {} },
+                { provide: DecisionConflictService, useValue: {} },
+                { provide: TaskReviewRejectionService, useValue: {} },
+                { provide: AgentEscalationService, useValue: escalations },
+                { provide: TaskPrStatusService, useValue: {} },
+                { provide: ScopeContextService, useValue: { getScope: () => everScope } },
+                { provide: ActivityLogService, useValue: {} },
+            ],
+        }).compile();
+        const controller = moduleRef.get(TasksController);
         return { controller, service, chat, agents, escalations };
     }
 
     it('threads the exact active tenant and Organization through run, batch, and candidates', async () => {
-        const { controller, service } = build();
+        const { controller, service } = await build();
 
         await controller.run(auth, taskId, { agentId });
         await controller.runBatch(auth, { items: [{ taskId, agentId }] });
@@ -98,7 +119,7 @@ describe('TasksController — board-run active scope', () => {
     });
 
     it('binds escalation resolution to the routed Task and its persisted scope', async () => {
-        const { controller, service, escalations } = build();
+        const { controller, service, escalations } = await build();
         const escalationId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 
         await controller.resolveEscalation(auth, taskId, escalationId, { note: 'Approved' });
@@ -114,7 +135,7 @@ describe('TasksController — board-run active scope', () => {
     });
 
     it('uses the same opaque 404 when scoped Task escalation CAS loses', async () => {
-        const { controller, escalations } = build();
+        const { controller, escalations } = await build();
         const escalationId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
         escalations.resolveForTask.mockResolvedValueOnce(false);
 
@@ -124,7 +145,7 @@ describe('TasksController — board-run active scope', () => {
     });
 
     it('threads the exact active scope through every core Task and chat request operation', async () => {
-        const { controller, service, chat, agents } = build();
+        const { controller, service, chat, agents } = await build();
         const assigneeId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
         const attachmentId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
         const relatedTaskId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';

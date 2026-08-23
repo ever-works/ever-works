@@ -51,6 +51,11 @@ import { toAgentDto } from './types';
 // inline (and matched in value) to avoid coupling agent-export to
 // agent-file at the module-construction layer.
 const MAX_IMPORT_FILE_BYTES = 64 * 1024; // 64 KB per file (spec §5.10a / §5.6.6).
+const SUPPORTED_AGENT_TARGET_TYPES = new Set(['mission', 'idea', 'work', 'wildcard']);
+
+function isSupportedAgentTargetType(value: unknown): value is AgentTarget['type'] {
+    return typeof value === 'string' && SUPPORTED_AGENT_TARGET_TYPES.has(value);
+}
 
 /**
  * Review-fix I7: shared canonical-hash function. Mirrors the
@@ -553,6 +558,23 @@ export class AgentExportService {
                 `Envelope identity.scope is invalid: ${envelope.identity.scope}`,
             );
         }
+        if (!envelope.runtime || typeof envelope.runtime !== 'object') {
+            throw new BadRequestException('Envelope runtime is required.');
+        }
+        if (envelope.runtime.targets !== null && !Array.isArray(envelope.runtime.targets)) {
+            throw new BadRequestException('Envelope runtime.targets must be an array or null.');
+        }
+        for (const target of envelope.runtime.targets ?? []) {
+            if (!target || typeof target !== 'object' || !isSupportedAgentTargetType(target.type)) {
+                throw new BadRequestException('Envelope runtime.targets contains an invalid type.');
+            }
+            if (
+                target.type !== 'wildcard' &&
+                (typeof target.id !== 'string' || target.id.trim().length === 0)
+            ) {
+                throw new BadRequestException(`Imported ${target.type} target requires an id.`);
+            }
+        }
     }
 
     /**
@@ -619,12 +641,22 @@ export class AgentExportService {
         ownershipScope?: OwnershipScope,
     ): Promise<void> {
         for (const target of targets ?? []) {
-            if (target.type === 'wildcard') continue;
-            if (!target.id) {
-                throw new BadRequestException(`Imported ${target.type} target requires an id.`);
+            let entity: EntityTarget<ObjectLiteral>;
+            switch (target.type) {
+                case 'wildcard':
+                    continue;
+                case 'mission':
+                    entity = Mission;
+                    break;
+                case 'idea':
+                    entity = WorkProposal;
+                    break;
+                case 'work':
+                    entity = Work;
+                    break;
+                default:
+                    throw new BadRequestException('Imported Agent target type is invalid.');
             }
-            const entity: EntityTarget<ObjectLiteral> =
-                target.type === 'mission' ? Mission : target.type === 'idea' ? WorkProposal : Work;
             await this.assertEntityOwned(
                 userId,
                 entity,

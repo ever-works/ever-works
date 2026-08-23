@@ -447,6 +447,17 @@ describe('AgentsService', () => {
     });
 
     describe('addTarget / removeTarget (assign an existing Agent to a Work)', () => {
+        it('rejects an unknown target discriminant instead of treating it as a wildcard', async () => {
+            const agent = makeAgent({ scope: AgentScope.TENANT, targets: null });
+            agents.findByIdAndUser.mockResolvedValue(agent);
+
+            await expect(
+                svc.addTarget('u1', 'a1', { type: 'galaxy', id: 'target-1' } as never),
+            ).rejects.toThrow(BadRequestException);
+            expect(agents.casUpdateTargets).not.toHaveBeenCalled();
+            expect(memberships.addMembership).not.toHaveBeenCalled();
+        });
+
         it('appends the target and materializes the membership row', async () => {
             const agent = makeAgent({ scope: AgentScope.TENANT, targets: null });
             agents.findByIdAndUser.mockResolvedValue(agent);

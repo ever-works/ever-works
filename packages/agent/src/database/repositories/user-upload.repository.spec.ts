@@ -114,4 +114,34 @@ describe('UserUploadRepository — ownership scope', () => {
             expect(branch.organizationId).toEqual(expect.objectContaining({ _type: 'isNull' }));
         }
     });
+
+    it('normalizes uppercase SHA-256 before scoped lookup and persistence', async () => {
+        const uppercaseSha256 = sha256.toUpperCase();
+
+        await uploads.record({
+            userId,
+            sha256: uppercaseSha256,
+            ...everScope,
+            storageProvider: 'local-fs',
+            storagePath: `${userId}/${sha256}.png`,
+        });
+
+        expect(orm.findOne).toHaveBeenCalledWith({
+            where: [{ userId, sha256, ...everScope }],
+        });
+        expect(orm.create).toHaveBeenCalledWith(
+            expect.objectContaining({ userId, sha256, ...everScope }),
+        );
+        expect(orm.create).not.toHaveBeenCalledWith(
+            expect.objectContaining({ sha256: uppercaseSha256 }),
+        );
+    });
+
+    it('normalizes uppercase SHA-256 on owned reads so it dedupes with lowercase rows', async () => {
+        await uploads.findOwnedByUser(sha256.toUpperCase(), userId, everScope);
+
+        expect(orm.findOne).toHaveBeenCalledWith({
+            where: [{ sha256, userId, ...everScope }],
+        });
+    });
 });

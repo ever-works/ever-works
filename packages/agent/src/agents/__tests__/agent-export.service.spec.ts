@@ -179,6 +179,18 @@ describe('AgentExportService', () => {
             );
         });
 
+        it.each([[{ type: 'galaxy', id: 'target-1' }], [{ id: 'target-1' }], [null]])(
+            'rejects an imported malformed or unsupported target (%p)',
+            async (target) => {
+                const env = baseEnvelope();
+                env.runtime.targets = [target] as never;
+
+                await expect(svc.importOne('u1', env)).rejects.toThrow(BadRequestException);
+                expect(agents.create).not.toHaveBeenCalled();
+                expect(memberships.replaceForAgent).not.toHaveBeenCalled();
+            },
+        );
+
         it('rejects scope+ids mismatch (TENANT must not carry workId)', async () => {
             await expect(
                 svc.importOne('u1', baseEnvelope(), {

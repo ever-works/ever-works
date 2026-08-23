@@ -215,7 +215,7 @@ export class GoalOrchestratorService {
             goal.assignedAgentId = await this.resolveAssignedAgentId(
                 userId,
                 input.assignedAgentId,
-                scope,
+                ownershipScopeOf(goal),
             );
         }
 

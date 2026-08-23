@@ -40,13 +40,13 @@ describe('AgentRepository Organization scope', () => {
 
         await repository.findByUserIdScoped('user-1', {}, EVER_SCOPE);
 
-        expect(harness.predicates.join('\n')).toContain('agent.tenantId = :scopeTenantId');
+        expect(harness.predicates.join('\n')).toContain('agent.tenantId = :ownershipTenantId');
         expect(harness.predicates.join('\n')).toContain(
-            'agent.organizationId = :scopeOrganizationId',
+            'agent.organizationId = :ownershipOrganizationId',
         );
         expect(Object.assign({}, ...harness.parameters)).toMatchObject({
-            scopeTenantId: EVER_SCOPE.tenantId,
-            scopeOrganizationId: EVER_SCOPE.organizationId,
+            ownershipTenantId: EVER_SCOPE.tenantId,
+            ownershipOrganizationId: EVER_SCOPE.organizationId,
         });
     });
 
@@ -65,7 +65,31 @@ describe('AgentRepository Organization scope', () => {
 
         expect(harness.predicates.join('\n')).toContain('agent.organizationId IS NULL');
         expect(harness.predicates.join('\n')).toContain(
-            '(agent.tenantId = :scopeTenantId OR agent.tenantId IS NULL)',
+            '(agent.tenantId = :ownershipTenantId OR agent.tenantId IS NULL)',
         );
+    });
+
+    it('uses IS NULL for a null-Tenant Organization scope instead of binding = NULL', async () => {
+        const harness = queryHarness();
+        const repository = new AgentRepository(harness.repository);
+
+        await repository.findByUserIdScoped(
+            'user-1',
+            {},
+            {
+                tenantId: null,
+                organizationId: EVER_SCOPE.organizationId,
+            },
+        );
+
+        const predicates = harness.predicates.join('\n');
+        const parameters = Object.assign({}, ...harness.parameters);
+        expect(predicates).toContain('agent.tenantId IS NULL');
+        expect(predicates).toContain('agent.organizationId = :ownershipOrganizationId');
+        expect(predicates).not.toContain('agent.tenantId = :');
+        expect(parameters).toEqual(
+            expect.objectContaining({ ownershipOrganizationId: EVER_SCOPE.organizationId }),
+        );
+        expect(parameters).not.toHaveProperty('ownershipTenantId');
     });
 });

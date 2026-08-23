@@ -4,6 +4,10 @@ import { Repository } from 'typeorm';
 import { UserUpload } from '../../entities/user-upload.entity';
 import { ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 
+function normalizeUploadSha256(sha256: string): string {
+    return sha256.toLowerCase();
+}
+
 export interface RecordUploadInput {
     userId?: string | null;
     sha256: string;
@@ -40,26 +44,30 @@ export class UserUploadRepository {
      * centralized ownership predicate.
      */
     async record(input: RecordUploadInput): Promise<UserUpload> {
-        const scope: OwnershipScope = {
-            tenantId: input.tenantId ?? null,
-            organizationId: input.organizationId ?? null,
+        const normalizedInput = {
+            ...input,
+            sha256: normalizeUploadSha256(input.sha256),
         };
-        const userId = input.userId ?? null;
+        const scope: OwnershipScope = {
+            tenantId: normalizedInput.tenantId ?? null,
+            organizationId: normalizedInput.organizationId ?? null,
+        };
+        const userId = normalizedInput.userId ?? null;
         const existing = await this.repo.findOne({
             where:
                 userId === null
                     ? {
                           userId: null,
-                          sha256: input.sha256,
+                          sha256: normalizedInput.sha256,
                           tenantId: scope.tenantId,
                           organizationId: scope.organizationId,
                       }
                     : ownershipWhereWith<UserUpload>(userId, scope, {
-                          sha256: input.sha256,
+                          sha256: normalizedInput.sha256,
                       }),
         });
         if (existing) return existing;
-        const entity = this.repo.create(input);
+        const entity = this.repo.create(normalizedInput);
         return this.repo.save(entity);
     }
 
@@ -70,7 +78,9 @@ export class UserUploadRepository {
         scope?: OwnershipScope,
     ): Promise<UserUpload | null> {
         return this.repo.findOne({
-            where: ownershipWhereWith<UserUpload>(userId, scope, { sha256 }),
+            where: ownershipWhereWith<UserUpload>(userId, scope, {
+                sha256: normalizeUploadSha256(sha256),
+            }),
         });
     }
 
@@ -125,7 +135,10 @@ export class UserUploadRepository {
         sha256: string,
         folderId: string | null,
     ): Promise<boolean> {
-        const result = await this.repo.update({ userId, sha256 }, { folderId });
+        const result = await this.repo.update(
+            { userId, sha256: normalizeUploadSha256(sha256) },
+            { folderId },
+        );
         return (result.affected ?? 0) > 0;
     }
 

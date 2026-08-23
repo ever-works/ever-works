@@ -326,6 +326,29 @@ describe('GoalOrchestratorService — limits', () => {
         });
     });
 
+    it('validates a pin against the persisted legacy Goal scope, not the broader request scope', async () => {
+        const personalRequestScope = { tenantId: everScope.tenantId, organizationId: null };
+        const { service, agents, goals } = build({
+            goal: { tenantId: null, organizationId: null },
+        });
+        agents.findByIdAndUser.mockResolvedValueOnce(null as never);
+
+        await expect(
+            service.updateLimits(
+                'u1',
+                'g1',
+                { assignedAgentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+                personalRequestScope,
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(
+            'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            'u1',
+            { tenantId: null, organizationId: null },
+        );
+        expect(goals.save).not.toHaveBeenCalled();
+    });
+
     it('persists every limit field and logs the change', async () => {
         const { service, goals, events } = build();
         const dto = await service.updateLimits('u1', 'g1', {
