@@ -257,8 +257,11 @@ export class WorkImportService {
             };
         }
 
-        const normalizedName = this.normalizeWorkName(dto.name, dto.sourceType);
-        let slug = slugifyText(normalizedName);
+        // ImportWorkDto names are explicit, validated user input. Preserve the
+        // requested display name (and derive its slug from the full name); only
+        // repository-derived fallback names are normalized.
+        const requestedName = dto.name;
+        let slug = slugifyText(requestedName);
 
         const existingDir = await this.workRepository.findByOwnerAndSlug({
             userId: user.id,
@@ -350,7 +353,7 @@ export class WorkImportService {
             const work = await this.workRepository.create(
                 {
                     slug,
-                    name: normalizedName,
+                    name: requestedName,
                     description: `Imported from ${safeSourceUrl}`,
                     userId: user.id,
                     owner: workOwner,
