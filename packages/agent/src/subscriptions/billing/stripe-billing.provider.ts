@@ -535,6 +535,36 @@ export class StripeBillingProvider extends BillingProvider {
         };
     }
 
+    /**
+     * 🛑 THIS PATH COLLECTS NO TAX, AND CANNOT BE MADE TO WITHOUT RESHAPING IT.
+     *
+     * The Checkout credit-pack purchase asks for `automatic_tax`, so a German
+     * buyer of the 5,500-credit pack pays $50 + $9.50 VAT. The SAME pack bought
+     * through auto-recharge goes out as a bare PaymentIntent and is charged at
+     * $50 flat. Under the account's OSS registration that VAT is owed either
+     * way, so the difference comes out of margin - and the two prices for one
+     * product is the kind of thing an audit finds.
+     *
+     * It is not an omission that can be patched here: PaymentIntents do not
+     * accept the parameter at all. Verified against the live API, 2026-08-23:
+     *   POST /v1/payment_intents  automatic_tax[enabled]=true
+     *   -> 400 "Received unknown parameter: automatic_tax"
+     * Collecting tax off-session means routing through an Invoice (invoice items
+     * + an invoice carrying `automatic_tax`, paid off-session), which changes
+     * this method's result shape and the events it emits. Deliberately left
+     * alone rather than half-done.
+     *
+     * EXPOSURE TODAY IS ZERO, and the reason is worth knowing because it is
+     * about to change: `autoRechargeEnabled` defaults false and is opt-in, and
+     * turning it on requires a saved card - which was impossible, because the
+     * setup session was rejected by Stripe for want of a `currency`. Measured:
+     * zero live Stripe customers carry an Ever Works userId (control: 1 of 8
+     * live customers in the shared account does have a default payment method,
+     * so the probe discriminates).
+     *
+     * Fixing that setup session is what makes this path reachable for the first
+     * time. Resolve the tax question BEFORE auto-recharge is advertised.
+     */
     async chargeOffSession(request: OffSessionChargeRequest): Promise<OffSessionChargeResult> {
         const stripe = this.requireClient();
         try {
