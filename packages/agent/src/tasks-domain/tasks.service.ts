@@ -37,6 +37,9 @@ import {
 import { AgentRepository } from '../database/repositories/agent.repository';
 import type { Agent } from '../entities/agent.entity';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { UserRepository } from '../database/repositories/user.repository';
+import { OrganizationMemberRepository } from '../database/repositories/organization-member.repository';
+import { TenantRepository } from '../database/repositories/tenant.repository';
 import type { AgentRunStatus } from '../entities/agent-run.entity';
 import { TaskNotificationService } from './task-notification.service';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
@@ -44,6 +47,7 @@ import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import {
     ownershipScopeMatches,
+    ownershipScopeOf,
     ownershipStamp,
     ownershipWhereWith,
     type OwnershipScope,
@@ -292,34 +296,71 @@ export class TasksService {
         // test fixtures keep compiling and graphs without the Agents module
         // simply skip the embed.
         @Optional() private readonly agentRuns?: AgentRunRepository,
+        @Optional() private readonly users?: UserRepository,
+        @Optional() private readonly organizationMembers?: OrganizationMemberRepository,
+        @Optional() private readonly tenants?: TenantRepository,
     ) {}
 
     /**
      * Review-fix I4: shared validator for assignee / reviewer / approver
-     * add paths. For `agent` actor type, the Agent must belong to the
-     * acting user (cross-user is rejected with a 400). For `user` actor
-     * type we just sanity-check the id is a non-empty string — full
-     * user-existence validation requires a UserRepository in this graph
-     * and is deferred to the API layer's @CurrentUser() resolution.
+     * add paths. The persisted Task scope is authoritative: an Agent must
+     * exist in that exact scope, and a user actor must be an active member
+     * of the exact Organization roster (or the Tenant owner). Personal
+     * Tasks can only point back to their owner. Every mismatch shares one
+     * response so a known UUID is not an Organization-roster oracle.
      */
     private async assertActorIsValid(
         userId: string,
         actorType: TaskActorType,
         actorId: string,
-        ownershipScope?: OwnershipScope,
+        task: Task,
     ): Promise<void> {
         if (!actorId || actorId.trim().length === 0) {
             throw new BadRequestException(`${actorType} id is required.`);
         }
+        const taskScope = ownershipScopeOf(task);
         if (actorType === 'agent' && this.agents) {
             const agent = await this.agents
-                .findByIdAndUser(actorId, userId, ownershipScope)
+                .findByIdAndUser(actorId, userId, taskScope)
                 .catch(() => null);
             if (!agent) {
-                throw new BadRequestException(
-                    `Agent ${actorId} is not reachable for this user — cannot assign.`,
-                );
+                throw new BadRequestException('Task actor is not reachable in this Task scope.');
             }
+            return;
+        }
+
+        if (actorType !== 'user') return;
+        const actor = this.users ? await this.users.findById(actorId).catch(() => null) : null;
+        let reachable = Boolean(actor?.isActive);
+
+        if (reachable && taskScope.organizationId) {
+            reachable = actor?.tenantId === taskScope.tenantId;
+            if (reachable && taskScope.tenantId) {
+                const member = this.organizationMembers
+                    ? await this.organizationMembers
+                          .findByOrgAndUser(taskScope.organizationId, actorId)
+                          .catch(() => null)
+                    : null;
+                reachable = Boolean(
+                    member?.organizationId === taskScope.organizationId &&
+                    member?.tenantId === taskScope.tenantId &&
+                    member?.userId === actorId,
+                );
+                if (!reachable) {
+                    const tenant = this.tenants
+                        ? await this.tenants.findById(taskScope.tenantId).catch(() => null)
+                        : null;
+                    reachable = tenant?.ownerUserId === actorId;
+                }
+            } else {
+                reachable = false;
+            }
+        } else if (reachable) {
+            reachable = actorId === task.userId;
+        }
+
+        if (!reachable) {
+            throw new BadRequestException('Task actor is not reachable in this Task scope.');
         }
     }
 
@@ -1214,7 +1255,7 @@ export class TasksService {
     ) {
         const task = await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, assigneeType, assigneeId, ownershipScope);
+        await this.assertActorIsValid(userId, assigneeType, assigneeId, task);
         const row = await this.insertOrConflict(
             () => this.assignees.add(taskId, assigneeType, assigneeId),
             `Task ${taskId} already has assignee ${assigneeId}.`,
@@ -1273,9 +1314,9 @@ export class TasksService {
         reviewerId: string,
         ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId, ownershipScope);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, reviewerType, reviewerId, ownershipScope);
+        await this.assertActorIsValid(userId, reviewerType, reviewerId, task);
         return this.insertOrConflict(
             () => this.reviewers.add(taskId, reviewerType, reviewerId),
             `Task ${taskId} already has reviewer ${reviewerId}.`,
@@ -1289,9 +1330,9 @@ export class TasksService {
         approverId: string,
         ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId, ownershipScope);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, approverType, approverId, ownershipScope);
+        await this.assertActorIsValid(userId, approverType, approverId, task);
         return this.insertOrConflict(
             () => this.approvers.add(taskId, approverType, approverId),
             `Task ${taskId} already has approver ${approverId}.`,

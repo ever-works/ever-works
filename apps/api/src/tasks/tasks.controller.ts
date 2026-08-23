@@ -43,7 +43,7 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 // drive the chat-dispatch fan-out (TaskChatService:136-168). The
 // repository class lives under `@ever-works/agent/database` (the
 // agents barrel re-exports services + module only).
-import { AgentRepository, type OwnershipScope } from '@ever-works/agent/database';
+import { AgentRepository, ownershipScopeOf, type OwnershipScope } from '@ever-works/agent/database';
 import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 // Re-litigation guard (memory upgrades M6) — provided + exported by
 // `KnowledgeBaseModule`, which the api-side TasksModule imports.
@@ -733,10 +733,12 @@ export class TasksController {
         @Param('escalationId', ParseUUIDPipe) escalationId: string,
         @Body() body: ResolveEscalationDto,
     ) {
-        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
-        const resolved = await this.escalations.resolve(
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
+        const resolved = await this.escalations.resolveForTask(
             escalationId,
             auth.userId,
+            id,
+            ownershipScopeOf(task),
             body.note ?? null,
         );
         if (!resolved) {

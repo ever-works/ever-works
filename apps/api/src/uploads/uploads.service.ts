@@ -14,7 +14,7 @@ import type { WorkRepoResolver } from '@ever-works/github-storage-plugin';
 // `@ever-works/agent/database` VALUE barrel into UploadsService would drag TypeORM
 // into the upload unit-test import graph (path-scurry-under-Jest crash). The
 // UploadsModule binds the token to the real repo via `useExisting`.
-import type { UserUploadRepository } from '@ever-works/agent/database';
+import type { OwnershipScope, UserUploadRepository } from '@ever-works/agent/database';
 import { getActiveStorageBackend } from './storage-backend.factory';
 import { ScopeContextService } from '../scope/scope-context.service';
 
@@ -52,6 +52,11 @@ export interface UploadResult {
      * can hand it back when submitting the prompt.
      */
     key?: string;
+}
+
+export interface SaveUploadOptions {
+    workId?: string;
+    ownershipScope?: OwnershipScope;
 }
 
 /**
@@ -312,11 +317,12 @@ export class UploadsService {
         mimeType: string;
         fileSize: number;
         workId?: string;
+        ownershipScope?: OwnershipScope;
     }): Promise<void> {
         if (!this.userUploads) {
             throw new Error('Upload metadata repository is not configured');
         }
-        const scope = this.scopeContext.getScope();
+        const scope = input.ownershipScope ?? this.scopeContext.getScope();
         await this.userUploads.record({
             userId: input.userId,
             sha256: input.sha256,
@@ -349,7 +355,7 @@ export class UploadsService {
     async saveImage(
         userId: string,
         file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'size' | 'originalname'>,
-        opts?: { workId?: string },
+        opts?: SaveUploadOptions,
     ): Promise<UploadResult> {
         this.assertValidUserId(userId);
 
@@ -418,6 +424,7 @@ export class UploadsService {
             mimeType: sniffed.mime,
             fileSize: file.size,
             workId,
+            ownershipScope: opts?.ownershipScope,
         });
 
         // Codex P1 finding on PR #890: returning the plugin's backend-native
@@ -504,7 +511,7 @@ export class UploadsService {
     async saveFile(
         userId: string,
         file: Pick<Express.Multer.File, 'buffer' | 'mimetype' | 'size' | 'originalname'>,
-        opts?: { workId?: string },
+        opts?: SaveUploadOptions,
     ): Promise<UploadResult> {
         this.assertValidUserId(userId);
 
@@ -581,6 +588,7 @@ export class UploadsService {
                 mimeType: declared,
                 fileSize: file.size,
                 workId,
+                ownershipScope: opts?.ownershipScope,
             });
             const url = workId
                 ? `/api/uploads/${encodeURIComponent(userId)}/${filename}?workId=${encodeURIComponent(workId)}`
@@ -632,6 +640,7 @@ export class UploadsService {
                 mimeType: declared,
                 fileSize: file.size,
                 workId,
+                ownershipScope: opts?.ownershipScope,
             });
             const url = workId
                 ? `/api/uploads/${encodeURIComponent(userId)}/${filename}?workId=${encodeURIComponent(workId)}`

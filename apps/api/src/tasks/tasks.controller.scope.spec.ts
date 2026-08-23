@@ -11,12 +11,17 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
 jest.mock('@ever-works/agent/database', () => ({
     PluginUsageRepository: class {},
     AgentRepository: class {},
+    ownershipScopeOf: (row: { tenantId?: string | null; organizationId?: string | null }) => ({
+        tenantId: row.tenantId ?? null,
+        organizationId: row.organizationId ?? null,
+    }),
 }));
 jest.mock('@ever-works/agent/services', () => ({ DecisionConflictService: class {} }));
 jest.mock('@ever-works/agent/activity-log', () => ({ ActivityLogService: class {} }));
 jest.mock('@ever-works/agent/agents', () => ({ AgentEscalationService: class {} }));
 
 import { TasksController } from './tasks.controller';
+import { NotFoundException } from '@nestjs/common';
 
 describe('TasksController — board-run active scope', () => {
     const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -32,7 +37,7 @@ describe('TasksController — board-run active scope', () => {
         const service = {
             list: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
             create: jest.fn().mockResolvedValue({ id: taskId }),
-            getOne: jest.fn().mockResolvedValue({ id: taskId, workId: null }),
+            getOne: jest.fn().mockResolvedValue({ id: taskId, workId: null, ...everScope }),
             update: jest.fn().mockResolvedValue({ id: taskId }),
             listSubtasks: jest.fn().mockResolvedValue({ rows: [], total: 0, doneCount: 0 }),
             remove: jest.fn().mockResolvedValue({ deleted: true }),
@@ -60,6 +65,7 @@ describe('TasksController — board-run active scope', () => {
             post: jest.fn().mockResolvedValue({ id: 'message-1' }),
         };
         const agents = { findByUserIdScoped: jest.fn().mockResolvedValue({ rows: [] }) };
+        const escalations = { resolveForTask: jest.fn().mockResolvedValue(true) };
         const controller = new TasksController(
             service as never,
             chat as never,
@@ -68,11 +74,11 @@ describe('TasksController — board-run active scope', () => {
             {} as never,
             {} as never,
             {} as never,
-            {} as never,
+            escalations as never,
             {} as never,
             { getScope: () => everScope } as never,
         );
-        return { controller, service, chat, agents };
+        return { controller, service, chat, agents, escalations };
     }
 
     it('threads the exact active tenant and Organization through run, batch, and candidates', async () => {
@@ -89,6 +95,32 @@ describe('TasksController — board-run active scope', () => {
             everScope,
         );
         expect(service.listRunCandidates).toHaveBeenCalledWith(userId, taskId, everScope);
+    });
+
+    it('binds escalation resolution to the routed Task and its persisted scope', async () => {
+        const { controller, service, escalations } = build();
+        const escalationId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+
+        await controller.resolveEscalation(auth, taskId, escalationId, { note: 'Approved' });
+
+        expect(service.getOne).toHaveBeenCalledWith(userId, taskId, everScope);
+        expect(escalations.resolveForTask).toHaveBeenCalledWith(
+            escalationId,
+            userId,
+            taskId,
+            everScope,
+            'Approved',
+        );
+    });
+
+    it('uses the same opaque 404 when scoped Task escalation CAS loses', async () => {
+        const { controller, escalations } = build();
+        const escalationId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+        escalations.resolveForTask.mockResolvedValueOnce(false);
+
+        await expect(
+            controller.resolveEscalation(auth, taskId, escalationId, { note: 'Approved' }),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('threads the exact active scope through every core Task and chat request operation', async () => {

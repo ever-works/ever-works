@@ -23,7 +23,12 @@ import {
 import {
     UserUploadRepository,
     WorkRepository,
+    UserRepository,
+    OrganizationRepository,
+    OrganizationMemberRepository,
+    TenantRepository,
     ownershipScopeMatches,
+    type OwnershipScope,
 } from '@ever-works/agent/database';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
@@ -90,6 +95,18 @@ export class UploadsController {
         // scope. Unlike the repositories above, this must fail Nest startup if
         // request-scope plumbing is absent rather than degrading to user-only.
         private readonly scopeContext: ScopeContextService,
+        @Optional()
+        @Inject(UserRepository)
+        private readonly userRepository?: UserRepository,
+        @Optional()
+        @Inject(OrganizationRepository)
+        private readonly organizationRepository?: OrganizationRepository,
+        @Optional()
+        @Inject(OrganizationMemberRepository)
+        private readonly organizationMembers?: OrganizationMemberRepository,
+        @Optional()
+        @Inject(TenantRepository)
+        private readonly tenantRepository?: TenantRepository,
     ) {}
 
     /**
@@ -137,7 +154,10 @@ export class UploadsController {
         if (workId) {
             await this.assertWorkAccess(auth.userId, workId);
         }
-        return this.uploads.saveImage(auth.userId, file, workId ? { workId } : undefined);
+        return this.uploads.saveImage(auth.userId, file, {
+            ...(workId ? { workId } : {}),
+            ownershipScope: this.scopeContext.getScope(),
+        });
     }
 
     @Post('image')
@@ -210,7 +230,10 @@ export class UploadsController {
         if (workId) {
             await this.assertWorkAccess(auth.userId, workId);
         }
-        return this.uploads.saveFile(auth.userId, file, workId ? { workId } : undefined);
+        return this.uploads.saveFile(auth.userId, file, {
+            ...(workId ? { workId } : {}),
+            ownershipScope: this.scopeContext.getScope(),
+        });
     }
 
     /**
@@ -302,9 +325,10 @@ export class UploadsController {
         // reach this point with `req.user` unset (because @Public() bypasses
         // AuthSessionGuard), an authenticated caller is supported as a
         // no-branch convenience.
-        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
+        const { userId, anonAccessToken, anonymousExpiresAt, ownershipScope } =
+            await this.resolveActingUser(req);
 
-        const result = await this.uploads.saveImage(userId, file);
+        const result = await this.uploads.saveImage(userId, file, { ownershipScope });
 
         // Note: `correlationHeader` is accepted but not yet propagated to
         // analytics. Hook it into the ZeroFrictionFunnel emit in a follow-up
@@ -377,9 +401,10 @@ export class UploadsController {
             });
         }
 
-        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
+        const { userId, anonAccessToken, anonymousExpiresAt, ownershipScope } =
+            await this.resolveActingUser(req);
 
-        const result = await this.uploads.saveFile(userId, file);
+        const result = await this.uploads.saveFile(userId, file, { ownershipScope });
 
         // The existing /anonymous endpoint takes an `x-correlation-id`
         // header for future telemetry; we omit it here until the
@@ -425,6 +450,10 @@ export class UploadsController {
         description: 'Backend does not support presign — use POST /api/uploads',
     })
     async presign(@Body() body: PresignUploadDto, @Req() req: AnonRequest) {
+        // Authenticate + hydrate ownership before touching even the backend
+        // capability surface. A revoked bearer must not receive a presign
+        // oracle or a key in a fallback personal scope.
+        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
         const backend = await this.uploads.getBackend();
         if (!backend.presignPut) {
             throw new NotImplementedException({
@@ -434,10 +463,6 @@ export class UploadsController {
                     'Active storage backend does not support presigned uploads — use POST /api/uploads with multipart form data instead.',
             });
         }
-
-        // Mint an anon user when no session is present, same as the anon
-        // upload route — direct-to-cloud uploads need an owner segment.
-        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
 
         const presign = await backend.presignPut({
             filename: body.filename,
@@ -558,24 +583,33 @@ export class UploadsController {
         userId: string;
         anonAccessToken: string | undefined;
         anonymousExpiresAt: string | null | undefined;
+        ownershipScope: OwnershipScope;
     }> {
-        // Codex P2 finding on PR #890: `@Public()` routes never have
-        // `req.user` populated (the guard short-circuits before it
-        // gets to bearer parsing), so the old `req.user?.userId`
-        // check was dead and every authenticated caller hitting
-        // /anonymous or /presign was getting re-anon-minted. Resolve
-        // the bearer here directly — same `authProvider.authenticate`
-        // path the guard would have taken. We swallow the error case:
-        // an unauthenticated request shouldn't fail the upload, it
-        // should fall through to the anon-mint branch.
-        const existing = await this.tryAuthenticate(req);
-        if (existing) {
+        const authorization = req.headers?.authorization;
+        const hasBearer = Array.isArray(authorization)
+            ? authorization.some((value) => value.trim().length > 0)
+            : typeof authorization === 'string' && authorization.trim().length > 0;
+
+        if (hasBearer) {
+            // @Public() skips the global session/scope guards, so reproduce
+            // their authoritative half here. A supplied-but-invalid bearer
+            // is never reinterpreted as an anonymous request.
+            const existing = await this.authenticateBearer(req);
+            const ownershipScope = await this.hydrateAuthenticatedScope(existing);
+            req.user = existing;
+            this.scopeContext.setScope(ownershipScope);
             return {
                 userId: existing.userId,
                 anonAccessToken: undefined,
                 anonymousExpiresAt: undefined,
+                ownershipScope,
             };
         }
+
+        // A genuinely anonymous request is always personal/null, regardless
+        // of any x-scope header the public middleware happened to resolve.
+        const ownershipScope: OwnershipScope = { tenantId: null, organizationId: null };
+        this.scopeContext.setScope(ownershipScope);
 
         const ipAddress =
             (typeof req.ip === 'string' && req.ip) ||
@@ -595,23 +629,66 @@ export class UploadsController {
             userId: anon.user.id,
             anonAccessToken: anon.access_token,
             anonymousExpiresAt: anon.user.anonymousExpiresAt ?? null,
+            ownershipScope,
         };
     }
 
-    /**
-     * Best-effort bearer resolution for `@Public()` upload routes.
-     * Returns the authenticated user when a valid session token is
-     * present, otherwise `null`. Never throws — an invalid/missing
-     * token falls through to anon-mint instead of 401-ing a route
-     * that's documented as accepting anonymous traffic.
-     */
-    private async tryAuthenticate(req: AnonRequest): Promise<AuthenticatedUser | null> {
-        const auth = req.headers?.authorization;
-        if (!auth) return null;
+    private opaqueScopeNotFound(): never {
+        throw new NotFoundException({ status: 'error', message: 'Resource not found' });
+    }
+
+    private async authenticateBearer(req: AnonRequest): Promise<AuthenticatedUser> {
         try {
-            return await this.authProvider.authenticate(toHeaders(req.headers || {}));
+            const authenticated = await this.authProvider.authenticate(
+                toHeaders(req.headers || {}),
+            );
+            if (!authenticated?.userId) this.opaqueScopeNotFound();
+            return authenticated;
         } catch {
-            return null;
+            this.opaqueScopeNotFound();
         }
+    }
+
+    /** Hydrate the exact scope a global SessionScopeGuard would authorize. */
+    private async hydrateAuthenticatedScope(auth: AuthenticatedUser): Promise<OwnershipScope> {
+        const user = this.userRepository
+            ? await this.userRepository.findById(auth.userId).catch(() => null)
+            : null;
+        if (!user?.isActive) this.opaqueScopeNotFound();
+
+        const requested = this.scopeContext.getScope();
+        if (!requested.organizationId) {
+            if (requested.tenantId && requested.tenantId !== (user.tenantId ?? null)) {
+                this.opaqueScopeNotFound();
+            }
+            return { tenantId: user.tenantId ?? null, organizationId: null };
+        }
+
+        if (!requested.tenantId || user.tenantId !== requested.tenantId) {
+            this.opaqueScopeNotFound();
+        }
+        const organization = this.organizationRepository
+            ? await this.organizationRepository.findById(requested.organizationId).catch(() => null)
+            : null;
+        if (!organization || organization.tenantId !== requested.tenantId) {
+            this.opaqueScopeNotFound();
+        }
+        const member = this.organizationMembers
+            ? await this.organizationMembers
+                  .findByOrgAndUser(requested.organizationId, auth.userId)
+                  .catch(() => null)
+            : null;
+        const exactMember = Boolean(
+            member?.userId === auth.userId &&
+            member?.tenantId === requested.tenantId &&
+            member?.organizationId === requested.organizationId,
+        );
+        if (!exactMember) {
+            const tenant = this.tenantRepository
+                ? await this.tenantRepository.findById(requested.tenantId).catch(() => null)
+                : null;
+            if (tenant?.ownerUserId !== auth.userId) this.opaqueScopeNotFound();
+        }
+        return { tenantId: requested.tenantId, organizationId: requested.organizationId };
     }
 }

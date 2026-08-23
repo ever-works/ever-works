@@ -6,6 +6,10 @@
 jest.mock('@ever-works/agent/database', () => ({
     UserUploadRepository: class {},
     WorkRepository: class {},
+    UserRepository: class {},
+    OrganizationRepository: class {},
+    OrganizationMemberRepository: class {},
+    TenantRepository: class {},
     ownershipScopeMatches: (
         row: { tenantId?: string | null; organizationId?: string | null },
         scope?: { tenantId: string | null; organizationId: string | null },
@@ -29,7 +33,14 @@ import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Test } from '@nestjs/testing';
-import { UserUploadRepository, WorkRepository } from '@ever-works/agent/database';
+import {
+    OrganizationMemberRepository,
+    OrganizationRepository,
+    TenantRepository,
+    UserRepository,
+    UserUploadRepository,
+    WorkRepository,
+} from '@ever-works/agent/database';
 import { UploadsController } from './uploads.controller';
 import { UploadsService, USER_UPLOAD_REPOSITORY } from './uploads.service';
 import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
@@ -138,11 +149,297 @@ describe('UploadsController', () => {
             expect.arrayContaining([
                 { index: 3, param: WorkRepository },
                 { index: 4, param: UserUploadRepository },
+                { index: 6, param: UserRepository },
+                { index: 7, param: OrganizationRepository },
+                { index: 8, param: OrganizationMemberRepository },
+                { index: 9, param: TenantRepository },
             ]),
         );
         expect(Reflect.getMetadata('design:paramtypes', UploadsController)[5]).toBe(
             ScopeContextService,
         );
+    });
+
+    describe('public upload routes — bearer-aware scope hydration', () => {
+        const bearerUserId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const yoMemberId = bearerUserId;
+        const fileResult = {
+            id: 'a'.repeat(64),
+            url: `/api/uploads/${bearerUserId}/${'a'.repeat(64)}.png`,
+            filename: `${'a'.repeat(64)}.png`,
+            size: TINY_PNG.length,
+            mimeType: 'image/png',
+            hash: 'a'.repeat(64),
+            key: `${bearerUserId}/${'a'.repeat(64)}.png`,
+        };
+
+        function publicController(options: {
+            activeScope: { tenantId: string | null; organizationId: string | null };
+            bearer?: boolean;
+            authRejects?: boolean;
+            user?: object | null;
+            organization?: object | null;
+            member?: object | null;
+            tenant?: object | null;
+        }) {
+            const uploads = {
+                saveImage: jest.fn().mockResolvedValue(fileResult),
+                saveFile: jest.fn().mockResolvedValue(fileResult),
+                getBackend: jest.fn().mockResolvedValue({
+                    presignPut: jest.fn().mockResolvedValue({
+                        url: 'https://storage.test/put',
+                        key: `${bearerUserId}/direct.png`,
+                        expiresAt: '2099-01-01T00:00:00.000Z',
+                    }),
+                }),
+            };
+            const anonymousAuth = {
+                createAnonymousUser: jest.fn().mockResolvedValue({
+                    user: {
+                        id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                        anonymousExpiresAt: '2099-01-01T00:00:00.000Z',
+                    },
+                    access_token: 'anon-token',
+                }),
+            };
+            const authProvider = {
+                authenticate: options.authRejects
+                    ? jest.fn().mockRejectedValue(new Error('invalid bearer'))
+                    : jest
+                          .fn()
+                          .mockResolvedValue(
+                              options.bearer ? mkAuth({ userId: bearerUserId }) : null,
+                          ),
+            };
+            const scopeContext = {
+                getScope: jest.fn().mockReturnValue(options.activeScope),
+                setScope: jest.fn(),
+            };
+            const users = {
+                findById: jest
+                    .fn()
+                    .mockResolvedValue(
+                        options.user === undefined
+                            ? { id: bearerUserId, tenantId: everScope.tenantId, isActive: true }
+                            : options.user,
+                    ),
+            };
+            const organizations = {
+                findById: jest
+                    .fn()
+                    .mockResolvedValue(
+                        options.organization === undefined
+                            ? { id: everScope.organizationId, tenantId: everScope.tenantId }
+                            : options.organization,
+                    ),
+            };
+            const members = {
+                findByOrgAndUser: jest.fn().mockResolvedValue(
+                    options.member === undefined
+                        ? {
+                              userId: bearerUserId,
+                              tenantId: everScope.tenantId,
+                              organizationId: everScope.organizationId,
+                          }
+                        : options.member,
+                ),
+            };
+            const tenants = {
+                findById: jest
+                    .fn()
+                    .mockResolvedValue(
+                        options.tenant === undefined
+                            ? { id: everScope.tenantId, ownerUserId: 'owner-other' }
+                            : options.tenant,
+                    ),
+            };
+            const scopedController = new (UploadsController as any)(
+                uploads,
+                anonymousAuth,
+                authProvider,
+                undefined,
+                undefined,
+                scopeContext,
+                users,
+                organizations,
+                members,
+                tenants,
+            ) as UploadsController;
+            const req = {
+                headers:
+                    options.bearer || options.authRejects ? { authorization: 'Bearer token' } : {},
+            } as never;
+            return {
+                controller: scopedController,
+                uploads,
+                anonymousAuth,
+                authProvider,
+                scopeContext,
+                users,
+                organizations,
+                members,
+                tenants,
+                req,
+            };
+        }
+
+        it.each([
+            [
+                'image',
+                (ctx: ReturnType<typeof publicController>) =>
+                    ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined),
+            ],
+            [
+                'file',
+                (ctx: ReturnType<typeof publicController>) =>
+                    ctx.controller.uploadAnonymousFile(mkFile({}), ctx.req),
+            ],
+        ] as const)(
+            'forces a truly anonymous spoofed-scope %s upload to explicit null/null',
+            async (_label, invoke) => {
+                const ctx = publicController({ activeScope: everScope });
+
+                await invoke(ctx);
+
+                expect(ctx.scopeContext.setScope).toHaveBeenCalledWith({
+                    tenantId: null,
+                    organizationId: null,
+                });
+                const save = _label === 'image' ? ctx.uploads.saveImage : ctx.uploads.saveFile;
+                expect(save).toHaveBeenCalledWith(
+                    'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+                    expect.anything(),
+                    { ownershipScope: { tenantId: null, organizationId: null } },
+                );
+            },
+        );
+
+        it.each([
+            [
+                'image',
+                (ctx: ReturnType<typeof publicController>) =>
+                    ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined),
+            ],
+            [
+                'file',
+                (ctx: ReturnType<typeof publicController>) =>
+                    ctx.controller.uploadAnonymousFile(mkFile({}), ctx.req),
+            ],
+        ] as const)(
+            'hydrates and explicitly stamps a valid Ever bearer %s upload',
+            async (_label, invoke) => {
+                const ctx = publicController({ activeScope: everScope, bearer: true });
+
+                await invoke(ctx);
+
+                expect(ctx.anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
+                const save = _label === 'image' ? ctx.uploads.saveImage : ctx.uploads.saveFile;
+                expect(save).toHaveBeenCalledWith(bearerUserId, expect.anything(), {
+                    ownershipScope: everScope,
+                });
+                expect(ctx.scopeContext.setScope).toHaveBeenCalledWith(everScope);
+            },
+        );
+
+        it('authorizes a valid Ever bearer before presigning', async () => {
+            const ctx = publicController({ activeScope: everScope, bearer: true });
+
+            await ctx.controller.presign(
+                { filename: 'direct.png', mimeType: 'image/png', size: 100 },
+                ctx.req,
+            );
+
+            expect(ctx.users.findById).toHaveBeenCalledWith(bearerUserId);
+            expect(ctx.members.findByOrgAndUser).toHaveBeenCalledWith(
+                everScope.organizationId,
+                bearerUserId,
+            );
+            expect(ctx.uploads.getBackend).toHaveBeenCalledTimes(1);
+        });
+
+        it.each([
+            [
+                'known Yo member',
+                {
+                    member: {
+                        userId: bearerUserId,
+                        tenantId: yoScope.tenantId,
+                        organizationId: yoScope.organizationId,
+                    },
+                    tenant: { id: everScope.tenantId, ownerUserId: 'other' },
+                },
+            ],
+            [
+                'revoked Ever member',
+                { member: null, tenant: { id: everScope.tenantId, ownerUserId: 'other' } },
+            ],
+            ['unknown Organization', { organization: null }],
+        ] as const)(
+            'opaquely rejects a bearer with %s before upload or presign',
+            async (_label, overrides) => {
+                const uploadCtx = publicController({
+                    activeScope: everScope,
+                    bearer: true,
+                    ...overrides,
+                });
+                const presignCtx = publicController({
+                    activeScope: everScope,
+                    bearer: true,
+                    ...overrides,
+                });
+
+                await expect(
+                    uploadCtx.controller.uploadAnonymous(mkFile({}), uploadCtx.req, undefined),
+                ).rejects.toBeInstanceOf(NotFoundException);
+                await expect(
+                    presignCtx.controller.presign(
+                        { filename: 'direct.png', mimeType: 'image/png', size: 100 },
+                        presignCtx.req,
+                    ),
+                ).rejects.toBeInstanceOf(NotFoundException);
+                expect(uploadCtx.uploads.saveImage).not.toHaveBeenCalled();
+                expect(presignCtx.uploads.getBackend).not.toHaveBeenCalled();
+            },
+        );
+
+        it('rejects an invalid bearer instead of silently minting an anonymous owner', async () => {
+            const ctx = publicController({ activeScope: everScope, authRejects: true });
+
+            await expect(
+                ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined),
+            ).rejects.toBeDefined();
+            expect(ctx.anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
+            expect(ctx.uploads.saveImage).not.toHaveBeenCalled();
+        });
+
+        it('forces anonymous presign to null/null before reading the backend', async () => {
+            const ctx = publicController({ activeScope: everScope });
+
+            await ctx.controller.presign(
+                { filename: 'direct.png', mimeType: 'image/png', size: 100 },
+                ctx.req,
+            );
+
+            expect(ctx.scopeContext.setScope).toHaveBeenCalledWith({
+                tenantId: null,
+                organizationId: null,
+            });
+            expect(ctx.anonymousAuth.createAnonymousUser).toHaveBeenCalledTimes(1);
+            expect(ctx.uploads.getBackend).toHaveBeenCalledTimes(1);
+        });
+
+        it('derives an explicit personal scope for a valid bearer', async () => {
+            const personalScope = { tenantId: everScope.tenantId, organizationId: null };
+            const ctx = publicController({ activeScope: personalScope, bearer: true });
+
+            await ctx.controller.uploadAnonymousFile(mkFile({}), ctx.req);
+
+            expect(ctx.uploads.saveFile).toHaveBeenCalledWith(bearerUserId, expect.anything(), {
+                ownershipScope: personalScope,
+            });
+            expect(ctx.organizations.findById).not.toHaveBeenCalled();
+            expect(ctx.members.findByOrgAndUser).not.toHaveBeenCalled();
+        });
     });
 
     beforeEach(async () => {

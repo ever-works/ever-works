@@ -100,6 +100,28 @@ describe('UploadsService', () => {
                 /metadata database unavailable/,
             );
         });
+
+        it.each(['saveImage', 'saveFile'] as const)(
+            'uses the explicit ownership scope for %s even when request ALS is stale',
+            async (method) => {
+                const yoScope = {
+                    tenantId: everScope.tenantId,
+                    organizationId: '33333333-3333-4333-8333-333333333333',
+                };
+                const userUploads = { record: jest.fn().mockResolvedValue({ id: 'row-ever' }) };
+                const scoped = new (UploadsService as any)(backend, undefined, userUploads, {
+                    getScope: () => yoScope,
+                }) as UploadsService;
+
+                await (scoped[method] as any)(userId, fakeFile({}), {
+                    ownershipScope: everScope,
+                });
+
+                expect(userUploads.record).toHaveBeenCalledWith(
+                    expect.objectContaining({ userId, ...everScope }),
+                );
+            },
+        );
     });
 
     beforeEach(async () => {

@@ -47,10 +47,15 @@ function makeService(overrides: Record<string, any> = {}) {
             wouldCreateCycle: jest.fn().mockResolvedValue(false),
         },
         assignees: {
+            add: jest.fn().mockResolvedValue({ id: 'assignee-row' }),
             removeForTask: jest.fn(),
         },
-        reviewers: {},
-        approvers: {},
+        reviewers: {
+            add: jest.fn().mockResolvedValue({ id: 'reviewer-row' }),
+        },
+        approvers: {
+            add: jest.fn().mockResolvedValue({ id: 'approver-row' }),
+        },
         blocks: {
             removeForTask: jest.fn(),
         },
@@ -90,10 +95,22 @@ function makeService(overrides: Record<string, any> = {}) {
         agentRuns: {
             findByIds: jest.fn(),
         },
+        notifications: {
+            emit: jest.fn().mockResolvedValue(undefined),
+        },
+        users: {
+            findById: jest.fn(),
+        },
+        organizationMembers: {
+            findByOrgAndUser: jest.fn(),
+        },
+        tenants: {
+            findById: jest.fn(),
+        },
         ...overrides,
     };
 
-    const service = new TasksService(
+    const service = new (TasksService as any)(
         repos.tasks as any,
         repos.assignees as any,
         repos.reviewers as any,
@@ -105,7 +122,7 @@ function makeService(overrides: Record<string, any> = {}) {
         undefined,
         repos.attachments as any,
         repos.agents as any,
-        undefined,
+        repos.notifications as any,
         repos.workUploads as any,
         repos.works as any,
         repos.missions as any,
@@ -113,6 +130,9 @@ function makeService(overrides: Record<string, any> = {}) {
         repos.teams as any,
         repos.goals as any,
         repos.agentRuns as any,
+        repos.users as any,
+        repos.organizationMembers as any,
+        repos.tenants as any,
     );
 
     return { service, repos };
@@ -127,6 +147,167 @@ describe('TasksService authorization guardrails', () => {
         tenantId: everScope.tenantId,
         organizationId: '33333333-3333-4333-8333-333333333333',
     };
+
+    const taskOwnerId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const everMemberId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    const yoMemberId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+    const actorCases = [
+        {
+            label: 'assignee',
+            invoke: (
+                service: TasksService,
+                taskId: string,
+                actorId: string,
+                scope: typeof everScope,
+            ) => service.addAssignee(taskOwnerId, taskId, 'user', actorId, scope),
+            inserted: (repos: ReturnType<typeof makeService>['repos']) => repos.assignees.add,
+        },
+        {
+            label: 'reviewer',
+            invoke: (
+                service: TasksService,
+                taskId: string,
+                actorId: string,
+                scope: typeof everScope,
+            ) => service.addReviewer(taskOwnerId, taskId, 'user', actorId, scope),
+            inserted: (repos: ReturnType<typeof makeService>['repos']) => repos.reviewers.add,
+        },
+        {
+            label: 'approver',
+            invoke: (
+                service: TasksService,
+                taskId: string,
+                actorId: string,
+                scope: typeof everScope,
+            ) => service.addApprover(taskOwnerId, taskId, 'user', actorId, scope),
+            inserted: (repos: ReturnType<typeof makeService>['repos']) => repos.approvers.add,
+        },
+    ] as const;
+
+    it.each(actorCases)(
+        'rejects a known same-Tenant Yo user as an Ever Task $label without inserting or notifying',
+        async ({ invoke, inserted }) => {
+            const task = makeTask({ userId: taskOwnerId, ...everScope });
+            const { service, repos } = makeService();
+            repos.tasks.findByIdAndUser.mockResolvedValueOnce(task);
+            repos.users.findById.mockResolvedValueOnce({
+                id: yoMemberId,
+                tenantId: everScope.tenantId,
+                isActive: true,
+            });
+            // Even a repository bug returning the known Yo roster row must
+            // not weaken the exact Organization comparison in the service.
+            repos.organizationMembers.findByOrgAndUser.mockResolvedValueOnce({
+                userId: yoMemberId,
+                tenantId: yoScope.tenantId,
+                organizationId: yoScope.organizationId,
+            });
+            repos.tenants.findById.mockResolvedValueOnce({
+                id: everScope.tenantId,
+                ownerUserId: taskOwnerId,
+            });
+
+            await expect(invoke(service, task.id, yoMemberId, everScope)).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(inserted(repos)).not.toHaveBeenCalled();
+            expect(repos.notifications.emit).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(actorCases)(
+        'rejects a revoked Ever user as a Task $label with the same opaque failure',
+        async ({ invoke, inserted }) => {
+            const task = makeTask({ userId: taskOwnerId, ...everScope });
+            const { service, repos } = makeService();
+            repos.tasks.findByIdAndUser.mockResolvedValueOnce(task);
+            repos.users.findById.mockResolvedValueOnce({
+                id: everMemberId,
+                tenantId: everScope.tenantId,
+                isActive: true,
+            });
+            repos.organizationMembers.findByOrgAndUser.mockResolvedValueOnce(null);
+            repos.tenants.findById.mockResolvedValueOnce({
+                id: everScope.tenantId,
+                ownerUserId: taskOwnerId,
+            });
+
+            await expect(invoke(service, task.id, everMemberId, everScope)).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(inserted(repos)).not.toHaveBeenCalled();
+            expect(repos.notifications.emit).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(actorCases)(
+        'accepts an active exact-roster Ever user as a Task $label',
+        async ({ invoke, inserted }) => {
+            const task = makeTask({ userId: taskOwnerId, ...everScope });
+            const { service, repos } = makeService();
+            repos.tasks.findByIdAndUser.mockResolvedValueOnce(task);
+            repos.users.findById.mockResolvedValueOnce({
+                id: everMemberId,
+                tenantId: everScope.tenantId,
+                isActive: true,
+            });
+            repos.organizationMembers.findByOrgAndUser.mockResolvedValueOnce({
+                userId: everMemberId,
+                organizationId: everScope.organizationId,
+                tenantId: everScope.tenantId,
+            });
+
+            await expect(invoke(service, task.id, everMemberId, everScope)).resolves.toBeDefined();
+            expect(inserted(repos)).toHaveBeenCalled();
+        },
+    );
+
+    it('allows the tenant owner without a roster row on an Ever Task', async () => {
+        const task = makeTask({ userId: taskOwnerId, ...everScope });
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValueOnce(task);
+        repos.users.findById.mockResolvedValueOnce({
+            id: taskOwnerId,
+            tenantId: everScope.tenantId,
+            isActive: true,
+        });
+        repos.organizationMembers.findByOrgAndUser.mockResolvedValueOnce(null);
+        repos.tenants.findById.mockResolvedValueOnce({
+            id: everScope.tenantId,
+            ownerUserId: taskOwnerId,
+        });
+
+        await expect(
+            service.addAssignee(taskOwnerId, task.id, 'user', taskOwnerId, everScope),
+        ).resolves.toBeDefined();
+    });
+
+    it('keeps personal Task user actors limited to the personal owner', async () => {
+        const personalScope = { tenantId: everScope.tenantId, organizationId: null };
+        const task = makeTask({ userId: taskOwnerId, ...personalScope });
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValue(task);
+        repos.users.findById
+            .mockResolvedValueOnce({
+                id: taskOwnerId,
+                tenantId: everScope.tenantId,
+                isActive: true,
+            })
+            .mockResolvedValueOnce({
+                id: everMemberId,
+                tenantId: everScope.tenantId,
+                isActive: true,
+            });
+
+        await expect(
+            service.addReviewer(taskOwnerId, task.id, 'user', taskOwnerId, personalScope),
+        ).resolves.toBeDefined();
+        await expect(
+            service.addReviewer(taskOwnerId, task.id, 'user', everMemberId, personalScope),
+        ).rejects.toThrow(BadRequestException);
+        expect(repos.reviewers.add).toHaveBeenCalledTimes(1);
+    });
 
     it('scopes the includeRun batch lookup instead of trusting a Task latestRunId pointer', async () => {
         const knownRunId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
