@@ -84,6 +84,12 @@ export interface UsageSummaryTotals {
     creditsConsumed: number;
     /** Credits (purchases/grants/daily-free) inside the window. */
     creditsAdded: number;
+    /**
+     * Unconsumed allowance credits that lapsed inside the window (`expiry`
+     * rows). Reported apart from `creditsConsumed` so "Credits used" is
+     * only ever what the user spent.
+     */
+    creditsExpired: number;
     /** Metered spend (`plugin_usage_events.costCents`) in the window. */
     spendCents: number;
     tasksCompleted: number;
@@ -232,6 +238,7 @@ export class UsageSummaryService {
             balanceCredits,
             creditsConsumed: ledgerTotals.consumedCredits,
             creditsAdded: ledgerTotals.addedCredits,
+            creditsExpired: ledgerTotals.expiredCredits,
             spendCents,
             tasksCompleted: counts.tasksCompleted,
             worksActive: counts.worksActive,

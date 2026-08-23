@@ -5,9 +5,6 @@ import {
     CreditLedgerWrite,
 } from '@src/database/repositories/credit-ledger.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
-import { UserSubscriptionRepository } from '@src/database/repositories/user-subscription.repository';
-import { BillingProfileRepository } from '@src/database/repositories/billing-profile.repository';
-import { isPastDueSubscriptionStatus } from '@src/entities/billing-profile.entity';
 import { CreditLedgerEntry, CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
 import type { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
 import type { ClassToObject } from '@src/entities/types';
@@ -50,6 +47,13 @@ export interface RecordCreditEntryOptions {
     allowNegativeBalance?: boolean;
     /** Ceiling for non-accumulating grants; a full clamp returns null. */
     maxBalanceAfter?: number | null;
+    /**
+     * Bucket expiry for a positive write (plan allowance grants carry
+     * their allowance-month end). Ignored on debits; absent = never.
+     */
+    expiresAt?: Date | null;
+    /** Clock override for tests. */
+    now?: Date;
 }
 
 export interface CreditLedgerListOptions {
@@ -87,26 +91,19 @@ export interface DailyGrantSummary {
      * systematic failure is visible instead of looking like a quiet run.
      */
     failed: number;
-    /** Users that received a monthly plan allowance (or a top-up) this run. */
-    monthlyGranted: number;
-    /** Users whose monthly allowance for this period already existed. */
-    monthlyAlreadyGranted: number;
-    /**
-     * Users whose MONTHLY grant threw. Counted for exactly the same reason as
-     * {@link failed}: without it, a sweep in which every paying subscriber
-     * failed to be paid is byte-identical to a healthy one.
-     */
-    monthlyFailed: number;
 }
 
-/**
- * `refType` stamped on every monthly plan-allowance row. 12 chars, well
- * inside the varchar(32) column. The monthly grant sums prior rows of this
- * type inside the calendar month to work out how much is still owed, so
- * this string is load-bearing - changing it re-grants the full allowance
- * to every user in the current month.
- */
-export const MONTHLY_PLAN_REF_TYPE = 'plan-monthly';
+export interface ExpirySweepSummary {
+    /** Users that had at least one due bucket. */
+    users: number;
+    /** Buckets closed. */
+    buckets: number;
+    /** Credits written off as `expiry` rows. */
+    credits: number;
+}
+
+/** Outcome of the lazy per-user daily grant (dispatch-gate path). */
+export type DailyGrantOutcome = 'granted' | 'already-granted' | 'skipped';
 
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 100;
@@ -133,8 +130,6 @@ export class CreditLedgerService {
         private readonly creditLedgerRepository: CreditLedgerRepository,
         private readonly entitlementsService: EntitlementsService,
         private readonly userRepository: UserRepository,
-        private readonly userSubscriptionRepository: UserSubscriptionRepository,
-        private readonly billingProfileRepository: BillingProfileRepository,
     ) {}
 
     /**
@@ -169,9 +164,14 @@ export class CreditLedgerService {
             idempotencyKey: options.idempotencyKey ?? null,
         };
 
+        if (options.expiresAt && options.amountCredits > 0) {
+            write.expiresAt = options.expiresAt;
+        }
+
         const result = await this.creditLedgerRepository.recordAtomic(write, {
             minBalanceAfter: options.amountCredits < 0 && !allowNegative ? 0 : null,
             maxBalanceAfter: options.maxBalanceAfter ?? null,
+            now: options.now,
         });
 
         switch (result.status) {
@@ -189,9 +189,69 @@ export class CreditLedgerService {
         }
     }
 
-    /** Authoritative balance: SUM of all signed movements for the user. */
+    /** True when a movement with this idempotency key was already written. */
+    async hasEntry(idempotencyKey: string): Promise<boolean> {
+        return (await this.creditLedgerRepository.findByIdempotencyKey(idempotencyKey)) !== null;
+    }
+
+    async sumByRefTypeInWindow(
+        userId: string,
+        refType: string,
+        from: Date,
+        to: Date,
+    ): Promise<number> {
+        return this.creditLedgerRepository.sumByRefTypeInWindow(userId, refType, from, to);
+    }
+
+    /**
+     * Available balance: SUM of all signed movements for the user, minus
+     * the unconsumed part of buckets that lapsed but are not swept yet.
+     */
     async getBalance(userId: string): Promise<number> {
         return this.creditLedgerRepository.getBalance(userId);
+    }
+
+    /**
+     * Close lapsed buckets (billing spec §3.2 FR-7). With a `userId`,
+     * just that user (the settlement/gate path); without, every user
+     * with a due bucket, in bounded batches (the daily sweep). Each
+     * expiry is an `expiry` row keyed `expiry:{entryId}`, so re-running
+     * is a no-op.
+     */
+    async expireDueCredits(userId?: string, now: Date = new Date()): Promise<ExpirySweepSummary> {
+        const summary: ExpirySweepSummary = { users: 0, buckets: 0, credits: 0 };
+        const expireOne = async (id: string) => {
+            const expired = await this.creditLedgerRepository.expireDueBuckets(id, now);
+            if (expired.length > 0) {
+                summary.users += 1;
+                summary.buckets += expired.length;
+                summary.credits += expired.reduce((sum, item) => sum + item.expiredCredits, 0);
+            }
+        };
+
+        if (userId) {
+            await expireOne(userId);
+            return summary;
+        }
+
+        const batchSize = config.billing.credits.getDailyGrantBatchSize();
+        // Each pass closes the buckets it found, so the next read returns
+        // a strictly smaller set; the guard stops a pathological loop.
+        for (let pass = 0; pass < 1000; pass += 1) {
+            const users = await this.creditLedgerRepository.findUsersWithDueBuckets(now, batchSize);
+            if (users.length === 0) break;
+            for (const id of users) {
+                try {
+                    await expireOne(id);
+                } catch (error) {
+                    this.logger.warn(
+                        `Credit expiry failed for user ${id}: ${(error as Error).message}`,
+                    );
+                }
+            }
+            if (users.length < batchSize) break;
+        }
+        return summary;
     }
 
     /** Owner-scoped paginated ledger with period + kind filters. */
@@ -273,9 +333,9 @@ export class CreditLedgerService {
 
     /**
      * Daily free-credit sweep (RPC target of the `credits-daily-grant`
-     * cron, 00:05 UTC). For every active user whose plan carries the
-     * `daily-free-credits` entitlement (> 0), tops the balance back UP TO
-     * that level — non-accumulating per the PRD: a balance already at or
+     * cron, 00:05 UTC). For every active user, on EVERY plan, tops the
+     * balance back UP TO the plan's `daily-free-credits` level (platform
+     * default 50) — non-accumulating per the PRD: a balance already at or
      * above the level receives nothing. Idempotency key
      * `daily:{userId}:{date}` makes cron re-runs a no-op.
      */
@@ -286,9 +346,6 @@ export class CreditLedgerService {
             alreadyGranted: 0,
             scanned: 0,
             failed: 0,
-            monthlyGranted: 0,
-            monthlyAlreadyGranted: 0,
-            monthlyFailed: 0,
         };
         const date = now.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
         const batchSize = config.billing.credits.getDailyGrantBatchSize();
@@ -304,38 +361,24 @@ export class CreditLedgerService {
             for (const user of users) {
                 summary.scanned += 1;
                 const planCode = (user.defaultPlan?.code as string) || defaultPlanCode;
-
-                const daily = await this.grantDailyCredits(
-                    user.id,
-                    planCode,
-                    date,
-                    fallbackDailyFree,
-                );
-                if (daily === 'granted') {
-                    summary.granted += 1;
-                } else if (daily === 'already') {
-                    summary.alreadyGranted += 1;
-                } else if (daily === 'failed') {
-                    // Counted separately from `skipped`: a systematic grant
-                    // failure used to be byte-identical to a healthy sweep, so
-                    // it could re-fail once a day forever with nobody paged.
+                try {
+                    const outcome = await this.grantDailyForPlan(
+                        user.id,
+                        planCode,
+                        date,
+                        fallbackDailyFree,
+                    );
+                    if (outcome === 'granted') summary.granted += 1;
+                    else if (outcome === 'already-granted') summary.alreadyGranted += 1;
+                    else summary.skipped += 1;
+                } catch (error) {
+                    // Best-effort per user — one failure must not starve the
+                    // rest of the sweep; the idempotency key retries tomorrow.
+                    summary.skipped += 1;
                     summary.failed += 1;
-                    summary.skipped += 1;
-                } else {
-                    summary.skipped += 1;
-                }
-
-                // Deliberately NOT chained to the daily outcome. The daily
-                // grant returns early on a zero entitlement and on a cron
-                // re-run, and a plan monthly allowance must not inherit
-                // either of those exits - they are separate promises.
-                const monthly = await this.grantMonthlyPlanCredits(user.id, now);
-                if (monthly === 'granted') {
-                    summary.monthlyGranted += 1;
-                } else if (monthly === 'already') {
-                    summary.monthlyAlreadyGranted += 1;
-                } else if (monthly === 'failed') {
-                    summary.monthlyFailed += 1;
+                    this.logger.warn(
+                        `Daily grant failed for user ${user.id}: ${(error as Error).message}`,
+                    );
                 }
             }
             if (users.length < batchSize) {
@@ -346,29 +389,47 @@ export class CreditLedgerService {
         // Emitted here as well as in the cron task, because this method is also
         // reachable over the internal RPC channel and a payout failure must be
         // visible from whichever side invoked it.
-        if (summary.failed > 0 || summary.monthlyFailed > 0) {
+        if (summary.failed > 0) {
             this.logger.error(
-                `Credit grant sweep: ${summary.failed} daily and ${summary.monthlyFailed} monthly ` +
-                    `grant(s) FAILED across ${summary.scanned} user(s).`,
+                `Credit grant sweep: ${summary.failed} daily grant(s) FAILED ` +
+                    `across ${summary.scanned} user(s).`,
             );
         }
 
         return summary;
     }
     /**
-     * One user daily free credits. Extracted from the sweep so that its
-     * early exits cannot swallow the monthly plan allowance.
-     *
-     * `'skipped'` covers three genuinely different outcomes that the summary
-     * has always counted together: a zero entitlement, a ceiling that clamped
-     * the grant to nothing, and a per-user failure.
+     * Lazy daily grant for one user. The dispatch gate and sweep share the
+     * same idempotency key, so they cannot double-grant.
      */
-    private async grantDailyCredits(
+    async grantDailyForUser(
+        userId: string,
+        planCode: string,
+        now: Date = new Date(),
+    ): Promise<DailyGrantOutcome> {
+        const date = now.toISOString().slice(0, 10);
+        return this.grantDailyForPlan(
+            userId,
+            planCode,
+            date,
+            config.billing.credits.getDailyFreeCredits(),
+        );
+    }
+
+    /**
+     * The universal daily allowance (billing spec FR-1): every plan code
+     * resolves its `daily-free-credits` entitlement, and a plan without a
+     * row falls back to the platform default (`CREDITS_DAILY_FREE`, 50).
+     * Earlier code granted the fallback to the free plan only, which is
+     * why paid subscribers received no daily credits while the catalog
+     * and the marketing site said 50/day on every tier.
+     */
+    private async grantDailyForPlan(
         userId: string,
         planCode: string,
         date: string,
         fallbackDailyFree: number,
-    ): Promise<'granted' | 'already' | 'failed' | 'skipped'> {
+    ): Promise<DailyGrantOutcome> {
         // The advertised daily allowance is universal (the pricing page says
         // "50 free credits/day" on every tier), so the FALLBACK is the same for
         // every plan. A plan that should get none carries an explicit
@@ -382,12 +443,11 @@ export class CreditLedgerService {
         if (level <= 0) {
             return 'skipped';
         }
-
         try {
             const idempotencyKey = `daily:${userId}:${date}`;
             const existing = await this.creditLedgerRepository.findByIdempotencyKey(idempotencyKey);
             if (existing) {
-                return 'already';
+                return 'already-granted';
             }
 
             // 🛑 No `maxBalanceAfter`. It used to top the balance UP TO the
@@ -418,174 +478,7 @@ export class CreditLedgerService {
             // Best-effort per user - one failure must not starve the rest of
             // the sweep; the idempotency key retries tomorrow.
             this.logger.warn(`Daily grant failed for user ${userId}: ${(error as Error).message}`);
-            return 'failed';
+            throw error;
         }
     }
-
-    /**
-     * The plan's monthly credit allowance (`subscription_plans.monthlyCredits`).
-     *
-     * ## What it is keyed to, and why that is the whole design
-     *
-     * Resolved from the user's CURRENT subscription row, never from
-     * `user.defaultPlan`. Two independent reasons, both live today:
-     *
-     *  - **Dunning.** A failed invoice leaves `defaultPlanId` on the paid tier
-     *    for the whole of Stripe's retry window, because the webhook handler
-     *    deliberately neither grants nor revokes. A `defaultPlan` reader would
-     *    keep paying out 3,000 / 25,000 credits a month for invoices that never
-     *    cleared.
-     *
-     *    🛑 Reading the subscription row is NOT by itself enough to stop that.
-     *    `SubscriptionStatus.PAST_DUE` exists in the enum and is never assigned
-     *    anywhere — the dunning state is persisted on a different table,
-     *    `billing_profiles.subscriptionStatus`. So the grant consults the billing
-     *    profile too, and skips while the provider cannot collect.
-     *  - **Divergence.** The subscription row is written unconditionally,
-     *    while `assignPlanToUser` (the only writer of `defaultPlanId`) is
-     *    gated on `SUBSCRIPTIONS_ENABLED`. On a deployment where that flag
-     *    is off, a paying customer has an ACTIVE `standard` row and
-     *    `defaultPlanId = free` — a `defaultPlan` reader pays them nothing,
-     *    forever, and nothing self-heals it.
-     *
-     * Consequence to state plainly: a plan assigned by an admin with no
-     * `user_subscriptions` row receives no monthly credits. That is
-     * deliberate — this grant follows money, not tier labels.
-     *
-     * ## The idempotency key
-     *
-     * `plan-monthly:{userId}:{subscriptionId}:{monthIndex}:{planCode}`, where
-     * `monthIndex` counts whole months elapsed since the subscription's
-     * `createdAt` — its billing anniversary, not the calendar. Written as a
-     * TOP-UP to the best allowance held inside that anniversary window, so:
-     *
-     *   - a monthly renewal grants again (the index moves on the anniversary);
-     *   - an ANNUAL subscriber still gets twelve grants a year, not one;
-     *   - a mid-cycle upgrade grants only the difference (Pro to Enterprise
-     *     adds 22,000, not a second 25,000);
-     *   - a mid-cycle downgrade writes nothing and removes nothing;
-     *   - a cancelled subscription simply stops.
-     *
-     * 🛑 A CALENDAR-month key looks equivalent and is not: someone who
-     * subscribes on the 31st would be granted again hours later on the 1st.
-     * Anchoring on the subscription keeps grants and charges in step, and
-     * makes it safe to also call this straight from the activation path.
-     *
-     * Max key length: 13 + 36 + 1 + 36 + 1 + 4 + 1 + 21 = 113 <= varchar(128).
-     *
-     * Credits ROLL OVER. Nothing in this codebase expires or claws back a
-     * granted credit, and this method deliberately does not become the first
-     * thing that does.
-     */
-    private async grantMonthlyPlanCredits(
-        userId: string,
-        now: Date,
-    ): Promise<'granted' | 'already' | 'failed' | 'skipped'> {
-        try {
-            const subscription = await this.userSubscriptionRepository.findCurrentByUser(userId);
-            if (!subscription) {
-                return 'skipped';
-            }
-
-            const plan = subscription.plan ?? null;
-            const allowance = Number(plan?.monthlyCredits ?? 0);
-            if (!Number.isInteger(allowance) || allowance <= 0) {
-                return 'skipped';
-            }
-
-            // The real dunning signal. `user_subscriptions.status` never becomes
-            // `past_due` — nothing writes it — so without this a customer whose
-            // invoice has been failing for weeks keeps drawing the full monthly
-            // allowance. A missing profile is treated as "collecting fine", which
-            // is the pre-existing posture everywhere else that reads this state.
-            const profile = await this.billingProfileRepository.findByUserId(userId);
-            if (isPastDueSubscriptionStatus(profile?.subscriptionStatus)) {
-                return 'skipped';
-            }
-
-            const anchor = subscription.createdAt;
-            if (!(anchor instanceof Date) || Number.isNaN(anchor.getTime())) {
-                return 'skipped';
-            }
-            const monthIndex = elapsedWholeMonths(anchor, now);
-            const planCode = String(subscription.planCode ?? plan?.code ?? 'unknown');
-            const idempotencyKey = `plan-monthly:${userId}:${subscription.id}:${monthIndex}:${planCode}`;
-
-            const existing = await this.creditLedgerRepository.findByIdempotencyKey(idempotencyKey);
-            if (existing) {
-                return 'already';
-            }
-
-            const from = addWholeMonths(anchor, monthIndex);
-            const to = addWholeMonths(anchor, monthIndex + 1);
-            const alreadyGrantedThisPeriod = await this.creditLedgerRepository.sumByRefTypeInWindow(
-                userId,
-                MONTHLY_PLAN_REF_TYPE,
-                from,
-                to,
-            );
-            const delta = allowance - alreadyGrantedThisPeriod;
-            if (delta <= 0) {
-                // A downgrade, or a re-grant under a different plan code in the
-                // same period. Never write a zero or negative row.
-                return 'skipped';
-            }
-
-            const entry = await this.record({
-                userId,
-                kind: CreditLedgerKind.GRANT,
-                amountCredits: delta,
-                refType: MONTHLY_PLAN_REF_TYPE,
-                refId: subscription.id,
-                description: `Monthly plan credits - ${plan?.displayName ?? planCode}`,
-                idempotencyKey,
-                // No maxBalanceAfter: the monthly allowance accumulates. A
-                // balance ceiling here would deny a customer the allowance they
-                // are actively paying for the moment they buy a credit pack.
-            });
-            return entry ? 'granted' : 'skipped';
-        } catch (error) {
-            this.logger.warn(
-                `Monthly plan grant failed for user ${userId}: ${(error as Error).message}`,
-            );
-            return 'failed';
-        }
-    }
-}
-
-/**
- * Whole UTC months elapsed from `anchor` to `now`, never negative.
- *
- * Month arithmetic, not 30-day arithmetic: a subscription created on the
- * 31st has anniversaries on the 30th/28th in shorter months, and
- * {@link addWholeMonths} clamps to the last valid day rather than rolling
- * into the following month. Rolling over is how a Jan-31 anchor silently
- * grants twice in March.
- */
-export function elapsedWholeMonths(anchor: Date, now: Date): number {
-    let months =
-        (now.getUTCFullYear() - anchor.getUTCFullYear()) * 12 +
-        (now.getUTCMonth() - anchor.getUTCMonth());
-    if (now.getTime() < addWholeMonths(anchor, months).getTime()) {
-        months -= 1;
-    }
-    return Math.max(0, months);
-}
-
-/** `anchor` + `months`, with the day clamped to the target month length. */
-export function addWholeMonths(anchor: Date, months: number): Date {
-    const year = anchor.getUTCFullYear();
-    const month = anchor.getUTCMonth() + months;
-    const lastDayOfTarget = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-    return new Date(
-        Date.UTC(
-            year,
-            month,
-            Math.min(anchor.getUTCDate(), lastDayOfTarget),
-            anchor.getUTCHours(),
-            anchor.getUTCMinutes(),
-            anchor.getUTCSeconds(),
-            anchor.getUTCMilliseconds(),
-        ),
-    );
 }

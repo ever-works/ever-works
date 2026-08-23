@@ -142,6 +142,7 @@ function build(
         profileRepository?: any;
         userRepository?: any;
         subscriptionService?: any;
+        planCreditGrantService?: any;
     } = {},
 ) {
     const provider = overrides.provider ?? makeProvider();
@@ -150,6 +151,7 @@ function build(
     const profileRepository = overrides.profileRepository ?? makeProfileRepository();
     const userRepository = overrides.userRepository ?? makeUserRepository();
     const subscriptionService = overrides.subscriptionService ?? makeSubscriptionService();
+    const planCreditGrantService = overrides.planCreditGrantService;
     const service = new PlanSubscriptionService(
         provider,
         planRepository,
@@ -157,6 +159,7 @@ function build(
         profileRepository,
         userRepository,
         subscriptionService,
+        planCreditGrantService,
     );
     return {
         service,
@@ -166,6 +169,7 @@ function build(
         profileRepository,
         userRepository,
         subscriptionService,
+        planCreditGrantService,
     };
 }
 
@@ -654,6 +658,60 @@ describe('applyWebhook — activation and revocation', () => {
             expect.objectContaining({ id: 'u1' }),
             'standard',
         );
+    });
+
+    /**
+     * Billing spec FR-4 — the allowance month's credits land on activation,
+     * not at the next sweep. Best-effort: a failing grant never un-activates
+     * the tier (the daily sweep shares the idempotency key and catches up).
+     */
+    it('grants the current plan allowance on activation, and a grant failure does not un-activate', async () => {
+        const granting = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+            planCreditGrantService: {
+                grantCurrentAllowance: jest.fn().mockResolvedValue('granted'),
+            },
+        });
+        await expect(granting.service.applyWebhook(event())).resolves.toBe(
+            'subscription-activated',
+        );
+        expect(granting.planCreditGrantService.grantCurrentAllowance).toHaveBeenCalledWith('u1');
+
+        const failing = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+            planCreditGrantService: {
+                grantCurrentAllowance: jest.fn().mockRejectedValue(new Error('ledger down')),
+            },
+        });
+        await expect(failing.service.applyWebhook(event())).resolves.toBe('subscription-activated');
+        expect(failing.subscriptionService.assignPlanToUser).toHaveBeenCalled();
+    });
+
+    it('does not grant an allowance for a self-hosted licence purchase', async () => {
+        const { service, planCreditGrantService } = build({
+            planRepository: makePlanRepository({
+                findByCode: jest.fn().mockResolvedValue({
+                    ...STANDARD_PLAN,
+                    code: 'selfhosted_pro',
+                    hosting: 'selfhosted',
+                }),
+            }),
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+            planCreditGrantService: {
+                grantCurrentAllowance: jest.fn().mockResolvedValue('granted'),
+            },
+        });
+
+        await expect(
+            service.applyWebhook(event({ planCode: 'selfhosted_pro', subscriptionId: null })),
+        ).resolves.toBe('subscription-activated');
+        expect(planCreditGrantService.grantCurrentAllowance).not.toHaveBeenCalled();
     });
 
     /**

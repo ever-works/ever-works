@@ -3682,6 +3682,7 @@
                     "balance": "Credits balance",
                     "consumed": "Credits used",
                     "added": "Credits added",
+                    "expired": "Credits expired",
                     "spend": "Month spend",
                     "tasksCompleted": "Tasks completed",
                     "worksActive": "Works active",
