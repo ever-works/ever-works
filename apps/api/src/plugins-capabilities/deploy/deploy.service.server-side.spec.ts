@@ -174,6 +174,8 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
             getOrGenerateAuthSecret: jest.fn().mockResolvedValue('auth-secret-base64'),
             getOrGenerateCookieSecret: jest.fn().mockResolvedValue('cookie-secret-base64'),
             getDatabaseUrl: jest.fn().mockResolvedValue(null),
+            // Allow-listed per-Work env (Stripe keys & co.). Default = none.
+            getRuntimeEnvVars: jest.fn().mockResolvedValue({}),
         };
 
         // EW-617 G5: DNS automation no-ops in tests (no env vars). The
@@ -243,6 +245,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
             funnel,
             subdomainAllocator,
             customDomainRepository,
+            workRuntimeEnvService,
         };
     };
 
@@ -314,6 +317,56 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         expect(pushedNames).not.toContain('DEPLOY_TOKEN');
         // Everything non-credential still pushes (CI builds keep working).
         expect(pushedNames).toContain('WORK_ID');
+    });
+
+    it('managed tier → allow-listed per-Work env is merged into the runtime env; managed keys win', async () => {
+        const plugin = managedPlugin();
+        const { service, githubPlugin, workRuntimeEnvService } = buildService({
+            plugin,
+            settings: { clusterSource: 'k8s-works-shared' },
+        });
+        workRuntimeEnvService.getRuntimeEnvVars.mockResolvedValue({
+            STRIPE_SECRET_KEY: 'sk_live_abc',
+            NEXT_PUBLIC_PAYMENT_PROVIDER: 'stripe',
+            // Defensive: even if a managed key ever slipped into the stored
+            // map, the platform-managed value must win.
+            TENANT_ID: 'spoofed-tenant',
+        });
+
+        await service.deploy('work-1', 'user-1');
+
+        expect(workRuntimeEnvService.getRuntimeEnvVars).toHaveBeenCalledWith('work-1');
+        const [config] = plugin.deploy.mock.calls[0];
+        const runtimeEnv = config.options.runtimeEnv as Record<string, string>;
+        expect(runtimeEnv.STRIPE_SECRET_KEY).toBe('sk_live_abc');
+        expect(runtimeEnv.NEXT_PUBLIC_PAYMENT_PROVIDER).toBe('stripe');
+        expect(runtimeEnv.TENANT_ID).toBe('work-1');
+        expect(runtimeEnv.AUTH_SECRET).toBe('auth-secret-base64');
+        // The workflow-path push also ran (server-side deploys still push
+        // non-credential repo secrets so CI builds keep working).
+        const pushedNames = githubPlugin.setActionSecret.mock.calls.map(
+            (c: unknown[]) => (c[0] as { key: string }).key,
+        );
+        expect(pushedNames).toContain('STRIPE_SECRET_KEY');
+    });
+
+    it('managed tier → a failing per-Work env lookup does not block the deploy', async () => {
+        const plugin = managedPlugin();
+        const { service, workRuntimeEnvService } = buildService({
+            plugin,
+            settings: { clusterSource: 'k8s-works-shared' },
+        });
+        workRuntimeEnvService.getRuntimeEnvVars.mockRejectedValue(
+            new Error('deploy runtime-env map is malformed.'),
+        );
+
+        const result = await service.deploy('work-1', 'user-1');
+
+        expect(result.dispatched).toBe(true);
+        const [config] = plugin.deploy.mock.calls[0];
+        const runtimeEnv = config.options.runtimeEnv as Record<string, string>;
+        expect(runtimeEnv.TENANT_ID).toBe('work-1');
+        expect(runtimeEnv.STRIPE_SECRET_KEY).toBeUndefined();
     });
 
     it('managed tier → branch alias image tag (main → prod)', async () => {

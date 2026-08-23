@@ -293,6 +293,7 @@ export class DeployService {
         await this.ensureCronSecret(ctx);
         await this.ensureWebhookSecret(ctx, work);
         await this.ensureRuntimeEnv(ctx, work, plugin);
+        await this.pushWorkRuntimeEnvSecrets(ctx, work);
 
         const template = await this.websiteTemplateResolver.resolveForWork(work);
         const targetBranch = env.branch ?? template.branch;
@@ -1476,6 +1477,32 @@ export class DeployService {
                 );
             }
         }
+        // Operator-managed, allow-listed per-Work env (Stripe keys & co.) —
+        // merged LAST so every platform-managed key above wins on a collision
+        // (the allow-list already excludes them; this is belt-and-braces).
+        // Best-effort like the other lookups: a decrypt failure logs and
+        // omits the vars rather than failing the deploy. Key NAMES only in
+        // logs — never values.
+        try {
+            const perWorkEnv = await this.workRuntimeEnvService.getRuntimeEnvVars(work.id);
+            const applied: string[] = [];
+            for (const [key, value] of Object.entries(perWorkEnv)) {
+                if (key in env) continue;
+                env[key] = value;
+                applied.push(key);
+            }
+            if (applied.length > 0) {
+                this.logger.debug(
+                    `Applied ${applied.length} per-Work runtime env var(s) for work ${work.id}: ${applied.join(', ')}`,
+                );
+            }
+        } catch (error: unknown) {
+            this.logger.error(
+                `Runtime-env per-Work env lookup failed for work ${work.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
         return env;
     }
 
@@ -1765,6 +1792,60 @@ export class DeployService {
                 `Failed to push runtime env for ${ctx.owner}/${ctx.repo}: ${
                     error instanceof Error ? error.message : String(error)
                 }`,
+            );
+        }
+    }
+
+    /**
+     * Push the operator-managed, allow-listed per-Work env (Stripe keys & co.,
+     * see `WORK_RUNTIME_ENV_ALLOWED_KEYS`) as GitHub Actions repo secrets so
+     * the workflow deploy paths can forward them: `deploy_k8s.yaml` copies
+     * every non-CI repo secret into the `${slug}-runtime-env` k8s Secret, and
+     * the Vercel workflows can read them the same way. Provider-agnostic on
+     * purpose (unlike `ensureRuntimeEnv`, which is k8s-only): the values are
+     * the Work owner's own payment config for their own site repo.
+     *
+     * Best-effort — a missing encryption key / decrypt failure / GitHub error
+     * logs and continues; the deploy itself must not fail because a Stripe
+     * key could not be pushed. Logs key NAMES only, never values.
+     */
+    private async pushWorkRuntimeEnvSecrets(ctx: RepoContext, work: Work) {
+        let vars: Record<string, string>;
+        try {
+            vars = await this.workRuntimeEnvService.getRuntimeEnvVars(work.id);
+        } catch (error: unknown) {
+            this.logger.warn(
+                `Per-Work runtime env lookup failed for work ${work.id}; skipping env secret push: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return;
+        }
+        const entries = Object.entries(vars);
+        if (entries.length === 0) {
+            return;
+        }
+        const results = await Promise.allSettled(
+            entries.map(([key, value]) => this.setSecret(ctx, key, value)),
+        );
+        const pushed: string[] = [];
+        results.forEach((result, index) => {
+            const key = entries[index][0];
+            if (result.status === 'fulfilled') {
+                pushed.push(key);
+            } else {
+                this.logger.error(
+                    `Failed to push per-Work runtime env secret ${key} for work ${work.id} on ${ctx.owner}/${ctx.repo}: ${
+                        result.reason instanceof Error
+                            ? result.reason.message
+                            : String(result.reason)
+                    }`,
+                );
+            }
+        });
+        if (pushed.length > 0) {
+            this.logger.debug(
+                `Pushed ${pushed.length} per-Work runtime env secret(s) for work ${work.id} to ${ctx.owner}/${ctx.repo}: ${pushed.join(', ')}`,
             );
         }
     }

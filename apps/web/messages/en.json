@@ -5711,6 +5711,24 @@
                     "invalidFormat": "Use 3-63 lowercase letters, digits, or hyphens (cannot start or end with a hyphen).",
                     "helperSuffix": ".ever.works",
                     "readonlyHint": "Managed subdomain is read-only for this Work."
+                },
+                "runtimeEnvVars": {
+                    "title": "Environment variables",
+                    "description": "Per-site settings the deployed directory reads at runtime (e.g. Stripe payment keys). Only the keys listed here can be set.",
+                    "placeholderSet": "Enter a new value to replace the current one",
+                    "placeholderUnset": "Enter a value",
+                    "saveButton": "Save",
+                    "removeButton": "Remove",
+                    "saveAria": "Save {key}",
+                    "removeAria": "Remove {key}",
+                    "saveSuccess": "Environment variable saved — redeploy to apply it to the live site.",
+                    "saveFailed": "Failed to save environment variable",
+                    "removeSuccess": "Environment variable removed — redeploy to apply it to the live site.",
+                    "removeFailed": "Failed to remove environment variable",
+                    "currentSecret": "Set (value hidden)",
+                    "currentValue": "Set: {masked}",
+                    "notSet": "Not set",
+                    "hint": "Applied on the next deploy. Stored encrypted; values are never shown back in full."
                 }
             },
             "kb": {

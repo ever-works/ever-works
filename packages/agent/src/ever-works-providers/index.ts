@@ -22,4 +22,7 @@ export {
     type DnsRecordSnapshot,
 } from './cloudflare-dns.provider';
 export { SubdomainAllocator, type SubdomainAllocationResult } from './subdomain-allocator.service';
-export { EverWorksDbProvisionService } from './ever-works-db-provision.service';
+export {
+    EverWorksDbProvisionService,
+    summarizeDbProvisionError,
+} from './ever-works-db-provision.service';
