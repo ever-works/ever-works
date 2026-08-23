@@ -14,17 +14,29 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 // Hoisted because vi.mock factory runs before regular module code.
-const { setOAuthStateCookieMock, getOAuthAuthUrlMock, loginMock } = vi.hoisted(() => ({
+const {
+    setOAuthStateCookieMock,
+    setAuthCookiesMock,
+    getOAuthAuthUrlMock,
+    getLoginDefaultWorkspaceHrefMock,
+    getRedirectUrlMock,
+    loginMock,
+    redirectMock,
+} = vi.hoisted(() => ({
     setOAuthStateCookieMock: vi.fn(),
+    setAuthCookiesMock: vi.fn(),
     getOAuthAuthUrlMock: vi.fn(),
+    getLoginDefaultWorkspaceHrefMock: vi.fn(),
+    getRedirectUrlMock: vi.fn(),
     loginMock: vi.fn(),
+    redirectMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({
     setOAuthStateCookie: setOAuthStateCookieMock,
     // unused by connectProvider but exported by the barrel
     removeAuthAccessCookies: vi.fn(),
-    setAuthCookies: vi.fn(),
+    setAuthCookies: setAuthCookiesMock,
 }));
 
 vi.mock('@/lib/api', () => ({
@@ -34,7 +46,10 @@ vi.mock('@/lib/api', () => ({
         register: vi.fn(),
         logout: vi.fn(),
     },
+    getLoginDefaultWorkspaceHref: getLoginDefaultWorkspaceHrefMock,
 }));
+
+vi.mock('@/lib/auth/redirect', () => ({ getRedirectUrl: getRedirectUrlMock }));
 
 vi.mock('next-intl/server', () => ({
     getTranslations: async () => (key: string) => key,
@@ -42,7 +57,7 @@ vi.mock('next-intl/server', () => ({
 }));
 
 vi.mock('@/i18n/navigation', () => ({
-    redirect: vi.fn(),
+    redirect: redirectMock,
 }));
 
 describe('connectProvider — C-03 state round-trip', () => {
@@ -130,6 +145,10 @@ describe('connectProvider — C-03 state round-trip', () => {
 describe('login — which failure the user is told about', () => {
     beforeEach(() => {
         loginMock.mockReset();
+        setAuthCookiesMock.mockReset();
+        getLoginDefaultWorkspaceHrefMock.mockReset().mockResolvedValue('/');
+        getRedirectUrlMock.mockReset().mockImplementation(async (_auth, href) => href);
+        redirectMock.mockReset();
     });
 
     afterEach(() => {
@@ -183,5 +202,34 @@ describe('login — which failure the user is told about', () => {
         const result = await login('someone@example.com', 'correct-horse', null);
 
         expect(result).toEqual({ success: false, error: 'invalidCredentials' });
+    });
+
+    it('uses the persisted Organization only as the fresh-login navigation default', async () => {
+        loginMock.mockResolvedValue({ access_token: 'token', user: {} });
+        getLoginDefaultWorkspaceHrefMock.mockResolvedValue('/org/ever/dashboard');
+
+        const { login } = await import('./auth');
+        await login('someone@example.com', 'correct-horse', null);
+
+        expect(getLoginDefaultWorkspaceHrefMock).toHaveBeenCalledTimes(1);
+        expect(getRedirectUrlMock).toHaveBeenCalledWith(
+            expect.objectContaining({ access_token: 'token' }),
+            '/org/ever/dashboard',
+        );
+        expect(redirectMock).toHaveBeenCalledWith({
+            locale: 'en',
+            href: '/org/ever/dashboard',
+        });
+    });
+
+    it('does not let the mutable preference override an explicit login redirect', async () => {
+        loginMock.mockResolvedValue({ access_token: 'token', user: {} });
+
+        const { login } = await import('./auth');
+        await login('someone@example.com', 'correct-horse', '/missions');
+
+        expect(getLoginDefaultWorkspaceHrefMock).not.toHaveBeenCalled();
+        expect(getRedirectUrlMock).not.toHaveBeenCalled();
+        expect(redirectMock).toHaveBeenCalledWith({ locale: 'en', href: '/missions' });
     });
 });

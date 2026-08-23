@@ -11,10 +11,10 @@ vi.mock('next-intl', () => ({
 
 // next/navigation — `useParams()` returns the URL slug. We mock it
 // per-test via `paramsMock`.
-const paramsMock = vi.fn<() => { slug?: string }>();
-paramsMock.mockReturnValue({});
+const pathnameMock = vi.fn<() => string>();
+pathnameMock.mockReturnValue('/dashboard');
 vi.mock('next/navigation', () => ({
-    useParams: () => paramsMock(),
+    usePathname: () => pathnameMock(),
 }));
 
 // i18n navigation — `useRouter().push()` for the switch-on-click flow.
@@ -69,7 +69,7 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
     beforeEach(() => {
         __resetOrganizationsStoreForTests();
         routerPushMock.mockReset();
-        paramsMock.mockReset().mockReturnValue({});
+        pathnameMock.mockReset().mockReturnValue('/dashboard');
         vi.stubGlobal(
             'fetch',
             vi.fn().mockResolvedValue({
@@ -237,7 +237,7 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
         expect(screen.getByText('organizations.switcher.createNew')).toBeInTheDocument();
     });
 
-    it('persists the selected Organization before navigating to its compatibility dashboard', async () => {
+    it('persists from the current tab scope before navigating to the canonical dashboard', async () => {
         const yo = makeOrg({ id: 'o-yo', slug: 'yo-inc', displayName: 'Yo Incorporated' });
         const ever = makeOrg({ id: 'o-ever', slug: 'ever', displayName: 'Ever' });
         __seedOrganizationsStoreForTests({
@@ -251,6 +251,7 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
             resolveSwitch = resolve;
         });
         const fetchMock = vi.mocked(fetch);
+        window.history.replaceState({}, '', '/org/yo-inc/dashboard');
         fetchMock.mockImplementation((_input, init) => {
             if (init?.method === 'POST') {
                 return switchResponse as Promise<Response>;
@@ -277,6 +278,8 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
                 body: JSON.stringify({ organizationSlug: 'ever' }),
             }),
         );
+        const switchHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+        expect(switchHeaders.get('x-ever-workspace')).toBe('org:yo-inc');
         expect(routerPushMock).not.toHaveBeenCalled();
 
         resolveSwitch({
@@ -289,6 +292,6 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
             }),
         });
 
-        await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/ever/dashboard'));
+        await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/org/ever/dashboard'));
     });
 });

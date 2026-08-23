@@ -10,7 +10,10 @@ import { SessionScopeGuard } from '../session-scope.guard';
  * `getType()` returns 'http' by default; `switchToHttp().getRequest()`
  * returns the `request` object we pass in.
  */
-function makeContext(request: { user?: unknown }): ExecutionContext {
+function makeContext(request: {
+    user?: unknown;
+    headers?: Record<string, string | string[] | undefined>;
+}): ExecutionContext {
     return {
         getType: () => 'http',
         switchToHttp: () => ({
@@ -110,7 +113,7 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
         expect(findById).not.toHaveBeenCalled();
     });
 
-    it('seeds { tenantId, organizationId } for a user with both set', async () => {
+    it('treats a headerless unprefixed request as personal and never reads the mutable pointer', async () => {
         findById.mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-1' });
         const ctx = makeContext({ user: { userId: 'u-1' } });
 
@@ -123,7 +126,25 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
         );
 
         expect(findById).toHaveBeenCalledWith('u-1');
-        expect(observed).toEqual({ tenantId: 't-1', organizationId: 'o-1' });
+        expect(observed).toEqual({ tenantId: 't-1', organizationId: null });
+    });
+
+    it('keeps explicit @personal personal even when another tab persisted an Organization', async () => {
+        findById.mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-yo' });
+        const ctx = makeContext({
+            user: { userId: 'u-1' },
+            headers: { 'x-scope-slug': '@personal' },
+        });
+
+        const observed = await scopeContext.runWith(
+            { tenantId: null, organizationId: null },
+            async () => {
+                await guard.canActivate(ctx);
+                return scopeContext.getScope();
+            },
+        );
+
+        expect(observed).toEqual({ tenantId: 't-1', organizationId: null });
     });
 
     it('seeds { tenantId, organizationId: null } when lastScopeOrganizationId is null', async () => {
@@ -277,7 +298,7 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
         } as unknown as ExecutionContext;
     }
 
-    it('legacy route: session guard seeds scope + hydrates user, ownership guard then allows', async () => {
+    it('personal route: session guard seeds bare scope + hydrates user, ownership guard then allows', async () => {
         const scopeContext = new ScopeContextService();
         const findById = jest
             .fn()
@@ -301,7 +322,7 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
 
         // Before the fix this threw 403 in ownershipGuard.
         expect(allowed).toBe(true);
-        expect(observed).toEqual({ tenantId: 't-1', organizationId: 'o-1' });
+        expect(observed).toEqual({ tenantId: 't-1', organizationId: null });
     });
 
     it('slug route to OWN tenant: ownership guard allows after hydration', async () => {

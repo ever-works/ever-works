@@ -1,34 +1,17 @@
 import { notFound, redirect } from 'next/navigation';
-import type { ActiveScopeResponse } from '@ever-works/contracts/api';
-import { ApiResponseError, serverFetch } from '@/lib/api/server-api';
+import { LOCALES } from '@/lib/constants';
+import { getLegacyOrganizationDashboardRedirect } from '@/lib/workspace-scope';
 
 interface OrganizationDashboardCompatibilityPageProps {
     params: Promise<{ slug: string }>;
 }
 
-/**
- * Compatibility entry point for the canonical Organization dashboard URL.
- * The switch mutation already happened through POST /api/users/me/scope;
- * this GET only validates that persisted state before entering legacy routes.
- */
+/** Server fallback for bookmarks that bypassed the canonical proxy redirect. */
 export default async function OrganizationDashboardCompatibilityPage({
     params,
 }: OrganizationDashboardCompatibilityPageProps) {
     const { slug } = await params;
-
-    let activeScope: ActiveScopeResponse;
-    try {
-        activeScope = await serverFetch<ActiveScopeResponse>('/users/me/scope');
-    } catch (error) {
-        if (error instanceof ApiResponseError && error.statusCode === 404) {
-            notFound();
-        }
-        throw error;
-    }
-
-    if (!activeScope.organizationId || activeScope.organizationSlug !== slug) {
-        notFound();
-    }
-
-    redirect('/');
+    const target = getLegacyOrganizationDashboardRedirect(`/${slug}/dashboard`, LOCALES);
+    if (target === null) notFound();
+    redirect(target);
 }

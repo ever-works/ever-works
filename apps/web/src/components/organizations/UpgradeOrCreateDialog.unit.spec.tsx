@@ -131,6 +131,8 @@ describe('UpgradeOrCreateDialog — EW-661 Phase 9', () => {
             );
             expect(onClose).toHaveBeenCalledWith(true);
         });
+        const init = fetchMock.mock.calls[0][1] as RequestInit;
+        expect(new Headers(init.headers).get('x-ever-workspace')).toBe('personal');
     });
 
     it('keeps the dialog open and reports a parent completion failure', async () => {

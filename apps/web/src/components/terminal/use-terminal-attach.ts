@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 /**
  * Terminal attach hook (streaming-terminal M7).
@@ -101,7 +102,7 @@ export function useTerminalAttach(
     useEffect(() => {
         let cancelled = false;
         let socket: WebSocket | null = null;
-        const doFetch = deps.fetchImpl ?? fetch;
+        const doFetch = deps.fetchImpl ?? browserApiFetch;
         const WS = deps.webSocketImpl ?? WebSocket;
 
         setState('starting');

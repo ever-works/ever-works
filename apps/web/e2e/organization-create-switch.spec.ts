@@ -18,15 +18,15 @@ import {
  * two orgs through the modal and confirm both become selectable entries in the
  * header switcher (the "switch" affordance), cross-checked against
  * GET /api/organizations. Selecting an org persists the scope and safely
- * resolves the slug-scoped compatibility URL back to the legacy dashboard.
+ * navigates to the canonical Organization dashboard namespace.
  *
  * Scope notes:
  *  - Creating the first Organization runs a tenantId backfill that used
  *    Postgres-only `$n` placeholders → 500 under the sqlite e2e DB. Fixed in
  *    organization.service.ts (query-builder placeholders); without it this
  *    flow is impossible on the e2e stack.
- *  - The narrow slug-scoped compatibility page validates the persisted scope
- *    and redirects to `/`, keeping the unprefixed dashboard tree stable.
+ *  - The visible `/org/{slug}` URL is the per-tab workspace authority; the
+ *    persisted selection is only a future-login default.
  *  - Runs as a FRESH, isolated user (its own empty-storageState context) rather
  *    than the shared seeded storageState user. The header WorkspaceSwitcher
  *    lists EVERY org the current user owns in a single `overflow-hidden`,
@@ -107,19 +107,19 @@ test.describe('Organizations — create + switch via header', () => {
             expect(names).toContain(alpha);
             expect(names).toContain(beta);
 
-            // 6. Selection persists before visiting the validated slug route.
+            // 6. Selection persists before visiting the canonical slug route.
             const alphaSlug = (await listOrganizationsViaAPI(request, token)).find(
                 (o) => o.displayName === alpha,
             )?.slug;
             expect(alphaSlug, 'alpha should have a slug').toBeTruthy();
-            const slugNavigation = page.waitForRequest(
+            const canonicalNavigation = page.waitForRequest(
                 (candidate) =>
                     candidate.method() === 'GET' &&
-                    new URL(candidate.url()).pathname === `/${alphaSlug}/dashboard`,
+                    new URL(candidate.url()).pathname === `/org/${alphaSlug}/dashboard`,
             );
             await selectOrganizationInSwitcher(page, alpha);
-            await slugNavigation;
-            await expect(page).toHaveURL(/\/$/, { timeout: 90_000 });
+            await canonicalNavigation;
+            await expect(page).toHaveURL(`/org/${alphaSlug}/dashboard`, { timeout: 90_000 });
             await expect(
                 page.getByRole('button', { name: 'Switch Organization' }).getByText(alpha),
             ).toBeVisible();

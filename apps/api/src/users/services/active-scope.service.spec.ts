@@ -62,14 +62,13 @@ describe('ActiveScopeService', () => {
         expect(users.update).not.toHaveBeenCalled();
     });
 
-    it('returns bare-Tenant scope for a stale persisted pointer without mutating on GET', async () => {
+    it('returns an opaque 404 for a revoked persisted login default without mutating on GET', async () => {
         users.findById.mockResolvedValue(user as never);
         membership.ensureMember.mockRejectedValue(new NotFoundException('not found'));
 
-        await expect(service.getActiveScope(user.id)).resolves.toEqual({
-            tenantId: 'tenant-1',
-            organizationId: null,
-            organizationSlug: null,
+        await expect(service.getActiveScope(user.id)).rejects.toMatchObject({
+            status: 404,
+            message: 'Organization not found',
         });
         expect(users.update).not.toHaveBeenCalled();
     });

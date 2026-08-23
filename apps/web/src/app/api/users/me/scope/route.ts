@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
-export async function GET(_request: NextRequest) {
-    return proxyActiveScope('GET');
+export async function GET(request: NextRequest) {
+    return proxyActiveScope(request, 'GET');
 }
 
 export async function POST(request: NextRequest) {
@@ -14,19 +15,26 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    return proxyActiveScope('POST', body);
+    return proxyActiveScope(request, 'POST', body);
 }
 
-async function proxyActiveScope(method: 'GET' | 'POST', body?: unknown) {
+async function proxyActiveScope(request: NextRequest, method: 'GET' | 'POST', body?: unknown) {
     const token = await getAuthAccessCookie();
     if (!token) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const headers = new Headers();
-    headers.set('Authorization', `Bearer ${token}`);
+    const baseHeaders = new Headers();
+    baseHeaders.set('Authorization', `Bearer ${token}`);
     if (method === 'POST') {
-        headers.set('Content-Type', 'application/json');
+        baseHeaders.set('Content-Type', 'application/json');
+    }
+
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, baseHeaders);
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
     }
 
     try {

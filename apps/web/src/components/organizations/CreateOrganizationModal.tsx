@@ -21,6 +21,7 @@ import {
 import { useRouter } from '@/i18n/navigation';
 import { useOrganizations } from '@/lib/hooks/use-organizations';
 import { UpgradeOrCreateDialog } from './UpgradeOrCreateDialog';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 /**
  * Mirror of `User.deriveSlugIfMissing` (and the server-side
@@ -48,7 +49,7 @@ const MAX_NAME_LENGTH = 200;
 const MAX_VISION_LENGTH = 5000;
 
 async function persistActiveOrganization(organizationSlug: string): Promise<void> {
-    const response = await fetch('/api/users/me/scope', {
+    const response = await browserApiFetch('/api/users/me/scope', {
         method: 'POST',
         credentials: 'include',
         cache: 'no-store',
@@ -171,7 +172,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
         const controller = new AbortController();
         void (async () => {
             try {
-                const res = await fetch('/api/org-templates', {
+                const res = await browserApiFetch('/api/org-templates', {
                     method: 'GET',
                     signal: controller.signal,
                     cache: 'no-store',
@@ -200,7 +201,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
         const timer = setTimeout(() => {
             void (async () => {
                 try {
-                    const res = await fetch(
+                    const res = await browserApiFetch(
                         `/api/organizations/check-slug?value=${encodeURIComponent(trimmed)}`,
                         {
                             method: 'GET',
@@ -266,7 +267,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
         startTransition(() => {
             void (async () => {
                 try {
-                    const res = await fetch(
+                    const res = await browserApiFetch(
                         importing ? '/api/organizations/import-company' : '/api/organizations',
                         {
                             method: 'POST',
@@ -337,7 +338,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                         if (/^[a-z0-9-]+$/.test(org.slug)) {
                             await persistActiveOrganization(org.slug);
                             onOpenChange(false);
-                            router.push(`/${org.slug}/dashboard`);
+                            router.push(`/org/${org.slug}/dashboard`);
                         }
                     }
                 } catch (err) {
@@ -375,7 +376,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
             setShowUpgradeDialog(false);
             setCreatedOrg(null);
             onOpenChange(false);
-            router.push(`/${target.slug}/dashboard`);
+            router.push(`/org/${target.slug}/dashboard`);
             // Pull the freshly-upgraded org list (tenantId is now set on
             // the user, so subsequent fetches reflect that).
             if (didUpgrade) void mutate();

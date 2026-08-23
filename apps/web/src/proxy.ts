@@ -5,6 +5,12 @@ import { LOCALES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
 import { getAuthFromRequest } from './lib/auth';
+import {
+    BROWSER_WORKSPACE_SCOPE_HEADER,
+    getLegacyOrganizationDashboardRedirect,
+    parseWorkspacePath,
+    serializeWorkspaceScope,
+} from './lib/workspace-scope';
 
 const nextIntlMiddleware = createMiddleware(routing);
 
@@ -169,10 +175,43 @@ export default async function proxy(req: NextRequest) {
         return applySecurityHeaders(response);
     }
 
+    // Safe compatibility for the one Organization URL shape shipped before
+    // the canonical namespace. Locale and reserved app segments never enter
+    // this branch, so `/en/dashboard` remains a locale compatibility URL.
+    const organizationLegacyTarget = getLegacyOrganizationDashboardRedirect(
+        `${pathname}${req.nextUrl.search}`,
+        LOCALES,
+    );
+    if (organizationLegacyTarget) {
+        const target = new URL(organizationLegacyTarget, req.url);
+        const response = NextResponse.redirect(target, 307);
+        response.headers.set('Cache-Control', 'no-store');
+        return applySecurityHeaders(response);
+    }
+
+    // The visible URL is the per-tab authority. Overwrite any inbound selector
+    // and strip the canonical `/org/{slug}` prefix only for the internal App
+    // Router match. next-intl then applies its locale rewrite to that request.
+    let selectedScope;
+    try {
+        selectedScope = parseWorkspacePath(pathname);
+    } catch {
+        return applySecurityHeaders(new NextResponse(null, { status: 404 }));
+    }
+    const scopedHeaders = new Headers(req.headers);
+    scopedHeaders.set(BROWSER_WORKSPACE_SCOPE_HEADER, serializeWorkspaceScope(selectedScope));
+    const scopedRequest = new NextRequest(req, { headers: scopedHeaders });
+    if (selectedScope.kind === 'organization') {
+        const prefix = `/org/${selectedScope.slug}`;
+        const internalPath = pathname.slice(prefix.length);
+        scopedRequest.nextUrl.pathname =
+            internalPath === '' || internalPath === '/' ? '/' : internalPath;
+    }
+
     // 2) Let next-intl resolve the locale from the cookie / Accept-Language.
     //    In `localePrefix: 'never'` mode this rewrites the request
     //    internally (the visible URL stays unprefixed).
-    const intlResponse = await nextIntlMiddleware(req);
+    const intlResponse = await nextIntlMiddleware(scopedRequest);
 
     // 3) Public routes need no auth check.
     if (isPublicRoute(pathname)) {

@@ -63,6 +63,18 @@ describe('ScopeResolverMiddleware (EW-659 Phase 7)', () => {
             expect(userRepository.findBySlug).not.toHaveBeenCalled();
         });
 
+        it('recognizes the collision-proof personal sentinel without a slug lookup', async () => {
+            const { scope, nextCalled } = await runWithCapture({
+                params: {},
+                headers: { 'x-scope-slug': '@personal' },
+            });
+
+            expect(nextCalled).toBe(true);
+            expect(scope).toEqual({ tenantId: null, organizationId: null });
+            expect(organizationRepository.findBySlug).not.toHaveBeenCalled();
+            expect(userRepository.findBySlug).not.toHaveBeenCalled();
+        });
+
         it('treats whitespace-only slug as missing (EMPTY_SCOPE pass-through)', async () => {
             const { scope, nextCalled } = await runWithCapture({
                 params: { slug: '   ' },

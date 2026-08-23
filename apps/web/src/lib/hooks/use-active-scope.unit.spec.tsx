@@ -1,10 +1,10 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 
-const paramsMock = vi.fn<() => { slug?: string }>();
+const pathnameMock = vi.fn<() => string>();
 vi.mock('next/navigation', () => ({
-    useParams: () => paramsMock(),
+    usePathname: () => pathnameMock(),
 }));
 
 import { useActiveScope } from './use-active-scope';
@@ -30,7 +30,7 @@ describe('useActiveScope', () => {
     beforeEach(() => {
         __resetOrganizationsStoreForTests();
         __seedOrganizationsStoreForTests({ data: [yo, ever], isLoading: false, error: null });
-        paramsMock.mockReset().mockReturnValue({});
+        pathnameMock.mockReset().mockReturnValue('/dashboard');
         vi.stubGlobal(
             'fetch',
             vi.fn().mockResolvedValue({
@@ -50,7 +50,7 @@ describe('useActiveScope', () => {
     });
 
     it('uses the route slug as the canonical active scope when one is present', () => {
-        paramsMock.mockReturnValue({ slug: 'ever' });
+        pathnameMock.mockReturnValue('/org/ever/dashboard');
 
         const { result } = renderHook(() => useActiveScope());
 
@@ -59,23 +59,27 @@ describe('useActiveScope', () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('restores the persisted Organization on an unprefixed legacy route', async () => {
+    it('keeps an unprefixed route explicitly personal without reading persisted preference', () => {
         const { result } = renderHook(() => useActiveScope());
 
-        await waitFor(() => expect(result.current.activeOrganization?.id).toBe('org-yo'));
-        expect(fetch).toHaveBeenCalledWith(
-            '/api/users/me/scope',
-            expect.objectContaining({ method: 'GET' }),
-        );
+        expect(result.current.activeOrganization).toBeNull();
+        expect(result.current.slug).toBeNull();
+        expect(fetch).not.toHaveBeenCalled();
     });
 
-    it('reflects a successfully persisted switch immediately without localStorage', async () => {
-        const { result } = renderHook(() => useActiveScope());
-        await waitFor(() => expect(result.current.activeOrganization?.id).toBe('org-yo'));
-
-        act(() => result.current.setActiveOrganization(ever));
-
+    it('re-derives from the visible URL after navigation without shared module cache', () => {
+        pathnameMock.mockReturnValue('/org/ever/dashboard');
+        const { result, rerender, unmount } = renderHook(() => useActiveScope());
         expect(result.current.activeOrganization?.id).toBe('org-ever');
-        expect(result.current.slug).toBe('ever');
+
+        pathnameMock.mockReturnValue('/org/yo-inc/dashboard');
+        rerender();
+        expect(result.current.activeOrganization?.id).toBe('org-yo');
+
+        unmount();
+        pathnameMock.mockReturnValue('/dashboard');
+        const fresh = renderHook(() => useActiveScope());
+        expect(fresh.result.current.activeOrganization).toBeNull();
+        expect(fetch).not.toHaveBeenCalled();
     });
 });

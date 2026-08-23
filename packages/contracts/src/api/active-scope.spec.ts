@@ -1,5 +1,11 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { ACTIVE_SCOPE_RESPONSE_SCHEMA, type ActiveScopeResponse } from './active-scope.js';
+import {
+	ACTIVE_SCOPE_API_HEADER,
+	ACTIVE_SCOPE_BROWSER_HEADER,
+	ACTIVE_SCOPE_PERSONAL_SENTINEL,
+	ACTIVE_SCOPE_RESPONSE_SCHEMA,
+	type ActiveScopeResponse
+} from './active-scope.js';
 
 describe('active scope response contract', () => {
 	it('defines the shared runtime schema used by API documentation and consumers', () => {
@@ -18,5 +24,11 @@ describe('active scope response contract', () => {
 			organizationId: string | null;
 			organizationSlug: string | null;
 		}>();
+	});
+
+	it('defines a reserved personal selector and canonical transport headers', () => {
+		expect(ACTIVE_SCOPE_PERSONAL_SENTINEL).toBe('@personal');
+		expect(ACTIVE_SCOPE_API_HEADER).toBe('x-scope-slug');
+		expect(ACTIVE_SCOPE_BROWSER_HEADER).toBe('x-ever-workspace');
 	});
 });

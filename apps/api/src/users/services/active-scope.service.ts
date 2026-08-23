@@ -25,7 +25,9 @@ export class ActiveScopeService {
         try {
             organization = await this.membership.ensureMember(organizationId, user.id);
         } catch (error) {
-            if (error instanceof NotFoundException) return this.bareTenantScope(tenantId);
+            if (error instanceof NotFoundException) {
+                throw new NotFoundException('Organization not found');
+            }
             throw error;
         }
 

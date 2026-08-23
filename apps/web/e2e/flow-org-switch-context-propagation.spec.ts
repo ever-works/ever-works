@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext, type BrowserContext } from '@playwright/test';
+import { expect, test, type APIRequestContext, type BrowserContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 import { loginViaUI } from './helpers/auth';
 import {
@@ -6,125 +6,10 @@ import {
     gotoDashboardWithSwitcher,
     listOrganizationsViaAPI,
     selectOrganizationInSwitcher,
+    type Organization,
 } from './helpers/organizations';
 
-/**
- * ORG SWITCH -> CONTEXT PROPAGATION (deep integration)
- *
- * Theme: switching the active Organization must propagate into every
- * subsequent scoped WRITE (the new resource is stamped with the active org);
- * a resource stamped under A carries A's org id while B-scoped writes carry
- * B's; switching back resumes A-stamping; and the user's
- * `lastScopeOrganizationId` persists across a fresh login. Cross-tenant scope
- * spoofing is rejected.
- *
- * ──────────────────────────────────────────────────────────────────────────
- * THE REAL SWITCH MECHANISM:
- *
- *   - There is NO `POST /api/organizations/switch` and NO
- *     `GET /api/organizations/current` route. The organizations controller
- *     (apps/api/src/organizations/organizations.controller.ts) exposes ONLY:
- *       POST   /api/organizations               { name, slug? } -> 201
- *       POST   /api/organizations/register-company
- *       GET    /api/organizations               -> 200 [orgs in caller's Tenant]
- *       GET    /api/organizations/check-slug
- *       GET    /api/organizations/:slug         -> 200 GLOBAL resolver (any authed user)
- *       PATCH  /api/organizations/:id
- *       POST   /api/organizations/:id/upgrade-from-account
- *
- *   - The switcher POSTs the chosen slug to `/api/users/me/scope`; the API
- *     validates ownership and persists `users.lastScopeOrganizationId`.
- *   - The active scope is resolved SERVER-SIDE by ScopeResolverMiddleware
- *     plus SessionScopeGuard:
- *       1. `X-Scope-Slug: <orgSlug>` request header for explicit API clients.
- *       2. else the first `/{slug}/...` URL path segment.
- *       3. else SessionScopeGuard seeds the persisted Organization scope.
- *     An UNKNOWN slug in X-Scope-Slug -> middleware throws NotFoundException
- *     -> 404. A slug belonging to ANOTHER tenant -> resolves, but the
- *     ScopeOwnershipGuard rejects it for this user -> 403.
- *
- *   - Explicit `X-Scope-Slug` remains supported for API clients, but the real
- *     browser switch no longer relies on synthetic localStorage plumbing.
- *
- * PROBED FACTS the assertions below rely on (ALL verified live, 2026-06-01):
- *   - POST /api/works (X-Scope-Slug: A) -> 200 { status:'success',
- *       work:{ id, organizationId === A.id, tenantId === A.tenantId } }.
- *       With X-Scope-Slug: B the new work's organizationId === B.id. Switching
- *       back to A stamps A again. THIS is the propagation contract.
- *   - GET /api/works is OWNER-scoped, NOT org-filtered: under ANY active scope
- *       it returns ALL of the owner's works (both A's and B's). So the
- *       per-org "invisibility" lives in each row's stamped organizationId, not
- *       in a filtered list. (Truthful probed behavior — see DEVIATION below.)
- *   - GET /api/works/:id is OWNER-scoped: 200 across any active scope, org id
- *       on the row is unchanged by the switch (the resource is not re-homed).
- *   - A FOREIGN user (different tenant) sending org A's slug in X-Scope-Slug
- *       -> 403 (ScopeOwnershipGuard) — cross-tenant scope spoofing is blocked.
- *   - An UNKNOWN X-Scope-Slug -> 404 (ScopeResolverMiddleware NotFoundException).
- *   - GET /api/organizations/:slug is a GLOBAL resolver -> 200 for any authed user.
- *   - login DTO accepts ONLY { email, password } (extra { name } -> 400);
- *     lastScopeOrganizationId + org membership survive a fresh login.
- *
- * TRUTHFUL DEVIATION (probed, asserted as-is, NOT a fictional contract):
- *   The task title implies that "resources created under org A are invisible
- *   under org B" via a filtered list. In THIS build the works LIST is purely
- *   owner-scoped and does NOT filter by the active org, so two same-owner orgs
- *   share one visible list. The genuine org-isolation signal is the per-row
- *   `organizationId` stamp (verified) plus the cross-TENANT 403. This spec
- *   asserts the real signal and never claims a non-existent list filter.
- *
- * GOTCHAS honoured: mutations run on FRESH registerUserViaAPI() users (cross-
- * spec isolation); the seeded user (storageState) is only touched for the
- * UI flow; unique Date.now suffixes; assert toContain/membership,
- * never exact counts; flow- filename is safe vs the no-auth testIgnore regex.
- */
-
-interface WorkRow {
-    id: string;
-    organizationId: string | null;
-    tenantId: string | null;
-    userId?: string;
-}
-
-const works = (body: unknown): WorkRow[] =>
-    (body as { works?: WorkRow[] })?.works ?? (Array.isArray(body) ? (body as WorkRow[]) : []);
-const workIds = (body: unknown): string[] =>
-    works(body)
-        .map((w) => w.id)
-        .filter(Boolean);
-
-/** POST /api/works under a given active org scope (via X-Scope-Slug). */
-async function createWorkUnderScope(
-    request: APIRequestContext,
-    token: string,
-    scopeSlug: string | null,
-    name: string,
-): Promise<WorkRow> {
-    const headers: Record<string, string> = { ...authedHeaders(token) };
-    if (scopeSlug) headers['X-Scope-Slug'] = scopeSlug;
-    const slug = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    const res = await request.post(`${API_BASE}/api/works`, {
-        headers,
-        data: { name, slug, description: `e2e ${name}`, organization: false },
-    });
-    // Probed: POST /api/works returns 200 (not 201) with { status:'success', work:{…} }.
-    expect(res.status(), `create work body=${await res.text().catch(() => '')}`).toBe(200);
-    const body = await res.json();
-    expect(body.status).toBe('success');
-    return body.work as WorkRow;
-}
-
-/** GET /api/works under a given active org scope (via X-Scope-Slug). */
-async function listWorksUnderScope(
-    request: APIRequestContext,
-    token: string,
-    scopeSlug: string | null,
-): Promise<unknown> {
-    const headers: Record<string, string> = { ...authedHeaders(token) };
-    if (scopeSlug) headers['X-Scope-Slug'] = scopeSlug;
-    const res = await request.get(`${API_BASE}/api/works`, { headers });
-    expect(res.status(), `list works body=${await res.text().catch(() => '')}`).toBe(200);
-    return res.json();
-}
+const PERSONAL_SCOPE = '@personal';
 
 interface ActiveScope {
     tenantId: string | null;
@@ -132,7 +17,21 @@ interface ActiveScope {
     organizationSlug: string | null;
 }
 
-async function setActiveScope(
+interface MissionRow {
+    id: string;
+    title: string;
+    tenantId: string | null;
+    organizationId: string | null;
+}
+
+function scopedHeaders(token: string, scope: string | null): Record<string, string> {
+    return {
+        ...authedHeaders(token),
+        ...(scope === null ? {} : { 'X-Scope-Slug': scope }),
+    };
+}
+
+async function setLoginDefault(
     request: APIRequestContext,
     token: string,
     organizationSlug: string | null,
@@ -145,7 +44,7 @@ async function setActiveScope(
     return response.json();
 }
 
-async function getActiveScope(request: APIRequestContext, token: string): Promise<ActiveScope> {
+async function getLoginDefault(request: APIRequestContext, token: string): Promise<ActiveScope> {
     const response = await request.get(`${API_BASE}/api/users/me/scope`, {
         headers: authedHeaders(token),
     });
@@ -153,219 +52,227 @@ async function getActiveScope(request: APIRequestContext, token: string): Promis
     return response.json();
 }
 
-test.describe('Org switch -> context propagation', () => {
-    test('switching active org via X-Scope-Slug propagates into subsequent scoped WRITES (A -> B -> A)', async ({
+async function createMission(
+    request: APIRequestContext,
+    token: string,
+    scope: string | null,
+    title: string,
+): Promise<MissionRow> {
+    const response = await request.post(`${API_BASE}/api/me/missions`, {
+        headers: scopedHeaders(token, scope),
+        data: {
+            title,
+            description: `Workspace isolation coverage for ${title}`,
+            type: 'one-shot',
+        },
+    });
+    expect(
+        response.status(),
+        `create Mission (${String(scope)}) body=${await response.text().catch(() => '')}`,
+    ).toBe(201);
+    return response.json();
+}
+
+async function findMission(
+    request: APIRequestContext,
+    token: string,
+    scope: string,
+    title: string,
+): Promise<MissionRow | undefined> {
+    const response = await request.get(`${API_BASE}/api/me/missions`, {
+        headers: scopedHeaders(token, scope),
+    });
+    expect(response.status(), `list Mission body=${await response.text().catch(() => '')}`).toBe(
+        200,
+    );
+    const rows = (await response.json()) as MissionRow[];
+    return rows.find((row) => row.title === title);
+}
+
+async function expectSwitcherSelection(
+    context: BrowserContext,
+    page: Awaited<ReturnType<BrowserContext['newPage']>>,
+    displayName: string,
+): Promise<void> {
+    await expect(
+        page.getByRole('button', { name: 'Switch Organization' }).getByText(displayName),
+    ).toBeVisible({ timeout: 30_000 });
+    expect(context.pages()).toContain(page);
+}
+
+test.describe('Organization workspace request authority', () => {
+    test.describe.configure({ timeout: 150_000 });
+
+    test('parallel Ever, Yo, personal, and headerless creates keep exact request-local stamps', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
-        const orgA = await createOrganizationViaAPI(
-            request,
-            user.access_token,
-            `Switch A ${Date.now()}`,
-        );
-        const orgB = await createOrganizationViaAPI(
-            request,
-            user.access_token,
-            `Switch B ${Date.now()}`,
-        );
-        expect(orgA.id).not.toBe(orgB.id);
-        // Both orgs share the one lazily-minted tenant.
-        expect(orgA.tenantId).toBeTruthy();
-        expect(orgB.tenantId).toBe(orgA.tenantId);
+        const suffix = Date.now().toString(36);
+        const ever = await createOrganizationViaAPI(request, user.access_token, `Ever ${suffix}`);
+        const yo = await createOrganizationViaAPI(request, user.access_token, `Yo ${suffix}`);
 
-        // Switch active org -> A: a write is stamped with A.
-        const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'work-in-A');
-        expect(wA.organizationId).toBe(orgA.id);
-        expect(wA.tenantId).toBe(orgA.tenantId);
+        // Deliberately make the mutable preference disagree with the first
+        // request. It is a future-login default, never request authority.
+        await setLoginDefault(request, user.access_token, yo.slug);
+        const sharedTitle = `parallel-same-title-${suffix}`;
 
-        // Switch active org -> B: the very next write is stamped with B, not A.
-        const wB = await createWorkUnderScope(request, user.access_token, orgB.slug, 'work-in-B');
-        expect(wB.organizationId).toBe(orgB.id);
-        expect(wB.organizationId).not.toBe(orgA.id);
+        const [everMission, yoMission, personalMission, headerlessMission] = await Promise.all([
+            createMission(request, user.access_token, ever.slug, sharedTitle),
+            createMission(request, user.access_token, yo.slug, sharedTitle),
+            createMission(request, user.access_token, PERSONAL_SCOPE, sharedTitle),
+            createMission(request, user.access_token, null, sharedTitle),
+        ]);
 
-        // Switch back -> A: writes resume being stamped with A.
-        const wA2 = await createWorkUnderScope(
-            request,
-            user.access_token,
-            orgA.slug,
-            'work-in-A-again',
-        );
-        expect(wA2.organizationId).toBe(orgA.id);
+        expect(everMission).toMatchObject({
+            tenantId: ever.tenantId,
+            organizationId: ever.id,
+        });
+        expect(yoMission).toMatchObject({ tenantId: yo.tenantId, organizationId: yo.id });
+        expect(personalMission).toMatchObject({
+            tenantId: ever.tenantId,
+            organizationId: null,
+        });
+        expect(headerlessMission).toMatchObject({
+            tenantId: ever.tenantId,
+            organizationId: null,
+        });
+        expect(
+            new Set([everMission.id, yoMission.id, personalMission.id, headerlessMission.id]),
+        ).toHaveLength(4);
     });
 
-    test('per-row org stamping is the isolation signal: A-scoped and B-scoped resources keep their own org id; switch-back stamps A again', async ({
+    test('two browser sessions stay isolated when Yo changes the login default and Ever mutates later', async ({
+        browser,
+        request,
+        baseURL,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        await request
+            .post(`${API_BASE}/api/onboarding/dismiss`, {
+                headers: authedHeaders(user.access_token),
+            })
+            .catch(() => {});
+        const ever = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `Ever Session ${suffix}`,
+        );
+        const yo = await createOrganizationViaAPI(
+            request,
+            user.access_token,
+            `Yo Session ${suffix}`,
+        );
+        await setLoginDefault(request, user.access_token, ever.slug);
+
+        const everContext = await browser.newContext({
+            storageState: { cookies: [], origins: [] },
+        });
+        const yoContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const everPage = await everContext.newPage();
+        const yoPage = await yoContext.newPage();
+
+        try {
+            await loginViaUI(everPage, { email: user.email, password: user.password });
+            await loginViaUI(yoPage, { email: user.email, password: user.password });
+            await expect(everPage).toHaveURL(`/org/${ever.slug}/dashboard`);
+            await expect(yoPage).toHaveURL(`/org/${ever.slug}/dashboard`);
+            await gotoDashboardWithSwitcher(everPage, baseURL, '/dashboard');
+            await gotoDashboardWithSwitcher(yoPage, baseURL, '/dashboard');
+
+            const persistedRequest = yoPage.waitForRequest(
+                (candidate) =>
+                    candidate.method() === 'POST' &&
+                    new URL(candidate.url()).pathname === '/api/users/me/scope',
+            );
+            const canonicalNavigation = yoPage.waitForRequest(
+                (candidate) =>
+                    candidate.method() === 'GET' &&
+                    new URL(candidate.url()).pathname === `/org/${yo.slug}/dashboard`,
+            );
+            await selectOrganizationInSwitcher(yoPage, yo.displayName);
+
+            const persisted = await persistedRequest;
+            expect(persisted.postDataJSON()).toEqual({ organizationSlug: yo.slug });
+            expect(persisted.headers()['x-ever-workspace']).toBe(`org:${ever.slug}`);
+            await canonicalNavigation;
+            await expect(yoPage).toHaveURL(`/org/${yo.slug}/dashboard`);
+            await expectSwitcherSelection(yoContext, yoPage, yo.displayName);
+
+            // The account-wide preference changed, but the other session's
+            // visible URL remains authoritative, including after a reload.
+            await expect(everPage).toHaveURL(`/org/${ever.slug}/dashboard`);
+            await everPage.reload({ waitUntil: 'domcontentloaded' });
+            await expect(everPage).toHaveURL(`/org/${ever.slug}/dashboard`);
+            await expectSwitcherSelection(everContext, everPage, ever.displayName);
+            expect(await getLoginDefault(request, user.access_token)).toMatchObject({
+                organizationId: yo.id,
+                organizationSlug: yo.slug,
+            });
+
+            // A server-action mutation from the old Ever session must use the
+            // current request path, not the now-Yo login preference.
+            const missionTitle = `ever-after-yo-switch-${suffix}`;
+            await everPage.goto(`/org/${ever.slug}/missions/new`, {
+                waitUntil: 'domcontentloaded',
+            });
+            await everPage.locator('#new-mission-title').fill(missionTitle);
+            await everPage
+                .locator('#new-mission-description')
+                .fill('This Mission must remain stamped in the Ever workspace.');
+            await everPage
+                .locator('[data-testid="new-mission-form"] button[type="submit"]')
+                .click();
+            await expect(everPage).toHaveURL(
+                new RegExp(`/org/${ever.slug}/missions/[0-9a-f-]+$`, 'i'),
+                { timeout: 90_000 },
+            );
+
+            await expect
+                .poll(
+                    async () =>
+                        (await findMission(request, user.access_token, ever.slug, missionTitle))
+                            ?.organizationId,
+                    { timeout: 30_000 },
+                )
+                .toBe(ever.id);
+            await expect(yoPage).toHaveURL(`/org/${yo.slug}/dashboard`);
+        } finally {
+            await Promise.all([everContext.close(), yoContext.close()]);
+        }
+    });
+
+    test('fresh login hydrates the preference, while explicit personal remains personal', async ({
+        browser,
         request,
     }) => {
         const user = await registerUserViaAPI(request);
-        const orgA = await createOrganizationViaAPI(
+        const org = await createOrganizationViaAPI(
             request,
             user.access_token,
-            `Iso A ${Date.now()}`,
+            `Login ${Date.now()}`,
         );
-        const orgB = await createOrganizationViaAPI(
+        await setLoginDefault(request, user.access_token, org.slug);
+
+        const personal = await createMission(
             request,
             user.access_token,
-            `Iso B ${Date.now()}`,
+            PERSONAL_SCOPE,
+            `personal-after-${org.slug}`,
         );
+        expect(personal).toMatchObject({ tenantId: org.tenantId, organizationId: null });
 
-        const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'iso-A');
-        const wB = await createWorkUnderScope(request, user.access_token, orgB.slug, 'iso-B');
-        const wA2 = await createWorkUnderScope(request, user.access_token, orgA.slug, 'iso-A-2');
-
-        // Each resource carries the org that was active when it was written.
-        expect(wA.organizationId).toBe(orgA.id);
-        expect(wB.organizationId).toBe(orgB.id);
-        expect(wA2.organizationId).toBe(orgA.id); // switch-back resumed A-stamping
-        // A-scoped rows are distinguishable from B-scoped rows by org id.
-        expect(wA.organizationId).not.toBe(wB.organizationId);
-
-        // The owner's list (owner-scoped, NOT org-filtered) contains all three;
-        // the org boundary is visible PER ROW, not by the list omitting rows.
-        const all = await listWorksUnderScope(request, user.access_token, orgA.slug);
-        const rows = works(all);
-        const byId = new Map(rows.map((w) => [w.id, w]));
-        expect(byId.get(wA.id)?.organizationId).toBe(orgA.id);
-        expect(byId.get(wB.id)?.organizationId).toBe(orgB.id);
-        expect(byId.get(wA2.id)?.organizationId).toBe(orgA.id);
-
-        // Switching the active scope does NOT re-home already-written rows:
-        // re-reading the same set under scope B leaves every org id unchanged.
-        const allUnderB = await listWorksUnderScope(request, user.access_token, orgB.slug);
-        const byIdB = new Map(works(allUnderB).map((w) => [w.id, w]));
-        expect(byIdB.get(wA.id)?.organizationId).toBe(orgA.id);
-        expect(byIdB.get(wB.id)?.organizationId).toBe(orgB.id);
+        const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+        const page = await context.newPage();
+        try {
+            await loginViaUI(page, { email: user.email, password: user.password });
+            await expect(page).toHaveURL(`/org/${org.slug}/dashboard`);
+        } finally {
+            await context.close();
+        }
     });
 
-    test('a work stays readable BY ID across org switches and keeps its original org id (findOne is owner-scoped)', async ({
-        request,
-    }) => {
-        const user = await registerUserViaAPI(request);
-        const orgA = await createOrganizationViaAPI(
-            request,
-            user.access_token,
-            `ById A ${Date.now()}`,
-        );
-        const orgB = await createOrganizationViaAPI(
-            request,
-            user.access_token,
-            `ById B ${Date.now()}`,
-        );
-
-        const wA = await createWorkUnderScope(request, user.access_token, orgA.slug, 'byid');
-        expect(wA.organizationId).toBe(orgA.id);
-
-        // A direct GET /works/:id is owner-scoped and resolves even with B as the
-        // active scope; its organizationId stays A — the switch never re-homes it.
-        const byId = await request.get(`${API_BASE}/api/works/${wA.id}`, {
-            headers: { ...authedHeaders(user.access_token), 'X-Scope-Slug': orgB.slug },
-        });
-        expect(byId.status()).toBe(200);
-        const fetched = await byId.json();
-        const work = (fetched?.work ?? fetched) as WorkRow;
-        expect(work.id).toBe(wA.id);
-        expect(work.organizationId).toBe(orgA.id);
-
-        // And reading it back under A's scope gives the identical org id.
-        const byIdA = await request.get(`${API_BASE}/api/works/${wA.id}`, {
-            headers: { ...authedHeaders(user.access_token), 'X-Scope-Slug': orgA.slug },
-        });
-        expect(byIdA.status()).toBe(200);
-        expect(((await byIdA.json())?.work as WorkRow)?.organizationId).toBe(orgA.id);
-    });
-
-    test('cross-tenant scope spoofing is rejected (403); unknown scope slug is 404; get-by-slug stays a global 200', async ({
-        request,
-    }) => {
-        // Owner builds an org with a scoped resource.
-        const owner = await registerUserViaAPI(request);
-        const orgA = await createOrganizationViaAPI(
-            request,
-            owner.access_token,
-            `Foreign A ${Date.now()}`,
-        );
-        const wA = await createWorkUnderScope(request, owner.access_token, orgA.slug, 'foreign-A');
-        expect(wA.organizationId).toBe(orgA.id);
-
-        // A different user (different tenant) tries to "switch into" orgA via its
-        // slug. The slug resolves (global namespace) but ScopeOwnershipGuard sees
-        // it belongs to another tenant -> 403. Cross-tenant spoofing blocked.
-        const stranger = await registerUserViaAPI(request);
-        const spoof = await request.get(`${API_BASE}/api/works`, {
-            headers: { ...authedHeaders(stranger.access_token), 'X-Scope-Slug': orgA.slug },
-        });
-        expect(spoof.status()).toBe(403);
-
-        // An UNKNOWN scope slug doesn't resolve at all -> the middleware 404s.
-        const unknown = await request.get(`${API_BASE}/api/works`, {
-            headers: {
-                ...authedHeaders(stranger.access_token),
-                'X-Scope-Slug': `no-such-org-${Date.now().toString(36)}`,
-            },
-        });
-        expect(unknown.status()).toBe(404);
-
-        // GET /api/organizations/:slug, however, IS a global resolver -> 200 even
-        // for the stranger (it backs the Phase-7 slug middleware + deep links).
-        // The real authorization boundary is the SCOPED request (403 above), not
-        // get-by-slug.
-        const resolve = await request.get(
-            `${API_BASE}/api/organizations/${encodeURIComponent(orgA.slug)}`,
-            { headers: authedHeaders(stranger.access_token) },
-        );
-        expect(resolve.status()).toBe(200);
-        expect((await resolve.json()).id).toBe(orgA.id);
-    });
-
-    test('selected Organization persists across a fresh login and stamps headerless writes', async ({
-        request,
-    }) => {
-        const user = await registerUserViaAPI(request);
-        const orgA = await createOrganizationViaAPI(
-            request,
-            user.access_token,
-            `Persist A ${Date.now()}`,
-        );
-        const orgB = await createOrganizationViaAPI(
-            request,
-            user.access_token,
-            `Persist B ${Date.now()}`,
-        );
-
-        const selected = await setActiveScope(request, user.access_token, orgB.slug);
-        expect(selected).toEqual({
-            tenantId: orgB.tenantId,
-            organizationId: orgB.id,
-            organizationSlug: orgB.slug,
-        });
-
-        // Re-login: the login DTO is whitelisted to { email, password } ONLY.
-        const badLogin = await request.post(`${API_BASE}/api/auth/login`, {
-            data: { email: user.email, password: user.password, name: 'nope' },
-        });
-        expect(badLogin.status(), 'extra {name} on login DTO must 400').toBe(400);
-
-        const relogin = await request.post(`${API_BASE}/api/auth/login`, {
-            data: { email: user.email, password: user.password },
-        });
-        expect(relogin.status()).toBe(200);
-        const freshToken = (await relogin.json()).access_token;
-        expect(freshToken).toBeTruthy();
-
-        // Org membership survives the new session (the Tenant + both orgs outlived it).
-        const orgsAfter = await listOrganizationsViaAPI(request, freshToken);
-        const orgIds = orgsAfter.map((o) => o.id);
-        expect(orgIds).toContain(orgA.id);
-        expect(orgIds).toContain(orgB.id);
-
-        expect(await getActiveScope(request, freshToken)).toEqual(selected);
-
-        // No X-Scope-Slug: SessionScopeGuard must seed the persisted scope.
-        const wB = await createWorkUnderScope(request, freshToken, null, 'persist-B-headerless');
-        expect(wB.organizationId).toBe(orgB.id);
-        expect(wB.tenantId).toBe(orgB.tenantId);
-    });
-
-    test('unknown and foreign scope selection fail closed without changing the persisted Organization', async ({
+    test('unknown and foreign selections share opaque 404 parity and do not change the default', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -374,17 +281,7 @@ test.describe('Org switch -> context propagation', () => {
             owner.access_token,
             `Owned ${Date.now()}`,
         );
-        await setActiveScope(request, owner.access_token, owned.slug);
-
-        const unknown = await request.post(`${API_BASE}/api/users/me/scope`, {
-            headers: authedHeaders(owner.access_token),
-            data: { organizationSlug: `unknown-${Date.now().toString(36)}` },
-        });
-        expect(unknown.status()).toBe(404);
-        expect(await getActiveScope(request, owner.access_token)).toMatchObject({
-            organizationId: owned.id,
-            organizationSlug: owned.slug,
-        });
+        await setLoginDefault(request, owner.access_token, owned.slug);
 
         const stranger = await registerUserViaAPI(request);
         const foreign = await createOrganizationViaAPI(
@@ -392,72 +289,29 @@ test.describe('Org switch -> context propagation', () => {
             stranger.access_token,
             `Foreign ${Date.now()}`,
         );
-        const rejected = await request.post(`${API_BASE}/api/users/me/scope`, {
-            headers: authedHeaders(owner.access_token),
-            data: { organizationSlug: foreign.slug },
-        });
+        const [unknown, rejected] = await Promise.all([
+            request.post(`${API_BASE}/api/users/me/scope`, {
+                headers: authedHeaders(owner.access_token),
+                data: { organizationSlug: `unknown-${Date.now().toString(36)}` },
+            }),
+            request.post(`${API_BASE}/api/users/me/scope`, {
+                headers: authedHeaders(owner.access_token),
+                data: { organizationSlug: foreign.slug },
+            }),
+        ]);
+
+        expect(unknown.status()).toBe(404);
         expect(rejected.status()).toBe(404);
-        expect(await getActiveScope(request, owner.access_token)).toMatchObject({
+        expect((await unknown.json()).message).toBe((await rejected.json()).message);
+        expect(await getLoginDefault(request, owner.access_token)).toMatchObject({
             organizationId: owned.id,
             organizationSlug: owned.slug,
         });
-    });
 
-    test('real WorkspaceSwitcher click persists, safely resolves the slug URL, and governs a headerless write', async ({
-        browser,
-        request,
-        baseURL,
-    }) => {
-        test.setTimeout(120_000);
-        const fresh = await registerUserViaAPI(request);
-        const token = fresh.access_token;
-        await request
-            .post(`${API_BASE}/api/onboarding/dismiss`, { headers: authedHeaders(token) })
-            .catch(() => {});
-        const orgA = await createOrganizationViaAPI(request, token, `UI A ${Date.now()}`);
-        const orgB = await createOrganizationViaAPI(request, token, `UI B ${Date.now()}`);
-        await setActiveScope(request, token, orgA.slug);
-
-        const context: BrowserContext = await browser.newContext({
-            storageState: { cookies: [], origins: [] },
-        });
-        const page = await context.newPage();
-        try {
-            await loginViaUI(page, { email: fresh.email, password: fresh.password });
-            await gotoDashboardWithSwitcher(page, baseURL);
-
-            const persistedRequest = page.waitForRequest(
-                (candidate) =>
-                    candidate.method() === 'POST' &&
-                    new URL(candidate.url()).pathname === '/api/users/me/scope',
-            );
-            const compatibilityNavigation = page.waitForRequest(
-                (candidate) =>
-                    candidate.method() === 'GET' &&
-                    new URL(candidate.url()).pathname === `/${orgB.slug}/dashboard`,
-            );
-            await selectOrganizationInSwitcher(page, orgB.displayName);
-
-            expect((await persistedRequest).postDataJSON()).toEqual({
-                organizationSlug: orgB.slug,
-            });
-            await compatibilityNavigation;
-            await expect(page).toHaveURL(/\/$/, { timeout: 90_000 });
-            await expect(
-                page
-                    .getByRole('button', { name: 'Switch Organization' })
-                    .getByText(orgB.displayName),
-            ).toBeVisible();
-
-            expect(await getActiveScope(request, token)).toMatchObject({
-                organizationId: orgB.id,
-                organizationSlug: orgB.slug,
-            });
-            const scoped = await createWorkUnderScope(request, token, null, 'ui-real-switch');
-            expect(scoped.organizationId).toBe(orgB.id);
-            expect(scoped.organizationId).not.toBe(orgA.id);
-        } finally {
-            await context.close();
-        }
+        const visible = await listOrganizationsViaAPI(request, owner.access_token);
+        expect(visible.map((organization: Organization) => organization.id)).toContain(owned.id);
+        expect(visible.map((organization: Organization) => organization.id)).not.toContain(
+            foreign.id,
+        );
     });
 });

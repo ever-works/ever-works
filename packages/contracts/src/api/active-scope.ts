@@ -4,6 +4,11 @@ type NullableStringSchemaProperty = {
 	nullable: true;
 };
 
+/** Reserved transport contract; Organization slugs can never collide with this value. */
+export const ACTIVE_SCOPE_PERSONAL_SENTINEL = '@personal' as const;
+export const ACTIVE_SCOPE_API_HEADER = 'x-scope-slug' as const;
+export const ACTIVE_SCOPE_BROWSER_HEADER = 'x-ever-workspace' as const;
+
 const ACTIVE_SCOPE_RESPONSE_PROPERTIES = {
 	tenantId: { type: 'string', format: 'uuid', nullable: true },
 	organizationId: { type: 'string', format: 'uuid', nullable: true },

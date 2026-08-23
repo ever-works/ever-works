@@ -20,6 +20,7 @@ import { FaviconEverWorkImage, LogoEverWorkImage } from '../logos';
 import { CreateOrganizationModal } from '../organizations/CreateOrganizationModal';
 import type { WorkConfig } from '@/lib/api';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 interface WorkspaceSwitcherProps {
     /** Site config passed through to the inline logo / favicon. */
@@ -101,7 +102,7 @@ export function WorkspaceSwitcher({
     const t = useTranslations('organizations.switcher');
     const router = useRouter();
     const { organizations, isLoading } = useOrganizations();
-    const { activeOrganization, setActiveOrganization } = useActiveScope();
+    const { activeOrganization } = useActiveScope();
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
 
@@ -118,7 +119,7 @@ export function WorkspaceSwitcher({
 
         setPendingOrganizationSlug(org.slug);
         try {
-            const response = await fetch('/api/users/me/scope', {
+            const response = await browserApiFetch('/api/users/me/scope', {
                 method: 'POST',
                 credentials: 'include',
                 cache: 'no-store',
@@ -132,8 +133,7 @@ export function WorkspaceSwitcher({
             if (persisted.organizationSlug !== org.slug) {
                 throw new Error('The persisted active Organization did not match the selection');
             }
-            setActiveOrganization(org);
-            router.push(`/${org.slug}/dashboard`);
+            router.push(`/org/${org.slug}/dashboard`);
         } catch {
             toast.error('Could not switch Organization. Please try again.');
         } finally {

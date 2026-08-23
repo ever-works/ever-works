@@ -33,6 +33,7 @@ const {
 }));
 
 vi.mock('@/lib/api', () => ({
+    getLoginDefaultWorkspaceHref: vi.fn(async () => '/'),
     authAPI: {
         register: registerMock,
         redeemMagicLink: redeemMagicLinkApiMock,

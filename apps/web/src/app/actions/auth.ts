@@ -4,7 +4,12 @@ import { z } from 'zod';
 import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { ALLOWED_REDIRECT_URLS, ROUTES, withAppUrl } from '@/lib/constants';
 import { PASSWORD_RULES, VALIDATION_RULES } from './validation';
-import { authAPI, AuthResponse, type TermsAcceptanceClaim } from '@/lib/api';
+import {
+    authAPI,
+    AuthResponse,
+    getLoginDefaultWorkspaceHref,
+    type TermsAcceptanceClaim,
+} from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
@@ -156,7 +161,9 @@ export async function login(identifier: string, password: string, redirectUrl: s
     ) {
         href = redirectUrl;
     } else if (authResponse) {
-        // Check if we have a redirect URL in a cookie
+        // The mutable preference is navigation convenience only. Resolve it
+        // once after authentication, then let an explicit redirect cookie win.
+        href = await getLoginDefaultWorkspaceHref();
         href = await getRedirectUrl(authResponse, href);
     }
 
@@ -661,6 +668,7 @@ export async function redeemMagicLink(token: string, redirectUrl: string | null)
     ) {
         href = redirectUrl;
     } else if (authResponse) {
+        href = await getLoginDefaultWorkspaceHref();
         href = await getRedirectUrl(authResponse, href);
     }
 

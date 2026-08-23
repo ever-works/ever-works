@@ -20,7 +20,7 @@ import { API_BASE, authedHeaders } from './api';
  *     "Move your existing items?" dialog — we pick "Start empty" → "Continue"
  *     (the default "Move existing items" hits a Postgres-only endpoint that
  *     500s on sqlite). 2nd+ orgs persist the scope, visit the validated
- *     /{slug}/dashboard compatibility route, then redirect to the legacy root.
+ *     canonical /org/{slug}/dashboard route and remain in that namespace.
  */
 
 export interface Organization {
@@ -73,7 +73,11 @@ export async function gotoDashboardWithSwitcher(
         { name: 'sidebar-collapsed', value: '0', url: origin },
         { name: 'chat-panel-open', value: '0', url: origin },
     ]);
-    await page.goto(route, { waitUntil: 'domcontentloaded' });
+    const currentPath = new URL(page.url()).pathname;
+    const organizationPrefix = /^\/org\/[^/]+/.exec(currentPath)?.[0] ?? '';
+    const destination =
+        organizationPrefix && !route.startsWith('/org/') ? `${organizationPrefix}${route}` : route;
+    await page.goto(destination, { waitUntil: 'domcontentloaded' });
     await expect(switcherTrigger(page)).toBeVisible({ timeout: 30_000 });
 }
 
@@ -99,7 +103,7 @@ export async function openWorkspaceSwitcher(page: Page): Promise<void> {
 /**
  * Create an Organization through the UI switcher → modal flow. Handles the
  * first-org "Start empty" branch and the 2nd+-org direct-navigation branch.
- * Returns once the validated slug navigation has resolved to the legacy root.
+ * Returns once the canonical Organization navigation has resolved.
  */
 export async function createOrganizationViaUI(page: Page, name: string): Promise<void> {
     await openWorkspaceSwitcher(page);
@@ -121,27 +125,27 @@ export async function createOrganizationViaUI(page: Page, name: string): Promise
         await blank.click();
     }
 
-    // Observe the compatibility navigation so a redirect to `/` cannot make a
-    // broken switch look green merely because the final route happens to load.
-    const compatibilityNavigation = page.waitForRequest((candidate) => {
+    // Observe the canonical navigation so a stale/personal route cannot make a
+    // broken switch look green merely because some dashboard happens to load.
+    const canonicalNavigation = page.waitForRequest((candidate) => {
         return (
             candidate.method() === 'GET' &&
-            /^\/[^/]+\/dashboard$/.test(new URL(candidate.url()).pathname)
+            /^\/org\/[^/]+\/dashboard$/.test(new URL(candidate.url()).pathname)
         );
     });
 
     // Submit via the stable testid (the button label is locale-dependent).
     await page.getByTestId('org-create-submit').click();
 
-    await compatibilityNavigation;
-    await page.waitForURL((url) => url.pathname === '/', { timeout: 30_000 });
+    const request = await canonicalNavigation;
+    const pathname = new URL(request.url()).pathname;
+    await page.waitForURL((url) => url.pathname === pathname, { timeout: 30_000 });
 }
 
 /**
  * Select an existing Organization from the switcher dropdown. The switcher
- * persists the choice before navigating through the validated slug-dashboard
- * compatibility route. The route redirects to `/`; the persisted scope keeps
- * the selected Organization active on the legacy dashboard tree.
+ * persists the preference before navigating to the canonical Organization
+ * dashboard. Correctness comes from that visible per-tab URL, not the write.
  */
 export async function selectOrganizationInSwitcher(page: Page, displayName: string): Promise<void> {
     await openWorkspaceSwitcher(page);

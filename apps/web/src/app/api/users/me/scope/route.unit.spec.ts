@@ -11,10 +11,16 @@ vi.mock('@/lib/constants', () => ({
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
 import { GET, POST } from './route';
 
-function makeRequest(body?: string) {
+function makeRequest(body?: string, selector: string | null = 'personal', referer?: string) {
+    const headers = new Headers(
+        body === undefined ? undefined : { 'content-type': 'application/json' },
+    );
+    if (selector !== null) headers.set('x-ever-workspace', selector);
+    if (referer) headers.set('referer', referer);
+    headers.set('x-scope-slug', 'attacker-supplied');
     return new Request('http://web.example/api/users/me/scope', {
         method: body === undefined ? 'GET' : 'POST',
-        headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+        headers,
         body,
     }) as Parameters<typeof POST>[0];
 }
@@ -51,6 +57,8 @@ describe('/api/users/me/scope BFF', () => {
         expect(url).toBe('http://api.example/users/me/scope');
         expect(init.method).toBe('GET');
         expect((init.headers as Headers).get('authorization')).toBe('Bearer access-token');
+        expect((init.headers as Headers).get('x-scope-slug')).toBe('@personal');
+        expect((init.headers as Headers).get('x-ever-workspace')).toBeNull();
     });
 
     it('POST forwards the selection and returns the persisted active scope', async () => {
@@ -78,6 +86,27 @@ describe('/api/users/me/scope BFF', () => {
         await expect(response.json()).resolves.toEqual({
             message: "Organization 'foreign' not found",
         });
+    });
+
+    it('accepts an explicit Organization selector without Referer and overwrites spoofing', async () => {
+        const response = await POST(
+            makeRequest(JSON.stringify({ organizationSlug: 'ever' }), 'org:ever'),
+        );
+
+        expect(response.status).toBe(200);
+        const init = fetchMock.mock.calls[0][1] as RequestInit;
+        expect((init.headers as Headers).get('x-scope-slug')).toBe('ever');
+    });
+
+    it('fails closed on a missing or stale browser selector', async () => {
+        const missing = await POST(makeRequest('{}', null));
+        expect(missing.status).toBe(400);
+
+        const stale = await POST(
+            makeRequest('{}', 'org:ever', 'http://web.example/org/yo/dashboard'),
+        );
+        expect(stale.status).toBe(400);
+        expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it('returns 401 without making an upstream request when the auth cookie is absent', async () => {

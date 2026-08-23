@@ -24,18 +24,20 @@ import { ScopeContextService } from './scope-context.service';
  * under `EMPTY_SCOPE` (both fields `null`).
  *
  * That's wrong for an authenticated user who HAS been upgraded to a
- * Tenant: their legacy-route requests should operate in their default
- * scope (their Tenant + last-active Org), not the empty scope. Otherwise
+ * Tenant: their unprefixed requests should operate in their bare personal
+ * scope (their Tenant, no Organization), not the empty scope. Otherwise
  * the Phase 5b [`ScopeStampingSubscriber`](./scope-stamping.subscriber.ts)
  * stamps NULLs on rows they create, and scope-filtered reads miss their
- * own data.
+ * own data. The mutable `users.lastScopeOrganizationId` preference is a
+ * fresh-login navigation default only — it is never read here as request
+ * authorization (see `ActiveScopeService` / PR #2152).
  *
  * The middleware can't fix this itself: it runs BEFORE `AuthSessionGuard`
  * populates `request.user`, so it has no user to read `tenantId` /
  * `lastScopeOrganizationId` from. This guard runs AFTER `AuthSessionGuard`
  * (guards execute in `providers`-array registration order — see
  * `api.module.ts`) and does TWO things: hydrates `req.user.tenantId`
- * and, on legacy routes, seeds the default scope in place via
+ * and, on unprefixed personal routes, seeds bare personal scope in place via
  * [`ScopeContextService.setScope`](./scope-context.service.ts).
  *
  * **Behavior:**
@@ -48,9 +50,9 @@ import { ScopeContextService } from './scope-context.service';
  *   - An Organization scope must still have an exact roster membership;
  *     the Tenant owner is the sole row-less exception. A revoked/missing
  *     Organization is an opaque 404.
- *   - Then SEED scope only if no slug already resolved one
+ *   - Then SEED personal scope only if no Organization slug resolved one
  *     (`scope.tenantId === null`) AND the user has a Tenant →
- *     `{ tenantId, organizationId: lastScopeOrganizationId ?? null }`.
+ *     `{ tenantId, organizationId: null }`.
  *     A user with no Tenant leaves `EMPTY_SCOPE`.
  *
  * **Why hydrate on slug routes too (not just legacy):** the next guard,
@@ -111,10 +113,10 @@ export class SessionScopeGuard implements CanActivate {
         // reads it.
         user.tenantId = tenantId;
 
-        // Seed the default scope ONLY on legacy routes (no slug resolved
-        // a scope). Slug routes keep the middleware-resolved scope; the
-        // ownership guard then verifies it belongs to this user's
-        // hydrated tenant.
+        // An unprefixed request is the personal route contract. Never read the
+        // user's mutable last-Organization preference here: that value is only
+        // a fresh-login navigation default, not request authorization. This is
+        // what keeps simultaneous Ever and Yo tabs isolated.
         const scope = this.scopeContext.getScope();
         if (
             scope.organizationId !== null &&
@@ -124,21 +126,13 @@ export class SessionScopeGuard implements CanActivate {
             await this.requireActiveOrganization(user.userId, scope.tenantId, scope.organizationId);
         }
         if (scope.tenantId === null && tenantId !== null) {
-            // Security: validate that lastScopeOrganizationId still belongs to
-            // this user's tenant before seeding it as the active scope.
-            // Missing, foreign, or revoked last-active Organizations fail with
-            // the same opaque 404 as an explicit slug request. Falling back to
-            // bare personal scope here would make revocation grant a different
-            // data surface that the caller did not explicitly select.
-            const resolvedOrganizationId: string | null = dbUser?.lastScopeOrganizationId ?? null;
-            if (resolvedOrganizationId !== null) {
-                await this.requireActiveOrganization(user.userId, tenantId, resolvedOrganizationId);
-            }
             this.scopeContext.setScope({
                 tenantId,
-                organizationId: resolvedOrganizationId,
+                organizationId: null,
             });
-            this.logger.debug(`Seeded session scope for user ${user.userId}: tenantId=${tenantId}`);
+            this.logger.debug(
+                `Seeded personal scope for user ${user.userId}: tenantId=${tenantId}`,
+            );
         }
 
         return true;

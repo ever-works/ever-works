@@ -156,7 +156,7 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
             // Modal closed.
             expect(onOpenChange).toHaveBeenCalledWith(false);
             // Navigated to the new Org's dashboard.
-            expect(routerPushMock).toHaveBeenCalledWith(`/${newOrg.slug}/dashboard`);
+            expect(routerPushMock).toHaveBeenCalledWith(`/org/${newOrg.slug}/dashboard`);
         });
 
         // POST request body carried the trimmed name.
@@ -168,6 +168,9 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
         expect(postCall).toBeDefined();
         const body = JSON.parse((postCall![1] as RequestInit).body as string);
         expect(body).toEqual({ name: 'Globex LLC' });
+        expect(new Headers((postCall![1] as RequestInit).headers).get('x-ever-workspace')).toBe(
+            'personal',
+        );
 
         const scopeCall = fetchMock.mock.calls.find(
             ([url, init]) =>
@@ -285,7 +288,7 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
         fireEvent.click(screen.getByText('organizations.upgrade.confirm'));
 
         await waitFor(() => {
-            expect(routerPushMock).toHaveBeenCalledWith(`/${newOrg.slug}/dashboard`);
+            expect(routerPushMock).toHaveBeenCalledWith(`/org/${newOrg.slug}/dashboard`);
         });
         const scopeCall = fetchMock.mock.calls.find(
             ([url, init]) =>
@@ -298,7 +301,7 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
         });
         expect(events.indexOf('scope')).toBeLessThan(events.indexOf('modal:false'));
         expect(events.indexOf('scope')).toBeLessThan(
-            events.indexOf(`navigate:/${newOrg.slug}/dashboard`),
+            events.indexOf(`navigate:/org/${newOrg.slug}/dashboard`),
         );
     });
 

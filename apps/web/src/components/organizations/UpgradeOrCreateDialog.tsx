@@ -14,6 +14,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 type UpgradeChoice = 'upgrade' | 'empty';
 
@@ -92,7 +93,7 @@ export function UpgradeOrCreateDialog({ open, organization, onClose }: UpgradeOr
         startTransition(async () => {
             try {
                 if (!upgradeCompleted) {
-                    const res = await fetch(
+                    const res = await browserApiFetch(
                         `/api/organizations/${encodeURIComponent(organization.id)}/upgrade-from-account`,
                         {
                             method: 'POST',
