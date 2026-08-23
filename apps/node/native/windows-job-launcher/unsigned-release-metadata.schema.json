@@ -114,6 +114,8 @@
 				"cargoHome",
 				"clearedCargoRustOverrideCount",
 				"clearedCargoProfileOverrideCount",
+				"clearedMsvcLinkOptionOverrideCount",
+				"msvcLinkerEnvironment",
 				"effective"
 			],
 			"properties": {
@@ -121,6 +123,27 @@
 				"cargoHome": { "const": "target/repro-cargo-home" },
 				"clearedCargoRustOverrideCount": { "type": "integer", "minimum": 0 },
 				"clearedCargoProfileOverrideCount": { "type": "integer", "minimum": 0 },
+				"clearedMsvcLinkOptionOverrideCount": { "type": "integer", "minimum": 0, "maximum": 2 },
+				"msvcLinkerEnvironment": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"recognizedInputs",
+						"linkOptions",
+						"libraryPath",
+						"executableSearchPath",
+						"temporaryDirectory"
+					],
+					"properties": {
+						"recognizedInputs": {
+							"const": ["LINK", "_LINK_", "LIB", "PATH", "TMP"]
+						},
+						"linkOptions": { "const": "cleared" },
+						"libraryPath": { "const": "fixed-msvc-sdk" },
+						"executableSearchPath": { "const": "fixed-rust-msvc-system" },
+						"temporaryDirectory": { "const": "target/repro-linker-temp" }
+					}
+				},
 				"effective": {
 					"type": "object",
 					"additionalProperties": false,
@@ -183,12 +206,13 @@
 				"linker": {
 					"type": "object",
 					"additionalProperties": false,
-					"required": ["name", "fileVersion", "productVersion", "sha256"],
+					"required": ["name", "fileVersion", "productVersion", "sha256", "cvtresSha256"],
 					"properties": {
 						"name": { "const": "link.exe" },
 						"fileVersion": { "type": "string", "minLength": 1 },
 						"productVersion": { "type": "string", "minLength": 1 },
-						"sha256": { "$ref": "#/$defs/sha256" }
+						"sha256": { "$ref": "#/$defs/sha256" },
+						"cvtresSha256": { "$ref": "#/$defs/sha256" }
 					}
 				},
 				"windowsSdk": {

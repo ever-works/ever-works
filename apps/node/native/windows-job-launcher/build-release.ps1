@@ -19,6 +19,7 @@ $targetRoot = [IO.Path]::GetFullPath((Join-Path $packageRoot "target"))
 $firstTargetDirectory = Join-Path $targetRoot "repro-build-1"
 $secondTargetDirectory = Join-Path $targetRoot "repro-build-2"
 $isolatedCargoHome = Join-Path $targetRoot "repro-cargo-home"
+$isolatedLinkerTemp = Join-Path $targetRoot "repro-linker-temp"
 $canonicalBinaryPath = Join-Path $targetRoot "$targetTriple\release\$artifactName"
 . (Join-Path $packageRoot "pe-authenticode-content.ps1")
 
@@ -30,6 +31,11 @@ $cargoRustEnvironmentNames = @(
 )
 $clearedCargoProfileOverrideCount = @(
 	$cargoRustEnvironmentNames | Where-Object { $_ -match '^CARGO_PROFILE_' }
+).Count
+$msvcLinkOptionEnvironmentNames = @("LINK", "_LINK_")
+$clearedMsvcLinkOptionOverrideCount = @(
+	$msvcLinkOptionEnvironmentNames |
+		Where-Object { $null -ne [Environment]::GetEnvironmentVariable($_, "Process") }
 ).Count
 $fixedManagedEnvironmentNames = @(
 	"CARGO_HOME",
@@ -44,11 +50,16 @@ $fixedManagedEnvironmentNames = @(
 	"CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS",
 	"INCLUDE",
 	"LIB",
+	"LINK",
+	"_LINK_",
+	"PATH",
 	"RUSTC",
 	"RUSTC_WORKSPACE_WRAPPER",
 	"RUSTC_WRAPPER",
 	"RUSTFLAGS",
 	"SOURCE_DATE_EPOCH",
+	"TEMP",
+	"TMP",
 	"UniversalCRTSdkDir",
 	"UCRTVersion",
 	"VCToolsInstallDir",
@@ -160,6 +171,21 @@ function Reset-IsolatedCargoHome {
 	New-Item -ItemType Directory -Path $isolatedCargoHome | Out-Null
 }
 
+function Reset-IsolatedLinkerTemp {
+	$resolved = [IO.Path]::GetFullPath($isolatedLinkerTemp)
+	$prefix = $targetRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+	if (
+		-not $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or
+		$resolved -cne $isolatedLinkerTemp
+	) {
+		throw "refusing to clean an unexpected linker temporary directory"
+	}
+	if (Test-Path -LiteralPath $isolatedLinkerTemp) {
+		Remove-Item -LiteralPath $isolatedLinkerTemp -Recurse -Force
+	}
+	New-Item -ItemType Directory -Path $isolatedLinkerTemp | Out-Null
+}
+
 function Invoke-IsolatedReleaseBuild {
 	param(
 		[Parameter(Mandatory)] [string]$CargoPath,
@@ -220,6 +246,9 @@ try {
 	foreach ($name in $cargoRustEnvironmentNames) {
 		Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
 	}
+	foreach ($name in $msvcLinkOptionEnvironmentNames) {
+		Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+	}
 	Push-Location $packageRoot
 	try {
 		$sourceStatus = git status --porcelain=v1 --untracked-files=normal -- .
@@ -268,10 +297,14 @@ try {
 			-Name "MSVC toolset" `
 			-Predicate { param($path) Test-Path -LiteralPath (Join-Path $path "bin\Hostx64\x64\link.exe") }
 		$linkerPath = Join-Path $msvcToolset.FullName "bin\Hostx64\x64\link.exe"
+		$cvtresPath = Join-Path $msvcToolset.FullName "bin\Hostx64\x64\cvtres.exe"
 		$msvcLibDirectory = Join-Path $msvcToolset.FullName "lib\x64"
 		$msvcRuntimeLibPath = Join-Path $msvcLibDirectory "libvcruntime.lib"
 		if (-not (Test-Path -LiteralPath $msvcRuntimeLibPath -PathType Leaf)) {
 			throw "MSVC x64 runtime library input is unavailable"
+		}
+		if (-not (Test-Path -LiteralPath $cvtresPath -PathType Leaf)) {
+			throw "MSVC resource-conversion linker input is unavailable"
 		}
 
 		$windowsKits = Get-ItemProperty `
@@ -296,6 +329,7 @@ try {
 		$windowsSdkUcrtLibrarySet = Get-LibrarySetIdentity $windowsSdkUcrtLibDirectory
 
 		Reset-IsolatedCargoHome
+		Reset-IsolatedLinkerTemp
 		$env:CARGO_HOME = $isolatedCargoHome
 		$env:RUSTFLAGS = $fixedRustFlags
 		$env:CARGO_INCREMENTAL = "0"
@@ -304,6 +338,14 @@ try {
 		$env:RUSTC = $rustcPath
 		$env:SOURCE_DATE_EPOCH = $sourceDateEpoch
 		$env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $linkerPath
+		$fixedPathDirectories = @(
+			Split-Path -Parent $rustcPath
+			Split-Path -Parent $linkerPath
+			[Environment]::SystemDirectory
+		) | Select-Object -Unique
+		$env:PATH = $fixedPathDirectories -join ";"
+		$env:TMP = $isolatedLinkerTemp
+		$env:TEMP = $isolatedLinkerTemp
 		$env:VCToolsInstallDir = $msvcToolset.FullName.TrimEnd("\") + "\"
 		$env:VCToolsVersion = $msvcToolset.Name
 		$env:WindowsSdkDir = $windowsSdkRoot.TrimEnd("\") + "\"
@@ -397,6 +439,14 @@ try {
 		cargoHome = "target/repro-cargo-home"
 		clearedCargoRustOverrideCount = $cargoRustEnvironmentNames.Count
 		clearedCargoProfileOverrideCount = $clearedCargoProfileOverrideCount
+		clearedMsvcLinkOptionOverrideCount = $clearedMsvcLinkOptionOverrideCount
+		msvcLinkerEnvironment = [ordered]@{
+			recognizedInputs = @("LINK", "_LINK_", "LIB", "PATH", "TMP")
+			linkOptions = "cleared"
+			libraryPath = "fixed-msvc-sdk"
+			executableSearchPath = "fixed-rust-msvc-system"
+			temporaryDirectory = "target/repro-linker-temp"
+		}
 		effective = [ordered]@{
 			rustFlags = $fixedRustFlags
 			cargoIncremental = $false
@@ -431,6 +481,7 @@ try {
 			fileVersion = [string](Get-Item -LiteralPath $linkerPath).VersionInfo.FileVersion
 			productVersion = [string](Get-Item -LiteralPath $linkerPath).VersionInfo.ProductVersion
 			sha256 = Get-Sha256 $linkerPath
+			cvtresSha256 = Get-Sha256 $cvtresPath
 		}
 		windowsSdk = [ordered]@{
 			version = $windowsSdkVersion
