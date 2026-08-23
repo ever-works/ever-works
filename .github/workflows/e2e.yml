@@ -47,10 +47,11 @@ name: E2E Tests
 # 2026-08-22/23 six consecutive stage runs were cancelled in a row and the
 # Promotion Gate (stage -> main) had no E2E verdict for a day. GitHub keeps at
 # most ONE pending run per concurrency group and cancels older *pending* ones,
-# so with `cancel-in-progress: false` the running suite finishes, the newest
-# push waits behind it, and every push still converges on the latest commit -
-# the runner load is the same either way (one run at a time), but the gate
-# now produces verdicts. Same policy as k8s-e2e.yml in this repo.
+# so with `cancel-in-progress: false` the running suite finishes and the newest
+# push waits behind it. During a burst, GitHub may replace an older pending run;
+# the runner load stays at one run at a time while the gate validates the active
+# commit and then converges on the newest queued commit. Same policy as
+# k8s-e2e.yml in this repo.
 #
 # See Workspace/knowledge/runbooks/CI_RELEASE_GATES.md for the policy.
 
@@ -637,4 +638,3 @@ jobs:
             apps/web/e2e/test-results
           retention-days: 14
           if-no-files-found: ignore
-
