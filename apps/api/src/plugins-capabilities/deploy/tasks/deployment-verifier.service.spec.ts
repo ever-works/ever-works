@@ -666,12 +666,12 @@ describe('DeploymentVerifierService', () => {
             expect(result).toEqual({ found: false });
         });
 
-        it('facade rejects → swallows error + logs + returns {found:false}', async () => {
+        it('facade rejects → logs and preserves the deterministic failure', async () => {
             deployFacade.lookupExistingDeployment.mockRejectedValueOnce(new Error('oops'));
 
-            const result = await service.lookupExistingDeployment(buildWork() as any, 'user-1');
-
-            expect(result).toEqual({ found: false });
+            await expect(
+                service.lookupExistingDeployment(buildWork() as any, 'user-1'),
+            ).rejects.toThrow('oops');
             expect(errorSpy).toHaveBeenCalledWith(
                 expect.stringContaining('Failed to lookup existing deployment for work work-1'),
                 expect.any(Error),

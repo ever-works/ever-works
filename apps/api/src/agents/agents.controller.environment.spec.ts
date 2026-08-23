@@ -59,6 +59,10 @@ describe('AgentsController — Environment assignment mapping', () => {
     const auth = { userId: 'u1' } as any;
     const agentId = '00000000-0000-0000-0000-000000000001';
     const environmentId = '00000000-0000-0000-0000-0000000000e1';
+    const activeScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
 
     let service: any;
     let controller: AgentsController;
@@ -81,6 +85,11 @@ describe('AgentsController — Environment assignment mapping', () => {
             { log: jest.fn().mockResolvedValue(undefined) } as any,
             undefined,
             undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            { getScope: () => activeScope } as any,
         );
     });
 
@@ -89,6 +98,7 @@ describe('AgentsController — Environment assignment mapping', () => {
         expect(service.create).toHaveBeenCalledWith(
             'u1',
             expect.objectContaining({ environmentId }),
+            activeScope,
         );
     });
 
@@ -97,6 +107,7 @@ describe('AgentsController — Environment assignment mapping', () => {
         expect(service.create).toHaveBeenCalledWith(
             'u1',
             expect.objectContaining({ environmentId: null }),
+            activeScope,
         );
     });
 
@@ -106,6 +117,7 @@ describe('AgentsController — Environment assignment mapping', () => {
             'u1',
             agentId,
             expect.objectContaining({ environmentId }),
+            activeScope,
         );
     });
 
@@ -115,6 +127,7 @@ describe('AgentsController — Environment assignment mapping', () => {
             'u1',
             agentId,
             expect.objectContaining({ environmentId: null }),
+            activeScope,
         );
     });
 

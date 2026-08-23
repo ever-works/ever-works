@@ -3,6 +3,10 @@ import { TaskChatService } from '../task-chat.service';
 import { ActivityActionType } from '../../entities/activity-log.types';
 
 describe('TaskChatService', () => {
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
     let tasks: any;
     let messages: any;
     let kbMentions: any;
@@ -26,6 +30,35 @@ describe('TaskChatService', () => {
     });
 
     describe('post', () => {
+        it('requires the parent Task through the exact active scope for list, post, and edit', async () => {
+            tasks.findByIdAndUser.mockResolvedValue({ id: 't1', userId: 'u1', ...everScope });
+            messages.create.mockResolvedValue({ id: 'm1' });
+            messages.findById
+                .mockResolvedValueOnce({
+                    id: 'm1',
+                    taskId: 't1',
+                    authorType: 'user',
+                    authorId: 'u1',
+                    body: 'old',
+                    createdAt: new Date(),
+                })
+                .mockResolvedValueOnce({ id: 'm1', taskId: 't1', body: 'new' });
+
+            await (svc.list as any)('u1', 't1', {}, everScope);
+            await (svc.post as any)(
+                'u1',
+                { taskId: 't1', authorType: 'user', authorId: 'u1', body: 'hello' },
+                {},
+                everScope,
+            );
+            await (svc.edit as any)('u1', 'm1', 'new', {}, everScope);
+
+            expect(tasks.findByIdAndUser).toHaveBeenCalledTimes(3);
+            for (const call of tasks.findByIdAndUser.mock.calls) {
+                expect(call).toEqual(['t1', 'u1', everScope]);
+            }
+        });
+
         it('404s for a cross-user Task', async () => {
             tasks.findByIdAndUser.mockResolvedValueOnce(null);
             await expect(
@@ -123,7 +156,7 @@ describe('TaskChatService', () => {
                 runs as any,
                 chatDispatcher,
             );
-            tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1' });
+            tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1', userId: 'u1', ...everScope });
             messages.create.mockImplementationOnce((d: any) => Promise.resolve({ id: 'm1', ...d }));
 
             await dispatchingSvc.post(
@@ -145,6 +178,7 @@ describe('TaskChatService', () => {
                     triggerKind: 'chat',
                     taskId: 't1',
                     chatMessageId: 'm1',
+                    ...everScope,
                 }),
             );
             expect(chatDispatcher.enqueue).toHaveBeenCalledWith(

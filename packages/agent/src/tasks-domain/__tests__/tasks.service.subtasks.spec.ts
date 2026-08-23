@@ -107,6 +107,7 @@ describe('TasksService.listSubtasks', () => {
         expect(repos.tasks.findByUserIdFiltered).toHaveBeenCalledWith(
             'user-1',
             expect.objectContaining({ parentTaskId: 'task-1' }),
+            undefined,
         );
         expect(out.rows.map((row) => row.id)).toEqual(['c1', 'c2']);
         expect(out.total).toBe(2);

@@ -39,6 +39,41 @@ describe('buildDeployment', () => {
 		expect(c.readinessProbe).toBeDefined();
 	});
 
+	it('preserves the provider-neutral 256Mi fallback and explicit sizing', () => {
+		const defaults = buildDeployment(baseInput) as Record<string, any>;
+		expect(defaults.spec.template.spec.containers[0].resources.requests.memory).toBe('256Mi');
+
+		const explicit = buildDeployment({ ...baseInput, memoryRequest: '768Mi' }) as Record<string, any>;
+		expect(explicit.spec.template.spec.containers[0].resources.requests.memory).toBe('768Mi');
+	});
+
+	it('trades one-replica availability for no temporary surge and keeps multi-replica availability', () => {
+		const single = buildDeployment({ ...baseInput, replicas: 1 }) as Record<string, any>;
+		expect(single.spec.strategy.rollingUpdate).toEqual({ maxSurge: 0, maxUnavailable: 1 });
+
+		const multiple = buildDeployment(baseInput) as Record<string, any>;
+		expect(multiple.spec.strategy.rollingUpdate).toEqual({ maxSurge: 1, maxUnavailable: 0 });
+	});
+
+	it('preserves the homepage startup warm-up before ongoing health probes begin', () => {
+		const d = buildDeployment(baseInput) as Record<string, any>;
+		const c = d.spec.template.spec.containers[0];
+		expect(c.startupProbe.httpGet.path).toBe('/');
+	});
+
+	it('softly spreads replicas without letting an untolerated control-plane domain strand a rollout', () => {
+		const d = buildDeployment(baseInput) as Record<string, any>;
+		expect(d.spec.template.spec.topologySpreadConstraints).toEqual([
+			{
+				maxSkew: 1,
+				topologyKey: 'kubernetes.io/hostname',
+				whenUnsatisfiable: 'ScheduleAnyway',
+				labelSelector: { matchLabels: { 'app.kubernetes.io/name': 'my-site' } }
+			}
+		]);
+		expect(d.spec.template.spec.topologySpreadConstraints[0].nodeTaintsPolicy).toBeUndefined();
+	});
+
 	it('omits imagePullSecrets when no pull secret name is provided', () => {
 		const d = buildDeployment(baseInput) as Record<string, any>;
 		expect(d.spec.template.spec.imagePullSecrets).toBeUndefined();
@@ -47,6 +82,14 @@ describe('buildDeployment', () => {
 	it('attaches imagePullSecrets when a pull secret name is provided', () => {
 		const d = buildDeployment({ ...baseInput, pullSecretName: 'my-site-pull' }) as Record<string, any>;
 		expect(d.spec.template.spec.imagePullSecrets).toEqual([{ name: 'my-site-pull' }]);
+	});
+
+	it('uses the cheap health endpoint for ongoing readiness and liveness probes', () => {
+		const d = buildDeployment(baseInput) as Record<string, any>;
+		const container = d.spec.template.spec.containers[0];
+
+		expect(container.readinessProbe.httpGet.path).toBe('/api/health');
+		expect(container.livenessProbe.httpGet.path).toBe('/api/health');
 	});
 });
 

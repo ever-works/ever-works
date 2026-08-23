@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import type {
     FleetJobKind,
     FleetJobStatus,
@@ -20,6 +21,7 @@ import { FleetJob } from '../entities/fleet-job.entity';
 import { FleetJobRepository } from './fleet-job.repository';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { verifyNodeSecret } from './fleet-node-credential';
+import { FleetAgentNodeAffinityRepository } from './fleet-agent-node-affinity.repository';
 
 /** Batch ceiling on one reclaim pass, so a huge backlog can't stall a poll. */
 export const FLEET_JOB_RECLAIM_BATCH = 200;
@@ -98,6 +100,7 @@ export class FleetJobService {
     constructor(
         private readonly jobs: FleetJobRepository,
         private readonly nodes: FleetNodeRepository,
+        private readonly affinities: FleetAgentNodeAffinityRepository,
     ) {}
 
     /**
@@ -125,9 +128,12 @@ export class FleetJobService {
             }
         }
 
+        const targetNodeId = await this.resolveTargetNodeId(input.kind, input.userId, payload);
+
         const created = await this.jobs.create({
             userId: input.userId,
             organizationId: input.organizationId ?? null,
+            targetNodeId,
             kind: input.kind,
             payload,
             requiredCapabilities,
@@ -136,6 +142,38 @@ export class FleetJobService {
             queuedReason: normalizeQueuedReason(input.queuedReason),
         });
         return toJobView(created);
+    }
+
+    /**
+     * The node an `agent-task` for this Agent is pinned to, or null when
+     * the Agent is unbound (or not a well-formed owned Agent id). The
+     * binding is resolved through the AGENT's own Organization — never
+     * through the scope a particular job or Task happens to carry, which
+     * is null for cron-spawned recurrence instances and can differ for a
+     * Task created under another of the owner's Organizations. Keying on
+     * the job would silently un-pin exactly the runs the owner bound.
+     *
+     * Public because the run router asks the same question BEFORE the
+     * job exists, to judge availability against the bound node instead
+     * of the whole fleet; both callers must agree on the answer.
+     */
+    async resolveAgentTaskTarget(userId: string, agentId: unknown): Promise<string | null> {
+        if (typeof agentId !== 'string' || !isUUID(agentId)) {
+            return null;
+        }
+        const affinity = await this.affinities.findForOwnedAgent(userId, agentId);
+        return affinity?.nodeId ?? null;
+    }
+
+    private async resolveTargetNodeId(
+        kind: FleetJobKind,
+        userId: string,
+        payload: Record<string, unknown> | null,
+    ): Promise<string | null> {
+        if (kind !== 'agent-task') {
+            return null;
+        }
+        return this.resolveAgentTaskTarget(userId, payload?.agentId);
     }
 
     /**
@@ -165,14 +203,18 @@ export class FleetJobService {
         // Over-fetch: capability filtering is in-memory (the tag set is a
         // JSON column and must behave identically on Postgres and sqlite),
         // and CAS losses to a racing node also consume candidates.
-        const candidates = await this.jobs.findQueuedForUser(
+        const candidates = await this.jobs.findQueuedForNode(
             node.userId,
+            node.id,
             Math.max(max * 4, FLEET_JOB_MAX_LEASE_BATCH),
         );
 
         const leased: FleetJobView[] = [];
         for (const candidate of candidates) {
             if (leased.length >= max) break;
+            if (candidate.targetNodeId && candidate.targetNodeId !== node.id) {
+                continue;
+            }
             if (!nodeSatisfiesCapabilities(capabilities, candidate.requiredCapabilities)) {
                 continue;
             }
@@ -447,6 +489,7 @@ export function toJobView(job: FleetJob): FleetJobView {
         kind: job.kind,
         status: job.status,
         nodeId: job.nodeId ?? null,
+        targetNodeId: job.targetNodeId ?? null,
         requiredCapabilities: job.requiredCapabilities ?? [],
         payload: job.payload ?? null,
         leaseExpiresAt: job.leaseExpiresAt ? toIso(job.leaseExpiresAt) : null,

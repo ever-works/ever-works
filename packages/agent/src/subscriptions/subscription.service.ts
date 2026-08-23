@@ -185,6 +185,11 @@ const PLAN_SEED_DATA: Array<{
     },
 ];
 
+/** Display name of a seeded plan by code; the code itself if the seed has no such row. */
+function planDisplayName(code: SubscriptionPlanCode): string {
+    return PLAN_SEED_DATA.find((plan) => plan.code === code)?.displayName ?? code;
+}
+
 /**
  * "Unlimited" for an entitlement valve.
  *
@@ -446,18 +451,26 @@ export class SubscriptionService implements OnModuleInit {
         return billingMode !== WorkScheduleBillingMode.USAGE;
     }
 
+    /**
+     * The plan a user should be told to upgrade to for a cadence their plan
+     * does not allow. Returns the catalog DISPLAY name, resolved from the
+     * seed by plan code, so the copy cannot drift from the plan switcher
+     * again: the tiers were renamed Standard/Premium -> Pro/Enterprise in
+     * the catalog while this string kept recommending plans that no longer
+     * exist under those names (and three e2e specs asserted the stale copy).
+     */
     private recommendationForCadence(cadence: WorkScheduleCadence): string {
         switch (cadence) {
             case WorkScheduleCadence.HOURLY:
             case WorkScheduleCadence.EVERY_3_HOURS:
             case WorkScheduleCadence.EVERY_8_HOURS:
-                return 'Premium';
+                return planDisplayName(SubscriptionPlanCode.PREMIUM);
             case WorkScheduleCadence.EVERY_12_HOURS:
             case WorkScheduleCadence.DAILY:
             case WorkScheduleCadence.WEEKLY:
-                return 'Standard';
+                return planDisplayName(SubscriptionPlanCode.STANDARD);
             default:
-                return 'Free';
+                return planDisplayName(SubscriptionPlanCode.FREE);
         }
     }
 

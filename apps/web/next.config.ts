@@ -95,6 +95,11 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
     output: BUILD_OUTPUT as NextConfig['output'],
+    // Keep the proxy's validated request-origin rewrite intact. Without this,
+    // Next normalizes next-intl's rewrite back to its internal `localhost`
+    // origin; behind a differently named listener/reverse proxy that becomes
+    // an external rewrite and re-enters the proxy.
+    skipProxyUrlNormalize: true,
     // Dev-only (Next ignores this in production builds): let the e2e/CI
     // harness reach the dev server over 127.0.0.1. The self-hosted CI
     // runner resolves `localhost` to IPv6 `::1`, where the dev servers

@@ -137,6 +137,7 @@ import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import { BillingProfile } from '../entities/billing-profile.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
+import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
 import { FleetJob } from '../entities/fleet-job.entity';
@@ -340,6 +341,9 @@ export const ENTITIES = [
     // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
     // headless) with hashed credentials + heartbeat status.
     FleetNode,
+    // Organization-scoped Agent scheduling intent selecting one user-owned
+    // Fleet node. Future jobs snapshot this row; existing jobs are unchanged.
+    FleetAgentNodeAffinity,
     // Streaming-terminal M9 / founder decision D1 — append-only,
     // redacted, retention-capped terminal transcript chunks.
     TerminalTranscriptChunk,

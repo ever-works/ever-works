@@ -22,17 +22,20 @@ const {
     registerMock,
     redeemMagicLinkApiMock,
     setAuthCookiesMock,
+    getLoginDefaultWorkspaceHrefMock,
     getRedirectUrlMock,
     redirectMock,
 } = vi.hoisted(() => ({
     registerMock: vi.fn(),
     redeemMagicLinkApiMock: vi.fn(),
     setAuthCookiesMock: vi.fn(),
+    getLoginDefaultWorkspaceHrefMock: vi.fn(),
     getRedirectUrlMock: vi.fn(),
     redirectMock: vi.fn(),
 }));
 
 vi.mock('@/lib/api', () => ({
+    getLoginDefaultWorkspaceHref: getLoginDefaultWorkspaceHrefMock,
     authAPI: {
         register: registerMock,
         redeemMagicLink: redeemMagicLinkApiMock,
@@ -156,6 +159,7 @@ describe('EW-080 — a magic-link sign-in says the address is still unconfirmed'
     beforeEach(() => {
         redeemMagicLinkApiMock.mockReset();
         setAuthCookiesMock.mockReset();
+        getLoginDefaultWorkspaceHrefMock.mockReset().mockResolvedValue('/');
         getRedirectUrlMock.mockReset();
         redirectMock.mockReset();
         vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -200,6 +204,44 @@ describe('EW-080 — a magic-link sign-in says the address is still unconfirmed'
         expect(noticeParam(redirectedHref())).toBeNull();
     });
 
+    it('uses the persisted Organization only as the fresh-login navigation default', async () => {
+        const response = authResponse(true);
+        redeemMagicLinkApiMock.mockResolvedValue(response);
+        getLoginDefaultWorkspaceHrefMock.mockResolvedValue('/org/ever/dashboard');
+        getRedirectUrlMock.mockImplementation(async (_r: unknown, href: string) => href);
+
+        const { redeemMagicLink } = await import('./auth');
+        const result = await redeemMagicLink('a'.repeat(64), null);
+
+        expect(setAuthCookiesMock).toHaveBeenCalledWith('tok-1');
+        expect(getLoginDefaultWorkspaceHrefMock).toHaveBeenCalledTimes(1);
+        expect(getRedirectUrlMock).toHaveBeenCalledWith(response, '/org/ever/dashboard');
+        expect(redirectedHref()).toBe('/org/ever/dashboard');
+        expect(result).toEqual({ success: true });
+    });
+
+    it.each([
+        ['a transient scope API failure', new Error('scope API unavailable')],
+        ['a malformed persisted Organization slug', new Error('Invalid workspace scope')],
+    ])(
+        'preserves successful redemption and falls back to personal for %s',
+        async (_scenario, lookupError) => {
+            const response = authResponse(true);
+            redeemMagicLinkApiMock.mockResolvedValue(response);
+            getLoginDefaultWorkspaceHrefMock.mockRejectedValue(lookupError);
+            getRedirectUrlMock.mockImplementation(async (_r: unknown, href: string) => href);
+
+            const { redeemMagicLink } = await import('./auth');
+            const result = await redeemMagicLink('a'.repeat(64), null);
+
+            expect(setAuthCookiesMock).toHaveBeenCalledWith('tok-1');
+            expect(getLoginDefaultWorkspaceHrefMock).toHaveBeenCalledTimes(1);
+            expect(getRedirectUrlMock).toHaveBeenCalledWith(response, '/');
+            expect(redirectedHref()).toBe('/');
+            expect(result).toEqual({ success: true });
+        },
+    );
+
     it('does not decorate an allowlisted absolute redirect target', async () => {
         // `ALLOWED_REDIRECT_URLS` defaults to `localhost,127.0.0.1`, so this is
         // a host the redirect guard actually honours. An external page has no
@@ -222,5 +264,6 @@ describe('EW-080 — a magic-link sign-in says the address is still unconfirmed'
         expect(result.success).toBe(false);
         expect(redirectMock).not.toHaveBeenCalled();
         expect(setAuthCookiesMock).not.toHaveBeenCalled();
+        expect(getLoginDefaultWorkspaceHrefMock).not.toHaveBeenCalled();
     });
 });

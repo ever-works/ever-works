@@ -9,6 +9,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ShowDateTime } from '@/components/ui/show-datetime';
 import { MergePolicyCard } from '@/components/policy/MergePolicyCard';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import { useOrganizations } from '@/lib/hooks/use-organizations';
 import { OrganizationMembersSection } from './OrganizationMembersSection';
 
@@ -93,16 +94,19 @@ export function OrganizationSettings() {
         startTransition(() => {
             void (async () => {
                 try {
-                    const res = await fetch(`/api/organizations/${encodeURIComponent(orgId)}`, {
-                        method: 'PATCH',
-                        credentials: 'include',
-                        cache: 'no-store',
-                        headers: { 'Content-Type': 'application/json' },
-                        // Empty textarea = clear the vision (explicit null —
-                        // the column is nullable and NULL means "never set /
-                        // no vision context for agents").
-                        body: JSON.stringify({ vision: trimmed.length > 0 ? trimmed : null }),
-                    });
+                    const res = await browserApiFetch(
+                        `/api/organizations/${encodeURIComponent(orgId)}`,
+                        {
+                            method: 'PATCH',
+                            credentials: 'include',
+                            cache: 'no-store',
+                            headers: { 'Content-Type': 'application/json' },
+                            // Empty textarea = clear the vision (explicit null —
+                            // the column is nullable and NULL means "never set /
+                            // no vision context for agents").
+                            body: JSON.stringify({ vision: trimmed.length > 0 ? trimmed : null }),
+                        },
+                    );
                     if (!res.ok) {
                         setSaveError(t('errors.generic'));
                         return;
@@ -143,7 +147,7 @@ export function OrganizationSettings() {
         async (next: MergePolicyOverride | null) => {
             if (!selectedOrg) return { success: false, error: t('errors.generic') };
             try {
-                const res = await fetch(
+                const res = await browserApiFetch(
                     `/api/organizations/${encodeURIComponent(selectedOrg.id)}`,
                     {
                         method: 'PATCH',

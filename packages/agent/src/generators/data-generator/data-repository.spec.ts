@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { DataRepository } from './data-repository';
+import { DataRepository, RuntimeYamlCompatibilityError } from './data-repository';
 
 describe('DataRepository', () => {
     afterEach(async () => {
@@ -43,6 +43,11 @@ describe('DataRepository', () => {
         });
         expect(warnSpy).toHaveBeenCalledTimes(1);
 
+        await expect(repository.assertRuntimeCompatible()).rejects.toMatchObject({
+            name: RuntimeYamlCompatibilityError.name,
+            relativePath: 'data/box/box.yml',
+        });
+
         await fs.rm(repoDir, { recursive: true, force: true });
     });
 
@@ -71,6 +76,27 @@ describe('DataRepository', () => {
 
         await expect(repository.countItems()).resolves.toBe(1);
         await expect(repository.getItem('broken-item')).rejects.toThrow();
+        await expect(repository.assertRuntimeCompatible()).rejects.toMatchObject({
+            name: RuntimeYamlCompatibilityError.name,
+            relativePath: 'data/broken-item/broken-item.yml',
+        });
+
+        await fs.rm(repoDir, { recursive: true, force: true });
+    });
+
+    it('certifies item YAML only when the strict runtime parser accepts the corpus', async () => {
+        const repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'data-repository-spec-'));
+
+        await fs.mkdir(path.join(repoDir, 'data', 'valid-item'), { recursive: true });
+        await fs.writeFile(
+            path.join(repoDir, 'data', 'valid-item', 'valid-item.yml'),
+            ['name: Valid Item', 'description: Runtime-compatible YAML', ''].join('\n'),
+            'utf-8',
+        );
+
+        const repository = await DataRepository.create(repoDir);
+
+        await expect(repository.assertRuntimeCompatible()).resolves.toBeUndefined();
 
         await fs.rm(repoDir, { recursive: true, force: true });
     });

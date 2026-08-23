@@ -1,0 +1,68 @@
+name: Windows Job Launcher
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - 'apps/node/native/windows-job-launcher/**'
+      - 'apps/node/src/core/windows-job-launcher/**'
+      - '.github/workflows/windows-job-launcher.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js 24.x
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: 'pnpm'
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Node workspace dependencies
+        run: pnpm --filter "ever-works-node^..." build
+
+      - name: Test and build internal adapter
+        run: |
+          pnpm --filter ever-works-node test -- src/core/windows-job-launcher
+          pnpm --filter ever-works-node type-check
+          pnpm --filter ever-works-node build
+
+      - name: Verify Rust formatting
+        working-directory: apps/node/native/windows-job-launcher
+        run: cargo fmt --all -- --check
+
+      - name: Lint native helper
+        working-directory: apps/node/native/windows-job-launcher
+        run: cargo clippy --locked --all-targets --features test-fixtures -- -D warnings
+
+      - name: Run native and adversarial tests
+        working-directory: apps/node/native/windows-job-launcher
+        run: cargo test --locked --features test-fixtures -- --test-threads=1
+
+      - name: Build unsigned release and provenance metadata
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: .\build-release.ps1

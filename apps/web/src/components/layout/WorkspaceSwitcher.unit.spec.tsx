@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
 
 // next-intl — return the key path verbatim so assertions can match
@@ -11,10 +11,10 @@ vi.mock('next-intl', () => ({
 
 // next/navigation — `useParams()` returns the URL slug. We mock it
 // per-test via `paramsMock`.
-const paramsMock = vi.fn<() => { slug?: string }>();
-paramsMock.mockReturnValue({});
+const pathnameMock = vi.fn<() => string>();
+pathnameMock.mockReturnValue('/dashboard');
 vi.mock('next/navigation', () => ({
-    useParams: () => paramsMock(),
+    usePathname: () => pathnameMock(),
 }));
 
 // i18n navigation — `useRouter().push()` for the switch-on-click flow.
@@ -24,6 +24,13 @@ vi.mock('@/i18n/navigation', () => ({
         <a {...rest}>{children}</a>
     ),
     useRouter: () => ({ push: routerPushMock }),
+}));
+
+const { navigateToWorkspaceDashboardMock } = vi.hoisted(() => ({
+    navigateToWorkspaceDashboardMock: vi.fn(),
+}));
+vi.mock('@/lib/workspace-navigation', () => ({
+    navigateToWorkspaceDashboard: navigateToWorkspaceDashboardMock,
 }));
 
 // Mock the image-only logo variants to simple sentinels — we don't want
@@ -69,11 +76,25 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
     beforeEach(() => {
         __resetOrganizationsStoreForTests();
         routerPushMock.mockReset();
-        paramsMock.mockReset().mockReturnValue({});
+        navigateToWorkspaceDashboardMock.mockReset();
+        pathnameMock.mockReset().mockReturnValue('/dashboard');
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockResolvedValue({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    tenantId: 't-1',
+                    organizationId: null,
+                    organizationSlug: null,
+                }),
+            }),
+        );
     });
 
     afterEach(() => {
         vi.restoreAllMocks();
+        vi.unstubAllGlobals();
     });
 
     /**
@@ -222,5 +243,69 @@ describe('WorkspaceSwitcher — EW-660 Phase 8', () => {
         // After opening, the org list row + create row both show.
         expect(screen.getAllByText('Acme Inc').length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText('organizations.switcher.createNew')).toBeInTheDocument();
+    });
+
+    it('persists from the current tab scope before navigating to the canonical dashboard', async () => {
+        const yo = makeOrg({ id: 'o-yo', slug: 'yo-inc', displayName: 'Yo Incorporated' });
+        const ever = makeOrg({ id: 'o-ever', slug: 'ever', displayName: 'Ever' });
+        __seedOrganizationsStoreForTests({
+            data: [yo, ever],
+            isLoading: false,
+            error: null,
+        });
+
+        let resolveSwitch!: (response: unknown) => void;
+        const switchResponse = new Promise((resolve) => {
+            resolveSwitch = resolve;
+        });
+        const fetchMock = vi.mocked(fetch);
+        window.history.replaceState({}, '', '/org/yo-inc/dashboard');
+        fetchMock.mockImplementation((_input, init) => {
+            if (init?.method === 'POST') {
+                return switchResponse as Promise<Response>;
+            }
+            return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    tenantId: 't-1',
+                    organizationId: 'o-yo',
+                    organizationSlug: 'yo-inc',
+                }),
+            } as Response);
+        });
+
+        render(<WorkspaceSwitcher />);
+        fireEvent.click(screen.getAllByRole('button')[0]);
+        fireEvent.click(screen.getByText('Ever'));
+
+        expect(fetchMock).toHaveBeenCalledWith(
+            '/api/users/me/scope',
+            expect.objectContaining({
+                method: 'POST',
+                body: JSON.stringify({ organizationSlug: 'ever' }),
+            }),
+        );
+        const switchHeaders = new Headers(fetchMock.mock.calls[0][1]?.headers);
+        expect(switchHeaders.get('x-ever-workspace')).toBe('org:yo-inc');
+        expect(navigateToWorkspaceDashboardMock).not.toHaveBeenCalled();
+
+        resolveSwitch({
+            ok: true,
+            status: 200,
+            json: async () => ({
+                tenantId: 't-1',
+                organizationId: 'o-ever',
+                organizationSlug: 'ever',
+            }),
+        });
+
+        await waitFor(() =>
+            expect(navigateToWorkspaceDashboardMock).toHaveBeenCalledWith({
+                kind: 'organization',
+                slug: 'ever',
+            }),
+        );
+        expect(routerPushMock).not.toHaveBeenCalled();
     });
 });
