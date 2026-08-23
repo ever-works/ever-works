@@ -1,0 +1,52 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.co/schemas/windows-job-launcher/unsigned-release-metadata.schema.json",
+	"title": "Ever Works Windows Job launcher unsigned release metadata",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"schemaVersion",
+		"productionEligible",
+		"artifact",
+		"targetTriple",
+		"rustToolchain",
+		"cargoLocked",
+		"sourceCommit",
+		"binarySize",
+		"unsignedBuildSha256",
+		"cargoLockSha256",
+		"sbom",
+		"sbomSha256",
+		"provenance",
+		"provenanceSha256",
+		"authenticode"
+	],
+	"properties": {
+		"schemaVersion": { "const": 2 },
+		"productionEligible": { "const": false },
+		"artifact": { "const": "ever-works-windows-job-launcher.exe" },
+		"targetTriple": { "const": "x86_64-pc-windows-msvc" },
+		"rustToolchain": { "type": "string", "minLength": 1 },
+		"cargoLocked": { "const": true },
+		"sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+		"binarySize": { "type": "integer", "minimum": 1 },
+		"unsignedBuildSha256": { "$ref": "#/$defs/sha256" },
+		"cargoLockSha256": { "$ref": "#/$defs/sha256" },
+		"sbom": { "const": "ever-works-windows-job-launcher.sbom.cdx.json" },
+		"sbomSha256": { "$ref": "#/$defs/sha256" },
+		"provenance": { "const": "ever-works-windows-job-launcher.provenance.intoto.json" },
+		"provenanceSha256": { "$ref": "#/$defs/sha256" },
+		"authenticode": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["status", "productionUse"],
+			"properties": {
+				"status": { "const": "unsigned" },
+				"productionUse": { "const": "forbidden" }
+			}
+		}
+	},
+	"$defs": {
+		"sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+	}
+}

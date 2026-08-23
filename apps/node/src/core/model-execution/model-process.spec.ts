@@ -14,7 +14,7 @@ import {
 	type ModelExecutionProvider,
 	type ModelExecutionRequest
 } from './model-process';
-import { executeModelProcessInternal } from './model-process.internal';
+import { ModelProcessContainmentUnavailableError, executeModelProcessInternal } from './model-process.internal';
 
 const executeModelProcess = executeModelProcessInternal;
 type ModelExecutionIo = NonNullable<Parameters<typeof executeModelProcessInternal>[1]>;
@@ -700,6 +700,28 @@ describe('executeModelProcess — real process boundary', () => {
 
 		expect(result.status).toBe('containment-unavailable');
 		expect(result.summary).toMatch(/pre-spawn.*job object|containment.*prerequisite/i);
+		await expect(access(harness.capturePath)).rejects.toThrow();
+	});
+
+	it('reports containment unavailable when the trusted launcher cannot verify or start its helper', async () => {
+		const harness = await createHarness('success');
+		let closeCalls = 0;
+		const result = await executeModelProcess(request('codex', harness.workspacePath), {
+			...harness.io,
+			createModelProcessContainment: async () => ({
+				spawn: async () => {
+					throw new ModelProcessContainmentUnavailableError();
+				},
+				close: async () => {
+					closeCalls += 1;
+					return { verified: true };
+				}
+			})
+		});
+
+		expect(result.status).toBe('containment-unavailable');
+		expect(result.summary).not.toContain('Program Files');
+		expect(closeCalls).toBe(1);
 		await expect(access(harness.capturePath)).rejects.toThrow();
 	});
 
@@ -1694,13 +1716,13 @@ describe('executeModelProcess — request refusal', () => {
 				const containment = await baseCreateContainment(spawnFn);
 				return {
 					...containment,
-					spawn: ((...args: Parameters<typeof spawn>) => {
-						const child = containment.spawn(...args);
+					spawn: (async (...args: Parameters<TestContainment['spawn']>) => {
+						const child = await containment.spawn(...args);
 						child.once('close', () => {
 							monotonicTime = 1_001;
 						});
 						return child;
-					}) as typeof spawn
+					}) as TestContainment['spawn']
 				};
 			}
 		});
@@ -1889,6 +1911,67 @@ describe('executeModelProcess — request refusal', () => {
 		},
 		6_000
 	);
+
+	it('makes cancellation win when the trusted async launcher rejects after observing abort', async () => {
+		const harness = await createHarness('success');
+		const controller = new AbortController();
+		const baseCreateContainment = harness.io.createModelProcessContainment!;
+		let containmentCount = 0;
+		let markModelSpawnStarted!: () => void;
+		const modelSpawnStarted = new Promise<void>((resolvePromise) => {
+			markModelSpawnStarted = resolvePromise;
+		});
+		const execution = executeModelProcess(request('codex', harness.workspacePath, { signal: controller.signal }), {
+			...harness.io,
+			createModelProcessContainment: async (spawnFn) => {
+				const containment = await baseCreateContainment(spawnFn);
+				containmentCount += 1;
+				if (containmentCount === 1) return containment;
+				return {
+					...containment,
+					spawn: async () => {
+						markModelSpawnStarted();
+						await new Promise<void>((resolvePromise) =>
+							controller.signal.addEventListener('abort', () => resolvePromise(), { once: true })
+						);
+						throw new Error('trusted broker stopped after cancellation');
+					}
+				};
+			}
+		});
+
+		await modelSpawnStarted;
+		controller.abort();
+		const result = await execution;
+
+		expect(result.status).toBe('cancelled');
+	});
+
+	it('makes the absolute deadline win when the trusted async launcher rejects after the budget', async () => {
+		const harness = await createHarness('success');
+		const baseCreateContainment = harness.io.createModelProcessContainment!;
+		let containmentCount = 0;
+		let monotonicTime = 0;
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
+			...harness.io,
+			monotonicNow: () => monotonicTime,
+			createModelProcessContainment: async (spawnFn) => {
+				const containment = await baseCreateContainment(spawnFn);
+				containmentCount += 1;
+				if (containmentCount === 1) return containment;
+				return {
+					...containment,
+					spawn: async () => {
+						monotonicTime = 1_001;
+						throw new Error('trusted broker stopped after deadline');
+					}
+				};
+			}
+		});
+
+		expect(result.status).toBe('timed-out');
+		expect(result.summary).toMatch(/wall-clock/i);
+	});
 
 	it('bounds a never-resolving workspace validation inside the one execution deadline', async () => {
 		const harness = await createHarness('success');

@@ -2,10 +2,11 @@ name: Windows Job Launcher
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, codex/windows-job-launcher-phase1]
     paths:
       - 'apps/node/native/windows-job-launcher/**'
       - 'apps/node/src/core/windows-job-launcher/**'
+      - 'apps/node/src/core/model-execution/**'
       - '.github/workflows/windows-job-launcher.yml'
   workflow_dispatch:
 
@@ -41,15 +42,6 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Node workspace dependencies
-        run: pnpm --filter "ever-works-node^..." build
-
-      - name: Test and build internal adapter
-        run: |
-          pnpm --filter ever-works-node test -- src/core/windows-job-launcher
-          pnpm --filter ever-works-node type-check
-          pnpm --filter ever-works-node build
-
       - name: Verify Rust formatting
         working-directory: apps/node/native/windows-job-launcher
         run: cargo fmt --all -- --check
@@ -66,3 +58,51 @@ jobs:
         working-directory: apps/node/native/windows-job-launcher
         shell: pwsh
         run: .\build-release.ps1
+
+      - name: Verify deterministic metadata and unsigned schema
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: |
+          $files = @(
+            'target/release-metadata/ever-works-windows-job-launcher.json',
+            'target/release-metadata/ever-works-windows-job-launcher.sbom.cdx.json',
+            'target/release-metadata/ever-works-windows-job-launcher.provenance.intoto.json'
+          )
+          $first = $files | ForEach-Object { (Get-FileHash -Algorithm SHA256 -LiteralPath $_).Hash }
+          .\build-release.ps1 | Out-Null
+          $second = $files | ForEach-Object { (Get-FileHash -Algorithm SHA256 -LiteralPath $_).Hash }
+          if (Compare-Object $first $second) { throw 'release metadata is not deterministic' }
+          $valid = Get-Content -Raw -LiteralPath $files[0] |
+            Test-Json -SchemaFile 'unsigned-release-metadata.schema.json'
+          if (-not $valid) { throw 'unsigned release metadata failed its schema' }
+
+      - name: Build Node workspace dependencies
+        run: pnpm --filter "ever-works-node^..." build
+
+      - name: Test and build trusted adapter and model factory
+        run: |
+          pnpm --filter ever-works-node test -- src/core/windows-job-launcher src/core/model-execution
+          pnpm --filter ever-works-node type-check
+          pnpm --filter ever-works-node build
+
+      - name: Prepare ephemeral self-signed test helper
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: .\prepare-test-signed-manifest.ps1
+
+      - name: Verify test-only signed manifest schema
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: |
+          $valid = Get-Content -Raw -LiteralPath 'target/signed-test-fixture/ever-works-windows-job-launcher.signed.json' |
+            Test-Json -SchemaFile 'signed-artifact-manifest.schema.json'
+          if (-not $valid) { throw 'signed test manifest failed its schema' }
+
+      - name: Test signed helper trust and broker-death cleanup
+        run: pnpm --filter ever-works-node test -- src/core/windows-job-launcher/windows-job-helper-trust.windows.spec.ts
+
+      - name: Remove ephemeral test certificate and helper
+        if: always()
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: .\prepare-test-signed-manifest.ps1 -Cleanup

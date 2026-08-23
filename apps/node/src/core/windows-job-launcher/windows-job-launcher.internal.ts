@@ -3,6 +3,11 @@ import { win32 as windowsPath } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import type { EventEmitter } from 'node:events';
 import {
+	createTrustedWindowsJobHelperBrokerInternal,
+	normalizeWindowsJobHelperTrustPolicyInternal,
+	type WindowsJobHelperTrustPolicyInternal
+} from './windows-job-helper-trust.internal';
+import {
 	ServerMessageKind,
 	ServerProtocolDecoder,
 	encodeCancelFrame,
@@ -23,12 +28,20 @@ export interface WindowsJobHelperProcessInternal extends EventEmitter {
 
 export interface WindowsJobLauncherDependenciesInternal {
 	platform: NodeJS.Platform;
-	spawnHelper: (helperPath: string, arguments_: string[], options: SpawnOptions) => WindowsJobHelperProcessInternal;
+	/** Test-only direct helper seam. Production always uses spawnTrustedHelper. */
+	spawnHelper?: (helperPath: string, arguments_: string[], options: SpawnOptions) => WindowsJobHelperProcessInternal;
+	spawnTrustedHelper: (policy: WindowsJobHelperTrustPolicyInternal) => WindowsJobHelperProcessInternal;
 	outputHighWaterMark: number;
 }
 
 export interface WindowsJobLaunchInternalRequest extends WindowsJobLaunchRequest {
 	helperPath: string;
+	/** Required outside the explicit direct-helper test seam. */
+	helperTrust?: Omit<WindowsJobHelperTrustPolicyInternal, 'helperPath'>;
+	/** Internal cancellation channel; never serialized into the native launch frame. */
+	signal?: AbortSignal;
+	/** Allows the integrity broker to initialize without weakening the native Job cleanup bound. */
+	helperStartupTimeoutMs?: number;
 }
 
 export interface WindowsJobRunInternal {
@@ -69,6 +82,8 @@ const defaultDependencies: WindowsJobLauncherDependenciesInternal = {
 	platform: process.platform,
 	spawnHelper: (helperPath, arguments_, options) =>
 		spawn(helperPath, arguments_, options) as WindowsJobHelperProcessInternal,
+	spawnTrustedHelper: (policy) =>
+		createTrustedWindowsJobHelperBrokerInternal(policy) as WindowsJobHelperProcessInternal,
 	outputHighWaterMark: 16 * 1024
 };
 
@@ -77,7 +92,8 @@ export async function launchWindowsJobInternal(
 	dependencyOverrides: Partial<WindowsJobLauncherDependenciesInternal> = {}
 ): Promise<WindowsJobRunInternal> {
 	const dependencies = { ...defaultDependencies, ...dependencyOverrides };
-	validateTrustedRequest(request, dependencies.platform);
+	const directTestHelper = dependencyOverrides.spawnHelper !== undefined;
+	const helperPolicy = validateTrustedRequest(request, dependencies.platform, directTestHelper);
 
 	let launchFrame: Buffer;
 	try {
@@ -88,13 +104,15 @@ export async function launchWindowsJobInternal(
 
 	let helper: WindowsJobHelperProcessInternal;
 	try {
-		helper = dependencies.spawnHelper(request.helperPath, [], {
-			shell: false,
-			windowsHide: true,
-			windowsVerbatimArguments: true,
-			env: {},
-			stdio: ['pipe', 'pipe', 'pipe']
-		});
+		helper = directTestHelper
+			? dependencyOverrides.spawnHelper!(request.helperPath, [], {
+					shell: false,
+					windowsHide: true,
+					windowsVerbatimArguments: true,
+					env: {},
+					stdio: ['pipe', 'pipe', 'pipe']
+				})
+			: dependencies.spawnTrustedHelper(helperPolicy!);
 	} catch {
 		throw new WindowsJobLauncherError('WINDOWS_JOB_SPAWN_FAILED');
 	}
@@ -341,7 +359,7 @@ export async function launchWindowsJobInternal(
 
 	const launchTimer = setTimeout(
 		() => fail('WINDOWS_JOB_LAUNCH_TIMEOUT'),
-		Math.min(request.cleanupTimeoutMs, 30_000)
+		Math.min(request.helperStartupTimeoutMs ?? request.cleanupTimeoutMs, 30_000)
 	);
 	void launched.finally(() => clearTimeout(launchTimer)).catch(() => undefined);
 
@@ -352,6 +370,10 @@ export async function launchWindowsJobInternal(
 	} catch {
 		fail('WINDOWS_JOB_CONTROL_FAILED');
 	}
+	const onAbort = (): void => beginCancellation();
+	request.signal?.addEventListener('abort', onAbort, { once: true });
+	void completion.finally(() => request.signal?.removeEventListener('abort', onAbort)).catch(() => undefined);
+	if (request.signal?.aborted) onAbort();
 
 	const launchedRootPid = await launched;
 	const cancel = (): Promise<WindowsJobCompletion> => {
@@ -369,14 +391,17 @@ export async function launchWindowsJobInternal(
 	};
 }
 
-function validateTrustedRequest(request: WindowsJobLaunchInternalRequest, platform: NodeJS.Platform): void {
+function validateTrustedRequest(
+	request: WindowsJobLaunchInternalRequest,
+	platform: NodeJS.Platform,
+	allowDirectTestHelper: boolean
+): WindowsJobHelperTrustPolicyInternal | undefined {
 	if (platform !== 'win32') {
 		throw new WindowsJobLauncherError('WINDOWS_JOB_UNSUPPORTED_PLATFORM');
 	}
 	const applicationExtension = windowsPath.extname(request.applicationPath).toLowerCase();
 	if (
-		!windowsPath.isAbsolute(request.helperPath) ||
-		windowsPath.extname(request.helperPath).toLowerCase() !== '.exe' ||
+		!isNormalizedLocalWindowsExecutable(request.helperPath) ||
 		!windowsPath.isAbsolute(request.applicationPath) ||
 		applicationExtension !== '.exe' ||
 		!windowsPath.isAbsolute(request.workingDirectory) ||
@@ -386,4 +411,29 @@ function validateTrustedRequest(request: WindowsJobLaunchInternalRequest, platfo
 	) {
 		throw new WindowsJobLauncherError('WINDOWS_JOB_INVALID_REQUEST');
 	}
+	if (request.helperTrust === undefined) {
+		if (allowDirectTestHelper) return undefined;
+		throw new WindowsJobLauncherError('WINDOWS_JOB_INVALID_REQUEST');
+	}
+	try {
+		return normalizeWindowsJobHelperTrustPolicyInternal({
+			helperPath: request.helperPath,
+			...request.helperTrust
+		});
+	} catch {
+		throw new WindowsJobLauncherError('WINDOWS_JOB_INVALID_REQUEST');
+	}
+}
+
+function isNormalizedLocalWindowsExecutable(path: string): boolean {
+	return (
+		/^[A-Za-z]:\\/.test(path) &&
+		windowsPath.isAbsolute(path) &&
+		!path.startsWith('\\\\') &&
+		!path.includes('/') &&
+		!path.includes('\0') &&
+		path === windowsPath.normalize(path) &&
+		path.indexOf(':', 2) === -1 &&
+		windowsPath.extname(path).toLowerCase() === '.exe'
+	);
 }
