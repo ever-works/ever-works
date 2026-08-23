@@ -5,6 +5,12 @@
     "compilerOptions": {
         "builder": "swc",
         "deleteOutDir": false,
-        "typeCheck": true
+        "typeCheck": true,
+        "assets": [
+            {
+                "include": "**/*.json",
+                "outDir": "dist"
+            }
+        ]
     }
 }
