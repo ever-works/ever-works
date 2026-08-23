@@ -21,7 +21,10 @@ import {
 import { useOrganizations } from '@/lib/hooks/use-organizations';
 import { UpgradeOrCreateDialog } from './UpgradeOrCreateDialog';
 import { browserApiFetch } from '@/lib/api/browser-api';
-import { navigateToWorkspaceDashboard } from '@/lib/workspace-navigation';
+import {
+    navigateToWorkspaceDashboard,
+    persistActiveOrganization,
+} from '@/lib/workspace-navigation';
 
 /**
  * Mirror of `User.deriveSlugIfMissing` (and the server-side
@@ -47,23 +50,6 @@ const MAX_NAME_LENGTH = 200;
  * their own tighter ~2000-char injection cap.
  */
 const MAX_VISION_LENGTH = 5000;
-
-async function persistActiveOrganization(organizationSlug: string): Promise<void> {
-    const response = await browserApiFetch('/api/users/me/scope', {
-        method: 'POST',
-        credentials: 'include',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationSlug }),
-    });
-    if (!response.ok) {
-        throw new Error(`Failed to persist active Organization (${response.status})`);
-    }
-    const persisted = (await response.json()) as { organizationSlug?: string | null };
-    if (persisted.organizationSlug !== organizationSlug) {
-        throw new Error('The persisted active Organization did not match the selection');
-    }
-}
 
 /**
  * Teams & Prebuilt Companies (spec §4.4/§6) — one catalog entry from

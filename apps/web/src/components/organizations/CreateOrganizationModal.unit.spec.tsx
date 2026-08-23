@@ -38,7 +38,8 @@ vi.mock('@/i18n/navigation', () => ({
 const { navigateToWorkspaceDashboardMock } = vi.hoisted(() => ({
     navigateToWorkspaceDashboardMock: vi.fn(),
 }));
-vi.mock('@/lib/workspace-navigation', () => ({
+vi.mock('@/lib/workspace-navigation', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/workspace-navigation')>()),
     navigateToWorkspaceDashboard: navigateToWorkspaceDashboardMock,
 }));
 

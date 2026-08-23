@@ -1,6 +1,33 @@
 import { buildWorkspaceHref, isOrganizationSlug, type WorkspaceScope } from './workspace-scope';
+import { browserApiFetch } from './api/browser-api';
 
 type WorkspaceLocation = Pick<Location, 'origin' | 'assign'>;
+
+/**
+ * Persist the user's fresh-login default only after the membership-validated
+ * scope endpoint confirms the exact Organization selected by this tab.
+ */
+export async function persistActiveOrganization(organizationSlug: string): Promise<void> {
+    if (!isOrganizationSlug(organizationSlug)) {
+        throw new Error('Invalid Organization workspace');
+    }
+
+    const response = await browserApiFetch('/api/users/me/scope', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationSlug }),
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to persist active Organization (${response.status})`);
+    }
+
+    const persisted = (await response.json()) as { organizationSlug?: string | null };
+    if (persisted.organizationSlug !== organizationSlug) {
+        throw new Error('The persisted active Organization did not match the selection');
+    }
+}
 
 /**
  * Cross a workspace boundary with a fresh document. This deliberately avoids
