@@ -41,7 +41,10 @@ export class FleetAgentNodeAffinityRepository {
      * Null when the Agent is not owned by `userId`, has no Organization
      * (personal scope — bindings are never written there), or is unbound.
      */
-    async findForOwnedAgent(userId: string, agentId: string): Promise<FleetAgentNodeAffinity | null> {
+    async findForOwnedAgent(
+        userId: string,
+        agentId: string,
+    ): Promise<FleetAgentNodeAffinity | null> {
         const agent = await this.agents.findOne({
             where: { id: agentId, userId },
             select: { id: true, organizationId: true },

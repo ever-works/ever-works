@@ -22,22 +22,22 @@ Ever Works sells **three things** on one shared Stripe account ("Ever Tech", `ac
 1. **A plan** — Free / Pro / Enterprise (cloud) or Community / Pro / Enterprise Edition (self-hosted). Flat, recurring (monthly/annual) or a one-off perpetual licence on self-hosted Pro.
 2. **Seats** — employees **or** agents, interchangeable. Each paid plan includes 10; additional seats are a per-unit recurring price ($5 Pro / $10 Enterprise per seat per month).
 3. **Credits** — the unit of platform-billed AI usage. **1 credit = 1 cent** of platform-billed usage. Credits come from four places, all landing in one append-only ledger:
-   - the **daily free allowance** (50/day, every plan, non-accumulating),
-   - the **monthly plan allowance** (3,000 Pro / 25,000 Enterprise, expiring at the end of each allowance month),
-   - **prepaid packs** ($10/1,000 · $50/5,500 · $200/25,000, never expire) — bought at checkout or by threshold auto-recharge,
-   - **pay-as-you-go (PAYG)** — when the prepaid balance is exhausted and the owner has opted in, the remainder is **metered to Stripe and invoiced monthly in arrears** at graduated per-credit rates, under a user-set monthly cap.
+    - the **daily free allowance** (50/day, every plan, non-accumulating),
+    - the **monthly plan allowance** (3,000 Pro / 25,000 Enterprise, expiring at the end of each allowance month),
+    - **prepaid packs** ($10/1,000 · $50/5,500 · $200/25,000, never expire) — bought at checkout or by threshold auto-recharge,
+    - **pay-as-you-go (PAYG)** — when the prepaid balance is exhausted and the owner has opted in, the remainder is **metered to Stripe and invoiced monthly in arrears** at graduated per-credit rates, under a user-set monthly cap.
 
 Runs on the customer's **own model keys** (BYOK/BYOS) spend no credits on any plan.
 
 This spec closes the five gaps found in the 2026-08-23 audit:
 
-| Gap | What was wrong | What this spec does |
-| --- | --- | --- |
-| 1 | Paid subscribers received **zero** credits (no monthly grant writer; daily grant was free-plan-only in code while catalog/marketing said universal) | §3.2 monthly allowance grants + expiry; §3.1 universal daily grant |
-| 2 | `CREDITS_MARGIN_PERCENT=0` → packs sold at or below provider list cost | §3.4 margin becomes a catalog value (35 %) with documented economics |
-| 3 | Seats billed to Stripe but neither persisted nor enforced; ledger per user | §3.6 seats persisted, exposed, enforceable, adjustable; org wallets explicitly deferred (§7) |
-| 4 | Docs drift (pack prices, plan names, removed Stripe APIs), ToS promises in-arrears invoicing the code could not do, PRD missing | this spec + `docs/features/credits-and-billing.md` + `docs/advanced/subscription-billing.md` rewritten; §3.5 makes in-arrears invoicing real |
-| 5 | "Pay-as-you-go from your credits balance" on plan cards while no PAYG existed | §3.5 real PAYG; plan-card wording changed to "Usage is billed from your credits balance" |
+| Gap | What was wrong                                                                                                                                      | What this spec does                                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Paid subscribers received **zero** credits (no monthly grant writer; daily grant was free-plan-only in code while catalog/marketing said universal) | §3.2 monthly allowance grants + expiry; §3.1 universal daily grant                                                                           |
+| 2   | `CREDITS_MARGIN_PERCENT=0` → packs sold at or below provider list cost                                                                              | §3.4 margin becomes a catalog value (35 %) with documented economics                                                                         |
+| 3   | Seats billed to Stripe but neither persisted nor enforced; ledger per user                                                                          | §3.6 seats persisted, exposed, enforceable, adjustable; org wallets explicitly deferred (§7)                                                 |
+| 4   | Docs drift (pack prices, plan names, removed Stripe APIs), ToS promises in-arrears invoicing the code could not do, PRD missing                     | this spec + `docs/features/credits-and-billing.md` + `docs/advanced/subscription-billing.md` rewritten; §3.5 makes in-arrears invoicing real |
+| 5   | "Pay-as-you-go from your credits balance" on plan cards while no PAYG existed                                                                       | §3.5 real PAYG; plan-card wording changed to "Usage is billed from your credits balance"                                                     |
 
 ## 2. User Scenarios
 
