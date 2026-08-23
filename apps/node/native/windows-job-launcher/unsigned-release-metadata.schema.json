@@ -325,12 +325,7 @@
 		"signedToolIdentity": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": [
-				"sha256",
-				"authenticodeStatus",
-				"publisherSubject",
-				"publisherCertificateSha256"
-			],
+			"required": ["sha256", "authenticodeStatus", "publisherSubject", "publisherCertificateSha256"],
 			"properties": {
 				"sha256": { "$ref": "#/$defs/sha256" },
 				"authenticodeStatus": { "const": "Valid" },
