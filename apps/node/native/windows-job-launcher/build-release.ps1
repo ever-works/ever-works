@@ -96,8 +96,11 @@ try {
 				if (-not [string]::IsNullOrWhiteSpace($_.license)) {
 					$component["licenses"] = @([ordered]@{ expression = $_.license })
 				}
-				if ($_.checksum -match '^[0-9a-f]{64}$') {
-					$component["hashes"] = @([ordered]@{ alg = "SHA-256"; content = $_.checksum })
+				$checksumProperty = $_.PSObject.Properties["checksum"]
+				if ($null -ne $checksumProperty -and [string]$checksumProperty.Value -match '^[0-9a-f]{64}$') {
+					$component["hashes"] = @(
+						[ordered]@{ alg = "SHA-256"; content = [string]$checksumProperty.Value }
+					)
 				}
 				$component
 			}
