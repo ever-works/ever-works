@@ -47,6 +47,34 @@ function Assert-ScriptFailsLike {
 	}
 }
 
+function Copy-TestJsonObject {
+	param([Parameter(Mandatory)] [object]$Value)
+	return $Value | ConvertTo-Json -Depth 32 -Compress | ConvertFrom-Json
+}
+
+function Write-TestMetadataBundle {
+	param(
+		[Parameter(Mandatory)] [string]$Directory,
+		[Parameter(Mandatory)] [object]$Metadata,
+		[Parameter(Mandatory)] [object]$Provenance,
+		[Parameter(Mandatory)] [string]$SourceMetadataDirectory
+	)
+	New-Item -ItemType Directory -Force -Path $Directory | Out-Null
+	$metadataPath = Join-Path $Directory "ever-works-windows-job-launcher.json"
+	$provenancePath = Join-Path $Directory ([string]$Metadata.provenance)
+	$provenanceJson = $Provenance | ConvertTo-Json -Depth 32 -Compress
+	[IO.File]::WriteAllText($provenancePath, "$provenanceJson`n", [Text.UTF8Encoding]::new($false))
+	$Metadata.provenanceSha256 = (
+		Get-FileHash -Algorithm SHA256 -LiteralPath $provenancePath
+	).Hash.ToLowerInvariant()
+	Copy-Item `
+		-LiteralPath (Join-Path $SourceMetadataDirectory ([string]$Metadata.sbom)) `
+		-Destination (Join-Path $Directory ([string]$Metadata.sbom))
+	$metadataJson = $Metadata | ConvertTo-Json -Depth 32 -Compress
+	[IO.File]::WriteAllText($metadataPath, "$metadataJson`n", [Text.UTF8Encoding]::new($false))
+	return $metadataPath
+}
+
 function Set-TestUInt16 {
 	param([byte[]]$Bytes, [int]$Offset, [uint16]$Value)
 	[Array]::Copy([BitConverter]::GetBytes($Value), 0, $Bytes, $Offset, 2)
@@ -398,6 +426,74 @@ try {
 		ExpectedPublisherCertificateSha256 = $certificateSha256
 		UnsignedMetadataPath = $testMetadataPath
 	}
+
+	$fabricatedHash = "1".PadLeft(64, "1")
+	$fabricatedMetadata = Copy-TestJsonObject $unsignedMetadata
+	$fabricatedProvenance = Get-Content `
+		-Raw `
+		-LiteralPath (Join-Path $testMetadataDirectory ([string]$unsignedMetadata.provenance)) |
+		ConvertFrom-Json
+	$fabricatedMetadata.unsignedBuildSha256 = $fabricatedHash
+	$fabricatedMetadata.reproducibility.buildSha256 = @($fabricatedHash, $fabricatedHash)
+	$fabricatedProvenance.subject[0].digest.sha256 = $fabricatedHash
+	$fabricatedProvenance.predicate.runDetails.metadata.reproducibilityEvidence.buildSha256 = @(
+		$fabricatedHash,
+		$fabricatedHash
+	)
+	$fabricatedMetadataPath = Write-TestMetadataBundle `
+		-Directory (Join-Path $fixtureRoot "fabricated-metadata") `
+		-Metadata $fabricatedMetadata `
+		-Provenance $fabricatedProvenance `
+		-SourceMetadataDirectory $sourceMetadataDirectory
+	Assert-ScriptFailsLike -Pattern "*unsigned artifact SHA-256 does not match unsigned release metadata*" -Message "fabricated unsigned metadata and consistently rehashed provenance must be rejected" -Action {
+		& $manifestScript `
+			-SignedArtifactPath $goodPath `
+			-ExpectedPublisherSubject $certificate.Subject `
+			-ExpectedPublisherCertificateSha256 $certificateSha256 `
+			-UnsignedMetadataPath $fabricatedMetadataPath `
+			-OutputPath (Join-Path $fixtureRoot "fabricated-metadata.json")
+	}
+
+	$mismatchedProvenanceMetadata = Copy-TestJsonObject $unsignedMetadata
+	$mismatchedProvenance = Get-Content `
+		-Raw `
+		-LiteralPath (Join-Path $testMetadataDirectory ([string]$unsignedMetadata.provenance)) |
+		ConvertFrom-Json
+	$mismatchedProvenance.subject[0].digest.sha256 = "2".PadLeft(64, "2")
+	$mismatchedProvenanceMetadataPath = Write-TestMetadataBundle `
+		-Directory (Join-Path $fixtureRoot "mismatched-provenance") `
+		-Metadata $mismatchedProvenanceMetadata `
+		-Provenance $mismatchedProvenance `
+		-SourceMetadataDirectory $sourceMetadataDirectory
+	Assert-ScriptFailsLike -Pattern "*provenance subject does not match the verified unsigned artifact*" -Message "rehashed provenance with a fabricated subject must be rejected" -Action {
+		& $manifestScript `
+			-SignedArtifactPath $goodPath `
+			-ExpectedPublisherSubject $certificate.Subject `
+			-ExpectedPublisherCertificateSha256 $certificateSha256 `
+			-UnsignedMetadataPath $mismatchedProvenanceMetadataPath `
+			-OutputPath (Join-Path $fixtureRoot "mismatched-provenance.json")
+	}
+
+	$invalidSchemaMetadata = Copy-TestJsonObject $unsignedMetadata
+	$invalidSchemaMetadata | Add-Member -NotePropertyName attackerControlled -NotePropertyValue $true
+	$invalidSchemaProvenance = Get-Content `
+		-Raw `
+		-LiteralPath (Join-Path $testMetadataDirectory ([string]$unsignedMetadata.provenance)) |
+		ConvertFrom-Json
+	$invalidSchemaMetadataPath = Write-TestMetadataBundle `
+		-Directory (Join-Path $fixtureRoot "invalid-schema") `
+		-Metadata $invalidSchemaMetadata `
+		-Provenance $invalidSchemaProvenance `
+		-SourceMetadataDirectory $sourceMetadataDirectory
+	Assert-ScriptFailsLike -Pattern "*unsigned release metadata failed schema validation*" -Message "unsigned metadata outside the checked-in schema must be rejected" -Action {
+		& $manifestScript `
+			-SignedArtifactPath $goodPath `
+			-ExpectedPublisherSubject $certificate.Subject `
+			-ExpectedPublisherCertificateSha256 $certificateSha256 `
+			-UnsignedMetadataPath $invalidSchemaMetadataPath `
+			-OutputPath (Join-Path $fixtureRoot "invalid-schema.json")
+	}
+
 	Assert-ScriptFailsLike -Pattern "*canonical Authenticode content hash does not match*" -Message "same-signer different PE must be rejected by source derivation" -Action {
 		& $manifestScript @manifestArguments `
 			-SignedArtifactPath $differentPath `
