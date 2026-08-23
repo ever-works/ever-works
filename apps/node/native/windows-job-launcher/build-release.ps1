@@ -395,6 +395,30 @@ function Assert-ControlledCargoCwd {
 	}
 }
 
+function Get-ControlledDirectoryAcl {
+	param([Parameter(Mandatory)] [string]$LiteralPath)
+	$sections = (
+		[Security.AccessControl.AccessControlSections]::Access -bor
+		[Security.AccessControl.AccessControlSections]::Owner -bor
+		[Security.AccessControl.AccessControlSections]::Group
+	)
+	return [IO.FileSystemAclExtensions]::GetAccessControl(
+		[IO.DirectoryInfo]::new($LiteralPath),
+		$sections
+	)
+}
+
+function Set-ControlledDirectoryAcl {
+	param(
+		[Parameter(Mandatory)] [string]$LiteralPath,
+		[Parameter(Mandatory)] [Security.AccessControl.DirectorySecurity]$Acl
+	)
+	[IO.FileSystemAclExtensions]::SetAccessControl(
+		[IO.DirectoryInfo]::new($LiteralPath),
+		$Acl
+	)
+}
+
 function New-ControlledCargoCwd {
 	if (-not (Test-Path -LiteralPath $privateCargoInvocationRoot -PathType Container)) {
 		New-Item -ItemType Directory -Force -Path $privateCargoInvocationRoot | Out-Null
@@ -427,7 +451,7 @@ function New-ControlledCargoCwd {
 		[Security.AccessControl.AccessControlType]::Allow
 	)
 	$acl.AddAccessRule($rule)
-	Set-Acl -LiteralPath $controlledCargoCwd -AclObject $acl
+	Set-ControlledDirectoryAcl -LiteralPath $controlledCargoCwd -Acl $acl
 	Assert-ControlledCargoCwd
 }
 
@@ -444,17 +468,15 @@ function Remove-ControlledCargoCwd {
 			throw "refusing to clean a nonempty controlled Cargo working directory"
 		}
 		$currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User
-		$acl = [Security.AccessControl.DirectorySecurity]::new()
-		$acl.SetOwner($currentSid)
-		$acl.SetAccessRuleProtection($true, $false)
-		$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
+		$acl = Get-ControlledDirectoryAcl -LiteralPath $controlledCargoCwd
+		$acl.SetAccessRule([Security.AccessControl.FileSystemAccessRule]::new(
 			$currentSid,
 			[Security.AccessControl.FileSystemRights]::FullControl,
 			[Security.AccessControl.InheritanceFlags]::None,
 			[Security.AccessControl.PropagationFlags]::None,
 			[Security.AccessControl.AccessControlType]::Allow
 		))
-		Set-Acl -LiteralPath $controlledCargoCwd -AclObject $acl
+		Set-ControlledDirectoryAcl -LiteralPath $controlledCargoCwd -Acl $acl
 		Remove-Item -LiteralPath $controlledCargoCwd -Force
 	} finally {
 		$script:controlledCargoCwd = $null
