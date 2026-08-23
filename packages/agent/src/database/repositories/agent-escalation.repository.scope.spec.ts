@@ -24,6 +24,32 @@ describe('AgentEscalationRepository Task resolution ownership', () => {
         };
     }
 
+    it('persists an explicit producer scope instead of relying on request ALS', async () => {
+        const orm = {
+            findOne: jest.fn().mockResolvedValue(null),
+            create: jest.fn((input: object) => input),
+            save: jest.fn(async (input: object) => ({ id: 'escalation-1', ...input })),
+        };
+        const repository = new AgentEscalationRepository(orm as never);
+
+        await repository.record({
+            userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            reasonCode: 'gate-exhausted',
+            summary: 'Checks remained red.',
+            decisionNeeded: 'Decide whether to retry.',
+            taskId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            tenantId: everScope.tenantId,
+            organizationId: everScope.organizationId,
+        });
+
+        expect(orm.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                tenantId: everScope.tenantId,
+                organizationId: everScope.organizationId,
+            }),
+        );
+    });
+
     it('CAS-resolves only the exact user, routed Task, tenant and Organization', async () => {
         const { repository, qb } = build();
 

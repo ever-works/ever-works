@@ -56,6 +56,19 @@ describe('AgentRunSweeperService — state-aware policy (M6)', () => {
         };
     }
 
+    function persistedRun(over: Record<string, unknown> = {}) {
+        return {
+            id: 'r1',
+            agentId: 'a1',
+            userId: 'u1',
+            taskId: 'task-1',
+            workId: 'work-1',
+            tenantId: 'tenant-ever',
+            organizationId: 'org-ever',
+            ...over,
+        };
+    }
+
     beforeEach(() => {
         saved = {};
         for (const k of ENV_KEYS) {
@@ -68,7 +81,7 @@ describe('AgentRunSweeperService — state-aware policy (M6)', () => {
             parkStaleRunning: jest.fn().mockResolvedValue(0),
             findQueuedTooLong: jest.fn().mockResolvedValue([]),
             setAttention: jest.fn().mockResolvedValue(true),
-            findById: jest.fn().mockResolvedValue({ id: 'r1', userId: 'u1' }),
+            findById: jest.fn().mockResolvedValue(persistedRun()),
         };
         notifications = { notifyAgentRunQueuedTooLong: jest.fn().mockResolvedValue(undefined) };
         escalations = { record: jest.fn().mockResolvedValue({ id: 'e1' }) };
@@ -160,6 +173,75 @@ describe('AgentRunSweeperService — state-aware policy (M6)', () => {
                 expect.objectContaining({ reasonCode: 'run-parked', runId: 'r1', userId: 'u1' }),
             );
         });
+
+        it('uses the persisted Task and Organization scope for a parked escalation outside ALS', async () => {
+            runs.findStuckNonTerminal.mockResolvedValue([
+                row({
+                    status: 'running',
+                    taskId: undefined,
+                    tenantId: undefined,
+                    organizationId: undefined,
+                }),
+            ]);
+            runs.parkStaleRunning.mockResolvedValue(1);
+            runs.findById.mockResolvedValue(
+                persistedRun({
+                    taskId: 'task-ever',
+                    tenantId: 'tenant-ever',
+                    organizationId: 'org-ever',
+                }),
+            );
+
+            await makeSvc().sweepStuckRuns();
+
+            expect(escalations.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    reasonCode: 'run-parked',
+                    runId: 'r1',
+                    taskId: 'task-ever',
+                    tenantId: 'tenant-ever',
+                    organizationId: 'org-ever',
+                }),
+            );
+        });
+
+        it('passes explicit personal null/null scope for a parked Task escalation outside ALS', async () => {
+            runs.findStuckNonTerminal.mockResolvedValue([row({ status: 'running' })]);
+            runs.parkStaleRunning.mockResolvedValue(1);
+            runs.findById.mockResolvedValue(
+                persistedRun({
+                    taskId: 'task-personal',
+                    tenantId: null,
+                    organizationId: null,
+                }),
+            );
+
+            await makeSvc().sweepStuckRuns();
+
+            expect(escalations.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    reasonCode: 'run-parked',
+                    taskId: 'task-personal',
+                    tenantId: null,
+                    organizationId: null,
+                }),
+            );
+        });
+
+        it.each([
+            ['miss', null],
+            ['error', new Error('lookup failed')],
+        ])('keeps a parked sweep best-effort on full-run lookup %s', async (_case, result) => {
+            runs.findStuckNonTerminal.mockResolvedValue([row({ status: 'running' })]);
+            runs.parkStaleRunning.mockResolvedValue(1);
+            if (result instanceof Error) runs.findById.mockRejectedValue(result);
+            else runs.findById.mockResolvedValue(result);
+
+            await expect(makeSvc().sweepStuckRuns()).resolves.toEqual(
+                expect.objectContaining({ parked: 1, swept: 1 }),
+            );
+            expect(escalations.record).not.toHaveBeenCalled();
+        });
     });
 
     describe('queued-too-long → surface, never reap', () => {
@@ -231,5 +313,78 @@ describe('AgentRunSweeperService — state-aware policy (M6)', () => {
             expect(summary.flagged).toBe(2);
             expect(summary.notified).toBe(1);
         });
+
+        it('uses the persisted Organization scope for a queued Task escalation outside ALS', async () => {
+            runs.findQueuedTooLong.mockResolvedValue([
+                row({
+                    status: 'queued',
+                    taskId: 'task-ever',
+                    tenantId: undefined,
+                    organizationId: undefined,
+                }),
+            ]);
+            runs.findById.mockResolvedValue(
+                persistedRun({
+                    taskId: 'task-ever',
+                    tenantId: 'tenant-ever',
+                    organizationId: 'org-ever',
+                }),
+            );
+
+            await makeSvc().sweepQueuedTooLong();
+
+            expect(escalations.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    reasonCode: 'queued-too-long',
+                    runId: 'r1',
+                    taskId: 'task-ever',
+                    tenantId: 'tenant-ever',
+                    organizationId: 'org-ever',
+                }),
+            );
+        });
+
+        it('passes explicit personal null/null scope for a queued Task escalation outside ALS', async () => {
+            runs.findQueuedTooLong.mockResolvedValue([
+                row({ status: 'queued', taskId: 'task-personal' }),
+            ]);
+            runs.findById.mockResolvedValue(
+                persistedRun({
+                    taskId: 'task-personal',
+                    tenantId: null,
+                    organizationId: null,
+                }),
+            );
+
+            await makeSvc().sweepQueuedTooLong();
+
+            expect(escalations.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    reasonCode: 'queued-too-long',
+                    taskId: 'task-personal',
+                    tenantId: null,
+                    organizationId: null,
+                }),
+            );
+        });
+
+        it.each([
+            ['miss', null],
+            ['error', new Error('lookup failed')],
+        ])(
+            'keeps a queued Task sweep best-effort on full-run lookup %s without filing guessed scope',
+            async (_case, result) => {
+                runs.findQueuedTooLong.mockResolvedValue([
+                    row({ status: 'queued', taskId: 'task-ever' }),
+                ]);
+                if (result instanceof Error) runs.findById.mockRejectedValue(result);
+                else runs.findById.mockResolvedValue(result);
+
+                await expect(makeSvc().sweepQueuedTooLong()).resolves.toEqual(
+                    expect.objectContaining({ flagged: 1, scanned: 1 }),
+                );
+                expect(escalations.record).not.toHaveBeenCalled();
+            },
+        );
     });
 });

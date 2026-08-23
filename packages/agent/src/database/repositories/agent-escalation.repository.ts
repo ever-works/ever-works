@@ -24,6 +24,7 @@ export interface RecordEscalationInput {
     workId?: string | null;
     agentId?: string | null;
     attempted?: AgentEscalationAttempt[] | null;
+    tenantId?: string | null;
     organizationId?: string | null;
     /**
      * Stable idempotency key. Omitted = derived from
@@ -105,6 +106,7 @@ export class AgentEscalationRepository {
             agentId: input.agentId ?? null,
             attempted: normalizeAttempts(input.attempted),
             dedupKey,
+            ...(input.tenantId !== undefined ? { tenantId: input.tenantId } : {}),
             ...(input.organizationId !== undefined ? { organizationId: input.organizationId } : {}),
             ...buildConfidencePatch(input.confidence, input.confidenceSource),
         });

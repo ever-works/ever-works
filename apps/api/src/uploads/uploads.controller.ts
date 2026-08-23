@@ -658,37 +658,66 @@ export class UploadsController {
 
         const requested = this.scopeContext.getScope();
         if (!requested.organizationId) {
-            if (requested.tenantId && requested.tenantId !== (user.tenantId ?? null)) {
+            const userTenantId = user.tenantId ?? null;
+            if (requested.tenantId && requested.tenantId !== userTenantId) {
                 this.opaqueScopeNotFound();
             }
-            return { tenantId: user.tenantId ?? null, organizationId: null };
+
+            // ScopeResolverMiddleware leaves a headerless public request at
+            // EMPTY_SCOPE because @Public() skips SessionScopeGuard. Mirror
+            // that guard's default-Organization behavior here: a persisted
+            // default must still exist and retain exact roster access. An
+            // explicit personal scope already carries the user's tenant and
+            // therefore does not enter this fallback.
+            const defaultOrganizationId =
+                requested.tenantId === null ? (user.lastScopeOrganizationId ?? null) : null;
+            if (userTenantId && defaultOrganizationId) {
+                return this.requireAuthenticatedOrganizationScope(
+                    auth.userId,
+                    userTenantId,
+                    defaultOrganizationId,
+                );
+            }
+            return { tenantId: userTenantId, organizationId: null };
         }
 
         if (!requested.tenantId || user.tenantId !== requested.tenantId) {
             this.opaqueScopeNotFound();
         }
+        return this.requireAuthenticatedOrganizationScope(
+            auth.userId,
+            requested.tenantId,
+            requested.organizationId,
+        );
+    }
+
+    private async requireAuthenticatedOrganizationScope(
+        userId: string,
+        tenantId: string,
+        organizationId: string,
+    ): Promise<OwnershipScope> {
         const organization = this.organizationRepository
-            ? await this.organizationRepository.findById(requested.organizationId).catch(() => null)
+            ? await this.organizationRepository.findById(organizationId).catch(() => null)
             : null;
-        if (!organization || organization.tenantId !== requested.tenantId) {
+        if (!organization || organization.tenantId !== tenantId) {
             this.opaqueScopeNotFound();
         }
         const member = this.organizationMembers
             ? await this.organizationMembers
-                  .findByOrgAndUser(requested.organizationId, auth.userId)
+                  .findByOrgAndUser(organizationId, userId)
                   .catch(() => null)
             : null;
         const exactMember = Boolean(
-            member?.userId === auth.userId &&
-            member?.tenantId === requested.tenantId &&
-            member?.organizationId === requested.organizationId,
+            member?.userId === userId &&
+            member?.tenantId === tenantId &&
+            member?.organizationId === organizationId,
         );
         if (!exactMember) {
             const tenant = this.tenantRepository
-                ? await this.tenantRepository.findById(requested.tenantId).catch(() => null)
+                ? await this.tenantRepository.findById(tenantId).catch(() => null)
                 : null;
-            if (tenant?.ownerUserId !== auth.userId) this.opaqueScopeNotFound();
+            if (tenant?.ownerUserId !== userId) this.opaqueScopeNotFound();
         }
-        return { tenantId: requested.tenantId, organizationId: requested.organizationId };
+        return { tenantId, organizationId };
     }
 }
