@@ -42,6 +42,24 @@ describe('UserSubscriptionRepository', () => {
         });
     });
 
+    describe('findCurrentByUser', () => {
+        it('selects the newest active or trialing subscription', async () => {
+            const row = { id: 's-newest' } as UserSubscription;
+            repository.findOne.mockResolvedValueOnce(row);
+
+            await expect(service.findCurrentByUser('u1')).resolves.toBe(row);
+
+            expect(repository.findOne).toHaveBeenCalledWith({
+                where: [
+                    { userId: 'u1', status: SubscriptionStatus.ACTIVE },
+                    { userId: 'u1', status: SubscriptionStatus.TRIALING },
+                ],
+                relations: ['plan'],
+                order: { createdAt: 'DESC' },
+            });
+        });
+    });
+
     describe('listByUser', () => {
         it('orders by createdAt DESC and joins the plan relation', async () => {
             const rows = [{ id: 's1' } as UserSubscription, { id: 's2' } as UserSubscription];

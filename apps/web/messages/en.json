@@ -3658,6 +3658,20 @@
                     "pagePrev": "Previous",
                     "pageNext": "Next",
                     "pageInfo": "Page {page} of {pages}"
+                },
+                "licence": {
+                    "title": "Commercial licence (self-hosted)",
+                    "subtitle": "Run Ever Works on your own infrastructure under a commercial licence.",
+                    "explainer": "A perpetual commercial licence for a deployment you run yourself. It lifts the AGPLv3 obligation for your own installation — it does not change your plan on this hosted service.",
+                    "buyLifetime": "Buy lifetime licence — {price}",
+                    "confirmBody": "You are buying a one-off perpetual licence for your OWN deployment. Your plan and credits on this hosted service stay exactly as they are.",
+                    "confirmCta": "Continue to payment",
+                    "cancel": "Cancel"
+                },
+                "checkoutReturn": {
+                    "confirmed": "Payment confirmed — thank you.",
+                    "settling": "Payment received. It is still settling; this page will reflect it shortly.",
+                    "licenceBody": "Your {name} commercial licence is recorded against this payment. It applies to the deployment you run yourself — your plan and credits on this hosted service are unchanged."
                 }
             },
             "usage": {

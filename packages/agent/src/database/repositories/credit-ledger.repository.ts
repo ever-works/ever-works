@@ -234,6 +234,34 @@ export class CreditLedgerRepository {
     }
 
     /**
+     * Sum of movements of ONE `refType` inside a half-open `[from, to)`
+     * window. Used by the monthly plan grant to top UP to the best
+     * allowance the user has held this calendar month, so a mid-cycle
+     * upgrade adds only the difference and a downgrade removes nothing.
+     *
+     * No unary minus here on purpose - see the long note on
+     * {@link getPeriodTotals} for why `-e.amountCredits` breaks on
+     * Postgres while staying green on the SQLite the tests run against.
+     */
+    async sumByRefTypeInWindow(
+        userId: string,
+        refType: string,
+        from: Date,
+        to: Date,
+    ): Promise<number> {
+        const row = await this.repository
+            .createQueryBuilder('e')
+            .select('COALESCE(SUM(e.amountCredits), 0)', 'total')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.refType = :refType', { refType })
+            .andWhere('e.createdAt >= :from', { from })
+            .andWhere('e.createdAt < :to', { to })
+            .getRawOne<{ total: string }>();
+
+        return Number(row?.total ?? 0);
+    }
+
+    /**
      * Serialize concurrent ledger writes for one user. Pessimistic row
      * locks are only supported on postgres/mysql/mariadb; better-sqlite3
      * throws `LockNotSupportedOnGivenDriverError` AND serializes writes
