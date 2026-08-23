@@ -4,10 +4,12 @@ import {
     Controller,
     Delete,
     Get,
+    Logger,
     Param,
     ParseUUIDPipe,
     Post,
     Put,
+    ServiceUnavailableException,
     UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
@@ -36,7 +38,10 @@ import { AddDomainDto } from './dto/domain.dto';
 import { SetRuntimeEnvDto, TestDbConnectionDto, type DatabaseMode } from './dto/runtime-env.dto';
 import { SubdomainResponseDto, UpdateSubdomainDto } from './dto/subdomain.dto';
 import { ManagedSubdomainService } from './managed-subdomain.service';
-import { EverWorksDbProvisionService } from '@ever-works/agent/ever-works-providers';
+import {
+    EverWorksDbProvisionService,
+    summarizeDbProvisionError,
+} from '@ever-works/agent/ever-works-providers';
 
 /**
  * Mask a Postgres connection string for display — keep scheme/host/db, hide the
@@ -74,6 +79,8 @@ function resolveDeployProviderId(providerId: string): string {
 @Controller('api/deploy')
 @UseGuards(AuthSessionGuard)
 export class DeployController {
+    private readonly logger = new Logger(DeployController.name);
+
     constructor(
         private readonly deployService: DeployService,
         private readonly deployFacade: DeployFacadeService,
@@ -372,6 +379,11 @@ export class DeployController {
             'Runtime env updated: { mode, sharedAvailable, databaseUrl: { configured, masked }, allowedEnvKeys: string[], env: Array<{ key, set, masked, secret }>, message }',
     })
     @ApiResponse({ status: 400, description: 'Invalid body or non-allow-listed env key' })
+    @ApiResponse({
+        status: 503,
+        description:
+            'mode=shared but the Ever Works DB could not be provisioned (admin connection / DDL failure). Body: { code: "SHARED_DB_PROVISION_FAILED", reason, message } — reason is a sanitized SQLSTATE/errno class, never the connection string.',
+    })
     async setRuntimeEnv(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', new ParseUUIDPipe()) id: string,
@@ -401,7 +413,30 @@ export class DeployController {
                 await this.workRuntimeEnvService.setDatabaseMode(id, 'shared');
                 // Provision (or re-point) the shared DB now so it is set + visible
                 // immediately; also re-runs idempotently on the next deploy.
-                await this.dbProvisionService.ensureDatabaseForWork(id, { force: true });
+                try {
+                    await this.dbProvisionService.ensureDatabaseForWork(id, { force: true });
+                } catch (error) {
+                    // Surface the failure instead of a bare 500 so the caller (and the
+                    // operator reading the response) learns WHY provisioning failed —
+                    // SQLSTATE / errno class only, never the admin connection string.
+                    const reason = summarizeDbProvisionError(error);
+                    this.logger.error(
+                        `Shared DB provisioning failed for work ${id} (${reason}): ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                    throw new ServiceUnavailableException({
+                        statusCode: 503,
+                        error: 'Service Unavailable',
+                        code: 'SHARED_DB_PROVISION_FAILED',
+                        reason,
+                        message:
+                            `The Ever Works DB could not be provisioned for this Work: ${reason}. ` +
+                            'The Work stays on the Ever Works DB mode and provisioning is retried on the next deploy; ' +
+                            "an operator should check the platform's shared-cluster admin connection " +
+                            '(DB_EVER_WORKS_SHARED_ADMIN_URL: reachability, credentials, CREATEDB/CREATEROLE privileges).',
+                    });
+                }
                 // Keep the PostgreSQL DB plugin authoritative: clear any per-Work
                 // override so the Work inherits the account-level setting. Best-
                 // effort — never fail the deploy config if the plugin isn't loaded.

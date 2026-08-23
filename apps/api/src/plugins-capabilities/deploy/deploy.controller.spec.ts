@@ -38,7 +38,7 @@ jest.mock('../../auth', () => ({
     CurrentUser: () => () => undefined,
 }));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { DeployController } from './deploy.controller';
 import type { DeployFacadeService } from '@ever-works/agent/facades';
 import type { WorkOwnershipService } from '@ever-works/agent/services';
@@ -404,6 +404,40 @@ describe('DeployController', () => {
                     env: { DATABASE_URL: 'postgres://evil' },
                 }),
             ).rejects.toBeInstanceOf(BadRequestException);
+            expect(activityLogService.log).not.toHaveBeenCalled();
+        });
+
+        it('setRuntimeEnv mode:shared surfaces a provisioning failure as 503 with a sanitized reason', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork(),
+                isCreator: true,
+            });
+            dbProvisionService.isReady.mockReturnValue(true);
+            // pg / net errors carry the admin host in their message — that must
+            // never reach the caller, only the errno / SQLSTATE class.
+            dbProvisionService.ensureDatabaseForWork.mockRejectedValue(
+                Object.assign(
+                    new Error('connect ECONNREFUSED 10.0.0.12:5432 (pg-admin.internal)'),
+                    {
+                        code: 'ECONNREFUSED',
+                    },
+                ),
+            );
+
+            const promise = controller.setRuntimeEnv({ userId: 'user-1' } as never, 'work-1', {
+                mode: 'shared',
+            });
+            await expect(promise).rejects.toBeInstanceOf(ServiceUnavailableException);
+            const error = (await promise.catch((e: unknown) => e)) as ServiceUnavailableException;
+            const body = error.getResponse() as Record<string, unknown>;
+            expect(body.code).toBe('SHARED_DB_PROVISION_FAILED');
+            expect(body.reason).toBe('connection refused [ECONNREFUSED]');
+            expect(JSON.stringify(body)).not.toContain('pg-admin.internal');
+            expect(JSON.stringify(body)).not.toContain('10.0.0.12');
+            // The mode switch itself is kept (provisioning is retried on deploy)…
+            expect(workRuntimeEnvService.setDatabaseMode).toHaveBeenCalledWith('work-1', 'shared');
+            // …but nothing else ran and no "updated" activity was logged.
+            expect(workRuntimeEnvService.setRuntimeEnvVars).not.toHaveBeenCalled();
             expect(activityLogService.log).not.toHaveBeenCalled();
         });
 

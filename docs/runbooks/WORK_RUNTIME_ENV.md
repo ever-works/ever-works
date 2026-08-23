@@ -171,6 +171,19 @@ back.
 - **`PLATFORM_ENCRYPTION_KEY` missing** on the API: writes fail with a clear
   error; deploys log `Runtime-env per-Work env lookup failed …` and proceed
   without the vars.
+- **`PUT … {"mode":"shared"}` answers 503 `SHARED_DB_PROVISION_FAILED`**: the
+  API switched the Work to the Ever Works DB mode but `ensureDatabaseForWork`
+  (direct DDL over `DB_EVER_WORKS_SHARED_ADMIN_URL`: `CREATE ROLE` /
+  `CREATE DATABASE`) threw. The body's `reason` is the sanitized errno /
+  SQLSTATE class — `connection refused [ECONNREFUSED]`,
+  `host not found [ENOTFOUND]`, `password authentication failed [28P01]`,
+  `insufficient privilege … [42501]`, … — never the connection string (the
+  full error is in the API log: `Shared DB provisioning failed for work …`).
+  Fix the admin connection (reachability from the API pods, credentials,
+  `CREATEDB` / `CREATEROLE` on the admin role) and re-send the same request;
+  deploys also retry provisioning idempotently (warn-level
+  `Shared DB provision failed for work …` when it keeps failing — the site then
+  runs without `DATABASE_URL`). Before this the endpoint answered a bare 500.
 - **Audit**: every write logs an Activity Feed entry
   (`work.runtime-env.updated`) with the changed key **names**; values are
   never logged anywhere.
