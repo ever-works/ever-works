@@ -1,0 +1,38 @@
+{
+	"schemaVersion": 1,
+	"rustToolchain": "1.88.0",
+	"targetTriple": "x86_64-pc-windows-msvc",
+	"rustRootRelativeToOsUserProfile": ".rustup/toolchains/1.88.0-x86_64-pc-windows-msvc",
+	"rustFiles": [
+		{
+			"path": "bin/cargo.exe",
+			"sha256": "d9d1f16c0438e0e5e820b2bb40846e3cc6a023e0a835505c5c4b25664e46c3be"
+		},
+		{
+			"path": "bin/rustc.exe",
+			"sha256": "17e7448d6f213cdd41d1e4d8385a403e364c2b09c55b2b645f1afaf404adf1a6"
+		},
+		{
+			"path": "bin/rustc_driver-386698c5705dd10f.dll",
+			"sha256": "22038a950d9b3f4ba8374fb63b8d5a35180639db26abbcffe1625fbaed37a011"
+		},
+		{
+			"path": "bin/std-c85e9beb7923f636.dll",
+			"sha256": "6486ecda4da7307381d13e8bcdd16e9d766b42cac97dada94f9dea5469908abe"
+		}
+	],
+	"rustBinarySet": {
+		"fileCount": 4,
+		"fileSetSha256": "bedeb993b32647f92a42b41f34ca57fc9f592c4ef48fc3b7a8ca38aef7348f12"
+	},
+	"rustTargetLibrarySet": {
+		"relativeDirectory": "lib/rustlib/x86_64-pc-windows-msvc/lib",
+		"fileCount": 25,
+		"fileSetSha256": "6022fdc2c8064e6bcea4671d66d05cd8fa8ffeb2044739d97431062219f7da3b"
+	},
+	"publishers": {
+		"git": "CN=Johannes Schindelin, O=Johannes Schindelin, S=Nordrhein-Westfalen, C=DE",
+		"microsoft": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+	},
+	"attestationBoundary": "external-authenticated-runner-attestation-required"
+}

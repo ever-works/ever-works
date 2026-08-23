@@ -8,6 +8,7 @@ import {
 	type WindowsJobHelperProcessInternal,
 	type WindowsJobLauncherDependenciesInternal
 } from './windows-job-launcher.internal';
+import type { WindowsJobHelperTrustPolicyInternal } from './windows-job-helper-trust.internal';
 import {
 	ClientMessageKind,
 	ProtocolDecoder,
@@ -28,7 +29,47 @@ const request = (overrides: Partial<WindowsJobLaunchRequest> = {}): WindowsJobLa
 	...overrides
 });
 
+const helperTrust = (): Omit<WindowsJobHelperTrustPolicyInternal, 'helperPath'> => ({
+	expectedSha256: 'A'.repeat(64),
+	publisherSubject: 'CN=Ever Co, O=Ever Co, C=US',
+	publisherCertificateSha256: 'B'.repeat(64)
+});
+
 describe('internal Windows Job launcher adapter', () => {
+	it('uses the trusted broker by default and passes all immutable trust pins', async () => {
+		const fake = new FakeHelper();
+		const spawnTrustedHelper = vi.fn(() => fake);
+		fake.onMessage = (message) => {
+			if (message.kind === ClientMessageKind.Launch) fake.send(launched(4141));
+		};
+
+		const run = await launchWindowsJobInternal(
+			{
+				helperPath: String.raw`C:\trusted\native\windows-job-launcher.exe`,
+				helperTrust: helperTrust(),
+				...request()
+			},
+			{ platform: 'win32', spawnTrustedHelper, outputHighWaterMark: 16 * 1024 }
+		);
+
+		expect(run.rootPid).toBe(4141);
+		expect(spawnTrustedHelper).toHaveBeenCalledWith({
+			helperPath: String.raw`C:\trusted\native\windows-job-launcher.exe`,
+			...helperTrust()
+		});
+	});
+
+	it('fails closed before production broker startup when a trust pin is missing', async () => {
+		const spawnTrustedHelper = vi.fn();
+		await expect(
+			launchWindowsJobInternal(
+				{ helperPath: String.raw`C:\trusted\native\windows-job-launcher.exe`, ...request() },
+				{ platform: 'win32', spawnTrustedHelper, outputHighWaterMark: 16 * 1024 }
+			)
+		).rejects.toMatchObject({ code: 'WINDOWS_JOB_INVALID_REQUEST' });
+		expect(spawnTrustedHelper).not.toHaveBeenCalled();
+	});
+
 	it('uses only explicit absolute executables, a scrubbed helper environment, and shell-free stdio pipes', async () => {
 		const fake = new FakeHelper();
 		const spawnHelper = vi.fn(() => fake);
@@ -92,6 +133,9 @@ describe('internal Windows Job launcher adapter', () => {
 
 	it.each([
 		['relative helper', { helperPath: 'helper.exe' }],
+		['UNC helper', { helperPath: String.raw`\\server\share\helper.exe` }],
+		['device helper', { helperPath: String.raw`\\?\C:\trusted\helper.exe` }],
+		['traversing helper', { helperPath: String.raw`C:\trusted\..\helper.exe` }],
 		['PATH application', { applicationPath: 'runner.exe' }],
 		['relative cwd', { workingDirectory: 'work' }],
 		['cmd shim', { applicationPath: String.raw`C:\trusted\runner.cmd` }],
@@ -177,6 +221,33 @@ describe('internal Windows Job launcher adapter', () => {
 		expect(first).toEqual(second);
 		expect(first.status).toBe('cancelled');
 		expect(fake.messages.filter((message) => message.kind === ClientMessageKind.Cancel)).toHaveLength(1);
+	});
+
+	it('forwards cancellation during broker startup and closes control instead of orphaning a later helper', async () => {
+		const fake = new FakeHelper();
+		const controller = new AbortController();
+		fake.onMessage = (message) => {
+			if (message.kind === ClientMessageKind.Cancel) {
+				fake.send(completed(verifiedCompletion({ status: 'cancelled', rootPid: 0, exitCode: undefined })));
+			}
+		};
+		const launch = launchWindowsJobInternal(
+			{
+				helperPath: String.raw`C:\trusted\helper.exe`,
+				...request(),
+				signal: controller.signal
+			},
+			dependencies(() => fake)
+		);
+		await vi.waitFor(() =>
+			expect(fake.messages.some((message) => message.kind === ClientMessageKind.Launch)).toBe(true)
+		);
+
+		controller.abort();
+
+		await expect(launch).rejects.toMatchObject({ code: 'WINDOWS_JOB_PROTOCOL_ERROR' });
+		expect(fake.messages.filter((message) => message.kind === ClientMessageKind.Cancel)).toHaveLength(1);
+		expect(fake.stdin.writableEnded).toBe(true);
 	});
 
 	it.each([
@@ -300,6 +371,27 @@ describe('internal Windows Job launcher adapter', () => {
 			});
 		}
 	});
+
+	it('treats broker death after launch as unverified and closes the model streams', async () => {
+		const fake = new FakeHelper();
+		fake.onMessage = (message) => {
+			if (message.kind === ClientMessageKind.Launch) fake.send(launched(909));
+		};
+		const run = await launchWindowsJobInternal(
+			{ helperPath: String.raw`C:\trusted\helper.exe`, ...request() },
+			dependencies(() => fake)
+		);
+		const stdoutFinished = finished(run.stdout);
+		const stderrFinished = finished(run.stderr);
+		run.stdout.resume();
+		run.stderr.resume();
+
+		fake.exit(23);
+
+		await expect(run.completion).rejects.toMatchObject({ code: 'WINDOWS_JOB_HELPER_EXITED' });
+		await expect(stdoutFinished).resolves.toBeUndefined();
+		await expect(stderrFinished).resolves.toBeUndefined();
+	});
 });
 
 class FakeHelper extends EventEmitter implements WindowsJobHelperProcessInternal {
@@ -335,10 +427,18 @@ class FakeHelper extends EventEmitter implements WindowsJobHelperProcessInternal
 }
 
 function dependencies(
-	spawnHelper: WindowsJobLauncherDependenciesInternal['spawnHelper'],
+	spawnHelper: NonNullable<WindowsJobLauncherDependenciesInternal['spawnHelper']>,
 	overrides: Partial<WindowsJobLauncherDependenciesInternal> = {}
 ): WindowsJobLauncherDependenciesInternal {
-	return { platform: 'win32', spawnHelper, outputHighWaterMark: 16 * 1024, ...overrides };
+	return {
+		platform: 'win32',
+		spawnHelper,
+		spawnTrustedHelper: () => {
+			throw new Error('unexpected trusted helper spawn in a direct-helper test');
+		},
+		outputHighWaterMark: 16 * 1024,
+		...overrides
+	};
 }
 
 function launched(rootPid: number): Buffer {

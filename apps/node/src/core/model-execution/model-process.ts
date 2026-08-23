@@ -5,6 +5,7 @@ import {
 	type ModelExecutionProvider,
 	type ModelCliCommand
 } from './model-process.internal';
+import { createProductionModelExecutionIoInternal } from './model-process-factory.internal';
 
 export {
 	MODEL_CLI_COMPATIBILITY,
@@ -35,6 +36,23 @@ export interface ModelProcessExecutorConfig {
 	 * files must not be writable by a leased task identity.
 	 */
 	readonly commands: Readonly<Record<ModelExecutionProvider, ModelCliCommand>>;
+	/**
+	 * Required for native containment on Windows. All four values must describe
+	 * the final signed production helper artifact; no PATH lookup or unsigned
+	 * build hash is accepted by this boundary.
+	 */
+	readonly windowsJobLauncher?: WindowsJobLauncherTrustConfig;
+}
+
+export interface WindowsJobLauncherTrustConfig {
+	/** Node-operator-owned, normalized local drive-absolute path to the signed helper. */
+	readonly helperPath: string;
+	/** SHA-256 of the final Authenticode-signed artifact, never the unsigned build hash. */
+	readonly expectedSha256: string;
+	/** Exact Authenticode leaf certificate subject. */
+	readonly publisherSubject: string;
+	/** SHA-256 of the exact Authenticode leaf certificate. */
+	readonly publisherCertificateSha256: string;
 }
 
 export interface ModelProcessExecutor {
@@ -43,11 +61,8 @@ export interface ModelProcessExecutor {
 
 /** Create the production executor without exposing process, environment, clock, or filesystem seams. */
 export function createModelProcessExecutor(config: ModelProcessExecutorConfig): ModelProcessExecutor {
-	const commands: Readonly<Record<ModelExecutionProvider, ModelCliCommand>> = Object.freeze({
-		'claude-code': Object.freeze({ ...config.commands['claude-code'] }),
-		codex: Object.freeze({ ...config.commands.codex })
-	});
+	const io = createProductionModelExecutionIoInternal(config);
 	return Object.freeze({
-		execute: (request: ModelExecutionRequest) => executeModelProcessInternal(request, { commands })
+		execute: (request: ModelExecutionRequest) => executeModelProcessInternal(request, io)
 	});
 }

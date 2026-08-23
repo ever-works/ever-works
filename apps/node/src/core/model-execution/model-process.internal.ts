@@ -100,7 +100,7 @@ export interface ModelCliCommand {
 	readonly localSessionHome?: string;
 }
 
-interface ModelExecutionIo {
+export interface ModelExecutionIo {
 	/**
 	 * Trusted node-owned executable configuration. The node operator must keep
 	 * these canonical paths outside task-writable roots and protect them from
@@ -120,9 +120,9 @@ interface ModelExecutionIo {
 	/** Test-only cleanup seam; never exported by the production model-process API. */
 	readonly removeRunRoot?: (path: string) => Promise<void>;
 	/**
-	 * Internal containment integration seam. The production factory deliberately
-	 * supplies none until an audited native launcher can create a suspended child,
-	 * assign it to a kill-on-close Job Object, and only then resume it.
+	 * Internal containment integration seam. Production supplies it only for a
+	 * configured trusted Windows launcher that assigns the suspended child to a
+	 * kill-on-close Job Object before resuming it.
 	 */
 	readonly createModelProcessContainment?: (testSpawn: typeof spawn) => Promise<ModelProcessContainment>;
 }
@@ -138,6 +138,14 @@ export class ModelExecutionCleanupError extends Error {
 	constructor() {
 		super('The isolated model run directory could not be removed after bounded retries');
 		this.name = 'ModelExecutionCleanupError';
+	}
+}
+
+/** Internal marker for a configured containment implementation that failed closed before child startup. */
+export class ModelProcessContainmentUnavailableError extends Error {
+	constructor() {
+		super('The configured model process containment boundary is unavailable');
+		this.name = 'ModelProcessContainmentUnavailableError';
 	}
 }
 
@@ -232,14 +240,19 @@ interface RawProcessResult {
 	readonly spawnError: Error | null;
 }
 
-interface ProcessTreeTermination {
+export interface ProcessTreeTermination {
 	readonly verified: boolean;
 	readonly detail?: string;
 }
 
-interface ModelProcessContainment {
+export interface ModelProcessContainment {
 	/** Must return only after the child is assigned to the containment boundary and resumed. */
-	readonly spawn: typeof spawn;
+	readonly spawn: (
+		executable: string,
+		arguments_: readonly string[],
+		options: SpawnOptions,
+		signal?: AbortSignal
+	) => ChildProcess | Promise<ChildProcess>;
 	/** Kill-on-close must cover every descendant, including detached children. */
 	readonly close: () => Promise<ProcessTreeTermination>;
 }
@@ -1123,15 +1136,24 @@ async function runProcess(
 		remainingMs = remainingExecutionMs(options.deadlineAt, options.monotonicNow);
 		if (remainingMs <= 0) return closeBeforeSpawn(rawPreSpawnTermination('timed-out'));
 		processTimeoutMs = Math.min(options.timeoutMs, remainingMs);
-		child = (containment?.spawn ?? spawnFn)(options.executable, options.args, {
+		const spawnOptions: SpawnOptions = {
 			cwd: options.cwd,
 			env: options.env,
 			stdio: ['pipe', 'pipe', 'pipe'],
 			shell: false,
 			windowsHide: true,
 			detached: platform !== 'win32'
-		});
+		};
+		child = await (containment
+			? containment.spawn(options.executable, options.args, spawnOptions, options.signal)
+			: spawnFn(options.executable, options.args, spawnOptions));
+		remainingMs = remainingExecutionMs(options.deadlineAt, options.monotonicNow);
+		processTimeoutMs = Math.min(options.timeoutMs, Math.max(0, remainingMs));
 	} catch (error) {
+		if (options.signal?.aborted) return closeBeforeSpawn(rawPreSpawnTermination('cancelled'));
+		if (remainingExecutionMs(options.deadlineAt, options.monotonicNow) <= 0) {
+			return closeBeforeSpawn(rawPreSpawnTermination('timed-out'));
+		}
 		return closeBeforeSpawn(rawSpawnFailure(error));
 	}
 
@@ -1519,6 +1541,9 @@ function toTerminalResult(
 		});
 	}
 	if (raw.spawnError) {
+		if (raw.spawnError instanceof ModelProcessContainmentUnavailableError) {
+			return containmentUnavailableResult(provider, durationMs);
+		}
 		return enforceTerminalBudget({
 			...base,
 			status: 'spawn-failed',

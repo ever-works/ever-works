@@ -2,10 +2,11 @@ name: Windows Job Launcher
 
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, codex/windows-job-launcher-phase1]
     paths:
       - 'apps/node/native/windows-job-launcher/**'
       - 'apps/node/src/core/windows-job-launcher/**'
+      - 'apps/node/src/core/model-execution/**'
       - '.github/workflows/windows-job-launcher.yml'
   workflow_dispatch:
 
@@ -41,15 +42,6 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Node workspace dependencies
-        run: pnpm --filter "ever-works-node^..." build
-
-      - name: Test and build internal adapter
-        run: |
-          pnpm --filter ever-works-node test -- src/core/windows-job-launcher
-          pnpm --filter ever-works-node type-check
-          pnpm --filter ever-works-node build
-
       - name: Verify Rust formatting
         working-directory: apps/node/native/windows-job-launcher
         run: cargo fmt --all -- --check
@@ -62,7 +54,124 @@ jobs:
         working-directory: apps/node/native/windows-job-launcher
         run: cargo test --locked --features test-fixtures -- --test-threads=1
 
-      - name: Build unsigned release and provenance metadata
+      - name: Prove hostile build environment cannot change release output or builder identity
         working-directory: apps/node/native/windows-job-launcher
         shell: pwsh
-        run: .\build-release.ps1
+        run: .\test-build-release-environment.ps1
+
+      - name: Verify independent executable builds and unsigned provenance
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: |
+          $metadataPath = 'target/release-metadata/ever-works-windows-job-launcher.json'
+          $valid = Get-Content -Raw -LiteralPath $metadataPath |
+            Test-Json -SchemaFile 'unsigned-release-metadata.schema.json'
+          if (-not $valid) { throw 'unsigned release metadata failed its schema' }
+          $metadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
+          if (-not $metadata.reproducibility.verified -or $metadata.reproducibility.buildCount -ne 2) {
+            throw 'two-build reproducibility evidence is missing'
+          }
+          $expectedArtifacts = @(
+            'target/repro-build-1/x86_64-pc-windows-msvc/release/ever-works-windows-job-launcher.exe',
+            'target/repro-build-2/x86_64-pc-windows-msvc/release/ever-works-windows-job-launcher.exe'
+          )
+          for ($index = 0; $index -lt $expectedArtifacts.Count; $index++) {
+            if ($metadata.reproducibility.buildArtifacts[$index] -cne $expectedArtifacts[$index]) {
+              throw 'reproducibility evidence names an unexpected build artifact'
+            }
+            $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $expectedArtifacts[$index]).Hash.ToLowerInvariant()
+            if ($actualHash -cne $metadata.reproducibility.buildSha256[$index]) {
+              throw 'recorded reproducibility hash does not match its executable'
+            }
+            if ($actualHash -cne $metadata.unsignedBuildSha256) {
+              throw 'independent executable builds are not byte-for-byte identical'
+            }
+          }
+          $canonicalHash = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath 'target/x86_64-pc-windows-msvc/release/ever-works-windows-job-launcher.exe'
+          ).Hash.ToLowerInvariant()
+          if ($canonicalHash -cne $metadata.unsignedBuildSha256) {
+            throw 'canonical unsigned artifact differs from reproducibility evidence'
+          }
+          if ($metadata.buildInputs.rustFlags -cne '-C link-arg=/Brepro') {
+            throw 'build inherited caller RUSTFLAGS instead of the fixed policy'
+          }
+           $builder = $metadata.buildInputs.builder
+           if (
+             $builder.kind -cne 'local-untrusted' -or
+             $builder.id -cne 'urn:ever-works:builder:build-release-script:v3'
+           ) { throw 'script-produced metadata claimed an authenticated builder identity' }
+           if (
+             $metadata.invocationHints.trust -cne 'untrusted-environment' -or
+             $metadata.invocationHints.claimedProvider -cne 'github-actions'
+           ) { throw 'environment-provided CI fields are not explicitly untrusted invocation hints' }
+           $environmentPolicy = $metadata.buildInputs.environmentPolicy
+           if (
+             $environmentPolicy.mode -cne 'isolated-cargo-rust-allowlist' -or
+             $environmentPolicy.cargoHome -cne 'target/repro-cargo-home' -or
+             $environmentPolicy.clearedCargoProfileOverrideCount -lt 11
+           ) { throw 'hostile Cargo profile inputs were not normalized by the fixed build policy' }
+          $sbomHash = (
+            Get-FileHash -Algorithm SHA256 -LiteralPath "target/release-metadata/$($metadata.sbom)"
+          ).Hash.ToLowerInvariant()
+          if ($sbomHash -cne $metadata.sbomSha256) { throw 'SBOM hash mismatch' }
+          $provenancePath = "target/release-metadata/$($metadata.provenance)"
+          $provenanceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $provenancePath).Hash.ToLowerInvariant()
+          if ($provenanceHash -cne $metadata.provenanceSha256) { throw 'provenance hash mismatch' }
+          $provenance = Get-Content -Raw -LiteralPath $provenancePath | ConvertFrom-Json
+          if (
+             $provenance.subject[0].digest.sha256 -cne $metadata.unsignedBuildSha256 -or
+             -not $provenance.predicate.runDetails.metadata.reproducible -or
+             $provenance.predicate.runDetails.metadata.reproducibilityEvidence.buildCount -ne 2 -or
+             $provenance.predicate.runDetails.builder.kind -cne 'local-untrusted' -or
+             $provenance.predicate.runDetails.metadata.invocationHints.trust -cne 'untrusted-environment'
+          ) {
+            throw 'provenance is not bound to the verified two-build executable hash'
+          }
+
+      - name: Test Authenticode content derivation and tamper rejection
+        working-directory: apps/node/native/windows-job-launcher
+        shell: powershell
+        run: |
+          $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          & $windowsPowerShell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned `
+            -File .\test-pe-authenticode-content.ps1
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) {
+            throw "PE Authenticode content test process exited $testExitCode"
+          }
+
+      - name: Build Node workspace dependencies
+        run: pnpm --filter "ever-works-node^..." build
+
+      - name: Test trusted adapter and model factory
+        run: pnpm --filter ever-works-node test -- src/core/windows-job-launcher src/core/model-execution
+
+      - name: Type-check trusted adapter and model factory
+        run: pnpm --filter ever-works-node type-check
+
+      - name: Build trusted adapter and model factory
+        run: pnpm --filter ever-works-node build
+
+      - name: Prepare ephemeral self-signed test helper
+        timeout-minutes: 3
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: .\prepare-test-signed-manifest.ps1
+
+      - name: Verify test-only signed manifest schema
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: |
+          $valid = Get-Content -Raw -LiteralPath 'target/signed-test-fixture/ever-works-windows-job-launcher.signed.json' |
+            Test-Json -SchemaFile 'signed-artifact-manifest.schema.json'
+          if (-not $valid) { throw 'signed test manifest failed its schema' }
+
+      - name: Test signed helper trust and broker-death cleanup
+        run: pnpm --filter ever-works-node test -- src/core/windows-job-launcher/windows-job-helper-trust.windows.spec.ts
+
+      - name: Remove ephemeral test certificate and helper
+        if: always()
+        working-directory: apps/node/native/windows-job-launcher
+        shell: pwsh
+        run: .\prepare-test-signed-manifest.ps1 -Cleanup
