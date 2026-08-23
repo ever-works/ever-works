@@ -36,8 +36,40 @@ export class WorkDeploymentRepository {
     findLatest(workId: string, environment: DeploymentEnvironment): Promise<WorkDeployment | null> {
         return this.repository.findOne({
             where: { workId, environment },
-            order: { createdAt: 'DESC' },
+            order: { createdAt: 'DESC', id: 'DESC' },
         });
+    }
+
+    /**
+     * Load one newest history row per Work. The correlated subquery keeps the
+     * result bounded to the requested Work count instead of materializing and
+     * folding every historical deployment in application memory.
+     */
+    async findLatestForWorks(
+        workIds: string[],
+        environment: DeploymentEnvironment,
+    ): Promise<Map<string, WorkDeployment>> {
+        if (workIds.length === 0) {
+            return new Map();
+        }
+
+        const query = this.repository.createQueryBuilder('deployment');
+        const latestIdQuery = query
+            .subQuery()
+            .select('latest.id')
+            .from(WorkDeployment, 'latest')
+            .where('latest.workId = deployment.workId')
+            .andWhere('latest.environment = :environment')
+            .orderBy('latest.createdAt', 'DESC')
+            .addOrderBy('latest.id', 'DESC')
+            .limit(1);
+        const rows = await query
+            .where('deployment.workId IN (:...workIds)', { workIds })
+            .andWhere('deployment.environment = :environment', { environment })
+            .andWhere(`deployment.id = ${latestIdQuery.getQuery()}`)
+            .getMany();
+
+        return new Map(rows.map((row) => [row.workId, row]));
     }
 
     findByPr(workId: string, prNumber: number): Promise<WorkDeployment | null> {
