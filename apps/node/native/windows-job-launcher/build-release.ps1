@@ -477,7 +477,7 @@ function Remove-ControlledCargoCwd {
 			[Security.AccessControl.AccessControlType]::Allow
 		))
 		Set-ControlledDirectoryAcl -LiteralPath $controlledCargoCwd -Acl $acl
-		Remove-Item -LiteralPath $controlledCargoCwd -Force
+		[IO.Directory]::Delete($controlledCargoCwd)
 	} finally {
 		$script:controlledCargoCwd = $null
 		$script:controlledCargoIdentity = $null
