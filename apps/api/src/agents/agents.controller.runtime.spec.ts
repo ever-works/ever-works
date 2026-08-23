@@ -91,6 +91,44 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
     const agentId = '00000000-0000-0000-0000-000000000001';
     const runId = '00000000-0000-0000-0000-0000000000aa';
     const taskId = '00000000-0000-0000-0000-0000000000bb';
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+
+    function scopedController(
+        options: {
+            steering?: any;
+            dispatchGate?: any;
+            scope?: { tenantId: string | null; organizationId: string | null };
+            scopeError?: Error;
+        } = {},
+    ) {
+        return new AgentsController(
+            service,
+            files,
+            exportService,
+            dispatcher,
+            agentRuns,
+            agentRunLogs,
+            skillBindings,
+            pluginUsage,
+            tasks,
+            activityLog,
+            heartbeatTrigger,
+            taskExecuteDispatcher,
+            runCanceller,
+            options.dispatchGate,
+            undefined,
+            options.steering,
+            {
+                getScope: () => {
+                    if (options.scopeError) throw options.scopeError;
+                    return options.scope ?? everScope;
+                },
+            } as never,
+        );
+    }
 
     beforeEach(() => {
         service = {
@@ -116,7 +154,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             markFailed: jest.fn().mockResolvedValue(undefined),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
-            findByIdAndUser: jest.fn().mockResolvedValue(null),
+            findByIdAndUser: jest.fn().mockResolvedValue({ id: runId, agentId }),
             // Wave 4 M3 — org-wide Sessions list (owner-scoped variant).
             listSessionsForUser: jest.fn().mockResolvedValue([[], 0]),
         };
@@ -204,6 +242,42 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
     });
 
     describe('GET /:id/runs', () => {
+        it('passes exact active scope into both repository queries and exposes persisted scope', async () => {
+            agentRuns.findByAgentAndUser.mockResolvedValueOnce([
+                {
+                    id: runId,
+                    agentId,
+                    userId: 'u1',
+                    ...everScope,
+                    status: 'completed',
+                    triggerKind: 'task',
+                    startedAt: null,
+                    finishedAt: null,
+                    durationMs: null,
+                    summary: null,
+                    errorMessage: null,
+                    taskId,
+                    createdAt: new Date('2026-08-22T00:00:00.000Z'),
+                },
+            ]);
+            agentRuns.countByAgentAndUser.mockResolvedValueOnce(1);
+
+            const result = await scopedController().listRuns(auth, agentId, {
+                limit: 25,
+                offset: 0,
+            });
+
+            expect(agentRuns.findByAgentAndUser).toHaveBeenCalledWith(
+                agentId,
+                'u1',
+                25,
+                0,
+                everScope,
+            );
+            expect(agentRuns.countByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1', everScope);
+            expect(result.data[0]).toMatchObject(everScope);
+        });
+
         it('returns paginated runs + total', async () => {
             // Security (EW-710 wave M): the controller must use the
             // user-scoped findByAgentAndUser/countByAgentAndUser so run
@@ -235,6 +309,91 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
     });
 
     describe('GET /runs — Sessions list (Wave 4 M3)', () => {
+        it('passes the exact active Organization to the repository boundary', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            const scopedController = new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                runCanceller,
+                undefined,
+                undefined,
+                undefined,
+                { getScope: () => everScope } as never,
+            );
+
+            await scopedController.listRunSessions(auth, {});
+
+            expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
+                'u1',
+                expect.any(Object),
+                25,
+                0,
+                everScope,
+            );
+        });
+
+        it('shows an Ever heartbeat session in Ever but excludes it from explicit personal scope', async () => {
+            const heartbeat = {
+                id: runId,
+                agentId,
+                userId: 'u1',
+                status: 'queued',
+                triggerKind: 'heartbeat',
+                taskId: null,
+                workId: null,
+                tenantId: everScope.tenantId,
+                organizationId: everScope.organizationId,
+                createdAt: new Date('2026-08-23T00:00:00.000Z'),
+            };
+            agentRuns.listSessionsForUser.mockImplementation(
+                async (
+                    _userId: string,
+                    _filter: object,
+                    _limit: number,
+                    _offset: number,
+                    scope?: typeof everScope,
+                ) =>
+                    scope?.tenantId === heartbeat.tenantId &&
+                    scope.organizationId === heartbeat.organizationId
+                        ? [[heartbeat], 1]
+                        : [[], 0],
+            );
+
+            const ever = await scopedController().listRunSessions(auth, { kind: 'heartbeat' });
+            const personal = await scopedController({
+                scope: { tenantId: everScope.tenantId, organizationId: null },
+            }).listRunSessions(auth, { kind: 'heartbeat' });
+
+            expect(ever.data).toEqual([
+                expect.objectContaining({ triggerKind: 'heartbeat', ...everScope }),
+            ]);
+            expect(personal.data).toEqual([]);
+        });
+
+        it('does not query heartbeat sessions when revoked membership blocks active-scope resolution', async () => {
+            const revoked = new NotFoundException('Organization not found.');
+
+            await expect(
+                scopedController({ scopeError: revoked }).listRunSessions(auth, {
+                    kind: 'heartbeat',
+                }),
+            ).rejects.toBe(revoked);
+            expect(agentRuns.listSessionsForUser).not.toHaveBeenCalled();
+        });
+
         it('is owner-scoped at the repository layer — userId always comes from auth', async () => {
             // Security: no agent ownership pre-check exists on this route
             // (it spans all the caller's Agents), so the repository-level
@@ -254,6 +413,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 },
                 25,
                 0,
+                undefined,
             );
         });
 
@@ -279,6 +439,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 },
                 5,
                 10,
+                undefined,
             );
         });
 
@@ -291,6 +452,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 expect.objectContaining({ attention: true }),
                 25,
                 0,
+                undefined,
             );
         });
 
@@ -480,8 +642,31 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             });
         });
 
+        it('steer forwards the exact active run scope to the steering boundary', async () => {
+            controller = scopedController({ steering });
+            await controller.steerRun(auth, agentId, runId, { message: 'go left' });
+            expect(steering.steer).toHaveBeenCalledWith({
+                runId,
+                userId: 'u1',
+                message: 'go left',
+                ownershipScope: everScope,
+            });
+        });
+
         it('steer 404s a cross-user Agent before touching the run', async () => {
             service.getOne.mockRejectedValueOnce(new NotFoundException('nope'));
+            await expect(
+                controller.steerRun(auth, agentId, runId, { message: 'go left' }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(steering.steer).not.toHaveBeenCalled();
+        });
+
+        it('steer 404s a known run UUID bound to a different Agent', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce({
+                id: runId,
+                agentId: '00000000-0000-0000-0000-000000000099',
+            });
+
             await expect(
                 controller.steerRun(auth, agentId, runId, { message: 'go left' }),
             ).rejects.toBeInstanceOf(NotFoundException);
@@ -511,6 +696,12 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             );
         });
 
+        it('interrupt forwards the exact active run scope', async () => {
+            controller = scopedController({ steering });
+            await controller.interruptRun(auth, agentId, runId);
+            expect(steering.interrupt).toHaveBeenCalledWith(runId, 'u1', everScope);
+        });
+
         it('resume forwards the optional message and returns the NEW run id', async () => {
             const result = await controller.resumeRun(auth, agentId, runId, { message: 'go on' });
             expect(steering.resume).toHaveBeenCalledWith(runId, 'u1', 'go on');
@@ -524,6 +715,12 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
         it('resume passes null when no message was sent ("carry on")', async () => {
             await controller.resumeRun(auth, agentId, runId, {});
             expect(steering.resume).toHaveBeenCalledWith(runId, 'u1', null);
+        });
+
+        it('resume forwards the exact active run scope', async () => {
+            controller = scopedController({ steering });
+            await controller.resumeRun(auth, agentId, runId, { message: 'continue' });
+            expect(steering.resume).toHaveBeenCalledWith(runId, 'u1', 'continue', everScope);
         });
 
         it('resume surfaces the service 409 for a non-resumable run', async () => {
@@ -545,6 +742,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
         const runRow = {
             id: runId,
             agentId,
+            ...everScope,
             status: 'failed',
             triggerKind: 'task',
             startedAt: new Date('2026-01-01T00:00:00Z'),
@@ -586,6 +784,44 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             });
             expect(agentRuns.findByIdAndUser).toHaveBeenCalledWith(runId, 'u1');
             expect(agentRunLogs.findByRun).toHaveBeenCalledWith(runId, 500);
+        });
+
+        it('gets the run in exact active scope and exposes the persisted scope', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce(runRow);
+            const result = await scopedController().getRun(auth, agentId, runId);
+            expect(agentRuns.findByIdAndUser).toHaveBeenCalledWith(runId, 'u1', everScope);
+            expect(result).toMatchObject(everScope);
+        });
+
+        it('uses one opaque 404 for a foreign run row and a foreign Agent parent', async () => {
+            const scoped = scopedController();
+            agentRuns.findByIdAndUser.mockResolvedValueOnce(null);
+            const foreignRunError = await scoped
+                .getRun(auth, agentId, runId)
+                .catch((error: unknown) => error);
+
+            agentRuns.findByIdAndUser.mockResolvedValueOnce(runRow);
+            service.getOne.mockRejectedValueOnce(
+                new NotFoundException('Agent secret-id not found'),
+            );
+            const foreignAgentError = await scoped
+                .getRun(auth, agentId, runId)
+                .catch((error: unknown) => error);
+
+            expect(foreignRunError).toBeInstanceOf(NotFoundException);
+            expect(foreignAgentError).toBeInstanceOf(NotFoundException);
+            expect((foreignRunError as Error).message).toBe('AgentRun not found.');
+            expect((foreignAgentError as Error).message).toBe('AgentRun not found.');
+            expect(agentRunLogs.findByRun).not.toHaveBeenCalled();
+        });
+
+        it('does not disguise an Agent parent lookup outage as an ownership 404', async () => {
+            const outage = new Error('agent database unavailable');
+            agentRuns.findByIdAndUser.mockResolvedValueOnce(runRow);
+            service.getOne.mockRejectedValueOnce(outage);
+
+            await expect(scopedController().getRun(auth, agentId, runId)).rejects.toBe(outage);
+            expect(agentRunLogs.findByRun).not.toHaveBeenCalled();
         });
 
         it('throws 404 when the run does not exist for this user', async () => {
@@ -707,6 +943,24 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
     });
 
     describe('POST /:id/runs/:runId/cancel', () => {
+        it('checks and mutates the run in the same exact active scope', async () => {
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'queued',
+            });
+            await scopedController().cancelRun(auth, agentId, runId);
+            expect(agentRuns.findByIdAndUser).toHaveBeenCalledWith(runId, 'u1', everScope);
+            expect(agentRuns.cancel).toHaveBeenCalledWith(runId, 'u1', everScope);
+        });
+
+        it('does not mutate after membership revocation makes the active scope unreachable', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce(null);
+            await expect(scopedController().cancelRun(auth, agentId, runId)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(agentRuns.cancel).not.toHaveBeenCalled();
+        });
+
         it('cancels a queued run, fires AGENT_RUN_CANCELLED activity', async () => {
             agentRuns.cancel.mockResolvedValueOnce({ found: true, previousStatus: 'queued' });
             const result = await controller.cancelRun(auth, agentId, runId);
@@ -728,9 +982,24 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
 
         it('throws 404 when run-id not found', async () => {
             agentRuns.cancel.mockResolvedValueOnce({ found: false });
+            const error = await controller
+                .cancelRun(auth, agentId, runId)
+                .catch((caught: unknown) => caught);
+
+            expect(error).toBeInstanceOf(NotFoundException);
+            expect((error as Error).message).toBe('AgentRun not found.');
+        });
+
+        it('does not cancel a known run UUID bound to a different Agent', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce({
+                id: runId,
+                agentId: '00000000-0000-0000-0000-000000000099',
+            });
+
             await expect(controller.cancelRun(auth, agentId, runId)).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+            expect(agentRuns.cancel).not.toHaveBeenCalled();
         });
 
         it('also cancels the Trigger.dev run when the row carries a triggerRunId', async () => {
@@ -914,6 +1183,22 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
     });
 
     describe('POST /:id/assign-task', () => {
+        it('binds Task lookup, in-flight dedup and the queued run to the exact active scope', async () => {
+            tasks.getOne.mockResolvedValueOnce({ id: taskId, workId: null, ...everScope });
+            agentRuns.createQueued.mockResolvedValueOnce({ id: runId });
+
+            await scopedController().assignTask(auth, agentId, { taskId });
+
+            expect(tasks.getOne).toHaveBeenCalledWith('u1', taskId, everScope);
+            expect(agentRuns.findInFlightForTaskAgent).toHaveBeenCalledWith(
+                taskId,
+                agentId,
+                'u1',
+                everScope,
+            );
+            expect(agentRuns.createQueued).toHaveBeenCalledWith(expect.objectContaining(everScope));
+        });
+
         it('pre-creates AgentRun + dispatches agent-task-execute', async () => {
             agentRuns.createQueued.mockResolvedValueOnce({ id: runId });
             const result = await controller.assignTask(auth, agentId, { taskId });

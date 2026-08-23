@@ -9,7 +9,9 @@ jest.mock('@src/generators/website-generator/website-generator.service', () => (
 }));
 
 import { WorkImportService } from '../work-import.service';
-import { ImportSourceTypeEnum } from '@src/dto/import-work.dto';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { ImportSourceTypeEnum, ImportWorkDto } from '@src/dto/import-work.dto';
 
 function createWorksConfigRestoreServiceMock() {
     return {
@@ -273,6 +275,179 @@ describe('WorkImportService.analyzeRepository', () => {
 });
 
 describe('WorkImportService.initiateImport', () => {
+    function createLinkedImportService() {
+        const workRepository = {
+            findByOwnerAndSlug: jest.fn().mockResolvedValue(null),
+            create: jest.fn().mockImplementation(async (input) => ({
+                id: `work-${input.slug}`,
+                ...input,
+            })),
+            update: jest.fn().mockResolvedValue(undefined),
+        };
+        const generationHistoryRepository = {
+            createEntry: jest.fn().mockResolvedValue({
+                id: 'history-1',
+                startedAt: new Date('2026-08-23T00:00:00.000Z'),
+            }),
+        };
+        const sourceRepoAnalyzer = {
+            parseGitUrl: jest.fn().mockImplementation((sourceUrl: string) => {
+                const [, owner, repo] = new URL(sourceUrl).pathname.split('/');
+                return { owner, repo, provider: 'github' };
+            }),
+        };
+        const service = new WorkImportService(
+            workRepository as any,
+            generationHistoryRepository as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            { getAccessToken: jest.fn().mockResolvedValue(undefined) } as any,
+            sourceRepoAnalyzer as any,
+            {} as any,
+            {} as any,
+            createWorksConfigRestoreServiceMock() as any,
+            {} as any,
+            {} as any,
+            { emit: jest.fn() } as any,
+        );
+
+        (service as any).handleLinkExisting = jest.fn().mockImplementation(async (work) => ({
+            status: 'success',
+            workId: work.id,
+            message: 'Work linked to existing repositories',
+        }));
+        (service as any).dispatchImportTask = jest.fn().mockResolvedValue(undefined);
+
+        return { service, workRepository };
+    }
+
+    it.each([
+        ['Ever Works Data', 'Ever Works', 'ever-works'],
+        ['Ever Works Website', 'Ever Works', 'ever-works'],
+    ])(
+        'keeps legacy DATA_REPO suffix normalization for %s',
+        async (requestedName, expectedName, expectedSlug) => {
+            const { service, workRepository } = createLinkedImportService();
+
+            await expect(
+                service.initiateImport(
+                    {
+                        sourceUrl: 'https://github.com/ever-works/ever-works-data',
+                        sourceType: ImportSourceTypeEnum.DATA_REPO,
+                        name: requestedName,
+                        owner: 'ever-works',
+                        organization: true,
+                        restoreWorksConfig: false,
+                        sync: false,
+                        gitProvider: 'github',
+                    } as any,
+                    { id: 'user-1', username: 'ever-works' } as any,
+                ),
+            ).resolves.toMatchObject({ status: 'success' });
+
+            expect(workRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ name: expectedName, slug: expectedSlug }),
+                expect.anything(),
+            );
+        },
+    );
+
+    it('preserves explicit linked Work names and derives distinct slugs from their full names', async () => {
+        const { service, workRepository } = createLinkedImportService();
+        const user = {
+            id: 'user-1',
+            username: 'ever-works',
+        } as any;
+
+        await service.initiateImport(
+            {
+                sourceUrl: 'https://github.com/ever-works/ever-works',
+                sourceType: ImportSourceTypeEnum.LINK_EXISTING,
+                name: 'Ever Works Platform',
+                gitProvider: 'github',
+                organization: true,
+            } as any,
+            user,
+        );
+        await service.initiateImport(
+            {
+                sourceUrl: 'https://github.com/ever-works/ever-works-website',
+                sourceType: ImportSourceTypeEnum.LINK_EXISTING,
+                name: 'Ever Works Website',
+                gitProvider: 'github',
+                organization: true,
+            } as any,
+            user,
+        );
+
+        expect(workRepository.create.mock.calls.map(([input]) => input)).toEqual([
+            expect.objectContaining({
+                name: 'Ever Works Platform',
+                slug: 'ever-works-platform',
+            }),
+            expect.objectContaining({
+                name: 'Ever Works Website',
+                slug: 'ever-works-website',
+            }),
+        ]);
+        expect(workRepository.findByOwnerAndSlug.mock.calls.map(([input]) => input.slug)).toEqual([
+            'ever-works-platform',
+            'ever-works-website',
+        ]);
+    });
+
+    it('keeps explicit display names exact after the existing security and length transform', async () => {
+        for (const name of ['Ever Works Platform', 'Ever Works Website']) {
+            const dto = plainToInstance(ImportWorkDto, {
+                sourceUrl: 'https://github.com/ever-works/example',
+                sourceType: ImportSourceTypeEnum.LINK_EXISTING,
+                name,
+                gitProvider: 'github',
+            });
+
+            await expect(validate(dto)).resolves.toHaveLength(0);
+            expect(dto.name).toBe(name);
+        }
+
+        const sanitized = plainToInstance(ImportWorkDto, {
+            sourceUrl: 'https://github.com/ever-works/example',
+            sourceType: ImportSourceTypeEnum.LINK_EXISTING,
+            name: `  Ever\u0000\n Works Website ${'x'.repeat(120)}`,
+            gitProvider: 'github',
+        });
+        await expect(validate(sanitized)).resolves.toHaveLength(0);
+        expect(sanitized.name).not.toMatch(/[\u0000\r\n]/);
+        expect(sanitized.name.length).toBeLessThanOrEqual(100);
+    });
+
+    it('keeps repository-derived linked Work name normalization compatible', async () => {
+        const { service, workRepository } = createLinkedImportService();
+
+        await service.onboardLinkedRepository(
+            {
+                sourceUrl: 'https://github.com/ever-works/ever-works-website',
+                sourceOwner: 'ever-works',
+                sourceRepo: 'ever-works-website',
+                name: 'Ever Works Website',
+                gitProvider: 'github',
+                organization: true,
+            },
+            {
+                id: 'user-1',
+                username: 'ever-works',
+            } as any,
+        );
+
+        expect(workRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: 'Ever Works',
+                slug: 'ever-works',
+            }),
+            expect.anything(),
+        );
+    });
+
     it('passes updated works_config source repository data to the import dispatcher path', async () => {
         const workRepository = {
             findByOwnerAndSlug: jest.fn().mockResolvedValue(null),

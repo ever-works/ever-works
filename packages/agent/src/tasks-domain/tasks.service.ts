@@ -37,11 +37,21 @@ import {
 import { AgentRepository } from '../database/repositories/agent.repository';
 import type { Agent } from '../entities/agent.entity';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { UserRepository } from '../database/repositories/user.repository';
+import { OrganizationMemberRepository } from '../database/repositories/organization-member.repository';
+import { TenantRepository } from '../database/repositories/tenant.repository';
 import type { AgentRunStatus } from '../entities/agent-run.entity';
 import { TaskNotificationService } from './task-notification.service';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
+import {
+    ownershipScopeMatches,
+    ownershipScopeOf,
+    ownershipStamp,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../database/ownership-scope';
 
 export interface CreateTaskInput {
     title: string;
@@ -286,31 +296,71 @@ export class TasksService {
         // test fixtures keep compiling and graphs without the Agents module
         // simply skip the embed.
         @Optional() private readonly agentRuns?: AgentRunRepository,
+        @Optional() private readonly users?: UserRepository,
+        @Optional() private readonly organizationMembers?: OrganizationMemberRepository,
+        @Optional() private readonly tenants?: TenantRepository,
     ) {}
 
     /**
      * Review-fix I4: shared validator for assignee / reviewer / approver
-     * add paths. For `agent` actor type, the Agent must belong to the
-     * acting user (cross-user is rejected with a 400). For `user` actor
-     * type we just sanity-check the id is a non-empty string — full
-     * user-existence validation requires a UserRepository in this graph
-     * and is deferred to the API layer's @CurrentUser() resolution.
+     * add paths. The persisted Task scope is authoritative: an Agent must
+     * exist in that exact scope, and a user actor must be an active member
+     * of the exact Organization roster (or the Tenant owner). Personal
+     * Tasks can only point back to their owner. Every mismatch shares one
+     * response so a known UUID is not an Organization-roster oracle.
      */
     private async assertActorIsValid(
         userId: string,
         actorType: TaskActorType,
         actorId: string,
+        task: Task,
     ): Promise<void> {
         if (!actorId || actorId.trim().length === 0) {
             throw new BadRequestException(`${actorType} id is required.`);
         }
+        const taskScope = ownershipScopeOf(task);
         if (actorType === 'agent' && this.agents) {
-            const agent = await this.agents.findByIdAndUser(actorId, userId).catch(() => null);
+            const agent = await this.agents
+                .findByIdAndUser(actorId, userId, taskScope)
+                .catch(() => null);
             if (!agent) {
-                throw new BadRequestException(
-                    `Agent ${actorId} is not reachable for this user — cannot assign.`,
-                );
+                throw new BadRequestException('Task actor is not reachable in this Task scope.');
             }
+            return;
+        }
+
+        if (actorType !== 'user') return;
+        const actor = this.users ? await this.users.findById(actorId).catch(() => null) : null;
+        let reachable = Boolean(actor?.isActive);
+
+        if (reachable && taskScope.organizationId) {
+            reachable = actor?.tenantId === taskScope.tenantId;
+            if (reachable && taskScope.tenantId) {
+                const member = this.organizationMembers
+                    ? await this.organizationMembers
+                          .findByOrgAndUser(taskScope.organizationId, actorId)
+                          .catch(() => null)
+                    : null;
+                reachable = Boolean(
+                    member?.organizationId === taskScope.organizationId &&
+                    member?.tenantId === taskScope.tenantId &&
+                    member?.userId === actorId,
+                );
+                if (!reachable) {
+                    const tenant = this.tenants
+                        ? await this.tenants.findById(taskScope.tenantId).catch(() => null)
+                        : null;
+                    reachable = tenant?.ownerUserId === actorId;
+                }
+            } else {
+                reachable = false;
+            }
+        } else if (reachable) {
+            reachable = actorId === task.userId;
+        }
+
+        if (!reachable) {
+            throw new BadRequestException('Task actor is not reachable in this Task scope.');
         }
     }
 
@@ -318,8 +368,13 @@ export class TasksService {
         userId: string,
         filter: ListTasksFilter = {},
         opts: { includeRun?: boolean } = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<{ rows: TaskWithRun[]; total: number }> {
-        const { rows, total } = await this.tasks.findByUserIdFiltered(userId, filter);
+        const { rows, total } = await this.tasks.findByUserIdFiltered(
+            userId,
+            filter,
+            ownershipScope,
+        );
         if (!opts.includeRun || rows.length === 0 || !this.agentRuns) {
             return { rows, total };
         }
@@ -346,7 +401,7 @@ export class TasksService {
         }
         let runsById = new Map<string, TaskRunEmbed>();
         try {
-            const runs = await this.agentRuns.findByIds(runIds);
+            const runs = await this.agentRuns.findByIds(runIds, userId, ownershipScope);
             runsById = new Map(
                 runs.map((run) => [
                     run.id,
@@ -375,9 +430,22 @@ export class TasksService {
         return { rows: withRuns, total };
     }
 
-    async getOne(userId: string, id: string): Promise<Task> {
-        const task = await this.tasks.findByIdAndUser(id, userId);
-        if (!task) throw new NotFoundException(`Task ${id} not found.`);
+    async getOne(userId: string, id: string, scope?: OwnershipScope): Promise<Task> {
+        const task = await this.tasks.findByIdAndUser(id, userId, scope);
+        if (!task || !ownershipScopeMatches(task, scope)) {
+            throw new NotFoundException(`Task ${id} not found.`);
+        }
+
+        // A Work-scoped Task carries two authoritative scope rows. Both must
+        // agree with the active request; accepting the Task row alone lets a
+        // stale/malformed cross-Organization workId dispatch in the wrong
+        // workspace. Fail closed when the Work repository is unavailable.
+        if (scope && task.workId) {
+            const work = this.works ? await this.works.findById(task.workId) : null;
+            if (!work || work.userId !== userId || !ownershipScopeMatches(work, scope)) {
+                throw new NotFoundException(`Task ${id} not found.`);
+            }
+        }
         return task;
     }
 
@@ -395,12 +463,20 @@ export class TasksService {
      * first, so a foreign parent 404s before any side row is read, and
      * the child rows come from the user-scoped list query.
      */
-    async listSubtasks(userId: string, parentTaskId: string): Promise<TaskSubtasksProjection> {
-        await this.getOne(userId, parentTaskId);
-        const { rows, total } = await this.tasks.findByUserIdFiltered(userId, {
-            parentTaskId,
-            limit: SUBTASKS_PAGE_SIZE,
-        });
+    async listSubtasks(
+        userId: string,
+        parentTaskId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<TaskSubtasksProjection> {
+        await this.getOne(userId, parentTaskId, ownershipScope);
+        const { rows, total } = await this.tasks.findByUserIdFiltered(
+            userId,
+            {
+                parentTaskId,
+                limit: SUBTASKS_PAGE_SIZE,
+            },
+            ownershipScope,
+        );
 
         const ids = rows.map((row) => row.id);
         const [assigneeRows, approverRows] = await Promise.all([
@@ -453,12 +529,16 @@ export class TasksService {
         };
     }
 
-    async create(userId: string, input: CreateTaskInput): Promise<Task> {
+    async create(
+        userId: string,
+        input: CreateTaskInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
         // Ownership is deliberately NOT exclusive. A Task may belong to a
         // Work and a Team and have been raised by a Mission at the same
         // time; the previous "exactly zero or one of missionId/ideaId/workId"
         // rule made that impossible to express.
-        await this.assertScopeReachable(userId, input);
+        await this.assertScopeReachable(userId, input, ownershipScope);
         this.assertTitle(input.title);
         if (input.description) assertNoSecrets(input.description, 'task.description');
 
@@ -468,7 +548,11 @@ export class TasksService {
         // impossible for a brand-new id, but a malformed parent chain
         // pointing into existing-cyclic data would propagate downstream.
         if (input.parentTaskId) {
-            const parent = await this.tasks.findByIdAndUser(input.parentTaskId, userId);
+            const parent = await this.tasks.findByIdAndUser(
+                input.parentTaskId,
+                userId,
+                ownershipScope,
+            );
             if (!parent) {
                 throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
             }
@@ -505,7 +589,7 @@ export class TasksService {
                     );
                 }
                 seen.add(cursor);
-                const ancestor = await this.tasks.findByIdAndUser(cursor, userId);
+                const ancestor = await this.tasks.findByIdAndUser(cursor, userId, ownershipScope);
                 if (!ancestor) break;
                 cursor = ancestor.parentTaskId ?? null;
                 hops += 1;
@@ -519,6 +603,7 @@ export class TasksService {
 
         const created = await this.tasks.create({
             userId,
+            ...ownershipStamp(ownershipScope),
             slug,
             title: input.title.trim(),
             description: input.description ?? null,
@@ -553,8 +638,13 @@ export class TasksService {
         return created;
     }
 
-    async update(userId: string, id: string, input: UpdateTaskInput): Promise<Task> {
-        const task = await this.getOne(userId, id);
+    async update(
+        userId: string,
+        id: string,
+        input: UpdateTaskInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        const task = await this.getOne(userId, id, ownershipScope);
         const patch: Partial<Task> = {};
 
         if (input.title !== undefined) {
@@ -617,9 +707,13 @@ export class TasksService {
         const ownersChanged = Object.keys(ownerPatch).length > 0;
 
         if (ownersChanged) {
-            await this.assertScopeReachable(userId, {
-                ...ownerPatch,
-            } as CreateTaskInput);
+            await this.assertScopeReachable(
+                userId,
+                {
+                    ...ownerPatch,
+                } as CreateTaskInput,
+                ownershipScope,
+            );
 
             // Re-filing a Task must not break the sub-task hierarchy. The
             // create path enforces "a child agrees with its parent on every
@@ -633,7 +727,11 @@ export class TasksService {
             const effectiveParentId =
                 input.parentTaskId !== undefined ? input.parentTaskId : task.parentTaskId;
             if (effectiveParentId) {
-                const parent = await this.tasks.findByIdAndUser(effectiveParentId, userId);
+                const parent = await this.tasks.findByIdAndUser(
+                    effectiveParentId,
+                    userId,
+                    ownershipScope,
+                );
                 if (parent) {
                     this.assertParentScopeMatches(nextOwners, parent);
                 }
@@ -643,10 +741,14 @@ export class TasksService {
             // which cannot be fixed by validating this row alone. Refuse
             // rather than leave the tree inconsistent — the caller can move
             // the children first, or detach them.
-            const { total: childCount } = await this.tasks.findByUserIdFiltered(userId, {
-                parentTaskId: id,
-                limit: 1,
-            });
+            const { total: childCount } = await this.tasks.findByUserIdFiltered(
+                userId,
+                {
+                    parentTaskId: id,
+                    limit: 1,
+                },
+                ownershipScope,
+            );
             if (childCount > 0) {
                 throw new BadRequestException(
                     `Task ${id} has ${childCount} sub-task(s); re-file or detach them before changing its owners so parent and child scopes cannot diverge.`,
@@ -660,7 +762,11 @@ export class TasksService {
             if (input.parentTaskId === null) {
                 patch.parentTaskId = null;
             } else {
-                const parent = await this.tasks.findByIdAndUser(input.parentTaskId, userId);
+                const parent = await this.tasks.findByIdAndUser(
+                    input.parentTaskId,
+                    userId,
+                    ownershipScope,
+                );
                 if (!parent) {
                     throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
                 }
@@ -670,7 +776,12 @@ export class TasksService {
                 // block approved the move, then this check compared the OLD
                 // owners against the NEW parent and threw.
                 this.assertParentScopeMatches(nextOwners, parent);
-                const isCycle = await this.tasks.wouldCreateCycle(id, input.parentTaskId);
+                const isCycle = await this.tasks.wouldCreateCycle(
+                    id,
+                    input.parentTaskId,
+                    userId,
+                    ownershipScope,
+                );
                 if (isCycle) {
                     throw new ConflictException(
                         `Cannot set parent — would create a sub-task cycle.`,
@@ -681,7 +792,7 @@ export class TasksService {
         }
 
         await this.tasks.updateById(id, patch);
-        const refreshed = (await this.tasks.findById(id)) as Task;
+        const refreshed = await this.getOne(userId, id, ownershipScope);
         await this.logActivity({
             userId,
             taskId: id,
@@ -691,8 +802,12 @@ export class TasksService {
         return refreshed;
     }
 
-    async remove(userId: string, id: string): Promise<{ deleted: true }> {
-        const task = await this.getOne(userId, id);
+    async remove(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<{ deleted: true }> {
+        const task = await this.getOne(userId, id, ownershipScope);
         await this.tasks.deleteById(id);
         await this.logActivity({
             userId,
@@ -724,8 +839,9 @@ export class TasksService {
             recurrenceEndsAt?: Date | null;
             recurrenceMaxOccurrences?: number | null;
         },
+        ownershipScope?: OwnershipScope,
     ): Promise<Task> {
-        await this.getOne(userId, id);
+        await this.getOne(userId, id, ownershipScope);
         const hasRule = !!input.recurrenceRule;
         const hasCron = !!input.recurrenceCron;
         if (hasRule === hasCron) {
@@ -773,13 +889,17 @@ export class TasksService {
             recurrenceEndsAt: input.recurrenceEndsAt ?? null,
             recurrenceMaxOccurrences: input.recurrenceMaxOccurrences ?? null,
         });
-        return (await this.tasks.findById(id)) as Task;
+        return this.getOne(userId, id, ownershipScope);
     }
 
     /** Phase 17.2 — turn off recurrence on a template. Existing
      * spawned instances are untouched. */
-    async clearRecurring(userId: string, id: string): Promise<Task> {
-        await this.getOne(userId, id);
+    async clearRecurring(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        await this.getOne(userId, id, ownershipScope);
         await this.tasks.updateById(id, {
             isRecurring: false,
             recurrenceRule: null,
@@ -788,7 +908,7 @@ export class TasksService {
             recurrenceEndsAt: null,
             recurrenceMaxOccurrences: null,
         });
-        return (await this.tasks.findById(id)) as Task;
+        return this.getOne(userId, id, ownershipScope);
     }
 
     // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
@@ -799,8 +919,13 @@ export class TasksService {
      * the dispatcher picks up the NEW time. Mutually exclusive with
      * recurrence — a recurring template already has a cadence.
      */
-    async scheduleTask(userId: string, id: string, runAt: Date): Promise<Task> {
-        const task = await this.getOne(userId, id);
+    async scheduleTask(
+        userId: string,
+        id: string,
+        runAt: Date,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        const task = await this.getOne(userId, id, ownershipScope);
         this.assertFutureSchedule(runAt);
         if (task.isRecurring) {
             throw new BadRequestException(
@@ -814,12 +939,16 @@ export class TasksService {
             actionType: ActivityActionType.TASK_UPDATED,
             details: { scheduledAt: runAt.toISOString() },
         });
-        return (await this.tasks.findById(id)) as Task;
+        return this.getOne(userId, id, ownershipScope);
     }
 
     /** Remove the one-shot schedule (mode back to Run Once). */
-    async unscheduleTask(userId: string, id: string): Promise<Task> {
-        await this.getOne(userId, id);
+    async unscheduleTask(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        await this.getOne(userId, id, ownershipScope);
         await this.tasks.updateById(id, { scheduledAt: null, scheduleClaimedAt: null });
         await this.logActivity({
             userId,
@@ -827,7 +956,7 @@ export class TasksService {
             actionType: ActivityActionType.TASK_UPDATED,
             details: { scheduledAt: null },
         });
-        return (await this.tasks.findById(id)) as Task;
+        return this.getOne(userId, id, ownershipScope);
     }
 
     private assertFutureSchedule(runAt: Date): void {
@@ -853,8 +982,12 @@ export class TasksService {
      * failure degrades to the candidates gathered so far, so the picker
      * still opens with whatever is knowable).
      */
-    async listRunCandidates(userId: string, taskId: string): Promise<RunCandidateAgent[]> {
-        const task = await this.getOne(userId, taskId);
+    async listRunCandidates(
+        userId: string,
+        taskId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<RunCandidateAgent[]> {
+        const task = await this.getOne(userId, taskId, ownershipScope);
         const out = new Map<string, RunCandidateAgent>();
 
         const push = (id: string, source: RunCandidateAgent['source'], agent?: Agent | null) => {
@@ -872,7 +1005,9 @@ export class TasksService {
             const assigned = await this.assignees.findAgentAssignees(taskId);
             for (const row of assigned) {
                 const agent = this.agents
-                    ? await this.agents.findByIdAndUser(row.assigneeId, userId).catch(() => null)
+                    ? await this.agents
+                          .findByIdAndUser(row.assigneeId, userId, ownershipScope)
+                          .catch(() => null)
                     : null;
                 // An assignee row whose Agent is gone (or belongs to
                 // someone else) is not a candidate — the picker must
@@ -884,16 +1019,22 @@ export class TasksService {
         }
 
         if (task.agentId && this.agents) {
-            const agent = await this.agents.findByIdAndUser(task.agentId, userId).catch(() => null);
+            const agent = await this.agents
+                .findByIdAndUser(task.agentId, userId, ownershipScope)
+                .catch(() => null);
             if (agent) push(task.agentId, 'task', agent);
         }
 
         if (task.workId && this.agents) {
             try {
-                const { rows } = await this.agents.findByUserIdScoped(userId, {
-                    workId: task.workId,
-                    limit: 25,
-                });
+                const { rows } = await this.agents.findByUserIdScoped(
+                    userId,
+                    {
+                        workId: task.workId,
+                        limit: 25,
+                    },
+                    ownershipScope,
+                );
                 for (const agent of rows) push(agent.id, 'work-default', agent);
             } catch (err) {
                 this.logger.warn(`Run candidates: Work-agent lookup failed for ${taskId}: ${err}`);
@@ -922,13 +1063,19 @@ export class TasksService {
         userId: string,
         taskId: string,
         opts: { agentId?: string | null } = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<RunTaskResult> {
-        const task = await this.getOne(userId, taskId);
-        const agentId = await this.resolveRunAgentId(userId, taskId, opts.agentId ?? null);
+        const task = await this.getOne(userId, taskId, ownershipScope);
+        const agentId = await this.resolveRunAgentId(
+            userId,
+            taskId,
+            opts.agentId ?? null,
+            ownershipScope,
+        );
 
         if (this.agentRuns) {
             const inFlight = await this.agentRuns
-                .findInFlightForTaskAgent(taskId, agentId)
+                .findInFlightForTaskAgent(taskId, agentId, userId, ownershipScope)
                 .catch(() => null);
             if (inFlight) {
                 throw new ConflictException({
@@ -977,6 +1124,7 @@ export class TasksService {
     async runTasksBatch(
         userId: string,
         items: { taskId: string; agentId?: string | null }[],
+        ownershipScope?: OwnershipScope,
     ): Promise<{ results: RunBatchItemResult[] }> {
         if (!Array.isArray(items) || items.length === 0) {
             throw new BadRequestException('At least one task is required.');
@@ -989,7 +1137,12 @@ export class TasksService {
         const results: RunBatchItemResult[] = [];
         for (const item of items) {
             try {
-                const run = await this.runTask(userId, item.taskId, { agentId: item.agentId });
+                const run = await this.runTask(
+                    userId,
+                    item.taskId,
+                    { agentId: item.agentId },
+                    ownershipScope,
+                );
                 results.push({ taskId: item.taskId, ok: true, run });
             } catch (err) {
                 results.push({
@@ -1010,13 +1163,18 @@ export class TasksService {
         userId: string,
         taskId: string,
         explicitAgentId: string | null,
+        ownershipScope?: OwnershipScope,
     ): Promise<string> {
         if (explicitAgentId) {
             if (!this.agents) {
                 throw new BadRequestException('Agent repository not wired in this context.');
             }
-            const agent = await this.agents.findByIdAndUser(explicitAgentId, userId);
-            if (!agent) {
+            const agent = await this.agents.findByIdAndUser(
+                explicitAgentId,
+                userId,
+                ownershipScope,
+            );
+            if (!agent || !ownershipScopeMatches(agent, ownershipScope)) {
                 // 400 (not 404) and no existence leak: from the caller's
                 // side an id they do not own and an id that never existed
                 // are the same unusable input.
@@ -1028,7 +1186,7 @@ export class TasksService {
             return explicitAgentId;
         }
 
-        const candidates = await this.listRunCandidates(userId, taskId);
+        const candidates = await this.listRunCandidates(userId, taskId, ownershipScope);
         if (candidates.length === 1) return candidates[0].id;
         if (candidates.length === 0) {
             throw new BadRequestException({
@@ -1053,8 +1211,9 @@ export class TasksService {
         // red-gate review refusal in TaskTransitionService; human/API
         // callers omit it and are unaffected.
         opts: TransitionOptions = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<Task> {
-        const task = await this.getOne(userId, id);
+        const task = await this.getOne(userId, id, ownershipScope);
         const from = task.status;
         const result = await this.transitions.transition(task, to, opts);
         await this.logActivity({
@@ -1092,10 +1251,11 @@ export class TasksService {
         taskId: string,
         assigneeType: TaskActorType,
         assigneeId: string,
+        ownershipScope?: OwnershipScope,
     ) {
-        const task = await this.getOne(userId, taskId);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, assigneeType, assigneeId);
+        await this.assertActorIsValid(userId, assigneeType, assigneeId, task);
         const row = await this.insertOrConflict(
             () => this.assignees.add(taskId, assigneeType, assigneeId),
             `Task ${taskId} already has assignee ${assigneeId}.`,
@@ -1127,8 +1287,13 @@ export class TasksService {
         return row;
     }
 
-    async removeAssignee(userId: string, taskId: string, assigneeId: string) {
-        await this.getOne(userId, taskId);
+    async removeAssignee(
+        userId: string,
+        taskId: string,
+        assigneeId: string,
+        ownershipScope?: OwnershipScope,
+    ) {
+        await this.getOne(userId, taskId, ownershipScope);
         const removed = await this.assignees.removeForTask(taskId, assigneeId);
         if (!removed) {
             throw new NotFoundException(`Assignee ${assigneeId} not found.`);
@@ -1147,10 +1312,11 @@ export class TasksService {
         taskId: string,
         reviewerType: TaskActorType,
         reviewerId: string,
+        ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, reviewerType, reviewerId);
+        await this.assertActorIsValid(userId, reviewerType, reviewerId, task);
         return this.insertOrConflict(
             () => this.reviewers.add(taskId, reviewerType, reviewerId),
             `Task ${taskId} already has reviewer ${reviewerId}.`,
@@ -1162,22 +1328,28 @@ export class TasksService {
         taskId: string,
         approverType: TaskActorType,
         approverId: string,
+        ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, approverType, approverId);
+        await this.assertActorIsValid(userId, approverType, approverId, task);
         return this.insertOrConflict(
             () => this.approvers.add(taskId, approverType, approverId),
             `Task ${taskId} already has approver ${approverId}.`,
         );
     }
 
-    async addBlocker(userId: string, taskId: string, blockedByTaskId: string) {
-        await this.getOne(userId, taskId);
+    async addBlocker(
+        userId: string,
+        taskId: string,
+        blockedByTaskId: string,
+        ownershipScope?: OwnershipScope,
+    ) {
+        await this.getOne(userId, taskId, ownershipScope);
         if (taskId === blockedByTaskId) {
             throw new BadRequestException('Task cannot block itself.');
         }
-        const blocker = await this.tasks.findByIdAndUser(blockedByTaskId, userId);
+        const blocker = await this.tasks.findByIdAndUser(blockedByTaskId, userId, ownershipScope);
         if (!blocker) {
             throw new BadRequestException(`Blocking Task ${blockedByTaskId} not found.`);
         }
@@ -1205,8 +1377,13 @@ export class TasksService {
         return row;
     }
 
-    async removeBlocker(userId: string, taskId: string, blockId: string) {
-        await this.getOne(userId, taskId);
+    async removeBlocker(
+        userId: string,
+        taskId: string,
+        blockId: string,
+        ownershipScope?: OwnershipScope,
+    ) {
+        await this.getOne(userId, taskId, ownershipScope);
         const removed = await this.blocks.removeForTask(taskId, blockId);
         if (!removed) {
             throw new NotFoundException(`Blocker ${blockId} not found.`);
@@ -1228,13 +1405,14 @@ export class TasksService {
         taskId: string,
         relatedTaskId: string,
         kind: 'related' | 'duplicates' | 'follow-up',
+        ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId);
+        await this.getOne(userId, taskId, ownershipScope);
         // A task cannot relate to itself (mirrors the addBlocker self-guard).
         if (taskId === relatedTaskId) {
             throw new BadRequestException('Task cannot relate to itself.');
         }
-        const related = await this.tasks.findByIdAndUser(relatedTaskId, userId);
+        const related = await this.tasks.findByIdAndUser(relatedTaskId, userId, ownershipScope);
         if (!related) {
             throw new BadRequestException(`Related Task ${relatedTaskId} not found.`);
         }
@@ -1249,8 +1427,8 @@ export class TasksService {
 
     // ── Phase 13.5 — attachments ──────────────────────────────────
 
-    async listAttachments(userId: string, taskId: string) {
-        await this.getOne(userId, taskId);
+    async listAttachments(userId: string, taskId: string, ownershipScope?: OwnershipScope) {
+        await this.getOne(userId, taskId, ownershipScope);
         if (!this.attachments) return [];
         return this.attachments.findByTaskId(taskId);
     }
@@ -1268,8 +1446,9 @@ export class TasksService {
         taskId: string,
         uploadId: string,
         role: 'initial' | 'result' = 'initial',
+        ownershipScope?: OwnershipScope,
     ) {
-        const task = await this.getOne(userId, taskId);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         if (!uploadId) throw new BadRequestException('uploadId is required.');
         if (role !== 'initial' && role !== 'result') {
             throw new BadRequestException(`Invalid attachment role: ${role}`);
@@ -1303,8 +1482,13 @@ export class TasksService {
         }
     }
 
-    async removeAttachment(userId: string, taskId: string, attachmentId: string) {
-        await this.getOne(userId, taskId);
+    async removeAttachment(
+        userId: string,
+        taskId: string,
+        attachmentId: string,
+        ownershipScope?: OwnershipScope,
+    ) {
+        await this.getOne(userId, taskId, ownershipScope);
         if (!this.attachments) {
             throw new BadRequestException('Attachment repository not wired in this context.');
         }
@@ -1326,13 +1510,17 @@ export class TasksService {
         }
     }
 
-    private async assertScopeReachable(userId: string, input: CreateTaskInput): Promise<void> {
+    private async assertScopeReachable(
+        userId: string,
+        input: CreateTaskInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<void> {
         if (input.workId) {
             if (!this.works) {
                 throw new BadRequestException('Work repository not wired in this context.');
             }
             const work = await this.works.findById(input.workId);
-            if (!work || work.userId !== userId) {
+            if (!work || work.userId !== userId || !ownershipScopeMatches(work, ownershipScope)) {
                 throw new BadRequestException(`Work ${input.workId} not found.`);
             }
         }
@@ -1341,7 +1529,9 @@ export class TasksService {
                 throw new BadRequestException('Mission repository not wired in this context.');
             }
             const mission = await this.missions.findOne({
-                where: { id: input.missionId, userId },
+                where: ownershipWhereWith<Mission>(userId, ownershipScope, {
+                    id: input.missionId,
+                }),
                 select: ['id', 'userId'],
             });
             if (!mission) {
@@ -1353,7 +1543,7 @@ export class TasksService {
                 throw new BadRequestException('Idea repository not wired in this context.');
             }
             const idea = await this.ideas.findByIdForUser(input.ideaId, userId);
-            if (!idea) {
+            if (!idea || !ownershipScopeMatches(idea, ownershipScope)) {
                 throw new BadRequestException(`Idea ${input.ideaId} not found.`);
             }
         }
@@ -1368,7 +1558,7 @@ export class TasksService {
                 throw new BadRequestException('Team repository not wired in this context.');
             }
             const team = await this.teams.findOne({
-                where: { id: input.teamId, userId },
+                where: ownershipWhereWith<Team>(userId, ownershipScope, { id: input.teamId }),
                 select: ['id'],
             });
             if (!team) {
@@ -1379,8 +1569,8 @@ export class TasksService {
             if (!this.agents) {
                 throw new BadRequestException('Agent repository not wired in this context.');
             }
-            const agent = await this.agents.findByIdAndUser(input.agentId, userId);
-            if (!agent) {
+            const agent = await this.agents.findByIdAndUser(input.agentId, userId, ownershipScope);
+            if (!agent || !ownershipScopeMatches(agent, ownershipScope)) {
                 throw new BadRequestException(`Agent ${input.agentId} not found.`);
             }
         }
@@ -1389,7 +1579,7 @@ export class TasksService {
                 throw new BadRequestException('Goal repository not wired in this context.');
             }
             const goal = await this.goals.findOne({
-                where: { id: input.goalId, userId },
+                where: ownershipWhereWith<Goal>(userId, ownershipScope, { id: input.goalId }),
                 select: ['id'],
             });
             if (!goal) {

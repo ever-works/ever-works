@@ -36,7 +36,7 @@ describe('OrgMemoryController — ingest chat attachments into Memory', () => {
 
     let kb: { createOrgUpload: jest.Mock };
     let membership: { ensureMember: jest.Mock; ensureAdmin: jest.Mock };
-    let scopeContext: { getOrganizationId: jest.Mock };
+    let scopeContext: { getOrganizationId: jest.Mock; getScope: jest.Mock };
     let uploads: { readFile: jest.Mock };
     let userUploads: { findOwnedByUser: jest.Mock };
     let controller: OrgMemoryController;
@@ -52,7 +52,10 @@ describe('OrgMemoryController — ingest chat attachments into Memory', () => {
             ensureMember: jest.fn().mockResolvedValue({ id: 'org-1' }),
             ensureAdmin: jest.fn().mockResolvedValue({ id: 'org-1' }),
         };
-        scopeContext = { getOrganizationId: jest.fn().mockReturnValue('org-1') };
+        scopeContext = {
+            getOrganizationId: jest.fn().mockReturnValue('org-1'),
+            getScope: jest.fn().mockReturnValue({ tenantId: 'tenant-1', organizationId: 'org-1' }),
+        };
         uploads = {
             readFile: jest
                 .fn()
@@ -84,7 +87,10 @@ describe('OrgMemoryController — ingest chat attachments into Memory', () => {
     it('resolves each hash against the CALLER, so another user’s upload is never reachable', async () => {
         await controller.ingestAttachmentsIntoMemory(auth, { attachmentIds: [SHA] });
 
-        expect(userUploads.findOwnedByUser).toHaveBeenCalledWith(SHA, 'user-1');
+        expect(userUploads.findOwnedByUser).toHaveBeenCalledWith(SHA, 'user-1', {
+            tenantId: 'tenant-1',
+            organizationId: 'org-1',
+        });
     });
 
     it('reports an unresolvable hash as not_found without touching storage', async () => {

@@ -4,6 +4,7 @@ import { AgentsService } from './agents.service';
 import { AgentFileService } from './agent-file.service';
 import type { AgentDto } from './types';
 import { getAgentTemplate, listAgentTemplates, type AgentTemplate } from './agent-templates';
+import type { OwnershipScope } from '../database/ownership-scope';
 
 /**
  * Optional placement overrides accepted by {@link AgentTemplatesService.createFromTemplate}.
@@ -65,11 +66,12 @@ export class AgentTemplatesService {
         userId: string,
         slug: string,
         input: CreateAgentFromTemplateInput = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<AgentDto> {
         const template = this.get(slug);
         const scope = input.scope ?? AgentScope.TENANT;
 
-        const created = await this.agents.create(userId, {
+        const createInput = {
             scope,
             missionId: input.missionId ?? null,
             ideaId: input.ideaId ?? null,
@@ -78,7 +80,10 @@ export class AgentTemplatesService {
             title: template.title,
             capabilities: template.capabilities,
             permissions: template.defaultPermissions,
-        });
+        };
+        const created = ownershipScope
+            ? await this.agents.create(userId, createInput, ownershipScope)
+            : await this.agents.create(userId, createInput);
 
         // Persist the template's system prompt as the Agent's SOUL.md.
         // Best-effort ordering: the Agent row exists first, so a failed
@@ -97,6 +102,13 @@ export class AgentTemplatesService {
         }
 
         // Seed the review-before-act guardrails and return the fresh DTO.
-        return this.agents.setGuardrails(userId, created.id, template.defaultGuardrails);
+        return ownershipScope
+            ? this.agents.setGuardrails(
+                  userId,
+                  created.id,
+                  template.defaultGuardrails,
+                  ownershipScope,
+              )
+            : this.agents.setGuardrails(userId, created.id, template.defaultGuardrails);
     }
 }

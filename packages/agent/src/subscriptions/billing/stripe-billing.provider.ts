@@ -73,6 +73,46 @@ export const STRIPE_METADATA_KEYS = {
 /** The only value {@link STRIPE_METADATA_KEYS.licence} ever takes. */
 export const STRIPE_PERPETUAL_LICENCE = 'perpetual-commercial' as const;
 
+/**
+ * Stripe Tax, applied to every session that actually CHARGES.
+ *
+ * The account has Stripe Tax active with live registrations, but a session only calculates tax if
+ * it asks: without `automatic_tax` every invoice ships with no tax line, and VAT we are registered
+ * to collect has to come out of margin or be chased retroactively.
+ *
+ * - `customer_update.address: 'auto'` is REQUIRED alongside `automatic_tax` whenever an existing
+ *   `customer` is passed. Stripe needs an address to pick a jurisdiction, and this lets Checkout
+ *   collect it and write it back to the customer.
+ * - `tax_id_collection` lets a business enter its VAT/GST number, which is what triggers EU
+ *   reverse-charge instead of us charging VAT to a registered business.
+ *
+ * 🛑 Deliberately NOT applied to `mode: 'setup'` sessions — saving a card charges nothing, and
+ * Stripe rejects `automatic_tax` there.
+ *
+ * `tax_behavior` is left `unspecified` on prices on purpose: the account default
+ * `inferred_by_currency` already resolves USD to tax-exclusive, and the field is IMMUTABLE once
+ * set, so pinning it would foreclose tax-inclusive EUR pricing later for no gain today.
+ */
+const STRIPE_TAX_SESSION_FIELDS = {
+    automatic_tax: { enabled: true },
+    // 🛑 `name: 'auto'` is NOT optional here, and its absence is not a degraded
+    // experience - it is a hard 400 on EVERY session. Stripe refuses
+    // `tax_id_collection` on a session that passes an existing `customer` unless
+    // `customer_update.name` is also 'auto':
+    //
+    //   "Tax ID collection requires updating business name on the customer. To
+    //    enable tax ID collection for an existing customer, please set
+    //    `customer_update[name]` to `auto`."
+    //
+    // Every session this constant is spread into passes a `customer`, so without
+    // this line NOTHING in Ever Works can be bought - not credit packs, not plans,
+    // not the perpetual licence. No unit test can catch it either: the provider
+    // specs mock the Stripe client, so the rejection only exists at the real API.
+    // Verified against Stripe test mode: address-only => 400, address+name => 200.
+    customer_update: { address: 'auto', name: 'auto' },
+    tax_id_collection: { enabled: true },
+} as const;
+
 /** `kind` metadata values — how a purchase at the provider originated. */
 export const STRIPE_PURCHASE_KINDS = {
     checkout: 'credit-topup',
@@ -208,6 +248,7 @@ export class StripeBillingProvider extends BillingProvider {
             client_reference_id: request.referenceId,
             success_url: request.successUrl,
             cancel_url: request.cancelUrl,
+            ...STRIPE_TAX_SESSION_FIELDS,
             line_items: [
                 {
                     quantity: 1,
@@ -288,6 +329,20 @@ export class StripeBillingProvider extends BillingProvider {
             cancel_url: request.cancelUrl,
             line_items: lineItems,
             metadata,
+            ...STRIPE_TAX_SESSION_FIELDS,
+            // A `mode: 'payment'` sale emits no `invoice.*` event unless invoice
+            // creation is asked for explicitly. Without this, a successful $99
+            // perpetual-licence payment produces NO invoice, NO ledger row and NO
+            // subscription row — by design, since a licence grants no hosted
+            // tier — so the billing page after paying is byte-identical to
+            // before, with the same enabled "$99" button. The buyer concludes it
+            // failed and pays again, and nothing on this path is idempotent
+            // (`checkout.sessions.create` carries no idempotency key here).
+            //
+            // Turning it on routes the sale through the existing
+            // `invoice.updated` -> `mirrorInvoice` path, so the buyer gets a
+            // receipt in-app through plumbing that already exists.
+            ...(isPerpetual ? { invoice_creation: { enabled: true } } : {}),
             // `subscription_data` is rejected outright in payment mode; the one-off equivalent is
             // `payment_intent_data`, which is also where the licence marker has to be mirrored so a
             // refund or dispute on the charge can still be traced back to the sale.
@@ -480,6 +535,47 @@ export class StripeBillingProvider extends BillingProvider {
         };
     }
 
+    /**
+     * 🛑 THIS PATH COLLECTS NO TAX. It can be made to - see the flow below -
+     * but it is not wired, and the difference is real money.
+     *
+     * The Checkout credit-pack purchase asks for `automatic_tax`, so a German
+     * buyer of the 5,500-credit pack pays $50 + $9.50 VAT. The SAME pack bought
+     * through auto-recharge goes out as a bare PaymentIntent and is charged at
+     * $50 flat. Under the account's OSS registration that VAT is owed either
+     * way, so the difference comes out of margin - and the two prices for one
+     * product is the kind of thing an audit finds.
+     *
+     * `automatic_tax` is not the mechanism here - PaymentIntents reject it
+     * outright (verified 2026-08-23: `POST /v1/payment_intents`
+     * `automatic_tax[enabled]=true` -> 400 "Received unknown parameter"). But a
+     * supported off-session flow DOES exist, and it is smaller than an Invoice
+     * rewrite:
+     *
+     *   1. `POST /v1/tax/calculations` with the pack amount, the product tax
+     *      code and the customer's address -> `amount_total` including tax;
+     *   2. create the PaymentIntent for that total, passing the calculation id
+     *      as `hooks[inputs][tax][calculation]`;
+     *   3. after it succeeds, `POST /v1/tax/transactions/create_from_calculation`
+     *      so the collected tax is actually reported.
+     *
+     * Step 2 is confirmed accepted on this account (2026-08-23; control: a bogus
+     * `hooks[inputs][tax][not_a_field]` on the same call IS rejected, so the
+     * probe discriminates). It is left unimplemented deliberately - it changes
+     * the amount charged, and shipping a new tax path on a money route with no
+     * end-to-end test would be worse than the gap it closes.
+     *
+     * EXPOSURE TODAY IS ZERO, and the reason is worth knowing because it is
+     * about to change: `autoRechargeEnabled` defaults false and is opt-in, and
+     * turning it on requires a saved card - which was impossible, because the
+     * setup session was rejected by Stripe for want of a `currency`. Measured:
+     * zero live Stripe customers carry an Ever Works userId (control: 1 of 8
+     * live customers in the shared account does have a default payment method,
+     * so the probe discriminates).
+     *
+     * Fixing that setup session is what makes this path reachable for the first
+     * time. Resolve the tax question BEFORE auto-recharge is advertised.
+     */
     async chargeOffSession(request: OffSessionChargeRequest): Promise<OffSessionChargeResult> {
         const stripe = this.requireClient();
         try {
@@ -855,6 +951,17 @@ export class StripeBillingProvider extends BillingProvider {
         const session = await stripe.checkout.sessions.create({
             mode: 'setup',
             customer: request.customerId,
+            // 🛑 Required. Stripe rejects a `mode: 'setup'` session outright -
+            // "Missing required param: currency" - unless EITHER `currency` or an
+            // explicit `payment_method_types` is given. Neither was, so saving a card
+            // has been returning a 400 for every user, not degrading gracefully.
+            //
+            // Found by replaying this exact call against Stripe test mode; the unit
+            // specs mock the client, so they accept the incomplete shape happily.
+            // `currency` is preferred over pinning `payment_method_types: ['card']`
+            // because it lets Checkout keep offering whatever methods the account has
+            // enabled for that currency instead of hardcoding cards.
+            currency: this.getDefaultCurrency(),
             success_url: request.successUrl,
             cancel_url: request.cancelUrl,
             metadata: {

@@ -10,6 +10,7 @@ export * from './ingest/index.js';
 export * from './skills/index.js';
 export * from './agents/index.js';
 export * from './fleet/index.js';
+export * from './fleet/fleet-task-workspace.types.js';
 export * from './digest/index.js';
 // Judgment layer G5 / G8s / G9 — workflow graph edges + input mapping,
 // typed human-in-the-loop question payloads, sub-agent delegation.

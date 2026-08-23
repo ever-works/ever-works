@@ -7,6 +7,7 @@ import {
     prepareCaseInsensitiveContainsPattern,
     sanitizeLikePattern,
 } from '../utils';
+import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 
 export interface ListTasksFilter {
     status?: TaskStatus | TaskStatus[];
@@ -50,8 +51,14 @@ export class TaskRepository {
         return this.repository.findOne({ where: { id } });
     }
 
-    async findByIdAndUser(id: string, userId: string): Promise<Task | null> {
-        return this.repository.findOne({ where: { id, userId } });
+    async findByIdAndUser(
+        id: string,
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<Task | null> {
+        return this.repository.findOne({
+            where: ownershipWhereWith<Task>(userId, scope, { id }),
+        });
     }
 
     async findBySlug(slug: string): Promise<Task | null> {
@@ -123,10 +130,16 @@ export class TaskRepository {
     async findByUserIdFiltered(
         userId: string,
         filter: ListTasksFilter = {},
+        scope?: OwnershipScope,
     ): Promise<{ rows: Task[]; total: number }> {
         const qb = this.repository
             .createQueryBuilder('task')
             .where('task.userId = :userId', { userId });
+
+        const scopePredicate = ownershipSqlPredicate('task', scope, 'taskScope');
+        if (scopePredicate) {
+            qb.andWhere(scopePredicate.clause, scopePredicate.parameters);
+        }
 
         if (filter.status) {
             if (Array.isArray(filter.status)) {
@@ -368,6 +381,8 @@ export class TaskRepository {
     async wouldCreateCycle(
         candidateChildId: string,
         proposedParentId: string,
+        userId?: string,
+        scope?: OwnershipScope,
         maxDepth = 200,
     ): Promise<boolean> {
         if (candidateChildId === proposedParentId) return true;
@@ -378,7 +393,9 @@ export class TaskRepository {
             seen.add(cursor);
             if (cursor === candidateChildId) return true;
             const next = await this.repository.findOne({
-                where: { id: cursor },
+                where: userId
+                    ? ownershipWhereWith<Task>(userId, scope, { id: cursor })
+                    : { id: cursor },
                 select: ['id', 'parentTaskId'],
             });
             cursor = next?.parentTaskId ?? null;

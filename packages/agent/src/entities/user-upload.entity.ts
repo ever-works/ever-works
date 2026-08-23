@@ -35,6 +35,7 @@ import { User } from './user.entity';
  */
 @Entity({ name: 'user_uploads' })
 @Index('idx_user_uploads_user_sha', ['userId', 'sha256'])
+@Index('idx_user_uploads_user_scope_sha', ['userId', 'tenantId', 'organizationId', 'sha256'])
 @Index('idx_user_uploads_sha', ['sha256'])
 export class UserUpload {
     @PrimaryGeneratedColumn('uuid')

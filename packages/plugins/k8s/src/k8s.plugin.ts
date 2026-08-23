@@ -3,6 +3,7 @@ import type {
 	ConnectionValidationResult,
 	DeploymentConfig,
 	DeploymentDomain,
+	DeploymentLookupContext,
 	DeploymentProject,
 	DeploymentResult,
 	IDeploymentPlugin,
@@ -11,7 +12,9 @@ import type {
 	PluginCategory,
 	PluginContext,
 	PluginHealthCheck,
-	PluginManifest
+	PluginManifest,
+	ValidationError,
+	ValidationResult
 } from '@ever-works/plugin';
 
 import { createHash } from 'node:crypto';
@@ -68,6 +71,113 @@ function hashRuntimeEnv(env: Record<string, string>): string {
 const DEFAULT_NAMESPACE = 'ever-works';
 const DEFAULT_REPLICAS = 1;
 const CONTAINER_PORT = 3000;
+const DEFAULT_MEMORY_REQUEST = '512Mi';
+const DEFAULT_MEMORY_LIMIT = '2Gi';
+
+interface ParsedQuantity {
+	numerator: bigint;
+	denominator: bigint;
+}
+
+const MANAGED_MEMORY_REQUEST_MINIMUM = parseKubernetesQuantity(DEFAULT_MEMORY_REQUEST)!;
+
+function isPlatformManagedClusterSource(source: ClusterSource | undefined): boolean {
+	return source === 'k8s-works' || source === 'k8s-works-shared';
+}
+
+/**
+ * Parse Kubernetes' DecimalSI, BinarySI, and DecimalExponent quantity forms
+ * into an exact rational number. Custom clusters keep passing their strings
+ * through untouched; this parser is only used to enforce managed-cluster
+ * memory invariants before an API write.
+ */
+function parseKubernetesQuantity(value: unknown): ParsedQuantity | undefined {
+	if (typeof value !== 'string') return undefined;
+	const match = /^([+-]?)(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:(?:[eE]([+-]?\d+))|(Ki|Mi|Gi|Ti|Pi|Ei|[numkMGTPE]))?$/.exec(
+		value
+	);
+	if (!match) return undefined;
+
+	const integer = match[2] ?? '0';
+	const fraction = match[3] ?? match[4] ?? '';
+	let numerator = BigInt(`${integer}${fraction}` || '0');
+	let denominator = 10n ** BigInt(fraction.length);
+	if (match[1] === '-') numerator = -numerator;
+
+	const exponentText = match[5];
+	const suffix = match[6] ?? '';
+	if (exponentText !== undefined) {
+		const exponent = Number(exponentText);
+		// Kubernetes resources are bounded far below this; the guard prevents
+		// an adversarial settings string from allocating an enormous BigInt.
+		if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 100) return undefined;
+		if (exponent >= 0) numerator *= 10n ** BigInt(exponent);
+		else denominator *= 10n ** BigInt(-exponent);
+	}
+
+	const decimalPowers: Record<string, number> = {
+		n: -9,
+		u: -6,
+		m: -3,
+		'': 0,
+		k: 3,
+		M: 6,
+		G: 9,
+		T: 12,
+		P: 15,
+		E: 18
+	};
+	const binaryPowers: Record<string, number> = { Ki: 10, Mi: 20, Gi: 30, Ti: 40, Pi: 50, Ei: 60 };
+
+	if (suffix in binaryPowers) {
+		numerator *= 1n << BigInt(binaryPowers[suffix]);
+	} else {
+		const power = decimalPowers[suffix];
+		if (power === undefined) return undefined;
+		if (power >= 0) numerator *= 10n ** BigInt(power);
+		else denominator *= 10n ** BigInt(-power);
+	}
+
+	return { numerator, denominator };
+}
+
+function compareQuantities(left: ParsedQuantity, right: ParsedQuantity): number {
+	const leftScaled = left.numerator * right.denominator;
+	const rightScaled = right.numerator * left.denominator;
+	return leftScaled < rightScaled ? -1 : leftScaled > rightScaled ? 1 : 0;
+}
+
+function effectiveMemorySizing(settings: KubernetesSettings): {
+	memoryRequest: string | undefined;
+	memoryLimit: string | undefined;
+} {
+	if (!isPlatformManagedClusterSource(settings.clusterSource)) {
+		return { memoryRequest: settings.memoryRequest, memoryLimit: settings.memoryLimit };
+	}
+
+	const requested = settings.memoryRequest ?? DEFAULT_MEMORY_REQUEST;
+	const limited = settings.memoryLimit ?? DEFAULT_MEMORY_LIMIT;
+	const requestQuantity = parseKubernetesQuantity(requested);
+	const limitQuantity = parseKubernetesQuantity(limited);
+	if (requestQuantity === undefined || limitQuantity === undefined) {
+		throw new K8sPluginError(
+			'UNKNOWN',
+			'Managed Kubernetes memory request and limit must use valid Kubernetes resource quantities.'
+		);
+	}
+
+	const belowFloor = compareQuantities(requestQuantity, MANAGED_MEMORY_REQUEST_MINIMUM) < 0;
+	const memoryRequest = belowFloor ? DEFAULT_MEMORY_REQUEST : requested;
+	const effectiveRequestQuantity = belowFloor ? MANAGED_MEMORY_REQUEST_MINIMUM : requestQuantity;
+	if (compareQuantities(limitQuantity, effectiveRequestQuantity) < 0) {
+		throw new K8sPluginError(
+			'UNKNOWN',
+			'Managed Kubernetes memory limit must cover the effective request (the 512Mi admission floor or a larger configured request).'
+		);
+	}
+
+	return { memoryRequest, memoryLimit: limited };
+}
 
 interface DeployOptions {
 	/** Short git SHA (or any deterministic version tag). */
@@ -99,6 +209,8 @@ interface DeployOptions {
 	 * workflow's toJSON(secrets) copy step; values never touch the repo.
 	 */
 	namespaceOverride?: string;
+	/** `null` selects the effective kubeconfig's current context. */
+	kubeContextOverride?: string | null;
 	imageName?: string;
 	runtimeEnv?: Record<string, string>;
 	/**
@@ -295,7 +407,8 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			memoryRequest: {
 				type: 'string',
 				title: 'Memory request',
-				description: "Kubernetes quantity, e.g. '256Mi'."
+				description:
+					"Kubernetes quantity, e.g. '512Mi' or '500M'. Platform-managed clusters use 512Mi only as an admission floor; set a larger measured value for each heavier catalogue."
 			},
 			cpuLimit: {
 				type: 'string',
@@ -305,6 +418,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			memoryLimit: {
 				type: 'string',
 				title: 'Memory limit',
+				default: DEFAULT_MEMORY_LIMIT,
 				description:
 					"Kubernetes quantity, e.g. '2Gi'. Must fit the target node: a limit larger than a node's allocatable memory schedules fine (requests are small) and then OOM-kills the pod climbing toward a ceiling that does not exist."
 			}
@@ -363,6 +477,68 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			message: 'Kubernetes plugin is ready (cluster reachability is per-token)',
 			checkedAt: Date.now()
 		};
+	}
+
+	validateSettings(settings: Record<string, unknown>): ValidationResult {
+		const errors: ValidationError[] = [];
+		const clusterSource = isClusterSource(settings.clusterSource) ? settings.clusterSource : undefined;
+		// Kubernetes accepts DecimalSI, BinarySI, and exponent quantities. Do
+		// not narrow syntax for a customer's own cluster; its API server remains
+		// authoritative. Managed clusters need local parsing only because the
+		// platform enforces an admission floor before it writes any resource.
+		if (!isPlatformManagedClusterSource(clusterSource)) return { valid: true };
+
+		const memoryRequest = settings.memoryRequest ?? DEFAULT_MEMORY_REQUEST;
+		const memoryLimit = settings.memoryLimit ?? DEFAULT_MEMORY_LIMIT;
+		const requestQuantity = parseKubernetesQuantity(memoryRequest);
+		const limitQuantity = parseKubernetesQuantity(memoryLimit);
+
+		if (requestQuantity === undefined) {
+			errors.push({
+				path: 'memoryRequest',
+				code: 'INVALID_MEMORY_QUANTITY',
+				message: "Memory request must be a valid Kubernetes quantity such as '512Mi', '500M', or '1e9'."
+			});
+		}
+
+		if (limitQuantity === undefined) {
+			errors.push({
+				path: 'memoryLimit',
+				code: 'INVALID_MEMORY_QUANTITY',
+				message: "Memory limit must be a valid Kubernetes quantity such as '2Gi' or '2G'."
+			});
+		}
+
+		if (
+			requestQuantity !== undefined &&
+			limitQuantity !== undefined &&
+			compareQuantities(requestQuantity, limitQuantity) > 0
+		) {
+			errors.push({
+				path: 'memoryRequest',
+				code: 'MEMORY_REQUEST_EXCEEDS_LIMIT',
+				message: 'Memory request must not exceed the memory limit.'
+			});
+		}
+
+		if (requestQuantity !== undefined && compareQuantities(requestQuantity, MANAGED_MEMORY_REQUEST_MINIMUM) < 0) {
+			errors.push({
+				path: 'memoryRequest',
+				code: 'MANAGED_MEMORY_REQUEST_TOO_LOW',
+				message:
+					'Platform-managed clusters require a 512Mi admission floor; heavier sites need a larger measured request.'
+			});
+		}
+
+		if (limitQuantity !== undefined && compareQuantities(limitQuantity, MANAGED_MEMORY_REQUEST_MINIMUM) < 0) {
+			errors.push({
+				path: 'memoryLimit',
+				code: 'MANAGED_MEMORY_LIMIT_TOO_LOW',
+				message: 'Platform-managed memory limit must cover the 512Mi admission floor.'
+			});
+		}
+
+		return errors.length > 0 ? { valid: false, errors } : { valid: true };
 	}
 
 	getManifest(): PluginManifest {
@@ -500,6 +676,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			...(await this.loadSettings()),
 			...((opts.settingsOverride ?? {}) as Partial<KubernetesSettings>)
 		} as KubernetesSettings;
+		applyKubeContextOverride(settings, opts.kubeContextOverride);
 		// `namespaceOverride` is the namespace the PLATFORM enforced server-side
 		// (per-tenant override + reserved-namespace blocklist). It must win over
 		// the plugin's own persisted `namespace`, which is free-text the user
@@ -541,6 +718,11 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		let pullSecretName: string | undefined;
 
 		try {
+			// Resolve request and limit as a pair before the first write. A legacy
+			// managed Work may combine a sub-floor request with an even lower
+			// limit; raising only the request would make an invalid Deployment.
+			const memorySizing = effectiveMemorySizing(settings);
+
 			// Idempotently ensure the namespace exists. Without this, the
 			// SSA patches below 404 against a fresh cluster (e.g. the
 			// default `ever-works` namespace on a brand-new EKS cluster).
@@ -597,9 +779,12 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				// Per-Work sizing, resolved through the same settings merge as the
 				// rest (settingsOverride layers the work tier over the plugin's own).
 				cpuRequest: settings.cpuRequest,
-				memoryRequest: settings.memoryRequest,
+				// Stored legacy managed settings may still say 256Mi. Normalize the
+				// request only after validating it against the effective limit, and
+				// never mutate the Work row as a side effect of deployment.
+				memoryRequest: memorySizing.memoryRequest,
 				cpuLimit: settings.cpuLimit,
-				memoryLimit: settings.memoryLimit,
+				memoryLimit: memorySizing.memoryLimit,
 				// Makes the pod template differ between deploys of the same branch.
 				// The image tag is a mutable alias, so without this the manifest is
 				// identical every time and server-side apply rolls nothing.
@@ -646,19 +831,24 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		}
 	}
 
-	async getDeploymentStatus(deploymentId: string, kubeconfig: string): Promise<DeploymentResult> {
-		const settings = await this.loadSettings();
-		const { namespace, name } = parseDeploymentId(deploymentId);
+	async getDeploymentStatus(
+		deploymentId: string,
+		kubeconfig: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentResult> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
+		const { namespace, name } = resolveDeploymentTarget(deploymentId, context);
+		const effectiveDeploymentId = makeDeploymentId(namespace, name);
 		const createdAt = new Date().toISOString();
 
 		try {
 			const deployment = await this.api.getDeployment(kubeconfig, namespace, name, settings.kubeContext);
 			if (!deployment) {
-				return { id: deploymentId, status: 'pending', createdAt };
+				return { id: effectiveDeploymentId, status: 'pending', createdAt };
 			}
 			const status = mapDeploymentToStatus(deployment);
 			return {
-				id: deploymentId,
+				id: effectiveDeploymentId,
 				status,
 				createdAt,
 				completedAt: status === 'ready' || status === 'error' ? new Date().toISOString() : undefined
@@ -666,7 +856,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		} catch (err) {
 			const scrubbed = scrubError(err, this.runtimeScrubPatterns({ kubeconfig }));
 			return {
-				id: deploymentId,
+				id: effectiveDeploymentId,
 				status: 'error',
 				error: scrubbed.message,
 				createdAt,
@@ -691,29 +881,37 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	async lookupExistingDeployment(
 		projectName: string,
-		kubeconfig: string
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
 	): Promise<{ found: boolean; website?: string; deploymentState?: string; projectId?: string }> {
-		const settings = await this.loadSettings();
-		const slug = sanitiseSlug(projectName);
-		const namespace = settings.namespace?.trim() || DEFAULT_NAMESPACE;
-		try {
-			const deployment = await this.api.getDeployment(kubeconfig, namespace, slug, settings.kubeContext);
-			if (!deployment) return { found: false };
-			const projectId = makeDeploymentId(namespace, slug);
-			return {
-				found: true,
-				projectId,
-				website: await this.resolveWebsiteUrl(kubeconfig, namespace, slug, settings),
-				deploymentState: toVerifierDeploymentState(mapDeploymentToStatus(deployment))
-			};
-		} catch {
-			return { found: false };
-		}
+		const settings = await this.loadEffectiveDeploymentSettings(context);
+		const projectNameOverride = context?.projectNameOverride?.trim();
+		const slug = sanitiseSlug(projectNameOverride || projectName);
+		const requestedNamespace = context?.namespaceOverride?.trim();
+		const namespace =
+			(requestedNamespace && isValidK8sNamespace(requestedNamespace) ? requestedNamespace : undefined) ??
+			settings.namespace?.trim() ??
+			DEFAULT_NAMESPACE;
+		const deployment = await this.api.getDeployment(kubeconfig, namespace, slug, settings.kubeContext);
+		if (!deployment) return { found: false };
+		const projectId = makeDeploymentId(namespace, slug);
+		return {
+			found: true,
+			projectId,
+			website: await this.resolveWebsiteUrl(kubeconfig, namespace, slug, settings),
+			deploymentState: toVerifierDeploymentState(mapDeploymentToStatus(deployment))
+		};
 	}
 
-	async getDomains(projectId: string, kubeconfig: string): Promise<DeploymentDomain[]> {
-		const settings = await this.loadSettings();
-		const { namespace, name } = parseDeploymentId(projectId);
+	async getDomains(
+		projectId: string,
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentDomain[]> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
+		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
 		if (!ingress?.spec) return [];
 		const spec = ingress.spec as { rules?: Array<{ host?: string }> };
@@ -736,8 +934,14 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			}));
 	}
 
-	async addDomain(projectId: string, domain: string, kubeconfig: string): Promise<AddDomainResult> {
-		const settings = await this.loadSettings();
+	async addDomain(
+		projectId: string,
+		domain: string,
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<AddDomainResult> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
 		// Security: the domain is written verbatim as the Ingress `host:` rule.
 		// Reject anything that is not a strict RFC-1123 hostname so a value like
 		// `*` (catch-all rule that hijacks unmatched cluster traffic) or an empty
@@ -746,7 +950,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		if (!host) {
 			throw new K8sPluginError('UNKNOWN', 'Invalid domain: provide a valid hostname.');
 		}
-		const { namespace, name } = parseDeploymentId(projectId);
+		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
 
@@ -779,9 +983,15 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		};
 	}
 
-	async removeDomain(projectId: string, domain: string, kubeconfig: string): Promise<boolean> {
-		const settings = await this.loadSettings();
-		const { namespace, name } = parseDeploymentId(projectId);
+	async removeDomain(
+		projectId: string,
+		domain: string,
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<boolean> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
+		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, settings.ingressClass);
 		const strategy = this.ingressStrategies.selectStrategy(controller);
 		const existing = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
@@ -801,9 +1011,15 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		return true;
 	}
 
-	async verifyDomain(projectId: string, domain: string, kubeconfig: string): Promise<DeploymentDomain> {
-		const settings = await this.loadSettings();
-		const { namespace, name } = parseDeploymentId(projectId);
+	async verifyDomain(
+		projectId: string,
+		domain: string,
+		kubeconfig: string,
+		_teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentDomain> {
+		const settings = await this.loadEffectiveDeploymentSettings(context);
+		const { namespace, name } = resolveDeploymentTarget(projectId, context);
 		// Resolve the cluster's actual ingress LB host/IP. Without this, any
 		// domain with any DNS record was returned `verified: true` —
 		// including domains pointing at a completely unrelated server.
@@ -896,6 +1112,15 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		return this.coerceSettings(raw);
 	}
 
+	private async loadEffectiveDeploymentSettings(context?: DeploymentLookupContext): Promise<KubernetesSettings> {
+		const settings = {
+			...(await this.loadSettings()),
+			...this.coerceSettings(context?.settingsOverride ?? {})
+		};
+		applyKubeContextOverride(settings, context?.kubeContextOverride);
+		return settings;
+	}
+
 	private coerceSettings(raw: Record<string, unknown>): KubernetesSettings {
 		const out: KubernetesSettings = {};
 		if (isClusterSource(raw.clusterSource)) out.clusterSource = raw.clusterSource;
@@ -944,14 +1169,10 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		name: string,
 		settings: KubernetesSettings
 	): Promise<string | undefined> {
-		try {
-			const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
-			const rules = (ingress?.spec as { rules?: Array<{ host?: string }> } | undefined)?.rules ?? [];
-			const host = rules.find((rule) => typeof rule.host === 'string' && rule.host.trim().length > 0)?.host;
-			return host ? `https://${host}` : undefined;
-		} catch {
-			return undefined;
-		}
+		const ingress = await this.api.readIngress(kubeconfig, namespace, name, settings.kubeContext);
+		const rules = (ingress?.spec as { rules?: Array<{ host?: string }> } | undefined)?.rules ?? [];
+		const host = rules.find((rule) => typeof rule.host === 'string' && rule.host.trim().length > 0)?.host;
+		return host ? `https://${host}` : undefined;
 	}
 
 	private async controllerForClassName(
@@ -1015,6 +1236,34 @@ function parseDeploymentId(id: string): { namespace: string; name: string } {
 		return { namespace: DEFAULT_NAMESPACE, name: id };
 	}
 	return { namespace: id.slice(0, slash), name: id.slice(slash + 1) };
+}
+
+function resolveDeploymentTarget(
+	projectId: string,
+	context?: DeploymentLookupContext
+): { namespace: string; name: string } {
+	const parsed = parseDeploymentId(projectId);
+	const namespaceOverride = context?.namespaceOverride?.trim();
+	if (namespaceOverride && !isValidK8sNamespace(namespaceOverride)) {
+		throw new K8sPluginError('NOT_CONFIGURED', 'The effective Kubernetes namespace is invalid.');
+	}
+	const projectNameOverride = context?.projectNameOverride?.trim();
+	const name = projectNameOverride ? sanitiseSlug(projectNameOverride) : parsed.name;
+	if (!name) {
+		throw new K8sPluginError('NOT_CONFIGURED', 'The effective Kubernetes project name is invalid.');
+	}
+	return {
+		namespace: namespaceOverride || parsed.namespace,
+		name
+	};
+}
+
+function applyKubeContextOverride(settings: KubernetesSettings, override?: string | null): void {
+	if (override === null) {
+		delete settings.kubeContext;
+	} else if (typeof override === 'string') {
+		settings.kubeContext = override;
+	}
 }
 
 function sanitiseSlug(input: string): string {

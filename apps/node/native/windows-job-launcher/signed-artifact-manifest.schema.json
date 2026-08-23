@@ -1,0 +1,45 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.co/schemas/windows-job-launcher/signed-artifact-manifest.schema.json",
+	"title": "Ever Works Windows Job launcher signed artifact manifest",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"schemaVersion",
+		"productionEligible",
+		"releaseApproval",
+		"artifact",
+		"signedArtifactSha256",
+		"authenticodeContentSha256",
+		"unsignedBinarySize",
+		"signedBinarySize",
+		"publisherSubject",
+		"publisherCertificateSha256",
+		"authenticodeStatus",
+		"sourceCommit",
+		"unsignedBuildSha256",
+		"sbomSha256",
+		"provenanceSha256"
+	],
+	"properties": {
+		"schemaVersion": { "const": 1 },
+		"productionEligible": { "const": false },
+		"releaseApproval": { "const": "required" },
+		"artifact": { "const": "ever-works-windows-job-launcher.exe" },
+		"signedArtifactSha256": { "$ref": "#/$defs/sha256" },
+		"authenticodeContentSha256": { "$ref": "#/$defs/sha256" },
+		"unsignedBinarySize": { "type": "integer", "minimum": 1 },
+		"signedBinarySize": { "type": "integer", "minimum": 1 },
+		"publisherSubject": { "type": "string", "minLength": 1, "maxLength": 1024 },
+		"publisherCertificateSha256": { "$ref": "#/$defs/sha256" },
+		"authenticodeStatus": { "const": "Valid" },
+		"sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+		"unsignedBuildSha256": { "$ref": "#/$defs/sha256" },
+		"sbomSha256": { "$ref": "#/$defs/sha256" },
+		"provenanceSha256": { "$ref": "#/$defs/sha256" },
+		"testOnly": { "type": "boolean" }
+	},
+	"$defs": {
+		"sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+	}
+}

@@ -108,6 +108,18 @@ describe('persistence round-trip', () => {
 		expect(reloaded).toEqual(config());
 	});
 
+	it('persists the unsafe process-tree quarantine across service restarts', async () => {
+		const { fs } = memoryFs();
+		const path = '/home/x/.config/ever-works-node/node-config.json';
+		const unsafe = {
+			since: '2026-08-22T23:00:00.000Z',
+			reason: 'Git helper process tree could not be proven stopped'
+		};
+
+		await saveConfig(fs, path, config({ unsafe } as never), { platform: 'linux' });
+		await expect(loadConfig(fs, path)).resolves.toMatchObject({ unsafe });
+	});
+
 	it('creates the parent directory and tightens the file to 0600 on POSIX', async () => {
 		const { fs, dirs, chmods } = memoryFs();
 		const path = '/home/x/.config/ever-works-node/node-config.json';

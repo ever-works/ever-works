@@ -189,7 +189,7 @@ test.describe('Flow: subscription tier ↔ work-schedule entitlement integration
             if (!c.allowed) {
                 gated += 1;
                 expect(c.payPerUse, `gated ${name} should be pay-per-use`).toBe(true);
-                expect(c.reason, `gated ${name} carries an upgrade reason`).toContain('Premium');
+                expect(c.reason, `gated ${name} carries an upgrade reason`).toContain('Enterprise');
             }
         }
         expect(

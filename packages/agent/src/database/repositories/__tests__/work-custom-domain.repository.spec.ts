@@ -3,7 +3,10 @@ import { WorkCustomDomainRepository } from '../work-custom-domain.repository';
 import { WorkCustomDomain } from '../../../entities/work-custom-domain.entity';
 
 type Mocked = jest.Mocked<
-    Pick<Repository<WorkCustomDomain>, 'find' | 'findOne' | 'create' | 'save' | 'delete' | 'update'>
+    Pick<
+        Repository<WorkCustomDomain>,
+        'find' | 'findOne' | 'create' | 'save' | 'delete' | 'update' | 'createQueryBuilder'
+    >
 >;
 
 describe('WorkCustomDomainRepository', () => {
@@ -12,12 +15,13 @@ describe('WorkCustomDomainRepository', () => {
 
     beforeEach(() => {
         repository = {
-            find: jest.fn(),
+            find: jest.fn().mockResolvedValue([]),
             findOne: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
             delete: jest.fn(),
             update: jest.fn(),
+            createQueryBuilder: jest.fn(),
         };
         service = new WorkCustomDomainRepository(
             repository as unknown as Repository<WorkCustomDomain>,
@@ -44,20 +48,34 @@ describe('WorkCustomDomainRepository', () => {
     });
 
     describe('findOne', () => {
-        it('forwards the (workId, domain) composite key into the where clause', async () => {
+        it('returns the deterministic case-insensitive identity match', async () => {
             const row = { id: 'd1' } as WorkCustomDomain;
-            repository.findOne.mockResolvedValueOnce(row);
+            repository.find.mockResolvedValueOnce([row]);
 
             await expect(service.findOne('work-1', 'example.com')).resolves.toBe(row);
-
-            expect(repository.findOne).toHaveBeenCalledWith({
-                where: { workId: 'work-1', domain: 'example.com' },
-            });
         });
 
         it('returns null when no record exists', async () => {
-            repository.findOne.mockResolvedValueOnce(null);
+            repository.find.mockResolvedValueOnce([]);
             await expect(service.findOne('work-1', 'missing.com')).resolves.toBeNull();
+        });
+
+        it('reuses the verified record first when legacy case variants already exist', async () => {
+            const older = {
+                id: 'd1',
+                domain: 'EVER.WORKS',
+                verified: false,
+                createdAt: new Date('2026-01-01T00:00:00Z'),
+            } as WorkCustomDomain;
+            const verified = {
+                id: 'd2',
+                domain: 'Ever.Works',
+                verified: true,
+                createdAt: new Date('2026-02-01T00:00:00Z'),
+            } as WorkCustomDomain;
+            repository.find.mockResolvedValueOnce([verified, older]);
+
+            await expect(service.findOne('work-1', 'ever.works')).resolves.toBe(verified);
         });
     });
 
@@ -93,83 +111,266 @@ describe('WorkCustomDomainRepository', () => {
                 provider: undefined,
             });
         });
+
+        it('canonicalizes every new supported domain write', async () => {
+            repository.find.mockResolvedValueOnce([]);
+            repository.create.mockReturnValueOnce({} as WorkCustomDomain);
+            repository.save.mockResolvedValueOnce({ domain: 'ever.works' } as WorkCustomDomain);
+
+            await service.addDomain('work-1', '  Ever.Works  ', 'manual');
+
+            expect(repository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ domain: 'ever.works' }),
+            );
+        });
+
+        it('preserves and reuses a legacy mixed-case record', async () => {
+            const existing = {
+                id: 'd1',
+                domain: 'Ever.Works',
+                verified: true,
+                provider: 'manual',
+            } as WorkCustomDomain;
+            repository.find.mockResolvedValueOnce([existing]);
+
+            await expect(service.addDomain('work-1', 'ever.works')).resolves.toBe(existing);
+            expect(repository.create).not.toHaveBeenCalled();
+            expect(repository.save).not.toHaveBeenCalled();
+        });
+
+        it('recovers only an expected same-domain uniqueness race by rereading', async () => {
+            const raced = {
+                id: 'd1',
+                workId: 'work-1',
+                domain: 'ever.works',
+                verified: false,
+            } as WorkCustomDomain;
+            repository.find.mockResolvedValueOnce([]).mockResolvedValueOnce([raced]);
+            repository.create.mockReturnValueOnce({} as WorkCustomDomain);
+            repository.save.mockRejectedValueOnce(
+                Object.assign(
+                    new Error(
+                        'UNIQUE constraint failed: work_custom_domains.workId, work_custom_domains.domain',
+                    ),
+                    { code: 'SQLITE_CONSTRAINT_UNIQUE' },
+                ),
+            );
+
+            await expect(service.addDomain('work-1', 'Ever.Works')).resolves.toBe(raced);
+        });
+
+        it('does not swallow an unrelated constraint failure', async () => {
+            const error = Object.assign(
+                new Error('UNIQUE constraint failed: work_custom_domains.id'),
+                { code: 'SQLITE_CONSTRAINT_UNIQUE' },
+            );
+            repository.find.mockResolvedValueOnce([]);
+            repository.create.mockReturnValueOnce({} as WorkCustomDomain);
+            repository.save.mockRejectedValueOnce(error);
+
+            await expect(service.addDomain('work-1', 'Ever.Works')).rejects.toBe(error);
+        });
+
+        it('uses a target-specific PostgreSQL conflict insert and rereads the winner', async () => {
+            const raced = {
+                id: 'd1',
+                workId: 'work-1',
+                domain: 'ever.works',
+                verified: true,
+            } as WorkCustomDomain;
+            const builder = {
+                insert: jest.fn(),
+                into: jest.fn(),
+                values: jest.fn(),
+                onConflict: jest.fn(),
+                returning: jest.fn(),
+                execute: jest.fn().mockResolvedValue({
+                    identifiers: [],
+                    generatedMaps: [],
+                    raw: [],
+                }),
+            };
+            builder.insert.mockReturnValue(builder);
+            builder.into.mockReturnValue(builder);
+            builder.values.mockReturnValue(builder);
+            builder.onConflict.mockReturnValue(builder);
+            builder.returning.mockReturnValue(builder);
+            Object.assign(repository, {
+                manager: { connection: { options: { type: 'postgres' } } },
+            });
+            repository.find.mockResolvedValueOnce([]).mockResolvedValueOnce([raced]);
+            repository.create.mockReturnValueOnce({ domain: 'ever.works' } as WorkCustomDomain);
+            repository.createQueryBuilder.mockReturnValueOnce(builder as never);
+
+            await expect(service.addDomain('work-1', 'Ever.Works', 'manual')).resolves.toBe(raced);
+
+            expect(builder.onConflict).toHaveBeenCalledWith('("workId", "domain") DO NOTHING');
+            expect(builder.returning).toHaveBeenCalledWith(['id']);
+            expect(repository.find).toHaveBeenCalledTimes(2);
+            expect(repository.save).not.toHaveBeenCalled();
+        });
+
+        it('surfaces unrelated PostgreSQL insert constraints without a recovery reread', async () => {
+            const error = Object.assign(new Error('violates unrelated check constraint'), {
+                code: '23514',
+                table: 'work_custom_domains',
+                constraint: 'CHK_unrelated',
+            });
+            const builder = {
+                insert: jest.fn(),
+                into: jest.fn(),
+                values: jest.fn(),
+                onConflict: jest.fn(),
+                returning: jest.fn(),
+                execute: jest.fn().mockRejectedValue(error),
+            };
+            builder.insert.mockReturnValue(builder);
+            builder.into.mockReturnValue(builder);
+            builder.values.mockReturnValue(builder);
+            builder.onConflict.mockReturnValue(builder);
+            builder.returning.mockReturnValue(builder);
+            Object.assign(repository, {
+                manager: { connection: { options: { type: 'postgres' } } },
+            });
+            repository.find.mockResolvedValueOnce([]);
+            repository.create.mockReturnValueOnce({ domain: 'ever.works' } as WorkCustomDomain);
+            repository.createQueryBuilder.mockReturnValueOnce(builder as never);
+
+            await expect(service.addDomain('work-1', 'Ever.Works')).rejects.toBe(error);
+
+            expect(repository.find).toHaveBeenCalledTimes(1);
+            expect(repository.save).not.toHaveBeenCalled();
+        });
+
+        it('rereads and retries a bounded SQLite BUSY write', async () => {
+            const saved = { id: 'd1', domain: 'ever.works' } as WorkCustomDomain;
+            Object.assign(repository, {
+                manager: { connection: { options: { type: 'better-sqlite3' } } },
+            });
+            repository.find.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+            repository.create.mockReturnValueOnce({} as WorkCustomDomain);
+            repository.save
+                .mockRejectedValueOnce(
+                    Object.assign(new Error('database is locked'), { code: 'SQLITE_BUSY' }),
+                )
+                .mockResolvedValueOnce(saved);
+
+            await expect(service.addDomain('work-1', 'Ever.Works')).resolves.toBe(saved);
+            expect(repository.save).toHaveBeenCalledTimes(2);
+        });
+
+        it('keeps the bounded retry when the post-BUSY reread is also locked', async () => {
+            const saved = { id: 'd1', domain: 'ever.works' } as WorkCustomDomain;
+            const busy = Object.assign(new Error('database is locked'), {
+                code: 'SQLITE_BUSY',
+            });
+            Object.assign(repository, {
+                manager: { connection: { options: { type: 'better-sqlite3' } } },
+            });
+            repository.find.mockResolvedValueOnce([]).mockRejectedValueOnce(busy);
+            repository.create.mockReturnValueOnce({} as WorkCustomDomain);
+            repository.save.mockRejectedValueOnce(busy).mockResolvedValueOnce(saved);
+
+            await expect(service.addDomain('work-1', 'Ever.Works')).resolves.toBe(saved);
+            expect(repository.save).toHaveBeenCalledTimes(2);
+        });
+
+        it('bounds SQLite BUSY retries and surfaces exhaustion', async () => {
+            Object.assign(repository, {
+                manager: { connection: { options: { type: 'better-sqlite3' } } },
+            });
+            const error = Object.assign(new Error('database is locked'), {
+                code: 'SQLITE_LOCKED',
+            });
+            repository.find.mockResolvedValue([]);
+            repository.create.mockReturnValueOnce({} as WorkCustomDomain);
+            repository.save.mockRejectedValue(error);
+
+            await expect(service.addDomain('work-1', 'Ever.Works')).rejects.toBe(error);
+            expect(repository.save).toHaveBeenCalledTimes(6);
+        });
     });
 
     describe('removeDomain', () => {
         it('returns true when at least one row was affected', async () => {
+            repository.find.mockResolvedValueOnce([{ id: 'd1' } as WorkCustomDomain]);
             repository.delete.mockResolvedValueOnce({ affected: 1, raw: {} });
 
             await expect(service.removeDomain('work-1', 'example.com')).resolves.toBe(true);
 
             expect(repository.delete).toHaveBeenCalledWith({
-                workId: 'work-1',
-                domain: 'example.com',
+                id: 'd1',
             });
         });
 
         it('returns false when no rows were deleted', async () => {
+            repository.find.mockResolvedValueOnce([{ id: 'd1' } as WorkCustomDomain]);
             repository.delete.mockResolvedValueOnce({ affected: 0, raw: {} });
             await expect(service.removeDomain('work-1', 'example.com')).resolves.toBe(false);
         });
 
         it('coerces undefined affected to 0 (returns false)', async () => {
+            repository.find.mockResolvedValueOnce([{ id: 'd1' } as WorkCustomDomain]);
             repository.delete.mockResolvedValueOnce({ affected: undefined, raw: {} });
             await expect(service.removeDomain('work-1', 'example.com')).resolves.toBe(false);
         });
 
         it('coerces null affected to 0 (returns false)', async () => {
+            repository.find.mockResolvedValueOnce([{ id: 'd1' } as WorkCustomDomain]);
             repository.delete.mockResolvedValueOnce({ affected: null, raw: {} } as never);
             await expect(service.removeDomain('work-1', 'example.com')).resolves.toBe(false);
+        });
+
+        it('does not issue a delete when no case-insensitive identity exists', async () => {
+            repository.find.mockResolvedValueOnce([]);
+
+            await expect(service.removeDomain('work-1', 'missing.com')).resolves.toBe(false);
+            expect(repository.delete).not.toHaveBeenCalled();
         });
     });
 
     describe('updateVerified', () => {
         it('updates verified field on the (workId, domain) composite key', async () => {
+            repository.find.mockResolvedValueOnce([{ id: 'd1' } as WorkCustomDomain]);
             repository.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
 
             await expect(
                 service.updateVerified('work-1', 'example.com', true),
             ).resolves.toBeUndefined();
 
-            expect(repository.update).toHaveBeenCalledWith(
-                { workId: 'work-1', domain: 'example.com' },
-                { verified: true },
-            );
+            expect(repository.update).toHaveBeenCalledWith({ id: 'd1' }, { verified: true });
         });
 
         it('forwards verified=false verbatim', async () => {
+            repository.find.mockResolvedValueOnce([{ id: 'd1' } as WorkCustomDomain]);
             repository.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
 
             await service.updateVerified('work-1', 'example.com', false);
 
-            expect(repository.update).toHaveBeenCalledWith(
-                { workId: 'work-1', domain: 'example.com' },
-                { verified: false },
-            );
+            expect(repository.update).toHaveBeenCalledWith({ id: 'd1' }, { verified: false });
         });
     });
 
     describe('updateProvider', () => {
         it('updates provider field on the (workId, domain) composite key', async () => {
+            repository.find.mockResolvedValueOnce([{ id: 'd1' } as WorkCustomDomain]);
             repository.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
 
             await expect(
                 service.updateProvider('work-1', 'example.com', 'vercel'),
             ).resolves.toBeUndefined();
 
-            expect(repository.update).toHaveBeenCalledWith(
-                { workId: 'work-1', domain: 'example.com' },
-                { provider: 'vercel' },
-            );
+            expect(repository.update).toHaveBeenCalledWith({ id: 'd1' }, { provider: 'vercel' });
         });
 
         it('forwards an arbitrary provider string verbatim', async () => {
+            repository.find.mockResolvedValueOnce([{ id: 'd1' } as WorkCustomDomain]);
             repository.update.mockResolvedValueOnce({ affected: 1, raw: {}, generatedMaps: [] });
 
             await service.updateProvider('work-1', 'example.com', 'cloudflare');
 
             expect(repository.update).toHaveBeenCalledWith(
-                { workId: 'work-1', domain: 'example.com' },
+                { id: 'd1' },
                 { provider: 'cloudflare' },
             );
         });

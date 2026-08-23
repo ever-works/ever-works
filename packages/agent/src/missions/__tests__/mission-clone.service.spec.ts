@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import type { Repository } from 'typeorm';
+import type { FindOptionsWhere, Repository } from 'typeorm';
 import { MissionCloneService } from '../mission-clone.service';
 import { Mission, MissionStatus, MissionType } from '../../entities/mission.entity';
 import {
@@ -44,29 +44,61 @@ function makeStore() {
         } as WorkProposal;
     }
 
+    function matchesWhere(
+        row: Record<string, unknown>,
+        where:
+            | FindOptionsWhere<Record<string, unknown>>
+            | FindOptionsWhere<Record<string, unknown>>[],
+    ): boolean {
+        if (Array.isArray(where)) return where.some((branch) => matchesWhere(row, branch));
+        return Object.entries(where).every(([key, expected]) => {
+            if (
+                typeof expected === 'object' &&
+                expected !== null &&
+                (expected as { _type?: string })._type === 'isNull'
+            ) {
+                return row[key] == null;
+            }
+            if (
+                typeof expected === 'object' &&
+                expected !== null &&
+                (expected as { _type?: string })._type === 'not'
+            ) {
+                return row[key] !== (expected as { _value?: unknown })._value;
+            }
+            return row[key] === expected;
+        });
+    }
+
     const txManager = {
-        findOne: jest.fn(async (entity: unknown, opts: { where: Record<string, unknown> }) => {
-            if (entity === Mission) {
-                return (
-                    missions.find((m) =>
-                        Object.entries(opts.where).every(
-                            ([k, v]) => (m as unknown as Record<string, unknown>)[k] === v,
-                        ),
-                    ) ?? null
-                );
-            }
-            return null;
-        }),
-        find: jest.fn(async (entity: unknown, opts: { where: Record<string, unknown> }) => {
-            if (entity === WorkProposal) {
-                return proposals.filter((p) =>
-                    Object.entries(opts.where).every(
-                        ([k, v]) => (p as unknown as Record<string, unknown>)[k] === v,
-                    ),
-                );
-            }
-            return [];
-        }),
+        findOne: jest.fn(
+            async (
+                entity: unknown,
+                opts: {
+                    where: FindOptionsWhere<Mission> | FindOptionsWhere<Mission>[];
+                },
+            ) => {
+                if (entity === Mission) {
+                    return (
+                        missions.find((m) => matchesWhere(m as never, opts.where as never)) ?? null
+                    );
+                }
+                return null;
+            },
+        ),
+        find: jest.fn(
+            async (
+                entity: unknown,
+                opts: {
+                    where: FindOptionsWhere<WorkProposal> | FindOptionsWhere<WorkProposal>[];
+                },
+            ) => {
+                if (entity === WorkProposal) {
+                    return proposals.filter((p) => matchesWhere(p as never, opts.where as never));
+                }
+                return [];
+            },
+        ),
         create: jest.fn((entity: unknown, partial: Partial<Mission | WorkProposal>) => {
             if (entity === Mission) return createMissionEntity(partial as Partial<Mission>);
             if (entity === WorkProposal)
@@ -96,6 +128,7 @@ function makeStore() {
         missions,
         proposals,
         txManager,
+        matchesWhere,
         seedMission(partial: Partial<Mission> & { userId: string }): Mission {
             const m: Mission = createMissionEntity({
                 title: 'src title',
@@ -143,14 +176,12 @@ function makeRepos(store: ReturnType<typeof makeStore>) {
                 return cb(store.txManager);
             }),
         },
-        count: jest.fn(async (opts: { where: { sourceMissionId?: string; userId?: string } }) => {
-            return store.missions.filter(
-                (m) =>
-                    m.sourceMissionId === opts.where.sourceMissionId &&
-                    (opts.where.userId === undefined || m.userId === opts.where.userId) &&
-                    m.id !== opts.where.sourceMissionId,
-            ).length;
-        }),
+        count: jest.fn(
+            async (opts: { where: FindOptionsWhere<Mission> | FindOptionsWhere<Mission>[] }) =>
+                store.missions.filter((mission) =>
+                    store.matchesWhere(mission as never, opts.where as never),
+                ).length,
+        ),
     };
     const proposalRepo = {};
     return { missionRepo, proposalRepo };
@@ -319,6 +350,51 @@ describe('MissionCloneService', () => {
             await expect(
                 service.cloneForUser('u1', '00000000-0000-0000-0000-000000000000'),
             ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('does not clone a known Mission UUID from another active Organization', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            const source = store.seedMission({
+                userId: 'u1',
+                tenantId: everScope.tenantId,
+                organizationId: '33333333-3333-4333-8333-333333333333',
+            });
+
+            await expect(
+                (service.cloneForUser as any)('u1', source.id, {}, everScope),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(store.missions).toEqual([source]);
+        });
+
+        it('copies only Ideas from the active Organization and stamps the clone exactly', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            const source = store.seedMission({ userId: 'u1', ...everScope });
+            store.seedProposal({
+                userId: 'u1',
+                missionId: source.id,
+                title: 'Ever idea',
+                ...everScope,
+            });
+            store.seedProposal({
+                userId: 'u1',
+                missionId: source.id,
+                title: 'Yo idea',
+                tenantId: everScope.tenantId,
+                organizationId: '33333333-3333-4333-8333-333333333333',
+            });
+
+            const result = await (service.cloneForUser as any)('u1', source.id, {}, everScope);
+            const copies = store.proposals.filter((idea) => idea.missionId === result.mission.id);
+
+            expect(result.mission).toMatchObject(everScope);
+            expect(copies).toHaveLength(1);
+            expect(copies[0]).toMatchObject({ title: 'Ever idea', ...everScope });
         });
     });
 

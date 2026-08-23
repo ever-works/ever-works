@@ -23,14 +23,26 @@ type QbMock = {
 function makeQb(balance: number | string): QbMock {
     const qb: any = {};
     qb.select = jest.fn().mockReturnValue(qb);
+    qb.addSelect = jest.fn().mockReturnValue(qb);
     qb.where = jest.fn().mockReturnValue(qb);
+    qb.andWhere = jest.fn().mockReturnValue(qb);
+    qb.setParameter = jest.fn().mockReturnValue(qb);
+    qb.groupBy = jest.fn().mockReturnValue(qb);
+    qb.limit = jest.fn().mockReturnValue(qb);
+    // `balance` feeds sumBalance; the due-remaining / expired aggregates
+    // read other keys and therefore coerce to 0 on this harness.
     qb.getRawOne = jest.fn().mockResolvedValue({ balance });
+    qb.getRawMany = jest.fn().mockResolvedValue([]);
     return qb;
 }
 
 function makeHarness(options: { balance?: number | string; driver?: string } = {}) {
     const entryRepo = {
         findOne: jest.fn().mockResolvedValue(null),
+        // Bucket reads (expire-on-touch + debit allocation): no open
+        // buckets on this harness unless a test seeds some.
+        find: jest.fn().mockResolvedValue([]),
+        update: jest.fn().mockResolvedValue(undefined),
         create: jest.fn((value: any) => value),
         save: jest.fn(async (value: any) => ({ id: 'entry-1', ...value })),
         createQueryBuilder: jest.fn(() => makeQb(options.balance ?? 0)),
@@ -212,14 +224,17 @@ describe('CreditLedgerRepository reads', () => {
         qb.addSelect = jest.fn().mockReturnValue(qb);
         qb.where = jest.fn().mockReturnValue(qb);
         qb.andWhere = jest.fn().mockReturnValue(qb);
-        qb.getRawOne = jest.fn().mockResolvedValue({ consumed: '260', added: '300' });
+        qb.setParameter = jest.fn().mockReturnValue(qb);
+        qb.getRawOne = jest
+            .fn()
+            .mockResolvedValue({ consumed: '260', added: '300', expired: '40' });
         topLevelRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
 
         const from = new Date(Date.UTC(2026, 6, 1));
         const to = new Date(Date.UTC(2026, 7, 1));
         const totals = await repository.getPeriodTotals('user-1', from, to);
 
-        expect(totals).toEqual({ consumedCredits: 260, addedCredits: 300 });
+        expect(totals).toEqual({ consumedCredits: 260, addedCredits: 300, expiredCredits: 40 });
         expect(qb.where).toHaveBeenCalledWith('e.userId = :userId', { userId: 'user-1' });
         expect(qb.andWhere).toHaveBeenCalledWith('e.createdAt >= :from', { from });
         expect(qb.andWhere).toHaveBeenCalledWith('e.createdAt < :to', { to });
@@ -232,6 +247,7 @@ describe('CreditLedgerRepository reads', () => {
         qb.addSelect = jest.fn().mockReturnValue(qb);
         qb.where = jest.fn().mockReturnValue(qb);
         qb.andWhere = jest.fn().mockReturnValue(qb);
+        qb.setParameter = jest.fn().mockReturnValue(qb);
         qb.getRawOne = jest.fn().mockResolvedValue(undefined);
         topLevelRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
 
@@ -241,6 +257,6 @@ describe('CreditLedgerRepository reads', () => {
             new Date(Date.UTC(2026, 7, 1)),
         );
 
-        expect(totals).toEqual({ consumedCredits: 0, addedCredits: 0 });
+        expect(totals).toEqual({ consumedCredits: 0, addedCredits: 0, expiredCredits: 0 });
     });
 });

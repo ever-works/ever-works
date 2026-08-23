@@ -1,3 +1,5 @@
+import type { FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
+
 /**
  * Fleet job lease protocol — the wire shapes an enrolled node and the
  * platform exchange so work can actually EXECUTE on a fleet machine.
@@ -189,6 +191,8 @@ export interface FleetJobView {
 	status: FleetJobStatus;
 	/** Node currently holding (or last holding) the claim. */
 	nodeId: string | null;
+	/** Node selected at enqueue time, or null when the job is unbound. */
+	targetNodeId?: string | null;
 	/** Capability tags a node must advertise to be eligible. */
 	requiredCapabilities: string[];
 	/** Executor input. Shape is per-kind; see `FleetAcceptanceChecksPayload`. */
@@ -210,6 +214,15 @@ export interface FleetJobView {
 	 * still satisfies this type on a newer client.
 	 */
 	queuedReason?: string | null;
+}
+
+/** Owner-safe view of one active-Organization Agent-to-node binding. */
+export interface FleetAgentNodeAffinityView {
+	agentId: string;
+	nodeId: string;
+	organizationId: string;
+	createdAt: string | null;
+	updatedAt: string | null;
 }
 
 /**
@@ -285,6 +298,12 @@ export interface FleetAgentTaskPayload {
 	 * service was installed. When present it must be absolute and exist.
 	 */
 	workspacePath?: string;
+	/**
+	 * Repository metadata for a node-provisioned isolated task worktree.
+	 * `null` is the legacy wire representation of an absent field and falls
+	 * back to `workspacePath` (or the node default) exactly like omission.
+	 */
+	workspace?: FleetTaskWorkspaceSpec | null;
 	/** Ordered commands the node executes for this run. */
 	steps?: FleetAgentTaskStep[];
 }

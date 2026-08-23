@@ -83,8 +83,9 @@ describe('TasksService.scheduleTask / unscheduleTask', () => {
     it('schedules a future one-shot and clears any stale claim', async () => {
         const { service, repos } = makeService();
         const task = makeTask({ scheduleClaimedAt: new Date() });
-        repos.tasks.findByIdAndUser.mockResolvedValue(task);
-        repos.tasks.findById.mockResolvedValue(makeTask({ scheduledAt: FUTURE }));
+        repos.tasks.findByIdAndUser
+            .mockResolvedValueOnce(task)
+            .mockResolvedValueOnce(makeTask({ scheduledAt: FUTURE }));
 
         const out = await service.scheduleTask('user-1', 'task-1', FUTURE);
 
@@ -136,8 +137,9 @@ describe('TasksService.scheduleTask / unscheduleTask', () => {
 
     it('unschedule clears both schedule columns', async () => {
         const { service, repos } = makeService();
-        repos.tasks.findByIdAndUser.mockResolvedValue(makeTask({ scheduledAt: FUTURE }));
-        repos.tasks.findById.mockResolvedValue(makeTask());
+        repos.tasks.findByIdAndUser
+            .mockResolvedValueOnce(makeTask({ scheduledAt: FUTURE }))
+            .mockResolvedValueOnce(makeTask());
 
         await service.unscheduleTask('user-1', 'task-1');
 

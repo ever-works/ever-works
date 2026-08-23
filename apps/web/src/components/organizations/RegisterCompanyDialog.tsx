@@ -14,8 +14,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { useRouter } from '@/i18n/navigation';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import { useOrganizations } from '@/lib/hooks/use-organizations';
+import {
+    navigateToWorkspaceDashboard,
+    persistActiveOrganization,
+} from '@/lib/workspace-navigation';
 import { UpgradeOrCreateDialog } from './UpgradeOrCreateDialog';
 
 const MAX_NAME_LENGTH = 200;
@@ -42,7 +46,8 @@ export interface RegisterCompanyDialogProps {
  *  - First Org (`organizations.length === 0` pre-submit) → hands off
  *    to `<UpgradeOrCreateDialog>` so the user can choose Upgrade vs
  *    Empty.
- *  - 2nd+ Org → close + navigate to `/${org.slug}/dashboard`.
+ *  - 2nd+ Org → persist membership-validated scope, then cross to the
+ *    canonical `/org/{slug}/dashboard` in a fresh document.
  *
  * The full Stripe Atlas form (paperwork inputs, jurisdiction picker,
  * etc.) is intentionally out of scope here — the chip's value in v1
@@ -52,7 +57,6 @@ export interface RegisterCompanyDialogProps {
  */
 export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDialogProps) {
     const t = useTranslations('organizations.registerCompany');
-    const router = useRouter();
     const { organizations, isLoading, error: orgsError, mutate } = useOrganizations();
 
     const [name, setName] = useState('');
@@ -127,7 +131,7 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
         setIsSubmitting(true);
 
         try {
-            const res = await fetch('/api/organizations/register-company', {
+            const res = await browserApiFetch('/api/organizations/register-company', {
                 method: 'POST',
                 credentials: 'include',
                 cache: 'no-store',
@@ -164,8 +168,9 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
                 setCreatedOrg(org);
                 setShowUpgradeDialog(true);
             } else {
+                await persistActiveOrganization(org.slug);
                 onOpenChange(false);
-                router.push(`/${org.slug}/dashboard`);
+                navigateToWorkspaceDashboard({ kind: 'organization', slug: org.slug });
             }
         } catch (err) {
             setSubmitError(err instanceof Error ? err.message : t('errors.generic'));
@@ -181,22 +186,24 @@ export function RegisterCompanyDialog({ open, onOpenChange }: RegisterCompanyDia
         organizations.length,
         mutate,
         onOpenChange,
-        router,
         t,
     ]);
 
     const handleUpgradeDialogClose = useCallback(
-        (didUpgrade: boolean) => {
-            setShowUpgradeDialog(false);
+        async (didUpgrade: boolean) => {
             const target = createdOrg;
+            if (!target) {
+                throw new Error(t('errors.generic'));
+            }
+
+            await persistActiveOrganization(target.slug);
+            setShowUpgradeDialog(false);
             setCreatedOrg(null);
             onOpenChange(false);
-            if (target) {
-                router.push(`/${target.slug}/dashboard`);
-                if (didUpgrade) void mutate();
-            }
+            navigateToWorkspaceDashboard({ kind: 'organization', slug: target.slug });
+            if (didUpgrade) void mutate();
         },
-        [createdOrg, mutate, onOpenChange, router],
+        [createdOrg, mutate, onOpenChange, t],
     );
 
     const showCreatePanel = !showUpgradeDialog;

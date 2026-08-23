@@ -10,6 +10,14 @@ import { TasksService, TaskTransitionService } from '@ever-works/agent/tasks-dom
 const PARENT_AGENT = 'agent-parent';
 const CHILD_AGENT = 'agent-child';
 const OWNER = 'user-1';
+const EVER_SCOPE = {
+    tenantId: '11111111-1111-4111-8111-111111111111',
+    organizationId: '22222222-2222-4222-8222-222222222222',
+};
+const YO_SCOPE = {
+    tenantId: EVER_SCOPE.tenantId,
+    organizationId: '33333333-3333-4333-8333-333333333333',
+};
 
 /**
  * The real sub-agent delegation runner.
@@ -28,9 +36,9 @@ const OWNER = 'user-1';
  */
 describe('SubAgentDelegationRunnerService', () => {
     let runner: SubAgentDelegationRunnerService;
-    let agents: { findById: jest.Mock };
+    let agents: { findById: jest.Mock; findByIdAndUser: jest.Mock };
     let runs: { findById: jest.Mock };
-    let tasks: { create: jest.Mock };
+    let tasks: { create: jest.Mock; getOne: jest.Mock };
     let transitions: { dispatchAgentRun: jest.Mock };
     let collaborators: { listForAgent: jest.Mock };
 
@@ -46,10 +54,16 @@ describe('SubAgentDelegationRunnerService', () => {
 
     beforeEach(async () => {
         agents = {
-            findById: jest.fn(async (id: string) => ({ id, userId: OWNER })),
+            findById: jest.fn(async (id: string) => ({ id, userId: OWNER, ...EVER_SCOPE })),
+            findByIdAndUser: jest.fn(async (id: string) => ({ id, userId: OWNER, ...EVER_SCOPE })),
         };
         runs = { findById: jest.fn().mockResolvedValue({ status: 'completed', summary: 'done' }) };
-        tasks = { create: jest.fn().mockResolvedValue({ id: 'task-child' }) };
+        tasks = {
+            create: jest.fn().mockResolvedValue({ id: 'task-child', userId: OWNER, ...EVER_SCOPE }),
+            getOne: jest
+                .fn()
+                .mockResolvedValue({ id: 'task-parent', userId: OWNER, ...EVER_SCOPE }),
+        };
         transitions = {
             dispatchAgentRun: jest
                 .fn()
@@ -91,6 +105,7 @@ describe('SubAgentDelegationRunnerService', () => {
         expect(tasks.create).toHaveBeenCalledWith(
             OWNER,
             expect.objectContaining({ createdByType: 'agent', agentId: CHILD_AGENT }),
+            EVER_SCOPE,
         );
         expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'task-child' }),
@@ -99,6 +114,62 @@ describe('SubAgentDelegationRunnerService', () => {
         );
         expect(result.status).toBe('completed');
         expect(result.childRunId).toBe('run-child');
+    });
+
+    it('propagates the persisted parent Agent scope into the child Task and dispatched run', async () => {
+        await runner.run(request({ childAgentId: CHILD_AGENT, parentTaskId: 'task-parent' }));
+
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(CHILD_AGENT, OWNER, EVER_SCOPE);
+        expect(tasks.getOne).toHaveBeenCalledWith(OWNER, 'task-parent', EVER_SCOPE);
+        expect(tasks.create).toHaveBeenCalledWith(
+            OWNER,
+            expect.objectContaining({ parentTaskId: 'task-parent', agentId: CHILD_AGENT }),
+            EVER_SCOPE,
+        );
+        expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
+            expect.objectContaining(EVER_SCOPE),
+            CHILD_AGENT,
+            expect.any(Object),
+        );
+    });
+
+    it('refuses a same-user child Agent from another Organization before creating work', async () => {
+        agents.findById.mockImplementation(async (id: string) => ({
+            id,
+            userId: OWNER,
+            ...(id === CHILD_AGENT ? YO_SCOPE : EVER_SCOPE),
+        }));
+        agents.findByIdAndUser.mockResolvedValue(null);
+
+        const result = await runner.run(request({ childAgentId: CHILD_AGENT }));
+
+        expect(result.status).toBe('failed');
+        expect(tasks.create).not.toHaveBeenCalled();
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+    });
+
+    it('keeps legacy personal delegation children and runs personal', async () => {
+        const personalScope = { tenantId: null, organizationId: null };
+        agents.findById.mockImplementation(async (id: string) => ({
+            id,
+            userId: OWNER,
+            ...personalScope,
+        }));
+        agents.findByIdAndUser.mockImplementation(async (id: string) => ({
+            id,
+            userId: OWNER,
+            ...personalScope,
+        }));
+        tasks.create.mockResolvedValue({ id: 'task-child', userId: OWNER, ...personalScope });
+
+        await runner.run(request({ childAgentId: CHILD_AGENT }));
+
+        expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.any(Object), personalScope);
+        expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
+            expect.objectContaining(personalScope),
+            CHILD_AGENT,
+            expect.any(Object),
+        );
     });
 
     describe("inputs reach the child's brief", () => {
@@ -218,16 +289,14 @@ describe('SubAgentDelegationRunnerService', () => {
     });
 
     it('refuses a child agent owned by someone else', async () => {
-        agents.findById.mockImplementation(async (id: string) =>
-            id === CHILD_AGENT ? { id, userId: 'someone-else' } : { id, userId: OWNER },
-        );
+        agents.findByIdAndUser.mockResolvedValue(null);
 
         const result = await runner.run(request({ childAgentId: CHILD_AGENT }));
 
         // Otherwise a parent could spend another owner's budget and reach
         // their scope; the narrowing step cannot catch this.
         expect(result.status).toBe('failed');
-        expect(result.summary).toMatch(/different owner/);
+        expect(result.summary).toMatch(/not found/);
         expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
     });
 
@@ -274,11 +343,12 @@ describe('SubAgentDelegationRunnerService', () => {
         // way to see (let alone clear) the rule still pointing at it —
         // and nothing downstream of dispatch re-checks agent status, so
         // the archived agent would keep executing delegated work.
-        agents.findById.mockImplementation(async (id: string) =>
-            id === CHILD_AGENT
-                ? { id, userId: OWNER, status: 'archived' }
-                : { id, userId: OWNER, status: 'active' },
-        );
+        agents.findByIdAndUser.mockResolvedValue({
+            id: CHILD_AGENT,
+            userId: OWNER,
+            status: 'archived',
+            ...EVER_SCOPE,
+        });
         collaborators.listForAgent.mockResolvedValue([
             { collaboratorAgentId: CHILD_AGENT, enabled: true },
         ]);
@@ -293,10 +363,11 @@ describe('SubAgentDelegationRunnerService', () => {
     });
 
     it('still admits a non-archived child (the guard is not a blanket refusal)', async () => {
-        agents.findById.mockImplementation(async (id: string) => ({
+        agents.findByIdAndUser.mockImplementation(async (id: string) => ({
             id,
             userId: OWNER,
             status: 'paused',
+            ...EVER_SCOPE,
         }));
         collaborators.listForAgent.mockResolvedValue([
             { collaboratorAgentId: CHILD_AGENT, enabled: true },
@@ -318,9 +389,7 @@ describe('SubAgentDelegationRunnerService', () => {
     });
 
     it('checks ownership BEFORE the allow-list (cross-owner stays a failure)', async () => {
-        agents.findById.mockImplementation(async (id: string) =>
-            id === CHILD_AGENT ? { id, userId: 'someone-else' } : { id, userId: OWNER },
-        );
+        agents.findByIdAndUser.mockResolvedValue(null);
         collaborators.listForAgent.mockResolvedValue([
             { collaboratorAgentId: CHILD_AGENT, enabled: true },
         ]);
@@ -330,7 +399,7 @@ describe('SubAgentDelegationRunnerService', () => {
         // An enabled collaborator row must never launder a cross-owner
         // child into admissibility.
         expect(result.status).toBe('failed');
-        expect(result.summary).toMatch(/different owner/);
+        expect(result.summary).toMatch(/not found/);
     });
 
     it('reports a failed child run as failed, carrying its error', async () => {

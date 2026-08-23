@@ -120,6 +120,62 @@ describe('enrollNode', () => {
 });
 
 describe('createNodeRuntime', () => {
+	it('wires the durable worker safety gate through startup and safe shutdown', async () => {
+		const { io: deps } = io(async () => ({
+			ok: true,
+			status: 200,
+			text: async () => JSON.stringify({ jobs: [] })
+		}));
+		const safetyGate = {
+			acquire: vi.fn(async () => ({ kind: 'acquired' as const, sessionId: 'runtime-session' })),
+			release: vi.fn(async () => undefined),
+			inspect: vi.fn(async () => null),
+			clear: vi.fn(async () => undefined)
+		};
+		const runtime = createNodeRuntime(
+			{
+				apiUrl: 'https://api.ever.works',
+				nodeId: NODE_ID,
+				secret: SECRET,
+				kind: 'node',
+				capabilities: ['os:linux'],
+				heartbeatIntervalMs: 30_000,
+				enrolledAt: '2026-07-25T10:00:00.000Z'
+			} as NodeConfig,
+			deps,
+			{ workerEnabled: true, workerSafetyGate: safetyGate }
+		);
+
+		await runtime.worker?.start();
+		expect(safetyGate.acquire).toHaveBeenCalledOnce();
+		await runtime.worker?.stop();
+		expect(safetyGate.release).toHaveBeenCalledWith('runtime-session');
+	});
+
+	it('restores a persisted unsafe quarantine before the worker can make a lease request', async () => {
+		const requests: string[] = [];
+		const { io: deps } = io(async (url) => {
+			requests.push(url);
+			return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+		});
+		const config = {
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z',
+			unsafe: { since: '2026-08-22T23:00:00.000Z', reason: 'unverified process tree' }
+		} as NodeConfig;
+
+		const runtime = createNodeRuntime(config, deps, { workerEnabled: true });
+		await runtime.worker?.start();
+		expect(runtime.worker?.getState()).toMatchObject({ state: 'unsafe', lastError: 'unverified process tree' });
+		expect(requests).toEqual([]);
+		await runtime.worker?.stop();
+	});
+
 	it('wires a client and a loop against the stored config, protecting the secret', async () => {
 		const {
 			io: deps,
@@ -151,6 +207,90 @@ describe('createNodeRuntime', () => {
 
 		logger.info(`secret is ${SECRET}`);
 		expect(entries.map((entry) => entry.message).join('\n')).not.toContain(SECRET);
+	});
+
+	it('wires the repository provisioner into agent-task before command execution', async () => {
+		const completedBodies: Record<string, unknown>[] = [];
+		let leased = false;
+		const repositoryWorkspace = {
+			repositoryId: 'ever/repository',
+			repoUrl: 'https://github.com/ever/repository.git',
+			baseRef: 'develop',
+			branch: 'task/fleet-runtime-12345678'
+		};
+		const descriptor = {
+			path: process.cwd(),
+			repositoryId: repositoryWorkspace.repositoryId,
+			baseRef: repositoryWorkspace.baseRef,
+			branch: repositoryWorkspace.branch,
+			baseSha: 'a'.repeat(40),
+			headSha: 'b'.repeat(40),
+			reused: false
+		};
+		const provisionWorkspace = vi.fn().mockResolvedValue(descriptor);
+		const fetchFn: FetchLike = async (url, init) => {
+			if (url.endsWith('/api/fleet/jobs/lease')) {
+				const jobs = leased
+					? []
+					: [
+							{
+								id: 'job-workspace-1',
+								kind: 'agent-task',
+								status: 'leased',
+								nodeId: NODE_ID,
+								requiredCapabilities: [],
+								payload: {
+									taskId: 'task-1',
+									workspace: repositoryWorkspace,
+									steps: [{ id: 'node-version', command: 'node --version' }]
+								},
+								leaseExpiresAt: null,
+								attempts: 1,
+								maxAttempts: 3,
+								createdAt: null,
+								startedAt: null,
+								completedAt: null
+							}
+						];
+				leased = true;
+				return { ok: true, status: 200, text: async () => JSON.stringify({ jobs }) };
+			}
+			if (url.endsWith('/complete')) {
+				completedBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+				return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, job: {} }) };
+			}
+			throw new Error(`unexpected request: ${url}`);
+		};
+		const { io: deps } = io(fetchFn);
+		const scheduler = {
+			setTimeout: () => ({ scheduled: true }),
+			clearTimeout: () => undefined
+		};
+		const config: NodeConfig = {
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z'
+		};
+
+		const runtime = createNodeRuntime(
+			config,
+			{ ...deps, scheduler },
+			{
+				workerEnabled: true,
+				workspaceProvisioner: { provision: provisionWorkspace }
+			}
+		);
+		await runtime.worker?.start();
+		await runtime.worker?.drained();
+		await runtime.worker?.stop();
+
+		expect(provisionWorkspace).toHaveBeenCalledWith('task-1', repositoryWorkspace, expect.any(AbortSignal));
+		expect(completedBodies).toHaveLength(1);
+		expect(completedBodies[0]).toMatchObject({ success: true, result: { workspace: descriptor } });
 	});
 });
 

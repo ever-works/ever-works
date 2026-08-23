@@ -280,6 +280,13 @@ export function UsageCreditsSettings({
                         value={formatCreditsAsDollars(totals.creditsAdded)}
                         testId="usage-tile-added"
                     />
+                    {(totals.creditsExpired ?? 0) > 0 ? (
+                        <StatTile
+                            label={t('tiles.expired')}
+                            value={formatCreditsAsDollars(totals.creditsExpired ?? 0)}
+                            testId="usage-tile-expired"
+                        />
+                    ) : null}
                     <StatTile
                         label={t('tiles.spend')}
                         value={formatCents(
