@@ -39,9 +39,9 @@ describe('buildDeployment', () => {
 		expect(c.readinessProbe).toBeDefined();
 	});
 
-	it('uses a 512Mi admission floor by default and preserves explicit sizing', () => {
+	it('preserves the provider-neutral 256Mi fallback and explicit sizing', () => {
 		const defaults = buildDeployment(baseInput) as Record<string, any>;
-		expect(defaults.spec.template.spec.containers[0].resources.requests.memory).toBe('512Mi');
+		expect(defaults.spec.template.spec.containers[0].resources.requests.memory).toBe('256Mi');
 
 		const explicit = buildDeployment({ ...baseInput, memoryRequest: '768Mi' }) as Record<string, any>;
 		expect(explicit.spec.template.spec.containers[0].resources.requests.memory).toBe('768Mi');

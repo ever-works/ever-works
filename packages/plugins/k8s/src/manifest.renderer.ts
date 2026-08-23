@@ -94,7 +94,9 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				resources: {
 					requests: {
 						cpu: input.cpuRequest ?? '100m',
-						memory: input.memoryRequest ?? '512Mi'
+						// Managed deployments pass their 512Mi floor explicitly; BYOC
+						// keeps this provider-neutral historical fallback.
+						memory: input.memoryRequest ?? '256Mi'
 					},
 					limits: {
 						cpu: input.cpuLimit ?? '2',

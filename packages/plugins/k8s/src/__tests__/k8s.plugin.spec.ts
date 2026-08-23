@@ -179,7 +179,7 @@ describe('KubernetesPlugin metadata', () => {
 
 	it('publishes measured memory defaults without narrowing Kubernetes quantity syntax', () => {
 		const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
-		expect(props.memoryRequest?.default).toBe('512Mi');
+		expect(props.memoryRequest?.default).toBeUndefined();
 		expect(props.memoryLimit?.default).toBe('2Gi');
 		expect(props.memoryRequest?.pattern).toBeUndefined();
 		expect(props.memoryLimit?.pattern).toBeUndefined();
@@ -626,6 +626,24 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 					githubOwner: 'acme',
 					websiteRepoIsPrivate: false,
 					settingsOverride: { clusterSource: 'custom-kubeconfig', memoryRequest: '256Mi' }
+				}
+			},
+			VALID
+		);
+
+		const manifest = vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>;
+		expect(manifest.spec.template.spec.containers[0].resources.requests.memory).toBe('256Mi');
+	});
+
+	it('preserves the historical 256Mi fallback for a custom cluster without an override', async () => {
+		await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'custom-kubeconfig' }
 				}
 			},
 			VALID

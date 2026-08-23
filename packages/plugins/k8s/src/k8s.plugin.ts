@@ -404,7 +404,6 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 			memoryRequest: {
 				type: 'string',
 				title: 'Memory request',
-				default: DEFAULT_MEMORY_REQUEST,
 				description:
 					"Kubernetes quantity, e.g. '512Mi' or '500M'. Platform-managed clusters use 512Mi only as an admission floor; set a larger measured value for each heavier catalogue."
 			},
