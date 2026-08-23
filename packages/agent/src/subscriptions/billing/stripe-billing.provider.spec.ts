@@ -1022,6 +1022,43 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         );
     });
 
+    /**
+     * 🛑 REGRESSION. Stripe rejects a line item carrying `recurring` in a `mode: payment` session.
+     * The inline fallback attached it unconditionally, so on any deployment whose catalog is NOT
+     * synced — exactly the deployments the fallback exists to serve — the $99 perpetual licence
+     * checkout threw instead of selling.
+     */
+    it('omits recurring from the inline fallback for a one-off licence', async () => {
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: {
+                ...planRequest.plan,
+                mode: 'payment',
+                lookupKey: 'ever_works_selfhosted_pro_lifetime',
+            },
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('payment');
+        expect(params.line_items[0].price_data).toBeDefined();
+        expect(params.line_items[0].price_data.recurring).toBeUndefined();
+    });
+
+    it('KEEPS recurring on the inline fallback for a subscription', async () => {
+        // Control: the fix must not strip it from the recurring path.
+        const { provider, client } = build();
+        client.prices = { list: jest.fn().mockResolvedValue({ data: [] }) };
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('subscription');
+        expect(params.line_items[0].price_data.recurring).toEqual({ interval: 'month' });
+    });
+
     it('bills the shared-account CATALOG price when the lookup key resolves', async () => {
         const { provider, client } = build();
         client.prices = {
@@ -1075,6 +1112,118 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
 
         const params = client.checkout.sessions.create.mock.calls[0][0];
         expect(params.line_items[0].price_data.unit_amount).toBe(2900);
+    });
+
+    /**
+     * 🛑 REGRESSION. A THROWN lookup must not be memoised. It is a transient condition — timeout,
+     * 5xx, rate limit — not an answer about this account. Caching it made one blip permanent for
+     * the process lifetime, and because the seat line has no inline fallback (the per-seat amount
+     * lives only in the catalog) every later checkout on that pod would silently stop billing
+     * seats. Undercharging, and invisible after the first warning.
+     */
+    it('does NOT cache a thrown lookup — the next attempt retries and bills correctly', async () => {
+        const { provider, client } = build();
+        const list = jest
+            .fn()
+            .mockRejectedValueOnce(new Error('stripe timeout'))
+            .mockResolvedValue({ data: [{ id: 'price_cat_1' }] });
+        client.prices = { list };
+
+        const req = {
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        };
+
+        // First attempt: the lookup throws, so it falls back to the inline price.
+        await provider.createPlanCheckoutSession(req);
+        expect(
+            client.checkout.sessions.create.mock.calls[0][0].line_items[0].price_data,
+        ).toBeDefined();
+
+        // Second attempt: Stripe is healthy again and the catalog price MUST be used.
+        await provider.createPlanCheckoutSession(req);
+        const second = client.checkout.sessions.create.mock.calls[1][0];
+        expect(second.line_items[0].price).toBe('price_cat_1');
+        expect(second.line_items[0].price_data).toBeUndefined();
+        // Proves the retry actually happened rather than a cached null being reused.
+        expect(list).toHaveBeenCalledTimes(2);
+    });
+
+    /**
+     * 🛑 A MISS must NOT be memoised either. The catalog is published by a script that runs
+     * independently of the pods, so a pod that starts before the sync would otherwise pin every key
+     * to null for its whole lifetime — and because the seat line has no inline fallback, that pod
+     * silently stops billing seats, with nothing in the logs after the first warning.
+     */
+    it('re-checks after a MISS, so a later catalog sync is picked up without a restart', async () => {
+        const { provider, client } = build();
+        const list = jest
+            .fn()
+            .mockResolvedValueOnce({ data: [] }) // catalog not synced yet
+            .mockResolvedValue({ data: [{ id: 'price_cat_1' }] }); // sync ran
+        client.prices = { list };
+
+        const req = {
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        };
+        await provider.createPlanCheckoutSession(req);
+        await provider.createPlanCheckoutSession(req);
+
+        expect(list).toHaveBeenCalledTimes(2);
+        // The second checkout uses the now-published catalog price rather than a cached miss.
+        expect(client.checkout.sessions.create.mock.calls[1][0].line_items[0].price).toBe(
+            'price_cat_1',
+        );
+    });
+
+    /**
+     * 🛑 REGRESSION. The resolved-price cache belongs to the KEY, not the process. The same 22
+     * `ever_works_*` lookup keys exist in BOTH test and live mode of the shared account, so a
+     * process that resolved under `sk_test_…` and rotates to `sk_live_…` would otherwise hand
+     * TEST-mode price ids to a LIVE client.
+     */
+    it('drops the price cache when the secret key rotates', async () => {
+        const { provider, client } = build();
+        const list = jest
+            .fn()
+            .mockResolvedValueOnce({ data: [{ id: 'price_TEST_mode' }] })
+            .mockResolvedValue({ data: [{ id: 'price_LIVE_mode' }] });
+        client.prices = { list };
+
+        const req = {
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        };
+
+        await provider.createPlanCheckoutSession(req);
+        expect(client.checkout.sessions.create.mock.calls[0][0].line_items[0].price).toBe(
+            'price_TEST_mode',
+        );
+
+        // Rotate the key, exactly as a Secret update would.
+        process.env.STRIPE_SECRET_KEY = 'sk_live_rotated';
+        await provider.createPlanCheckoutSession(req);
+
+        const second = client.checkout.sessions.create.mock.calls[1][0];
+        expect(second.line_items[0].price).toBe('price_LIVE_mode');
+        // Proves the cache was dropped rather than the id reused.
+        expect(list).toHaveBeenCalledTimes(2);
+    });
+
+    it('memoises a HIT, so a healthy account is queried once and not per checkout', async () => {
+        const { provider, client } = build();
+        const list = jest.fn().mockResolvedValue({ data: [{ id: 'price_cat_1' }] });
+        client.prices = { list };
+
+        const req = {
+            ...planRequest,
+            plan: { ...planRequest.plan, lookupKey: 'ever_works_cloud_pro_monthly' },
+        };
+        await provider.createPlanCheckoutSession(req);
+        await provider.createPlanCheckoutSession(req);
+
+        expect(list).toHaveBeenCalledTimes(1);
     });
 
     it('adds a second line item for the seats beyond the allowance', async () => {

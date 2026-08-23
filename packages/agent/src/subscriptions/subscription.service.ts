@@ -26,6 +26,18 @@ const ALL_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.HOURLY,
 ];
 
+/**
+ * "Unlimited" for a quota stored in an `int` column.
+ *
+ * 🛑 NOT `Number.MAX_SAFE_INTEGER`. `subscription_plans.maxWorks` is a Postgres `integer`, whose
+ * ceiling is 2147483647; MAX_SAFE_INTEGER is 9007199254740991 and Postgres rejects the INSERT with
+ * `integer out of range`. Because `seedPlans()` runs inside `onModuleInit`, that rejection does not
+ * degrade — it aborts module init and the API never finishes booting, on every environment with a
+ * real database. Unit tests cannot catch it: the plan repository is a mock there, so the value is
+ * never handed to Postgres.
+ */
+const UNLIMITED_WORKS = 2_147_483_647;
+
 const PAID_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.MONTHLY,
     WorkScheduleCadence.WEEKLY,
@@ -128,8 +140,9 @@ const PLAN_SEED_DATA: Array<{
         displayName: 'Community Edition',
         hosting: 'selfhosted',
         // Free AGPLv3 download with no limits, mirroring Gauzy's Community Edition. Never bought,
-        // so it has no Stripe object at all.
-        maxWorks: Number.MAX_SAFE_INTEGER,
+        // so it has no Stripe object at all. Quotas are advisory here anyway — a self-hoster owns
+        // the database — but the value still has to fit the column. See {@link UNLIMITED_WORKS}.
+        maxWorks: UNLIMITED_WORKS,
         allowedCadences: ALL_CADENCES,
         monthlyPrice: '0',
         annualPrice: '0',
@@ -221,7 +234,17 @@ export class SubscriptionService implements OnModuleInit {
         }
 
         const subscription = await this.getActiveSubscription(user.id);
-        if (subscription?.plan) {
+        // 🛑 Defence in depth: a SELF-HOSTED plan never decides the tier on THIS deployment.
+        //
+        // This is the single choke point where "what plan is this user on" is answered, and it
+        // reads the active subscription BEFORE `user.defaultPlan` — so guarding only the writer
+        // (`activate()`) is not enough on its own. Any row that already exists, or any future
+        // writer, is covered here. A self-hosted licence applies to the buyer's own deployment;
+        // on the hosted service they fall through to whatever they actually pay for.
+        if (
+            subscription?.plan &&
+            (subscription.plan as SubscriptionPlan).hosting !== 'selfhosted'
+        ) {
             return subscription.plan as SubscriptionPlan;
         }
 
@@ -389,6 +412,26 @@ export class SubscriptionService implements OnModuleInit {
                 'Paid plans must be activated through billing and cannot be self-assigned.',
             );
         }
+        // EW-711 #23, second gate (added with the self-hosted editions, 2026-08-22).
+        //
+        // 🛑 The price check alone is NOT sufficient once a self-hosted tier exists. The Community
+        // Edition is genuinely free (`monthlyPrice: '0'`) and genuinely unlimited — that is correct
+        // for someone running the AGPLv3 platform on their own hardware, where quotas are advisory
+        // because they own the database. But it makes the row look self-serviceable to
+        // `isPaidPlan()`, so on the HOSTED service any authenticated user could assign it to
+        // themselves and receive `maxWorks: 2_147_483_647` plus every cadence — entitlements that
+        // ARE enforced here (`work-schedule.service.ts` checks `plan.maxWorks` and
+        // `getCadenceAllowances`). That is precisely the free→paid escalation #23 closed.
+        //
+        // Self-hosted rows exist so the plan switcher and the licence paperwork describe the same
+        // thing. They are never something a user picks: the paid editions are commercial licences
+        // granted through billing, and the Community Edition applies to a deployment this instance
+        // is not.
+        if (plan.hosting === 'selfhosted') {
+            throw new ForbiddenException(
+                'Self-hosted editions cannot be self-assigned on a hosted deployment.',
+            );
+        }
         return this.persistDefaultPlan(user, plan);
     }
 
@@ -409,7 +452,23 @@ export class SubscriptionService implements OnModuleInit {
         const defaultCode = this.normalizePlanCode(config.subscriptions.getDefaultPlanCode());
         const plan = await this.planRepository.findByCode(defaultCode);
 
-        if (plan) {
+        // 🛑 A self-hosted edition can never be the DEFAULT plan on a hosted deployment.
+        //
+        // `SUBSCRIPTIONS_DEFAULT_PLAN` is an operator-set env var and `normalizePlanCode` accepts
+        // any member of the enum — which now includes `selfhosted_community`, a row that is free
+        // AND effectively unlimited. One typo in a Helm value would therefore hand every user with
+        // no subscription an unlimited plan, silently and fleet-wide, with no purchase involved.
+        //
+        // This is the same class as the self-service escalation, reached through configuration
+        // rather than through a request, so it needs the same answer: hosting decides where a plan
+        // applies, and nothing else does.
+        if (plan && plan.hosting === 'selfhosted') {
+            this.logger.error(
+                `SUBSCRIPTIONS_DEFAULT_PLAN is set to '${defaultCode}', a SELF-HOSTED edition — ` +
+                    `refusing to use it as the default on a hosted deployment. Falling back to FREE. ` +
+                    `Fix the environment variable.`,
+            );
+        } else if (plan) {
             return plan;
         }
 

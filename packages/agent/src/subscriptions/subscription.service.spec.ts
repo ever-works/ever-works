@@ -139,6 +139,79 @@ describe('SubscriptionService', () => {
             );
         });
 
+        /**
+         * 🛑 Every seeded code MUST be a member of `SubscriptionPlanCode`.
+         *
+         * `PlanSubscriptionService.findPlanByCode` rejects any code that is not in the enum
+         * BEFORE it reaches the repository, and `activate()` treats "no plan" as
+         * "activation skipped" — a warning log and a `false`. So a plan seeded with a code the
+         * enum does not carry is fully purchasable and then silently grants nothing: the money
+         * moves, the webhook returns `ignored`, and the buyer gets no tier. Nothing else in the
+         * suite would catch it, because seeding and activation are tested apart.
+         */
+        it('seeds no plan code that SubscriptionPlanCode does not carry', async () => {
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const seeded = planRepository.upsert.mock.calls.map((c) => c[0].code);
+            const known = new Set<string>(Object.values(SubscriptionPlanCode));
+
+            expect(seeded.length).toBeGreaterThan(0); // never pass vacuously
+            expect(seeded.filter((c: string) => !known.has(c))).toEqual([]);
+        });
+
+        /**
+         * 🛑 REGRESSION. `maxWorks` is a Postgres `integer` (ceiling 2147483647). Seeding
+         * `Number.MAX_SAFE_INTEGER` (9007199254740991) as "unlimited" made Postgres reject the
+         * INSERT with `integer out of range` — and because `seedPlans()` runs inside
+         * `onModuleInit`, that does not degrade gracefully: module init aborts and the API never
+         * finishes booting, on dev, stage AND production alike.
+         *
+         * Nothing else in this suite can catch it, because `planRepository` is a mock here and a
+         * mock accepts any number. This test encodes the column's real ceiling so the value is
+         * checked without a database.
+         */
+        const PG_INT4_MAX = 2_147_483_647;
+
+        it('seeds no integer quota that Postgres int4 would reject', async () => {
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const rows = planRepository.upsert.mock.calls.map((c) => c[0]);
+
+            expect(rows.length).toBeGreaterThan(0); // never pass vacuously
+            for (const row of rows) {
+                expect({ code: row.code, maxWorks: row.maxWorks }).toEqual({
+                    code: row.code,
+                    maxWorks: expect.any(Number),
+                });
+                expect(row.maxWorks).toBeLessThanOrEqual(PG_INT4_MAX);
+                expect(row.maxWorks).toBeGreaterThanOrEqual(0);
+                expect(Number.isInteger(row.maxWorks)).toBe(true);
+            }
+        });
+
+        it('seeds prices that fit decimal(10,2) and parse back to the same number', async () => {
+            // The price columns are decimal(10,2) — max 99,999,999.99 — and TypeORM hands them back
+            // as STRINGS. A value that does not round-trip would bill a different amount than the
+            // one reviewed here.
+            const { service, planRepository } = makeService();
+            await service.seedPlans();
+            const rows = planRepository.upsert.mock.calls.map((c) => c[0]);
+
+            for (const row of rows) {
+                for (const field of ['monthlyPrice', 'annualPrice', 'lifetimePrice'] as const) {
+                    const raw = row[field];
+                    if (raw === null || raw === undefined) continue;
+                    expect(typeof raw).toBe('string');
+                    const n = Number(raw);
+                    expect(Number.isFinite(n)).toBe(true);
+                    expect(n).toBeLessThan(100_000_000);
+                    expect(n).toBeGreaterThanOrEqual(0);
+                    // Two decimal places at most, or the column silently rounds the charge.
+                    expect(Math.round(n * 100)).toBe(n * 100);
+                }
+            }
+        });
+
         it('tags every row with a hosting mode, three cloud and three self-hosted', async () => {
             const { service, planRepository } = makeService();
             await service.seedPlans();
@@ -338,6 +411,48 @@ describe('SubscriptionService', () => {
             expect(planRepository.findByCode).not.toHaveBeenCalled();
         });
 
+        /**
+         * 🛑 REGRESSION — the defect a first attempt at this fix missed entirely.
+         *
+         * `resolvePlanForUser` is the single place that answers "what plan is this user on", and it
+         * reads the ACTIVE subscription BEFORE `user.defaultPlan`. So guarding only the writer was
+         * not enough: an active row pointing at a self-hosted plan still made a $99 one-off licence
+         * the buyer's effective HOSTED tier — the very arbitrage the fix was for.
+         *
+         * Guarding here covers every route: the webhook, the return path, any future writer, and
+         * any row that already exists in the database.
+         */
+        it('IGNORES an active self-hosted subscription — a licence is not a hosted tier', async () => {
+            const selfHosted = {
+                id: 'sub-licence',
+                plan: { ...PREMIUM_PLAN, code: 'selfhosted_pro', hosting: 'selfhosted' },
+            };
+            const { service } = makeService(
+                {},
+                { findActiveByUser: jest.fn().mockResolvedValue(selfHosted) },
+            );
+
+            const plan = await service.resolvePlanForUser({
+                id: 'u1',
+                defaultPlan: FREE_PLAN,
+            } as any);
+
+            // Falls through to what they actually pay for on this deployment.
+            expect(plan).toBe(FREE_PLAN);
+            expect((plan as any).code).not.toBe('selfhosted_pro');
+        });
+
+        it('still returns an active CLOUD subscription — the guard must not break the paying path', async () => {
+            const cloud = { id: 'sub-1', plan: { ...PREMIUM_PLAN, hosting: 'cloud' } };
+            const { service } = makeService(
+                {},
+                { findActiveByUser: jest.fn().mockResolvedValue(cloud) },
+            );
+
+            const plan = await service.resolvePlanForUser({ id: 'u1' } as any);
+            expect((plan as any).code).toBe(PREMIUM_PLAN.code);
+        });
+
         it('falls back to user.defaultPlan when there is no active subscription', async () => {
             const { service, userSubscriptionRepository, planRepository } = makeService(
                 {},
@@ -378,6 +493,42 @@ describe('SubscriptionService', () => {
             const plan = await service.resolvePlanForUser({ id: 'u1' } as any);
             expect(plan).toBe(STANDARD_PLAN);
             expect(planRepository.findByCode).toHaveBeenCalledWith(SubscriptionPlanCode.STANDARD);
+        });
+
+        /**
+         * 🛑 REGRESSION. `SUBSCRIPTIONS_DEFAULT_PLAN` is an operator-set env var and
+         * `normalizePlanCode` accepts ANY member of the enum — which now includes
+         * `selfhosted_community`, a row that is free AND effectively unlimited. One typo in a Helm
+         * value would hand every user with no subscription an unlimited plan, fleet-wide, with no
+         * purchase involved. Same class as the self-service escalation, reached through
+         * CONFIGURATION rather than a request.
+         */
+        it('REFUSES a self-hosted default plan and falls back to FREE', async () => {
+            process.env.SUBSCRIPTIONS_DEFAULT_PLAN = 'selfhosted_community';
+            const community = {
+                ...FREE_PLAN,
+                code: 'selfhosted_community',
+                displayName: 'Community Edition',
+                hosting: 'selfhosted',
+                maxWorks: 2_147_483_647,
+            };
+            const findByCode = jest
+                .fn()
+                .mockImplementation(async (code: string) =>
+                    code === 'selfhosted_community' ? community : FREE_PLAN,
+                );
+            const { service } = makeService(
+                { findByCode },
+                { findActiveByUser: jest.fn().mockResolvedValue(null) },
+            );
+
+            const plan = await service.resolvePlanForUser({ id: 'u1' } as any);
+
+            // The unlimited row must NOT become everyone's default.
+            expect((plan as any).code).toBe(FREE_PLAN.code);
+            expect((plan as any).maxWorks).toBe(1);
+            // It fell back rather than silently accepting the misconfiguration.
+            expect(findByCode).toHaveBeenCalledWith(SubscriptionPlanCode.FREE);
         });
 
         it('short-circuits to resolveDefaultPlan when the kill-switch is OFF (no DB lookup of active sub)', async () => {
@@ -716,6 +867,59 @@ describe('SubscriptionService', () => {
             await expect(
                 service.changePlanSelfService({ id: 'u1' } as any, SubscriptionPlanCode.FREE),
             ).rejects.toThrow(NotFoundException);
+        });
+
+        /**
+         * 🛑 REGRESSION (EW-711 #23, reopened and re-closed 2026-08-22).
+         *
+         * Adding the self-hosted editions introduced a row that is genuinely FREE
+         * (`monthlyPrice: '0'`) and genuinely UNLIMITED (`maxWorks` at the int4 ceiling, every
+         * cadence) — correct for someone self-hosting the AGPLv3 platform, where quotas are
+         * advisory because they own the database. But `isPaidPlan()` gates purely on price, so on
+         * the HOSTED service that row looked self-serviceable: any authenticated user could POST
+         * `{planCode:'selfhosted_community'}` and receive unlimited scheduled works plus hourly
+         * cadence for free. Those entitlements ARE enforced — `work-schedule.service.ts` reads
+         * `plan.maxWorks` and `getCadenceAllowances` — so this was a live free→paid escalation,
+         * exactly what #23 exists to prevent. The price check alone is not sufficient once a
+         * hosting axis exists.
+         */
+        it.each([
+            SubscriptionPlanCode.SELFHOSTED_COMMUNITY,
+            SubscriptionPlanCode.SELFHOSTED_PRO,
+            SubscriptionPlanCode.SELFHOSTED_ENTERPRISE,
+        ])('refuses to self-assign %s even when it is free-priced', async (code) => {
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue({
+                    id: 'plan-sh',
+                    code,
+                    displayName: 'Community Edition',
+                    hosting: 'selfhosted',
+                    // Deliberately free AND unlimited — the exact shape that slipped past the
+                    // price-only gate.
+                    monthlyPrice: '0',
+                    maxWorks: 2_147_483_647,
+                    allowedCadences: ALL_CADENCES_IN_PUBLIC_ORDER,
+                    overagePricePerRun: '0',
+                }),
+            });
+
+            await expect(service.changePlanSelfService({ id: 'u1' } as any, code)).rejects.toThrow(
+                ForbiddenException,
+            );
+            // The escalation is only truly closed if NOTHING was written.
+            expect(userRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('still allows a FREE CLOUD plan — the guard must not break the legitimate path', async () => {
+            const user = { id: 'u1' } as any;
+            const { service, userRepository } = makeService({
+                findByCode: jest.fn().mockResolvedValue({ ...FREE_PLAN, hosting: 'cloud' }),
+            });
+
+            await expect(
+                service.changePlanSelfService(user, SubscriptionPlanCode.FREE),
+            ).resolves.toBeDefined();
+            expect(userRepository.update).toHaveBeenCalled();
         });
 
         it('assigns a FREE plan (monthlyPrice 0) and persists it', async () => {

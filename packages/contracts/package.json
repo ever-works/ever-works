@@ -53,6 +53,7 @@
 		"dev": "tsup --watch",
 		"clean": "rm -rf dist",
 		"type-check": "tsc --noEmit",
+		"type-check:tests": "tsc -p tsconfig.speccheck.json --noEmit",
 		"test": "vitest run --passWithNoTests",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage"
