@@ -111,6 +111,7 @@ which now live folded into `tasks.md`).
 | [`markdown-generator`](features/markdown-generator/spec)                   | Retrospective | Markdown rendering pipeline                                                                   |
 | [`mcp-server`](features/mcp-server/spec)                                   | Retrospective | OpenAPI-derived MCP tool surface                                                              |
 | [`plugin-system`](features/plugin-system/spec)                             | Retrospective | Capability-driven plugin architecture (39 first-party plugins)                                |
+| [`policy-matrices`](features/policy-matrices/spec)                         | Retrospective | Merge-policy + tool-grant governance matrices resolved across four scopes                     |
 | [`scheduled-updates`](features/scheduled-updates/spec)                     | Retrospective | Cron-driven generation with CAS claim and drift correction                                    |
 | [`taxonomy-system`](features/taxonomy-system/spec)                         | Retrospective | Categories, tags, and collections in the data repo                                            |
 | [`website-generator`](features/website-generator/spec)                     | Retrospective | Static site generation pipeline                                                               |

@@ -174,6 +174,16 @@ export function credentialRefPattern(): RegExp {
 /** A credential key: alphanumeric, `_`, `.` and `-`, up to 64 chars. */
 export const CREDENTIAL_KEY_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}$/;
 
-export function isCredentialKey(value: string): boolean {
-	return CREDENTIAL_KEY_PATTERN.test(value);
+/**
+ * Takes `unknown`, not `string`, because this is a GUARD: its callers are
+ * validating values that arrived from a `simple-json` column, an API body or an
+ * import payload, where the static type is a claim rather than a fact.
+ *
+ * The `typeof` check is load-bearing. `RegExp.test` coerces its argument, so the
+ * previous `string`-typed version returned TRUE for `undefined`, `null`, `123`,
+ * `true`, `false` and `['A']` — every one of those stringifies to something the
+ * pattern happily matches. A gate that admits `undefined` is not a gate.
+ */
+export function isCredentialKey(value: unknown): value is string {
+	return typeof value === 'string' && CREDENTIAL_KEY_PATTERN.test(value);
 }
