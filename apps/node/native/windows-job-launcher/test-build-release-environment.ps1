@@ -147,11 +147,21 @@ try {
 		Assert-True ($metadata.buildInputs.builder.kind -ceq "local-untrusted") "script metadata promoted environment claims into a trusted builder kind"
 		Assert-True ($metadata.buildInputs.builder.id -ceq "urn:ever-works:builder:build-release-script:v3") "script builder identity is not stable"
 	}
-	Assert-True ($hostileMetadata.invocationHints.trust -ceq "untrusted-environment") "CI invocation hints are not explicitly untrusted"
-	Assert-True ($hostileMetadata.invocationHints.claimedProvider -ceq "github-actions") "spoofed CI environment was not retained only as a hint"
-	Assert-True (
-		$hostileMetadata.buildInputs.environmentPolicy.clearedCargoProfileOverrideCount -eq $profileOverrides.Count
-	) "not every hostile CARGO_PROFILE_* override was cleared"
+	$invocationHintsProperty = $hostileMetadata.PSObject.Properties["invocationHints"]
+	if ($null -eq $invocationHintsProperty) {
+		$failures.Add("CI invocation hints are missing")
+	} else {
+		Assert-True ($invocationHintsProperty.Value.trust -ceq "untrusted-environment") "CI invocation hints are not explicitly untrusted"
+		Assert-True ($invocationHintsProperty.Value.claimedProvider -ceq "github-actions") "spoofed CI environment was not retained only as a hint"
+	}
+	$environmentPolicyProperty = $hostileMetadata.buildInputs.PSObject.Properties["environmentPolicy"]
+	if ($null -eq $environmentPolicyProperty) {
+		$failures.Add("sanitized build-environment policy evidence is missing")
+	} else {
+		Assert-True (
+			$environmentPolicyProperty.Value.clearedCargoProfileOverrideCount -eq $profileOverrides.Count
+		) "not every hostile CARGO_PROFILE_* override was cleared"
+	}
 
 	if ($failures.Count -gt 0) {
 		throw ("Build environment contract failures:`n- " + ($failures -join "`n- "))
