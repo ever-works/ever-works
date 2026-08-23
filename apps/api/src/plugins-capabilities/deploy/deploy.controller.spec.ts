@@ -38,7 +38,7 @@ jest.mock('../../auth', () => ({
     CurrentUser: () => () => undefined,
 }));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { DeployController } from './deploy.controller';
 import type { DeployFacadeService } from '@ever-works/agent/facades';
 import type { WorkOwnershipService } from '@ever-works/agent/services';
@@ -85,7 +85,20 @@ describe('DeployController', () => {
         setDatabaseUrl: jest.Mock;
         getDatabaseMode: jest.Mock;
         setDatabaseMode: jest.Mock;
+        getAllowedEnvKeys: jest.Mock;
+        describeRuntimeEnvVars: jest.Mock;
+        setRuntimeEnvVars: jest.Mock;
     };
+    // Mirrors WORK_RUNTIME_ENV_ALLOWED_KEYS shape (the real constant lives in
+    // @ever-works/agent/services, which this spec mocks wholesale).
+    const ALLOWED_ENV_KEYS = ['NEXT_PUBLIC_PAYMENT_PROVIDER', 'STRIPE_SECRET_KEY'];
+    const describeEnv = (set: Record<string, string> = {}) =>
+        ALLOWED_ENV_KEYS.map((key) => ({
+            key,
+            set: key in set,
+            masked: key in set ? set[key] : null,
+            secret: key === 'STRIPE_SECRET_KEY',
+        }));
     let managedSubdomainService: { getState: jest.Mock; update: jest.Mock };
     let dbProvisionService: {
         isReady: jest.Mock;
@@ -147,6 +160,9 @@ describe('DeployController', () => {
             setDatabaseUrl: jest.fn().mockResolvedValue(undefined),
             getDatabaseMode: jest.fn().mockResolvedValue(null),
             setDatabaseMode: jest.fn().mockResolvedValue(undefined),
+            getAllowedEnvKeys: jest.fn().mockReturnValue(ALLOWED_ENV_KEYS),
+            describeRuntimeEnvVars: jest.fn().mockResolvedValue(describeEnv()),
+            setRuntimeEnvVars: jest.fn().mockResolvedValue({}),
         };
 
         managedSubdomainService = {
@@ -276,6 +292,161 @@ describe('DeployController', () => {
             expect(res.status).toBe('success');
             expect(res.databaseUrl.configured).toBe(true);
             expect(res.databaseUrl.masked).not.toContain(':p@'); // password masked
+            // The DB-only body must not touch the per-Work env map.
+            expect(workRuntimeEnvService.setRuntimeEnvVars).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('runtime-env (allow-listed per-Work env vars)', () => {
+        beforeEach(() => {
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork(),
+                isCreator: true,
+            });
+        });
+
+        it('getRuntimeEnv returns allowedEnvKeys plus one masked entry per key', async () => {
+            workRuntimeEnvService.describeRuntimeEnvVars.mockResolvedValue(
+                describeEnv({ STRIPE_SECRET_KEY: '***', NEXT_PUBLIC_PAYMENT_PROVIDER: 'stripe' }),
+            );
+
+            const res: any = await controller.getRuntimeEnv(
+                { userId: 'user-1' } as never,
+                'work-1',
+            );
+
+            expect(res.allowedEnvKeys).toEqual(ALLOWED_ENV_KEYS);
+            expect(res.env).toEqual([
+                {
+                    key: 'NEXT_PUBLIC_PAYMENT_PROVIDER',
+                    set: true,
+                    masked: 'stripe',
+                    secret: false,
+                },
+                { key: 'STRIPE_SECRET_KEY', set: true, masked: '***', secret: true },
+            ]);
+            // Never a plaintext secret in the read shape.
+            expect(JSON.stringify(res)).not.toContain('sk_live');
+        });
+
+        it('setRuntimeEnv with ONLY env applies the patch and leaves DB config untouched', async () => {
+            workRuntimeEnvService.describeRuntimeEnvVars.mockResolvedValue(
+                describeEnv({ STRIPE_SECRET_KEY: '***' }),
+            );
+
+            const res: any = await controller.setRuntimeEnv(
+                { userId: 'user-1' } as never,
+                'work-1',
+                { env: { STRIPE_SECRET_KEY: 'sk_live_abc' } },
+            );
+
+            expect(workRuntimeEnvService.setRuntimeEnvVars).toHaveBeenCalledWith('work-1', {
+                STRIPE_SECRET_KEY: 'sk_live_abc',
+            });
+            // DB section untouched.
+            expect(workRuntimeEnvService.setDatabaseUrl).not.toHaveBeenCalled();
+            expect(workRuntimeEnvService.setDatabaseMode).not.toHaveBeenCalled();
+            expect(dbProvisionService.ensureDatabaseForWork).not.toHaveBeenCalled();
+            expect(deployFacade.setWorkDbOverride).not.toHaveBeenCalled();
+
+            expect(res.status).toBe('success');
+            expect(res.env).toEqual(describeEnv({ STRIPE_SECRET_KEY: '***' }));
+            expect(res.allowedEnvKeys).toEqual(ALLOWED_ENV_KEYS);
+            expect(res.message).toMatch(/Environment variables updated/);
+            expect(JSON.stringify(res)).not.toContain('sk_live_abc');
+            // Activity log carries key NAMES only, never the value.
+            const summary = activityLogService.log.mock.calls[0][0].summary as string;
+            expect(summary).toContain('STRIPE_SECRET_KEY');
+            expect(summary).not.toContain('sk_live_abc');
+        });
+
+        it('setRuntimeEnv forwards null to remove a key', async () => {
+            await controller.setRuntimeEnv({ userId: 'user-1' } as never, 'work-1', {
+                env: { STRIPE_SECRET_KEY: null },
+            });
+            expect(workRuntimeEnvService.setRuntimeEnvVars).toHaveBeenCalledWith('work-1', {
+                STRIPE_SECRET_KEY: null,
+            });
+        });
+
+        it('setRuntimeEnv applies BOTH sections when databaseUrl and env are sent together', async () => {
+            workRuntimeEnvService.getDatabaseUrl.mockResolvedValue(
+                'postgresql://u:p@host.example.com/db',
+            );
+
+            const res: any = await controller.setRuntimeEnv(
+                { userId: 'user-1' } as never,
+                'work-1',
+                {
+                    databaseUrl: 'postgresql://u:p@host.example.com/db',
+                    env: { NEXT_PUBLIC_PAYMENT_PROVIDER: 'stripe' },
+                },
+            );
+
+            expect(workRuntimeEnvService.setDatabaseUrl).toHaveBeenCalledWith(
+                'work-1',
+                'postgresql://u:p@host.example.com/db',
+            );
+            expect(workRuntimeEnvService.setDatabaseMode).toHaveBeenCalledWith('work-1', 'custom');
+            expect(workRuntimeEnvService.setRuntimeEnvVars).toHaveBeenCalledWith('work-1', {
+                NEXT_PUBLIC_PAYMENT_PROVIDER: 'stripe',
+            });
+            expect(res.message).toMatch(/Runtime env updated/);
+        });
+
+        it('setRuntimeEnv propagates the service 400 for a non-allow-listed key', async () => {
+            workRuntimeEnvService.setRuntimeEnvVars.mockRejectedValue(
+                new BadRequestException('Unsupported runtime env key(s): DATABASE_URL'),
+            );
+
+            await expect(
+                controller.setRuntimeEnv({ userId: 'user-1' } as never, 'work-1', {
+                    env: { DATABASE_URL: 'postgres://evil' },
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(activityLogService.log).not.toHaveBeenCalled();
+        });
+
+        it('setRuntimeEnv mode:shared surfaces a provisioning failure as 503 with a sanitized reason', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork(),
+                isCreator: true,
+            });
+            dbProvisionService.isReady.mockReturnValue(true);
+            // pg / net errors carry the admin host in their message — that must
+            // never reach the caller, only the errno / SQLSTATE class.
+            dbProvisionService.ensureDatabaseForWork.mockRejectedValue(
+                Object.assign(
+                    new Error('connect ECONNREFUSED 10.0.0.12:5432 (pg-admin.internal)'),
+                    {
+                        code: 'ECONNREFUSED',
+                    },
+                ),
+            );
+
+            const promise = controller.setRuntimeEnv({ userId: 'user-1' } as never, 'work-1', {
+                mode: 'shared',
+            });
+            await expect(promise).rejects.toBeInstanceOf(ServiceUnavailableException);
+            const error = (await promise.catch((e: unknown) => e)) as ServiceUnavailableException;
+            const body = error.getResponse() as Record<string, unknown>;
+            expect(body.code).toBe('SHARED_DB_PROVISION_FAILED');
+            expect(body.reason).toBe('connection refused [ECONNREFUSED]');
+            expect(JSON.stringify(body)).not.toContain('pg-admin.internal');
+            expect(JSON.stringify(body)).not.toContain('10.0.0.12');
+            // The mode switch itself is kept (provisioning is retried on deploy)…
+            expect(workRuntimeEnvService.setDatabaseMode).toHaveBeenCalledWith('work-1', 'shared');
+            // …but nothing else ran and no "updated" activity was logged.
+            expect(workRuntimeEnvService.setRuntimeEnvVars).not.toHaveBeenCalled();
+            expect(activityLogService.log).not.toHaveBeenCalled();
+        });
+
+        it('setRuntimeEnv rejects an empty body (neither section addressed)', async () => {
+            await expect(
+                controller.setRuntimeEnv({ userId: 'user-1' } as never, 'work-1', {}),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(workRuntimeEnvService.setRuntimeEnvVars).not.toHaveBeenCalled();
+            expect(workRuntimeEnvService.setDatabaseUrl).not.toHaveBeenCalled();
         });
     });
 

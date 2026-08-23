@@ -28,6 +28,42 @@ import { WorkRuntimeEnvService } from '../services/work-runtime-env.service';
  * role owns the database it can create the `drizzle`/`public` schema objects
  * that migrate-on-boot needs.
  */
+
+/**
+ * Turn a shared-DB provisioning failure into a short, operator-actionable token
+ * that is SAFE to return to an API caller: only the Postgres SQLSTATE / Node
+ * errno class plus a generic label — never the raw error message, which can
+ * embed the admin connection's host, user or database name.
+ */
+export function summarizeDbProvisionError(error: unknown): string {
+    const rawCode = (error as { code?: unknown } | null | undefined)?.code;
+    const code = typeof rawCode === 'string' ? rawCode : '';
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    const labels: Record<string, string> = {
+        ECONNREFUSED: 'connection refused',
+        ECONNRESET: 'connection reset',
+        ETIMEDOUT: 'connection timed out',
+        ENOTFOUND: 'host not found',
+        EAI_AGAIN: 'DNS lookup failed',
+        EHOSTUNREACH: 'host unreachable',
+        ENETUNREACH: 'network unreachable',
+        '28P01': 'password authentication failed',
+        '28000': 'authentication failed',
+        '42501': 'insufficient privilege (admin role cannot CREATE ROLE / CREATE DATABASE)',
+        '3D000': 'admin database does not exist',
+        '53300': 'too many connections',
+        '57P03': 'server not accepting connections',
+        '08001': 'could not connect',
+        '08006': 'connection failure',
+    };
+    if (code && labels[code]) return `${labels[code]} [${code}]`;
+    if (code) return `error code ${code}`;
+    if (/timeout/i.test(message)) return 'connection timed out';
+    if (/self[- ]signed|certificate/i.test(message)) return 'TLS certificate rejected';
+    if (/\bssl\b|\btls\b/i.test(message)) return 'TLS negotiation failed';
+    return 'unknown error';
+}
+
 @Injectable()
 export class EverWorksDbProvisionService {
     private readonly logger = new Logger(EverWorksDbProvisionService.name);
