@@ -44,6 +44,7 @@ if (-not (Test-Path -LiteralPath $unsignedMetadataPath) -or -not (Test-Path -Lit
 New-Item -ItemType Directory -Force -Path $fixtureDirectory | Out-Null
 Copy-Item -LiteralPath $unsignedArtifactPath -Destination $fixtureArtifactPath
 $subject = "CN=Ever Works Windows Job Launcher Test Only"
+Write-Host "Creating ephemeral test-only code-signing certificate"
 $certificate = New-SelfSignedCertificate `
 	-Type CodeSigningCert `
 	-Subject $subject `
@@ -53,6 +54,7 @@ $certificate = New-SelfSignedCertificate `
 	-HashAlgorithm SHA256 `
 	-KeyExportPolicy NonExportable `
 	-NotAfter (Get-Date).AddHours(4)
+Write-Host "Created ephemeral test-only code-signing certificate"
 try {
 	[IO.File]::WriteAllText(
 		$thumbprintPath,
@@ -61,6 +63,8 @@ try {
 	)
 	Export-Certificate -Cert $certificate -FilePath $certificatePath -Force | Out-Null
 	Import-Certificate -FilePath $certificatePath -CertStoreLocation "Cert:\CurrentUser\Root" | Out-Null
+	Write-Host "Trusted ephemeral certificate for this test runner only"
+	Write-Host "Signing copied test-only helper fixture"
 	$signature = Set-AuthenticodeSignature `
 		-LiteralPath $fixtureArtifactPath `
 		-Certificate $certificate `
@@ -68,18 +72,21 @@ try {
 	if ($signature.Status -ne "Valid") {
 		throw "ephemeral test signature did not become Valid"
 	}
+	Write-Host "Signed copied test-only helper fixture"
 	$certificateSha256 = $certificate.GetCertHashString(
 		[Security.Cryptography.HashAlgorithmName]::SHA256
 	).ToLowerInvariant()
 	$signedSha256 = (
 		Get-FileHash -Algorithm SHA256 -LiteralPath $fixtureArtifactPath
 	).Hash.ToLowerInvariant()
+	Write-Host "Verifying test-only signed manifest contract"
 	$manifestPath = & (Join-Path $packageRoot "create-signed-manifest.ps1") `
 		-SignedArtifactPath $fixtureArtifactPath `
 		-ExpectedPublisherSubject $certificate.Subject `
 		-ExpectedPublisherCertificateSha256 $certificateSha256 `
 		-UnsignedMetadataPath $unsignedMetadataPath `
 		-OutputPath (Join-Path $fixtureDirectory "ever-works-windows-job-launcher.signed.json")
+	Write-Host "Verified test-only signed manifest contract"
 	$fixture = [ordered]@{
 		testOnly = $true
 		productionEligible = $false
@@ -97,6 +104,7 @@ try {
 		"EVER_WORKS_TEST_SIGNED_PUBLISHER_SUBJECT=$($certificate.Subject)",
 		"EVER_WORKS_TEST_SIGNED_PUBLISHER_CERTIFICATE_SHA256=$certificateSha256"
 	) | Add-Content -LiteralPath $GithubEnvironmentPath -Encoding utf8
+	Write-Host "Prepared ephemeral signed helper test environment"
 } catch {
 	& $PSCommandPath -Cleanup -GithubEnvironmentPath $GithubEnvironmentPath
 	throw

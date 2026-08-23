@@ -86,6 +86,7 @@ jobs:
           pnpm --filter ever-works-node build
 
       - name: Prepare ephemeral self-signed test helper
+        timeout-minutes: 3
         working-directory: apps/node/native/windows-job-launcher
         shell: pwsh
         run: .\prepare-test-signed-manifest.ps1
