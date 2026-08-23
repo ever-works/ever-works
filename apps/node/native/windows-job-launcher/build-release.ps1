@@ -30,8 +30,9 @@ try {
 } finally {
 	[Array]::Clear($packageRootBytes, 0, $packageRootBytes.Length)
 }
+$osTempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
 $controlledCargoCwd = [IO.Path]::GetFullPath(
-	(Join-Path ([IO.Path]::GetTempPath()) "ever-works-cargo-$packageRootToken")
+	(Join-Path $osTempRoot "ever-works-cargo-$packageRootToken")
 )
 . (Join-Path $packageRoot "pe-authenticode-content.ps1")
 
@@ -200,8 +201,7 @@ function Reset-IsolatedLinkerTemp {
 
 function Assert-ControlledCargoCwd {
 	$resolved = [IO.Path]::GetFullPath($controlledCargoCwd)
-	$tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
-	$prefix = $tempRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+	$prefix = $osTempRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 	if (-not $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
 		throw "controlled Cargo working directory escapes the OS temporary root"
 	}
