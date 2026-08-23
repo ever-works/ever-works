@@ -43,7 +43,7 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 // drive the chat-dispatch fan-out (TaskChatService:136-168). The
 // repository class lives under `@ever-works/agent/database` (the
 // agents barrel re-exports services + module only).
-import { AgentRepository } from '@ever-works/agent/database';
+import { AgentRepository, type OwnershipScope } from '@ever-works/agent/database';
 import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 // Re-litigation guard (memory upgrades M6) — provided + exported by
 // `KnowledgeBaseModule`, which the api-side TasksModule imports.
@@ -153,10 +153,14 @@ export class TasksController {
      * per post — Agent slugs change rarely enough that caching is
      * unnecessary for v1.
      */
-    private async buildMentionLookups(userId: string) {
+    private async buildMentionLookups(userId: string, ownershipScope: OwnershipScope) {
         const ownedAgentSlugs = new Map<string, string>();
         try {
-            const { rows } = await this.agents.findByUserIdScoped(userId, { limit: 500 });
+            const { rows } = await this.agents.findByUserIdScoped(
+                userId,
+                { limit: 500 },
+                ownershipScope,
+            );
             for (const a of rows) {
                 if (a?.slug && a?.id) ownedAgentSlugs.set(a.slug, a.id);
             }
@@ -209,9 +213,14 @@ export class TasksController {
             limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
             offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
         };
-        const { rows, total } = await this.service.list(auth.userId, filter, {
-            includeRun: includeRun === 'true',
-        });
+        const { rows, total } = await this.service.list(
+            auth.userId,
+            filter,
+            {
+                includeRun: includeRun === 'true',
+            },
+            this.scopeContext.getScope(),
+        );
         return { data: rows, meta: { total, limit: filter.limit, offset: filter.offset } };
     }
 
@@ -221,27 +230,31 @@ export class TasksController {
     @Throttle({ long: { limit: 60, ttl: 60_000 } })
     async create(@CurrentUser() auth: AuthenticatedUser, @Body() body: CreateTaskDto) {
         if (!body?.title) throw new BadRequestException('title is required.');
-        return this.service.create(auth.userId, {
-            title: body.title,
-            description: body.description ?? null,
-            status: body.status,
-            priority: body.priority,
-            labels: body.labels ?? null,
-            isolationMode: body.isolationMode ?? null,
-            missionId: body.missionId ?? null,
-            ideaId: body.ideaId ?? null,
-            workId: body.workId ?? null,
-            teamId: body.teamId ?? null,
-            agentId: body.agentId ?? null,
-            goalId: body.goalId ?? null,
-            parentTaskId: body.parentTaskId ?? null,
-            createdByType: 'user',
-            createdById: auth.userId,
-            requireAllApprovers: body.requireAllApprovers,
-            acceptanceChecks: body.acceptanceChecks ?? null,
-            maxGateAttempts: body.maxGateAttempts ?? null,
-            scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
-        });
+        return this.service.create(
+            auth.userId,
+            {
+                title: body.title,
+                description: body.description ?? null,
+                status: body.status,
+                priority: body.priority,
+                labels: body.labels ?? null,
+                isolationMode: body.isolationMode ?? null,
+                missionId: body.missionId ?? null,
+                ideaId: body.ideaId ?? null,
+                workId: body.workId ?? null,
+                teamId: body.teamId ?? null,
+                agentId: body.agentId ?? null,
+                goalId: body.goalId ?? null,
+                parentTaskId: body.parentTaskId ?? null,
+                createdByType: 'user',
+                createdById: auth.userId,
+                requireAllApprovers: body.requireAllApprovers,
+                acceptanceChecks: body.acceptanceChecks ?? null,
+                maxGateAttempts: body.maxGateAttempts ?? null,
+                scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
+            },
+            this.scopeContext.getScope(),
+        );
     }
 
     // Declared BEFORE every `:id` route: `run-batch` is a single path
@@ -267,7 +280,7 @@ export class TasksController {
     @ApiOperation({ summary: 'Get one Task.' })
     @HttpCode(HttpStatus.OK)
     async getOne(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
-        return this.service.getOne(auth.userId, id);
+        return this.service.getOne(auth.userId, id, this.scopeContext.getScope());
     }
 
     @Get(':id/decision-conflicts')
@@ -284,7 +297,7 @@ export class TasksController {
     ) {
         // Owner scope + existence: `getOne` throws NotFound for a Task
         // the caller doesn't own (no 403 existence leak).
-        const task = await this.service.getOne(auth.userId, id);
+        const task = await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         return this.decisionConflicts.checkIntent({
             workId: task.workId ?? null,
             userId: auth.userId,
@@ -306,15 +319,20 @@ export class TasksController {
         // service works in `Date` (the column is a timestamptz). The
         // three states are distinct: absent = untouched, null = clear
         // the schedule, string = (re-)schedule.
-        return this.service.update(auth.userId, id, {
-            ...body,
-            scheduledAt:
-                body.scheduledAt === undefined
-                    ? undefined
-                    : body.scheduledAt === null
-                      ? null
-                      : new Date(body.scheduledAt),
-        });
+        return this.service.update(
+            auth.userId,
+            id,
+            {
+                ...body,
+                scheduledAt:
+                    body.scheduledAt === undefined
+                        ? undefined
+                        : body.scheduledAt === null
+                          ? null
+                          : new Date(body.scheduledAt),
+            },
+            this.scopeContext.getScope(),
+        );
     }
 
     @Get(':id/subtasks')
@@ -327,7 +345,11 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        const { rows, total, doneCount } = await this.service.listSubtasks(auth.userId, id);
+        const { rows, total, doneCount } = await this.service.listSubtasks(
+            auth.userId,
+            id,
+            this.scopeContext.getScope(),
+        );
         return { data: rows, meta: { total, doneCount } };
     }
 
@@ -336,7 +358,7 @@ export class TasksController {
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async remove(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
-        return this.service.remove(auth.userId, id);
+        return this.service.remove(auth.userId, id, this.scopeContext.getScope());
     }
 
     @Post(':id/recurring')
@@ -354,13 +376,18 @@ export class TasksController {
         if (!body?.recurrenceRule && !body?.recurrenceCron) {
             throw new BadRequestException('recurrenceRule or recurrenceCron is required.');
         }
-        return this.service.setRecurring(auth.userId, id, {
-            recurrenceRule: body.recurrenceRule ?? null,
-            recurrenceCron: body.recurrenceCron ?? null,
-            recurrenceTimezone: body.recurrenceTimezone,
-            recurrenceEndsAt: body.recurrenceEndsAt ? new Date(body.recurrenceEndsAt) : null,
-            recurrenceMaxOccurrences: body.recurrenceMaxOccurrences ?? null,
-        });
+        return this.service.setRecurring(
+            auth.userId,
+            id,
+            {
+                recurrenceRule: body.recurrenceRule ?? null,
+                recurrenceCron: body.recurrenceCron ?? null,
+                recurrenceTimezone: body.recurrenceTimezone,
+                recurrenceEndsAt: body.recurrenceEndsAt ? new Date(body.recurrenceEndsAt) : null,
+                recurrenceMaxOccurrences: body.recurrenceMaxOccurrences ?? null,
+            },
+            this.scopeContext.getScope(),
+        );
     }
 
     // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
@@ -378,7 +405,12 @@ export class TasksController {
         @Body() body: ScheduleTaskDto,
     ) {
         if (!body?.runAt) throw new BadRequestException('runAt is required.');
-        return this.service.scheduleTask(auth.userId, id, new Date(body.runAt));
+        return this.service.scheduleTask(
+            auth.userId,
+            id,
+            new Date(body.runAt),
+            this.scopeContext.getScope(),
+        );
     }
 
     @Delete(':id/schedule')
@@ -388,7 +420,7 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        return this.service.unscheduleTask(auth.userId, id);
+        return this.service.unscheduleTask(auth.userId, id, this.scopeContext.getScope());
     }
 
     // ── Tasks upgrades — per-Task activity feed ───────────────────
@@ -406,7 +438,7 @@ export class TasksController {
         @Query('offset') offset?: string,
     ) {
         // 404-no-leak gate before any activity row is read.
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         if (!this.activityLog) {
             return { data: [], meta: { total: 0 } };
         }
@@ -429,7 +461,7 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        return this.service.clearRecurring(auth.userId, id);
+        return this.service.clearRecurring(auth.userId, id, this.scopeContext.getScope());
     }
 
     @Post(':id/transition')
@@ -444,7 +476,13 @@ export class TasksController {
         if (!Object.values(TaskStatus).includes(body?.to)) {
             throw new BadRequestException(`Invalid target status: ${body?.to}`);
         }
-        return this.service.transition(auth.userId, id, body.to, { force: body.force === true });
+        return this.service.transition(
+            auth.userId,
+            id,
+            body.to,
+            { force: body.force === true },
+            this.scopeContext.getScope(),
+        );
     }
 
     // ── Board dispatch (kanban M3 / M4) ───────────────────────────
@@ -504,6 +542,7 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Query('refresh') refresh?: string,
     ) {
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         return this.prInsights.getForTask(auth.userId, id, { refresh: refresh === 'true' });
     }
 
@@ -525,6 +564,7 @@ export class TasksController {
         @Query('maxFiles') maxFiles?: string,
         @Query('maxBytes') maxBytes?: string,
     ) {
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         return this.prInsights.getDiffForTask(auth.userId, id, {
             maxFiles: clampNumeric(maxFiles, MAX_DIFF_FILES),
             maxBytes: clampNumeric(maxBytes, MAX_DIFF_BYTES),
@@ -539,6 +579,7 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         try {
             return await this.taskWorkspace.resolveConflicts(auth.userId, id);
         } catch (error) {
@@ -561,6 +602,7 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         try {
             await this.taskWorkspace.discardBranch(auth.userId, id);
             return { ok: true };
@@ -581,7 +623,13 @@ export class TasksController {
         @Body() body: AddAssigneeDto,
     ) {
         this.assertActorType(body.assigneeType);
-        return this.service.addAssignee(auth.userId, id, body.assigneeType, body.assigneeId);
+        return this.service.addAssignee(
+            auth.userId,
+            id,
+            body.assigneeType,
+            body.assigneeId,
+            this.scopeContext.getScope(),
+        );
     }
 
     @Delete(':id/assignees/:assigneeId')
@@ -592,7 +640,12 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('assigneeId', ParseUUIDPipe) assigneeId: string,
     ) {
-        return this.service.removeAssignee(auth.userId, id, assigneeId);
+        return this.service.removeAssignee(
+            auth.userId,
+            id,
+            assigneeId,
+            this.scopeContext.getScope(),
+        );
     }
 
     @Post(':id/reviewers')
@@ -604,7 +657,13 @@ export class TasksController {
         @Body() body: AddReviewerDto,
     ) {
         this.assertActorType(body.reviewerType);
-        return this.service.addReviewer(auth.userId, id, body.reviewerType, body.reviewerId);
+        return this.service.addReviewer(
+            auth.userId,
+            id,
+            body.reviewerType,
+            body.reviewerId,
+            this.scopeContext.getScope(),
+        );
     }
 
     /**
@@ -629,6 +688,7 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: RejectTaskDto,
     ) {
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         const row = await this.rejections.rejectTask(auth.userId, id, body.feedback, {
             runId: body.runId ?? null,
         });
@@ -659,7 +719,7 @@ export class TasksController {
     ) {
         // 404-no-leak gate: getOne is owner-scoped and throws for a
         // foreign or missing Task before any escalation row is read.
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         return { data: await this.escalations.listForTask(id) };
     }
 
@@ -673,7 +733,7 @@ export class TasksController {
         @Param('escalationId', ParseUUIDPipe) escalationId: string,
         @Body() body: ResolveEscalationDto,
     ) {
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         const resolved = await this.escalations.resolve(
             escalationId,
             auth.userId,
@@ -698,7 +758,13 @@ export class TasksController {
         @Body() body: AddApproverDto,
     ) {
         this.assertActorType(body.approverType);
-        return this.service.addApprover(auth.userId, id, body.approverType, body.approverId);
+        return this.service.addApprover(
+            auth.userId,
+            id,
+            body.approverType,
+            body.approverId,
+            this.scopeContext.getScope(),
+        );
     }
 
     @Post(':id/blocks')
@@ -710,7 +776,12 @@ export class TasksController {
         @Body() body: AddBlockerDto,
     ) {
         if (!body?.blockedByTaskId) throw new BadRequestException('blockedByTaskId is required.');
-        return this.service.addBlocker(auth.userId, id, body.blockedByTaskId);
+        return this.service.addBlocker(
+            auth.userId,
+            id,
+            body.blockedByTaskId,
+            this.scopeContext.getScope(),
+        );
     }
 
     @Delete(':id/blocks/:blockId')
@@ -721,7 +792,7 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('blockId', ParseUUIDPipe) blockId: string,
     ) {
-        return this.service.removeBlocker(auth.userId, id, blockId);
+        return this.service.removeBlocker(auth.userId, id, blockId, this.scopeContext.getScope());
     }
 
     @Get(':id/attachments')
@@ -731,7 +802,7 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        return this.service.listAttachments(auth.userId, id);
+        return this.service.listAttachments(auth.userId, id, this.scopeContext.getScope());
     }
 
     @Post(':id/attachments')
@@ -747,7 +818,13 @@ export class TasksController {
         @Body() body: AddAttachmentDto,
     ) {
         if (!body?.uploadId) throw new BadRequestException('uploadId is required.');
-        return this.service.addAttachment(auth.userId, id, body.uploadId, body.role ?? 'initial');
+        return this.service.addAttachment(
+            auth.userId,
+            id,
+            body.uploadId,
+            body.role ?? 'initial',
+            this.scopeContext.getScope(),
+        );
     }
 
     @Delete(':id/attachments/:attachmentId')
@@ -758,7 +835,12 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
     ) {
-        return this.service.removeAttachment(auth.userId, id, attachmentId);
+        return this.service.removeAttachment(
+            auth.userId,
+            id,
+            attachmentId,
+            this.scopeContext.getScope(),
+        );
     }
 
     @Post(':id/relations')
@@ -773,7 +855,13 @@ export class TasksController {
         if (!['related', 'duplicates', 'follow-up'].includes(body.kind)) {
             throw new BadRequestException(`Invalid relation kind: ${body.kind}`);
         }
-        return this.service.addRelation(auth.userId, id, body.relatedTaskId, body.kind);
+        return this.service.addRelation(
+            auth.userId,
+            id,
+            body.relatedTaskId,
+            body.kind,
+            this.scopeContext.getScope(),
+        );
     }
 
     private parseStatusList(value?: string): TaskStatus | TaskStatus[] | undefined {
@@ -825,10 +913,15 @@ export class TasksController {
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
     ) {
-        const messages = await this.chat.list(auth.userId, id, {
-            limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
-            offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
-        });
+        const messages = await this.chat.list(
+            auth.userId,
+            id,
+            {
+                limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
+                offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
+            },
+            this.scopeContext.getScope(),
+        );
         return { data: messages };
     }
 
@@ -843,7 +936,7 @@ export class TasksController {
         @Query('currency') currency?: string,
     ) {
         // Cross-user ownership check — 404 if Task doesn't belong to user.
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext.getScope());
         const totalCents = await this.pluginUsage.getTotalSpendCentsForTask(id, {
             since: since ? new Date(since) : undefined,
             until: until ? new Date(until) : undefined,
@@ -873,7 +966,8 @@ export class TasksController {
         // mentioned Agent. Unknown tokens are still stripped (T6
         // posture). Known-user-slugs + known-kb-slugs maps land in
         // a follow-up once those domains expose lookup helpers.
-        const lookups = await this.buildMentionLookups(auth.userId);
+        const scope = this.scopeContext.getScope();
+        const lookups = await this.buildMentionLookups(auth.userId, scope);
         return this.chat.post(
             auth.userId,
             {
@@ -884,6 +978,7 @@ export class TasksController {
                 attachments: body.attachments,
             },
             lookups,
+            scope,
         );
     }
 }

@@ -12,11 +12,15 @@ describe('UserUploadRepository — ownership scope', () => {
         organizationId: '33333333-3333-4333-8333-333333333333',
     };
 
-    let orm: { findOne: jest.Mock };
+    let orm: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
     let uploads: UserUploadRepository;
 
     beforeEach(() => {
-        orm = { findOne: jest.fn().mockResolvedValue(null) };
+        orm = {
+            findOne: jest.fn().mockResolvedValue(null),
+            create: jest.fn((value) => value),
+            save: jest.fn(async (value) => ({ id: 'upload-row', ...value })),
+        };
         uploads = new UserUploadRepository(orm as never);
     });
 
@@ -65,5 +69,49 @@ describe('UserUploadRepository — ownership scope', () => {
         await uploads.findOwnedByUser(sha256, userId);
 
         expect(orm.findOne).toHaveBeenCalledWith({ where: { sha256, userId } });
+    });
+
+    it('dedupes identical bytes independently in Ever and Yo', async () => {
+        await uploads.record({
+            userId,
+            sha256,
+            ...everScope,
+            storageProvider: 'local-fs',
+            storagePath: `${userId}/${sha256}.png`,
+        });
+        await uploads.record({
+            userId,
+            sha256,
+            ...yoScope,
+            storageProvider: 'local-fs',
+            storagePath: `${userId}/${sha256}.png`,
+        });
+
+        expect(orm.findOne).toHaveBeenNthCalledWith(1, {
+            where: [{ userId, sha256, ...everScope }],
+        });
+        expect(orm.findOne).toHaveBeenNthCalledWith(2, {
+            where: [{ userId, sha256, ...yoScope }],
+        });
+        expect(orm.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('dedupes current and legacy personal uploads without matching an Organization row', async () => {
+        await uploads.record({
+            userId,
+            sha256,
+            tenantId: everScope.tenantId,
+            organizationId: null,
+            storageProvider: 'local-fs',
+            storagePath: `${userId}/${sha256}.png`,
+        });
+
+        const where = orm.findOne.mock.calls[0][0].where as Array<Record<string, unknown>>;
+        expect(where).toHaveLength(2);
+        expect(where[0]).toMatchObject({ userId, sha256, tenantId: everScope.tenantId });
+        expect(where[1]).toMatchObject({ userId, sha256 });
+        for (const branch of where) {
+            expect(branch.organizationId).toEqual(expect.objectContaining({ _type: 'isNull' }));
+        }
     });
 });

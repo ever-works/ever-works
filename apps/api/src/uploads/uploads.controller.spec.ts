@@ -31,7 +31,7 @@ import { tmpdir } from 'node:os';
 import { Test } from '@nestjs/testing';
 import { UserUploadRepository, WorkRepository } from '@ever-works/agent/database';
 import { UploadsController } from './uploads.controller';
-import { UploadsService } from './uploads.service';
+import { UploadsService, USER_UPLOAD_REPOSITORY } from './uploads.service';
 import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
 import type { PluginContext } from '@ever-works/plugin';
 import type { AnonymousAuthService } from '../auth/services/anonymous-auth.service';
@@ -154,7 +154,12 @@ describe('UploadsController', () => {
         delete process.env.UPLOADS_MAX_BYTES;
         const backend = new LocalFsStoragePlugin();
         await backend.onLoad(stubContext('local-fs'));
-        service = new UploadsService(backend);
+        service = new UploadsService(
+            backend,
+            undefined,
+            { record: jest.fn().mockResolvedValue({ id: 'upload-row' }) } as never,
+            { getScope: () => ({ tenantId: null, organizationId: null }) } as never,
+        );
         // The anonymous-auth service is only invoked by /anonymous and
         // /presign endpoints — pass a stub that throws if these tests
         // ever exercise it accidentally.
@@ -475,7 +480,14 @@ describe('UploadsService — Nest DI', () => {
         // accept that and lazily resolve on first call via the env-driven
         // backend factory (which we DO NOT exercise in this test).
         const moduleRef = await Test.createTestingModule({
-            providers: [UploadsService],
+            providers: [
+                UploadsService,
+                { provide: USER_UPLOAD_REPOSITORY, useValue: { record: jest.fn() } },
+                {
+                    provide: ScopeContextService,
+                    useValue: { getScope: () => ({ tenantId: null, organizationId: null }) },
+                },
+            ],
         }).compile();
         const svc = moduleRef.get(UploadsService);
         expect(svc).toBeInstanceOf(UploadsService);

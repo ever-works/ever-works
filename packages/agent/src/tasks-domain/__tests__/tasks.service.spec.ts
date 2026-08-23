@@ -41,6 +41,7 @@ function makeService(overrides: Record<string, any> = {}) {
         tasks: {
             findByIdAndUser: jest.fn(),
             findById: jest.fn(),
+            findByUserIdFiltered: jest.fn(),
             create: jest.fn(),
             updateById: jest.fn().mockResolvedValue(undefined),
             wouldCreateCycle: jest.fn().mockResolvedValue(false),
@@ -86,6 +87,9 @@ function makeService(overrides: Record<string, any> = {}) {
         goals: {
             findOne: jest.fn(),
         },
+        agentRuns: {
+            findByIds: jest.fn(),
+        },
         ...overrides,
     };
 
@@ -108,6 +112,7 @@ function makeService(overrides: Record<string, any> = {}) {
         repos.ideas as any,
         repos.teams as any,
         repos.goals as any,
+        repos.agentRuns as any,
     );
 
     return { service, repos };
@@ -123,6 +128,18 @@ describe('TasksService authorization guardrails', () => {
         organizationId: '33333333-3333-4333-8333-333333333333',
     };
 
+    it('scopes the includeRun batch lookup instead of trusting a Task latestRunId pointer', async () => {
+        const knownRunId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+        const task = makeTask({ latestRunId: knownRunId, ...everScope });
+        const { service, repos } = makeService();
+        repos.tasks.findByUserIdFiltered.mockResolvedValueOnce({ rows: [task], total: 1 });
+        repos.agentRuns.findByIds.mockResolvedValueOnce([]);
+
+        await service.list('user-1', {}, { includeRun: true }, everScope);
+
+        expect(repos.agentRuns.findByIds).toHaveBeenCalledWith([knownRunId], 'user-1', everScope);
+    });
+
     it('404s a same-user Task UUID from another active Organization', async () => {
         const hidden = makeTask({
             id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -135,6 +152,7 @@ describe('TasksService authorization guardrails', () => {
         await expect(
             (service.getOne as any)('user-1', hidden.id, everScope),
         ).rejects.toBeInstanceOf(NotFoundException);
+        expect(repos.tasks.findByIdAndUser).toHaveBeenCalledWith(hidden.id, 'user-1', everScope);
     });
 
     it('404s when the Task row matches but its Work belongs to Yo', async () => {
@@ -332,12 +350,19 @@ describe('TasksService authorization guardrails', () => {
         const parent = makeTask({ id: 'parent-1' });
         const refreshed = makeTask({ parentTaskId: parent.id });
         const { service, repos } = makeService();
-        repos.tasks.findByIdAndUser.mockResolvedValueOnce(task).mockResolvedValueOnce(parent);
-        repos.tasks.findById.mockResolvedValueOnce(refreshed);
+        repos.tasks.findByIdAndUser
+            .mockResolvedValueOnce(task)
+            .mockResolvedValueOnce(parent)
+            .mockResolvedValueOnce(refreshed);
 
         await service.update('user-1', task.id, { parentTaskId: parent.id });
 
-        expect(repos.tasks.wouldCreateCycle).toHaveBeenCalledWith(task.id, parent.id);
+        expect(repos.tasks.wouldCreateCycle).toHaveBeenCalledWith(
+            task.id,
+            parent.id,
+            'user-1',
+            undefined,
+        );
         expect(repos.tasks.updateById).toHaveBeenCalledWith(task.id, { parentTaskId: parent.id });
     });
 

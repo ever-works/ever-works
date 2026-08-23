@@ -72,6 +72,7 @@ describe('TaskTransitionService.dispatchAgentRun — the one dispatch path', () 
     let dispatcher: any;
     let runDenorm: any;
     let dispatchGate: any;
+    let agents: any;
 
     beforeEach(() => {
         tasks = { casUpdateStatus: jest.fn().mockResolvedValue(true), findById: jest.fn() };
@@ -89,6 +90,13 @@ describe('TaskTransitionService.dispatchAgentRun — the one dispatch path', () 
             recordTerminal: jest.fn().mockResolvedValue(undefined),
         };
         dispatchGate = { admit: jest.fn().mockResolvedValue({ admitted: true }) };
+        agents = {
+            findByIdAndUser: jest.fn(async (id: string, userId: string, scope: unknown) => ({
+                id,
+                userId,
+                ...(scope as object),
+            })),
+        };
     });
 
     const makeSvc = () =>
@@ -102,6 +110,9 @@ describe('TaskTransitionService.dispatchAgentRun — the one dispatch path', () 
             undefined,
             runDenorm,
             dispatchGate,
+            undefined,
+            undefined,
+            agents,
         );
 
     it('consults the dispatch gate, creates the queued run, mirrors it on the board and enqueues', async () => {

@@ -306,12 +306,15 @@ export class TasksService {
         userId: string,
         actorType: TaskActorType,
         actorId: string,
+        ownershipScope?: OwnershipScope,
     ): Promise<void> {
         if (!actorId || actorId.trim().length === 0) {
             throw new BadRequestException(`${actorType} id is required.`);
         }
         if (actorType === 'agent' && this.agents) {
-            const agent = await this.agents.findByIdAndUser(actorId, userId).catch(() => null);
+            const agent = await this.agents
+                .findByIdAndUser(actorId, userId, ownershipScope)
+                .catch(() => null);
             if (!agent) {
                 throw new BadRequestException(
                     `Agent ${actorId} is not reachable for this user — cannot assign.`,
@@ -324,8 +327,13 @@ export class TasksService {
         userId: string,
         filter: ListTasksFilter = {},
         opts: { includeRun?: boolean } = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<{ rows: TaskWithRun[]; total: number }> {
-        const { rows, total } = await this.tasks.findByUserIdFiltered(userId, filter);
+        const { rows, total } = await this.tasks.findByUserIdFiltered(
+            userId,
+            filter,
+            ownershipScope,
+        );
         if (!opts.includeRun || rows.length === 0 || !this.agentRuns) {
             return { rows, total };
         }
@@ -352,7 +360,7 @@ export class TasksService {
         }
         let runsById = new Map<string, TaskRunEmbed>();
         try {
-            const runs = await this.agentRuns.findByIds(runIds);
+            const runs = await this.agentRuns.findByIds(runIds, userId, ownershipScope);
             runsById = new Map(
                 runs.map((run) => [
                     run.id,
@@ -382,7 +390,7 @@ export class TasksService {
     }
 
     async getOne(userId: string, id: string, scope?: OwnershipScope): Promise<Task> {
-        const task = await this.tasks.findByIdAndUser(id, userId);
+        const task = await this.tasks.findByIdAndUser(id, userId, scope);
         if (!task || !ownershipScopeMatches(task, scope)) {
             throw new NotFoundException(`Task ${id} not found.`);
         }
@@ -414,12 +422,20 @@ export class TasksService {
      * first, so a foreign parent 404s before any side row is read, and
      * the child rows come from the user-scoped list query.
      */
-    async listSubtasks(userId: string, parentTaskId: string): Promise<TaskSubtasksProjection> {
-        await this.getOne(userId, parentTaskId);
-        const { rows, total } = await this.tasks.findByUserIdFiltered(userId, {
-            parentTaskId,
-            limit: SUBTASKS_PAGE_SIZE,
-        });
+    async listSubtasks(
+        userId: string,
+        parentTaskId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<TaskSubtasksProjection> {
+        await this.getOne(userId, parentTaskId, ownershipScope);
+        const { rows, total } = await this.tasks.findByUserIdFiltered(
+            userId,
+            {
+                parentTaskId,
+                limit: SUBTASKS_PAGE_SIZE,
+            },
+            ownershipScope,
+        );
 
         const ids = rows.map((row) => row.id);
         const [assigneeRows, approverRows] = await Promise.all([
@@ -491,7 +507,11 @@ export class TasksService {
         // impossible for a brand-new id, but a malformed parent chain
         // pointing into existing-cyclic data would propagate downstream.
         if (input.parentTaskId) {
-            const parent = await this.tasks.findByIdAndUser(input.parentTaskId, userId);
+            const parent = await this.tasks.findByIdAndUser(
+                input.parentTaskId,
+                userId,
+                ownershipScope,
+            );
             if (!parent) {
                 throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
             }
@@ -528,7 +548,7 @@ export class TasksService {
                     );
                 }
                 seen.add(cursor);
-                const ancestor = await this.tasks.findByIdAndUser(cursor, userId);
+                const ancestor = await this.tasks.findByIdAndUser(cursor, userId, ownershipScope);
                 if (!ancestor) break;
                 cursor = ancestor.parentTaskId ?? null;
                 hops += 1;
@@ -577,8 +597,13 @@ export class TasksService {
         return created;
     }
 
-    async update(userId: string, id: string, input: UpdateTaskInput): Promise<Task> {
-        const task = await this.getOne(userId, id);
+    async update(
+        userId: string,
+        id: string,
+        input: UpdateTaskInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        const task = await this.getOne(userId, id, ownershipScope);
         const patch: Partial<Task> = {};
 
         if (input.title !== undefined) {
@@ -641,9 +666,13 @@ export class TasksService {
         const ownersChanged = Object.keys(ownerPatch).length > 0;
 
         if (ownersChanged) {
-            await this.assertScopeReachable(userId, {
-                ...ownerPatch,
-            } as CreateTaskInput);
+            await this.assertScopeReachable(
+                userId,
+                {
+                    ...ownerPatch,
+                } as CreateTaskInput,
+                ownershipScope,
+            );
 
             // Re-filing a Task must not break the sub-task hierarchy. The
             // create path enforces "a child agrees with its parent on every
@@ -657,7 +686,11 @@ export class TasksService {
             const effectiveParentId =
                 input.parentTaskId !== undefined ? input.parentTaskId : task.parentTaskId;
             if (effectiveParentId) {
-                const parent = await this.tasks.findByIdAndUser(effectiveParentId, userId);
+                const parent = await this.tasks.findByIdAndUser(
+                    effectiveParentId,
+                    userId,
+                    ownershipScope,
+                );
                 if (parent) {
                     this.assertParentScopeMatches(nextOwners, parent);
                 }
@@ -667,10 +700,14 @@ export class TasksService {
             // which cannot be fixed by validating this row alone. Refuse
             // rather than leave the tree inconsistent — the caller can move
             // the children first, or detach them.
-            const { total: childCount } = await this.tasks.findByUserIdFiltered(userId, {
-                parentTaskId: id,
-                limit: 1,
-            });
+            const { total: childCount } = await this.tasks.findByUserIdFiltered(
+                userId,
+                {
+                    parentTaskId: id,
+                    limit: 1,
+                },
+                ownershipScope,
+            );
             if (childCount > 0) {
                 throw new BadRequestException(
                     `Task ${id} has ${childCount} sub-task(s); re-file or detach them before changing its owners so parent and child scopes cannot diverge.`,
@@ -684,7 +721,11 @@ export class TasksService {
             if (input.parentTaskId === null) {
                 patch.parentTaskId = null;
             } else {
-                const parent = await this.tasks.findByIdAndUser(input.parentTaskId, userId);
+                const parent = await this.tasks.findByIdAndUser(
+                    input.parentTaskId,
+                    userId,
+                    ownershipScope,
+                );
                 if (!parent) {
                     throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
                 }
@@ -694,7 +735,12 @@ export class TasksService {
                 // block approved the move, then this check compared the OLD
                 // owners against the NEW parent and threw.
                 this.assertParentScopeMatches(nextOwners, parent);
-                const isCycle = await this.tasks.wouldCreateCycle(id, input.parentTaskId);
+                const isCycle = await this.tasks.wouldCreateCycle(
+                    id,
+                    input.parentTaskId,
+                    userId,
+                    ownershipScope,
+                );
                 if (isCycle) {
                     throw new ConflictException(
                         `Cannot set parent — would create a sub-task cycle.`,
@@ -705,7 +751,7 @@ export class TasksService {
         }
 
         await this.tasks.updateById(id, patch);
-        const refreshed = (await this.tasks.findById(id)) as Task;
+        const refreshed = await this.getOne(userId, id, ownershipScope);
         await this.logActivity({
             userId,
             taskId: id,
@@ -715,8 +761,12 @@ export class TasksService {
         return refreshed;
     }
 
-    async remove(userId: string, id: string): Promise<{ deleted: true }> {
-        const task = await this.getOne(userId, id);
+    async remove(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<{ deleted: true }> {
+        const task = await this.getOne(userId, id, ownershipScope);
         await this.tasks.deleteById(id);
         await this.logActivity({
             userId,
@@ -748,8 +798,9 @@ export class TasksService {
             recurrenceEndsAt?: Date | null;
             recurrenceMaxOccurrences?: number | null;
         },
+        ownershipScope?: OwnershipScope,
     ): Promise<Task> {
-        await this.getOne(userId, id);
+        await this.getOne(userId, id, ownershipScope);
         const hasRule = !!input.recurrenceRule;
         const hasCron = !!input.recurrenceCron;
         if (hasRule === hasCron) {
@@ -797,13 +848,17 @@ export class TasksService {
             recurrenceEndsAt: input.recurrenceEndsAt ?? null,
             recurrenceMaxOccurrences: input.recurrenceMaxOccurrences ?? null,
         });
-        return (await this.tasks.findById(id)) as Task;
+        return this.getOne(userId, id, ownershipScope);
     }
 
     /** Phase 17.2 — turn off recurrence on a template. Existing
      * spawned instances are untouched. */
-    async clearRecurring(userId: string, id: string): Promise<Task> {
-        await this.getOne(userId, id);
+    async clearRecurring(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        await this.getOne(userId, id, ownershipScope);
         await this.tasks.updateById(id, {
             isRecurring: false,
             recurrenceRule: null,
@@ -812,7 +867,7 @@ export class TasksService {
             recurrenceEndsAt: null,
             recurrenceMaxOccurrences: null,
         });
-        return (await this.tasks.findById(id)) as Task;
+        return this.getOne(userId, id, ownershipScope);
     }
 
     // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
@@ -823,8 +878,13 @@ export class TasksService {
      * the dispatcher picks up the NEW time. Mutually exclusive with
      * recurrence — a recurring template already has a cadence.
      */
-    async scheduleTask(userId: string, id: string, runAt: Date): Promise<Task> {
-        const task = await this.getOne(userId, id);
+    async scheduleTask(
+        userId: string,
+        id: string,
+        runAt: Date,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        const task = await this.getOne(userId, id, ownershipScope);
         this.assertFutureSchedule(runAt);
         if (task.isRecurring) {
             throw new BadRequestException(
@@ -838,12 +898,16 @@ export class TasksService {
             actionType: ActivityActionType.TASK_UPDATED,
             details: { scheduledAt: runAt.toISOString() },
         });
-        return (await this.tasks.findById(id)) as Task;
+        return this.getOne(userId, id, ownershipScope);
     }
 
     /** Remove the one-shot schedule (mode back to Run Once). */
-    async unscheduleTask(userId: string, id: string): Promise<Task> {
-        await this.getOne(userId, id);
+    async unscheduleTask(
+        userId: string,
+        id: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
+        await this.getOne(userId, id, ownershipScope);
         await this.tasks.updateById(id, { scheduledAt: null, scheduleClaimedAt: null });
         await this.logActivity({
             userId,
@@ -851,7 +915,7 @@ export class TasksService {
             actionType: ActivityActionType.TASK_UPDATED,
             details: { scheduledAt: null },
         });
-        return (await this.tasks.findById(id)) as Task;
+        return this.getOne(userId, id, ownershipScope);
     }
 
     private assertFutureSchedule(runAt: Date): void {
@@ -1106,8 +1170,9 @@ export class TasksService {
         // red-gate review refusal in TaskTransitionService; human/API
         // callers omit it and are unaffected.
         opts: TransitionOptions = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<Task> {
-        const task = await this.getOne(userId, id);
+        const task = await this.getOne(userId, id, ownershipScope);
         const from = task.status;
         const result = await this.transitions.transition(task, to, opts);
         await this.logActivity({
@@ -1145,10 +1210,11 @@ export class TasksService {
         taskId: string,
         assigneeType: TaskActorType,
         assigneeId: string,
+        ownershipScope?: OwnershipScope,
     ) {
-        const task = await this.getOne(userId, taskId);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, assigneeType, assigneeId);
+        await this.assertActorIsValid(userId, assigneeType, assigneeId, ownershipScope);
         const row = await this.insertOrConflict(
             () => this.assignees.add(taskId, assigneeType, assigneeId),
             `Task ${taskId} already has assignee ${assigneeId}.`,
@@ -1180,8 +1246,13 @@ export class TasksService {
         return row;
     }
 
-    async removeAssignee(userId: string, taskId: string, assigneeId: string) {
-        await this.getOne(userId, taskId);
+    async removeAssignee(
+        userId: string,
+        taskId: string,
+        assigneeId: string,
+        ownershipScope?: OwnershipScope,
+    ) {
+        await this.getOne(userId, taskId, ownershipScope);
         const removed = await this.assignees.removeForTask(taskId, assigneeId);
         if (!removed) {
             throw new NotFoundException(`Assignee ${assigneeId} not found.`);
@@ -1200,10 +1271,11 @@ export class TasksService {
         taskId: string,
         reviewerType: TaskActorType,
         reviewerId: string,
+        ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId);
+        await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, reviewerType, reviewerId);
+        await this.assertActorIsValid(userId, reviewerType, reviewerId, ownershipScope);
         return this.insertOrConflict(
             () => this.reviewers.add(taskId, reviewerType, reviewerId),
             `Task ${taskId} already has reviewer ${reviewerId}.`,
@@ -1215,22 +1287,28 @@ export class TasksService {
         taskId: string,
         approverType: TaskActorType,
         approverId: string,
+        ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId);
+        await this.getOne(userId, taskId, ownershipScope);
         // Review-fix I4: validate the actor exists / belongs to user.
-        await this.assertActorIsValid(userId, approverType, approverId);
+        await this.assertActorIsValid(userId, approverType, approverId, ownershipScope);
         return this.insertOrConflict(
             () => this.approvers.add(taskId, approverType, approverId),
             `Task ${taskId} already has approver ${approverId}.`,
         );
     }
 
-    async addBlocker(userId: string, taskId: string, blockedByTaskId: string) {
-        await this.getOne(userId, taskId);
+    async addBlocker(
+        userId: string,
+        taskId: string,
+        blockedByTaskId: string,
+        ownershipScope?: OwnershipScope,
+    ) {
+        await this.getOne(userId, taskId, ownershipScope);
         if (taskId === blockedByTaskId) {
             throw new BadRequestException('Task cannot block itself.');
         }
-        const blocker = await this.tasks.findByIdAndUser(blockedByTaskId, userId);
+        const blocker = await this.tasks.findByIdAndUser(blockedByTaskId, userId, ownershipScope);
         if (!blocker) {
             throw new BadRequestException(`Blocking Task ${blockedByTaskId} not found.`);
         }
@@ -1258,8 +1336,13 @@ export class TasksService {
         return row;
     }
 
-    async removeBlocker(userId: string, taskId: string, blockId: string) {
-        await this.getOne(userId, taskId);
+    async removeBlocker(
+        userId: string,
+        taskId: string,
+        blockId: string,
+        ownershipScope?: OwnershipScope,
+    ) {
+        await this.getOne(userId, taskId, ownershipScope);
         const removed = await this.blocks.removeForTask(taskId, blockId);
         if (!removed) {
             throw new NotFoundException(`Blocker ${blockId} not found.`);
@@ -1281,13 +1364,14 @@ export class TasksService {
         taskId: string,
         relatedTaskId: string,
         kind: 'related' | 'duplicates' | 'follow-up',
+        ownershipScope?: OwnershipScope,
     ) {
-        await this.getOne(userId, taskId);
+        await this.getOne(userId, taskId, ownershipScope);
         // A task cannot relate to itself (mirrors the addBlocker self-guard).
         if (taskId === relatedTaskId) {
             throw new BadRequestException('Task cannot relate to itself.');
         }
-        const related = await this.tasks.findByIdAndUser(relatedTaskId, userId);
+        const related = await this.tasks.findByIdAndUser(relatedTaskId, userId, ownershipScope);
         if (!related) {
             throw new BadRequestException(`Related Task ${relatedTaskId} not found.`);
         }
@@ -1302,8 +1386,8 @@ export class TasksService {
 
     // ── Phase 13.5 — attachments ──────────────────────────────────
 
-    async listAttachments(userId: string, taskId: string) {
-        await this.getOne(userId, taskId);
+    async listAttachments(userId: string, taskId: string, ownershipScope?: OwnershipScope) {
+        await this.getOne(userId, taskId, ownershipScope);
         if (!this.attachments) return [];
         return this.attachments.findByTaskId(taskId);
     }
@@ -1321,8 +1405,9 @@ export class TasksService {
         taskId: string,
         uploadId: string,
         role: 'initial' | 'result' = 'initial',
+        ownershipScope?: OwnershipScope,
     ) {
-        const task = await this.getOne(userId, taskId);
+        const task = await this.getOne(userId, taskId, ownershipScope);
         if (!uploadId) throw new BadRequestException('uploadId is required.');
         if (role !== 'initial' && role !== 'result') {
             throw new BadRequestException(`Invalid attachment role: ${role}`);
@@ -1356,8 +1441,13 @@ export class TasksService {
         }
     }
 
-    async removeAttachment(userId: string, taskId: string, attachmentId: string) {
-        await this.getOne(userId, taskId);
+    async removeAttachment(
+        userId: string,
+        taskId: string,
+        attachmentId: string,
+        ownershipScope?: OwnershipScope,
+    ) {
+        await this.getOne(userId, taskId, ownershipScope);
         if (!this.attachments) {
             throw new BadRequestException('Attachment repository not wired in this context.');
         }

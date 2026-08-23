@@ -408,6 +408,42 @@ describe('AgentRunRepository — terminal transitions', () => {
             });
         });
 
+        it('binds a batch embed lookup to the same user and exact Organization', async () => {
+            await (runs.findByIds as any)([runId], userId, everScope);
+
+            expect(repository.find).toHaveBeenLastCalledWith({
+                where: [
+                    expect.objectContaining({
+                        id: expect.objectContaining({ _type: 'in', _value: [runId] }),
+                        userId,
+                        ...everScope,
+                    }),
+                ],
+            });
+        });
+
+        it('keeps current and legacy personal batch embeds separate from Organization runs', async () => {
+            await (runs.findByIds as any)([runId], userId, {
+                tenantId: everScope.tenantId,
+                organizationId: null,
+            });
+
+            const where = repository.find.mock.calls.at(-1)?.[0]?.where as Array<
+                Record<string, unknown>
+            >;
+            expect(where).toHaveLength(2);
+            expect(where[0]).toMatchObject({
+                userId,
+                tenantId: everScope.tenantId,
+                organizationId: expect.objectContaining({ _type: 'isNull' }),
+            });
+            expect(where[1]).toMatchObject({
+                userId,
+                tenantId: expect.objectContaining({ _type: 'isNull' }),
+                organizationId: expect.objectContaining({ _type: 'isNull' }),
+            });
+        });
+
         it('keeps current and legacy personal runs reachable without admitting either Org', async () => {
             await runs.findByIdAndUser(runId, userId, {
                 tenantId: everScope.tenantId,

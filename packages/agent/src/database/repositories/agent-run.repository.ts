@@ -111,16 +111,20 @@ export class AgentRunRepository {
      * Kanban run cockpit (Wave 2) — batch-load runs for the `includeRun`
      * list embed. One IN query, no N+1.
      *
-     * @internal Security: unscoped by design — callers MUST pass only ids
-     * derived server-side from rows the acting user already owns (the
-     * Tasks list hands over its own `latestRunId` pointers, never client
-     * input). HTTP handlers must not expose this with caller-supplied ids.
+     * Request-facing callers pass user + active scope so even a stale or
+     * malformed denormalized pointer cannot embed a same-user run from a
+     * different Organization. Omitted ownership preserves worker/internal
+     * callers that batch already-authoritative ids.
      */
-    async findByIds(ids: string[]): Promise<AgentRun[]> {
+    async findByIds(ids: string[], userId?: string, scope?: OwnershipScope): Promise<AgentRun[]> {
         // TypeORM renders `In([])` as invalid SQL on some drivers; and an
         // empty batch has an obvious answer anyway.
         if (ids.length === 0) return [];
-        return this.repository.find({ where: { id: In(ids) } });
+        const idPredicate = { id: In(ids) };
+        const where = userId
+            ? ownershipWhereWith<AgentRun>(userId, scope, idPredicate)
+            : idPredicate;
+        return this.repository.find({ where });
     }
 
     /**

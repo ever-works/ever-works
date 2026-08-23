@@ -40,12 +40,17 @@ import { TasksController } from './tasks.controller';
  */
 describe('TasksController — PR insights endpoints', () => {
     const auth = { userId: 'user-1' } as never;
+    const scope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
 
     function make() {
+        const getOne = jest.fn().mockResolvedValue({ id: 'task-1', ...scope });
         const getForTask = jest.fn().mockResolvedValue({ taskId: 'task-1', cached: true });
         const getDiffForTask = jest.fn().mockResolvedValue({ taskId: 'task-1', diff: {} });
         const controller = new TasksController(
-            {} as never,
+            { getOne } as never,
             {} as never,
             {} as never,
             {} as never,
@@ -54,15 +59,16 @@ describe('TasksController — PR insights endpoints', () => {
             {} as never,
             {} as never,
             { getForTask, getDiffForTask } as never,
-            undefined as never,
+            { getScope: () => scope } as never,
         );
-        return { controller, getForTask, getDiffForTask };
+        return { controller, getOne, getForTask, getDiffForTask };
     }
 
     describe('GET /tasks/:id/pr-status', () => {
         it('scopes the read to the authenticated user', async () => {
-            const { controller, getForTask } = make();
+            const { controller, getOne, getForTask } = make();
             await controller.prStatus(auth, 'task-1');
+            expect(getOne).toHaveBeenCalledWith('user-1', 'task-1', scope);
             expect(getForTask).toHaveBeenCalledWith('user-1', 'task-1', { refresh: false });
         });
 

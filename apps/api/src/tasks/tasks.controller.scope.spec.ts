@@ -4,8 +4,8 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskReviewRejectionService: class {},
     TaskWorkspaceService: class {},
     TaskPrStatusService: class {},
-    TaskStatus: {},
-    TaskPriority: {},
+    TaskStatus: { TODO: 'todo', IN_PROGRESS: 'in_progress' },
+    TaskPriority: { P3: 'p3' },
     RUN_BATCH_MAX_TASKS: 20,
 }));
 jest.mock('@ever-works/agent/database', () => ({
@@ -30,15 +30,41 @@ describe('TasksController — board-run active scope', () => {
 
     function build() {
         const service = {
+            list: jest.fn().mockResolvedValue({ rows: [], total: 0 }),
+            create: jest.fn().mockResolvedValue({ id: taskId }),
+            getOne: jest.fn().mockResolvedValue({ id: taskId, workId: null }),
+            update: jest.fn().mockResolvedValue({ id: taskId }),
+            listSubtasks: jest.fn().mockResolvedValue({ rows: [], total: 0, doneCount: 0 }),
+            remove: jest.fn().mockResolvedValue({ deleted: true }),
+            setRecurring: jest.fn().mockResolvedValue({ id: taskId }),
+            clearRecurring: jest.fn().mockResolvedValue({ id: taskId }),
+            scheduleTask: jest.fn().mockResolvedValue({ id: taskId }),
+            unscheduleTask: jest.fn().mockResolvedValue({ id: taskId }),
+            transition: jest.fn().mockResolvedValue({ id: taskId }),
+            addAssignee: jest.fn().mockResolvedValue({}),
+            removeAssignee: jest.fn().mockResolvedValue({ deleted: true }),
+            addReviewer: jest.fn().mockResolvedValue({}),
+            addApprover: jest.fn().mockResolvedValue({}),
+            addBlocker: jest.fn().mockResolvedValue({}),
+            removeBlocker: jest.fn().mockResolvedValue({ deleted: true }),
+            listAttachments: jest.fn().mockResolvedValue([]),
+            addAttachment: jest.fn().mockResolvedValue({}),
+            removeAttachment: jest.fn().mockResolvedValue({ deleted: true }),
+            addRelation: jest.fn().mockResolvedValue({}),
             runTasksBatch: jest.fn().mockResolvedValue({ results: [] }),
             listRunCandidates: jest.fn().mockResolvedValue([]),
             runTask: jest.fn().mockResolvedValue({ taskId, agentId }),
         };
+        const chat = {
+            list: jest.fn().mockResolvedValue([]),
+            post: jest.fn().mockResolvedValue({ id: 'message-1' }),
+        };
+        const agents = { findByUserIdScoped: jest.fn().mockResolvedValue({ rows: [] }) };
         const controller = new TasksController(
             service as never,
-            {} as never,
-            {} as never,
-            {} as never,
+            chat as never,
+            { getTotalSpendCentsForTask: jest.fn().mockResolvedValue(0) } as never,
+            agents as never,
             {} as never,
             {} as never,
             {} as never,
@@ -46,7 +72,7 @@ describe('TasksController — board-run active scope', () => {
             {} as never,
             { getScope: () => everScope } as never,
         );
-        return { controller, service };
+        return { controller, service, chat, agents };
     }
 
     it('threads the exact active tenant and Organization through run, batch, and candidates', async () => {
@@ -63,5 +89,91 @@ describe('TasksController — board-run active scope', () => {
             everScope,
         );
         expect(service.listRunCandidates).toHaveBeenCalledWith(userId, taskId, everScope);
+    });
+
+    it('threads the exact active scope through every core Task and chat request operation', async () => {
+        const { controller, service, chat, agents } = build();
+        const assigneeId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+        const attachmentId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+        const relatedTaskId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+
+        await (controller.list as any)(auth);
+        await controller.create(auth, { title: 'Scoped' } as never);
+        await controller.getOne(auth, taskId);
+        await controller.update(auth, taskId, {} as never);
+        await controller.listSubtasks(auth, taskId);
+        await controller.remove(auth, taskId);
+        await controller.setRecurring(auth, taskId, { recurrenceRule: 'FREQ=DAILY' } as never);
+        await controller.schedule(auth, taskId, { runAt: '2099-01-01T00:00:00.000Z' } as never);
+        await controller.unschedule(auth, taskId);
+        await controller.clearRecurring(auth, taskId);
+        await controller.transition(auth, taskId, { to: 'in_progress', force: false } as never);
+        await controller.addAssignee(auth, taskId, {
+            assigneeType: 'agent',
+            assigneeId,
+        } as never);
+        await controller.removeAssignee(auth, taskId, assigneeId);
+        await controller.addReviewer(auth, taskId, {
+            reviewerType: 'agent',
+            reviewerId: assigneeId,
+        } as never);
+        await controller.addApprover(auth, taskId, {
+            approverType: 'agent',
+            approverId: assigneeId,
+        } as never);
+        await controller.addBlocker(auth, taskId, { blockedByTaskId: relatedTaskId });
+        await controller.removeBlocker(auth, taskId, relatedTaskId);
+        await controller.listAttachments(auth, taskId);
+        await controller.addAttachment(auth, taskId, {
+            uploadId: attachmentId,
+            role: 'initial',
+        } as never);
+        await controller.removeAttachment(auth, taskId, attachmentId);
+        await controller.addRelation(auth, taskId, {
+            relatedTaskId,
+            kind: 'related',
+        } as never);
+        await (controller.listChat as any)(auth, taskId);
+        await (controller.spend as any)(auth, taskId);
+        await controller.postChat(auth, taskId, { body: 'hello' } as never);
+
+        const scopedMethods = [
+            'list',
+            'create',
+            'getOne',
+            'update',
+            'listSubtasks',
+            'remove',
+            'setRecurring',
+            'scheduleTask',
+            'unscheduleTask',
+            'clearRecurring',
+            'transition',
+            'addAssignee',
+            'removeAssignee',
+            'addReviewer',
+            'addApprover',
+            'addBlocker',
+            'removeBlocker',
+            'listAttachments',
+            'addAttachment',
+            'removeAttachment',
+            'addRelation',
+        ] as const;
+        for (const method of scopedMethods) {
+            expect(
+                service[method].mock.calls.some(
+                    (call: unknown[]) => call[call.length - 1] === everScope,
+                ),
+            ).toBe(true);
+        }
+        expect(chat.list).toHaveBeenCalledWith(userId, taskId, expect.any(Object), everScope);
+        expect(chat.post).toHaveBeenCalledWith(
+            userId,
+            expect.objectContaining({ taskId }),
+            expect.any(Object),
+            everScope,
+        );
+        expect(agents.findByUserIdScoped).toHaveBeenCalledWith(userId, { limit: 500 }, everScope);
     });
 });

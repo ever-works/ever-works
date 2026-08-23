@@ -17,6 +17,8 @@ import {
     TaskApproverRepository,
 } from '../database/repositories/task-side.repositories';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { AgentRepository } from '../database/repositories/agent.repository';
+import { ownershipScopeOf } from '../database/ownership-scope';
 import {
     AGENT_TASK_EXECUTE_DISPATCHER,
     JOB_RUNTIME_NOT_CONFIGURED_REASON,
@@ -126,6 +128,10 @@ export class TaskTransitionService {
         @Optional()
         @Inject(TERMINAL_SESSION_STARTER)
         private readonly terminalSessions?: TerminalSessionStarter,
+        // Ownership is enforced at the single dispatch choke point so
+        // transition fan-out, recurrence, delegation, and manual dispatch
+        // cannot drift into different Agent-scope rules.
+        @Optional() private readonly agents?: AgentRepository,
     ) {}
 
     /**
@@ -365,6 +371,17 @@ export class TaskTransitionService {
     }> {
         if (!this.dispatcher) {
             return { runId: null, dispatched: false, parked: false, error: 'no-dispatcher' };
+        }
+        const agent = await this.agents
+            ?.findByIdAndUser(agentId, task.userId, ownershipScopeOf(task))
+            .catch(() => null);
+        if (!agent) {
+            return {
+                runId: null,
+                dispatched: false,
+                parked: false,
+                error: 'agent-not-found',
+            };
         }
         const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
         const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;

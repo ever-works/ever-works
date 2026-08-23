@@ -16,6 +16,7 @@ import type { WorkRepoResolver } from '@ever-works/github-storage-plugin';
 // UploadsModule binds the token to the real repo via `useExisting`.
 import type { UserUploadRepository } from '@ever-works/agent/database';
 import { getActiveStorageBackend } from './storage-backend.factory';
+import { ScopeContextService } from '../scope/scope-context.service';
 
 /**
  * DI token for the optional `UserUploadRepository`. The UploadsModule provides
@@ -267,14 +268,15 @@ export class UploadsService {
         @Optional()
         @Inject(WORK_REPO_RESOLVER)
         private readonly workRepoResolver?: WorkRepoResolver,
-        // Ownership index for plain uploads. `@Optional()` so the unit tests
-        // that construct `new UploadsService(backend)` still work; in
-        // production / E2E the UploadsModule binds USER_UPLOAD_REPOSITORY to the
-        // real repo, so every upload is recorded and attachments can validate
-        // ownership.
-        @Optional()
+        // Authoritative ownership index for plain uploads. Required in the
+        // Nest graph: returning success without this row would create bytes
+        // that no scoped attach/read path can authorize.
         @Inject(USER_UPLOAD_REPOSITORY)
         private readonly userUploads?: UserUploadRepository,
+        // Globally provided in the API. The default keeps direct unit
+        // construction ergonomic and represents explicit legacy-personal
+        // scope; Nest still resolves the real singleton in production.
+        private readonly scopeContext: ScopeContextService = new ScopeContextService(),
     ) {
         this.maxSize = Number(process.env.UPLOADS_MAX_BYTES) || DEFAULT_MAX_SIZE;
         if (backend) {
@@ -297,11 +299,10 @@ export class UploadsService {
     }
 
     /**
-     * Best-effort: index the upload's ownership (`userId`) + storage location in
-     * `user_uploads` so an attachment can later validate that its `uploadId`
-     * (the sha256) references a real, caller-owned upload. The bytes are already
-     * stored when this runs, so a failure here MUST NOT fail the upload — log
-     * and continue (deduped per `(userId, sha256)` in the repo).
+     * Persist the authoritative ownership row before reporting upload success.
+     * Storage writes happen first because the plugin contract has no shared DB
+     * transaction, but metadata failure is never swallowed: callers receive an
+     * error rather than a URL that every scoped attach/read path must reject.
      */
     private async recordUpload(input: {
         userId: string;
@@ -312,25 +313,22 @@ export class UploadsService {
         fileSize: number;
         workId?: string;
     }): Promise<void> {
-        if (!this.userUploads) return;
-        try {
-            await this.userUploads.record({
-                userId: input.userId,
-                sha256: input.sha256,
-                workId: input.workId ?? null,
-                storageProvider: (process.env.STORAGE_BACKEND || 'local-fs').toLowerCase(),
-                storagePath: input.key,
-                originalFilename: input.originalFilename ?? null,
-                mimeType: input.mimeType,
-                fileSize: input.fileSize,
-            });
-        } catch (err) {
-            this.logger.warn(
-                `Failed to record upload ownership (sha256=${input.sha256.slice(0, 12)}…): ${
-                    err instanceof Error ? err.message : String(err)
-                }`,
-            );
+        if (!this.userUploads) {
+            throw new Error('Upload metadata repository is not configured');
         }
+        const scope = this.scopeContext.getScope();
+        await this.userUploads.record({
+            userId: input.userId,
+            sha256: input.sha256,
+            workId: input.workId ?? null,
+            tenantId: scope.tenantId,
+            organizationId: scope.organizationId,
+            storageProvider: (process.env.STORAGE_BACKEND || 'local-fs').toLowerCase(),
+            storagePath: input.key,
+            originalFilename: input.originalFilename ?? null,
+            mimeType: input.mimeType,
+            fileSize: input.fileSize,
+        });
     }
 
     /**
