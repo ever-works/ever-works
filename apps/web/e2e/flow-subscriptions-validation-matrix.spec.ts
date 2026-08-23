@@ -274,7 +274,7 @@ test.describe('Subscriptions plan — POST happy path, self-serve gate, transiti
         const body = await res.json();
         if (res.status() === 200) {
             expect(body.plan.code).toBe('standard');
-            expect(body.plan.name).toBe('Standard');
+            expect(body.plan.name).toBe('Pro');
             // STANDARD gates the sub-12h cadences to pay-per-use.
             const gated = body.plan.allowedCadences.filter((c: { allowed: boolean }) => !c.allowed);
             for (const c of gated) {
@@ -296,7 +296,7 @@ test.describe('Subscriptions plan — POST happy path, self-serve gate, transiti
         const body = await res.json();
         if (res.status() === 200) {
             expect(body.plan.code).toBe('premium');
-            expect(body.plan.name).toBe('Premium');
+            expect(body.plan.name).toBe('Enterprise');
             for (const c of body.plan.allowedCadences) {
                 expect(c.allowed).toBe(true);
                 expect(c.payPerUse).toBe(false);
