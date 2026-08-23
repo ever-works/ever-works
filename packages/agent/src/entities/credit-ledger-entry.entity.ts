@@ -81,8 +81,18 @@ export class CreditLedgerEntry {
     @Column({ type: 'varchar', length: 32, nullable: true })
     refType?: string | null;
 
-    /** UUID of the correlated run/generation/task. */
-    @Column({ type: 'uuid', nullable: true })
+    /**
+     * Id of the correlated run / generation / task / PAYMENT.
+     *
+     * varchar, not uuid: the settled-purchase and refund-reversal paths
+     * write the provider payment id here (`billing.service.ts` records
+     * `refId: event.paymentId`, a Stripe `pi_...` string), and
+     * `findLatestByRef` reads it back to size a refund. Declared `uuid` by
+     * the creating migration, it made the first real credit-pack purchase
+     * fail with 22P02 on Postgres while the sqlite test suite stayed green.
+     * Widened by migration 1787500000000.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
     refId?: string | null;
 
     /** Balance materialized at write time (display; SUM is authoritative). */

@@ -54,8 +54,21 @@ jest.mock('@ever-works/agent/subscriptions', () => ({
     CheckoutSessionNotFoundError: FakeCheckoutSessionNotFoundError,
     PlanSubscriptionService: class PlanSubscriptionService {},
 }));
+// 🛑 Keep this in step with the REAL enum in packages/agent/src/entities/types.ts.
+// It stubbed only the three cloud codes, which silently made every DTO
+// assertion here validate against a catalog that has not existed since the
+// self-hosted editions landed - so a `selfhosted_pro` body looked like a 400
+// in tests while the running API accepts it. A mock that lags the enum turns
+// this suite from a guard into a decoy.
 jest.mock('@ever-works/agent/entities', () => ({
-    SubscriptionPlanCode: { FREE: 'free', STANDARD: 'standard', PREMIUM: 'premium' },
+    SubscriptionPlanCode: {
+        FREE: 'free',
+        STANDARD: 'standard',
+        PREMIUM: 'premium',
+        SELFHOSTED_COMMUNITY: 'selfhosted_community',
+        SELFHOSTED_PRO: 'selfhosted_pro',
+        SELFHOSTED_ENTERPRISE: 'selfhosted_enterprise',
+    },
 }));
 jest.mock('../auth', () => ({
     AuthSessionGuard: class AuthSessionGuard {},
@@ -365,6 +378,41 @@ describe('CreatePlanCheckoutDto — the client can never name a price', () => {
 
     it('rejects a missing plan code', async () => {
         expect(await validateBody({})).not.toHaveLength(0);
+    });
+
+    /**
+     * H1 — `interval` and `seats` decide WHICH catalog SKU is priced. They
+     * have always been accepted here and forwarded by the controller, and
+     * until now no test at this boundary said so, while the web client never
+     * sent them. That is what made the $99 lifetime licence unreachable: not
+     * refused, just never requested.
+     */
+    it('accepts each supported interval, and rejects anything else', async () => {
+        for (const interval of ['monthly', 'annual', 'lifetime']) {
+            expect(await validateBody({ planCode: 'selfhosted_pro', interval })).toHaveLength(0);
+        }
+        for (const interval of ['weekly', 'perpetual', '', 1]) {
+            expect(await validateBody({ planCode: 'selfhosted_pro', interval })).not.toHaveLength(
+                0,
+            );
+        }
+    });
+
+    it('treats an omitted interval as not supplied (the server defaults to monthly)', async () => {
+        // @IsOptional() skips validation for null AND undefined, so both mean
+        // 'field absent' - which the controller turns into 'monthly'. Asserted
+        // so a later switch to @ValidateIf cannot silently start 400ing every
+        // body that predates this field.
+        expect(await validateBody({ planCode: 'standard' })).toHaveLength(0);
+        expect(await validateBody({ planCode: 'standard', interval: null })).toHaveLength(0);
+    });
+
+    it('accepts a seat count in range and rejects one outside it', async () => {
+        expect(await validateBody({ planCode: 'standard', seats: 0 })).toHaveLength(0);
+        expect(await validateBody({ planCode: 'standard', seats: 17 })).toHaveLength(0);
+        for (const seats of [-1, 1.5, 100001]) {
+            expect(await validateBody({ planCode: 'standard', seats })).not.toHaveLength(0);
+        }
     });
 });
 

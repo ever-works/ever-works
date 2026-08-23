@@ -34,7 +34,11 @@ describe('SubscriptionsController', () => {
     let subscriptionService: jest.Mocked<
         Pick<
             SubscriptionService,
-            'summarizePlan' | 'isEnabled' | 'changePlanSelfService' | 'listPlans'
+            | 'summarizePlan'
+            | 'isEnabled'
+            | 'changePlanSelfService'
+            | 'listPlans'
+            | 'listSelfHostedPlans'
         >
     >;
     let authService: jest.Mocked<Pick<AuthService, 'getUser'>>;
@@ -62,6 +66,7 @@ describe('SubscriptionsController', () => {
             isEnabled: jest.fn(),
             changePlanSelfService: jest.fn(),
             listPlans: jest.fn(),
+            listSelfHostedPlans: jest.fn(),
         } as any;
         authService = {
             getUser: jest.fn().mockResolvedValue(user),
@@ -133,6 +138,12 @@ describe('SubscriptionsController', () => {
     });
 
     describe('listPlans (Wave 13 — Billing page plan switcher)', () => {
+        beforeEach(() => {
+            // Most cases care only about the hosted switcher; the licence list
+            // is asserted separately below.
+            subscriptionService.listSelfHostedPlans.mockResolvedValue([]);
+        });
+
         const seededPlans = [
             {
                 code: 'free',
@@ -173,15 +184,67 @@ describe('SubscriptionsController', () => {
             expect(result.plans[0]).toEqual({
                 code: 'free',
                 name: 'Free',
+                hosting: undefined,
                 maxWorks: 1,
                 allowedCadences: ['monthly'],
                 monthlyPrice: '0',
+                annualPrice: undefined,
+                lifetimePrice: undefined,
+                seatsIncluded: undefined,
+                seatMonthlyPrice: undefined,
+                monthlyCredits: undefined,
                 overagePricePerRun: '10',
                 currency: 'usd',
                 isCurrent: false,
                 dailyFreeCredits: 50,
             });
             expect(result.plans[1].isCurrent).toBe(true);
+        });
+
+        /**
+         * H1 — self-hosted editions ship in their OWN array.
+         *
+         * They are purchasable (the $99 perpetual licence is the only lifetime
+         * SKU in the catalog) but never self-assignable: `changePlanSelfService`
+         * refuses them, so a card in the switcher would be a button whose only
+         * possible outcome is a 403. The switcher must keep exactly the plans a
+         * user can switch between.
+         */
+        it('returns self-hosted editions separately from the switchable plans', async () => {
+            subscriptionService.summarizePlan.mockResolvedValue({
+                enabled: true,
+                plan: { code: 'free', displayName: 'Free' },
+                allowances: [],
+            } as any);
+            subscriptionService.listPlans.mockResolvedValue(seededPlans);
+            subscriptionService.listSelfHostedPlans.mockResolvedValue([
+                {
+                    code: 'selfhosted_pro',
+                    displayName: 'Pro Edition',
+                    hosting: 'selfhosted',
+                    maxWorks: 5,
+                    allowedCadences: ['monthly'],
+                    monthlyPrice: '49',
+                    annualPrice: '408',
+                    lifetimePrice: '99',
+                    seatsIncluded: 10,
+                    seatMonthlyPrice: '5',
+                    monthlyCredits: 3000,
+                    overagePricePerRun: '0',
+                    currency: 'usd',
+                },
+            ] as any[]);
+            entitlementsService.getNumber.mockResolvedValue(50);
+
+            const result = await controller.listPlans(auth);
+
+            // The switcher is untouched — no self-hosted card leaks into it.
+            expect(result.plans.map((plan) => plan.code)).toEqual(['free', 'premium']);
+            expect(result.licences).toHaveLength(1);
+            expect(result.licences[0].code).toBe('selfhosted_pro');
+            expect(result.licences[0].lifetimePrice).toBe('99');
+            // A licence never becomes "your current plan" on this deployment.
+            expect(result.licences[0].isCurrent).toBe(false);
         });
 
         it('falls back to free as the current plan when subscriptions are disabled', async () => {
