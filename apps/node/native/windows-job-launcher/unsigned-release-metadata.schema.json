@@ -17,6 +17,7 @@
 		"authenticodeContentSha256",
 		"cargoLockSha256",
 		"buildInputs",
+		"invocationHints",
 		"reproducibility",
 		"sbom",
 		"sbomSha256",
@@ -37,6 +38,7 @@
 		"authenticodeContentSha256": { "$ref": "#/$defs/sha256" },
 		"cargoLockSha256": { "$ref": "#/$defs/sha256" },
 		"buildInputs": { "$ref": "#/$defs/buildInputs" },
+		"invocationHints": { "$ref": "#/$defs/invocationHints" },
 		"reproducibility": { "$ref": "#/$defs/reproducibility" },
 		"sbom": { "const": "ever-works-windows-job-launcher.sbom.cdx.json" },
 		"sbomSha256": { "$ref": "#/$defs/sha256" },
@@ -67,10 +69,22 @@
 		"builder": {
 			"type": "object",
 			"additionalProperties": false,
+			"required": ["kind", "id"],
+			"properties": {
+				"kind": { "const": "local-untrusted" },
+				"id": { "const": "urn:ever-works:builder:build-release-script:v3" }
+			}
+		},
+		"invocationHints": {
+			"type": "object",
+			"additionalProperties": false,
 			"required": [
-				"kind",
-				"id",
-				"workflowRef",
+				"trust",
+				"claimedProvider",
+				"githubRepository",
+				"githubRunAttempt",
+				"githubRunId",
+				"githubWorkflowRef",
 				"runnerOs",
 				"runnerArch",
 				"runnerEnvironment",
@@ -78,41 +92,56 @@
 				"imageVersion"
 			],
 			"properties": {
-				"kind": { "enum": ["github-actions", "local"] },
-				"id": { "type": "string", "minLength": 1 },
-				"workflowRef": { "type": "string", "minLength": 1 },
-				"runnerOs": { "type": "string", "minLength": 1 },
-				"runnerArch": { "type": "string", "minLength": 1 },
-				"runnerEnvironment": { "type": "string", "minLength": 1 },
-				"imageOs": { "type": "string", "minLength": 1 },
-				"imageVersion": { "type": "string", "minLength": 1 }
-			},
-			"allOf": [
-				{
-					"if": { "properties": { "kind": { "const": "local" } } },
-					"then": {
-						"properties": {
-							"id": { "const": "urn:ever-works:builder:local-untrusted" },
-							"workflowRef": { "const": "unmanaged" },
-							"runnerEnvironment": { "const": "unmanaged" },
-							"imageOs": { "const": "unmanaged" },
-							"imageVersion": { "const": "unmanaged" }
-						}
-					}
-				},
-				{
-					"if": { "properties": { "kind": { "const": "github-actions" } } },
-					"then": {
-						"properties": {
-							"id": {
-								"pattern": "^https://github\\.com/[^/]+/[^/]+/actions/runs/[0-9]+/attempts/[0-9]+$"
-							},
-							"runnerEnvironment": { "const": "github-hosted" },
-							"imageOs": { "pattern": "^win" }
-						}
+				"trust": { "const": "untrusted-environment" },
+				"claimedProvider": { "enum": ["github-actions", "unmanaged"] },
+				"githubRepository": { "$ref": "#/$defs/invocationHint" },
+				"githubRunAttempt": { "$ref": "#/$defs/invocationHint" },
+				"githubRunId": { "$ref": "#/$defs/invocationHint" },
+				"githubWorkflowRef": { "$ref": "#/$defs/invocationHint" },
+				"runnerOs": { "$ref": "#/$defs/invocationHint" },
+				"runnerArch": { "$ref": "#/$defs/invocationHint" },
+				"runnerEnvironment": { "$ref": "#/$defs/invocationHint" },
+				"imageOs": { "$ref": "#/$defs/invocationHint" },
+				"imageVersion": { "$ref": "#/$defs/invocationHint" }
+			}
+		},
+		"invocationHint": { "type": "string", "minLength": 1, "maxLength": 512 },
+		"environmentPolicy": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"mode",
+				"cargoHome",
+				"clearedCargoRustOverrideCount",
+				"clearedCargoProfileOverrideCount",
+				"effective"
+			],
+			"properties": {
+				"mode": { "const": "isolated-cargo-rust-allowlist" },
+				"cargoHome": { "const": "target/repro-cargo-home" },
+				"clearedCargoRustOverrideCount": { "type": "integer", "minimum": 0 },
+				"clearedCargoProfileOverrideCount": { "type": "integer", "minimum": 0 },
+				"effective": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"rustFlags",
+						"cargoIncremental",
+						"cargoBuildIncremental",
+						"rustcWrapper",
+						"rustcWorkspaceWrapper",
+						"cargoTargetDirectory"
+					],
+					"properties": {
+						"rustFlags": { "const": "-C link-arg=/Brepro" },
+						"cargoIncremental": { "const": false },
+						"cargoBuildIncremental": { "const": false },
+						"rustcWrapper": { "const": "disabled" },
+						"rustcWorkspaceWrapper": { "const": "disabled" },
+						"cargoTargetDirectory": { "const": "per-build-isolated" }
 					}
 				}
-			]
+			}
 		},
 		"buildInputs": {
 			"type": "object",
@@ -125,7 +154,8 @@
 				"msvcToolset",
 				"linker",
 				"windowsSdk",
-				"builder"
+				"builder",
+				"environmentPolicy"
 			],
 			"properties": {
 				"rustFlags": { "const": "-C link-arg=/Brepro" },
@@ -183,7 +213,8 @@
 						"ucrtLibrarySetSha256": { "$ref": "#/$defs/sha256" }
 					}
 				},
-				"builder": { "$ref": "#/$defs/builder" }
+				"builder": { "$ref": "#/$defs/builder" },
+				"environmentPolicy": { "$ref": "#/$defs/environmentPolicy" }
 			}
 		},
 		"reproducibility": {

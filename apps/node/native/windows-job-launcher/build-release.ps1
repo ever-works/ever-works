@@ -18,17 +18,27 @@ $provenancePath = Join-Path $metadataDirectory $provenanceName
 $targetRoot = [IO.Path]::GetFullPath((Join-Path $packageRoot "target"))
 $firstTargetDirectory = Join-Path $targetRoot "repro-build-1"
 $secondTargetDirectory = Join-Path $targetRoot "repro-build-2"
+$isolatedCargoHome = Join-Path $targetRoot "repro-cargo-home"
 $canonicalBinaryPath = Join-Path $targetRoot "$targetTriple\release\$artifactName"
 . (Join-Path $packageRoot "pe-authenticode-content.ps1")
 
-$managedEnvironmentNames = @(
+$cargoRustEnvironmentNames = @(
+	[Environment]::GetEnvironmentVariables("Process").Keys |
+		ForEach-Object { [string]$_ } |
+		Where-Object { $_ -match '^(CARGO_|RUST)' } |
+		Sort-Object -Unique
+)
+$clearedCargoProfileOverrideCount = @(
+	$cargoRustEnvironmentNames | Where-Object { $_ -match '^CARGO_PROFILE_' }
+).Count
+$fixedManagedEnvironmentNames = @(
+	"CARGO_HOME",
 	"CARGO_BUILD_INCREMENTAL",
 	"CARGO_BUILD_RUSTC",
 	"CARGO_BUILD_RUSTC_WRAPPER",
 	"CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER",
 	"CARGO_ENCODED_RUSTFLAGS",
 	"CARGO_INCREMENTAL",
-	"CARGO_PROFILE_RELEASE_INCREMENTAL",
 	"CARGO_TARGET_DIR",
 	"CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER",
 	"CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS",
@@ -45,6 +55,10 @@ $managedEnvironmentNames = @(
 	"VCToolsVersion",
 	"WindowsSdkDir",
 	"WindowsSDKVersion"
+)
+$managedEnvironmentNames = @(
+	$cargoRustEnvironmentNames + $fixedManagedEnvironmentNames |
+		Sort-Object -Unique
 )
 $previousEnvironment = @{}
 foreach ($name in $managedEnvironmentNames) {
@@ -131,6 +145,21 @@ function Assert-DisposableTargetDirectory {
 	}
 }
 
+function Reset-IsolatedCargoHome {
+	$resolved = [IO.Path]::GetFullPath($isolatedCargoHome)
+	$prefix = $targetRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+	if (
+		-not $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or
+		$resolved -cne $isolatedCargoHome
+	) {
+		throw "refusing to clean an unexpected Cargo home"
+	}
+	if (Test-Path -LiteralPath $isolatedCargoHome) {
+		Remove-Item -LiteralPath $isolatedCargoHome -Recurse -Force
+	}
+	New-Item -ItemType Directory -Path $isolatedCargoHome | Out-Null
+}
+
 function Invoke-IsolatedReleaseBuild {
 	param(
 		[Parameter(Mandatory)] [string]$CargoPath,
@@ -154,48 +183,43 @@ function Invoke-IsolatedReleaseBuild {
 	return $binaryPath
 }
 
-function Get-BuilderInput {
-	if ($env:GITHUB_ACTIONS -ceq "true") {
-		$requiredNames = @(
-			"GITHUB_REPOSITORY",
-			"GITHUB_RUN_ATTEMPT",
-			"GITHUB_RUN_ID",
-			"GITHUB_WORKFLOW_REF",
-			"ImageOS",
-			"ImageVersion",
-			"RUNNER_ARCH",
-			"RUNNER_ENVIRONMENT",
-			"RUNNER_OS"
-		)
-		foreach ($name in $requiredNames) {
-			if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name, "Process"))) {
-				throw "GitHub builder input $name is unavailable"
-			}
-		}
-		return [ordered]@{
-			kind = "github-actions"
-			id = "https://github.com/$($env:GITHUB_REPOSITORY)/actions/runs/$($env:GITHUB_RUN_ID)/attempts/$($env:GITHUB_RUN_ATTEMPT)"
-			workflowRef = $env:GITHUB_WORKFLOW_REF
-			runnerOs = $env:RUNNER_OS
-			runnerArch = $env:RUNNER_ARCH
-			runnerEnvironment = $env:RUNNER_ENVIRONMENT
-			imageOs = $env:ImageOS
-			imageVersion = $env:ImageVersion
-		}
+function Get-UntrustedInvocationHint {
+	param([Parameter(Mandatory)] [string]$Name)
+	$value = [Environment]::GetEnvironmentVariable($Name, "Process")
+	if ([string]::IsNullOrWhiteSpace($value)) {
+		return "unset"
+	}
+	if ($value.Length -gt 512) {
+		return $value.Substring(0, 512)
+	}
+	return $value
+}
+
+function Get-UntrustedInvocationHints {
+	$claimedProvider = "unmanaged"
+	if ((Get-UntrustedInvocationHint "GITHUB_ACTIONS") -ceq "true") {
+		$claimedProvider = "github-actions"
 	}
 	return [ordered]@{
-		kind = "local"
-		id = "urn:ever-works:builder:local-untrusted"
-		workflowRef = "unmanaged"
-		runnerOs = [Environment]::OSVersion.VersionString
-		runnerArch = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant()
-		runnerEnvironment = "unmanaged"
-		imageOs = "unmanaged"
-		imageVersion = "unmanaged"
+		trust = "untrusted-environment"
+		claimedProvider = $claimedProvider
+		githubRepository = (Get-UntrustedInvocationHint "GITHUB_REPOSITORY")
+		githubRunAttempt = (Get-UntrustedInvocationHint "GITHUB_RUN_ATTEMPT")
+		githubRunId = (Get-UntrustedInvocationHint "GITHUB_RUN_ID")
+		githubWorkflowRef = (Get-UntrustedInvocationHint "GITHUB_WORKFLOW_REF")
+		runnerOs = (Get-UntrustedInvocationHint "RUNNER_OS")
+		runnerArch = (Get-UntrustedInvocationHint "RUNNER_ARCH")
+		runnerEnvironment = (Get-UntrustedInvocationHint "RUNNER_ENVIRONMENT")
+		imageOs = (Get-UntrustedInvocationHint "ImageOS")
+		imageVersion = (Get-UntrustedInvocationHint "ImageVersion")
 	}
 }
 
 try {
+	$invocationHints = Get-UntrustedInvocationHints
+	foreach ($name in $cargoRustEnvironmentNames) {
+		Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+	}
 	Push-Location $packageRoot
 	try {
 		$sourceStatus = git status --porcelain=v1 --untracked-files=normal -- .
@@ -271,19 +295,13 @@ try {
 		$windowsSdkUmLibrarySet = Get-LibrarySetIdentity $windowsSdkUmLibDirectory
 		$windowsSdkUcrtLibrarySet = Get-LibrarySetIdentity $windowsSdkUcrtLibDirectory
 
+		Reset-IsolatedCargoHome
+		$env:CARGO_HOME = $isolatedCargoHome
 		$env:RUSTFLAGS = $fixedRustFlags
-		$env:CARGO_ENCODED_RUSTFLAGS = $null
-		$env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS = $null
 		$env:CARGO_INCREMENTAL = "0"
 		$env:CARGO_BUILD_INCREMENTAL = "false"
-		$env:CARGO_PROFILE_RELEASE_INCREMENTAL = "false"
 		$env:CARGO_BUILD_RUSTC = $rustcPath
-		$env:CARGO_BUILD_RUSTC_WRAPPER = ""
-		$env:CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER = ""
 		$env:RUSTC = $rustcPath
-		# Empty wrapper variables explicitly override any user-level Cargo wrapper configuration.
-		$env:RUSTC_WRAPPER = ""
-		$env:RUSTC_WORKSPACE_WRAPPER = ""
 		$env:SOURCE_DATE_EPOCH = $sourceDateEpoch
 		$env:CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER = $linkerPath
 		$env:VCToolsInstallDir = $msvcToolset.FullName.TrimEnd("\") + "\"
@@ -370,7 +388,24 @@ try {
 	Write-DeterministicJson -Value $sbom -LiteralPath $sbomPath
 	$sbomSha256 = Get-Sha256 $sbomPath
 
-	$builder = Get-BuilderInput
+	$builder = [ordered]@{
+		kind = "local-untrusted"
+		id = "urn:ever-works:builder:build-release-script:v3"
+	}
+	$environmentPolicy = [ordered]@{
+		mode = "isolated-cargo-rust-allowlist"
+		cargoHome = "target/repro-cargo-home"
+		clearedCargoRustOverrideCount = $cargoRustEnvironmentNames.Count
+		clearedCargoProfileOverrideCount = $clearedCargoProfileOverrideCount
+		effective = [ordered]@{
+			rustFlags = $fixedRustFlags
+			cargoIncremental = $false
+			cargoBuildIncremental = $false
+			rustcWrapper = "disabled"
+			rustcWorkspaceWrapper = "disabled"
+			cargoTargetDirectory = "per-build-isolated"
+		}
+	}
 	$buildInputs = [ordered]@{
 		rustFlags = $fixedRustFlags
 		rustc = [ordered]@{
@@ -407,6 +442,7 @@ try {
 			ucrtLibrarySetSha256 = $windowsSdkUcrtLibrarySet.librarySetSha256
 		}
 		builder = $builder
+		environmentPolicy = $environmentPolicy
 	}
 	$relativeFirstBinary = "target/repro-build-1/$targetTriple/release/$artifactName"
 	$relativeSecondBinary = "target/repro-build-2/$targetTriple/release/$artifactName"
@@ -465,6 +501,7 @@ try {
 				metadata = [ordered]@{
 					reproducible = $true
 					reproducibilityEvidence = $reproducibility
+					invocationHints = $invocationHints
 				}
 			}
 		}
@@ -485,6 +522,7 @@ try {
 		authenticodeContentSha256 = $unsignedIdentity.ContentSha256
 		cargoLockSha256 = $cargoLockSha256
 		buildInputs = $buildInputs
+		invocationHints = $invocationHints
 		reproducibility = $reproducibility
 		sbom = $sbomName
 		sbomSha256 = $sbomSha256

@@ -54,14 +54,10 @@ jobs:
         working-directory: apps/node/native/windows-job-launcher
         run: cargo test --locked --features test-fixtures -- --test-threads=1
 
-      - name: Build unsigned release and provenance metadata
+      - name: Prove hostile build environment cannot change release output or builder identity
         working-directory: apps/node/native/windows-job-launcher
         shell: pwsh
-        env:
-          # The build contract must replace, rather than silently inherit, caller flags.
-          RUSTFLAGS: '-C debuginfo=2'
-          CARGO_INCREMENTAL: '1'
-        run: .\build-release.ps1
+        run: .\test-build-release-environment.ps1
 
       - name: Verify independent executable builds and unsigned provenance
         working-directory: apps/node/native/windows-job-launcher
@@ -100,18 +96,21 @@ jobs:
           if ($metadata.buildInputs.rustFlags -cne '-C link-arg=/Brepro') {
             throw 'build inherited caller RUSTFLAGS instead of the fixed policy'
           }
-          $builder = $metadata.buildInputs.builder
-          if (
-            $builder.kind -cne 'github-actions' -or
-            $builder.runnerOs -cne $env:RUNNER_OS -or
-            $builder.runnerArch -cne $env:RUNNER_ARCH -or
-            $builder.runnerEnvironment -cne $env:RUNNER_ENVIRONMENT -or
-            $builder.imageOs -cne $env:ImageOS -or
-            $builder.imageVersion -cne $env:ImageVersion -or
-            $builder.workflowRef -cne $env:GITHUB_WORKFLOW_REF
-          ) {
-            throw 'GitHub runner image identity is missing or inaccurate'
-          }
+           $builder = $metadata.buildInputs.builder
+           if (
+             $builder.kind -cne 'local-untrusted' -or
+             $builder.id -cne 'urn:ever-works:builder:build-release-script:v3'
+           ) { throw 'script-produced metadata claimed an authenticated builder identity' }
+           if (
+             $metadata.invocationHints.trust -cne 'untrusted-environment' -or
+             $metadata.invocationHints.claimedProvider -cne 'github-actions'
+           ) { throw 'environment-provided CI fields are not explicitly untrusted invocation hints' }
+           $environmentPolicy = $metadata.buildInputs.environmentPolicy
+           if (
+             $environmentPolicy.mode -cne 'isolated-cargo-rust-allowlist' -or
+             $environmentPolicy.cargoHome -cne 'target/repro-cargo-home' -or
+             $environmentPolicy.clearedCargoProfileOverrideCount -lt 11
+           ) { throw 'hostile Cargo profile inputs were not normalized by the fixed build policy' }
           $sbomHash = (
             Get-FileHash -Algorithm SHA256 -LiteralPath "target/release-metadata/$($metadata.sbom)"
           ).Hash.ToLowerInvariant()
@@ -121,9 +120,11 @@ jobs:
           if ($provenanceHash -cne $metadata.provenanceSha256) { throw 'provenance hash mismatch' }
           $provenance = Get-Content -Raw -LiteralPath $provenancePath | ConvertFrom-Json
           if (
-            $provenance.subject[0].digest.sha256 -cne $metadata.unsignedBuildSha256 -or
-            -not $provenance.predicate.runDetails.metadata.reproducible -or
-            $provenance.predicate.runDetails.metadata.reproducibilityEvidence.buildCount -ne 2
+             $provenance.subject[0].digest.sha256 -cne $metadata.unsignedBuildSha256 -or
+             -not $provenance.predicate.runDetails.metadata.reproducible -or
+             $provenance.predicate.runDetails.metadata.reproducibilityEvidence.buildCount -ne 2 -or
+             $provenance.predicate.runDetails.builder.kind -cne 'local-untrusted' -or
+             $provenance.predicate.runDetails.metadata.invocationHints.trust -cne 'untrusted-environment'
           ) {
             throw 'provenance is not bound to the verified two-build executable hash'
           }

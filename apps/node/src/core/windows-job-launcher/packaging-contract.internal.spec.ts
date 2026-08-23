@@ -13,9 +13,14 @@ describe('Windows Job launcher packaging contract', () => {
 			'in-toto',
 			'repro-build-1',
 			'repro-build-2',
+			'repro-cargo-home',
+			"Where-Object { $_ -match '^(CARGO_|RUST)' }",
+			'Remove-Item -LiteralPath "Env:$name"',
 			'$env:RUSTFLAGS = $fixedRustFlags',
-			'$env:CARGO_ENCODED_RUSTFLAGS = $null',
 			'$firstBuildSha256 -cne $secondBuildSha256',
+			'kind = "local-untrusted"',
+			'id = "urn:ever-works:builder:build-release-script:v3"',
+			'Get-UntrustedInvocationHints',
 			'unsignedBuildSha256',
 			'sbomSha256',
 			'provenanceSha256',
@@ -26,6 +31,7 @@ describe('Windows Job launcher packaging contract', () => {
 		}
 		expect(source).not.toContain('Get-Date');
 		expect(source).not.toContain('generatedAt');
+		expect(source).not.toContain('kind = "github-actions"');
 		expect(source).not.toContain('Set-AuthenticodeSignature');
 		expect(source).not.toContain('upload-artifact');
 	});
@@ -44,6 +50,7 @@ describe('Windows Job launcher packaging contract', () => {
 				'unsignedBuildSha256',
 				'authenticodeContentSha256',
 				'buildInputs',
+				'invocationHints',
 				'reproducibility',
 				'sbomSha256',
 				'provenanceSha256'
@@ -69,6 +76,9 @@ describe('Windows Job launcher packaging contract', () => {
 		) as Record<string, any>;
 		const reproducibility = schema.$defs.reproducibility;
 		const buildInputs = schema.$defs.buildInputs;
+		const builder = schema.$defs.builder;
+		const environmentPolicy = schema.$defs.environmentPolicy;
+		const invocationHints = schema.$defs.invocationHints;
 		expect(schema.properties.reproducibility.$ref).toBe('#/$defs/reproducibility');
 		expect(schema.properties.buildInputs.$ref).toBe('#/$defs/buildInputs');
 		expect(reproducibility.required).toEqual(
@@ -88,9 +98,15 @@ describe('Windows Job launcher packaging contract', () => {
 				'msvcToolset',
 				'linker',
 				'windowsSdk',
-				'builder'
+				'builder',
+				'environmentPolicy'
 			])
 		);
+		expect(builder.properties.kind.const).toBe('local-untrusted');
+		expect(builder.properties.id.const).toBe('urn:ever-works:builder:build-release-script:v3');
+		expect(environmentPolicy.properties.mode.const).toBe('isolated-cargo-rust-allowlist');
+		expect(environmentPolicy.properties.cargoHome.const).toBe('target/repro-cargo-home');
+		expect(invocationHints.properties.trust.const).toBe('untrusted-environment');
 	});
 
 	it('creates a signed manifest only after Status=Valid and exact subject/certificate verification', async () => {
@@ -123,9 +139,10 @@ describe('Windows Job launcher packaging contract', () => {
 		const workflow = await readFile(join(repositoryRoot, '.github/workflows/windows-job-launcher.yml'), 'utf8');
 		expect(workflow).toContain('prepare-test-signed-manifest.ps1');
 		expect(workflow).toContain('test-pe-authenticode-content.ps1');
+		expect(workflow).toContain('test-build-release-environment.ps1');
 		expect(workflow).toContain('windows-job-helper-trust.windows.spec.ts');
 		expect(workflow).toContain('Get-FileHash -Algorithm SHA256 -LiteralPath $expectedArtifacts[$index]');
-		expect(workflow.match(/\.\\build-release\.ps1/g)).toHaveLength(1);
+		expect(workflow.match(/\.\\build-release\.ps1/g) ?? []).toHaveLength(0);
 		expect(workflow).toContain('if: always()');
 		for (const prohibited of ['upload-artifact', 'release create', 'kubectl', 'install-service.ps1']) {
 			expect(workflow).not.toContain(prohibited);
