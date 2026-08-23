@@ -11,6 +11,11 @@ export interface OwnershipStamp {
     organizationId?: string | null;
 }
 
+export interface OwnershipScopedRow {
+    tenantId?: string | null;
+    organizationId?: string | null;
+}
+
 export interface OwnershipSqlPredicate {
     clause: string;
     parameters: Record<string, string>;
@@ -69,6 +74,33 @@ export function ownershipStamp(scope?: OwnershipScope): OwnershipStamp {
 }
 
 /**
+ * In-memory equivalent of {@link ownershipWhere} for rows already loaded by
+ * a legacy/custom repository. Keep this beside the TypeORM and SQL builders
+ * so service-level validation cannot drift from database-level filtering.
+ */
+export function ownershipScopeMatches(row: OwnershipScopedRow, scope?: OwnershipScope): boolean {
+    if (!scope) return true;
+
+    const tenantId = row.tenantId ?? null;
+    const organizationId = row.organizationId ?? null;
+    if (scope.organizationId) {
+        return tenantId === scope.tenantId && organizationId === scope.organizationId;
+    }
+    return (
+        organizationId === null &&
+        (tenantId === scope.tenantId || (scope.tenantId !== null && tenantId === null))
+    );
+}
+
+/** Scope persisted on a row, normalized away from optional/undefined fields. */
+export function ownershipScopeOf(row: OwnershipScopedRow): OwnershipScope {
+    return {
+        tenantId: row.tenantId ?? null,
+        organizationId: row.organizationId ?? null,
+    };
+}
+
+/**
  * QueryBuilder equivalent of {@link ownershipWhere}. The parameter prefix
  * keeps the primitive safe to compose more than once in a single query.
  */
@@ -81,8 +113,9 @@ export function ownershipSqlPredicate(
 
     const tenantParameter = `${parameterPrefix}TenantId`;
     const organizationParameter = `${parameterPrefix}OrganizationId`;
-    const tenantColumn = `${alias}.tenantId`;
-    const organizationColumn = `${alias}.organizationId`;
+    const columnPrefix = alias ? `${alias}.` : '';
+    const tenantColumn = `${columnPrefix}tenantId`;
+    const organizationColumn = `${columnPrefix}organizationId`;
 
     if (scope.organizationId) {
         const tenantClause = scope.tenantId

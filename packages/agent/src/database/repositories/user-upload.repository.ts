@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserUpload } from '../../entities/user-upload.entity';
+import { ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 
 export interface RecordUploadInput {
     userId?: string | null;
@@ -47,8 +48,14 @@ export class UserUploadRepository {
     }
 
     /** An upload with this `sha256` owned by `userId`, else null. */
-    async findOwnedByUser(sha256: string, userId: string): Promise<UserUpload | null> {
-        return this.repo.findOne({ where: { sha256, userId } });
+    async findOwnedByUser(
+        sha256: string,
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<UserUpload | null> {
+        return this.repo.findOne({
+            where: ownershipWhereWith<UserUpload>(userId, scope, { sha256 }),
+        });
     }
 
     // ─── Memory Files (folder membership) ────────────────────────────────

@@ -3,7 +3,10 @@
 // database module's @src/config alias is resolvable in the API runtime
 // but not in this isolated jest context, so we mock the agent surface
 // the same way auth.controller.spec.ts does.
-jest.mock('@ever-works/agent/database', () => ({}));
+jest.mock('@ever-works/agent/database', () => ({
+    UserUploadRepository: class {},
+    WorkRepository: class {},
+}));
 
 import { BadRequestException, HttpStatus, Logger } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
@@ -169,6 +172,26 @@ describe('UploadsController', () => {
     });
 
     describe('GET /api/uploads/:userId/:filename', () => {
+        const everScope = {
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        };
+        const yoScope = {
+            tenantId: everScope.tenantId,
+            organizationId: '33333333-3333-4333-8333-333333333333',
+        };
+
+        function guardedController(userUploads: { findOwnedByUser: jest.Mock }, scope: object) {
+            return new UploadsController(
+                service,
+                {} as never,
+                { authenticate: jest.fn().mockResolvedValue(null) } as never,
+                undefined,
+                userUploads as never,
+                { getScope: () => scope } as never,
+            );
+        }
+
         it("refuses to serve another user's file (returns 404 — never 200 / never leaks)", async () => {
             const owner = mkAuth({ userId: 'ffffffff-1111-2222-3333-444444444444' });
             const stored = await controller.upload(owner, mkFile({}));
@@ -192,6 +215,96 @@ describe('UploadsController', () => {
                 `inline; filename="${stored.filename}"`,
             );
             expect(Buffer.isBuffer(calls.sent)).toBe(true);
+            expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
+        });
+
+        it('serves an Ever upload only after resolving the exact active scope', async () => {
+            const owner = mkAuth();
+            const stored = await controller.upload(owner, mkFile({}));
+            const userUploads = {
+                findOwnedByUser: jest.fn().mockResolvedValue({
+                    sha256: stored.id,
+                    userId: owner.userId,
+                    workId: null,
+                    ...everScope,
+                }),
+            };
+            const { res, calls } = mkRes();
+
+            await guardedController(userUploads, everScope).serve(
+                owner,
+                owner.userId,
+                stored.filename,
+                res,
+            );
+
+            expect(userUploads.findOwnedByUser).toHaveBeenCalledWith(
+                stored.id,
+                owner.userId,
+                everScope,
+            );
+            expect(calls.statusCode).toBeUndefined();
+            expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
+        });
+
+        it('opaque-404s the same-user known hash in Yo before reading bytes from Ever', async () => {
+            const owner = mkAuth();
+            const stored = await controller.upload(owner, mkFile({}));
+            const yoUpload = {
+                sha256: stored.id,
+                userId: owner.userId,
+                workId: null,
+                ...yoScope,
+            };
+            const userUploads = {
+                findOwnedByUser: jest.fn(
+                    async (_sha: string, _userId: string, scope: typeof everScope) =>
+                        scope.organizationId === yoUpload.organizationId ? yoUpload : null,
+                ),
+            };
+            const readFile = jest.spyOn(service, 'readFile');
+            const { res, calls } = mkRes();
+
+            await guardedController(userUploads, everScope).serve(
+                owner,
+                owner.userId,
+                stored.filename,
+                res,
+            );
+
+            expect(calls.statusCode).toBe(HttpStatus.NOT_FOUND);
+            expect(calls.body).toEqual({ status: 'error', message: 'Not found' });
+            expect(calls.sent).toBeUndefined();
+            expect(readFile).not.toHaveBeenCalled();
+        });
+
+        it('keeps a legacy personal upload readable from explicit personal scope', async () => {
+            const owner = mkAuth();
+            const stored = await controller.upload(owner, mkFile({}));
+            const personalScope = { tenantId: everScope.tenantId, organizationId: null };
+            const userUploads = {
+                findOwnedByUser: jest.fn().mockResolvedValue({
+                    sha256: stored.id,
+                    userId: owner.userId,
+                    workId: null,
+                    tenantId: null,
+                    organizationId: null,
+                }),
+            };
+            const { res, calls } = mkRes();
+
+            await guardedController(userUploads, personalScope).serve(
+                owner,
+                owner.userId,
+                stored.filename,
+                res,
+            );
+
+            expect(userUploads.findOwnedByUser).toHaveBeenCalledWith(
+                stored.id,
+                owner.userId,
+                personalScope,
+            );
             expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
         });
     });

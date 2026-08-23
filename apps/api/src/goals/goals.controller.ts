@@ -266,17 +266,22 @@ export class GoalsController {
         // that collapsed the two would silently make "remove this cap"
         // impossible while the DTO advertised it.
         await this.requireScopedGoal(auth.userId, id);
-        return this.orchestrator.updateLimits(auth.userId, id, {
-            spendCapCents: body.spendCapCents,
-            wallClockLimitHours: body.wallClockLimitHours,
-            stuckThresholdIterations: body.stuckThresholdIterations,
-            sessionBudgetMinutes: body.sessionBudgetMinutes,
-            gracePeriodMinutes: body.gracePeriodMinutes,
-            executionTarget: body.executionTarget,
-            plannerModelHint: body.plannerModelHint,
-            workerModelHint: body.workerModelHint,
-            assignedAgentId: body.assignedAgentId,
-        });
+        return this.orchestrator.updateLimits(
+            auth.userId,
+            id,
+            {
+                spendCapCents: body.spendCapCents,
+                wallClockLimitHours: body.wallClockLimitHours,
+                stuckThresholdIterations: body.stuckThresholdIterations,
+                sessionBudgetMinutes: body.sessionBudgetMinutes,
+                gracePeriodMinutes: body.gracePeriodMinutes,
+                executionTarget: body.executionTarget,
+                plannerModelHint: body.plannerModelHint,
+                workerModelHint: body.workerModelHint,
+                assignedAgentId: body.assignedAgentId,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     // ─── autonomy layer — Definition of Done ────────────────────────

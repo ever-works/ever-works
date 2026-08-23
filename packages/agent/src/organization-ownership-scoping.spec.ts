@@ -202,6 +202,221 @@ function agent(overrides: Partial<Agent>): Agent {
 }
 
 describe('Organization ownership scoping', () => {
+    const uploadSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+
+    describe('Agent and Mission attachment upload scope', () => {
+        it('404s when an Ever Agent is given the same user upload hash from Yo', async () => {
+            const ownedAgent = agent({ id: 'agent-ever', ...EVER_SCOPE });
+            const foreignUpload = {
+                sha256: uploadSha,
+                userId: 'user-1',
+                storagePath: uploadSha,
+                ...OTHER_SCOPE,
+            };
+            const edges = {
+                add: jest.fn(async () => ({
+                    id: 'edge-1',
+                    agentId: ownedAgent.id,
+                    uploadId: uploadSha,
+                })),
+                findByAgentId: jest.fn(async () => []),
+            };
+            const uploads = {
+                findOne: jest.fn(
+                    async (options: { where?: FindOptionsWhere<typeof foreignUpload> }) =>
+                        matchesWhere(foreignUpload, options.where) ? foreignUpload : null,
+                ),
+            };
+            const service = new AgentsService(
+                { findByIdAndUser: jest.fn(async () => ownedAgent) } as never,
+                {} as never,
+                {} as never,
+                edges as never,
+                undefined,
+                undefined,
+                undefined,
+                uploads as never,
+            );
+
+            await expect(
+                service.addAttachment('user-1', ownedAgent.id, uploadSha, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(edges.add).not.toHaveBeenCalled();
+        });
+
+        it('does not expose metadata or a URL for a Yo upload through an Ever Agent edge', async () => {
+            const ownedAgent = agent({ id: 'agent-ever', ...EVER_SCOPE });
+            const foreignUpload = {
+                sha256: uploadSha,
+                userId: 'user-1',
+                storagePath: `${uploadSha}.txt`,
+                originalFilename: 'yo-secret.txt',
+                mimeType: 'text/plain',
+                fileSize: 9,
+                ...OTHER_SCOPE,
+            };
+            const edges = {
+                findByAgentId: jest.fn(async () => [
+                    { id: 'edge-1', agentId: ownedAgent.id, uploadId: uploadSha },
+                ]),
+            };
+            const uploads = {
+                find: jest.fn(
+                    async (options: { where?: FindOptionsWhere<typeof foreignUpload> }) =>
+                        matchesWhere(foreignUpload, options.where) ? [foreignUpload] : [],
+                ),
+            };
+            const service = new AgentsService(
+                { findByIdAndUser: jest.fn(async () => ownedAgent) } as never,
+                {} as never,
+                {} as never,
+                edges as never,
+                undefined,
+                undefined,
+                undefined,
+                uploads as never,
+            );
+
+            await expect(
+                service.listAttachments('user-1', ownedAgent.id, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('404s an Ever Mission attachment whose upload hash belongs to Yo', async () => {
+            const ownedMission = mission({ id: 'mission-ever', ...EVER_SCOPE });
+            const attachments = { add: jest.fn() };
+            const foreignUpload = {
+                sha256: uploadSha,
+                userId: 'user-1',
+                ...OTHER_SCOPE,
+            };
+            const uploads = {
+                findOne: jest.fn(
+                    async (options: { where?: FindOptionsWhere<typeof foreignUpload> }) =>
+                        matchesWhere(foreignUpload, options.where) ? foreignUpload : null,
+                ),
+            };
+            const service = new MissionsService(
+                { findOne: jest.fn(async () => ownedMission) } as never,
+                new TitlerService(),
+                undefined,
+                attachments as never,
+                uploads as never,
+            );
+
+            await expect(
+                service.addAttachment('user-1', ownedMission.id, uploadSha, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(attachments.add).not.toHaveBeenCalled();
+        });
+
+        it('does not expose a Mission attachment edge backed by the same-user Yo hash', async () => {
+            const ownedMission = mission({ id: 'mission-ever', ...EVER_SCOPE });
+            const attachments = {
+                findByMissionId: jest.fn(async () => [
+                    { id: 'edge-yo', missionId: ownedMission.id, uploadId: uploadSha },
+                ]),
+            };
+            const foreignUpload = {
+                sha256: uploadSha,
+                userId: 'user-1',
+                ...OTHER_SCOPE,
+            };
+            const uploads = {
+                find: jest.fn(
+                    async (options: { where?: FindOptionsWhere<typeof foreignUpload> }) =>
+                        matchesWhere(foreignUpload, options.where) ? [foreignUpload] : [],
+                ),
+            };
+            const service = new MissionsService(
+                { findOne: jest.fn(async () => ownedMission) } as never,
+                new TitlerService(),
+                undefined,
+                attachments as never,
+                uploads as never,
+            );
+
+            await expect(
+                service.listAttachments('user-1', ownedMission.id, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('keeps legacy personal Agent attachment metadata and URL readable', async () => {
+            const legacyAgent = agent({
+                id: 'agent-personal',
+                tenantId: null,
+                organizationId: null,
+            });
+            const edges = {
+                findByAgentId: jest.fn(async () => [
+                    { id: 'edge-personal', agentId: legacyAgent.id, uploadId: uploadSha },
+                ]),
+            };
+            const uploads = {
+                find: jest.fn(async () => [
+                    {
+                        sha256: uploadSha,
+                        userId: 'user-1',
+                        storagePath: `${uploadSha}.txt`,
+                        originalFilename: 'legacy.txt',
+                        mimeType: 'text/plain',
+                        fileSize: 9,
+                        tenantId: null,
+                        organizationId: null,
+                    },
+                ]),
+            };
+            const service = new AgentsService(
+                { findByIdAndUser: jest.fn(async () => legacyAgent) } as never,
+                {} as never,
+                {} as never,
+                edges as never,
+                undefined,
+                undefined,
+                undefined,
+                uploads as never,
+            );
+
+            await expect(
+                service.listAttachments('user-1', legacyAgent.id, PERSONAL_SCOPE),
+            ).resolves.toEqual([
+                expect.objectContaining({
+                    filename: 'legacy.txt',
+                    url: `/api/uploads/user-1/${uploadSha}.txt`,
+                }),
+            ]);
+        });
+
+        it('keeps a legacy personal Mission and upload compatible with personal scope', async () => {
+            const legacyMission = mission({
+                id: 'mission-personal',
+                tenantId: null,
+                organizationId: null,
+            });
+            const edge = { id: 'edge-personal', missionId: legacyMission.id, uploadId: uploadSha };
+            const attachments = { add: jest.fn(async () => edge) };
+            const uploads = {
+                findOne: jest.fn(async () => ({
+                    sha256: uploadSha,
+                    userId: 'user-1',
+                    tenantId: null,
+                    organizationId: null,
+                })),
+            };
+            const service = new MissionsService(
+                { findOne: jest.fn(async () => legacyMission) } as never,
+                new TitlerService(),
+                undefined,
+                attachments as never,
+                uploads as never,
+            );
+
+            await expect(
+                service.addAttachment('user-1', legacyMission.id, uploadSha, PERSONAL_SCOPE),
+            ).resolves.toEqual(edge);
+        });
+    });
+
     describe('MissionsService', () => {
         function makeService(rows: Mission[]) {
             const repo = {

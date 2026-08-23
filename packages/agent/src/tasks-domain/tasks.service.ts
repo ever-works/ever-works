@@ -42,6 +42,7 @@ import { TaskNotificationService } from './task-notification.service';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
+import { ownershipScopeMatches, type OwnershipScope } from '../database/ownership-scope';
 
 export interface CreateTaskInput {
     title: string;
@@ -375,9 +376,22 @@ export class TasksService {
         return { rows: withRuns, total };
     }
 
-    async getOne(userId: string, id: string): Promise<Task> {
+    async getOne(userId: string, id: string, scope?: OwnershipScope): Promise<Task> {
         const task = await this.tasks.findByIdAndUser(id, userId);
-        if (!task) throw new NotFoundException(`Task ${id} not found.`);
+        if (!task || !ownershipScopeMatches(task, scope)) {
+            throw new NotFoundException(`Task ${id} not found.`);
+        }
+
+        // A Work-scoped Task carries two authoritative scope rows. Both must
+        // agree with the active request; accepting the Task row alone lets a
+        // stale/malformed cross-Organization workId dispatch in the wrong
+        // workspace. Fail closed when the Work repository is unavailable.
+        if (scope && task.workId) {
+            const work = this.works ? await this.works.findById(task.workId) : null;
+            if (!work || work.userId !== userId || !ownershipScopeMatches(work, scope)) {
+                throw new NotFoundException(`Task ${id} not found.`);
+            }
+        }
         return task;
     }
 

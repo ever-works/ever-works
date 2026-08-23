@@ -969,9 +969,14 @@ export class AgentsService {
         // already enforces the upload is owned by the caller, so the
         // owner-scoped lookup resolves every attachable upload.
         const uploads = await this.uploadsRepo.find({
-            where: { userId, sha256: In(rows.map((r) => r.uploadId)) },
+            where: ownershipWhereWith<UserUpload>(userId, ownershipScope, {
+                sha256: In(rows.map((r) => r.uploadId)),
+            }),
         });
         const bySha = new Map(uploads.map((u) => [u.sha256, u]));
+        if (new Set(rows.map((row) => row.uploadId)).size !== bySha.size) {
+            throw new NotFoundException(`Attachment not found`);
+        }
         return rows.map((r) => {
             const u = bySha.get(r.uploadId);
             if (!u) return r;
@@ -1020,7 +1025,9 @@ export class AgentsService {
             // sha256 is a case-insensitive content hash stored lowercase; the DTO
             // accepts /i, so normalize before the ownership lookup.
             const owned = await this.uploadsRepo.findOne({
-                where: { sha256: uploadId.toLowerCase(), userId },
+                where: ownershipWhereWith<UserUpload>(userId, ownershipScope, {
+                    sha256: uploadId.toLowerCase(),
+                }),
             });
             if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
         }

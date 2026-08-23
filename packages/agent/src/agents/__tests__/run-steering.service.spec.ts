@@ -14,6 +14,14 @@ import { RunSteeringService } from '../run-steering.service';
 describe('RunSteeringService', () => {
     const userId = 'user-1';
     const runId = 'run-1';
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+    const yoScope = {
+        tenantId: everScope.tenantId,
+        organizationId: '33333333-3333-4333-8333-333333333333',
+    };
 
     let runs: any;
     let runLogs: any;
@@ -28,7 +36,7 @@ describe('RunSteeringService', () => {
             status: 'running',
             taskId: 'task-1',
             workId: 'work-1',
-            organizationId: 'org-1',
+            ...everScope,
             awaitingInput: false,
             terminalEndedReason: null,
             cliSessionId: null,
@@ -108,6 +116,31 @@ describe('RunSteeringService', () => {
             ).rejects.toBeInstanceOf(NotFoundException);
         });
 
+        it('loads the run inside the exact active Ever scope', async () => {
+            await makeSvc().steer({
+                runId,
+                userId,
+                message: 'ping',
+                ownershipScope: everScope,
+            });
+
+            expect(runs.findByIdAndUser).toHaveBeenCalledWith(runId, userId, everScope);
+        });
+
+        it('404s the same-user known run id when only Yo is active', async () => {
+            runs.findByIdAndUser.mockResolvedValue(null);
+
+            await expect(
+                makeSvc().steer({
+                    runId,
+                    userId,
+                    message: 'ping',
+                    ownershipScope: yoScope,
+                }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(runs.appendPendingInput).not.toHaveBeenCalled();
+        });
+
         it('rejects an empty message rather than queueing whitespace', async () => {
             await expect(makeSvc().steer({ runId, userId, message: '   ' })).rejects.toBeInstanceOf(
                 ConflictException,
@@ -157,6 +190,12 @@ describe('RunSteeringService', () => {
                 NotFoundException,
             );
         });
+
+        it('loads the interrupt target inside the exact active scope', async () => {
+            await makeSvc().interrupt(runId, userId, everScope);
+
+            expect(runs.findByIdAndUser).toHaveBeenCalledWith(runId, userId, everScope);
+        });
     });
 
     // ── resume ─────────────────────────────────────────────────────
@@ -185,6 +224,15 @@ describe('RunSteeringService', () => {
                 cliSessionId: 'cli-session-abc',
                 pendingInput: ['yes, ship it'],
             });
+        });
+
+        it('loads and recreates a resumed run in its exact persisted scope', async () => {
+            runs.findByIdAndUser.mockResolvedValue(parked());
+
+            await makeSvc().resume(runId, userId, 'continue', everScope);
+
+            expect(runs.findByIdAndUser).toHaveBeenCalledWith(runId, userId, everScope);
+            expect(runs.createQueued).toHaveBeenCalledWith(expect.objectContaining(everScope));
         });
 
         it('resumes an awaiting-input run and clears its parked flag', async () => {
@@ -262,6 +310,53 @@ describe('RunSteeringService', () => {
         it('404s a run owned by another user', async () => {
             runs.findByIdAndUser.mockResolvedValue(null);
             await expect(makeSvc().resume(runId, userId)).rejects.toBeInstanceOf(NotFoundException);
+        });
+    });
+
+    describe('legacy personal compatibility', () => {
+        const personalScope = { tenantId: everScope.tenantId, organizationId: null };
+        const legacyPersonal = (over: Record<string, unknown> = {}) =>
+            makeRun({ tenantId: null, organizationId: null, ...over });
+
+        it('steers a legacy personal run through the personal predicate', async () => {
+            runs.findByIdAndUser.mockResolvedValue(legacyPersonal());
+
+            await expect(
+                makeSvc().steer({
+                    runId,
+                    userId,
+                    message: 'personal note',
+                    ownershipScope: personalScope,
+                }),
+            ).resolves.toEqual(expect.objectContaining({ dispatched: 'injected' }));
+            expect(runs.findByIdAndUser).toHaveBeenCalledWith(runId, userId, personalScope);
+        });
+
+        it('interrupts a legacy personal run through the personal predicate', async () => {
+            runs.findByIdAndUser.mockResolvedValue(legacyPersonal());
+
+            await expect(makeSvc().interrupt(runId, userId, personalScope)).resolves.toEqual({
+                interrupted: true,
+                runId,
+            });
+            expect(runs.findByIdAndUser).toHaveBeenCalledWith(runId, userId, personalScope);
+        });
+
+        it('resumes a legacy personal run and preserves the legacy scope', async () => {
+            runs.findByIdAndUser.mockResolvedValue(
+                legacyPersonal({
+                    status: 'completed',
+                    terminalEndedReason: 'parked',
+                    cliSessionId: 'legacy-cli',
+                }),
+            );
+
+            await makeSvc().resume(runId, userId, null, personalScope);
+
+            expect(runs.findByIdAndUser).toHaveBeenCalledWith(runId, userId, personalScope);
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ tenantId: null, organizationId: null }),
+            );
         });
     });
 });

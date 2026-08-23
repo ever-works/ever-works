@@ -73,11 +73,16 @@ describe('AgentsController — session detail (Feature K)', () => {
 
     const auth = { userId: 'u1' } as any;
     const runId = '00000000-0000-0000-0000-0000000000aa';
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
 
     const baseRun = () => ({
         id: runId,
         agentId: '00000000-0000-0000-0000-000000000001',
         userId: 'u1',
+        ...everScope,
         status: 'running',
         triggerKind: 'task',
         taskId: '00000000-0000-0000-0000-0000000000bb',
@@ -159,6 +164,41 @@ describe('AgentsController — session detail (Feature K)', () => {
             NotFoundException,
         );
         expect(agentRuns.findByIdAndUser).toHaveBeenCalledWith(runId, 'u1');
+    });
+
+    it('queries the run in exact active scope and exposes its persisted scope', async () => {
+        controller = new AgentsController(
+            { getOne: jest.fn().mockResolvedValue({ id: baseRun().agentId }) } as any,
+            {} as any,
+            {} as any,
+            {} as any,
+            agentRuns,
+            agentRunLogs,
+            {} as any,
+            {} as any,
+            {} as any,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            { getScope: () => everScope } as never,
+        );
+
+        const result = await controller.getRunSessionDetail(auth, runId, {});
+
+        expect(agentRuns.findByIdAndUser).toHaveBeenCalledWith(runId, 'u1', everScope);
+        expect(result.run).toMatchObject(everScope);
+    });
+
+    it('does not disguise an Agent parent lookup outage as an ownership 404', async () => {
+        const outage = new Error('agent database unavailable');
+        (controller as any).service.getOne.mockRejectedValueOnce(outage);
+
+        await expect(controller.getRunSessionDetail(auth, runId, {})).rejects.toBe(outage);
+        expect(agentRunLogs.findTimelineByRun).not.toHaveBeenCalled();
     });
 
     it('⭐ composes run row + counts + filesTouched + timeline', async () => {

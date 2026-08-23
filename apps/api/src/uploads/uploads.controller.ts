@@ -20,7 +20,7 @@ import {
     UploadedFile,
     UseInterceptors,
 } from '@nestjs/common';
-import { WorkRepository } from '@ever-works/agent/database';
+import { UserUploadRepository, WorkRepository } from '@ever-works/agent/database';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -33,6 +33,7 @@ import { AuthProvider } from '../auth/providers/auth-provider.abstract';
 import { toHeaders } from '../auth/providers/request-headers';
 import { UploadsService } from './uploads.service';
 import { PresignUploadDto } from './dto/presign-upload.dto';
+import { ScopeContextService } from '../scope/scope-context.service';
 
 const MAX_UPLOAD_BYTES = Number(process.env.UPLOADS_MAX_BYTES) || 5 * 1024 * 1024;
 
@@ -76,6 +77,8 @@ export class UploadsController {
         // for unit tests that don't exercise the workId path; the
         // module provides it in production.
         @Optional() private readonly workRepository?: WorkRepository,
+        @Optional() private readonly userUploads?: UserUploadRepository,
+        @Optional() private readonly scopeContext?: ScopeContextService,
     ) {}
 
     /**
@@ -471,6 +474,22 @@ export class UploadsController {
             // yours" is a small enumeration tell. Treat as not-found.
             res.status(HttpStatus.NOT_FOUND).json({ status: 'error', message: 'Not found' });
             return;
+        }
+        // The URL alone proves neither Organization nor Tenant ownership.
+        // Resolve the persisted upload row in the active request scope before
+        // touching storage; missing and wrong-scope hashes share the same
+        // opaque response. Legacy personal rows remain reachable through the
+        // centralized ownership predicate in UserUploadRepository.
+        if (this.userUploads) {
+            const match = /^([0-9a-f]{64})(?:\.|$)/i.exec(filename);
+            const scope = this.scopeContext?.getScope();
+            const upload = match
+                ? await this.userUploads.findOwnedByUser(match[1].toLowerCase(), userId, scope)
+                : null;
+            if (!upload || (upload.workId ?? null) !== (workId ?? null)) {
+                res.status(HttpStatus.NOT_FOUND).json({ status: 'error', message: 'Not found' });
+                return;
+            }
         }
         // EW-644 (Codex P1): when the caller passes a workId, verify
         // ownership before forwarding it to the backend — same gate as

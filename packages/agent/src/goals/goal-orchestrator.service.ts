@@ -30,6 +30,11 @@ import { AGENT_RUN_CANCELLER, type AgentRunCanceller } from '../agents/agent-run
 import { TasksService } from '../tasks-domain/tasks.service';
 import { TaskTransitionService } from '../tasks-domain/task-transition.service';
 import {
+    ownershipScopeOf,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../database/ownership-scope';
+import {
     dodProgressSignature,
     normalizeDoDCriteria,
     summarizeDoD,
@@ -152,8 +157,9 @@ export class GoalOrchestratorService {
         userId: string,
         goalId: string,
         input: UpdateGoalLimitsInput,
+        scope?: OwnershipScope,
     ): Promise<GoalDto> {
-        const goal = await this.findOrThrow(userId, goalId);
+        const goal = await this.findOrThrow(userId, goalId, scope);
         const before = this.limitsSnapshot(goal);
 
         if (input.spendCapCents !== undefined) {
@@ -206,7 +212,11 @@ export class GoalOrchestratorService {
             goal.workerModelHint = this.normalizeHint(input.workerModelHint);
         }
         if (input.assignedAgentId !== undefined) {
-            goal.assignedAgentId = await this.resolveAssignedAgentId(userId, input.assignedAgentId);
+            goal.assignedAgentId = await this.resolveAssignedAgentId(
+                userId,
+                input.assignedAgentId,
+                scope,
+            );
         }
 
         const saved = await this.goals.save(goal);
@@ -908,8 +918,14 @@ export class GoalOrchestratorService {
 
     // ─── internals ──────────────────────────────────────────────────
 
-    private async findOrThrow(userId: string, goalId: string): Promise<Goal> {
-        const row = await this.goals.findOne({ where: { id: goalId, userId } });
+    private async findOrThrow(
+        userId: string,
+        goalId: string,
+        scope?: OwnershipScope,
+    ): Promise<Goal> {
+        const row = await this.goals.findOne({
+            where: ownershipWhereWith<Goal>(userId, scope, { id: goalId }),
+        });
         if (!row) {
             throw new NotFoundException(`Goal not found`);
         }
@@ -1019,9 +1035,10 @@ export class GoalOrchestratorService {
      */
     private async resolveCandidates(goal: Goal): Promise<GoalRoutingCandidate[]> {
         if (goal.assignedAgentId) {
+            const goalScope = ownershipScopeOf(goal);
             const agent = this.agents
                 ? await this.agents
-                      .findByIdAndUser(goal.assignedAgentId, goal.userId)
+                      .findByIdAndUser(goal.assignedAgentId, goal.userId, goalScope)
                       .catch(() => null)
                 : null;
             // With no Agent repository wired we cannot verify the pin, but
@@ -1042,8 +1059,11 @@ export class GoalOrchestratorService {
         const out = new Map<string, GoalRoutingCandidate>();
         for (const task of tasks) {
             if (!task.agentId || out.has(task.agentId)) continue;
+            const goalScope = ownershipScopeOf(goal);
             const agent = this.agents
-                ? await this.agents.findByIdAndUser(task.agentId, goal.userId).catch(() => null)
+                ? await this.agents
+                      .findByIdAndUser(task.agentId, goal.userId, goalScope)
+                      .catch(() => null)
                 : null;
             if (this.agents && !agent) continue;
             out.set(task.agentId, {
@@ -1151,15 +1171,15 @@ export class GoalOrchestratorService {
     private async resolveAssignedAgentId(
         userId: string,
         agentId: string | null,
+        scope?: OwnershipScope,
     ): Promise<string | null> {
         if (agentId === null) return null;
         if (this.agents) {
-            const agent = await this.agents.findByIdAndUser(agentId, userId).catch(() => null);
+            const agent = await this.agents
+                .findByIdAndUser(agentId, userId, scope)
+                .catch(() => null);
             if (!agent) {
-                // 400, not 404, and no existence leak: from the caller's
-                // side an id they do not own and one that never existed are
-                // the same unusable input (the TasksService idiom).
-                throw new BadRequestException(`Agent ${agentId} not found.`);
+                throw new NotFoundException(`Agent ${agentId} not found.`);
             }
         }
         return agentId;

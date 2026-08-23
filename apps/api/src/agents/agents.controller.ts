@@ -451,6 +451,8 @@ export class AgentsController {
     private toSessionRow(r: AgentRun): {
         id: string;
         agentId: string;
+        tenantId: string | null;
+        organizationId: string | null;
         status: string;
         triggerKind: string;
         taskId: string | null;
@@ -483,6 +485,8 @@ export class AgentsController {
         return {
             id: r.id,
             agentId: r.agentId,
+            tenantId: r.tenantId ?? null,
+            organizationId: r.organizationId ?? null,
             status: r.status,
             triggerKind: r.triggerKind,
             taskId: r.taskId ?? null,
@@ -547,11 +551,21 @@ export class AgentsController {
         filesTouched: string[];
         timeline: { entries: SessionTimelineEntry[]; nextCursor: string | null; limit: number };
     }> {
-        const run = await this.agentRuns.findByIdAndUser(runId, auth.userId);
+        const scope = this.scopeContext?.getScope();
+        const run = scope
+            ? await this.agentRuns.findByIdAndUser(runId, auth.userId, scope)
+            : await this.agentRuns.findByIdAndUser(runId, auth.userId);
         if (!run) {
-            throw new NotFoundException(`AgentRun ${runId} not found.`);
+            throw new NotFoundException(`AgentRun not found.`);
         }
-        await this.service.getOne(auth.userId, run.agentId, this.scopeContext?.getScope());
+        try {
+            await this.service.getOne(auth.userId, run.agentId, scope);
+        } catch (error) {
+            if (error instanceof NotFoundException) {
+                throw new NotFoundException(`AgentRun not found.`);
+            }
+            throw error;
+        }
         const limit = query.limit ?? 100;
         const after = parseTimelineCursor(query.cursor);
         const [timelineRows, messages, toolCalls] = await Promise.all([
@@ -1004,6 +1018,8 @@ export class AgentsController {
     ): Promise<{
         data: Array<{
             id: string;
+            tenantId: string | null;
+            organizationId: string | null;
             status: string;
             triggerKind: string;
             startedAt: string | null;
@@ -1023,13 +1039,21 @@ export class AgentsController {
         // the unscoped findByAgent/countByAgent are @internal-only and would
         // become a latent IDOR if the getOne() ownership gate above were ever
         // refactored away.
-        const [rows, total] = await Promise.all([
-            this.agentRuns.findByAgentAndUser(id, auth.userId, limit, offset),
-            this.agentRuns.countByAgentAndUser(id, auth.userId),
-        ]);
+        const scope = this.scopeContext?.getScope();
+        const [rows, total] = scope
+            ? await Promise.all([
+                  this.agentRuns.findByAgentAndUser(id, auth.userId, limit, offset, scope),
+                  this.agentRuns.countByAgentAndUser(id, auth.userId, scope),
+              ])
+            : await Promise.all([
+                  this.agentRuns.findByAgentAndUser(id, auth.userId, limit, offset),
+                  this.agentRuns.countByAgentAndUser(id, auth.userId),
+              ]);
         return {
             data: rows.map((r) => ({
                 id: r.id,
+                tenantId: r.tenantId ?? null,
+                organizationId: r.organizationId ?? null,
                 status: r.status,
                 triggerKind: r.triggerKind,
                 startedAt: r.startedAt?.toISOString() ?? null,
@@ -1055,6 +1079,8 @@ export class AgentsController {
         @Param('runId', ParseUUIDPipe) runId: string,
     ): Promise<{
         id: string;
+        tenantId: string | null;
+        organizationId: string | null;
         status: string;
         triggerKind: string;
         startedAt: string | null;
@@ -1079,6 +1105,8 @@ export class AgentsController {
         const logs = await this.agentRunLogs.findByRun(runId, 500);
         return {
             id: run.id,
+            tenantId: run.tenantId ?? null,
+            organizationId: run.organizationId ?? null,
             status: run.status,
             triggerKind: run.triggerKind,
             startedAt: run.startedAt?.toISOString() ?? null,
@@ -1158,9 +1186,12 @@ export class AgentsController {
         @Param('runId', ParseUUIDPipe) runId: string,
     ): Promise<{ cancelled: boolean; previousStatus?: string }> {
         await this.requireScopedRun(auth.userId, id, runId);
-        const result = await this.agentRuns.cancel(runId, auth.userId);
+        const scope = this.scopeContext?.getScope();
+        const result = scope
+            ? await this.agentRuns.cancel(runId, auth.userId, scope)
+            : await this.agentRuns.cancel(runId, auth.userId);
         if (!result.found) {
-            throw new NotFoundException(`AgentRun ${runId} not found.`);
+            throw new NotFoundException(`AgentRun not found.`);
         }
         const wasOpen = result.previousStatus === 'queued' || result.previousStatus === 'running';
         // DB first, then the remote run. The reverse order risks a cancelled
@@ -1231,7 +1262,13 @@ export class AgentsController {
     ): Promise<{ dispatched: 'injected' | 'new-run'; runId: string; queuedCount?: number }> {
         await this.requireScopedRun(auth.userId, id, runId);
         const steering = this.requireSteering();
-        return steering.steer({ runId, userId: auth.userId, message: body.message });
+        const scope = this.scopeContext?.getScope();
+        return steering.steer({
+            runId,
+            userId: auth.userId,
+            message: body.message,
+            ...(scope ? { ownershipScope: scope } : {}),
+        });
     }
 
     /**
@@ -1260,7 +1297,10 @@ export class AgentsController {
     ): Promise<{ interrupted: boolean; runId: string }> {
         await this.requireScopedRun(auth.userId, id, runId);
         const steering = this.requireSteering();
-        const outcome = await steering.interrupt(runId, auth.userId);
+        const scope = this.scopeContext?.getScope();
+        const outcome = scope
+            ? await steering.interrupt(runId, auth.userId, scope)
+            : await steering.interrupt(runId, auth.userId);
         void this.tryLog({
             userId: auth.userId,
             agentId: id,
@@ -1300,7 +1340,10 @@ export class AgentsController {
     }> {
         await this.requireScopedRun(auth.userId, id, runId);
         const steering = this.requireSteering();
-        const outcome = await steering.resume(runId, auth.userId, body.message ?? null);
+        const scope = this.scopeContext?.getScope();
+        const outcome = scope
+            ? await steering.resume(runId, auth.userId, body.message ?? null, scope)
+            : await steering.resume(runId, auth.userId, body.message ?? null);
         void this.tryLog({
             userId: auth.userId,
             agentId: id,
@@ -1330,10 +1373,20 @@ export class AgentsController {
         agentId: string,
         runId: string,
     ): Promise<AgentRun> {
-        await this.service.getOne(userId, agentId, this.scopeContext?.getScope());
-        const run = await this.agentRuns.findByIdAndUser(runId, userId);
+        const scope = this.scopeContext?.getScope();
+        const run = scope
+            ? await this.agentRuns.findByIdAndUser(runId, userId, scope)
+            : await this.agentRuns.findByIdAndUser(runId, userId);
         if (!run || run.agentId !== agentId) {
-            throw new NotFoundException(`AgentRun ${runId} not found.`);
+            throw new NotFoundException(`AgentRun not found.`);
+        }
+        try {
+            await this.service.getOne(userId, agentId, scope);
+        } catch (error) {
+            if (error instanceof NotFoundException) {
+                throw new NotFoundException(`AgentRun not found.`);
+            }
+            throw error;
         }
         return run;
     }
@@ -1433,7 +1486,10 @@ export class AgentsController {
     ): Promise<{ runId: string; queued?: boolean; queuedReason?: string }> {
         await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         // Cross-user 404 on the Task too — surfaces via TasksService.
-        const task = await this.tasks.getOne(auth.userId, body.taskId);
+        const scope = this.scopeContext?.getScope();
+        const task = scope
+            ? await this.tasks.getOne(auth.userId, body.taskId, scope)
+            : await this.tasks.getOne(auth.userId, body.taskId);
         if (!task) {
             throw new NotFoundException(`Task ${body.taskId} not found.`);
         }
@@ -1444,7 +1500,9 @@ export class AgentsController {
         }
         // Dedup: re-use an in-flight run for the same (taskId, agentId) pair
         // rather than spawning a parallel one.
-        const inflight = await this.agentRuns.findInFlightForTaskAgent(body.taskId, id);
+        const inflight = scope
+            ? await this.agentRuns.findInFlightForTaskAgent(body.taskId, id, auth.userId, scope)
+            : await this.agentRuns.findInFlightForTaskAgent(body.taskId, id);
         if (inflight) {
             return { runId: inflight.id };
         }
@@ -1469,6 +1527,7 @@ export class AgentsController {
                 taskId: body.taskId,
                 workId: task.workId ?? null,
                 queuedReason: verdict.admitted ? null : (verdict.queuedReason ?? null),
+                ...(scope ?? {}),
             });
         };
         let admission: { admitted: boolean; queuedReason?: string } = { admitted: true };

@@ -103,6 +103,72 @@ function makeService(overrides: Record<string, any> = {}) {
 }
 
 describe('TasksService authorization guardrails', () => {
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+    const yoScope = {
+        tenantId: everScope.tenantId,
+        organizationId: '33333333-3333-4333-8333-333333333333',
+    };
+
+    it('404s a same-user Task UUID from another active Organization', async () => {
+        const hidden = makeTask({
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            tenantId: yoScope.tenantId,
+            organizationId: yoScope.organizationId,
+        });
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValueOnce(hidden);
+
+        await expect(
+            (service.getOne as any)('user-1', hidden.id, everScope),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('404s when the Task row matches but its Work belongs to Yo', async () => {
+        const hiddenWorkTask = makeTask({
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            workId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            ...everScope,
+        });
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValueOnce(hiddenWorkTask);
+        repos.works.findById.mockResolvedValueOnce({
+            id: hiddenWorkTask.workId,
+            userId: 'user-1',
+            ...yoScope,
+        });
+
+        await expect(
+            (service.getOne as any)('user-1', hiddenWorkTask.id, everScope),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('keeps legacy personal Task and Work rows reachable in personal scope', async () => {
+        const legacy = makeTask({
+            id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+            workId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+            tenantId: null,
+            organizationId: null,
+        });
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValueOnce(legacy);
+        repos.works.findById.mockResolvedValueOnce({
+            id: legacy.workId,
+            userId: 'user-1',
+            tenantId: null,
+            organizationId: null,
+        });
+
+        await expect(
+            (service.getOne as any)('user-1', legacy.id, {
+                tenantId: everScope.tenantId,
+                organizationId: null,
+            }),
+        ).resolves.toBe(legacy);
+    });
+
     it('rejects Work-scoped task creation when the Work is not owned by the user', async () => {
         const { service, repos } = makeService();
         repos.works.findById.mockResolvedValueOnce({ id: 'work-1', userId: 'other-user' });

@@ -5,7 +5,7 @@ import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialE
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
 import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
-import { ownershipSqlPredicate, type OwnershipScope } from '../ownership-scope';
+import { ownershipSqlPredicate, ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 import type { SubAgentScope } from '@ever-works/contracts';
 
 /**
@@ -213,17 +213,24 @@ export class AgentRunRepository {
         userId: string,
         limit = 25,
         offset = 0,
+        scope?: OwnershipScope,
     ): Promise<AgentRun[]> {
         return this.repository.find({
-            where: { agentId, userId },
+            where: ownershipWhereWith<AgentRun>(userId, scope, { agentId }),
             order: { createdAt: 'DESC' },
             take: limit,
             skip: offset,
         });
     }
 
-    async countByAgentAndUser(agentId: string, userId: string): Promise<number> {
-        return this.repository.count({ where: { agentId, userId } });
+    async countByAgentAndUser(
+        agentId: string,
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<number> {
+        return this.repository.count({
+            where: ownershipWhereWith<AgentRun>(userId, scope, { agentId }),
+        });
     }
 
     /**
@@ -231,8 +238,14 @@ export class AgentRunRepository {
      * ensures cross-user runs return null (controller maps that to 404
      * per architecture/security §9, no-existence-leak).
      */
-    async findByIdAndUser(runId: string, userId: string): Promise<AgentRun | null> {
-        return this.repository.findOne({ where: { id: runId, userId } });
+    async findByIdAndUser(
+        runId: string,
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<AgentRun | null> {
+        return this.repository.findOne({
+            where: ownershipWhereWith<AgentRun>(userId, scope, { id: runId }),
+        });
     }
 
     /**
@@ -253,6 +266,7 @@ export class AgentRunRepository {
     async cancel(
         runId: string,
         userId: string,
+        scope?: OwnershipScope,
     ): Promise<{
         found: boolean;
         previousStatus?: AgentRunStatus;
@@ -271,8 +285,8 @@ export class AgentRunRepository {
         workId?: string | null;
     }> {
         const run = await this.repository.findOne({
-            where: { id: runId, userId },
-            select: ['id', 'status', 'triggerRunId', 'workId'],
+            where: ownershipWhereWith<AgentRun>(userId, scope, { id: runId }),
+            select: ['id', 'status', 'triggerRunId', 'workId', 'tenantId', 'organizationId'],
         });
         if (!run) return { found: false };
         if (run.status !== 'queued' && run.status !== 'running') {
@@ -283,7 +297,7 @@ export class AgentRunRepository {
                 workId: run.workId ?? null,
             };
         }
-        const result = await this.repository
+        const query = this.repository
             .createQueryBuilder()
             .update(AgentRun)
             .set({ status: 'cancelled', finishedAt: new Date() })
@@ -291,16 +305,20 @@ export class AgentRunRepository {
             .andWhere('userId = :userId', { userId })
             .andWhere('status IN (:...statuses)', {
                 statuses: ['queued', 'running'] satisfies AgentRunStatus[],
-            })
-            .execute();
+            });
+        const scopePredicate = ownershipSqlPredicate('', scope, 'cancelRun');
+        if (scopePredicate) {
+            query.andWhere(scopePredicate.clause, scopePredicate.parameters);
+        }
+        const result = await query.execute();
         // affected=0 ⇒ a concurrent worker flipped the row terminal
         // between our findOne and this CAS — surface that as a
         // graceful no-op so the controller responds 200/no-cancel
         // instead of 5xx.
         if ((result.affected ?? 0) === 0) {
             const fresh = await this.repository.findOne({
-                where: { id: runId },
-                select: ['id', 'status', 'triggerRunId'],
+                where: ownershipWhereWith<AgentRun>(userId, scope, { id: runId }),
+                select: ['id', 'status', 'triggerRunId', 'tenantId', 'organizationId'],
             });
             return {
                 found: true,
@@ -543,6 +561,7 @@ export class AgentRunRepository {
         queuedReason?: string | null;
         /** Wave 4 M1 — pipeline plugin id when known at creation. */
         runnerKind?: string | null;
+        tenantId?: string | null;
         organizationId?: string | null;
         /**
          * Streaming-terminal — this run wants a long-lived interactive
@@ -574,6 +593,7 @@ export class AgentRunRepository {
             ...(args.persistent === true ? { persistent: true } : {}),
             // Only stamp when explicitly provided — the ambient scope
             // subscriber (EW-657) remains the default writer.
+            ...(args.tenantId !== undefined ? { tenantId: args.tenantId } : {}),
             ...(args.organizationId !== undefined ? { organizationId: args.organizationId } : {}),
         });
         return this.repository.save(run);
@@ -947,16 +967,26 @@ export class AgentRunRepository {
      * same task + agent, the new mention appends context to the
      * in-flight run rather than dispatching a 2nd run.
      */
-    async findInFlightForTaskAgent(taskId: string, agentId: string): Promise<AgentRun | null> {
-        return this.repository
+    async findInFlightForTaskAgent(
+        taskId: string,
+        agentId: string,
+        userId?: string,
+        scope?: OwnershipScope,
+    ): Promise<AgentRun | null> {
+        const query = this.repository
             .createQueryBuilder('run')
             .where('run.taskId = :taskId', { taskId })
             .andWhere('run.agentId = :agentId', { agentId })
             .andWhere('run.status IN (:...statuses)', {
                 statuses: ['queued', 'running'] satisfies AgentRunStatus[],
             })
-            .orderBy('run.createdAt', 'DESC')
-            .getOne();
+            .orderBy('run.createdAt', 'DESC');
+        if (userId) query.andWhere('run.userId = :userId', { userId });
+        const scopePredicate = ownershipSqlPredicate('run', scope, 'inFlightRun');
+        if (scopePredicate) {
+            query.andWhere(scopePredicate.clause, scopePredicate.parameters);
+        }
+        return query.getOne();
     }
 
     /**

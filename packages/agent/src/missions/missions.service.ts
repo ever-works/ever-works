@@ -6,7 +6,7 @@ import {
     Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository, type FindOptionsWhere } from 'typeorm';
+import { ILike, In, Repository, type FindOptionsWhere } from 'typeorm';
 import {
     Mission,
     MissionOutcome,
@@ -543,7 +543,17 @@ export class MissionsService {
     ): Promise<MissionAttachment[]> {
         await this.findOrThrow(userId, missionId, scope);
         if (!this.missionAttachments) return [];
-        return this.missionAttachments.findByMissionId(missionId);
+        const rows = await this.missionAttachments.findByMissionId(missionId);
+        if (rows.length === 0 || !this.uploadsRepo) return rows;
+        const uploads = await this.uploadsRepo.find({
+            where: ownershipWhereWith<UserUpload>(userId, scope, {
+                sha256: In(rows.map((row) => row.uploadId)),
+            }),
+        });
+        if (new Set(rows.map((row) => row.uploadId)).size !== uploads.length) {
+            throw new NotFoundException(`Attachment not found`);
+        }
+        return rows;
     }
 
     /**
@@ -567,7 +577,9 @@ export class MissionsService {
         // attachment edge the hunt found.
         if (this.uploadsRepo) {
             const owned = await this.uploadsRepo.findOne({
-                where: { sha256: uploadId.toLowerCase(), userId },
+                where: ownershipWhereWith<UserUpload>(userId, scope, {
+                    sha256: uploadId.toLowerCase(),
+                }),
             });
             if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
         }
