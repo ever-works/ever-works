@@ -9,18 +9,23 @@ Set-StrictMode -Version Latest
 $packageRoot = $PSScriptRoot
 $fixtureDirectory = Join-Path $packageRoot "target\signed-test-fixture"
 $fixtureArtifactPath = Join-Path $fixtureDirectory "ever-works-windows-job-launcher.exe"
+$certificatePath = Join-Path $fixtureDirectory "ever-works-windows-job-launcher-test.cer"
 $thumbprintPath = Join-Path $fixtureDirectory "certificate-thumbprint.txt"
+$certutilPath = Join-Path ([Environment]::SystemDirectory) "certutil.exe"
 
 if ($Cleanup) {
 	if (Test-Path -LiteralPath $thumbprintPath) {
 		$thumbprint = (Get-Content -Raw -LiteralPath $thumbprintPath).Trim()
 		if ($thumbprint -match '^[A-Fa-f0-9]{40}$') {
-			foreach ($storePath in @(
-				"Cert:\CurrentUser\My\$thumbprint",
-				"Cert:\CurrentUser\Root\$thumbprint"
-			)) {
-				if (Test-Path -LiteralPath $storePath) {
-					Remove-Item -LiteralPath $storePath -Force
+			$signingStorePath = "Cert:\CurrentUser\My\$thumbprint"
+			if (Test-Path -LiteralPath $signingStorePath) {
+				Remove-Item -LiteralPath $signingStorePath -Force
+			}
+			$trustedStorePath = "Cert:\CurrentUser\Root\$thumbprint"
+			if (Test-Path -LiteralPath $trustedStorePath) {
+				& $certutilPath -user -delstore Root $thumbprint *> $null
+				if ($LASTEXITCODE -ne 0) {
+					throw "certutil could not remove the ephemeral test certificate"
 				}
 			}
 		}
@@ -63,21 +68,11 @@ try {
 	$publicCertificateBytes = $certificate.Export(
 		[Security.Cryptography.X509Certificates.X509ContentType]::Cert
 	)
-	$publicCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new(
-		$publicCertificateBytes
-	)
-	$rootStore = [Security.Cryptography.X509Certificates.X509Store]::new(
-		[Security.Cryptography.X509Certificates.StoreName]::Root,
-		[Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser
-	)
-	try {
-		Write-Host "Opening ephemeral CurrentUser Root test store"
-		$rootStore.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-		Write-Host "Adding public-only ephemeral certificate to test trust store"
-		$rootStore.Add($publicCertificate)
-	} finally {
-		$rootStore.Close()
-		$publicCertificate.Dispose()
+	[IO.File]::WriteAllBytes($certificatePath, $publicCertificateBytes)
+	Write-Host "Adding public-only ephemeral certificate with noninteractive certutil"
+	& $certutilPath -user -f -addstore Root $certificatePath | Out-Null
+	if ($LASTEXITCODE -ne 0) {
+		throw "certutil could not add the ephemeral public certificate to CurrentUser Root"
 	}
 	Write-Host "Trusted ephemeral certificate for this test runner only"
 	Write-Host "Signing copied test-only helper fixture"
