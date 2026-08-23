@@ -343,6 +343,16 @@ export class CreditLedgerService {
             }
         }
 
+        // Emitted here as well as in the cron task, because this method is also
+        // reachable over the internal RPC channel and a payout failure must be
+        // visible from whichever side invoked it.
+        if (summary.failed > 0 || summary.monthlyFailed > 0) {
+            this.logger.error(
+                `Credit grant sweep: ${summary.failed} daily and ${summary.monthlyFailed} monthly ` +
+                    `grant(s) FAILED across ${summary.scanned} user(s).`,
+            );
+        }
+
         return summary;
     }
     /**

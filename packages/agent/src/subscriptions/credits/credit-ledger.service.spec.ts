@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
     addWholeMonths,
     CreditLedgerService,
@@ -756,15 +757,25 @@ describe('CreditLedgerService', () => {
          * gaps of the summary, so a sweep in which EVERY paying subscriber failed
          * to be paid reported exactly like a healthy one.
          */
-        it('counts a thrown monthly grant instead of losing it', async () => {
-            const { service } = withUser(proSubscription, {
-                sumByRefTypeInWindow: jest.fn().mockRejectedValue(new Error('db down')),
-            });
+        it('counts a thrown monthly grant instead of losing it, and SAYS so', async () => {
+            // Counting it is not enough: the number has to leave the process. The
+            // cron emitter used to gate every log line on the DAILY counters, so on
+            // a same-day re-run (retry, redeploy, manual trigger) a sweep in which
+            // every subscriber failed to be paid logged nothing at all.
+            const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
+            try {
+                const { service } = withUser(proSubscription, {
+                    sumByRefTypeInWindow: jest.fn().mockRejectedValue(new Error('db down')),
+                });
 
-            const summary = await service.dispatchDailyGrants(NOW);
+                const summary = await service.dispatchDailyGrants(NOW);
 
-            expect(summary.monthlyFailed).toBe(1);
-            expect(summary.monthlyGranted).toBe(0);
+                expect(summary.monthlyFailed).toBe(1);
+                expect(summary.monthlyGranted).toBe(0);
+                expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('FAILED'));
+            } finally {
+                errorSpy.mockRestore();
+            }
         });
 
         it('grants only the DIFFERENCE after a mid-cycle upgrade', async () => {

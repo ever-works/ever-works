@@ -31,9 +31,28 @@ export const creditsDailyGrantTask = schedules.task({
             async (appContext) => {
                 const svc = appContext.get(CreditLedgerService);
                 const summary = await svc.dispatchDailyGrants();
-                if (summary.granted > 0 || summary.skipped > 0) {
+                // 🛑 The monthly counters must not hide behind the daily ones. On any
+                // same-day re-run - a retry, a redeploy, a manual trigger - every daily
+                // grant returns 'already', so granted and skipped are both 0 and this
+                // used to log NOTHING AT ALL, even in a sweep where every paying
+                // subscriber's monthly grant threw. Silence that looks like health is
+                // the exact failure the `failed` counters were added to end.
+                if (
+                    summary.granted > 0 ||
+                    summary.skipped > 0 ||
+                    summary.monthlyGranted > 0 ||
+                    summary.monthlyAlreadyGranted > 0 ||
+                    summary.monthlyFailed > 0
+                ) {
                     logger.info('credits-daily-grant dispatched daily free credits', {
                         ...summary,
+                    });
+                }
+                if (summary.failed > 0 || summary.monthlyFailed > 0) {
+                    logger.error('credits-daily-grant had per-user failures', {
+                        failed: summary.failed,
+                        monthlyFailed: summary.monthlyFailed,
+                        scanned: summary.scanned,
                     });
                 }
                 return summary;
