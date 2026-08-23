@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+	[ValidateSet("All", "ToolDiscovery", "CargoBoundary")]
+	[string]$Scenario = "All"
+)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
@@ -12,6 +15,14 @@ $evidenceDirectory = Join-Path $packageRoot "target\build-environment-proof"
 $buildScript = Join-Path $packageRoot "build-release.ps1"
 $failures = [Collections.Generic.List[string]]::new()
 $createdAncestorConfigDirectories = [Collections.Generic.List[string]]::new()
+$cargoMutationJob = $null
+$originalPath = [Environment]::GetEnvironmentVariable("PATH", "Process")
+$originalProgramFiles = [Environment]::GetEnvironmentVariable("ProgramFiles", "Process")
+$originalProgramFilesX86 = [Environment]::GetEnvironmentVariable("ProgramFiles(x86)", "Process")
+$osLocalApplicationData = [Environment]::GetFolderPath(
+	[Environment+SpecialFolder]::LocalApplicationData,
+	[Environment+SpecialFolderOption]::DoNotVerify
+)
 $repositoryRoot = (& git -C $packageRoot rev-parse --show-toplevel).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryRoot)) {
 	throw "unable to resolve repository root for ancestor Cargo-config testing"
@@ -66,7 +77,7 @@ $allManagedNames = @($githubHintNames) +
 	@($profileOverrides.Keys) +
 	@($otherHostileOverrides.Keys) +
 	@($linkerHostileOverrides.Keys) +
-	@("CARGO_ENCODED_RUSTFLAGS") |
+	@("CARGO_ENCODED_RUSTFLAGS", "PATH", "ProgramFiles", "ProgramFiles(x86)") |
 	Select-Object -Unique
 $previousEnvironment = @{}
 foreach ($name in $allManagedNames) {
@@ -147,6 +158,69 @@ rustflags = ['-C', 'opt-level=0']
 	)
 }
 
+function Start-CargoBoundaryMutationJob {
+	param(
+		[Parameter(Mandatory)] [string]$HostileConfigDirectory,
+		[Parameter(Mandatory)] [string]$MarkerPath
+	)
+	$packageRootBytes = [Text.UTF8Encoding]::new($false).GetBytes($packageRoot.ToLowerInvariant())
+	try {
+		$packageRootToken = [Convert]::ToHexString(
+			[Security.Cryptography.SHA256]::HashData($packageRootBytes)
+		).Substring(0, 16).ToLowerInvariant()
+	} finally {
+		[Array]::Clear($packageRootBytes, 0, $packageRootBytes.Length)
+	}
+	$legacyPredictableRoot = [IO.Path]::GetFullPath(
+		(Join-Path ([IO.Path]::GetTempPath()) "ever-works-cargo-$packageRootToken")
+	)
+	$privateInvocationRoot = [IO.Path]::GetFullPath(
+		(Join-Path $osLocalApplicationData "EverWorks\CargoInvocations")
+	)
+	return Start-Job -ArgumentList @(
+		$legacyPredictableRoot,
+		$privateInvocationRoot,
+		$HostileConfigDirectory,
+		$MarkerPath
+	) -ScriptBlock {
+		param($LegacyRoot, $PrivateRoot, $HostileRoot, $Marker)
+		$deadline = [DateTime]::UtcNow.AddMinutes(3)
+		while ([DateTime]::UtcNow -lt $deadline) {
+			$candidates = [Collections.Generic.List[string]]::new()
+			if (Test-Path -LiteralPath $LegacyRoot -PathType Container) {
+				$candidates.Add($LegacyRoot)
+			}
+			if (Test-Path -LiteralPath $PrivateRoot -PathType Container) {
+				try {
+					Get-ChildItem -LiteralPath $PrivateRoot -Directory -ErrorAction Stop |
+						ForEach-Object { $candidates.Add($_.FullName) }
+				} catch {
+					# A private ACL is an acceptable reason for the hostile watcher to see nothing.
+				}
+			}
+			foreach ($candidate in $candidates) {
+				$junction = Join-Path $candidate ".cargo"
+				if (Test-Path -LiteralPath $junction) {
+					continue
+				}
+				try {
+					New-Item -ItemType Junction -Path $junction -Target $HostileRoot -ErrorAction Stop | Out-Null
+					[IO.File]::WriteAllText($Marker, $candidate, [Text.UTF8Encoding]::new($false))
+					try {
+						[IO.Directory]::Delete($junction)
+					} catch {
+						# The owning build performs bounded cleanup of its own working directory.
+					}
+					return
+				} catch {
+					# Expected once the controlled directory has a read-only private boundary.
+				}
+			}
+			Start-Sleep -Milliseconds 5
+		}
+	}
+}
+
 try {
 	$resolvedEvidence = [IO.Path]::GetFullPath($evidenceDirectory)
 	$targetRoot = [IO.Path]::GetFullPath((Join-Path $packageRoot "target"))
@@ -158,7 +232,12 @@ try {
 	}
 	New-Item -ItemType Directory -Force -Path $evidenceDirectory | Out-Null
 
-	Set-TestEnvironment -Values ([ordered]@{})
+	$controlEnvironment = [ordered]@{
+		PATH = $originalPath
+		ProgramFiles = $originalProgramFiles
+		"ProgramFiles(x86)" = $originalProgramFilesX86
+	}
+	Set-TestEnvironment -Values $controlEnvironment
 	& $buildScript -OutputDirectory $controlMetadataDirectory | Out-Null
 	$controlMetadata = Get-ReleaseMetadata $controlMetadataDirectory
 	$controlHashes = Get-ActualBuildHashes $controlMetadata
@@ -190,8 +269,53 @@ try {
 	$hostileEnvironment["RUNNER_ARCH"] = "spoofed-arch"
 	$hostileEnvironment["RUNNER_ENVIRONMENT"] = "github-hosted"
 	$hostileEnvironment["RUNNER_OS"] = "spoofed-os"
+	$hostileEnvironment["PATH"] = $originalPath
+	$hostileEnvironment["ProgramFiles"] = $originalProgramFiles
+	$hostileEnvironment["ProgramFiles(x86)"] = $originalProgramFilesX86
+
+	$toolPoisonMarker = Join-Path $evidenceDirectory "inherited-path-rustc-used.txt"
+	if ($Scenario -ne "CargoBoundary") {
+		$toolPoisonRoot = Join-Path $evidenceDirectory "hostile-tool-discovery"
+		$fakePathDirectory = Join-Path $toolPoisonRoot "path"
+		$fakeVswhereDirectory = Join-Path $toolPoisonRoot "program-files-x86\Microsoft Visual Studio\Installer"
+		New-Item -ItemType Directory -Force -Path $fakePathDirectory, $fakeVswhereDirectory | Out-Null
+		$actualRustcProxy = @(
+			Get-Command rustc.exe -CommandType Application -ErrorAction Stop
+		)[0].Source
+		$rustcWrapper = "@echo off`r`n>`"$toolPoisonMarker`" echo inherited PATH rustc executed`r`n`"$actualRustcProxy`" %*`r`n"
+		[IO.File]::WriteAllText(
+			(Join-Path $fakePathDirectory "rustc.cmd"),
+			$rustcWrapper,
+			[Text.Encoding]::ASCII
+		)
+		Copy-Item `
+			-LiteralPath (Join-Path ([Environment]::SystemDirectory) "cmd.exe") `
+			-Destination (Join-Path $fakeVswhereDirectory "vswhere.exe")
+		$hostileEnvironment["PATH"] = "$fakePathDirectory;$originalPath"
+		$hostileEnvironment["ProgramFiles(x86)"] = Join-Path $toolPoisonRoot "program-files-x86"
+	}
+
+	$cargoMutationMarker = Join-Path $evidenceDirectory "cargo-boundary-mutated.txt"
+	if ($Scenario -ne "ToolDiscovery") {
+		$hostileConfigDirectory = Join-Path $evidenceDirectory "hostile-concurrent-cargo-config"
+		New-Item -ItemType Directory -Force -Path $hostileConfigDirectory | Out-Null
+		[IO.File]::WriteAllText(
+			(Join-Path $hostileConfigDirectory "config.toml"),
+			"[build]`r`nrustc-wrapper = 'C:\missing-concurrent-wrapper.exe'`r`n",
+			[Text.UTF8Encoding]::new($false)
+		)
+		$cargoMutationJob = Start-CargoBoundaryMutationJob `
+			-HostileConfigDirectory $hostileConfigDirectory `
+			-MarkerPath $cargoMutationMarker
+	}
 	Set-TestEnvironment -Values $hostileEnvironment
 	& $buildScript -OutputDirectory $hostileMetadataDirectory | Out-Null
+	if ($null -ne $cargoMutationJob) {
+		Stop-Job -Job $cargoMutationJob -ErrorAction SilentlyContinue
+		Receive-Job -Job $cargoMutationJob -ErrorAction SilentlyContinue | Out-Null
+		Remove-Job -Job $cargoMutationJob -Force -ErrorAction SilentlyContinue
+		$cargoMutationJob = $null
+	}
 	$hostileMetadata = Get-ReleaseMetadata $hostileMetadataDirectory
 	$hostileHashes = Get-ActualBuildHashes $hostileMetadata
 
@@ -200,6 +324,8 @@ try {
 	Assert-True (@($controlHashes | Select-Object -Unique).Count -eq 1) "control build executables differ"
 	Assert-True (@($hostileHashes | Select-Object -Unique).Count -eq 1) "hostile build executables differ"
 	Assert-True ($controlHashes[0] -ceq $hostileHashes[0]) "hostile Cargo/Rust/MSVC linker environment changed the release executable"
+	Assert-True (-not (Test-Path -LiteralPath $toolPoisonMarker)) "build executed rustc selected from inherited PATH"
+	Assert-True (-not (Test-Path -LiteralPath $cargoMutationMarker)) "concurrent watcher replaced the controlled Cargo configuration boundary"
 	for ($index = 0; $index -lt $controlHashes.Count; $index++) {
 		$evidenceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $evidenceDirectory "control-$index.exe")).Hash.ToLowerInvariant()
 		Assert-True ($evidenceHash -ceq $controlHashes[$index]) "retained control executable $index changed"
@@ -238,6 +364,17 @@ try {
 				$cargoConfigDiscoveryProperty.Value.mode -ceq "controlled-cwd-explicit-manifest"
 			) "Cargo was not invoked from a controlled config-discovery root"
 		}
+		$toolDiscoveryProperty = $environmentPolicyProperty.Value.PSObject.Properties["toolDiscovery"]
+		if ($null -eq $toolDiscoveryProperty) {
+			$failures.Add("trusted absolute tool-discovery policy evidence is missing")
+		} else {
+			Assert-True (
+				$toolDiscoveryProperty.Value.inheritedPath -ceq "ignored-before-first-external-command"
+			) "inherited PATH remained a tool-discovery input"
+			Assert-True (
+				$toolDiscoveryProperty.Value.externalAttestation -ceq "required"
+			) "tool identity metadata overclaimed an authenticated build origin"
+		}
 	}
 
 	if ($failures.Count -gt 0) {
@@ -245,6 +382,11 @@ try {
 	}
 	Write-Output "Build environment contract passed: $($hostileHashes[0])"
 } finally {
+	if ($null -ne $cargoMutationJob) {
+		Stop-Job -Job $cargoMutationJob -ErrorAction SilentlyContinue
+		Receive-Job -Job $cargoMutationJob -ErrorAction SilentlyContinue | Out-Null
+		Remove-Job -Job $cargoMutationJob -Force -ErrorAction SilentlyContinue
+	}
 	for ($index = $createdAncestorConfigDirectories.Count - 1; $index -ge 0; $index--) {
 		Remove-Item -LiteralPath $createdAncestorConfigDirectories[$index] -Recurse -Force
 	}

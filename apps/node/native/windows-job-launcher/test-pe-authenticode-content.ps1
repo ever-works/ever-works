@@ -599,6 +599,117 @@ try {
 			-OutputPath (Join-Path $fixtureRoot "mismatched-provenance.json")
 	}
 
+	$mirroredClaimMismatchCases = @(
+		[ordered]@{
+			name = "source-commit"
+			pattern = "*source commit*"
+			mutate = {
+				param($metadata, $provenance)
+				$replacement = "3".PadLeft(40, "3")
+				$metadata.sourceCommit = $replacement
+				($provenance.predicate.buildDefinition.resolvedDependencies |
+					Where-Object { $_.uri -like "git+*" }).digest.gitCommit = $replacement
+			}
+		},
+		[ordered]@{
+			name = "cargo-lock"
+			pattern = "*Cargo.lock*"
+			mutate = {
+				param($metadata, $provenance)
+				$replacement = "4".PadLeft(64, "4")
+				$metadata.cargoLockSha256 = $replacement
+				($provenance.predicate.buildDefinition.resolvedDependencies |
+					Where-Object { $_.uri -ceq "file:Cargo.lock" }).digest.sha256 = $replacement
+			}
+		},
+		[ordered]@{
+			name = "resolved-git"
+			pattern = "*provenance*"
+			mutate = {
+				param($metadata, $provenance)
+				($provenance.predicate.buildDefinition.resolvedDependencies |
+					Where-Object { $_.uri -like "git+*" }).digest.gitCommit = "5".PadLeft(40, "5")
+			}
+		},
+		[ordered]@{
+			name = "resolved-sbom"
+			pattern = "*provenance*"
+			mutate = {
+				param($metadata, $provenance)
+				($provenance.predicate.buildDefinition.resolvedDependencies |
+					Where-Object { $_.uri -like "file:*.sbom.cdx.json" }).digest.sha256 = "6".PadLeft(64, "6")
+			}
+		},
+		[ordered]@{
+			name = "build-definition"
+			pattern = "*provenance*"
+			mutate = {
+				param($metadata, $provenance)
+				$provenance.predicate.buildDefinition.externalParameters.targetTriple = "attacker-target"
+			}
+		},
+		[ordered]@{
+			name = "build-inputs"
+			pattern = "*provenance*"
+			mutate = {
+				param($metadata, $provenance)
+				$provenance.predicate.buildDefinition.internalParameters.buildInputs.rustc.sha256 = "7".PadLeft(64, "7")
+			}
+		},
+		[ordered]@{
+			name = "builder"
+			pattern = "*provenance*"
+			mutate = {
+				param($metadata, $provenance)
+				$provenance.predicate.runDetails.builder.id = "urn:attacker:builder"
+			}
+		},
+		[ordered]@{
+			name = "invocation"
+			pattern = "*provenance*"
+			mutate = {
+				param($metadata, $provenance)
+				$provenance.predicate.runDetails.metadata.invocationHints.githubRepository = "attacker/rehashed"
+			}
+		},
+		[ordered]@{
+			name = "environment-evidence"
+			pattern = "*provenance*"
+			mutate = {
+				param($metadata, $provenance)
+				$provenance.predicate.buildDefinition.internalParameters.buildInputs.environmentPolicy.effective.cargoIncremental = $true
+			}
+		},
+		[ordered]@{
+			name = "reproducibility-evidence"
+			pattern = "*provenance*"
+			mutate = {
+				param($metadata, $provenance)
+				$provenance.predicate.runDetails.metadata.reproducibilityEvidence.buildArtifacts[0] = "target/attacker.exe"
+			}
+		}
+	)
+	foreach ($case in $mirroredClaimMismatchCases) {
+		$caseMetadata = Copy-TestJsonObject $unsignedMetadata
+		$caseProvenance = Get-Content `
+			-Raw `
+			-LiteralPath (Join-Path $testMetadataDirectory ([string]$unsignedMetadata.provenance)) |
+			ConvertFrom-Json
+		& $case.mutate $caseMetadata $caseProvenance
+		$caseDirectory = Join-Path $fixtureRoot "mismatched-$($case.name)"
+		$caseMetadataPath = Write-TestMetadataBundle `
+			-Directory $caseDirectory `
+			-Metadata $caseMetadata `
+			-Provenance $caseProvenance `
+			-SourceMetadataDirectory $sourceMetadataDirectory
+		Assert-ScriptFailsLike -Pattern $case.pattern -Message "rehashed $($case.name) claim mismatch must be rejected" -Action {
+			Invoke-TestSignedManifest @manifestArguments `
+				-SignedArtifactPath $goodPath `
+				-UnsignedMetadataPath $caseMetadataPath `
+				-OutputPath (Join-Path $caseDirectory "signed.json")
+		}
+	}
+
 	$invalidSchemaMetadata = Copy-TestJsonObject $unsignedMetadata
 	$invalidSchemaMetadata | Add-Member -NotePropertyName attackerControlled -NotePropertyValue $true
 	$invalidSchemaProvenance = Get-Content `
