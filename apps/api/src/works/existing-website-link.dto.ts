@@ -45,8 +45,11 @@ export function parseExistingWebsiteUrl(value: unknown): ParsedExistingWebsiteUr
     }
     // URL canonicalization erases an explicit default `:443`, so inspect
     // the raw authority to enforce the contract's no-port rule.
-    const authority = input.slice('https://'.length).split(/[/?#\\]/, 1)[0];
-    if (!authority || authority.includes(':')) {
+    const remainder = input.slice('https://'.length);
+    const suffixStart = remainder.search(/[/?#\\]/);
+    const authority = suffixStart === -1 ? remainder : remainder.slice(0, suffixStart);
+    const suffix = suffixStart === -1 ? '' : remainder.slice(suffixStart);
+    if (!authority || authority.includes(':') || (suffix !== '' && suffix !== '/')) {
         return invalidExistingWebsiteUrl();
     }
 
