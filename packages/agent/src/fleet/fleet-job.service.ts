@@ -339,17 +339,25 @@ export class FleetJobService {
 
         for (const job of expired) {
             try {
+                // A scan is only a snapshot. Pin the exact claim so a
+                // successful heartbeat between this read and the UPDATE wins.
+                if (!job.nodeId || !job.leaseExpiresAt) continue;
+                const observed = {
+                    status: job.status,
+                    nodeId: job.nodeId,
+                    leaseExpiresAt: job.leaseExpiresAt,
+                };
                 if ((job.attempts ?? 0) >= (job.maxAttempts ?? 1)) {
                     const failed = await this.jobs.failExhausted(
                         job.id,
-                        job.status,
+                        observed,
                         `Lease expired ${job.attempts} time(s) without a result; attempt budget exhausted`,
                         now,
                     );
                     if (failed) summary.failed += 1;
                     continue;
                 }
-                const requeued = await this.jobs.reclaim(job.id, job.status);
+                const requeued = await this.jobs.reclaim(job.id, observed);
                 if (requeued) summary.requeued += 1;
             } catch (error) {
                 this.logger.warn(

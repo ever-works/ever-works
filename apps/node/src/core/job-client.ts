@@ -89,14 +89,15 @@ export class FleetJobClient {
 	 * response, so an empty array must not be treated as an error.
 	 */
 	async lease(
-		request: { max?: number; leaseTtlSec?: number; capabilities?: string[] } = {}
+		request: { max?: number; leaseTtlSec?: number; capabilities?: string[] } = {},
+		signal?: AbortSignal
 	): Promise<FleetJobView[]> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
 		if (request.max !== undefined) body.max = request.max;
 		if (request.leaseTtlSec !== undefined) body.leaseTtlSec = request.leaseTtlSec;
 		if (request.capabilities !== undefined) body.capabilities = request.capabilities;
 
-		const payload = (await this.post('api/fleet/jobs/lease', 'lease', body)) as FleetJobLeaseResponse;
+		const payload = (await this.post('api/fleet/jobs/lease', 'lease', body, signal)) as FleetJobLeaseResponse;
 		if (!payload || !Array.isArray(payload.jobs)) {
 			throw new FleetClientError('malformed', 'Lease response did not contain a job list');
 		}
@@ -104,13 +105,14 @@ export class FleetJobClient {
 	}
 
 	/**
-	 * Extend the claim on a job. Returns false rather than throwing when
+	 * Extend the claim on a job. Returns the server's refreshed job view —
+	 * including its authoritative lease expiry — or null when
 	 * the platform refuses (401 — someone else's job, already terminal,
-	 * revoked credential): a lost lease is a normal outcome the loop
-	 * handles by finishing the work and letting the complete call fail,
-	 * not an exception worth unwinding an in-flight execution for.
+	 * revoked credential). A lost lease is a protocol outcome rather than a
+	 * transport exception; the worker aborts the shared task signal before the
+	 * platform can offer that job elsewhere.
 	 */
-	async heartbeat(jobId: string, leaseTtlSec?: number): Promise<boolean> {
+	async heartbeat(jobId: string, leaseTtlSec?: number): Promise<FleetJobView | null> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
 		if (leaseTtlSec !== undefined) body.leaseTtlSec = leaseTtlSec;
 		try {
@@ -119,10 +121,13 @@ export class FleetJobClient {
 				'job-heartbeat',
 				body
 			)) as FleetJobHeartbeatResponse;
-			return Boolean(payload?.ok);
+			if (!payload?.ok || !payload.job || typeof payload.job !== 'object') {
+				throw new FleetClientError('malformed', 'Job heartbeat response did not contain the renewed job');
+			}
+			return payload.job;
 		} catch (error) {
 			if (error instanceof FleetClientError && error.kind === 'unauthorized') {
-				return false;
+				return null;
 			}
 			throw error;
 		}
@@ -149,7 +154,12 @@ export class FleetJobClient {
 		return Boolean(payload?.ok);
 	}
 
-	private async post(path: string, operation: string, body: Record<string, unknown>): Promise<unknown> {
+	private async post(
+		path: string,
+		operation: string,
+		body: Record<string, unknown>,
+		signal?: AbortSignal
+	): Promise<unknown> {
 		const url = joinUrl(this.apiUrl, path);
 		const init: FetchRequestInit = {
 			method: 'POST',
@@ -160,9 +170,14 @@ export class FleetJobClient {
 			},
 			body: JSON.stringify(body)
 		};
-		if (this.timeoutMs > 0 && typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-			init.signal = AbortSignal.timeout(this.timeoutMs);
-		}
+		const timeoutSignal =
+			this.timeoutMs > 0 && typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+				? AbortSignal.timeout(this.timeoutMs)
+				: undefined;
+		init.signal =
+			signal && timeoutSignal && typeof AbortSignal.any === 'function'
+				? AbortSignal.any([signal, timeoutSignal])
+				: (signal ?? timeoutSignal);
 
 		let response;
 		try {

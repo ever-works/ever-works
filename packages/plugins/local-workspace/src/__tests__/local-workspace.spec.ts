@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { mkdtempSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -113,6 +113,69 @@ describe('provision (persistent pool + worktree)', () => {
 		expect(configMtimeAfter).toBe(configMtimeBefore);
 	});
 
+	it('migrates an exact pre-v2 binding stamp under the existing Git registration and reuses the worktree', async () => {
+		const bindingKey = 'lw-task-v1-migrate';
+		const branch = 'task/v1-migrate-10101010';
+		const first = await plugin.provision(spec(bindingKey, branch));
+		writeFileSync(join(first.path, 'must-remain.txt'), 'persistent task state\n');
+		const gitDir = git(first.path, 'rev-parse', '--path-format=absolute', '--git-dir');
+		const stampPath = join(gitDir, 'ew-workspace.json');
+		writeFileSync(stampPath, JSON.stringify({ bindingKey, branch }));
+
+		const reused = await plugin.provision(spec(bindingKey, branch));
+		expect(reused.reused).toBe(true);
+		expect(reused.path).toBe(first.path);
+		await expect(fs.readFile(join(reused.path, 'must-remain.txt'), 'utf8')).resolves.toBe(
+			'persistent task state\n'
+		);
+		expect(JSON.parse(await fs.readFile(stampPath, 'utf8'))).toMatchObject({
+			version: 2,
+			bindingKey,
+			branch
+		});
+	});
+
+	it('preserves a valid v1 stamp when the atomic replacement fails, then migrates on retry', async () => {
+		const bindingKey = 'lw-task-v1-crash';
+		const branch = 'task/v1-crash-20202020';
+		const first = await plugin.provision(spec(bindingKey, branch));
+		const gitDir = git(first.path, 'rev-parse', '--path-format=absolute', '--git-dir');
+		const stampPath = join(gitDir, 'ew-workspace.json');
+		const legacy = JSON.stringify({ bindingKey, branch });
+		writeFileSync(stampPath, legacy);
+
+		const interrupted = new LocalWorkspacePlugin({
+			replaceFile: async () => {
+				throw Object.assign(new Error('simulated atomic replace crash'), { code: 'EIO' });
+			}
+		} as never);
+		await expect(interrupted.provision(spec(bindingKey, branch))).rejects.toThrow(/replace crash|owned|binding/i);
+		await expect(fs.readFile(stampPath, 'utf8')).resolves.toBe(legacy);
+
+		const retried = await new LocalWorkspacePlugin().provision(spec(bindingKey, branch));
+		expect(retried.reused).toBe(true);
+		expect(JSON.parse(await fs.readFile(stampPath, 'utf8'))).toMatchObject({
+			version: 2,
+			bindingKey,
+			branch
+		});
+	});
+
+	it('reconciles an exact stale Git registration when its deterministic worktree path is absent', async () => {
+		const bindingKey = 'lw-task-missing-path';
+		const branch = 'task/missing-path-30303030';
+		const first = await plugin.provision(spec(bindingKey, branch));
+		const pool = poolRepoDir();
+		await fs.rm(first.path, { recursive: true, force: true, maxRetries: 3 });
+		expect(git(pool, 'worktree', 'list', '--porcelain')).toContain(bindingKey);
+
+		const retried = await new LocalWorkspacePlugin().provision(spec(bindingKey, branch));
+		expect(retried.path).toBe(first.path);
+		expect(git(retried.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(branch);
+		const registrations = git(pool, 'worktree', 'list', '--porcelain');
+		expect(registrations.match(new RegExp(bindingKey, 'g'))).toHaveLength(1);
+	});
+
 	it('self-heals a branch collision: same binding, different branch → recreate', async () => {
 		const h1 = await plugin.provision(spec('lw-task-3', 'task/heal-cccc3333'));
 		writeFileSync(join(h1.path, 'stale.txt'), 'stale\n');
@@ -126,7 +189,7 @@ describe('provision (persistent pool + worktree)', () => {
 		expect(existsSync(join(h2.path, 'stale.txt'))).toBe(false);
 	});
 
-	it('self-heals a foreign/corrupt binding stamp instead of bricking', async () => {
+	it('preserves a worktree with a foreign/corrupt binding stamp instead of deleting it', async () => {
 		const h1 = await plugin.provision(spec('lw-task-4', 'task/stamp-eeee5555'));
 		writeFileSync(join(h1.path, 'stale.txt'), 'stale\n');
 
@@ -139,10 +202,49 @@ describe('provision (persistent pool + worktree)', () => {
 			JSON.stringify({ bindingKey: 'someone-else', branch: 'task/stamp-eeee5555' })
 		);
 
-		const h2 = await plugin.provision(spec('lw-task-4', 'task/stamp-eeee5555'));
-		expect(h2.path).toBe(h1.path);
-		expect(git(h2.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/stamp-eeee5555');
-		expect(existsSync(join(h2.path, 'stale.txt'))).toBe(false);
+		await expect(plugin.provision(spec('lw-task-4', 'task/stamp-eeee5555'))).rejects.toThrow(/owned|binding/i);
+		expect(git(h1.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/stamp-eeee5555');
+		expect(await fs.readFile(join(h1.path, 'stale.txt'), 'utf8')).toBe('stale\n');
+	});
+
+	it.runIf(process.platform === 'win32')(
+		'rejects a junction alias and preserves the other registered worktree it targets',
+		async () => {
+			const victimBranch = 'task/alias-victim-11112222';
+			const victim = await plugin.provision(spec('lw-alias-victim', victimBranch));
+			writeFileSync(join(victim.path, 'must-survive.txt'), 'victim data\n');
+			const victimGitDir = git(victim.path, 'rev-parse', '--path-format=absolute', '--git-dir');
+			writeFileSync(
+				join(victimGitDir, 'ew-workspace.json'),
+				JSON.stringify({ bindingKey: 'lw-alias-attacker', branch: victimBranch })
+			);
+			const aliasPath = join(baseDir, 'worktrees', 'lw-alias-attacker');
+			await fs.symlink(victim.path, aliasPath, 'junction');
+
+			await expect(plugin.provision(spec('lw-alias-attacker', 'task/alias-attacker-33334444'))).rejects.toThrow(
+				/owned|binding|path/i
+			);
+			expect(await fs.readFile(join(victim.path, 'must-survive.txt'), 'utf8')).toBe('victim data\n');
+			expect(git(victim.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe(victimBranch);
+		}
+	);
+
+	it('refuses to delete a worktree registered to a different repository pool', async () => {
+		const victim = await plugin.provision(spec('lw-repo-owner', 'task/repo-owner-55556666'));
+		writeFileSync(join(victim.path, 'must-survive.txt'), 'original repository data\n');
+		const otherOriginDir = join(root, 'other-origin.git');
+		mkdirSync(otherOriginDir, { recursive: true });
+		git(otherOriginDir, 'init', '--bare', '--initial-branch', 'main');
+		const otherOriginUrl = pathToFileURL(otherOriginDir).toString();
+		git(seedDir, 'push', otherOriginUrl, 'HEAD:refs/heads/main');
+
+		await expect(
+			plugin.provision({
+				...spec('lw-repo-owner', 'task/repo-other-77778888'),
+				repoUrl: otherOriginUrl
+			})
+		).rejects.toThrow(/owned|repository|registration/i);
+		expect(await fs.readFile(join(victim.path, 'must-survive.txt'), 'utf8')).toBe('original repository data\n');
 	});
 
 	it('provisions two tasks in PARALLEL into two worktrees of ONE pool repo', async () => {
@@ -165,6 +267,148 @@ describe('provision (persistent pool + worktree)', () => {
 		const list = git(join(baseDir, 'repos', repos[0]), 'worktree', 'list');
 		expect(list).toContain('lw-par-a');
 		expect(list).toContain('lw-par-b');
+	});
+
+	it('releases settled repository and worktree mutex entries after concurrent reuse stress', async () => {
+		const stressPlugin = new LocalWorkspacePlugin();
+		const tasks = Array.from({ length: 8 }, (_, index) => ({
+			bindingKey: `lw-lock-stress-${index}`,
+			branch: `task/lock-stress-${index}-abcdef12`
+		}));
+		const first = await Promise.all(
+			tasks.map((task) => stressPlugin.provision(spec(task.bindingKey, task.branch)))
+		);
+
+		await expect
+			.poll(() => (stressPlugin as unknown as { repoLocks: Map<string, Promise<void>> }).repoLocks.size, {
+				timeout: 1_000
+			})
+			.toBe(0);
+
+		const reused = await Promise.all(
+			tasks.map((task) => stressPlugin.provision(spec(task.bindingKey, task.branch)))
+		);
+		expect(reused.every((handle, index) => handle.reused && handle.path === first[index].path)).toBe(true);
+		await expect
+			.poll(() => (stressPlugin as unknown as { repoLocks: Map<string, Promise<void>> }).repoLocks.size, {
+				timeout: 1_000
+			})
+			.toBe(0);
+	});
+
+	it('terminates a blocking Git process tree and settles promptly on cancellation', async () => {
+		const controller = new AbortController();
+		let blockingCalls = 0;
+		const child = { pid: 4242, kill: () => true };
+		const blockingExecFile = ((
+			_command: string,
+			args: string[],
+			_options: Record<string, unknown>,
+			callback: (error: Error | null, stdout?: string, stderr?: string) => void
+		) => {
+			if (args[0] === '--version') {
+				queueMicrotask(() => callback(null, 'git version test', ''));
+				return child;
+			}
+			blockingCalls += 1;
+			return child;
+		}) as never;
+		const terminated: unknown[] = [];
+		const blockingPlugin = new LocalWorkspacePlugin({
+			execFile: blockingExecFile,
+			terminateProcessTree: async (received) => {
+				terminated.push(received);
+			}
+		});
+		const pending = blockingPlugin.provision({
+			...spec('lw-abort', 'task/abort-99990000'),
+			signal: controller.signal
+		} as never);
+
+		await expect.poll(() => blockingCalls, { timeout: 500 }).toBeGreaterThan(0);
+		controller.abort();
+		await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+		expect(terminated).toEqual([child]);
+	});
+
+	it('surfaces an unproven Git/helper tree cancellation for worker quarantine', async () => {
+		const controller = new AbortController();
+		let blockingCalls = 0;
+		const child = { pid: 4343, kill: () => false };
+		const blockingExecFile = ((
+			_command: string,
+			args: string[],
+			_options: Record<string, unknown>,
+			callback: (error: Error | null, stdout?: string, stderr?: string) => void
+		) => {
+			if (args[0] === '--version') queueMicrotask(() => callback(null, 'git version test', ''));
+			else blockingCalls += 1;
+			return child;
+		}) as never;
+		const blockingPlugin = new LocalWorkspacePlugin({
+			execFile: blockingExecFile,
+			terminateProcessTree: async () => {
+				throw new Error('descendant still alive');
+			}
+		});
+		const pending = blockingPlugin.provision({
+			...spec('lw-abort-unproven', 'task/abort-unproven-99991111'),
+			signal: controller.signal
+		} as never);
+
+		await expect.poll(() => blockingCalls, { timeout: 500 }).toBeGreaterThan(0);
+		controller.abort();
+		await expect(pending).rejects.toMatchObject({
+			name: 'ProcessTreeTerminationError',
+			message: expect.stringMatching(/could not be proven stopped/i)
+		});
+	});
+
+	it('recovers the exact task workspace when cancellation lands after git worktree add', async () => {
+		const controller = new AbortController();
+		let abortedAfterAdd = false;
+		const abortingExecFile = ((
+			command: string,
+			args: readonly string[],
+			options: Record<string, unknown>,
+			callback: (error: Error | null, stdout?: string | Buffer, stderr?: string | Buffer) => void
+		) =>
+			execFile(
+				command,
+				[...args],
+				options as never,
+				((error, stdout, stderr) => {
+					if (!error && args[0] === 'worktree' && args[1] === 'add') {
+						abortedAfterAdd = true;
+						controller.abort();
+					}
+					callback(error, stdout, stderr);
+				}) as never
+			)) as unknown as typeof execFile;
+		const interruptedPlugin = new LocalWorkspacePlugin({
+			execFile: abortingExecFile,
+			// This test owns post-add filesystem recovery. The separate live
+			// process-tree harness proves the production terminator itself.
+			terminateProcessTree: async () => undefined
+		});
+		const interruptedSpec = {
+			...spec('lw-abort-after-add', 'task/abort-after-add-12121212'),
+			signal: controller.signal
+		};
+
+		await expect(interruptedPlugin.provision(interruptedSpec)).rejects.toMatchObject({ name: 'AbortError' });
+		expect(abortedAfterAdd).toBe(true);
+		const interruptedPath = join(baseDir, 'worktrees', 'lw-abort-after-add');
+		const interruptedGitDir = git(interruptedPath, 'rev-parse', '--path-format=absolute', '--git-dir');
+		expect(existsSync(join(interruptedGitDir, 'ew-workspace.json'))).toBe(true);
+
+		const retried = await new LocalWorkspacePlugin().provision({
+			...interruptedSpec,
+			signal: undefined
+		});
+		expect(retried.path).toBe(interruptedPath);
+		expect(retried.branch).toBe('task/abort-after-add-12121212');
+		expect(git(retried.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/abort-after-add-12121212');
 	});
 });
 

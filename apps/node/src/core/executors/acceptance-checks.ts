@@ -1,7 +1,8 @@
-import { spawn } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import { statSync } from 'fs';
+import { promises as fs } from 'fs';
 import { homedir, tmpdir } from 'os';
-import { isAbsolute, join } from 'path';
+import { isAbsolute, relative, resolve, sep } from 'path';
 import type { FleetAcceptanceChecksPayload, FleetJobView } from '@ever-works/contracts';
 import { resolveExclusiveAgentCredentials } from '@ever-works/contracts';
 
@@ -89,6 +90,8 @@ export interface WireCheck {
 /** Injected so the whole executor is testable without spawning processes. */
 export interface AcceptanceChecksIo {
 	spawnFn?: typeof spawn;
+	/** Test/embedding seam; production uses an OS-native whole-tree kill. */
+	terminateProcessTree?: (child: ReturnType<typeof spawn>) => Promise<void>;
 	/** Directory-existence probe; defaults to a real `statSync`. */
 	directoryExists?: (path: string) => boolean;
 	parentEnv?: NodeJS.ProcessEnv;
@@ -112,8 +115,10 @@ export class AcceptanceChecksPayloadError extends Error {
  */
 export async function runAcceptanceChecksJob(
 	job: FleetJobView,
-	io: AcceptanceChecksIo = {}
+	io: AcceptanceChecksIo = {},
+	signal?: AbortSignal
 ): Promise<AcceptanceChecksOutcome> {
+	throwIfCommandAborted(signal);
 	const payload = job.payload as unknown as FleetAcceptanceChecksPayload | null;
 	if (!payload || typeof payload !== 'object') {
 		throw new AcceptanceChecksPayloadError('Job payload is missing');
@@ -138,17 +143,21 @@ export async function runAcceptanceChecksJob(
 	const checks = normalizeChecks(payload.checks);
 	if (checks.length === 0) {
 		// No checks is not a pass and not a failure — it is nothing to run.
+		throwIfCommandAborted(signal);
 		return { gateStatus: 'none', results: [] };
 	}
 
 	const results: NodeCheckResult[] = [];
 	for (const check of checks) {
-		results.push(await executeCheck(check, workspacePath, io));
+		throwIfCommandAborted(signal);
+		results.push(await executeCheck(check, workspacePath, io, signal));
+		throwIfCommandAborted(signal);
 	}
 
 	const anyRequiredFailed = checks.some(
 		(check, index) => check.required !== false && results[index].status !== 'green'
 	);
+	throwIfCommandAborted(signal);
 	return { gateStatus: anyRequiredFailed ? 'red' : 'green', results };
 }
 
@@ -206,27 +215,39 @@ function defaultDirectoryExists(path: string): boolean {
  * commands. The env scrub below is what keeps that from also meaning
  * "it runs them with everything this machine has exported".
  */
-function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo): Promise<NodeCheckResult> {
+async function executeCheck(
+	check: WireCheck,
+	rootCwd: string,
+	io: AcceptanceChecksIo,
+	signal?: AbortSignal
+): Promise<NodeCheckResult> {
 	const spawnFn = io.spawnFn ?? spawn;
 	const now = io.now ?? (() => Date.now());
-	const cwd = check.cwd ? join(rootCwd, check.cwd) : rootCwd;
+	const cwd = await resolveStepCwd(rootCwd, check.cwd);
 	const timeoutSec = Math.min(
 		typeof check.timeoutSec === 'number' && check.timeoutSec > 0 ? check.timeoutSec : DEFAULT_CHECK_TIMEOUT_SEC,
 		MAX_CHECK_TIMEOUT_SEC
 	);
 	const startedAt = now();
 
-	return new Promise<NodeCheckResult>((resolve) => {
+	return new Promise<NodeCheckResult>((settle, reject) => {
 		let settled = false;
 		let timedOut = false;
+		let cancelled = false;
 		let tail = '';
 		let timer: ReturnType<typeof setTimeout> | undefined;
+		let abortListener: (() => void) | undefined;
+
+		const cleanup = (): void => {
+			if (timer) clearTimeout(timer);
+			if (signal && abortListener) signal.removeEventListener('abort', abortListener);
+		};
 
 		const finish = (status: NodeCheckStatus, exitCode: number | null): void => {
 			if (settled) return;
 			settled = true;
-			if (timer) clearTimeout(timer);
-			resolve({
+			cleanup();
+			settle({
 				id: check.id,
 				exitCode,
 				status,
@@ -234,12 +255,24 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 				...(tail.length > 0 ? { logTail: tail } : {})
 			});
 		};
+		const fail = (error: Error): void => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			reject(error);
+		};
+
+		if (signal?.aborted) {
+			fail(commandAbortError(signal));
+			return;
+		}
 
 		let child: ReturnType<typeof spawn>;
 		try {
 			child = spawnFn(check.command, {
 				cwd,
 				shell: true,
+				detached: process.platform !== 'win32',
 				windowsHide: true,
 				env: buildNodeCheckEnv(check.envPassthrough, io.parentEnv)
 			});
@@ -249,13 +282,41 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 			return;
 		}
 
+		const terminate = io.terminateProcessTree ?? terminateNodeProcessTree;
+		let termination: Promise<void> | null = null;
+		const ensureTerminated = (): Promise<void> => {
+			termination ??= Promise.resolve().then(() => terminate(child));
+			return termination;
+		};
+		const destroyPipes = (): void => {
+			child.stdout?.destroy();
+			child.stderr?.destroy();
+		};
+
+		abortListener = () => {
+			if (settled || cancelled) return;
+			cancelled = true;
+			void ensureTerminated().then(
+				() => {
+					destroyPipes();
+					fail(commandAbortError(signal));
+				},
+				(error: unknown) => fail(processTreeTerminationError(error))
+			);
+		};
+		signal?.addEventListener('abort', abortListener, { once: true });
+		if (signal?.aborted) abortListener();
+
 		timer = setTimeout(() => {
 			timedOut = true;
-			try {
-				child.kill('SIGKILL');
-			} catch {
-				// Already gone — the close handler settles.
-			}
+			void ensureTerminated().then(
+				() => {
+					destroyPipes();
+					if (cancelled) fail(commandAbortError(signal));
+					else finish('timeout', null);
+				},
+				(error: unknown) => fail(processTreeTerminationError(error))
+			);
 		}, timeoutSec * 1000);
 
 		const append = (chunk: Buffer | string): void => {
@@ -269,24 +330,20 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 		// problems.
 		child.on('error', (error: Error) => {
 			append(`\n${error.message}`);
+			if (cancelled || timedOut) return;
 			finish('error', null);
 		});
 
-		// On timeout, settle on 'exit' (process death) rather than 'close'
-		// (stdio drain): a killed shell can leave a grandchild holding the
-		// pipes open, and the gate must not wait for it.
+		// Timeout/cancellation settle from the whole-tree terminator rather
+		// than process events: a killed shell can leave a grandchild holding
+		// these pipes open, and the job must not wait for it.
 		child.on('exit', () => {
-			if (timedOut) {
-				child.stdout?.destroy();
-				child.stderr?.destroy();
-				finish('timeout', null);
-			}
+			if (cancelled || timedOut) return;
 		});
 
 		child.on('close', (code: number | null) => {
-			if (timedOut) {
-				finish('timeout', null);
-			} else if (code === 0) {
+			if (cancelled || timedOut) return;
+			if (code === 0) {
 				finish('green', 0);
 			} else {
 				// Killed by an external signal (code null) is still not a pass.
@@ -294,6 +351,58 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 			}
 		});
 	});
+}
+
+/** Resolve an explicit step directory without permitting aliases or escape. */
+async function resolveStepCwd(rootCwd: string, declared: string | undefined): Promise<string> {
+	if (!declared) return rootCwd;
+	if (isAbsolute(declared)) {
+		throw new AcceptanceChecksPayloadError('Step cwd must be relative to the isolated workspace');
+	}
+	const lexicalRoot = resolve(rootCwd);
+	const lexicalCandidate = resolve(lexicalRoot, declared);
+	if (!isStrictDescendantPath(lexicalRoot, lexicalCandidate)) {
+		throw new AcceptanceChecksPayloadError('Step cwd escapes the isolated workspace');
+	}
+
+	let canonicalRoot: string;
+	let canonicalCandidate: string;
+	try {
+		const candidateStats = await fs.lstat(lexicalCandidate);
+		if (candidateStats.isSymbolicLink() || !candidateStats.isDirectory()) {
+			throw new Error('link or non-directory');
+		}
+		[canonicalRoot, canonicalCandidate] = await Promise.all([
+			fs.realpath(lexicalRoot),
+			fs.realpath(lexicalCandidate)
+		]);
+	} catch {
+		throw new AcceptanceChecksPayloadError('Step cwd is missing, linked, or not a directory');
+	}
+	const canonicalDeclaredCandidate = resolve(
+		canonicalRoot,
+		relative(lexicalRoot, lexicalCandidate)
+	);
+	if (
+		!sameFilesystemPath(canonicalCandidate, canonicalDeclaredCandidate) ||
+		!isStrictDescendantPath(canonicalRoot, canonicalCandidate)
+	) {
+		throw new AcceptanceChecksPayloadError('Step cwd resolves through a link or outside the isolated workspace');
+	}
+	return canonicalCandidate;
+}
+
+function isStrictDescendantPath(root: string, candidate: string): boolean {
+	const rel = relative(root, candidate);
+	return Boolean(rel) && rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
+}
+
+function sameFilesystemPath(left: string, right: string): boolean {
+	const normalize = (value: string): string => {
+		const resolved = resolve(value);
+		return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+	};
+	return normalize(left) === normalize(right);
 }
 
 /**
@@ -308,9 +417,127 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 export function runNodeCommandStep(
 	step: WireCheck,
 	rootCwd: string,
-	io: AcceptanceChecksIo = {}
+	io: AcceptanceChecksIo = {},
+	signal?: AbortSignal
 ): Promise<NodeCheckResult> {
-	return executeCheck(step, rootCwd, io);
+	return executeCheck(step, rootCwd, io, signal);
+}
+
+/** Terminate the shell and every descendant without constructing a shell command. */
+export async function terminateNodeProcessTree(child: ReturnType<typeof spawn>): Promise<void> {
+	const pid = child.pid;
+	if (!Number.isSafeInteger(pid) || (pid ?? 0) <= 0) {
+		throw new Error('Spawned command has no valid process id for tree termination');
+	}
+
+	let primaryError: unknown;
+	try {
+		if (process.platform === 'win32') {
+			await new Promise<void>((resolve, reject) => {
+				execFile(
+					'taskkill',
+					['/PID', String(pid), '/T', '/F'],
+					{
+						windowsHide: true,
+						timeout: PROCESS_EXIT_VERIFY_TIMEOUT_MS,
+						maxBuffer: 1024 * 1024
+					},
+					(error) => (error ? reject(error) : resolve())
+				);
+			});
+			await waitForProcessGone(pid!);
+			return;
+		}
+		process.kill(-pid!, 'SIGKILL');
+		await waitForProcessGroupGone(pid!);
+		return;
+	} catch (error) {
+		primaryError = error;
+	}
+
+	// A best-effort direct-child kill is still worth doing after the native
+	// whole-tree mechanism fails. On POSIX the process-group probe below can
+	// prove the entire detached group is gone. On Windows a root-only fallback
+	// can never prove descendants, so it deliberately still rejects and causes
+	// the WorkerLoop to quarantine itself rather than leasing more work.
+	let fallbackError: unknown;
+	try {
+		const requested = child.kill('SIGKILL');
+		if (!requested && isProcessAlive(pid!)) {
+			throw new Error('direct child kill was refused while the process remained alive');
+		}
+		await waitForProcessGone(pid!);
+		if (process.platform === 'win32') {
+			throw new Error('Windows direct-child fallback cannot prove descendant termination');
+		}
+		await waitForProcessGroupGone(pid!);
+		return;
+	} catch (error) {
+		fallbackError = error;
+	}
+
+	throw new Error(
+		`native whole-tree termination failed (${errorDetail(primaryError)}); fallback could not prove the tree gone (${errorDetail(fallbackError)})`
+	);
+}
+
+const PROCESS_EXIT_VERIFY_TIMEOUT_MS = 2_000;
+const PROCESS_EXIT_VERIFY_POLL_MS = 20;
+
+async function waitForProcessGone(pid: number): Promise<void> {
+	await waitForGone(() => isProcessAlive(pid), `process ${pid} remained alive after termination`);
+}
+
+async function waitForProcessGroupGone(pid: number): Promise<void> {
+	await waitForGone(() => isProcessGroupAlive(pid), `process group ${pid} remained alive after termination`);
+}
+
+async function waitForGone(isAlive: () => boolean, message: string): Promise<void> {
+	const deadline = Date.now() + PROCESS_EXIT_VERIFY_TIMEOUT_MS;
+	while (isAlive()) {
+		if (Date.now() >= deadline) throw new Error(message);
+		await new Promise<void>((resolve) => setTimeout(resolve, PROCESS_EXIT_VERIFY_POLL_MS));
+	}
+}
+
+function isProcessAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+	}
+}
+
+function isProcessGroupAlive(pid: number): boolean {
+	try {
+		process.kill(-pid, 0);
+		return true;
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+	}
+}
+
+function errorDetail(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+function throwIfCommandAborted(signal?: AbortSignal): void {
+	if (signal?.aborted) throw commandAbortError(signal);
+}
+
+function commandAbortError(signal?: AbortSignal): Error {
+	const reason = signal?.reason;
+	const error = new Error(reason instanceof Error ? reason.message : 'Fleet command execution was cancelled');
+	error.name = 'AbortError';
+	return error;
+}
+
+function processTreeTerminationError(error: unknown): Error {
+	const detail = error instanceof Error ? error.message : String(error);
+	const failure = new Error(`Fleet command process tree could not be terminated: ${detail}`);
+	failure.name = 'ProcessTreeTerminationError';
+	return failure;
 }
 
 /**
