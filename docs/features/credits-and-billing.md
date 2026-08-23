@@ -101,12 +101,12 @@ Rows that cannot be attributed to a model, agent or Work are grouped under **Una
 
 Plans carry additive entitlement keys. A missing row always means "use the platform default", never an error:
 
-| Key                   | Effect                                                  |
-| --------------------- | ------------------------------------------------------- |
-| `daily-free-credits`  | Size of the daily free grant (every plan; default 50).  |
-| `max-concurrent-runs` | Concurrency ceiling consulted by the run dispatch gate. |
-| `works-limit`         | How many Works the plan allows.                         |
-| `credit-limited`      | Whether the plan's runs are billed against the balance. |
+| Key                   | Effect                                                                                                                                                                                                                                                                                                                                               |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `daily-free-credits`  | Size of the daily free grant (every plan; default 50).                                                                                                                                                                                                                                                                                               |
+| `max-concurrent-runs` | Concurrency ceiling folded into run admission (raise-only vs the org ceiling), dark behind `PLAN_CONCURRENCY_ENFORCEMENT` (default off).                                                                                                                                                                                                             |
+| `works-limit`         | ⚠️ Declared but **not read by anything** — the live Works ceiling is `subscription_plans.maxWorks` (`UNLIMITED_WORKS = 2_147_483_647` sentinel, comparisons `activeScheduleCount >= plan.maxWorks`). Do **not** seed it, and never with `-1`: a future reader wired against `-1` would refuse every schedule on exactly the tiers sold as unlimited. |
+| `credit-limited`      | Whether the plan's runs are billed against the balance.                                                                                                                                                                                                                                                                                              |
 
 Credit enforcement is deliberately conservative: only a `credit-limited` plan with a balance at or below zero parks new runs, and only when `CREDITS_ENFORCEMENT=on`. Today no plan seeds that row, so enforcement stays dark and a zero balance never blocks work unexpectedly.
 
