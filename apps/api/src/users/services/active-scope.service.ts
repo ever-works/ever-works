@@ -52,7 +52,7 @@ export class ActiveScopeService {
 
         const organization = await this.organizationRepository.findBySlug(organizationSlug);
         if (!organization) {
-            throw new NotFoundException(`Organization '${organizationSlug}' not found`);
+            throw new NotFoundException('Organization not found');
         }
 
         let authorizedOrganization: Organization;
@@ -60,7 +60,7 @@ export class ActiveScopeService {
             authorizedOrganization = await this.membership.ensureMember(organization.id, user.id);
         } catch (error) {
             if (error instanceof NotFoundException) {
-                throw new NotFoundException(`Organization '${organizationSlug}' not found`);
+                throw new NotFoundException('Organization not found');
             }
             throw error;
         }

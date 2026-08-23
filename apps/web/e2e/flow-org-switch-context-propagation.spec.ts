@@ -137,8 +137,8 @@ test.describe('Organization workspace request authority', () => {
             organizationId: null,
         });
         expect(
-            new Set([everMission.id, yoMission.id, personalMission.id, headerlessMission.id]),
-        ).toHaveLength(4);
+            new Set([everMission.id, yoMission.id, personalMission.id, headerlessMission.id]).size,
+        ).toBe(4);
     });
 
     test('two browser sessions stay isolated when Yo changes the login default and Ever mutates later', async ({
@@ -216,13 +216,17 @@ test.describe('Organization workspace request authority', () => {
             await everPage.goto(`/org/${ever.slug}/missions/new`, {
                 waitUntil: 'load',
             });
-            await everPage
-                .locator('#new-mission-description')
-                .fill('This Mission must remain stamped in the Ever workspace.');
+            const missionDescription = everPage.locator('#new-mission-description');
             const createMissionButton = everPage.locator(
                 '[data-testid="new-mission-form"] button[type="submit"]',
             );
-            await expect(createMissionButton).toBeEnabled({ timeout: 30_000 });
+            await expect(async () => {
+                await missionDescription.fill('');
+                await missionDescription.fill(
+                    'This Mission must remain stamped in the Ever workspace.',
+                );
+                await expect(createMissionButton).toBeEnabled({ timeout: 1_000 });
+            }).toPass({ timeout: 30_000 });
             // The enabled state is a user-visible hydration signal for this
             // controlled form. Enter the title afterwards so a cold page load
             // cannot leave only the DOM value updated while React state stays

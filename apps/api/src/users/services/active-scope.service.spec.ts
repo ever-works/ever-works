@@ -109,9 +109,10 @@ describe('ActiveScopeService', () => {
         users.findById.mockResolvedValue(user as never);
         organizations.findBySlug.mockResolvedValue(null);
 
-        await expect(service.updateActiveScope(user.id, 'missing')).rejects.toBeInstanceOf(
-            NotFoundException,
-        );
+        await expect(service.updateActiveScope(user.id, 'missing')).rejects.toMatchObject({
+            status: 404,
+            message: 'Organization not found',
+        });
         expect(users.update).not.toHaveBeenCalled();
     });
 
@@ -126,9 +127,9 @@ describe('ActiveScopeService', () => {
         membership.ensureMember.mockRejectedValue(new NotFoundException('not found'));
 
         const rejection = service.updateActiveScope(user.id, 'foreign');
-        await expect(rejection).rejects.toBeInstanceOf(NotFoundException);
         await expect(rejection).rejects.toMatchObject({
-            response: expect.objectContaining({ message: "Organization 'foreign' not found" }),
+            status: 404,
+            message: 'Organization not found',
         });
         expect(users.update).not.toHaveBeenCalled();
     });
