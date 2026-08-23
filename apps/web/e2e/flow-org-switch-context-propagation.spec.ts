@@ -214,15 +214,17 @@ test.describe('Organization workspace request authority', () => {
             // current request path, not the now-Yo login preference.
             const missionTitle = `ever-after-yo-switch-${suffix}`;
             await everPage.goto(`/org/${ever.slug}/missions/new`, {
-                waitUntil: 'domcontentloaded',
+                waitUntil: 'load',
             });
             await everPage.locator('#new-mission-title').fill(missionTitle);
             await everPage
                 .locator('#new-mission-description')
                 .fill('This Mission must remain stamped in the Ever workspace.');
-            await everPage
-                .locator('[data-testid="new-mission-form"] button[type="submit"]')
-                .click();
+            const createMissionButton = everPage.locator(
+                '[data-testid="new-mission-form"] button[type="submit"]',
+            );
+            await expect(createMissionButton).toBeEnabled({ timeout: 30_000 });
+            await createMissionButton.click();
             await expect(everPage).toHaveURL(
                 new RegExp(`/org/${ever.slug}/missions/[0-9a-f-]+$`, 'i'),
                 { timeout: 90_000 },

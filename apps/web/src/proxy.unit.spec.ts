@@ -26,7 +26,7 @@ describe('canonical Organization workspace proxy', () => {
 
     it.each([
         ['/org/ever/missions?status=active', '/missions', 'org:ever'],
-        ['/org/en/dashboard', '/dashboard', 'org:en'],
+        ['/org/en/dashboard', '/', 'org:en'],
         ['/missions', '/missions', 'personal'],
     ])(
         'rewrites %s internally and overwrites the trusted selector',
@@ -56,6 +56,48 @@ describe('canonical Organization workspace proxy', () => {
         expect(response.status).toBe(307);
         expect(response.headers.get('location')).toBe('https://app.example/dashboard');
         expect(intlMock).not.toHaveBeenCalled();
+    });
+
+    it('keeps next-intl rewrites internal when the runtime request host differs', async () => {
+        intlMock.mockResolvedValueOnce(
+            new Response(null, {
+                status: 200,
+                headers: {
+                    'x-middleware-rewrite': 'http://localhost:3000/en/missions?status=active',
+                },
+            }),
+        );
+        const runtimeRequest = new NextRequest(
+            'http://localhost:3000/org/ever/missions?status=active',
+            {
+                headers: {
+                    host: '127.0.0.1:3000',
+                    [BROWSER_WORKSPACE_SCOPE_HEADER]: 'attacker-supplied',
+                },
+            },
+        );
+
+        const response = await proxy(runtimeRequest);
+
+        expect(response.headers.get('x-middleware-rewrite')).toBe(
+            'http://127.0.0.1:3000/en/missions?status=active',
+        );
+    });
+
+    it('does not align an internal rewrite to a non-allowlisted Host header', async () => {
+        intlMock.mockResolvedValueOnce(
+            new Response(null, {
+                status: 200,
+                headers: { 'x-middleware-rewrite': 'http://localhost:3000/en/login' },
+            }),
+        );
+        const hostileRequest = new NextRequest('http://localhost:3000/login', {
+            headers: { host: 'malicious.invalid' },
+        });
+
+        const response = await proxy(hostileRequest);
+
+        expect(response.headers.get('x-middleware-rewrite')).toBe('http://localhost:3000/en/login');
     });
 
     it.each(['/settings/dashboard', '/org/dashboard'])(
