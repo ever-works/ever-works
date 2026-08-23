@@ -653,7 +653,7 @@ describe('SubscriptionService', () => {
                 expect(byCadence[cadence].reason).toBeUndefined();
             }
 
-            // The three NOT-allowed cadences should recommend Premium
+            // The three NOT-allowed cadences should recommend Enterprise (the catalog name of `premium`)
             for (const cadence of [
                 WorkScheduleCadence.EVERY_8_HOURS,
                 WorkScheduleCadence.EVERY_3_HOURS,
@@ -661,7 +661,7 @@ describe('SubscriptionService', () => {
             ]) {
                 expect(byCadence[cadence].allowed).toBe(false);
                 expect(byCadence[cadence].payPerUse).toBe(true);
-                expect(byCadence[cadence].reason).toBe('Upgrade to Premium for this cadence');
+                expect(byCadence[cadence].reason).toBe('Upgrade to Enterprise for this cadence');
             }
         });
 
@@ -688,12 +688,12 @@ describe('SubscriptionService', () => {
         // Validated by emitting a pure-payPerUse plan (allowedCadences: []) so
         // EVERY cadence triggers the reason field.
         it.each([
-            [WorkScheduleCadence.HOURLY, 'Premium'],
-            [WorkScheduleCadence.EVERY_3_HOURS, 'Premium'],
-            [WorkScheduleCadence.EVERY_8_HOURS, 'Premium'],
-            [WorkScheduleCadence.EVERY_12_HOURS, 'Standard'],
-            [WorkScheduleCadence.DAILY, 'Standard'],
-            [WorkScheduleCadence.WEEKLY, 'Standard'],
+            [WorkScheduleCadence.HOURLY, 'Enterprise'],
+            [WorkScheduleCadence.EVERY_3_HOURS, 'Enterprise'],
+            [WorkScheduleCadence.EVERY_8_HOURS, 'Enterprise'],
+            [WorkScheduleCadence.EVERY_12_HOURS, 'Pro'],
+            [WorkScheduleCadence.DAILY, 'Pro'],
+            [WorkScheduleCadence.WEEKLY, 'Pro'],
             [WorkScheduleCadence.MONTHLY, 'Free'],
         ] as const)('%s cadence → recommend %s', async (cadence, recommended) => {
             const emptyPlan = { ...FREE_PLAN, allowedCadences: [] };
