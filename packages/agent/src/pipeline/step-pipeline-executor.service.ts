@@ -199,7 +199,11 @@ export class StepPipelineExecutorService {
                 `Pipeline plugin "${plugin.id}" must implement createContext() for engine-orchestrated execution.`,
             );
         }
-        const context = plugin.createContext(work, request, existing);
+        // `await` is deliberate: a lazy plugin stub (PLUGIN_LAZY_LOAD) answers
+        // every call with a Promise; the orchestrator materialises before
+        // routing, but a caller wiring the executor directly must not end up
+        // with `context.work === undefined` (TypeError at the first `work.id`).
+        const context = await plugin.createContext(work, request, existing);
 
         // Attach log interceptor to capture ALL plugin logger output
         const onLogEntry = options?.onLogEntry;
