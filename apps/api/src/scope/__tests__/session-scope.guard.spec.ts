@@ -235,25 +235,38 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
         });
     });
 
-    it('does not silently fall back to personal scope after the last-active membership is revoked', async () => {
+    it('a revoked last-active membership never affects a headerless request: personal scope, no roster lookup', async () => {
         findById.mockResolvedValue({
             tenantId: 't-1',
             lastScopeOrganizationId: 'o-ever',
         });
+        const organizationRepository = {
+            findById: jest.fn().mockResolvedValue({ id: 'o-ever', tenantId: 't-1' }),
+        };
+        const organizationMembers = { findByOrgAndUser: jest.fn().mockResolvedValue(null) };
         const membershipGuard = new SessionScopeGuard(
             scopeContext,
             { findById } as never,
-            { findById: jest.fn().mockResolvedValue({ id: 'o-ever', tenantId: 't-1' }) } as never,
-            { findByOrgAndUser: jest.fn().mockResolvedValue(null) } as never,
+            organizationRepository as never,
+            organizationMembers as never,
             { findById: jest.fn().mockResolvedValue({ ownerUserId: 'tenant-owner' }) } as never,
         );
         const ctx = makeContext({ user: { userId: 'u-1' } });
 
-        await expect(
-            scopeContext.runWith({ tenantId: null, organizationId: null }, () =>
-                membershipGuard.canActivate(ctx),
-            ),
-        ).rejects.toMatchObject({ status: 404, message: 'Organization not found' });
+        const observed = await scopeContext.runWith(
+            { tenantId: null, organizationId: null },
+            async () => {
+                await membershipGuard.canActivate(ctx);
+                return scopeContext.getScope();
+            },
+        );
+
+        // The mutable pointer is a fresh-login navigation default only; it is
+        // never read as request authority, so revocation cannot lock the user
+        // out of their own personal scope and no Organization lookup happens.
+        expect(observed).toEqual({ tenantId: 't-1', organizationId: null });
+        expect(organizationRepository.findById).not.toHaveBeenCalled();
+        expect(organizationMembers.findByOrgAndUser).not.toHaveBeenCalled();
     });
 
     it('keeps Tenant-owner access even though owners intentionally have no roster row', async () => {
