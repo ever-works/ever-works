@@ -17,11 +17,19 @@ describe('AgentRunRepository — terminal transitions', () => {
         // Sweep path: findStuckNonTerminal is a SELECT terminating in getMany.
         select: jest.Mock;
         orderBy: jest.Mock;
+        take: jest.Mock;
+        skip: jest.Mock;
+        getManyAndCount: jest.Mock;
         limit: jest.Mock;
         getMany: jest.Mock;
+        getOne: jest.Mock;
     };
     let repository: {
         findOne: jest.Mock;
+        find: jest.Mock;
+        count: jest.Mock;
+        create: jest.Mock;
+        save: jest.Mock;
         createQueryBuilder: jest.Mock;
     };
     let runs: AgentRunRepository;
@@ -44,12 +52,20 @@ describe('AgentRunRepository — terminal transitions', () => {
             execute: jest.fn().mockResolvedValue({ affected: 1 }),
             select: jest.fn().mockReturnThis(),
             orderBy: jest.fn().mockReturnThis(),
+            take: jest.fn().mockReturnThis(),
+            skip: jest.fn().mockReturnThis(),
+            getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
             limit: jest.fn().mockReturnThis(),
             getMany: jest.fn().mockResolvedValue([]),
+            getOne: jest.fn().mockResolvedValue(null),
         };
         repository = {
             // startedAt drives durationMs; null keeps the arithmetic out of the way.
             findOne: jest.fn().mockResolvedValue({ id: 'r1', startedAt: null }),
+            find: jest.fn().mockResolvedValue([]),
+            count: jest.fn().mockResolvedValue(0),
+            create: jest.fn((input) => input),
+            save: jest.fn(async (input) => input),
             createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
         };
         runs = new AgentRunRepository(repository as never);
@@ -225,6 +241,34 @@ describe('AgentRunRepository — terminal transitions', () => {
             repository.findOne.mockResolvedValue(null);
             await expect(runs.cancel('r1', 'u1')).resolves.toEqual({ found: false });
         });
+
+        it('keeps the terminal CAS inside the same active Organization scope', async () => {
+            const scope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+
+            await runs.cancel('00000000-0000-0000-0000-0000000000aa', 'u1', scope);
+
+            expect(repository.findOne).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: [
+                        expect.objectContaining({
+                            id: '00000000-0000-0000-0000-0000000000aa',
+                            userId: 'u1',
+                            ...scope,
+                        }),
+                    ],
+                }),
+            );
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+                '(tenantId = :cancelRunTenantId AND organizationId = :cancelRunOrganizationId)',
+                {
+                    cancelRunTenantId: scope.tenantId,
+                    cancelRunOrganizationId: scope.organizationId,
+                },
+            );
+        });
     });
 
     describe('stuck-run sweep', () => {
@@ -268,6 +312,187 @@ describe('AgentRunRepository — terminal transitions', () => {
             repository.createQueryBuilder.mockClear();
             await expect(runs.markStuckFailed([], 'stuck-timeout: x')).resolves.toBe(0);
             expect(repository.createQueryBuilder).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('listSessionsForUser ownership scope', () => {
+        const everScope = {
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        };
+
+        it('adds the exact active Organization to the authenticated-user predicate', async () => {
+            await runs.listSessionsForUser('u1', {}, 25, 0, everScope);
+
+            expect(queryBuilder.where).toHaveBeenCalledWith('run.userId = :userId', {
+                userId: 'u1',
+            });
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+                '(run.tenantId = :ownershipTenantId AND run.organizationId = :ownershipOrganizationId)',
+                {
+                    ownershipTenantId: everScope.tenantId,
+                    ownershipOrganizationId: everScope.organizationId,
+                },
+            );
+        });
+
+        it('applies that same exact Organization predicate to scheduled heartbeat sessions', async () => {
+            await runs.listSessionsForUser('u1', { triggerKind: 'heartbeat' }, 25, 0, everScope);
+
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith('run.triggerKind = :triggerKind', {
+                triggerKind: 'heartbeat',
+            });
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+                '(run.tenantId = :ownershipTenantId AND run.organizationId = :ownershipOrganizationId)',
+                {
+                    ownershipTenantId: everScope.tenantId,
+                    ownershipOrganizationId: everScope.organizationId,
+                },
+            );
+        });
+
+        it('keeps explicit personal scope separate from both Organizations', async () => {
+            await runs.listSessionsForUser('u1', {}, 25, 0, {
+                tenantId: everScope.tenantId,
+                organizationId: null,
+            });
+
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+                '(run.organizationId IS NULL AND (run.tenantId = :ownershipTenantId OR run.tenantId IS NULL))',
+                { ownershipTenantId: everScope.tenantId },
+            );
+        });
+    });
+
+    describe('direct run ownership scope', () => {
+        const userId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const agentId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        const runId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+        const everScope = {
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        };
+        const yoScope = {
+            tenantId: everScope.tenantId,
+            organizationId: '33333333-3333-4333-8333-333333333333',
+        };
+
+        it('binds per-Agent list/count and direct get to the exact Ever scope', async () => {
+            await runs.findByAgentAndUser(agentId, userId, 25, 0, everScope);
+            await runs.countByAgentAndUser(agentId, userId, everScope);
+            await runs.findByIdAndUser(runId, userId, everScope);
+
+            const where = [
+                {
+                    agentId,
+                    userId,
+                    tenantId: everScope.tenantId,
+                    organizationId: everScope.organizationId,
+                },
+            ];
+            expect(repository.find).toHaveBeenCalledWith(expect.objectContaining({ where }));
+            expect(repository.count).toHaveBeenCalledWith({ where });
+            expect(repository.findOne).toHaveBeenLastCalledWith({
+                where: [{ id: runId, userId, ...everScope }],
+            });
+        });
+
+        it('uses a distinct predicate for the same-user known run UUID in Yo', async () => {
+            await runs.findByIdAndUser(runId, userId, yoScope);
+
+            expect(repository.findOne).toHaveBeenLastCalledWith({
+                where: [{ id: runId, userId, ...yoScope }],
+            });
+            expect(repository.findOne).not.toHaveBeenLastCalledWith({
+                where: [{ id: runId, userId, ...everScope }],
+            });
+        });
+
+        it('binds a batch embed lookup to the same user and exact Organization', async () => {
+            await (runs.findByIds as any)([runId], userId, everScope);
+
+            expect(repository.find).toHaveBeenLastCalledWith({
+                where: [
+                    expect.objectContaining({
+                        id: expect.objectContaining({ _type: 'in', _value: [runId] }),
+                        userId,
+                        ...everScope,
+                    }),
+                ],
+            });
+        });
+
+        it('keeps current and legacy personal batch embeds separate from Organization runs', async () => {
+            await (runs.findByIds as any)([runId], userId, {
+                tenantId: everScope.tenantId,
+                organizationId: null,
+            });
+
+            const where = repository.find.mock.calls.at(-1)?.[0]?.where as Array<
+                Record<string, unknown>
+            >;
+            expect(where).toHaveLength(2);
+            expect(where[0]).toMatchObject({
+                userId,
+                tenantId: everScope.tenantId,
+                organizationId: expect.objectContaining({ _type: 'isNull' }),
+            });
+            expect(where[1]).toMatchObject({
+                userId,
+                tenantId: expect.objectContaining({ _type: 'isNull' }),
+                organizationId: expect.objectContaining({ _type: 'isNull' }),
+            });
+        });
+
+        it('keeps current and legacy personal runs reachable without admitting either Org', async () => {
+            await runs.findByIdAndUser(runId, userId, {
+                tenantId: everScope.tenantId,
+                organizationId: null,
+            });
+
+            const where = repository.findOne.mock.calls.at(-1)?.[0]?.where as Array<
+                Record<string, unknown>
+            >;
+            expect(where).toHaveLength(2);
+            expect(where[0]).toMatchObject({
+                id: runId,
+                userId,
+                tenantId: everScope.tenantId,
+                organizationId: expect.objectContaining({ _type: 'isNull' }),
+            });
+            expect(where[1]).toMatchObject({
+                id: runId,
+                userId,
+                tenantId: expect.objectContaining({ _type: 'isNull' }),
+                organizationId: expect.objectContaining({ _type: 'isNull' }),
+            });
+        });
+
+        it('scopes same-task in-flight reuse to user + Organization', async () => {
+            await runs.findInFlightForTaskAgent(runId, agentId, userId, everScope);
+
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith('run.userId = :userId', {
+                userId,
+            });
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+                '(run.tenantId = :inFlightRunTenantId AND run.organizationId = :inFlightRunOrganizationId)',
+                {
+                    inFlightRunTenantId: everScope.tenantId,
+                    inFlightRunOrganizationId: everScope.organizationId,
+                },
+            );
+        });
+
+        it('persists both ownership columns on an explicitly scoped queued run', async () => {
+            await runs.createQueued({
+                userId,
+                agentId,
+                triggerKind: 'task',
+                ...everScope,
+            });
+
+            expect(repository.create).toHaveBeenCalledWith(expect.objectContaining(everScope));
+            expect(repository.save).toHaveBeenCalledWith(expect.objectContaining(everScope));
         });
     });
 

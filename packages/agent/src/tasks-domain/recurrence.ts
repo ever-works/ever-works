@@ -169,6 +169,8 @@ export function computeNextTemplateOccurrence(ctx: TemplateCadenceContext): Date
 export function cloneRecurringTaskAsInstance(template: Task): Partial<Task> {
     return {
         userId: template.userId,
+        tenantId: template.tenantId ?? null,
+        organizationId: template.organizationId ?? null,
         title: template.title,
         description: template.description ?? null,
         status: TaskStatus.TODO,

@@ -30,6 +30,10 @@ import { TasksController } from './tasks.controller';
  */
 describe('TasksController — includeHidden query mapping', () => {
     const auth = { userId: 'user-1' } as never;
+    const scope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
 
     function make() {
         const list = jest.fn().mockResolvedValue({ rows: [], total: 0 });
@@ -43,6 +47,7 @@ describe('TasksController — includeHidden query mapping', () => {
             {} as never,
             {} as never,
             {} as never,
+            { getScope: () => scope } as never,
         );
         return { controller, list };
     }

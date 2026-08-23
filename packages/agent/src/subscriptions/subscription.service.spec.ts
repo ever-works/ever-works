@@ -3,6 +3,8 @@ import { SubscriptionService } from './subscription.service';
 import { SubscriptionPlanCode } from '@src/entities/types';
 import { WorkScheduleBillingMode, WorkScheduleCadence } from '@ever-works/contracts/api';
 
+type SubscriptionServiceDependencies = ConstructorParameters<typeof SubscriptionService>;
+
 /**
  * SubscriptionService is the agent-package gateway between user accounts and
  * the seeded `SubscriptionPlan` rows. It owns: idempotent plan seeding from
@@ -55,20 +57,39 @@ function makeUserRepository(overrides: Record<string, jest.Mock> = {}) {
     };
 }
 
+function makePlanEntitlementRepository(overrides: Record<string, jest.Mock> = {}) {
+    return {
+        findByPlanAndKey: jest.fn().mockResolvedValue(null),
+        insertIfMissing: jest
+            .fn()
+            .mockImplementation(async (e: unknown) => ({ entitlement: e, created: true })),
+        ...overrides,
+    };
+}
+
 function makeService(
     plan: Record<string, jest.Mock> = {},
     userSub: Record<string, jest.Mock> = {},
     user: Record<string, jest.Mock> = {},
+    planEntitlement: Record<string, jest.Mock> = {},
 ) {
     const planRepository = makePlanRepository(plan);
     const userSubscriptionRepository = makeUserSubscriptionRepository(userSub);
     const userRepository = makeUserRepository(user);
+    const planEntitlementRepository = makePlanEntitlementRepository(planEntitlement);
     const service = new SubscriptionService(
-        planRepository as any,
-        userSubscriptionRepository as any,
-        userRepository as any,
+        planRepository as unknown as SubscriptionServiceDependencies[0],
+        userSubscriptionRepository as unknown as SubscriptionServiceDependencies[1],
+        userRepository as unknown as SubscriptionServiceDependencies[2],
+        planEntitlementRepository as unknown as SubscriptionServiceDependencies[3],
     );
-    return { service, planRepository, userSubscriptionRepository, userRepository };
+    return {
+        service,
+        planRepository,
+        userSubscriptionRepository,
+        userRepository,
+        planEntitlementRepository,
+    };
 }
 
 const FREE_PLAN = {

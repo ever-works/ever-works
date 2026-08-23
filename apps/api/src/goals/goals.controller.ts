@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -28,6 +29,7 @@ import {
 } from '@ever-works/agent/goals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { ScopeContextService } from '../scope';
 import { CreateGoalDto, UpdateGoalDto } from './dto/goal.dto';
 import {
     ApproveGoalDodDto,
@@ -79,6 +81,7 @@ export class GoalsController {
     constructor(
         private readonly service: GoalsService,
         private readonly orchestrator: GoalOrchestratorService,
+        @Optional() private readonly scopeContext?: ScopeContextService,
     ) {}
 
     @Get()
@@ -91,12 +94,16 @@ export class GoalsController {
         @Query('offset') offset?: string,
         @Query('archived') archived?: string,
     ): Promise<GoalDto[]> {
-        return this.service.listForUser(auth.userId, {
-            status: this.parseStatus(status),
-            limit: this.parseIntParam(limit, 'limit', 1, 101),
-            offset: this.parseIntParam(offset, 'offset', 0),
-            archived: this.parseArchived(archived),
-        });
+        return this.service.listForUser(
+            auth.userId,
+            {
+                status: this.parseStatus(status),
+                limit: this.parseIntParam(limit, 'limit', 1, 101),
+                offset: this.parseIntParam(offset, 'offset', 0),
+                archived: this.parseArchived(archived),
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Post()
@@ -107,22 +114,26 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: CreateGoalDto,
     ): Promise<GoalDto> {
-        return this.service.create(auth.userId, {
-            title: body.title,
-            description: body.description ?? null,
-            metricSource: body.metricSource,
-            comparator: body.comparator,
-            targetValue: body.targetValue,
-            unit: body.unit,
-            window: body.window,
-            baselineValue: body.baselineValue ?? null,
-            deadline: this.parseDeadline(body.deadline),
-            checkFrequencyMinutes: body.checkFrequencyMinutes,
-            // Judgment layer G1 - additive. Omitted stays undefined, which
-            // the service persists as NULL: the single-metric Goal.
-            criteria: body.criteria,
-            constraints: body.constraints,
-        });
+        return this.service.create(
+            auth.userId,
+            {
+                title: body.title,
+                description: body.description ?? null,
+                metricSource: body.metricSource,
+                comparator: body.comparator,
+                targetValue: body.targetValue,
+                unit: body.unit,
+                window: body.window,
+                baselineValue: body.baselineValue ?? null,
+                deadline: this.parseDeadline(body.deadline),
+                checkFrequencyMinutes: body.checkFrequencyMinutes,
+                // Judgment layer G1 - additive. Omitted stays undefined, which
+                // the service persists as NULL: the single-metric Goal.
+                criteria: body.criteria,
+                constraints: body.constraints,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Get(':id')
@@ -132,7 +143,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
-        return this.service.getForUser(auth.userId, id);
+        return this.service.getForUser(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Get(':id/samples')
@@ -147,6 +158,7 @@ export class GoalsController {
             auth.userId,
             id,
             this.parseIntParam(limit, 'limit', 1, 500) ?? 100,
+            this.scopeContext?.getScope(),
         );
     }
 
@@ -162,21 +174,27 @@ export class GoalsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateGoalDto,
     ): Promise<GoalDto> {
-        return this.service.update(auth.userId, id, {
-            title: body.title,
-            description: body.description,
-            metricSource: body.metricSource,
-            comparator: body.comparator,
-            targetValue: body.targetValue,
-            unit: body.unit,
-            window: body.window,
-            baselineValue: body.baselineValue,
-            deadline: body.deadline === undefined ? undefined : this.parseDeadline(body.deadline),
-            checkFrequencyMinutes: body.checkFrequencyMinutes,
-            outcome: body.outcome,
-            criteria: body.criteria,
-            constraints: body.constraints,
-        });
+        return this.service.update(
+            auth.userId,
+            id,
+            {
+                title: body.title,
+                description: body.description,
+                metricSource: body.metricSource,
+                comparator: body.comparator,
+                targetValue: body.targetValue,
+                unit: body.unit,
+                window: body.window,
+                baselineValue: body.baselineValue,
+                deadline:
+                    body.deadline === undefined ? undefined : this.parseDeadline(body.deadline),
+                checkFrequencyMinutes: body.checkFrequencyMinutes,
+                outcome: body.outcome,
+                criteria: body.criteria,
+                constraints: body.constraints,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Delete(':id')
@@ -187,7 +205,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<{ deleted: true }> {
-        return this.service.delete(auth.userId, id);
+        return this.service.delete(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/activate')
@@ -201,7 +219,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
-        return this.service.activate(auth.userId, id);
+        return this.service.activate(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/pause')
@@ -212,7 +230,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
-        return this.service.pause(auth.userId, id);
+        return this.service.pause(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/evaluate-now')
@@ -226,7 +244,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<{ entry: GoalEvaluationEntry; goal: GoalDto }> {
-        return this.service.evaluateNow(auth.userId, id);
+        return this.service.evaluateNow(auth.userId, id, this.scopeContext?.getScope());
     }
 
     // ─── autonomy layer — limits ────────────────────────────────────
@@ -247,17 +265,23 @@ export class GoalsController {
         // alone) is preserved as distinct from `null` (clear) — a mapping
         // that collapsed the two would silently make "remove this cap"
         // impossible while the DTO advertised it.
-        return this.orchestrator.updateLimits(auth.userId, id, {
-            spendCapCents: body.spendCapCents,
-            wallClockLimitHours: body.wallClockLimitHours,
-            stuckThresholdIterations: body.stuckThresholdIterations,
-            sessionBudgetMinutes: body.sessionBudgetMinutes,
-            gracePeriodMinutes: body.gracePeriodMinutes,
-            executionTarget: body.executionTarget,
-            plannerModelHint: body.plannerModelHint,
-            workerModelHint: body.workerModelHint,
-            assignedAgentId: body.assignedAgentId,
-        });
+        await this.requireScopedGoal(auth.userId, id);
+        return this.orchestrator.updateLimits(
+            auth.userId,
+            id,
+            {
+                spendCapCents: body.spendCapCents,
+                wallClockLimitHours: body.wallClockLimitHours,
+                stuckThresholdIterations: body.stuckThresholdIterations,
+                sessionBudgetMinutes: body.sessionBudgetMinutes,
+                gracePeriodMinutes: body.gracePeriodMinutes,
+                executionTarget: body.executionTarget,
+                plannerModelHint: body.plannerModelHint,
+                workerModelHint: body.workerModelHint,
+                assignedAgentId: body.assignedAgentId,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     // ─── autonomy layer — Definition of Done ────────────────────────
@@ -273,6 +297,7 @@ export class GoalsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: SetGoalDodDto,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.setDodCriteria(auth.userId, id, body.criteria ?? null);
     }
 
@@ -288,6 +313,7 @@ export class GoalsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: ProposeGoalDodDto,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.proposeDodCriteria(auth.userId, id, body.criteria);
     }
 
@@ -300,6 +326,7 @@ export class GoalsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: ApproveGoalDodDto,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.approveDodCriteria(auth.userId, id, body.criterionIds ?? null);
     }
 
@@ -313,6 +340,7 @@ export class GoalsController {
         @Param('criterionId') criterionId: string,
         @Body() body: PatchGoalDodCriterionDto,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.patchDodCriterion(auth.userId, id, criterionId, {
             status: body.status,
             text: body.text,
@@ -331,6 +359,7 @@ export class GoalsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Query('limit') limit?: string,
     ): Promise<GoalEventDto[]> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.listEvents(
             auth.userId,
             id,
@@ -345,6 +374,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalSessionDto[]> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.listSessions(auth.userId, id);
     }
 
@@ -356,6 +386,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.rollupSpend(auth.userId, id);
     }
 
@@ -369,6 +400,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.startLoop(auth.userId, id);
     }
 
@@ -380,6 +412,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.startLoop(auth.userId, id);
     }
 
@@ -391,6 +424,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.pauseLoop(auth.userId, id);
     }
 
@@ -402,6 +436,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.cancelLoop(auth.userId, id);
     }
 
@@ -413,6 +448,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalAdvanceResult> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.restartSession(auth.userId, id);
     }
 
@@ -427,6 +463,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalAdvanceResult> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.advance(auth.userId, id);
     }
 
@@ -439,6 +476,7 @@ export class GoalsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: NudgeGoalDto,
     ): Promise<{ goal: GoalDto; runId: string; queuedCount?: number }> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.nudge(auth.userId, id, body.message);
     }
 
@@ -452,6 +490,7 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.archive(auth.userId, id);
     }
 
@@ -463,7 +502,12 @@ export class GoalsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<GoalDto> {
+        await this.requireScopedGoal(auth.userId, id);
         return this.orchestrator.unarchive(auth.userId, id);
+    }
+
+    private async requireScopedGoal(userId: string, goalId: string): Promise<void> {
+        await this.service.getForUser(userId, goalId, this.scopeContext?.getScope());
     }
 
     private parseStatus(value?: string): GoalStatus | undefined {

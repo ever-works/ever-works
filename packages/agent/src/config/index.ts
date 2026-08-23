@@ -1072,6 +1072,25 @@ export const config = {
             return Number.isFinite(raw) ? raw : 25;
         },
         /**
+         * H2 kill-switch for the plan-driven concurrency ceiling
+         * (`plan_entitlements.max-concurrent-runs`), folded into the org
+         * valve above as a RAISE-ONLY adjustment.
+         *
+         * Ships DARK (default off), like the credits kill-switch. The
+         * adjustment can only ever raise a ceiling or switch the valve off
+         * for an "unlimited" tier, so turning it on cannot park a run that
+         * would not already have parked — but it does change how much
+         * concurrent work the platform will accept, and that deserves a
+         * deliberate flip rather than arriving with a deploy.
+         *
+         * Set `PLAN_CONCURRENCY_ENFORCEMENT=on` to honour the plan's
+         * entitlement.
+         */
+        isPlanConcurrencyEnforcementEnabled() {
+            const raw = (process.env.PLAN_CONCURRENCY_ENFORCEMENT || '').toLowerCase();
+            return raw === 'on' || raw === 'true' || raw === '1';
+        },
+        /**
          * Merge-policy matrix (Wave 3, D4) — operator kill-switch for
          * enforcement at the git facade. Default ON: an agent-driven merge
          * consults the resolved policy and is refused when the policy says

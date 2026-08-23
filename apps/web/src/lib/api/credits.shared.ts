@@ -119,10 +119,22 @@ export interface SubscriptionPlanSummary {
 export interface SubscriptionPlanListItem {
     code: string;
     name: string;
+    /** `'cloud'` | `'selfhosted'`. Echoed by the API; was silently dropped here. */
+    hosting?: string;
     maxWorks: number;
     allowedCadences: string[];
     /** Decimal string from the API (e.g. `'29'` / `'29.00'`). */
     monthlyPrice: string;
+    /**
+     * The YEARLY total, not a monthly equivalent — cloud Pro is `'204'`.
+     * Divide by 12 before rendering it next to a `/mo` suffix.
+     */
+    annualPrice?: string | null;
+    /** One-off perpetual licence price. Only `selfhosted_pro` has one. */
+    lifetimePrice?: string | null;
+    seatsIncluded?: number | null;
+    seatMonthlyPrice?: string | null;
+    monthlyCredits?: number | null;
     overagePricePerRun: string;
     currency: string;
     isCurrent: boolean;
@@ -134,6 +146,16 @@ export interface SubscriptionPlanList {
     enabled: boolean;
     currentPlanCode: string;
     plans: SubscriptionPlanListItem[];
+    /**
+     * Self-hosted commercial editions — a SEPARATE list from `plans`.
+     *
+     * They are purchasable but never self-assignable: buying one is a
+     * licence for a deployment you run yourself and changes nothing about
+     * your tier here. Rendering them as cards in the plan switcher would
+     * offer buttons whose only possible outcome is a 403. Optional so an
+     * older API response still types.
+     */
+    licences?: SubscriptionPlanListItem[];
 }
 
 // ── Pure helpers (unit-tested in credits.shared.unit.spec.ts) ───────

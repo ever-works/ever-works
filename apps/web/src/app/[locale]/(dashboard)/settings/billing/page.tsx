@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { creditsAPI, subscriptionsAPI } from '@/lib/api/credits';
 import { billingAPI } from '@/lib/api/billing';
+import type { PlanCheckoutReturnResponse } from '@/lib/api/billing';
 import type {
     CreditsBalance,
     CreditsLedgerPage,
@@ -42,9 +43,17 @@ export default async function BillingSettingsPage({ searchParams }: BillingSetti
     // the call to the session user, so a session id pasted from another
     // account's redirect resolves to a 404 and is swallowed here.
     const params = await searchParams;
-    if (params.session_id) {
-        await billingAPI.completePlanCheckout(params.session_id).catch(() => null);
-    }
+    // 🛑 The RESULT is what the page needs, not just the side effect. It used
+    // to be discarded, which is how a settled $99 perpetual licence produced a
+    // page byte-identical to the one before payment — a licence writes no
+    // subscription row and grants no tier by design, so without this the only
+    // visible change was none, and the same enabled "Buy" button was still
+    // sitting there inviting a second charge.
+    const checkoutReturn = params.session_id
+        ? await billingAPI
+              .completePlanCheckout(params.session_id)
+              .catch((): PlanCheckoutReturnResponse | null => null)
+        : null;
 
     // Each fetch degrades independently: a failed call renders that
     // section's error/empty state instead of failing the whole page.
@@ -76,6 +85,7 @@ export default async function BillingSettingsPage({ searchParams }: BillingSetti
             initialLedger={ledger}
             initialOverview={overview}
             initialInvoices={invoices}
+            checkoutReturn={checkoutReturn}
         />
     );
 }

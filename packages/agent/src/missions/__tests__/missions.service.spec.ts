@@ -521,6 +521,8 @@ describe('MissionsService', () => {
                 const rows: MissionWorkWithWork[] = [
                     {
                         id: 'mw1',
+                        tenantId: null,
+                        organizationId: null,
                         missionId: id,
                         workId: 'w1',
                         relation: 'created',
@@ -572,6 +574,8 @@ describe('MissionsService', () => {
                 const refreshed: MissionWorkWithWork[] = [
                     {
                         id: 'mw1',
+                        tenantId: null,
+                        organizationId: null,
                         missionId: id,
                         workId: 'w1',
                         relation: 'operates',
@@ -635,6 +639,8 @@ describe('MissionsService', () => {
                 const rows: MissionWorkWithMission[] = [
                     {
                         id: 'mw2',
+                        tenantId: null,
+                        organizationId: null,
                         missionId: 'm9',
                         workId: 'w1',
                         relation: 'markets',

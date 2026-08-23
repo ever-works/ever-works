@@ -39,8 +39,13 @@ function matchesValue(actual: unknown, expected: unknown): boolean {
 function makeRepo(prefix: string) {
     const rows: AnyRow[] = [];
     let counter = 0;
-    const matches = (row: AnyRow, where: Record<string, unknown> = {}) =>
-        Object.entries(where).every(([k, v]) => matchesValue(row[k], v));
+    const matches = (
+        row: AnyRow,
+        where: Record<string, unknown> | Record<string, unknown>[] = {},
+    ): boolean => {
+        if (Array.isArray(where)) return where.some((branch) => matches(row, branch));
+        return Object.entries(where).every(([k, v]) => matchesValue(row[k], v));
+    };
     return {
         find: jest.fn(async (opts: any = {}) => {
             let result = rows.filter((r) => matches(r, opts.where));
@@ -123,20 +128,34 @@ function build(overrides: { goal?: Partial<Goal> } = {}) {
     goals._rows.push(goalRow(overrides.goal));
 
     const agents = {
-        findByIdAndUser: jest.fn(async (id: string) => ({ id, name: `Agent ${id}`, slug: id })),
+        findByIdAndUser: jest.fn(
+            async (
+                id: string,
+                _userId?: string,
+                _scope?: { tenantId: string | null; organizationId: string | null },
+            ) => ({ id, name: `Agent ${id}`, slug: id }),
+        ),
     };
     const tasksService = {
-        create: jest.fn(async (userId: string, input: any) => {
-            const task = {
-                id: `task-${tasks._rows.length + 1}`,
-                slug: `T-${tasks._rows.length + 1}`,
-                userId,
-                createdAt: new Date(Date.now() + tasks._rows.length),
-                ...input,
-            };
-            tasks._rows.push(task);
-            return task;
-        }),
+        create: jest.fn(
+            async (
+                userId: string,
+                input: any,
+                scope?: { tenantId: string | null; organizationId: string | null },
+            ) => {
+                const task = {
+                    id: `task-${tasks._rows.length + 1}`,
+                    slug: `T-${tasks._rows.length + 1}`,
+                    userId,
+                    createdAt: new Date(Date.now() + tasks._rows.length),
+                    tenantId: scope?.tenantId ?? null,
+                    organizationId: scope?.organizationId ?? null,
+                    ...input,
+                };
+                tasks._rows.push(task);
+                return task;
+            },
+        ),
     };
     const transitions = {
         dispatchAgentRun: jest.fn(async () => ({
@@ -259,6 +278,77 @@ describe('GoalOrchestratorService — ownership', () => {
 });
 
 describe('GoalOrchestratorService — limits', () => {
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+    it('404s a same-user assigned Agent UUID outside the Goal active scope', async () => {
+        const { service, agents, goals } = build({ goal: everScope });
+        agents.findByIdAndUser.mockResolvedValueOnce(null as never);
+
+        await expect(
+            (service.updateLimits as any)(
+                'u1',
+                'g1',
+                { assignedAgentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+                everScope,
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(goals.save).not.toHaveBeenCalled();
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            'u1',
+            everScope,
+        );
+    });
+
+    it('accepts a legacy personal Agent for a legacy personal Goal', async () => {
+        const personalScope = { tenantId: everScope.tenantId, organizationId: null };
+        const { service, agents } = build({
+            goal: { tenantId: null, organizationId: null },
+        });
+        agents.findByIdAndUser.mockResolvedValueOnce({
+            id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            userId: 'u1',
+            tenantId: null,
+            organizationId: null,
+        } as never);
+
+        await expect(
+            (service.updateLimits as any)(
+                'u1',
+                'g1',
+                { assignedAgentId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+                personalScope,
+            ),
+        ).resolves.toMatchObject({
+            assignedAgentId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        });
+    });
+
+    it('validates a pin against the persisted legacy Goal scope, not the broader request scope', async () => {
+        const personalRequestScope = { tenantId: everScope.tenantId, organizationId: null };
+        const { service, agents, goals } = build({
+            goal: { tenantId: null, organizationId: null },
+        });
+        agents.findByIdAndUser.mockResolvedValueOnce(null as never);
+
+        await expect(
+            service.updateLimits(
+                'u1',
+                'g1',
+                { assignedAgentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
+                personalRequestScope,
+            ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(
+            'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            'u1',
+            { tenantId: null, organizationId: null },
+        );
+        expect(goals.save).not.toHaveBeenCalled();
+    });
+
     it('persists every limit field and logs the change', async () => {
         const { service, goals, events } = build();
         const dto = await service.updateLimits('u1', 'g1', {
@@ -320,7 +410,7 @@ describe('GoalOrchestratorService — limits', () => {
         agents.findByIdAndUser.mockResolvedValueOnce(null as never);
         await expect(
             service.updateLimits('u1', 'g1', { assignedAgentId: 'foreign' }),
-        ).rejects.toBeInstanceOf(BadRequestException);
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 });
 
@@ -495,6 +585,15 @@ describe('GoalOrchestratorService — spend rollup', () => {
 });
 
 describe('GoalOrchestratorService — advance', () => {
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+    const yoScope = {
+        tenantId: everScope.tenantId,
+        organizationId: '33333333-3333-4333-8333-333333333333',
+    };
+
     it('creates an iteration Task, dispatches it, and logs route + dispatch', async () => {
         const { service, tasksService, transitions, events, goals } = build({
             goal: {
@@ -519,6 +618,7 @@ describe('GoalOrchestratorService — advance', () => {
                 agentId: 'agent-7',
                 labels: ['goal-iteration'],
             }),
+            { tenantId: null, organizationId: null },
         );
         // The brief handed to the agent is built from persisted state, so
         // the open criterion and the session budget must both be in it.
@@ -538,6 +638,78 @@ describe('GoalOrchestratorService — advance', () => {
 
         expect(goals._rows[0].iteration).toBe(1);
         expect(goals._rows[0].activeAgentId).toBe('agent-7');
+    });
+
+    it('routes a pinned known Agent UUID only through the Goal persisted Ever scope', async () => {
+        const assignedAgentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const { service, agents, tasksService, transitions } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId,
+                ...everScope,
+            },
+        });
+
+        await service.advance('u1', 'g1');
+
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', everScope);
+        expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
+            expect.objectContaining(everScope),
+            assignedAgentId,
+            expect.anything(),
+        );
+        expect(tasksService.create).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ goalId: 'g1', agentId: assignedAgentId }),
+            everScope,
+        );
+    });
+
+    it('does not route the same-user known Agent UUID when it exists only in Yo', async () => {
+        const assignedAgentId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        const yoAgent = {
+            id: assignedAgentId,
+            userId: 'u1',
+            name: 'Yo Agent',
+            slug: 'yo-agent',
+            ...yoScope,
+        };
+        const { service, agents, transitions } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId,
+                ...everScope,
+            },
+        });
+        agents.findByIdAndUser.mockImplementation(
+            async (_id: string, _userId?: string, scope?: typeof everScope) =>
+                scope?.organizationId === yoAgent.organizationId ? yoAgent : null,
+        );
+
+        await service.advance('u1', 'g1');
+
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', everScope);
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+    });
+
+    it('keeps a legacy personal Goal pinned to a legacy personal Agent', async () => {
+        const assignedAgentId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+        const { service, agents, transitions } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId,
+                tenantId: null,
+                organizationId: null,
+            },
+        });
+
+        await service.advance('u1', 'g1');
+
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', {
+            tenantId: null,
+            organizationId: null,
+        });
+        expect(transitions.dispatchAgentRun).toHaveBeenCalled();
     });
 
     it('round-robins over the agents that have already worked the Goal', async () => {
