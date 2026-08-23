@@ -136,8 +136,8 @@ try {
 
 	Assert-True ($controlMetadata.reproducibility.verified -eq $true) "control build did not record verified reproducibility"
 	Assert-True ($hostileMetadata.reproducibility.verified -eq $true) "hostile build did not record verified reproducibility"
-	Assert-True (($controlHashes | Select-Object -Unique).Count -eq 1) "control build executables differ"
-	Assert-True (($hostileHashes | Select-Object -Unique).Count -eq 1) "hostile build executables differ"
+	Assert-True (@($controlHashes | Select-Object -Unique).Count -eq 1) "control build executables differ"
+	Assert-True (@($hostileHashes | Select-Object -Unique).Count -eq 1) "hostile build executables differ"
 	Assert-True ($controlHashes[0] -ceq $hostileHashes[0]) "hostile Cargo/Rust environment changed the release executable"
 	for ($index = 0; $index -lt $controlHashes.Count; $index++) {
 		$evidenceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $evidenceDirectory "control-$index.exe")).Hash.ToLowerInvariant()
