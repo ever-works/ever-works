@@ -361,8 +361,13 @@ try {
 			$failures.Add("controlled Cargo-config discovery evidence is missing")
 		} else {
 			Assert-True (
-				$cargoConfigDiscoveryProperty.Value.mode -ceq "controlled-cwd-explicit-manifest"
+				$cargoConfigDiscoveryProperty.Value.mode -ceq "private-acl-controlled-cwd-explicit-manifest"
 			) "Cargo was not invoked from a controlled config-discovery root"
+			Assert-True (
+				$cargoConfigDiscoveryProperty.Value.reparseComponents -ceq "forbidden" -and
+				$cargoConfigDiscoveryProperty.Value.mutationAccess -ceq "read-execute-only" -and
+				$cargoConfigDiscoveryProperty.Value.revalidation -ceq "immediately-before-each-cargo-command"
+			) "controlled Cargo directory did not record its reparse, ACL, and revalidation policy"
 		}
 		$toolDiscoveryProperty = $environmentPolicyProperty.Value.PSObject.Properties["toolDiscovery"]
 		if ($null -eq $toolDiscoveryProperty) {

@@ -12,6 +12,7 @@
 		"rustToolchain",
 		"cargoLocked",
 		"sourceCommit",
+		"sourceDateEpoch",
 		"binarySize",
 		"unsignedBuildSha256",
 		"authenticodeContentSha256",
@@ -33,6 +34,7 @@
 		"rustToolchain": { "const": "1.88.0" },
 		"cargoLocked": { "const": true },
 		"sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+		"sourceDateEpoch": { "type": "string", "pattern": "^[0-9]+$" },
 		"binarySize": { "type": "integer", "minimum": 1 },
 		"unsignedBuildSha256": { "$ref": "#/$defs/sha256" },
 		"authenticodeContentSha256": { "$ref": "#/$defs/sha256" },
@@ -117,6 +119,7 @@
 				"clearedMsvcLinkOptionOverrideCount",
 				"msvcLinkerEnvironment",
 				"cargoConfigDiscovery",
+				"toolDiscovery",
 				"effective"
 			],
 			"properties": {
@@ -148,12 +151,43 @@
 				"cargoConfigDiscovery": {
 					"type": "object",
 					"additionalProperties": false,
-					"required": ["mode", "workingDirectory", "manifestPath", "ancestorConfigFiles"],
+					"required": [
+						"mode",
+						"workingDirectory",
+						"manifestPath",
+						"ancestorConfigFiles",
+						"reparseComponents",
+						"mutationAccess",
+						"revalidation"
+					],
 					"properties": {
-						"mode": { "const": "controlled-cwd-explicit-manifest" },
-						"workingDirectory": { "const": "isolated-outside-source-tree" },
+						"mode": { "const": "private-acl-controlled-cwd-explicit-manifest" },
+						"workingDirectory": { "const": "unique-os-known-local-app-data-root" },
 						"manifestPath": { "const": "Cargo.toml" },
-						"ancestorConfigFiles": { "const": "required-absent" }
+						"ancestorConfigFiles": { "const": "required-absent" },
+						"reparseComponents": { "const": "forbidden" },
+						"mutationAccess": { "const": "read-execute-only" },
+						"revalidation": { "const": "immediately-before-each-cargo-command" }
+					}
+				},
+				"toolDiscovery": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"mode",
+						"inheritedPath",
+						"inheritedProgramFiles",
+						"rustToolchain",
+						"osTools",
+						"externalAttestation"
+					],
+					"properties": {
+						"mode": { "const": "absolute-os-roots-repository-pins-and-authenticode" },
+						"inheritedPath": { "const": "ignored-before-first-external-command" },
+						"inheritedProgramFiles": { "const": "ignored-and-normalized-from-os-special-folders" },
+						"rustToolchain": { "const": "checked-in-file-set-sha256" },
+						"osTools": { "const": "canonical-os-root-valid-authenticode-exact-publisher" },
+						"externalAttestation": { "const": "required" }
 					}
 				},
 				"effective": {
@@ -189,6 +223,7 @@
 				"msvcToolset",
 				"linker",
 				"windowsSdk",
+				"toolTrust",
 				"builder",
 				"environmentPolicy"
 			],
@@ -249,8 +284,58 @@
 						"ucrtLibrarySetSha256": { "$ref": "#/$defs/sha256" }
 					}
 				},
+				"toolTrust": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"policy",
+						"policySha256",
+						"rustBinaryFileCount",
+						"rustBinarySetSha256",
+						"rustTargetLibraryFileCount",
+						"rustTargetLibrarySetSha256",
+						"git",
+						"vswhere",
+						"linker",
+						"resourceConverter",
+						"externalAuthenticatedRunnerAttestation"
+					],
+					"properties": {
+						"policy": { "const": "repository-reviewed-toolchain-v1" },
+						"policySha256": { "$ref": "#/$defs/sha256" },
+						"rustBinaryFileCount": { "const": 4 },
+						"rustBinarySetSha256": {
+							"const": "bedeb993b32647f92a42b41f34ca57fc9f592c4ef48fc3b7a8ca38aef7348f12"
+						},
+						"rustTargetLibraryFileCount": { "const": 25 },
+						"rustTargetLibrarySetSha256": {
+							"const": "6022fdc2c8064e6bcea4671d66d05cd8fa8ffeb2044739d97431062219f7da3b"
+						},
+						"git": { "$ref": "#/$defs/signedToolIdentity" },
+						"vswhere": { "$ref": "#/$defs/signedToolIdentity" },
+						"linker": { "$ref": "#/$defs/signedToolIdentity" },
+						"resourceConverter": { "$ref": "#/$defs/signedToolIdentity" },
+						"externalAuthenticatedRunnerAttestation": { "const": "required" }
+					}
+				},
 				"builder": { "$ref": "#/$defs/builder" },
 				"environmentPolicy": { "$ref": "#/$defs/environmentPolicy" }
+			}
+		},
+		"signedToolIdentity": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"sha256",
+				"authenticodeStatus",
+				"publisherSubject",
+				"publisherCertificateSha256"
+			],
+			"properties": {
+				"sha256": { "$ref": "#/$defs/sha256" },
+				"authenticodeStatus": { "const": "Valid" },
+				"publisherSubject": { "type": "string", "minLength": 1 },
+				"publisherCertificateSha256": { "$ref": "#/$defs/sha256" }
 			}
 		},
 		"reproducibility": {

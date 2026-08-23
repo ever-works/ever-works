@@ -126,7 +126,9 @@ try {
 }
 '@
 		$nativeOutput = & $pwshPath -NoLogo -NoProfile -NonInteractive -Command $command 2>&1
-		if ($LASTEXITCODE -ne 0) {
+		$nativeExitCode = $LASTEXITCODE
+		$global:LASTEXITCODE = 0
+		if ($nativeExitCode -ne 0) {
 			$nativeFailure = @($nativeOutput | ForEach-Object {
 				$failureLines = @($_.ToString())
 				if ($_ -is [Management.Automation.ErrorRecord]) {
@@ -750,6 +752,7 @@ try {
 	if ($expectedFailureTestFailures.Count -gt 0) {
 		throw ("PE Authenticode content test failures:`n- " + ($expectedFailureTestFailures -join "`n- "))
 	}
+	$global:LASTEXITCODE = 0
 	Write-Output "PE Authenticode content tests passed"
 } finally {
 	if ($null -ne $certificate -and $null -ne $certificate.PSObject.Methods["GetCertHashString"]) {

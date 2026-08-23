@@ -132,7 +132,14 @@ jobs:
       - name: Test Authenticode content derivation and tamper rejection
         working-directory: apps/node/native/windows-job-launcher
         shell: powershell
-        run: .\test-pe-authenticode-content.ps1
+        run: |
+          $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          & $windowsPowerShell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned `
+            -File .\test-pe-authenticode-content.ps1
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) {
+            throw "PE Authenticode content test process exited $testExitCode"
+          }
 
       - name: Build Node workspace dependencies
         run: pnpm --filter "ever-works-node^..." build
