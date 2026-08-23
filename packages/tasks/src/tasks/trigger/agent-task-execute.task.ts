@@ -990,6 +990,12 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                             taskId: payload.taskId,
                             workId: taskRow.workId ?? null,
                             agentId: agent.id,
+                            // Trigger/internal-RPC execution has no request
+                            // ALS. Carry the persisted Task scope explicitly
+                            // so the escalation can later be resolved by the
+                            // exact Task-bound ownership CAS.
+                            tenantId: taskRow.tenantId ?? null,
+                            organizationId: taskRow.organizationId ?? null,
                             summary,
                             decisionNeeded: judgeEscalated
                                 ? `Every acceptance check passed, but the acceptance review says the task is not done: ${

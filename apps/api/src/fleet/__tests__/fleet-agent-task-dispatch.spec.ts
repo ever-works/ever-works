@@ -88,6 +88,21 @@ describe('fleet agent-task dispatch (AUDIT A46/A24 producer wiring)', () => {
             undefined,
             runs as never,
             dispatcher,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            {
+                findByIdAndUser: jest.fn().mockImplementation((id, userId, scope) =>
+                    Promise.resolve({
+                        id,
+                        userId,
+                        tenantId: scope.tenantId,
+                        organizationId: scope.organizationId,
+                    }),
+                ),
+            } as never,
         );
 
     beforeEach(() => {

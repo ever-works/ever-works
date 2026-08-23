@@ -37,6 +37,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
     let assignees: any;
     let runs: any;
     let dispatcher: any;
+    let agents: any;
 
     beforeEach(() => {
         tasks = {
@@ -52,11 +53,52 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
         };
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
+        agents = {
+            findByIdAndUser: jest.fn(async (id: string, userId: string, scope: unknown) => ({
+                id,
+                userId,
+                ...(scope as object),
+            })),
+        };
     });
 
     function makeSvc() {
-        return new TaskTransitionService(tasks, blocks, approvers, assignees, runs, dispatcher);
+        return new (TaskTransitionService as any)(
+            tasks,
+            blocks,
+            approvers,
+            assignees,
+            runs,
+            dispatcher,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            agents,
+        ) as TaskTransitionService;
     }
+
+    it('fails closed before creating a run when Agent ownership validation is unavailable', async () => {
+        const serviceWithoutAgents = new TaskTransitionService(
+            tasks,
+            blocks,
+            approvers,
+            assignees,
+            runs,
+            dispatcher,
+        );
+
+        await expect(
+            serviceWithoutAgents.dispatchAgentRun(makeTask(), 'agent-a'),
+        ).resolves.toMatchObject({
+            runId: null,
+            dispatched: false,
+            error: 'agent-not-found',
+        });
+        expect(runs.createQueued).not.toHaveBeenCalled();
+        expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
 
     it('does NOT fan out when there are no Agent assignees', async () => {
         const svc = makeSvc();
@@ -83,6 +125,49 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         expect(firstCall.taskId).toBe('t1');
         expect(firstCall.dedupKey).toMatch(/t1:agent-[ab]:1/);
         expect(firstCall.runId).toBe('r1');
+    });
+
+    it('drops known same-user Agent assignees outside the persisted Task Organization', async () => {
+        const svc = makeSvc();
+        const task = makeTask({
+            status: TaskStatus.TODO,
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        });
+        tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+        assignees.findAgentAssignees.mockResolvedValueOnce([
+            { assigneeType: 'agent', assigneeId: 'agent-yo' },
+        ]);
+        agents.findByIdAndUser.mockResolvedValueOnce(null);
+
+        await svc.transition(task, TaskStatus.IN_PROGRESS);
+        await new Promise((r) => setImmediate(r));
+
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith('agent-yo', 'u1', {
+            tenantId: task.tenantId,
+            organizationId: task.organizationId,
+        });
+        expect(runs.createQueued).not.toHaveBeenCalled();
+        expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('validates task.agentId in the persisted Task scope before fallback dispatch', async () => {
+        const svc = makeSvc();
+        const task = makeTask({
+            status: TaskStatus.TODO,
+            agentId: 'agent-yo',
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        });
+        tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+        assignees.findAgentAssignees.mockResolvedValueOnce([]);
+        agents.findByIdAndUser.mockResolvedValueOnce(null);
+
+        await svc.transition(task, TaskStatus.IN_PROGRESS);
+        await new Promise((r) => setImmediate(r));
+
+        expect(runs.createQueued).not.toHaveBeenCalled();
+        expect(dispatcher.enqueue).not.toHaveBeenCalled();
     });
 
     it('pre-creates a queued AgentRun row before enqueuing the Trigger.dev run', async () => {
@@ -243,6 +328,9 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
                 undefined, // notifications
                 undefined, // runDenorm
                 gate,
+                undefined, // works
+                undefined, // terminalSessions
+                agents,
             );
 
         const toInProgress = async (svc: TaskTransitionService, taskOver: Partial<Task> = {}) => {
@@ -325,6 +413,12 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
             assignees,
             undefined,
             dispatcher,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            agents,
         );
         dispatcher.enqueue.mockRejectedValueOnce(new Error('Trigger.dev down'));
         const task = makeTask({ status: TaskStatus.TODO });
@@ -367,6 +461,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
                 undefined,
                 undefined,
                 terminalSessions as never,
+                agents,
             );
         }
 
@@ -420,6 +515,7 @@ describe('TaskTransitionService — owner-column agent fallback (kanban/detail-p
     let assignees: any;
     let runs: any;
     let dispatcher: any;
+    let agents: any;
 
     beforeEach(() => {
         tasks = { casUpdateStatus: jest.fn().mockResolvedValue(true), findById: jest.fn() };
@@ -432,10 +528,30 @@ describe('TaskTransitionService — owner-column agent fallback (kanban/detail-p
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
         };
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
+        agents = {
+            findByIdAndUser: jest.fn(async (id: string, userId: string, scope: unknown) => ({
+                id,
+                userId,
+                ...(scope as object),
+            })),
+        };
     });
 
     const makeSvc = () =>
-        new TaskTransitionService(tasks, blocks, approvers, assignees, runs, dispatcher);
+        new (TaskTransitionService as any)(
+            tasks,
+            blocks,
+            approvers,
+            assignees,
+            runs,
+            dispatcher,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            agents,
+        ) as TaskTransitionService;
 
     it('dispatches the Task OWN agent (task.agentId) when there are no assignee rows', async () => {
         // The Task detail page assigns an Agent by writing task.agentId — it

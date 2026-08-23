@@ -2,6 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserUpload } from '../../entities/user-upload.entity';
+import { ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
+
+function normalizeUploadSha256(sha256: string): string {
+    return sha256.toLowerCase();
+}
 
 export interface RecordUploadInput {
     userId?: string | null;
@@ -32,23 +37,51 @@ export class UserUploadRepository {
     ) {}
 
     /**
-     * Insert the upload-ownership record, deduped per `(userId, sha256)` — a
-     * repeat upload of the same file by the same user returns the existing row.
-     * Best-effort by contract: the bytes are already stored, so the caller must
-     * not let a failure here fail the upload (swallow + log).
+     * Insert the upload-ownership record, deduped within the exact persisted
+     * ownership scope. Organization uploads never collapse into another
+     * Organization merely because their bytes (and therefore sha256) match.
+     * Personal scope deliberately includes legacy null/null rows through the
+     * centralized ownership predicate.
      */
     async record(input: RecordUploadInput): Promise<UserUpload> {
+        const normalizedInput = {
+            ...input,
+            sha256: normalizeUploadSha256(input.sha256),
+        };
+        const scope: OwnershipScope = {
+            tenantId: normalizedInput.tenantId ?? null,
+            organizationId: normalizedInput.organizationId ?? null,
+        };
+        const userId = normalizedInput.userId ?? null;
         const existing = await this.repo.findOne({
-            where: { userId: input.userId ?? null, sha256: input.sha256 },
+            where:
+                userId === null
+                    ? {
+                          userId: null,
+                          sha256: normalizedInput.sha256,
+                          tenantId: scope.tenantId,
+                          organizationId: scope.organizationId,
+                      }
+                    : ownershipWhereWith<UserUpload>(userId, scope, {
+                          sha256: normalizedInput.sha256,
+                      }),
         });
         if (existing) return existing;
-        const entity = this.repo.create(input);
+        const entity = this.repo.create(normalizedInput);
         return this.repo.save(entity);
     }
 
     /** An upload with this `sha256` owned by `userId`, else null. */
-    async findOwnedByUser(sha256: string, userId: string): Promise<UserUpload | null> {
-        return this.repo.findOne({ where: { sha256, userId } });
+    async findOwnedByUser(
+        sha256: string,
+        userId: string,
+        scope?: OwnershipScope,
+    ): Promise<UserUpload | null> {
+        return this.repo.findOne({
+            where: ownershipWhereWith<UserUpload>(userId, scope, {
+                sha256: normalizeUploadSha256(sha256),
+            }),
+        });
     }
 
     // ─── Memory Files (folder membership) ────────────────────────────────
@@ -102,7 +135,10 @@ export class UserUploadRepository {
         sha256: string,
         folderId: string | null,
     ): Promise<boolean> {
-        const result = await this.repo.update({ userId, sha256 }, { folderId });
+        const result = await this.repo.update(
+            { userId, sha256: normalizeUploadSha256(sha256) },
+            { folderId },
+        );
         return (result.affected ?? 0) > 0;
     }
 

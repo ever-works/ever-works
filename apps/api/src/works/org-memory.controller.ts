@@ -535,7 +535,11 @@ export class OrgMemoryController {
             // Ownership is the lookup: `findOwnedByUser` scopes to the
             // caller, so a hash belonging to another user simply is not
             // found. No separate authorization check to forget.
-            const record = await this.userUploads.findOwnedByUser(attachmentId, auth.userId);
+            const record = await this.userUploads.findOwnedByUser(
+                attachmentId,
+                auth.userId,
+                this.scopeContext.getScope(),
+            );
             if (!record) {
                 results.push({ attachmentId, status: 'not_found' });
                 continue;

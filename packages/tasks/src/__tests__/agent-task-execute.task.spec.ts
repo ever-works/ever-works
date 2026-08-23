@@ -614,6 +614,10 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
 
     describe('quality gates (Wave 3 M2+M3) — dispatch-freeze + PR gate', () => {
         const WORK_ID = '88888888-8888-4888-8888-888888888888';
+        const EVER_SCOPE = {
+            tenantId: '99999999-9999-4999-8999-999999999999',
+            organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        };
         const WORKSPACE = {
             cwd: '/workspaces/task-1',
             branch: 'task/owned-task',
@@ -630,7 +634,9 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
         };
 
         /** Point the owned task at a Work so the gate path can resolve it. */
-        const useWorkTask = () => {
+        const useWorkTask = (
+            scope: { tenantId: string | null; organizationId: string | null } = EVER_SCOPE,
+        ) => {
             tasks.getOne.mockImplementation(async (userId: string, taskId: string) => {
                 if (userId === OWNER && taskId === OWNED_TASK_ID) {
                     return {
@@ -644,6 +650,7 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                         missionId: null,
                         ideaId: null,
                         workId: WORK_ID,
+                        ...scope,
                     };
                 }
                 throw new Error(`Task ${taskId} not found.`);
@@ -1092,8 +1099,10 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 ],
             };
 
-            const useExhaustedGate = () => {
-                useWorkTask();
+            const useExhaustedGate = (
+                scope: { tenantId: string | null; organizationId: string | null } = EVER_SCOPE,
+            ) => {
+                useWorkTask(scope);
                 taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
                 resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
                 resolveChecksPolicyMock.mockReturnValue('required');
@@ -1115,8 +1124,24 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                         reasonCode: 'gate-exhausted',
                         taskId: OWNED_TASK_ID,
                         workId: WORK_ID,
+                        tenantId: EVER_SCOPE.tenantId,
+                        organizationId: EVER_SCOPE.organizationId,
                         decisionNeeded: expect.stringContaining('Decide'),
                         attempted: [expect.objectContaining({ label: 'build', detail: 'boom' })],
+                    }),
+                );
+            });
+
+            it('explicitly persists personal null ownership outside request ALS', async () => {
+                useExhaustedGate({ tenantId: null, organizationId: null });
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(escalations.record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        taskId: OWNED_TASK_ID,
+                        tenantId: null,
+                        organizationId: null,
                     }),
                 );
             });

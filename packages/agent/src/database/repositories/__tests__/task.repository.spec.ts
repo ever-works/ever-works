@@ -1,5 +1,43 @@
 import { TaskRepository } from '../task.repository';
 
+describe('TaskRepository ownership scope', () => {
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+
+    it('loads a known Task UUID with an exact user + tenant + Organization predicate', async () => {
+        const findOne = jest.fn().mockResolvedValue(null);
+        const tasks = new TaskRepository({ findOne } as never);
+
+        await (tasks.findByIdAndUser as any)('task-ever', 'user-1', everScope);
+
+        expect(findOne).toHaveBeenCalledWith({
+            where: [{ id: 'task-ever', userId: 'user-1', ...everScope }],
+        });
+    });
+
+    it('adds the active Organization predicate to list SQL before pagination', async () => {
+        const qb: any = {
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            take: jest.fn().mockReturnThis(),
+            skip: jest.fn().mockReturnThis(),
+            getCount: jest.fn().mockResolvedValue(0),
+            getMany: jest.fn().mockResolvedValue([]),
+        };
+        const tasks = new TaskRepository({ createQueryBuilder: jest.fn(() => qb) } as never);
+
+        await (tasks.findByUserIdFiltered as any)('user-1', {}, everScope);
+
+        expect(qb.andWhere).toHaveBeenCalledWith(
+            expect.stringContaining('task.organizationId = :taskScopeOrganizationId'),
+            expect.objectContaining({ taskScopeOrganizationId: everScope.organizationId }),
+        );
+    });
+});
+
 describe('TaskRepository.wouldCreateCycle', () => {
     function makeSvc(parentChain: Record<string, string | null>) {
         const repo = {
