@@ -94,6 +94,12 @@ export class SubscriptionsController {
             plans.map(async (plan) => ({
                 code: plan.code,
                 name: plan.displayName,
+                // Echoed so the response is self-describing: the switcher can tell a hosted tier
+                // from a self-hosted licence instead of inferring it from the plan name. Today
+                // `listPlans` only returns cloud plans, so this is always 'cloud' — it exists so a
+                // future self-hosted build does not have to guess, and so the omission that caused
+                // six undifferentiated cards cannot silently recur.
+                hosting: plan.hosting,
                 maxWorks: plan.maxWorks,
                 allowedCadences: plan.allowedCadences ?? [],
                 monthlyPrice: plan.monthlyPrice,
