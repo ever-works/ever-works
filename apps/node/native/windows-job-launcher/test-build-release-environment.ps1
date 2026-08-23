@@ -11,6 +11,16 @@ $hostileMetadataDirectory = "target\release-metadata"
 $evidenceDirectory = Join-Path $packageRoot "target\build-environment-proof"
 $buildScript = Join-Path $packageRoot "build-release.ps1"
 $failures = [Collections.Generic.List[string]]::new()
+$createdAncestorConfigDirectories = [Collections.Generic.List[string]]::new()
+$repositoryRoot = (& git -C $packageRoot rev-parse --show-toplevel).Trim()
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryRoot)) {
+	throw "unable to resolve repository root for ancestor Cargo-config testing"
+}
+$repositoryRoot = [IO.Path]::GetFullPath($repositoryRoot)
+$ancestorConfigDirectories = @(
+	Join-Path $repositoryRoot ".cargo"
+	Join-Path (Split-Path -Parent $packageRoot) ".cargo"
+)
 
 $githubHintNames = @(
 	"GITHUB_ACTIONS",
@@ -95,6 +105,48 @@ function Get-ActualBuildHashes {
 	return $hashes
 }
 
+function New-HostileAncestorCargoConfigs {
+	foreach ($directory in $ancestorConfigDirectories) {
+		$resolved = [IO.Path]::GetFullPath($directory)
+		$prefix = $repositoryRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
+		if (-not $resolved.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+			throw "ancestor Cargo-config fixture escapes the isolated repository"
+		}
+		if (Test-Path -LiteralPath $resolved) {
+			throw "refusing to overwrite an existing ancestor Cargo-config directory"
+		}
+		New-Item -ItemType Directory -Path $resolved | Out-Null
+		$createdAncestorConfigDirectories.Add($resolved)
+	}
+	$repositoryConfig = @'
+[profile.release]
+opt-level = 0
+lto = false
+codegen-units = 256
+debug = "full"
+strip = "none"
+panic = "unwind"
+'@
+	$nearPackageConfig = @'
+[build]
+rustc-wrapper = 'C:\missing-ancestor-rustc-wrapper.exe'
+
+[target.x86_64-pc-windows-msvc]
+linker = 'C:\missing-ancestor-linker.exe'
+rustflags = ['-C', 'opt-level=0']
+'@
+	[IO.File]::WriteAllText(
+		(Join-Path $ancestorConfigDirectories[0] "config.toml"),
+		$repositoryConfig,
+		[Text.UTF8Encoding]::new($false)
+	)
+	[IO.File]::WriteAllText(
+		(Join-Path $ancestorConfigDirectories[1] "config.toml"),
+		$nearPackageConfig,
+		[Text.UTF8Encoding]::new($false)
+	)
+}
+
 try {
 	$resolvedEvidence = [IO.Path]::GetFullPath($evidenceDirectory)
 	$targetRoot = [IO.Path]::GetFullPath((Join-Path $packageRoot "target"))
@@ -115,6 +167,7 @@ try {
 			-LiteralPath (Join-Path $packageRoot $controlMetadata.reproducibility.buildArtifacts[$index]) `
 			-Destination (Join-Path $evidenceDirectory "control-$index.exe")
 	}
+	New-HostileAncestorCargoConfigs
 
 	$hostileEnvironment = [ordered]@{}
 	foreach ($entry in $profileOverrides.GetEnumerator()) {
@@ -177,6 +230,14 @@ try {
 				$linkerOverrideCountProperty.Value -eq $linkerHostileOverrides.Count
 			) "not every hostile LINK/_LINK_ override was cleared"
 		}
+		$cargoConfigDiscoveryProperty = $environmentPolicyProperty.Value.PSObject.Properties["cargoConfigDiscovery"]
+		if ($null -eq $cargoConfigDiscoveryProperty) {
+			$failures.Add("controlled Cargo-config discovery evidence is missing")
+		} else {
+			Assert-True (
+				$cargoConfigDiscoveryProperty.Value.mode -ceq "controlled-cwd-explicit-manifest"
+			) "Cargo was not invoked from a controlled config-discovery root"
+		}
 	}
 
 	if ($failures.Count -gt 0) {
@@ -184,6 +245,9 @@ try {
 	}
 	Write-Output "Build environment contract passed: $($hostileHashes[0])"
 } finally {
+	for ($index = $createdAncestorConfigDirectories.Count - 1; $index -ge 0; $index--) {
+		Remove-Item -LiteralPath $createdAncestorConfigDirectories[$index] -Recurse -Force
+	}
 	foreach ($name in $allManagedNames) {
 		if ($null -eq $previousEnvironment[$name]) {
 			Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
