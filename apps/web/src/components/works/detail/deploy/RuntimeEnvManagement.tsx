@@ -1,15 +1,28 @@
 'use client';
 
 import { useEffect, useState, useTransition, type ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
 import type { Work } from '@/lib/api';
+import type { RuntimeEnvVarState } from '@/lib/api/plugins-capabilities/deploy';
 import { toast } from 'sonner';
 import { useRouter } from '@/i18n/navigation';
 import {
     getWorkRuntimeEnv,
     setWorkRuntimeEnv,
+    setWorkRuntimeEnvVars,
     testWorkDbConnection,
 } from '@/app/actions/dashboard/deploy';
-import { CheckCircle2, Database, Loader2, Lock, Save, Server, XCircle } from 'lucide-react';
+import {
+    CheckCircle2,
+    Database,
+    KeyRound,
+    Loader2,
+    Lock,
+    Save,
+    Server,
+    Trash2,
+    XCircle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -41,6 +54,7 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
         masked: string | null;
     } | null>(null);
     const [managed, setManaged] = useState<string[]>([]);
+    const [envVars, setEnvVars] = useState<RuntimeEnvVarState[]>([]);
     const [mode, setMode] = useState<DbMode>('custom');
     const [sharedAvailable, setSharedAvailable] = useState(false);
     const [value, setValue] = useState('');
@@ -59,6 +73,7 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
                 if (result.success) {
                     setDatabaseUrl(result.databaseUrl);
                     setManaged(result.managed);
+                    setEnvVars(result.env ?? []);
                     setLoadError(null);
                 } else {
                     // Server-reported failure: don't claim "Not configured"
@@ -256,6 +271,15 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
                         </div>
                     )}
 
+                    {envVars.length > 0 && (
+                        <EnvVarsSection
+                            workId={work.id}
+                            vars={envVars}
+                            disabled={hasLoadError}
+                            onChange={setEnvVars}
+                        />
+                    )}
+
                     {managed.length > 0 && (
                         <div>
                             <div className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
@@ -278,6 +302,134 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
                     )}
                 </div>
             )}
+        </div>
+    );
+}
+
+/**
+ * Operator-managed, allow-listed per-Work env vars (Stripe keys & co.).
+ *
+ * The API returns one masked entry per allow-listed key (`allowedEnvKeys` /
+ * `env` on `GET /runtime-env`), so this section renders the whole form from
+ * the server's list — no client-side key list to drift. Each row saves via
+ * `PUT /runtime-env { env: { KEY: value } }` (merge-patch) and removes via
+ * `{ env: { KEY: null } }`. Values are never echoed back: secrets show as
+ * `***`, non-secrets as a short prefix.
+ */
+function EnvVarsSection({
+    workId,
+    vars,
+    disabled,
+    onChange,
+}: {
+    workId: string;
+    vars: RuntimeEnvVarState[];
+    disabled: boolean;
+    onChange: (next: RuntimeEnvVarState[]) => void;
+}) {
+    const t = useTranslations('dashboard.workDetail.deploy.runtimeEnvVars');
+    const router = useRouter();
+    const [isPending, startTransition] = useTransition();
+    const [drafts, setDrafts] = useState<Record<string, string>>({});
+    const [pendingKey, setPendingKey] = useState<string | null>(null);
+
+    const submit = (key: string, value: string | null) => {
+        setPendingKey(key);
+        startTransition(async () => {
+            const result = await setWorkRuntimeEnvVars(workId, { [key]: value });
+            setPendingKey(null);
+            if (result.success) {
+                onChange(result.env);
+                setDrafts((prev) => {
+                    const next = { ...prev };
+                    delete next[key];
+                    return next;
+                });
+                toast.success(value === null ? t('removeSuccess') : t('saveSuccess'));
+                router.refresh();
+            } else {
+                toast.error(result.error ?? (value === null ? t('removeFailed') : t('saveFailed')));
+            }
+        });
+    };
+
+    return (
+        <div>
+            <div className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <KeyRound className="h-3 w-3" /> {t('title')}
+            </div>
+            <p className="text-xs text-muted-foreground">{t('description')}</p>
+            <div className="mt-2 space-y-2">
+                {vars.map((entry) => {
+                    const draft = drafts[entry.key] ?? '';
+                    const busy = isPending && pendingKey === entry.key;
+                    return (
+                        <div key={entry.key}>
+                            <label
+                                htmlFor={`runtime-env-${entry.key}`}
+                                className="mb-1 block font-mono text-[11px] font-medium text-muted-foreground"
+                            >
+                                {entry.key}
+                            </label>
+                            <div className="flex gap-2">
+                                <Input
+                                    id={`runtime-env-${entry.key}`}
+                                    type={entry.secret ? 'password' : 'text'}
+                                    autoComplete="off"
+                                    spellCheck={false}
+                                    placeholder={
+                                        entry.set
+                                            ? (entry.masked ?? t('placeholderSet'))
+                                            : t('placeholderUnset')
+                                    }
+                                    value={draft}
+                                    onChange={(e) =>
+                                        setDrafts((prev) => ({
+                                            ...prev,
+                                            [entry.key]: e.target.value,
+                                        }))
+                                    }
+                                    disabled={disabled || isPending}
+                                    className="font-mono text-xs"
+                                />
+                                <Button
+                                    onClick={() => submit(entry.key, draft)}
+                                    disabled={disabled || isPending || !draft.trim()}
+                                    size="sm"
+                                    aria-label={t('saveAria', { key: entry.key })}
+                                >
+                                    {busy ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="h-4 w-4" />
+                                    )}
+                                    <span className="ml-1">{t('saveButton')}</span>
+                                </Button>
+                                {entry.set && (
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => submit(entry.key, null)}
+                                        disabled={disabled || isPending}
+                                        size="sm"
+                                        aria-label={t('removeAria', { key: entry.key })}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        <span className="ml-1">{t('removeButton')}</span>
+                                    </Button>
+                                )}
+                            </div>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                {entry.set
+                                    ? entry.secret
+                                        ? t('currentSecret')
+                                        : t('currentValue', { masked: entry.masked ?? '' })
+                                    : t('notSet')}
+                            </p>
+                        </div>
+                    );
+                })}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{t('hint')}</p>
         </div>
     );
 }
