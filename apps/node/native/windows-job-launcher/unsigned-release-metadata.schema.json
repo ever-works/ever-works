@@ -148,12 +148,7 @@
 				"cargoConfigDiscovery": {
 					"type": "object",
 					"additionalProperties": false,
-					"required": [
-						"mode",
-						"workingDirectory",
-						"manifestPath",
-						"ancestorConfigFiles"
-					],
+					"required": ["mode", "workingDirectory", "manifestPath", "ancestorConfigFiles"],
 					"properties": {
 						"mode": { "const": "controlled-cwd-explicit-manifest" },
 						"workingDirectory": { "const": "isolated-outside-source-tree" },
