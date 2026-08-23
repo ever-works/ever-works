@@ -216,7 +216,6 @@ test.describe('Organization workspace request authority', () => {
             await everPage.goto(`/org/${ever.slug}/missions/new`, {
                 waitUntil: 'load',
             });
-            await everPage.locator('#new-mission-title').fill(missionTitle);
             await everPage
                 .locator('#new-mission-description')
                 .fill('This Mission must remain stamped in the Ever workspace.');
@@ -224,6 +223,11 @@ test.describe('Organization workspace request authority', () => {
                 '[data-testid="new-mission-form"] button[type="submit"]',
             );
             await expect(createMissionButton).toBeEnabled({ timeout: 30_000 });
+            // The enabled state is a user-visible hydration signal for this
+            // controlled form. Enter the title afterwards so a cold page load
+            // cannot leave only the DOM value updated while React state stays
+            // empty and the API derives a different title.
+            await everPage.locator('#new-mission-title').fill(missionTitle);
             await createMissionButton.click();
             await expect(everPage).toHaveURL(
                 new RegExp(`/org/${ever.slug}/missions/[0-9a-f-]+$`, 'i'),
