@@ -1573,3 +1573,82 @@ describe('StripeBillingProvider — subscription event normalization (audit B24)
         expect(normalized.kind).toBe('ignored');
     });
 });
+
+// H5: the account has Stripe Tax active with live registrations, but no session asked for it —
+// so every invoice would have shipped with NO tax line while we were registered to collect it.
+// A session only calculates tax if it sets `automatic_tax`; nothing else turns it on.
+describe('Stripe Tax — every session that CHARGES asks for tax', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    });
+
+    const taxPlanRequest = {
+        userId: 'u1',
+        customerId: 'cus_1',
+        plan: {
+            code: 'standard',
+            label: 'Standard plan',
+            priceCents: 2500,
+            currency: 'usd',
+            interval: 'month' as const,
+        },
+        successUrl: 'https://app.test/ok',
+        cancelUrl: 'https://app.test/no',
+        referenceId: 'u1:standard',
+    };
+
+    it('enables automatic tax on a plan checkout, and collects what Stripe needs to compute it', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession(taxPlanRequest as any);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.automatic_tax).toEqual({ enabled: true });
+        // Required alongside automatic_tax when an existing customer is passed: Stripe needs an
+        // address to pick a jurisdiction, and without this the session errors instead of taxing.
+        expect(params.customer_update).toEqual({ address: 'auto' });
+        // Lets a business supply its VAT/GST number, which is what triggers EU reverse charge.
+        expect(params.tax_id_collection).toEqual({ enabled: true });
+    });
+
+    it('enables automatic tax on a credit-pack purchase too', async () => {
+        const { provider, client } = build();
+
+        await provider.createCreditCheckoutSession({
+            userId: 'u1',
+            userEmail: 'u1@example.com',
+            customerId: 'cus_1',
+            pack: {
+                packId: 'credits-5500',
+                label: '5,500 credits',
+                credits: 5500,
+                priceCents: 5000,
+                currency: 'usd',
+            },
+            successUrl: 'https://app.test/ok',
+            cancelUrl: 'https://app.test/no',
+            referenceId: 'u1:credits-5500',
+        } as any);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.automatic_tax).toEqual({ enabled: true });
+    });
+
+    it('does NOT enable automatic tax on a card-setup session', async () => {
+        // `mode: 'setup'` charges nothing and Stripe rejects automatic_tax there, so this is not
+        // an oversight to "fix" later — sending it would break saving a card outright.
+        const { provider, client } = build();
+
+        await provider.createPaymentMethodSetupSession({
+            userId: 'u1',
+            customerId: 'cus_1',
+            successUrl: 'https://app.test/ok',
+            cancelUrl: 'https://app.test/no',
+        } as any);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('setup');
+        expect(params.automatic_tax).toBeUndefined();
+        expect(params.tax_id_collection).toBeUndefined();
+    });
+});

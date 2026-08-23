@@ -73,6 +73,32 @@ export const STRIPE_METADATA_KEYS = {
 /** The only value {@link STRIPE_METADATA_KEYS.licence} ever takes. */
 export const STRIPE_PERPETUAL_LICENCE = 'perpetual-commercial' as const;
 
+/**
+ * Stripe Tax, applied to every session that actually CHARGES.
+ *
+ * The account has Stripe Tax active with live registrations, but a session only calculates tax if
+ * it asks: without `automatic_tax` every invoice ships with no tax line, and VAT we are registered
+ * to collect has to come out of margin or be chased retroactively.
+ *
+ * - `customer_update.address: 'auto'` is REQUIRED alongside `automatic_tax` whenever an existing
+ *   `customer` is passed. Stripe needs an address to pick a jurisdiction, and this lets Checkout
+ *   collect it and write it back to the customer.
+ * - `tax_id_collection` lets a business enter its VAT/GST number, which is what triggers EU
+ *   reverse-charge instead of us charging VAT to a registered business.
+ *
+ * 🛑 Deliberately NOT applied to `mode: 'setup'` sessions — saving a card charges nothing, and
+ * Stripe rejects `automatic_tax` there.
+ *
+ * `tax_behavior` is left `unspecified` on prices on purpose: the account default
+ * `inferred_by_currency` already resolves USD to tax-exclusive, and the field is IMMUTABLE once
+ * set, so pinning it would foreclose tax-inclusive EUR pricing later for no gain today.
+ */
+const STRIPE_TAX_SESSION_FIELDS = {
+    automatic_tax: { enabled: true },
+    customer_update: { address: 'auto' },
+    tax_id_collection: { enabled: true },
+} as const;
+
 /** `kind` metadata values — how a purchase at the provider originated. */
 export const STRIPE_PURCHASE_KINDS = {
     checkout: 'credit-topup',
@@ -208,6 +234,7 @@ export class StripeBillingProvider extends BillingProvider {
             client_reference_id: request.referenceId,
             success_url: request.successUrl,
             cancel_url: request.cancelUrl,
+            ...STRIPE_TAX_SESSION_FIELDS,
             line_items: [
                 {
                     quantity: 1,
@@ -288,6 +315,7 @@ export class StripeBillingProvider extends BillingProvider {
             cancel_url: request.cancelUrl,
             line_items: lineItems,
             metadata,
+            ...STRIPE_TAX_SESSION_FIELDS,
             // `subscription_data` is rejected outright in payment mode; the one-off equivalent is
             // `payment_intent_data`, which is also where the licence marker has to be mirrored so a
             // refund or dispute on the charge can still be traced back to the sale.
