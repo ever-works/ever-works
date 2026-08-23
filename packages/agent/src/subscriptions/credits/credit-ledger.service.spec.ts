@@ -1,8 +1,6 @@
 import { Logger } from '@nestjs/common';
 import {
-    addWholeMonths,
     CreditLedgerService,
-    elapsedWholeMonths,
     InsufficientCreditsError,
 } from './credit-ledger.service';
 import { CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
@@ -27,6 +25,8 @@ function makeLedgerRepository(overrides: Record<string, jest.Mock> = {}) {
         findForUser: jest.fn().mockResolvedValue({ entries: [], total: 0 }),
         findByIdempotencyKey: jest.fn().mockResolvedValue(null),
         sumByRefTypeInWindow: jest.fn().mockResolvedValue(0),
+        expireDueBuckets: jest.fn().mockResolvedValue([]),
+        findUsersWithDueBuckets: jest.fn().mockResolvedValue([]),
         ...overrides,
     };
 }
@@ -47,47 +47,24 @@ function makeUserRepository(overrides: Record<string, jest.Mock> = {}) {
     };
 }
 
-function makeSubscriptionRepository(overrides: Record<string, jest.Mock> = {}) {
-    return {
-        findCurrentByUser: jest.fn().mockResolvedValue(null),
-        ...overrides,
-    };
-}
-
-function makeBillingProfileRepository(overrides: Record<string, jest.Mock> = {}) {
-    return {
-        // "collecting fine" by default.
-        findByUserId: jest.fn().mockResolvedValue({ subscriptionStatus: 'active' }),
-        ...overrides,
-    };
-}
-
 function makeService(
     ledger: Record<string, jest.Mock> = {},
     entitlements: Record<string, jest.Mock> = {},
     users: Record<string, jest.Mock> = {},
-    subscriptions: Record<string, jest.Mock> = {},
-    billingProfiles: Record<string, jest.Mock> = {},
 ) {
     const ledgerRepository = makeLedgerRepository(ledger);
     const entitlementsService = makeEntitlements(entitlements);
     const userRepository = makeUserRepository(users);
-    const subscriptionRepository = makeSubscriptionRepository(subscriptions);
-    const billingProfileRepository = makeBillingProfileRepository(billingProfiles);
     const service = new CreditLedgerService(
         ledgerRepository as any,
         entitlementsService as any,
         userRepository as any,
-        subscriptionRepository as any,
-        billingProfileRepository as any,
     );
     return {
         service,
         ledgerRepository,
         entitlementsService,
         userRepository,
-        subscriptionRepository,
-        billingProfileRepository,
     };
 }
 
@@ -364,9 +341,6 @@ describe('CreditLedgerService', () => {
                 alreadyGranted: 0,
                 scanned: 1,
                 failed: 0,
-                monthlyGranted: 0,
-                monthlyAlreadyGranted: 0,
-                monthlyFailed: 0,
             });
         });
 
@@ -387,9 +361,6 @@ describe('CreditLedgerService', () => {
                 alreadyGranted: 1,
                 scanned: 1,
                 failed: 0,
-                monthlyGranted: 0,
-                monthlyAlreadyGranted: 0,
-                monthlyFailed: 0,
             });
         });
 
@@ -421,9 +392,6 @@ describe('CreditLedgerService', () => {
                 alreadyGranted: 0,
                 scanned: 2,
                 failed: 0,
-                monthlyGranted: 0,
-                monthlyAlreadyGranted: 0,
-                monthlyFailed: 0,
             });
         });
 
@@ -453,9 +421,6 @@ describe('CreditLedgerService', () => {
                 // A thrown grant is now visible instead of being indistinguishable
                 // from a healthy no-op: `failed` is a subset of `skipped`.
                 failed: 1,
-                monthlyGranted: 0,
-                monthlyAlreadyGranted: 0,
-                monthlyFailed: 0,
             });
         });
 
@@ -580,342 +545,164 @@ describe('CreditLedgerService', () => {
         });
     });
 
-    /**
-     * Month arithmetic for the subscription anniversary. A 31st anchor is
-     * the case that breaks naive implementations: rolling Jan 31 forward by
-     * one month must give Feb 28/29, not Mar 3 — otherwise a customer is
-     * granted twice in March.
-     */
-    describe('anniversary month arithmetic', () => {
-        it('clamps a 31st anchor to the last day of a shorter month', () => {
-            const anchor = new Date('2026-01-31T12:00:00.000Z');
-            expect(addWholeMonths(anchor, 1).toISOString()).toBe('2026-02-28T12:00:00.000Z');
-            expect(addWholeMonths(anchor, 2).toISOString()).toBe('2026-03-31T12:00:00.000Z');
-            expect(addWholeMonths(anchor, 3).toISOString()).toBe('2026-04-30T12:00:00.000Z');
-        });
+    describe('dispatchDailyGrants — universal allowance (billing spec FR-1)', () => {
+        const NOW = new Date('2026-08-25T00:05:00.000Z');
 
-        it('does not advance the index before the anniversary instant', () => {
-            const anchor = new Date('2026-01-31T12:00:00.000Z');
-            expect(elapsedWholeMonths(anchor, new Date('2026-02-28T11:59:59.000Z'))).toBe(0);
-            expect(elapsedWholeMonths(anchor, new Date('2026-02-28T12:00:00.000Z'))).toBe(1);
-            expect(elapsedWholeMonths(anchor, new Date('2026-03-30T00:00:00.000Z'))).toBe(1);
-            expect(elapsedWholeMonths(anchor, new Date('2026-03-31T12:00:00.000Z'))).toBe(2);
-        });
-
-        it('never returns a negative index', () => {
-            const anchor = new Date('2026-06-15T00:00:00.000Z');
-            expect(elapsedWholeMonths(anchor, new Date('2026-01-01T00:00:00.000Z'))).toBe(0);
-        });
-
-        it('counts twelve grants across an annual subscription year', () => {
-            const anchor = new Date('2026-08-31T09:00:00.000Z');
-            const indexes = new Set<number>();
-            for (let day = 0; day < 365; day++) {
-                const at = new Date(anchor.getTime() + day * 24 * 3600 * 1000);
-                indexes.add(elapsedWholeMonths(anchor, at));
-            }
-            // Index 0 through 11 — one distinct grant key per month of the year.
-            expect(indexes.size).toBe(12);
-        });
-    });
-    /**
-     * H3 (b) — the plan's MONTHLY allowance.
-     *
-     * `subscription_plans.monthlyCredits` was seeded on every paid plan,
-     * mirrored into the Stripe catalog and printed on the pricing page, and
-     * read by no code anywhere. These pin what the key choice decides.
-     */
-    describe('monthly plan credits', () => {
-        const NOW = new Date('2026-07-25T00:05:00.000Z');
-        const ANCHOR = new Date('2026-05-10T08:00:00.000Z'); // 2 whole months before NOW
-
-        const proSubscription = {
-            id: 'sub-1',
-            planCode: 'standard',
-            createdAt: ANCHOR,
-            plan: { code: 'standard', displayName: 'Pro', monthlyCredits: 3000 },
-        };
-        const anyUser = [{ id: 'u1', defaultPlan: { code: 'free', monthlyCredits: 0 } }];
-
-        const withUser = (
-            subscription: unknown,
-            ledger: Record<string, jest.Mock> = {},
-            billingProfiles: Record<string, jest.Mock> = {},
-        ) =>
-            makeService(
-                ledger,
+        it('applies the platform fallback to EVERY plan code, not just free', async () => {
+            const users = [
+                { id: 'free-user', defaultPlan: { code: 'free' } },
+                { id: 'pro-user', defaultPlan: { code: 'standard' } },
+                { id: 'ent-user', defaultPlan: { code: 'premium' } },
+            ];
+            const { service, ledgerRepository, entitlementsService } = makeService(
                 {},
-                { findActiveBatch: jest.fn().mockResolvedValueOnce(anyUser).mockResolvedValue([]) },
-                { findCurrentByUser: jest.fn().mockResolvedValue(subscription) },
-                billingProfiles,
+                {
+                    // No entitlement rows: every plan resolves the caller's fallback.
+                    getNumber: jest
+                        .fn()
+                        .mockImplementation(async (_plan: string, _key: string, fb: number) => fb),
+                },
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
             );
-
-        it('grants the full allowance, keyed by subscription + elapsed month + plan', async () => {
-            const { service, ledgerRepository } = withUser(proSubscription);
 
             const summary = await service.dispatchDailyGrants(NOW);
 
-            expect(summary.monthlyGranted).toBe(1);
+            for (const code of ['free', 'standard', 'premium']) {
+                expect(entitlementsService.getNumber).toHaveBeenCalledWith(
+                    code,
+                    'daily-free-credits',
+                    50,
+                );
+            }
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledTimes(3);
+            expect(summary).toEqual({
+                granted: 3,
+                skipped: 0,
+                alreadyGranted: 0,
+                scanned: 3,
+                failed: 0,
+            });
+        });
+
+        it('honours CREDITS_DAILY_FREE as the universal fallback level', async () => {
+            process.env.CREDITS_DAILY_FREE = '75';
+            const users = [{ id: 'pro-user', defaultPlan: { code: 'standard' } }];
+            const { service, ledgerRepository } = makeService(
+                {},
+                {
+                    getNumber: jest
+                        .fn()
+                        .mockImplementation(async (_plan: string, _key: string, fb: number) => fb),
+                },
+                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
+            );
+
+            await service.dispatchDailyGrants(NOW);
+
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({ amountCredits: 75 }),
+                expect.objectContaining({ maxBalanceAfter: null }),
+            );
+        });
+    });
+
+    describe('grantDailyForUser — lazy per-user grant (billing spec FR-3)', () => {
+        const NOW = new Date('2026-08-25T13:00:00.000Z');
+
+        it('writes the same daily key the sweep would, so the two can never double-grant', async () => {
+            const { service, ledgerRepository } = makeService();
+
+            expect(await service.grantDailyForUser('u1', 'standard', NOW)).toBe('granted');
             expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
                 expect.objectContaining({
                     userId: 'u1',
-                    kind: CreditLedgerKind.GRANT,
-                    amountCredits: 3000,
-                    refType: 'plan-monthly',
-                    refId: 'sub-1',
-                    idempotencyKey: 'plan-monthly:u1:sub-1:2:standard',
+                    kind: CreditLedgerKind.DAILY_FREE,
+                    amountCredits: 50,
+                    idempotencyKey: 'daily:u1:2026-08-25',
                 }),
-                expect.anything(),
+                expect.objectContaining({ maxBalanceAfter: null }),
             );
         });
 
-        /**
-         * The reason this reads the subscription and not `user.defaultPlan`.
-         *
-         * `assignPlanToUser` (the only writer of `defaultPlanId`) is gated on
-         * SUBSCRIPTIONS_ENABLED while the subscription row is written
-         * unconditionally — so a paying customer on a deploy where the flag
-         * was off has an ACTIVE paid row and `defaultPlanId = free`.
-         */
-        it('pays a subscriber whose defaultPlan still says free', async () => {
-            const { service, ledgerRepository } = withUser(proSubscription);
-
-            await service.dispatchDailyGrants(NOW);
-
-            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
-                expect.objectContaining({ kind: CreditLedgerKind.GRANT, amountCredits: 3000 }),
-                expect.anything(),
-            );
-        });
-
-        /**
-         * Dunning. A failed invoice leaves `defaultPlanId` on the paid tier
-         * for the whole of Stripe's retry window, so a defaultPlan-driven
-         * grant keeps paying out for invoices that never cleared.
-         * `findCurrentByUser` returns only ACTIVE/TRIALING rows.
-         */
-        it('pays nothing when there is no current subscription (cancelled or past_due)', async () => {
-            const { service, ledgerRepository } = withUser(null);
-
-            const summary = await service.dispatchDailyGrants(NOW);
-
-            expect(summary.monthlyGranted).toBe(0);
-            const grants = ledgerRepository.recordAtomic.mock.calls.filter(
-                ([write]: any[]) => write.kind === CreditLedgerKind.GRANT,
-            );
-            expect(grants).toHaveLength(0);
-        });
-
-        /**
-         * 🛑 THE DUNNING GUARD THAT ALMOST WAS NOT.
-         *
-         * Reading the subscription row looks like it excludes dunning — the
-         * repository even documents that it 'deliberately excludes PAST_DUE'. But
-         * `SubscriptionStatus.PAST_DUE` is declared in the enum and assigned
-         * NOWHERE: the provider maps a failed invoice onto
-         * `billing_profiles.subscriptionStatus`, a different table entirely. So a
-         * subscription-row-only check leaves the customer 'active' for the whole of
-         * Stripe's retry window and pays out every month against invoices that
-         * never cleared.
-         *
-         * Revert-check: delete the billing-profile lookup and this goes RED.
-         */
-        it('pays NOTHING while the provider cannot collect (past_due / unpaid)', async () => {
-            for (const status of ['past_due', 'unpaid']) {
-                const { service, ledgerRepository } = withUser(
-                    proSubscription,
-                    {},
-                    { findByUserId: jest.fn().mockResolvedValue({ subscriptionStatus: status }) },
-                );
-
-                const summary = await service.dispatchDailyGrants(NOW);
-
-                expect(summary.monthlyGranted).toBe(0);
-                const grants = ledgerRepository.recordAtomic.mock.calls.filter(
-                    ([write]: any[]) => write.kind === CreditLedgerKind.GRANT,
-                );
-                expect(grants).toHaveLength(0);
-            }
-        });
-
-        it('still pays when there is no billing profile at all', async () => {
-            // A missing profile means "nothing has gone wrong yet", which is the
-            // posture every other reader of this state already takes.
-            const { service } = withUser(
-                proSubscription,
-                {},
-                { findByUserId: jest.fn().mockResolvedValue(null) },
-            );
-
-            const summary = await service.dispatchDailyGrants(NOW);
-
-            expect(summary.monthlyGranted).toBe(1);
-        });
-
-        /**
-         * The same defect the daily path had: a thrown grant vanished into the
-         * gaps of the summary, so a sweep in which EVERY paying subscriber failed
-         * to be paid reported exactly like a healthy one.
-         */
-        it('counts a thrown monthly grant instead of losing it, and SAYS so', async () => {
-            // Counting it is not enough: the number has to leave the process. The
-            // cron emitter used to gate every log line on the DAILY counters, so on
-            // a same-day re-run (retry, redeploy, manual trigger) a sweep in which
-            // every subscriber failed to be paid logged nothing at all.
-            const errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
-            try {
-                const { service } = withUser(proSubscription, {
-                    sumByRefTypeInWindow: jest.fn().mockRejectedValue(new Error('db down')),
-                });
-
-                const summary = await service.dispatchDailyGrants(NOW);
-
-                expect(summary.monthlyFailed).toBe(1);
-                expect(summary.monthlyGranted).toBe(0);
-                expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('FAILED'));
-            } finally {
-                errorSpy.mockRestore();
-            }
-        });
-
-        it('grants only the DIFFERENCE after a mid-cycle upgrade', async () => {
-            const upgraded = {
-                ...proSubscription,
-                planCode: 'premium',
-                plan: { code: 'premium', displayName: 'Enterprise', monthlyCredits: 25000 },
-            };
-            const { service, ledgerRepository } = withUser(upgraded, {
-                sumByRefTypeInWindow: jest.fn().mockResolvedValue(3000),
+        it("reports already-granted when today's key exists and skipped when the ceiling clamps", async () => {
+            const already = makeService({
+                findByIdempotencyKey: jest.fn().mockResolvedValue({ id: 'prior' }),
             });
-
-            const summary = await service.dispatchDailyGrants(NOW);
-
-            expect(summary.monthlyGranted).toBe(1);
-            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    kind: CreditLedgerKind.GRANT,
-                    amountCredits: 22000,
-                    idempotencyKey: 'plan-monthly:u1:sub-1:2:premium',
-                }),
-                expect.anything(),
+            expect(await already.service.grantDailyForUser('u1', 'free', NOW)).toBe(
+                'already-granted',
             );
-        });
+            expect(already.ledgerRepository.recordAtomic).not.toHaveBeenCalled();
 
-        it('writes NOTHING after a mid-cycle downgrade — credits are never clawed back', async () => {
-            const { service, ledgerRepository } = withUser(proSubscription, {
-                sumByRefTypeInWindow: jest.fn().mockResolvedValue(25000),
+            const clamped = makeService({
+                recordAtomic: jest.fn().mockResolvedValue({ status: 'skipped', balance: 900 }),
             });
-
-            const summary = await service.dispatchDailyGrants(NOW);
-
-            expect(summary.monthlyGranted).toBe(0);
-            const grants = ledgerRepository.recordAtomic.mock.calls.filter(
-                ([write]: any[]) => write.kind === CreditLedgerKind.GRANT,
-            );
-            expect(grants).toHaveLength(0);
-        });
-
-        it('is idempotent: an existing key for the period writes nothing', async () => {
-            const { service, ledgerRepository } = withUser(proSubscription, {
-                findByIdempotencyKey: jest
-                    .fn()
-                    .mockImplementation(async (key: string) =>
-                        key.startsWith('plan-monthly:') ? { id: 'prior' } : null,
-                    ),
-            });
-
-            const summary = await service.dispatchDailyGrants(NOW);
-
-            expect(summary.monthlyAlreadyGranted).toBe(1);
-            const grants = ledgerRepository.recordAtomic.mock.calls.filter(
-                ([write]: any[]) => write.kind === CreditLedgerKind.GRANT,
-            );
-            expect(grants).toHaveLength(0);
-        });
-
-        /**
-         * 🛑 The bug a CALENDAR-month key would have: a customer who
-         * subscribes on the 31st is granted again hours later on the 1st.
-         * Anchored on the subscription, the day after activation is still
-         * month index 0 — the key is already claimed, so nothing is written.
-         */
-        it('does not re-grant the day after a month-end signup', async () => {
-            const lateSignup = {
-                ...proSubscription,
-                createdAt: new Date('2026-08-31T22:00:00.000Z'),
-            };
-            const { service, ledgerRepository } = withUser(lateSignup);
-
-            await service.dispatchDailyGrants(new Date('2026-09-01T00:05:00.000Z'));
-
-            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
-                expect.objectContaining({ idempotencyKey: 'plan-monthly:u1:sub-1:0:standard' }),
-                expect.anything(),
-            );
-        });
-
-        /**
-         * An ANNUAL subscriber renews once a year. Keying the grant off the
-         * billing PERIOD would hand them 3,000 credits for a $204 year;
-         * keying it off the elapsed-month index gives them twelve.
-         */
-        it('advances the index every month, which is what makes annual work', async () => {
-            const { service, ledgerRepository } = withUser(proSubscription);
-
-            await service.dispatchDailyGrants(new Date('2027-04-10T08:00:00.000Z'));
-
-            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
-                expect.objectContaining({ idempotencyKey: 'plan-monthly:u1:sub-1:11:standard' }),
-                expect.anything(),
-            );
-        });
-
-        it('skips a subscription whose plan carries no monthly allowance', async () => {
-            const freeSub = {
-                ...proSubscription,
-                planCode: 'free',
-                plan: { code: 'free', displayName: 'Free', monthlyCredits: 0 },
-            };
-            const { service, ledgerRepository } = withUser(freeSub);
-
-            const summary = await service.dispatchDailyGrants(NOW);
-
-            expect(summary.monthlyGranted).toBe(0);
-            expect(ledgerRepository.sumByRefTypeInWindow).not.toHaveBeenCalled();
-        });
-
-        /**
-         * `credit_ledger_entries.idempotencyKey` is varchar(128). The longest
-         * possible key is 13 + 36 + 1 + 36 + 1 + 4 + 1 + 21 = 113.
-         */
-        it('produces a key that fits the varchar(128) column', async () => {
-            const longest = {
-                id: '11111111-2222-3333-4444-555555555555',
-                planCode: 'selfhosted_enterprise',
-                createdAt: ANCHOR,
-                plan: {
-                    code: 'selfhosted_enterprise',
-                    displayName: 'Enterprise Edition',
-                    monthlyCredits: 25000,
-                },
-            };
-            const users = [{ id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }];
-            const { service, ledgerRepository } = makeService(
-                {},
-                {},
-                { findActiveBatch: jest.fn().mockResolvedValueOnce(users).mockResolvedValue([]) },
-                { findCurrentByUser: jest.fn().mockResolvedValue(longest) },
-            );
-
-            await service.dispatchDailyGrants(NOW);
-
-            const grant = ledgerRepository.recordAtomic.mock.calls.find(
-                ([write]: any[]) => write.kind === CreditLedgerKind.GRANT,
-            );
-            expect(grant).toBeDefined();
-            expect(grant![0].idempotencyKey.length).toBeLessThanOrEqual(128);
+            expect(await clamped.service.grantDailyForUser('u1', 'free', NOW)).toBe('skipped');
         });
     });
+
+    describe('expireDueCredits — expiry sweep (billing spec FR-7)', () => {
+        const NOW = new Date('2026-09-23T00:05:00.000Z');
+
+        it("closes one user's due buckets and tallies them", async () => {
+            const { service, ledgerRepository } = makeService({
+                expireDueBuckets: jest.fn().mockResolvedValue([
+                    { entryId: 'a', expiredCredits: 300, expiryEntry: {} },
+                    { entryId: 'b', expiredCredits: 200, expiryEntry: {} },
+                ]),
+            });
+
+            const summary = await service.expireDueCredits('u1', NOW);
+
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u1', NOW);
+            expect(ledgerRepository.findUsersWithDueBuckets).not.toHaveBeenCalled();
+            expect(summary).toEqual({ users: 1, buckets: 2, credits: 500 });
+        });
+
+        it('without a user, walks every user with a due bucket until the work list is empty', async () => {
+            const { service, ledgerRepository } = makeService({
+                findUsersWithDueBuckets: jest
+                    .fn()
+                    .mockResolvedValueOnce(['u1', 'u2'])
+                    .mockResolvedValue([]),
+                expireDueBuckets: jest
+                    .fn()
+                    .mockResolvedValueOnce([{ entryId: 'a', expiredCredits: 10, expiryEntry: {} }])
+                    .mockResolvedValueOnce([]),
+            });
+
+            const summary = await service.expireDueCredits(undefined, NOW);
+
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u1', NOW);
+            expect(ledgerRepository.expireDueBuckets).toHaveBeenCalledWith('u2', NOW);
+            // u2 had nothing left by the time it was visited → not counted as a user.
+            expect(summary).toEqual({ users: 1, buckets: 1, credits: 10 });
+        });
+
+        it('record forwards expiresAt for a positive write only', async () => {
+            const { service, ledgerRepository } = makeService();
+            const expiresAt = new Date('2026-10-23T00:00:00.000Z');
+
+            await service.record({
+                userId: 'u1',
+                kind: CreditLedgerKind.GRANT,
+                amountCredits: 3000,
+                expiresAt,
+            });
+            await service.record({
+                userId: 'u1',
+                kind: CreditLedgerKind.CONSUMPTION,
+                amountCredits: -5,
+                expiresAt,
+                allowNegativeBalance: true,
+            });
+
+            expect(ledgerRepository.recordAtomic.mock.calls[0][0]).toEqual(
+                expect.objectContaining({ expiresAt }),
+            );
+            expect(ledgerRepository.recordAtomic.mock.calls[1][0].expiresAt).toBeUndefined();
+        });
+    });
+
     describe('getBalance', () => {
         it('delegates to the repository SUM (authoritative balance)', async () => {
             const { service, ledgerRepository } = makeService({

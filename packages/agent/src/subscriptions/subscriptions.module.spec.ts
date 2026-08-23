@@ -192,6 +192,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'UnknownCreditPackError',
                     // Subscription lifecycle (audit B07/B08)
                     'NoActiveSubscriptionError',
+                    'PLAN_GRANT_REF_TYPE',
                     'AutoRechargeService',
                     // Paid-plan purchase (audit B24)
                     'PlanSubscriptionService',
@@ -200,6 +201,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'CheckoutSessionNotFoundError',
                     // Payment methods (audit B10/B25)
                     'PaymentMethodService',
+                    'PlanCreditGrantService',
                     'PaymentMethodNotFoundError',
                     'LastPaymentMethodError',
                     // Provider-side setup-session marker + the handle
@@ -208,17 +210,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'paymentMethodHandle',
                     // Credits ledger + plan entitlements (pricing Wave 9 M1)
                     'CreditLedgerService',
+                    'CreditsSweepService',
                     'InsufficientCreditsError',
-                    // Subscription-anniversary month arithmetic for the monthly
-                    // credit grant. Exported so the clamping rules that decide how
-                    // often a customer is paid can be tested directly.
-                    'elapsedWholeMonths',
-                    'addWholeMonths',
-                    // refType stamped on every monthly plan-allowance row. The
-                    // grant sums prior rows of this type to work out what is still
-                    // owed, so the string is load-bearing - exported so a rename
-                    // cannot happen without this list noticing.
-                    'MONTHLY_PLAN_REF_TYPE',
                     // Transcript retention sentinels (#1877).
                     'RETENTION_FOREVER',
                     'RETENTION_NONE',
@@ -230,6 +223,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'RunCostSettlementService',
                     // Usage-summary aggregations (Wave 13 Billing/Usage UI)
                     'UsageSummaryService',
+                    'addMonthsClamped',
                     'resolveUsageSummaryWindow',
                     'InvalidUsagePeriodError',
                     'USAGE_SUMMARY_GROUP_BYS',
