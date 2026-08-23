@@ -215,13 +215,25 @@ export class SubscriptionService implements OnModuleInit {
     }
 
     /**
-     * Wave 13 (Billing page) — all active seeded plans for the plan/tier
-     * switcher. Read-only; plans are seeded at boot by {@link seedPlans}
-     * regardless of the `SUBSCRIPTIONS_ENABLED` flag, so the switcher can
+     * Wave 13 (Billing page) — the active seeded plans a user on THIS deployment can actually
+     * choose, for the plan/tier switcher. Read-only; plans are seeded at boot by
+     * {@link seedPlans} regardless of the `SUBSCRIPTIONS_ENABLED` flag, so the switcher can
      * render (degraded) even on deploys where billing is off.
+     *
+     * 🛑 SELF-HOSTED editions are excluded. They are licences for the buyer's OWN deployment, and
+     * {@link changePlanSelfService} refuses them here — so listing them offered a "Community
+     * Edition" card whose only possible outcome was an error, alongside two paid editions that
+     * cannot be bought on the hosted service either. Six cards where three belong.
+     *
+     * This mirrors the guard rather than duplicating a rule: anything `changePlanSelfService`
+     * would reject must not be advertised by the switcher in the first place. If this code is ever
+     * run as part of a genuinely self-hosted distribution, BOTH places need a deployment-mode
+     * config — filtering here alone would then show no plans at all, which is why the two are
+     * deliberately written against the same condition.
      */
     async listPlans(): Promise<SubscriptionPlan[]> {
-        return this.planRepository.findAllActive();
+        const plans = await this.planRepository.findAllActive();
+        return plans.filter((plan) => plan.hosting !== 'selfhosted');
     }
 
     async getActiveSubscription(userId: string) {
