@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 /**
  * Teams & Prebuilt Companies (spec §6.2) — web BFF proxy for
@@ -23,9 +24,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    const headers = new Headers();
-    headers.set('Authorization', `Bearer ${token}`);
-    headers.set('Content-Type', 'application/json');
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
 
     try {
         // Generous deadline: an import materializes up to ~100 files + rows.

@@ -177,6 +177,12 @@ export function clampResourceLimits(input: Partial<NodeResourceLimits> | null | 
  */
 export type NodeSecretStorage = 'keychain' | 'file';
 
+/** Durable local fail-closed marker for an unverified child process tree. */
+export interface NodeUnsafeState {
+	since: string;
+	reason: string;
+}
+
 /**
  * Everything the node needs to resume operating after a restart.
  *
@@ -216,6 +222,8 @@ export interface NodeConfig {
 	 * still heartbeats (so it stays observable) but leases no new work.
 	 */
 	paused?: boolean;
+	/** Survives service restarts until an operator explicitly verifies/clears it. */
+	unsafe?: NodeUnsafeState;
 }
 
 /** Credential-free projection of {@link NodeConfig}, safe to log or render. */
@@ -235,6 +243,8 @@ export interface RedactedNodeConfig {
 	secretStorage: NodeSecretStorage;
 	/** True when the operator has drained this node locally. */
 	paused: boolean;
+	/** Safe lifecycle diagnostic; contains no credential values. */
+	unsafe?: NodeUnsafeState;
 }
 
 /** Drop the credential from a config so it can cross a log or IPC boundary. */
@@ -256,6 +266,9 @@ export function redactConfig(config: NodeConfig): RedactedNodeConfig {
 	}
 	if (config.name !== undefined) {
 		redacted.name = config.name;
+	}
+	if (config.unsafe !== undefined) {
+		redacted.unsafe = { ...config.unsafe };
 	}
 	return redacted;
 }

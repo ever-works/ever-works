@@ -116,6 +116,35 @@ describe('AgentTemplatesService', () => {
         expect(input.missionId).toBeNull();
     });
 
+    it('keeps template parent validation and follow-up writes in the active Organization', async () => {
+        const { service, agents } = makeService();
+        const everScope = {
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        };
+        agents.create.mockImplementation(async (_userId, _input, scope) => {
+            if (scope?.organizationId !== everScope.organizationId) {
+                throw new NotFoundException('Mission mission-ever not found.');
+            }
+            return { ...CREATED, ...everScope };
+        });
+        agents.setGuardrails.mockImplementation(async (_userId, _id, _guardrails, scope) => {
+            if (scope?.organizationId !== everScope.organizationId) {
+                throw new NotFoundException('Agent agent-1 not found.');
+            }
+            return { ...AFTER_GUARDRAILS, ...everScope };
+        });
+
+        const result = await (service.createFromTemplate as any)(
+            'user-1',
+            'lead-researcher',
+            { scope: AgentScope.MISSION, missionId: 'mission-ever' },
+            everScope,
+        );
+
+        expect(result).toMatchObject(everScope);
+    });
+
     it('rejects unknown template slugs before creating anything', async () => {
         const { service, agents, files } = makeService();
 

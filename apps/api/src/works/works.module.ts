@@ -38,9 +38,11 @@ import { OrgKbController } from './org-kb.controller';
 import { OrgMemoryController } from './org-memory.controller';
 import { WorkTemplatesController } from './work-templates.controller';
 import { WorkCampaignsController } from './work-campaigns.controller';
+import { ExistingWebsiteLinkController } from './existing-website-link.controller';
 
 // Services
 import { WorksTemplateCatalogService } from './works-template-catalog.service';
+import { ExistingWebsiteLinkService } from './existing-website-link.service';
 
 // Tasks
 import { WorkCleanupService } from './tasks/work-cleanup.service';
@@ -87,6 +89,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
     providers: [
         CacheEntryRepository,
         WorksTemplateCatalogService,
+        ExistingWebsiteLinkService,
         WorkCleanupService,
         WebsiteTemplateSchedulerService,
         CommunityPrSchedulerService,
@@ -147,6 +150,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkTemplatesController,
         // Roadmap 14.1 — the only path that mints a `campaign` Work.
         WorkCampaignsController,
+        ExistingWebsiteLinkController,
     ],
 })
 export class WorksModule {}

@@ -47,6 +47,8 @@ export interface ConfigFileSystem {
 	/** Return the file's contents, or null when it does not exist. */
 	readFile(filePath: string): Promise<string | null>;
 	writeFile(filePath: string, content: string): Promise<void>;
+	/** Atomically create a new owner-only file; reject rather than overwrite. */
+	createFileExclusive?(filePath: string, content: string): Promise<void>;
 	mkdir(dirPath: string): Promise<void>;
 	chmod(filePath: string, mode: number): Promise<void>;
 	dirname(filePath: string): string;
@@ -169,6 +171,19 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 	}
 	if (typeof candidate.name === 'string' && candidate.name) {
 		config.name = candidate.name;
+	}
+	if (
+		candidate.unsafe &&
+		typeof candidate.unsafe === 'object' &&
+		typeof candidate.unsafe.since === 'string' &&
+		Number.isFinite(Date.parse(candidate.unsafe.since)) &&
+		typeof candidate.unsafe.reason === 'string' &&
+		candidate.unsafe.reason.trim()
+	) {
+		config.unsafe = {
+			since: new Date(candidate.unsafe.since).toISOString(),
+			reason: candidate.unsafe.reason.trim().slice(0, 2_000)
+		};
 	}
 	return config;
 }

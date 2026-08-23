@@ -35,6 +35,8 @@ export const DEFAULT_CHECK_FREQUENCY_MINUTES = 60;
  */
 export interface GoalDto {
     id: string;
+    tenantId: string | null;
+    organizationId: string | null;
     title: string;
     description: string | null;
     metricSource: GoalMetricSource;
@@ -85,6 +87,8 @@ export interface GoalDto {
 export function toGoalDto(goal: Goal): GoalDto {
     return {
         id: goal.id,
+        tenantId: goal.tenantId ?? null,
+        organizationId: goal.organizationId ?? null,
         title: goal.title,
         description: goal.description ?? null,
         metricSource: goal.metricSource,
@@ -148,6 +152,8 @@ export function toGoalMetricSampleDto(sample: GoalMetricSample): GoalMetricSampl
 /** Mission ↔ Goal edge, expanded with the Goal projection. */
 export interface MissionGoalLinkDto {
     id: string;
+    tenantId: string | null;
+    organizationId: string | null;
     missionId: string;
     goalId: string;
     isPrimary: boolean;
@@ -159,6 +165,8 @@ export function toMissionGoalLinkDto(link: MissionGoal, goal?: Goal | null): Mis
     const resolved = goal ?? link.goal ?? null;
     return {
         id: link.id,
+        tenantId: link.tenantId ?? null,
+        organizationId: link.organizationId ?? null,
         missionId: link.missionId,
         goalId: link.goalId,
         isPrimary: link.isPrimary,

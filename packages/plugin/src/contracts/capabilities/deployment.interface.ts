@@ -102,6 +102,28 @@ export interface AddDomainResult {
 }
 
 /**
+ * Effective context for deployment operations that must use Work-scoped settings.
+ *
+ * Deployment plugins are singletons, so their PluginContext does not carry the
+ * user/Work settings used by the deploy orchestrator. Facades may provide the
+ * already-resolved Work settings and the namespace that deploy enforced.
+ * Providers that do not need this context can ignore it.
+ */
+export interface DeploymentLookupContext {
+	/** Work-scoped plugin settings, layered over singleton defaults. */
+	readonly settingsOverride?: Record<string, unknown>;
+	/** Namespace previously validated/enforced by the deploy orchestrator. */
+	readonly namespaceOverride?: string;
+	/** Current website repository/project name enforced by the orchestrator. */
+	readonly projectNameOverride?: string;
+	/**
+	 * Context selected together with the effective kubeconfig. `null` means
+	 * use that kubeconfig's operator-controlled current context.
+	 */
+	readonly kubeContextOverride?: string | null;
+}
+
+/**
  * Deployment plugin interface
  * Capability: 'deployment'
  */
@@ -117,7 +139,11 @@ export interface IDeploymentPlugin extends IPlugin {
 	/**
 	 * Get deployment status
 	 */
-	getDeploymentStatus(deploymentId: string, token: string): Promise<DeploymentResult>;
+	getDeploymentStatus(
+		deploymentId: string,
+		token: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentResult>;
 
 	/**
 	 * Validate API token
@@ -135,7 +161,8 @@ export interface IDeploymentPlugin extends IPlugin {
 	lookupExistingDeployment?(
 		projectName: string,
 		token: string,
-		teamScope?: string
+		teamScope?: string,
+		context?: DeploymentLookupContext
 	): Promise<{
 		found: boolean;
 		website?: string;
@@ -161,22 +188,45 @@ export interface IDeploymentPlugin extends IPlugin {
 	/**
 	 * Get domains for a project
 	 */
-	getDomains?(projectId: string, token: string, teamScope?: string): Promise<DeploymentDomain[]>;
+	getDomains?(
+		projectId: string,
+		token: string,
+		teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentDomain[]>;
 
 	/**
 	 * Add a domain to a project
 	 */
-	addDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<AddDomainResult>;
+	addDomain?(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<AddDomainResult>;
 
 	/**
 	 * Remove a domain from a project
 	 */
-	removeDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<boolean>;
+	removeDomain?(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<boolean>;
 
 	/**
 	 * Verify a domain on a project
 	 */
-	verifyDomain?(projectId: string, domain: string, token: string, teamScope?: string): Promise<DeploymentDomain>;
+	verifyDomain?(
+		projectId: string,
+		domain: string,
+		token: string,
+		teamScope?: string,
+		context?: DeploymentLookupContext
+	): Promise<DeploymentDomain>;
 
 	/**
 	 * Workflow filenames to dispatch when deploying, in priority order.

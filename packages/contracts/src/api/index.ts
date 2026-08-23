@@ -22,6 +22,9 @@ export * from './data-sync/index.js';
 // upgrade-from-account API wire-types.
 export * from './organization/index.js';
 
+// EW-660 persisted Tenant / Organization workspace selection.
+export * from './active-scope.js';
+
 // EW-693 Dynamic plugin distribution — install state, catalog, allowlist
 // wire-types for `/plugins/catalog`, `/plugins/:id/install*`, and
 // `/admin/plugins/allowlist*`.

@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Agent } from '../entities/agent.entity';
+import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
 import { FleetJob } from '../entities/fleet-job.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
@@ -9,6 +11,8 @@ import { FleetService } from './fleet.service';
 import { FleetJobService } from './fleet-job.service';
 import { FleetExecutionPreferenceRepository } from './fleet-execution-preference.repository';
 import { FleetExecutionPreferenceService } from './fleet-execution-preference.service';
+import { FleetAgentNodeAffinityRepository } from './fleet-agent-node-affinity.repository';
+import { FleetAgentNodeAffinityService } from './fleet-agent-node-affinity.service';
 
 /**
  * Fleet (Wave 12, slice 1 + Desktop PRD M4) — agent-side module owning
@@ -38,28 +42,40 @@ import { FleetExecutionPreferenceService } from './fleet-execution-preference.se
  * are `@Optional()` — the module stays bootable in contexts without the
  * plugin runtime, where cluster merging simply degrades to [].
  *
- * `FleetNode` and `FleetJob` MUST also stay registered in the DataSource
- * ENTITIES array (`database/_entities-inventory.ts`) — this repo has no
+ * Every entity above MUST also stay registered in the DataSource ENTITIES
+ * array (`database/_entities-inventory.ts`) — this repo has no
  * `autoLoadEntities`, so a forFeature'd-but-unregistered entity throws
  * EntityMetadataNotFoundError on first query.
  */
 @Module({
-    imports: [TypeOrmModule.forFeature([FleetNode, FleetJob, FleetExecutionPreference])],
+    imports: [
+        TypeOrmModule.forFeature([
+            Agent,
+            FleetNode,
+            FleetJob,
+            FleetExecutionPreference,
+            FleetAgentNodeAffinity,
+        ]),
+    ],
     providers: [
         FleetNodeRepository,
         FleetJobRepository,
         FleetExecutionPreferenceRepository,
+        FleetAgentNodeAffinityRepository,
         FleetService,
         FleetJobService,
         FleetExecutionPreferenceService,
+        FleetAgentNodeAffinityService,
     ],
     exports: [
         FleetNodeRepository,
         FleetJobRepository,
         FleetExecutionPreferenceRepository,
+        FleetAgentNodeAffinityRepository,
         FleetService,
         FleetJobService,
         FleetExecutionPreferenceService,
+        FleetAgentNodeAffinityService,
     ],
 })
 export class FleetModule {}

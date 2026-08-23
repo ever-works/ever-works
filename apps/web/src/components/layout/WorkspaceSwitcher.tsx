@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Building2, Check, ChevronsUpDown, Plus } from 'lucide-react';
-import { useRouter } from '@/i18n/navigation';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import {
     DropdownMenu,
@@ -19,6 +19,8 @@ import { FaviconEverWorkImage, LogoEverWorkImage } from '../logos';
 import { CreateOrganizationModal } from '../organizations/CreateOrganizationModal';
 import type { WorkConfig } from '@/lib/api';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
+import { browserApiFetch } from '@/lib/api/browser-api';
+import { navigateToWorkspaceDashboard } from '@/lib/workspace-navigation';
 
 interface WorkspaceSwitcherProps {
     /** Site config passed through to the inline logo / favicon. */
@@ -98,10 +100,10 @@ export function WorkspaceSwitcher({
     isCollapsed = false,
 }: WorkspaceSwitcherProps) {
     const t = useTranslations('organizations.switcher');
-    const router = useRouter();
     const { organizations, isLoading } = useOrganizations();
     const { activeOrganization } = useActiveScope();
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [pendingOrganizationSlug, setPendingOrganizationSlug] = useState<string | null>(null);
 
     const hasOrgs = organizations.length > 0;
     // Pick the trigger label org — use the active one (from URL slug) if
@@ -111,8 +113,31 @@ export function WorkspaceSwitcher({
         ? (activeOrganization ?? organizations[0])
         : null;
 
-    const handleSelectOrg = (org: OrganizationResponse) => {
-        router.push(`/${org.slug}/dashboard`);
+    const handleSelectOrg = async (org: OrganizationResponse) => {
+        if (pendingOrganizationSlug !== null) return;
+
+        setPendingOrganizationSlug(org.slug);
+        try {
+            const response = await browserApiFetch('/api/users/me/scope', {
+                method: 'POST',
+                credentials: 'include',
+                cache: 'no-store',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ organizationSlug: org.slug }),
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to persist active Organization (${response.status})`);
+            }
+            const persisted = (await response.json()) as { organizationSlug?: string | null };
+            if (persisted.organizationSlug !== org.slug) {
+                throw new Error('The persisted active Organization did not match the selection');
+            }
+            navigateToWorkspaceDashboard({ kind: 'organization', slug: org.slug });
+        } catch {
+            toast.error('Could not switch Organization. Please try again.');
+        } finally {
+            setPendingOrganizationSlug(null);
+        }
     };
 
     const handleCreateOrg = () => {
@@ -180,6 +205,7 @@ export function WorkspaceSwitcher({
                                     key={org.id}
                                     onClick={() => handleSelectOrg(org)}
                                     className="cursor-pointer"
+                                    disabled={pendingOrganizationSlug !== null}
                                 >
                                     <div className="flex items-center gap-2 w-full">
                                         <OrgAvatar org={org} size="xs" />

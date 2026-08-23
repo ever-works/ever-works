@@ -35,7 +35,7 @@ import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from '.
  *       -> 200 { status:'success', enabled:true, plan:{ code:'free', name:'Free',
  *                allowedCadences:[{cadence,allowed,payPerUse,reason?} x7] } }  (fresh user → free)
  *     POST /api/subscriptions/plan { planCode:'free'|'standard'|'premium' }
- *       -> 200 { status:'success', enabled:true, plan:{ code, name:'Free'|'Standard'|'Premium',
+ *       -> 200 { status:'success', enabled:true, plan:{ code, name:'Free'|'Pro'|'Enterprise',
  *                allowedCadences:[...] } }
  *          SELF-SERVE PAID IS ON in e2e: standard/premium POST → 200 (not the 403 the
  *          production gate would give). On STANDARD the sub-hourly cadences flip to
@@ -186,7 +186,7 @@ test.describe('Flow: self-serve plan tier → per-work budget provisioning', () 
         expect(std.status(), 'self-serve paid (standard) accepted').toBe(200);
         const stdBody = await std.json();
         expect(stdBody.plan.code).toBe('standard');
-        expect(stdBody.plan.name).toBe('Standard');
+        expect(stdBody.plan.name).toBe('Pro');
         const stdCadences: Array<{ cadence: string; allowed: boolean; payPerUse: boolean }> =
             stdBody.plan.allowedCadences ?? [];
         const hourly = stdCadences.find((c) => c.cadence === 'hourly');
@@ -203,7 +203,7 @@ test.describe('Flow: self-serve plan tier → per-work budget provisioning', () 
         expect(prem.status()).toBe(200);
         const premBody = await prem.json();
         expect(premBody.plan.code).toBe('premium');
-        expect(premBody.plan.name).toBe('Premium');
+        expect(premBody.plan.name).toBe('Enterprise');
         for (const c of premBody.plan.allowedCadences ?? []) {
             expect(c.allowed, `premium ${c.cadence} re-allowed`).toBe(true);
             expect(c.payPerUse).toBe(false);

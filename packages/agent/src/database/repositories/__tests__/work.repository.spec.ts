@@ -36,6 +36,8 @@ function buildChain<TResult>(terminalName: string, terminalResolved: TResult) {
         'leftJoinAndSelect',
         'skip',
         'take',
+        'update',
+        'set',
     ];
 
     for (const m of passthroughMethods) {
@@ -300,6 +302,50 @@ describe('WorkRepository', () => {
             expect(fns.orderBy).toHaveBeenCalledWith('work.id', 'ASC');
             expect(fns.take).toHaveBeenCalledWith(50);
             expect(fns.getMany).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('markDeploymentReadyIfCurrent', () => {
+        it('updates only the captured deployment identity', async () => {
+            const { chain, fns } = buildChain('execute', { affected: 1 });
+            repository.createQueryBuilder.mockReturnValueOnce(chain as never);
+            const startedAt = new Date('2026-08-22T08:00:00.000Z');
+
+            await expect(
+                service.markDeploymentReadyIfCurrent('w1', {
+                    deploymentState: 'TIMEOUT',
+                    deploymentStartedAt: startedAt,
+                    lastDeployCorrelationId: 'corr-1',
+                }),
+            ).resolves.toBe(true);
+
+            expect(fns.update).toHaveBeenCalledWith(Work);
+            expect(fns.set).toHaveBeenCalledWith({ deploymentState: 'READY' });
+            expect(fns.where).toHaveBeenCalledWith('id = :id', { id: 'w1' });
+            expect(fns.andWhere).toHaveBeenCalledWith('deploymentState = :deploymentState', {
+                deploymentState: 'TIMEOUT',
+            });
+            expect(fns.andWhere).toHaveBeenCalledWith(
+                'lastDeployCorrelationId = :lastDeployCorrelationId',
+                { lastDeployCorrelationId: 'corr-1' },
+            );
+            expect(fns.andWhere).toHaveBeenCalledWith(
+                'deploymentStartedAt = :deploymentStartedAt',
+                { deploymentStartedAt: startedAt },
+            );
+        });
+
+        it('returns false when a newer deployment changed the guarded fields', async () => {
+            const { chain } = buildChain('execute', { affected: 0 });
+            repository.createQueryBuilder.mockReturnValueOnce(chain as never);
+
+            await expect(
+                service.markDeploymentReadyIfCurrent('w1', {
+                    deploymentState: 'TIMEOUT',
+                    deploymentStartedAt: null,
+                    lastDeployCorrelationId: null,
+                }),
+            ).resolves.toBe(false);
         });
     });
 

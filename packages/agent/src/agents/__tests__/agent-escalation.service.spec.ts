@@ -45,6 +45,7 @@ describe('AgentEscalationService (G3)', () => {
             listOpenForUser: jest.fn().mockResolvedValue([]),
             countOpenForWork: jest.fn().mockResolvedValue(0),
             resolve: jest.fn().mockResolvedValue(true),
+            resolveForTask: jest.fn().mockResolvedValue(true),
         };
     });
 
@@ -84,6 +85,24 @@ describe('AgentEscalationService (G3)', () => {
         expect(repository.listOpenForUser).toHaveBeenCalledWith('u1', expect.any(Date), 20);
         expect(repository.countOpenForWork).toHaveBeenCalledWith('work-1');
         expect(repository.resolve).toHaveBeenCalledWith('e1', 'u1', 'raised the budget');
+    });
+
+    it('delegates scoped Task resolution without dropping the route binding', async () => {
+        const scope = {
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        };
+        const svc = makeSvc();
+
+        await (svc as any).resolveForTask('e1', 'u1', 'task-1', scope, 'approved');
+
+        expect(repository.resolveForTask).toHaveBeenCalledWith(
+            'e1',
+            'u1',
+            'task-1',
+            scope,
+            'approved',
+        );
     });
 });
 

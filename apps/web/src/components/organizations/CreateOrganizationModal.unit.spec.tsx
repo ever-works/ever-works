@@ -35,6 +35,14 @@ vi.mock('@/i18n/navigation', () => ({
     getPathname: ({ href }: { href: string }) => href,
 }));
 
+const { navigateToWorkspaceDashboardMock } = vi.hoisted(() => ({
+    navigateToWorkspaceDashboardMock: vi.fn(),
+}));
+vi.mock('@/lib/workspace-navigation', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/lib/workspace-navigation')>()),
+    navigateToWorkspaceDashboard: navigateToWorkspaceDashboardMock,
+}));
+
 // next-intl `Dialog` uses Headless UI's Transition.show — render the
 // real dialog so we can drive the form. No additional mock needed.
 
@@ -68,6 +76,7 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
         __resetOrganizationsStoreForTests();
         __seedOrganizationsStoreForTests({ data: [], isLoading: false, error: null });
         routerPushMock.mockReset();
+        navigateToWorkspaceDashboardMock.mockReset();
     });
 
     afterEach(() => {
@@ -124,6 +133,16 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
                     headers: { 'Content-Type': 'application/json' },
                 });
             }
+            if (u === '/api/users/me/scope' && init?.method === 'POST') {
+                return new Response(
+                    JSON.stringify({
+                        tenantId: newOrg.tenantId,
+                        organizationId: newOrg.id,
+                        organizationSlug: newOrg.slug,
+                    }),
+                    { status: 200, headers: { 'Content-Type': 'application/json' } },
+                );
+            }
             if (u === '/api/organizations') {
                 return new Response(JSON.stringify([newOrg]), {
                     status: 200,
@@ -146,7 +165,10 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
             // Modal closed.
             expect(onOpenChange).toHaveBeenCalledWith(false);
             // Navigated to the new Org's dashboard.
-            expect(routerPushMock).toHaveBeenCalledWith(`/${newOrg.slug}/dashboard`);
+            expect(navigateToWorkspaceDashboardMock).toHaveBeenCalledWith({
+                kind: 'organization',
+                slug: newOrg.slug,
+            });
         });
 
         // POST request body carried the trimmed name.
@@ -158,6 +180,19 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
         expect(postCall).toBeDefined();
         const body = JSON.parse((postCall![1] as RequestInit).body as string);
         expect(body).toEqual({ name: 'Globex LLC' });
+        expect(new Headers((postCall![1] as RequestInit).headers).get('x-ever-workspace')).toBe(
+            'personal',
+        );
+
+        const scopeCall = fetchMock.mock.calls.find(
+            ([url, init]) =>
+                String(url) === '/api/users/me/scope' &&
+                (init as RequestInit | undefined)?.method === 'POST',
+        );
+        expect(scopeCall).toBeDefined();
+        expect(JSON.parse((scopeCall![1] as RequestInit).body as string)).toEqual({
+            organizationSlug: newOrg.slug,
+        });
     });
 
     /**
@@ -214,6 +249,122 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
             expect(screen.queryByText('organizations.create.submit')).toBeNull();
         });
         // No navigation yet — that happens after upgrade choice.
-        expect(routerPushMock).not.toHaveBeenCalled();
+        expect(navigateToWorkspaceDashboardMock).not.toHaveBeenCalled();
+    });
+
+    it('persists a first Organization as active before closing and navigating', async () => {
+        const newOrg = org({ id: 'o-first', slug: 'first-org', displayName: 'First Org' });
+        const events: string[] = [];
+        navigateToWorkspaceDashboardMock.mockImplementation(({ slug }: { slug: string }) =>
+            events.push(`navigate:/org/${slug}/dashboard`),
+        );
+        const onOpenChange = vi.fn((next: boolean) => events.push(`modal:${next}`));
+        const fetchMock = vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+            const u = String(url);
+            if (u === '/api/org-templates') {
+                return new Response('[]', { status: 200 });
+            }
+            if (u.includes('/api/organizations/check-slug')) {
+                return new Response(JSON.stringify({ available: true, normalized: newOrg.slug }), {
+                    status: 200,
+                });
+            }
+            if (u === '/api/organizations' && init?.method === 'POST') {
+                return new Response(JSON.stringify(newOrg), { status: 201 });
+            }
+            if (u === '/api/organizations') {
+                return new Response(JSON.stringify([newOrg]), { status: 200 });
+            }
+            if (u.endsWith('/upgrade-from-account') && init?.method === 'POST') {
+                events.push('upgrade');
+                return new Response('{}', { status: 200 });
+            }
+            if (u === '/api/users/me/scope' && init?.method === 'POST') {
+                events.push('scope');
+                return new Response(
+                    JSON.stringify({
+                        tenantId: newOrg.tenantId,
+                        organizationId: newOrg.id,
+                        organizationSlug: newOrg.slug,
+                    }),
+                    { status: 200 },
+                );
+            }
+            throw new Error(`Unexpected fetch: ${u}`);
+        });
+
+        render(<CreateOrganizationModal open={true} onOpenChange={onOpenChange} />);
+        fireEvent.change(screen.getByPlaceholderText('organizations.create.namePlaceholder'), {
+            target: { value: 'First Org' },
+        });
+        fireEvent.click(screen.getByText('organizations.create.submit'));
+        await screen.findByText('organizations.upgrade.title');
+        fireEvent.click(screen.getByText('organizations.upgrade.confirm'));
+
+        await waitFor(() => {
+            expect(navigateToWorkspaceDashboardMock).toHaveBeenCalledWith({
+                kind: 'organization',
+                slug: newOrg.slug,
+            });
+        });
+        const scopeCall = fetchMock.mock.calls.find(
+            ([url, init]) =>
+                String(url) === '/api/users/me/scope' &&
+                (init as RequestInit | undefined)?.method === 'POST',
+        );
+        expect(scopeCall).toBeDefined();
+        expect(JSON.parse((scopeCall![1] as RequestInit).body as string)).toEqual({
+            organizationSlug: newOrg.slug,
+        });
+        expect(events.indexOf('scope')).toBeLessThan(events.indexOf('modal:false'));
+        expect(events.indexOf('scope')).toBeLessThan(
+            events.indexOf(`navigate:/org/${newOrg.slug}/dashboard`),
+        );
+    });
+
+    it('keeps the upgrade dialog open when first-Organization scope persistence fails', async () => {
+        const newOrg = org({ id: 'o-first', slug: 'first-org', displayName: 'First Org' });
+        const onOpenChange = vi.fn();
+        vi.spyOn(global, 'fetch').mockImplementation(async (url, init) => {
+            const u = String(url);
+            if (u === '/api/org-templates') {
+                return new Response('[]', { status: 200 });
+            }
+            if (u.includes('/api/organizations/check-slug')) {
+                return new Response(JSON.stringify({ available: true, normalized: newOrg.slug }), {
+                    status: 200,
+                });
+            }
+            if (u === '/api/organizations' && init?.method === 'POST') {
+                return new Response(JSON.stringify(newOrg), { status: 201 });
+            }
+            if (u === '/api/organizations') {
+                return new Response(JSON.stringify([newOrg]), { status: 200 });
+            }
+            if (u.endsWith('/upgrade-from-account') && init?.method === 'POST') {
+                return new Response('{}', { status: 200 });
+            }
+            if (u === '/api/users/me/scope' && init?.method === 'POST') {
+                return new Response('{}', { status: 503 });
+            }
+            throw new Error(`Unexpected fetch: ${u}`);
+        });
+
+        render(<CreateOrganizationModal open={true} onOpenChange={onOpenChange} />);
+        fireEvent.change(screen.getByPlaceholderText('organizations.create.namePlaceholder'), {
+            target: { value: 'First Org' },
+        });
+        fireEvent.click(screen.getByText('organizations.create.submit'));
+        await screen.findByText('organizations.upgrade.title');
+        fireEvent.click(screen.getByText('organizations.upgrade.confirm'));
+
+        await waitFor(() => {
+            expect(screen.getByRole('alert')).toHaveTextContent(
+                'Failed to persist active Organization (503)',
+            );
+        });
+        expect(screen.getByText('organizations.upgrade.title')).toBeInTheDocument();
+        expect(onOpenChange).not.toHaveBeenCalledWith(false);
+        expect(navigateToWorkspaceDashboardMock).not.toHaveBeenCalled();
     });
 });

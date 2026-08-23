@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { subscriptionsAPI } from '@/lib/api/credits';
-import { billingAPI } from '@/lib/api/billing';
+import { billingAPI, type PlanCheckoutOptions } from '@/lib/api/billing';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 // Security: map ApiResponseError HTTP status codes to generic client-safe
@@ -90,14 +90,17 @@ export async function startCreditCheckoutAction(packId: string) {
  * failure branch inline (production redacts thrown server-action
  * messages).
  */
-export async function startPlanCheckoutAction(planCode: string) {
+export async function startPlanCheckoutAction(planCode: string, options: PlanCheckoutOptions = {}) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
     try {
-        const result = await billingAPI.startPlanCheckout(planCode);
+        // Pure pass-through. `interval` and `seats` are hints about WHICH
+        // catalog SKU to price; the amount is still resolved server-side from
+        // `subscription_plans` and the client can never name a price.
+        const result = await billingAPI.startPlanCheckout(planCode, options);
         return { success: true as const, url: result.url, error: null };
     } catch (error) {
         // Security: log full error server-side; return a generic client-safe message.

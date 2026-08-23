@@ -10,6 +10,7 @@ import {
     CreditCard,
     FileText,
     RefreshCw,
+    ShieldCheck,
     Wallet,
     Zap,
     Check,
@@ -58,6 +59,7 @@ import {
     subscriptionStatusTone,
     type BillingOverview,
     type InvoiceListPage,
+    type PlanCheckoutReturnResponse,
     type SubscriptionState,
 } from '@/lib/api/billing.shared';
 
@@ -70,6 +72,11 @@ interface BillingSettingsProps {
     /** Money path (billing PRD B5). Null ⇒ the overview call failed. */
     initialOverview: BillingOverview | null;
     initialInvoices: InvoiceListPage | null;
+    /**
+     * Result of finalising a checkout the provider just redirected back from.
+     * Null when this is an ordinary page load.
+     */
+    checkoutReturn?: PlanCheckoutReturnResponse | null;
 }
 
 const LEDGER_PAGE_SIZE = 10;
@@ -161,6 +168,7 @@ export function BillingSettings({
     initialLedger,
     initialOverview,
     initialInvoices,
+    checkoutReturn,
 }: BillingSettingsProps) {
     const t = useTranslations('dashboard.settings.billing');
     const [isPending, startTransition] = useTransition();
@@ -168,6 +176,20 @@ export function BillingSettings({
     const subscriptionsEnabled = initialPlans?.enabled ?? initialPlan?.enabled ?? false;
     const currentPlanCode = initialPlans?.currentPlanCode ?? initialPlan?.plan?.code ?? 'free';
     const plans = initialPlans?.plans ?? [];
+    // Only editions that are actually priced for a one-off purchase. Today
+    // that is exactly one SKU (`selfhosted_pro` @ $99); Community Edition
+    // has no prices at all and must not render a buy button.
+    const licences = (initialPlans?.licences ?? []).filter(
+        (licence) => Number(licence.lifetimePrice ?? 0) > 0,
+    );
+
+    // What was just bought, if anything. `ignored` means a credit top-up came
+    // back through the plan route — not an error, and not something to announce.
+    const justPurchased =
+        checkoutReturn && checkoutReturn.status !== 'ignored' ? checkoutReturn : null;
+    const purchasedLicence = justPurchased?.planCode
+        ? (licences.find((l) => l.code === justPurchased.planCode) ?? null)
+        : null;
     const currentPlan =
         plans.find((p) => p.isCurrent) ?? plans.find((p) => p.code === currentPlanCode) ?? null;
     const balanceCredits =
@@ -190,6 +212,8 @@ export function BillingSettings({
     // apply must not be offered as a live button.
     const upgradeEnabled = canUpgradePlan(overview, paymentsEnabled, subscriptionsEnabled);
     const [upgradingPlanCode, setUpgradingPlanCode] = useState<string | null>(null);
+    const [licencePendingCode, setLicencePendingCode] = useState<string | null>(null);
+    const [licenceConfirmCode, setLicenceConfirmCode] = useState<string | null>(null);
 
     const [autoRechargeOn, setAutoRechargeOn] = useState(overview?.autoRecharge.enabled ?? false);
     const [autoRechargeThreshold, setAutoRechargeThreshold] = useState(
@@ -309,6 +333,39 @@ export function BillingSettings({
         [upgradeEnabled, t],
     );
 
+    /**
+     * Buy a perpetual self-hosted commercial licence.
+     *
+     * 🛑 Deliberately NOT wrapped in `useCallback`. The sibling
+     * `handleUpgradePlan` memoizes on `[upgradeEnabled, t]`, both stable for
+     * the mounted component — so any new state read inside such a callback
+     * would be captured at first render and never update. For a checkout
+     * handler that means charging the cadence the page opened with rather
+     * than the one the buyer chose. There is nothing here worth memoizing.
+     */
+    const handleBuyLicence = async (licence: SubscriptionPlanListItem) => {
+        if (!upgradeEnabled) {
+            toast.info(t('plans.upgradeHint'));
+            return;
+        }
+        setLicencePendingCode(licence.code);
+        try {
+            // `interval: lifetime` selects the one-off SKU; the server still
+            // prices it from the catalog.
+            const result = await startPlanCheckoutAction(licence.code, {
+                interval: 'lifetime',
+            });
+            if (result.success && result.url) {
+                window.location.assign(result.url);
+                return;
+            }
+            toast.error(result.error ?? t('credits.checkoutError'));
+        } finally {
+            setLicencePendingCode(null);
+            setLicenceConfirmCode(null);
+        }
+    };
+
     const handleSaveAutoRecharge = useCallback(async () => {
         setAutoRechargeSaving(true);
         try {
@@ -392,6 +449,35 @@ export function BillingSettings({
                 </h2>
                 <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
             </div>
+
+            {/* ── Just-completed checkout ──────────────────────────────────
+                A perpetual licence deliberately writes no subscription row and
+                grants no tier, so without this the page after a settled $99
+                payment is identical to the page before it — same enabled "Buy"
+                button, no invoice yet, nothing. That reads as a failed payment,
+                and the obvious next action is to pay again. */}
+            {justPurchased ? (
+                <div
+                    data-testid="billing-checkout-return"
+                    className="flex items-start gap-2 rounded-lg border border-success/40 bg-success/5 p-4 text-sm text-text dark:text-text-dark"
+                >
+                    <Check className="w-4 h-4 shrink-0 mt-0.5 text-success" />
+                    <div className="space-y-1">
+                        <p className="font-medium">
+                            {justPurchased.status === 'active'
+                                ? t('checkoutReturn.confirmed')
+                                : t('checkoutReturn.settling')}
+                        </p>
+                        {purchasedLicence ? (
+                            <p className="text-text-muted dark:text-text-muted-dark">
+                                {t('checkoutReturn.licenceBody', {
+                                    name: purchasedLicence.name,
+                                })}
+                            </p>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
 
             {dataUnavailable ? (
                 <div
@@ -610,6 +696,86 @@ export function BillingSettings({
                     </div>
                 )}
             </SectionCard>
+
+            {/* ── Commercial licence (self-hosted) ──────────────────────────
+                Deliberately its own card, BELOW the switcher and never inside
+                it. A licence is not a tier you can switch to: the activation
+                path writes no subscription row and grants no plan, because it
+                applies to the deployment the buyer runs themselves. Putting it
+                in the switcher would read as "upgrade", and a buyer would pay
+                $99 expecting their hosted plan to change. */}
+            {licences.length > 0 && (
+                <SectionCard
+                    icon={ShieldCheck}
+                    title={t('licence.title')}
+                    subtitle={t('licence.subtitle')}
+                    testId="billing-licences"
+                >
+                    <div className="space-y-3">
+                        {licences.map((licence) => (
+                            <div
+                                key={licence.code}
+                                className="rounded-lg border border-border/60 p-4"
+                                data-testid={`billing-licence-${licence.code}`}
+                            >
+                                <div className="flex items-baseline justify-between gap-3">
+                                    <p className="text-sm font-medium">{licence.name}</p>
+                                    <p className="text-sm font-semibold">
+                                        {formatMonthlyPrice(
+                                            String(licence.lifetimePrice ?? '0'),
+                                            licence.currency,
+                                        )}
+                                    </p>
+                                </div>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    {t('licence.explainer')}
+                                </p>
+                                {licenceConfirmCode === licence.code ? (
+                                    <div className="mt-3 flex flex-col gap-2">
+                                        <p className="text-xs text-muted-foreground">
+                                            {t('licence.confirmBody')}
+                                        </p>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                className="text-xs"
+                                                data-testid={`billing-licence-confirm-${licence.code}`}
+                                                disabled={licencePendingCode !== null}
+                                                onClick={() => void handleBuyLicence(licence)}
+                                            >
+                                                {licencePendingCode === licence.code
+                                                    ? t('credits.redirecting')
+                                                    : t('licence.confirmCta')}
+                                            </Button>
+                                            <Button
+                                                variant="secondary"
+                                                className="text-xs"
+                                                disabled={licencePendingCode !== null}
+                                                onClick={() => setLicenceConfirmCode(null)}
+                                            >
+                                                {t('licence.cancel')}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <Button
+                                        className="mt-3 text-xs"
+                                        data-testid={`billing-licence-buy-${licence.code}`}
+                                        disabled={licencePendingCode !== null}
+                                        onClick={() => setLicenceConfirmCode(licence.code)}
+                                    >
+                                        {t('licence.buyLifetime', {
+                                            price: formatMonthlyPrice(
+                                                String(licence.lifetimePrice ?? '0'),
+                                                licence.currency,
+                                            ),
+                                        })}
+                                    </Button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </SectionCard>
+            )}
 
             {/* ── Buy credits (PRD §3.2 — flag-gated until payments land) ── */}
             <SectionCard

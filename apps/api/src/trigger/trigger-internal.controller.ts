@@ -79,7 +79,7 @@ import {
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
 import { MemoryConsolidationScheduleService } from '@ever-works/agent/services';
-import { CreditLedgerService } from '@ever-works/agent/subscriptions';
+import { CreditLedgerService, CreditsSweepService } from '@ever-works/agent/subscriptions';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -371,6 +371,13 @@ export class TriggerInternalController implements OnModuleInit {
         // the controller specs.
         @Optional()
         private readonly goalOrchestratorService?: GoalOrchestratorService,
+        // Billing spec §3.2 — backs the `credits-daily-grant` cron: the
+        // worker proxy calls `runDailySweep()` over the internal RPC
+        // channel (expiries → daily free → plan allowance), landing here
+        // where the ledger, entitlement and subscription repositories are
+        // wired. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly creditsSweepService?: CreditsSweepService,
     ) {}
 
     onModuleInit() {
@@ -463,6 +470,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Credits ledger (pricing Wave 9 M1) — `credits-daily-grant`
             // calls `dispatchDailyGrants()` here (allow-list auto-derived).
             CreditLedgerService: this.creditLedgerService,
+            // Billing spec §3.2 — `credits-daily-grant` calls
+            // `runDailySweep()` here (allow-list auto-derived).
+            CreditsSweepService: this.creditsSweepService,
             // Streaming-terminal M9 / D1 — `terminal-transcript-gc` calls
             // `sweepExpired()` here (allow-list auto-derived).
             TerminalTranscriptService: this.terminalTranscriptService,

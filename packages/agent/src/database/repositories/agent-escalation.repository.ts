@@ -12,6 +12,7 @@ import {
     type AgentEscalationStatus,
 } from '@ever-works/contracts';
 import { AgentEscalation } from '../../entities/agent-escalation.entity';
+import { ownershipSqlPredicate, type OwnershipScope } from '../ownership-scope';
 
 export interface RecordEscalationInput {
     userId: string;
@@ -23,6 +24,7 @@ export interface RecordEscalationInput {
     workId?: string | null;
     agentId?: string | null;
     attempted?: AgentEscalationAttempt[] | null;
+    tenantId?: string | null;
     organizationId?: string | null;
     /**
      * Stable idempotency key. Omitted = derived from
@@ -104,6 +106,7 @@ export class AgentEscalationRepository {
             agentId: input.agentId ?? null,
             attempted: normalizeAttempts(input.attempted),
             dedupKey,
+            ...(input.tenantId !== undefined ? { tenantId: input.tenantId } : {}),
             ...(input.organizationId !== undefined ? { organizationId: input.organizationId } : {}),
             ...buildConfidencePatch(input.confidence, input.confidenceSource),
         });
@@ -228,6 +231,40 @@ export class AgentEscalationRepository {
             .andWhere('userId = :userId', { userId })
             .andWhere('status = :open', { open: 'open' })
             .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Task-route resolution variant. The CAS binds not only the actor and
+     * open state, but the routed Task and its exact persisted ownership
+     * scope. A same-user escalation from another Organization is therefore
+     * indistinguishable from a missing or already-resolved row.
+     */
+    async resolveForTask(
+        id: string,
+        userId: string,
+        taskId: string,
+        scope: OwnershipScope,
+        resolutionNote?: string | null,
+    ): Promise<boolean> {
+        const ownership = ownershipSqlPredicate('', scope, 'escalationOwnership');
+        const query = this.repository
+            .createQueryBuilder()
+            .update(AgentEscalation)
+            .set({
+                status: 'resolved' as AgentEscalationStatus,
+                resolvedByUserId: userId,
+                resolutionNote: resolutionNote
+                    ? resolutionNote.slice(0, AGENT_ESCALATION_MAX_DECISION_CHARS)
+                    : null,
+                resolvedAt: new Date(),
+            })
+            .where('id = :id', { id })
+            .andWhere('userId = :userId', { userId })
+            .andWhere('taskId = :taskId', { taskId })
+            .andWhere('status = :open', { open: 'open' });
+        if (ownership) query.andWhere(ownership.clause, ownership.parameters);
+        const result = await query.execute();
         return (result.affected ?? 0) > 0;
     }
 }

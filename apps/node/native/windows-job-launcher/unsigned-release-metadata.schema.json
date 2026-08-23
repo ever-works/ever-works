@@ -1,0 +1,375 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ever.co/schemas/windows-job-launcher/unsigned-release-metadata.schema.json",
+	"title": "Ever Works Windows Job launcher unsigned release metadata",
+	"type": "object",
+	"additionalProperties": false,
+	"required": [
+		"schemaVersion",
+		"productionEligible",
+		"artifact",
+		"targetTriple",
+		"rustToolchain",
+		"cargoLocked",
+		"sourceCommit",
+		"sourceDateEpoch",
+		"binarySize",
+		"unsignedBuildSha256",
+		"authenticodeContentSha256",
+		"cargoLockSha256",
+		"buildInputs",
+		"invocationHints",
+		"reproducibility",
+		"sbom",
+		"sbomSha256",
+		"provenance",
+		"provenanceSha256",
+		"authenticode"
+	],
+	"properties": {
+		"schemaVersion": { "const": 3 },
+		"productionEligible": { "const": false },
+		"artifact": { "const": "ever-works-windows-job-launcher.exe" },
+		"targetTriple": { "const": "x86_64-pc-windows-msvc" },
+		"rustToolchain": { "const": "1.88.0" },
+		"cargoLocked": { "const": true },
+		"sourceCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+		"sourceDateEpoch": { "type": "string", "pattern": "^[0-9]+$" },
+		"binarySize": { "type": "integer", "minimum": 1 },
+		"unsignedBuildSha256": { "$ref": "#/$defs/sha256" },
+		"authenticodeContentSha256": { "$ref": "#/$defs/sha256" },
+		"cargoLockSha256": { "$ref": "#/$defs/sha256" },
+		"buildInputs": { "$ref": "#/$defs/buildInputs" },
+		"invocationHints": { "$ref": "#/$defs/invocationHints" },
+		"reproducibility": { "$ref": "#/$defs/reproducibility" },
+		"sbom": { "const": "ever-works-windows-job-launcher.sbom.cdx.json" },
+		"sbomSha256": { "$ref": "#/$defs/sha256" },
+		"provenance": { "const": "ever-works-windows-job-launcher.provenance.intoto.json" },
+		"provenanceSha256": { "$ref": "#/$defs/sha256" },
+		"authenticode": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["status", "productionUse"],
+			"properties": {
+				"status": { "const": "unsigned" },
+				"productionUse": { "const": "forbidden" }
+			}
+		}
+	},
+	"$defs": {
+		"sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+		"tool": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["version", "verboseVersion", "sha256"],
+			"properties": {
+				"version": { "type": "string", "minLength": 1 },
+				"verboseVersion": { "type": "string", "minLength": 1 },
+				"sha256": { "$ref": "#/$defs/sha256" }
+			}
+		},
+		"builder": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["kind", "id"],
+			"properties": {
+				"kind": { "const": "local-untrusted" },
+				"id": { "const": "urn:ever-works:builder:build-release-script:v3" }
+			}
+		},
+		"invocationHints": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"trust",
+				"claimedProvider",
+				"githubRepository",
+				"githubRunAttempt",
+				"githubRunId",
+				"githubWorkflowRef",
+				"runnerOs",
+				"runnerArch",
+				"runnerEnvironment",
+				"imageOs",
+				"imageVersion"
+			],
+			"properties": {
+				"trust": { "const": "untrusted-environment" },
+				"claimedProvider": { "enum": ["github-actions", "unmanaged"] },
+				"githubRepository": { "$ref": "#/$defs/invocationHint" },
+				"githubRunAttempt": { "$ref": "#/$defs/invocationHint" },
+				"githubRunId": { "$ref": "#/$defs/invocationHint" },
+				"githubWorkflowRef": { "$ref": "#/$defs/invocationHint" },
+				"runnerOs": { "$ref": "#/$defs/invocationHint" },
+				"runnerArch": { "$ref": "#/$defs/invocationHint" },
+				"runnerEnvironment": { "$ref": "#/$defs/invocationHint" },
+				"imageOs": { "$ref": "#/$defs/invocationHint" },
+				"imageVersion": { "$ref": "#/$defs/invocationHint" }
+			}
+		},
+		"invocationHint": { "type": "string", "minLength": 1, "maxLength": 512 },
+		"environmentPolicy": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"mode",
+				"cargoHome",
+				"clearedCargoRustOverrideCount",
+				"clearedCargoProfileOverrideCount",
+				"clearedMsvcLinkOptionOverrideCount",
+				"msvcLinkerEnvironment",
+				"cargoConfigDiscovery",
+				"toolDiscovery",
+				"effective"
+			],
+			"properties": {
+				"mode": { "const": "isolated-cargo-rust-allowlist" },
+				"cargoHome": { "const": "target/repro-cargo-home" },
+				"clearedCargoRustOverrideCount": { "type": "integer", "minimum": 0 },
+				"clearedCargoProfileOverrideCount": { "type": "integer", "minimum": 0 },
+				"clearedMsvcLinkOptionOverrideCount": { "type": "integer", "minimum": 0, "maximum": 2 },
+				"msvcLinkerEnvironment": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"recognizedInputs",
+						"linkOptions",
+						"libraryPath",
+						"executableSearchPath",
+						"temporaryDirectory"
+					],
+					"properties": {
+						"recognizedInputs": {
+							"const": ["LINK", "_LINK_", "LIB", "PATH", "TMP"]
+						},
+						"linkOptions": { "const": "cleared" },
+						"libraryPath": { "const": "fixed-msvc-sdk" },
+						"executableSearchPath": { "const": "fixed-rust-msvc-system" },
+						"temporaryDirectory": { "const": "target/repro-linker-temp" }
+					}
+				},
+				"cargoConfigDiscovery": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"mode",
+						"workingDirectory",
+						"manifestPath",
+						"ancestorConfigFiles",
+						"reparseComponents",
+						"mutationAccess",
+						"revalidation"
+					],
+					"properties": {
+						"mode": { "const": "private-acl-controlled-cwd-explicit-manifest" },
+						"workingDirectory": { "const": "unique-os-known-local-app-data-root" },
+						"manifestPath": { "const": "Cargo.toml" },
+						"ancestorConfigFiles": { "const": "required-absent" },
+						"reparseComponents": { "const": "forbidden" },
+						"mutationAccess": { "const": "read-execute-only" },
+						"revalidation": { "const": "immediately-before-each-cargo-command" }
+					}
+				},
+				"toolDiscovery": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"mode",
+						"inheritedPath",
+						"inheritedProgramFiles",
+						"rustToolchain",
+						"osTools",
+						"externalAttestation"
+					],
+					"properties": {
+						"mode": { "const": "absolute-os-roots-repository-pins-and-authenticode" },
+						"inheritedPath": { "const": "ignored-before-first-external-command" },
+						"inheritedProgramFiles": { "const": "ignored-and-normalized-from-os-special-folders" },
+						"rustToolchain": { "const": "checked-in-file-set-sha256" },
+						"osTools": { "const": "canonical-os-root-valid-authenticode-exact-publisher" },
+						"externalAttestation": { "const": "required" }
+					}
+				},
+				"effective": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"rustFlags",
+						"cargoIncremental",
+						"cargoBuildIncremental",
+						"rustcWrapper",
+						"rustcWorkspaceWrapper",
+						"cargoTargetDirectory"
+					],
+					"properties": {
+						"rustFlags": { "const": "-C link-arg=/Brepro" },
+						"cargoIncremental": { "const": false },
+						"cargoBuildIncremental": { "const": false },
+						"rustcWrapper": { "const": "disabled" },
+						"rustcWorkspaceWrapper": { "const": "disabled" },
+						"cargoTargetDirectory": { "const": "per-build-isolated" }
+					}
+				}
+			}
+		},
+		"buildInputs": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"rustFlags",
+				"rustc",
+				"cargo",
+				"targetTriple",
+				"msvcToolset",
+				"linker",
+				"windowsSdk",
+				"toolTrust",
+				"builder",
+				"environmentPolicy"
+			],
+			"properties": {
+				"rustFlags": { "const": "-C link-arg=/Brepro" },
+				"rustc": { "$ref": "#/$defs/tool" },
+				"cargo": { "$ref": "#/$defs/tool" },
+				"targetTriple": { "const": "x86_64-pc-windows-msvc" },
+				"msvcToolset": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"version",
+						"visualStudioVersion",
+						"runtimeLibrarySha256",
+						"libraryCount",
+						"librarySetSha256"
+					],
+					"properties": {
+						"version": { "type": "string", "pattern": "^\\d+(\\.\\d+)+$" },
+						"visualStudioVersion": { "type": "string", "pattern": "^\\d+(\\.\\d+)+$" },
+						"runtimeLibrarySha256": { "$ref": "#/$defs/sha256" },
+						"libraryCount": { "type": "integer", "minimum": 1 },
+						"librarySetSha256": { "$ref": "#/$defs/sha256" }
+					}
+				},
+				"linker": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["name", "fileVersion", "productVersion", "sha256", "cvtresSha256"],
+					"properties": {
+						"name": { "const": "link.exe" },
+						"fileVersion": { "type": "string", "minLength": 1 },
+						"productVersion": { "type": "string", "minLength": 1 },
+						"sha256": { "$ref": "#/$defs/sha256" },
+						"cvtresSha256": { "$ref": "#/$defs/sha256" }
+					}
+				},
+				"windowsSdk": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"version",
+						"kernel32LibrarySha256",
+						"ucrtLibrarySha256",
+						"umLibraryCount",
+						"umLibrarySetSha256",
+						"ucrtLibraryCount",
+						"ucrtLibrarySetSha256"
+					],
+					"properties": {
+						"version": { "type": "string", "pattern": "^\\d+(\\.\\d+)+$" },
+						"kernel32LibrarySha256": { "$ref": "#/$defs/sha256" },
+						"ucrtLibrarySha256": { "$ref": "#/$defs/sha256" },
+						"umLibraryCount": { "type": "integer", "minimum": 1 },
+						"umLibrarySetSha256": { "$ref": "#/$defs/sha256" },
+						"ucrtLibraryCount": { "type": "integer", "minimum": 1 },
+						"ucrtLibrarySetSha256": { "$ref": "#/$defs/sha256" }
+					}
+				},
+				"toolTrust": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": [
+						"policy",
+						"policySha256",
+						"rustBinaryFileCount",
+						"rustBinarySetSha256",
+						"rustTargetLibraryFileCount",
+						"rustTargetLibrarySetSha256",
+						"git",
+						"vswhere",
+						"linker",
+						"resourceConverter",
+						"externalAuthenticatedRunnerAttestation"
+					],
+					"properties": {
+						"policy": { "const": "repository-reviewed-toolchain-v1" },
+						"policySha256": { "$ref": "#/$defs/sha256" },
+						"rustBinaryFileCount": { "const": 4 },
+						"rustBinarySetSha256": {
+							"const": "bedeb993b32647f92a42b41f34ca57fc9f592c4ef48fc3b7a8ca38aef7348f12"
+						},
+						"rustTargetLibraryFileCount": { "const": 25 },
+						"rustTargetLibrarySetSha256": {
+							"const": "6022fdc2c8064e6bcea4671d66d05cd8fa8ffeb2044739d97431062219f7da3b"
+						},
+						"git": { "$ref": "#/$defs/signedToolIdentity" },
+						"vswhere": { "$ref": "#/$defs/signedToolIdentity" },
+						"linker": { "$ref": "#/$defs/signedToolIdentity" },
+						"resourceConverter": { "$ref": "#/$defs/signedToolIdentity" },
+						"externalAuthenticatedRunnerAttestation": { "const": "required" }
+					}
+				},
+				"builder": { "$ref": "#/$defs/builder" },
+				"environmentPolicy": { "$ref": "#/$defs/environmentPolicy" }
+			}
+		},
+		"signedToolIdentity": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["sha256", "authenticodeStatus", "publisherSubject", "publisherCertificateSha256"],
+			"properties": {
+				"sha256": { "$ref": "#/$defs/sha256" },
+				"authenticodeStatus": { "const": "Valid" },
+				"publisherSubject": { "type": "string", "minLength": 1 },
+				"publisherCertificateSha256": { "$ref": "#/$defs/sha256" }
+			}
+		},
+		"reproducibility": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": [
+				"verified",
+				"buildCount",
+				"buildSha256",
+				"buildArtifacts",
+				"isolatedTargetDirectories",
+				"incremental",
+				"compilerCache"
+			],
+			"properties": {
+				"verified": { "const": true },
+				"buildCount": { "const": 2 },
+				"buildSha256": {
+					"type": "array",
+					"minItems": 2,
+					"maxItems": 2,
+					"items": { "$ref": "#/$defs/sha256" }
+				},
+				"buildArtifacts": {
+					"type": "array",
+					"items": {
+						"enum": [
+							"target/repro-build-1/x86_64-pc-windows-msvc/release/ever-works-windows-job-launcher.exe",
+							"target/repro-build-2/x86_64-pc-windows-msvc/release/ever-works-windows-job-launcher.exe"
+						]
+					},
+					"minItems": 2,
+					"maxItems": 2,
+					"uniqueItems": true
+				},
+				"isolatedTargetDirectories": { "const": true },
+				"incremental": { "const": false },
+				"compilerCache": { "const": "disabled" }
+			}
+		}
+	}
+}

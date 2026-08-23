@@ -13,6 +13,7 @@ import {
 import { Agent, AgentScope, AgentStatus, type AgentTarget } from '../../entities/agent.entity';
 import { AgentMembership } from '../../entities/agent-membership.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
+import { ownershipSqlPredicate, ownershipWhere, type OwnershipScope } from '../ownership-scope';
 
 /**
  * Filter shape for `findByUserIdScoped`. All fields optional — caller
@@ -66,8 +67,19 @@ export class AgentRepository {
         return this.repository.findOne({ where: { id } });
     }
 
-    async findByIdAndUser(id: string, userId: string): Promise<Agent | null> {
-        return this.repository.findOne({ where: { id, userId } });
+    async findByIdAndUser(
+        id: string,
+        userId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Agent | null> {
+        return this.repository.findOne({
+            where: ownershipScope
+                ? ownershipWhere<Agent>(userId, ownershipScope).map((branch) => ({
+                      ...branch,
+                      id,
+                  }))
+                : { id, userId },
+        });
     }
 
     /**
@@ -80,22 +92,29 @@ export class AgentRepository {
         scope: AgentScope,
         slug: string,
         opts: { missionId?: string | null; ideaId?: string | null; workId?: string | null } = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<Agent | null> {
+        const common: FindOptionsWhere<Agent> = {
+            scope,
+            slug,
+            missionId: opts.missionId ?? IsNull(),
+            ideaId: opts.ideaId ?? IsNull(),
+            workId: opts.workId ?? IsNull(),
+        };
         return this.repository.findOne({
-            where: {
-                userId,
-                scope,
-                slug,
-                missionId: opts.missionId ?? IsNull(),
-                ideaId: opts.ideaId ?? IsNull(),
-                workId: opts.workId ?? IsNull(),
-            },
+            where: ownershipScope
+                ? ownershipWhere<Agent>(userId, ownershipScope).map((branch) => ({
+                      ...branch,
+                      ...common,
+                  }))
+                : { userId, ...common },
         });
     }
 
     async findByUserIdScoped(
         userId: string,
         filter: ListAgentsFilter = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<{ rows: Agent[]; total: number }> {
         // Archived Agents are hidden from every catalog surface by
         // default — EXCEPT when the caller explicitly asks for them
@@ -109,6 +128,11 @@ export class AgentRepository {
         const qb = this.repository
             .createQueryBuilder('agent')
             .where('agent.userId = :userId', { userId });
+
+        const ownership = ownershipSqlPredicate('agent', ownershipScope);
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
 
         if (!wantsArchived) {
             qb.andWhere('agent.status != :archived', { archived: AgentStatus.ARCHIVED });

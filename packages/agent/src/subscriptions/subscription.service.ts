@@ -13,6 +13,7 @@ import { config } from '@src/config';
 import { WorkScheduleAllowedCadence } from '@src/dto';
 import { User } from '@src/entities/user.entity';
 import { UserRepository } from '@src/database/repositories/user.repository';
+import { PlanEntitlementRepository } from '@src/database/repositories/plan-entitlement.repository';
 import { WorkScheduleBillingMode, WorkScheduleCadence, SubscriptionPlanCode } from '@src/entities';
 import type { SubscriptionPlanHosting } from '@src/entities/types';
 
@@ -184,6 +185,81 @@ const PLAN_SEED_DATA: Array<{
     },
 ];
 
+/** Display name of a seeded plan by code; the code itself if the seed has no such row. */
+function planDisplayName(code: SubscriptionPlanCode): string {
+    return PLAN_SEED_DATA.find((plan) => plan.code === code)?.displayName ?? code;
+}
+
+/**
+ * "Unlimited" for an entitlement valve.
+ *
+ * The dispatch gate treats ANY value <= 0 as "no ceiling", which is the
+ * same contract the two env-driven concurrency valves already publish
+ * (a limit of 0 disables that valve and skips its count query). -1 is
+ * used in the seed because it reads as a deliberate sentinel rather than
+ * an unset column, matching RETENTION_FOREVER.
+ */
+const ENTITLEMENT_UNLIMITED = -1;
+
+/**
+ * Boot-time entitlement seed. Insert-if-missing - see {@link
+ * SubscriptionService.seedEntitlements} for why this is not an upsert and
+ * why `works-limit` is not here.
+ *
+ * `daily-free-credits` is 50 on EVERY tier because that is what the
+ * pricing page promises on every tier; the paid tiers additionally carry
+ * an accumulating monthly allowance (`subscription_plans.monthlyCredits`).
+ *
+ * `max-concurrent-runs` mirrors the published "concurrent agent sessions"
+ * figure. `free` is intentionally NOT listed: its row already exists at 3
+ * (seeded from CREDITS_FREE_MAX_CONCURRENT_RUNS), the page says 1, and
+ * lowering it would take away something live users already have.
+ */
+export const PLAN_ENTITLEMENT_SEED_DATA: {
+    planId: string;
+    key: string;
+    valueInt: number;
+}[] = [
+    // Daily free credits - universal, matches CREDITS_DAILY_FREE / the page.
+    { planId: SubscriptionPlanCode.FREE, key: 'daily-free-credits', valueInt: 50 },
+    { planId: SubscriptionPlanCode.STANDARD, key: 'daily-free-credits', valueInt: 50 },
+    { planId: SubscriptionPlanCode.PREMIUM, key: 'daily-free-credits', valueInt: 50 },
+    {
+        planId: SubscriptionPlanCode.SELFHOSTED_COMMUNITY,
+        key: 'daily-free-credits',
+        valueInt: 50,
+    },
+    { planId: SubscriptionPlanCode.SELFHOSTED_PRO, key: 'daily-free-credits', valueInt: 50 },
+    {
+        planId: SubscriptionPlanCode.SELFHOSTED_ENTERPRISE,
+        key: 'daily-free-credits',
+        valueInt: 50,
+    },
+
+    // Concurrent agent sessions. free is omitted on purpose (see above).
+    { planId: SubscriptionPlanCode.STANDARD, key: 'max-concurrent-runs', valueInt: 10 },
+    {
+        planId: SubscriptionPlanCode.PREMIUM,
+        key: 'max-concurrent-runs',
+        valueInt: ENTITLEMENT_UNLIMITED,
+    },
+    {
+        planId: SubscriptionPlanCode.SELFHOSTED_COMMUNITY,
+        key: 'max-concurrent-runs',
+        valueInt: 3,
+    },
+    {
+        planId: SubscriptionPlanCode.SELFHOSTED_PRO,
+        key: 'max-concurrent-runs',
+        valueInt: 10,
+    },
+    {
+        planId: SubscriptionPlanCode.SELFHOSTED_ENTERPRISE,
+        key: 'max-concurrent-runs',
+        valueInt: ENTITLEMENT_UNLIMITED,
+    },
+];
+
 @Injectable()
 export class SubscriptionService implements OnModuleInit {
     private readonly logger = new Logger(SubscriptionService.name);
@@ -192,10 +268,12 @@ export class SubscriptionService implements OnModuleInit {
         private readonly planRepository: SubscriptionPlanRepository,
         private readonly userSubscriptionRepository: UserSubscriptionRepository,
         private readonly userRepository: UserRepository,
+        private readonly planEntitlementRepository: PlanEntitlementRepository,
     ) {}
 
     async onModuleInit() {
         await this.seedPlans();
+        await this.seedEntitlements();
     }
 
     async seedPlans() {
@@ -208,6 +286,44 @@ export class SubscriptionService implements OnModuleInit {
                 }),
             ),
         );
+    }
+
+    /**
+     * Per-plan entitlement levers, seeded at boot the same way the plan
+     * catalog is.
+     *
+     * Why boot-time and not another migration: the `free` rows arrived in
+     * the 1783400000000 migration and nothing has written
+     * `plan_entitlements` since, so every PAID plan resolves every lever to
+     * a code fallback. A migration only covers databases that run
+     * migrations; seeding beside {@link seedPlans} covers every environment
+     * on every boot and self-heals a row someone deleted.
+     *
+     * 🛑 INSERT-IF-MISSING, never upsert. Re-writing these at each pod start
+     * would stomp operator tuning and could REDUCE an entitlement a live
+     * user already holds - specifically `free`/`max-concurrent-runs`, which
+     * the migration seeded at 3 while the pricing page advertises 1. The
+     * existing row wins; if the page and the row must agree, change the
+     * page.
+     *
+     * Only keys with a real READER are seeded. `works-limit` is deliberately
+     * absent: it has no consumer anywhere, and the limit it purports to
+     * describe is actually enforced from `subscription_plans.maxWorks`.
+     * Seeding a second, unread source of truth for the same number is how
+     * the two silently diverge.
+     */
+    async seedEntitlements() {
+        const results = await Promise.all(
+            PLAN_ENTITLEMENT_SEED_DATA.map((seed) =>
+                this.planEntitlementRepository.insertIfMissing(seed),
+            ),
+        );
+        const created = results.filter((r) => r.created).length;
+        if (created > 0) {
+            this.logger.log(
+                `Seeded ${created} plan entitlement row(s); ${results.length - created} already present`,
+            );
+        }
     }
 
     isEnabled() {
@@ -234,6 +350,26 @@ export class SubscriptionService implements OnModuleInit {
     async listPlans(): Promise<SubscriptionPlan[]> {
         const plans = await this.planRepository.findAllActive();
         return plans.filter((plan) => plan.hosting !== 'selfhosted');
+    }
+
+    /**
+     * The self-hosted editions, as a SEPARATE list from {@link listPlans}.
+     *
+     * These are commercial licences for a deployment the buyer runs
+     * themselves. They are PURCHASABLE - the $99 perpetual licence is the
+     * only lifetime SKU in the whole catalog - but they are never
+     * self-assignable, and buying one does not change the tier on this
+     * hosted service.
+     *
+     * That is exactly why this is an additive sibling and not a relaxed
+     * filter on `listPlans`: the plan switcher must keep showing only the
+     * three cards a user can actually switch between, or every self-hosted
+     * card becomes a button whose only outcome is the
+     * `changePlanSelfService` rejection.
+     */
+    async listSelfHostedPlans(): Promise<SubscriptionPlan[]> {
+        const plans = await this.planRepository.findAllActive();
+        return plans.filter((plan) => plan.hosting === 'selfhosted');
     }
 
     async getActiveSubscription(userId: string) {
@@ -315,18 +451,26 @@ export class SubscriptionService implements OnModuleInit {
         return billingMode !== WorkScheduleBillingMode.USAGE;
     }
 
+    /**
+     * The plan a user should be told to upgrade to for a cadence their plan
+     * does not allow. Returns the catalog DISPLAY name, resolved from the
+     * seed by plan code, so the copy cannot drift from the plan switcher
+     * again: the tiers were renamed Standard/Premium -> Pro/Enterprise in
+     * the catalog while this string kept recommending plans that no longer
+     * exist under those names (and three e2e specs asserted the stale copy).
+     */
     private recommendationForCadence(cadence: WorkScheduleCadence): string {
         switch (cadence) {
             case WorkScheduleCadence.HOURLY:
             case WorkScheduleCadence.EVERY_3_HOURS:
             case WorkScheduleCadence.EVERY_8_HOURS:
-                return 'Premium';
+                return planDisplayName(SubscriptionPlanCode.PREMIUM);
             case WorkScheduleCadence.EVERY_12_HOURS:
             case WorkScheduleCadence.DAILY:
             case WorkScheduleCadence.WEEKLY:
-                return 'Standard';
+                return planDisplayName(SubscriptionPlanCode.STANDARD);
             default:
-                return 'Free';
+                return planDisplayName(SubscriptionPlanCode.FREE);
         }
     }
 
