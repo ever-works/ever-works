@@ -295,6 +295,9 @@ export async function executeModelProcessInternal(
 				secrets = [credential.value];
 				return credentialBoundaryUnavailableResult(request.provider, Math.max(0, now() - startedAt));
 			}
+			if (platform !== 'win32' || !io.createModelProcessContainment) {
+				return containmentUnavailableResult(request.provider, Math.max(0, now() - startedAt));
+			}
 			const trusted = await withinExecutionDeadline(
 				() => resolveTrustedCommand(request.provider, request.workspacePath, io.commands, platform),
 				deadlineAt,
@@ -342,6 +345,19 @@ export async function executeModelProcessInternal(
 			if (probeBudgetMs <= 0) {
 				return executionDeadlineResult(request.provider, Math.max(0, now() - startedAt));
 			}
+			let probeContainment: ModelProcessContainment;
+			try {
+				probeContainment = await acquireModelProcessContainment(
+					io.createModelProcessContainment,
+					io.spawnFn ?? spawn,
+					deadlineAt,
+					monotonicNow,
+					request.signal
+				);
+			} catch (error) {
+				if (error instanceof ExecutionDeadlineExceeded || error instanceof ExecutionCancelled) throw error;
+				return containmentUnavailableResult(request.provider, Math.max(0, now() - startedAt));
+			}
 
 			const versionRaw = await runProcess(
 				{
@@ -356,7 +372,8 @@ export async function executeModelProcessInternal(
 					monotonicNow,
 					signal: request.signal
 				},
-				io
+				io,
+				probeContainment
 			);
 			const probeResult = resolveCliVersionProbe(
 				request.provider,
@@ -380,9 +397,6 @@ export async function executeModelProcessInternal(
 					Math.max(0, now() - startedAt),
 					'Managed model executable identity changed between its version probe and credentialed run'
 				);
-			}
-			if (platform !== 'win32' || !io.createModelProcessContainment) {
-				return containmentUnavailableResult(request.provider, Math.max(0, now() - startedAt));
 			}
 			let containment: ModelProcessContainment;
 			try {
@@ -994,7 +1008,7 @@ function resolveCliVersionProbe(
 	durationMs: number,
 	secrets: readonly string[]
 ): ModelExecutionResult | { readonly version: string } {
-	if (raw.termination || raw.spawnError) {
+	if (raw.termination || raw.spawnError || raw.terminationFailure) {
 		return toTerminalResult(provider, raw, durationMs, secrets);
 	}
 	const version = parseCliVersion(provider, raw.stdout || raw.stderr);

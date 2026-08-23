@@ -35,6 +35,27 @@ if (providerArgs.length === 1 && providerArgs[0] === '--version') {
 	  if (Object.prototype.hasOwnProperty.call(process.env, key)) versionEnv[key] = process.env[key];
 	}
 	fs.writeFileSync(capturePath + '.version.json', JSON.stringify(versionEnv));
+	if (mode === 'version-detached-tree') {
+	  const authenticatedHome = process.env.CODEX_HOME || process.env.CLAUDE_CONFIG_DIR;
+	  const markerScript = 'setTimeout(() => require("node:fs").writeFileSync(' +
+	    'require("node:path").join(' + JSON.stringify(authenticatedHome) + ', "version-probe-orphan.txt"), ' +
+	    JSON.stringify(authenticatedHome) + '), 750)';
+	  const grandchild = spawn(process.execPath, ['-e', markerScript], {
+	    stdio: 'ignore',
+	    detached: true,
+	    windowsHide: true
+	  });
+	  grandchild.unref();
+	}
+	if (mode === 'version-oversized') {
+	  process.stdout.write('x'.repeat(${2 * 1024 * 1024}));
+	  setInterval(() => {}, 1000);
+	  return;
+	}
+	if (mode === 'version-hang') {
+	  setInterval(() => {}, 1000);
+	  return;
+	}
 	if (mode === 'spoofed-version') {
 	  process.stdout.write('workspace launcher 999.0.0 wrapping codex-cli 0.146.0\n');
 	} else if (mode === 'huge-version') {
@@ -449,9 +470,9 @@ describe('executeModelProcess — real process boundary', () => {
 	);
 
 	it.each(['claude-code', 'codex'] as const)(
-		'accepts a zero-secret local %s session request but fails closed before model spawn without pre-spawn containment',
+		'fails a zero-secret local %s session before an uncontained version probe can retain its authenticated home',
 		async (provider) => {
-			const harness = await createHarness('success');
+			const harness = await createHarness('version-detached-tree');
 			const localSessionRequest = request(provider, harness.workspacePath, {
 				authentication: { kind: 'local-session' },
 				credentialEnv: undefined
@@ -463,11 +484,209 @@ describe('executeModelProcess — real process boundary', () => {
 
 			expect(result.status).toBe('containment-unavailable');
 			expect(result.summary).toMatch(/pre-spawn.*job object|containment.*prerequisite/i);
+			await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_000));
 			await expect(access(harness.capturePath)).rejects.toThrow();
-			const versionEnvironment = await readFile(`${harness.capturePath}.version.json`, 'utf8');
-			expect(versionEnvironment).not.toContain(FAKE_CLAUDE_CREDENTIAL);
-			expect(versionEnvironment).not.toContain(FAKE_CODEX_CREDENTIAL);
+			await expect(access(`${harness.capturePath}.version.json`)).rejects.toThrow();
+			await expect(access(join(harness.localSessionHome, 'version-probe-orphan.txt'))).rejects.toThrow();
 		}
+	);
+
+	it.each(['claude-code', 'codex'] as const)(
+		'closes a dedicated %s version-probe containment before accepting its banner and starting the model',
+		async (provider) => {
+			const harness = await createHarness('success');
+			const baseCreateContainment = harness.io.createModelProcessContainment!;
+			const events: string[] = [];
+			let containmentIndex = 0;
+			const result = await executeModelProcess(request(provider, harness.workspacePath), {
+				...harness.io,
+				beforeSpawn: (purpose) => events.push(`spawn:${purpose}`),
+				createModelProcessContainment: async (spawnFn) => {
+					containmentIndex += 1;
+					const current = containmentIndex;
+					events.push(`create:${current}`);
+					const containment = await baseCreateContainment(spawnFn);
+					return {
+						...containment,
+						close: async () => {
+							const outcome = await containment.close();
+							events.push(`close:${current}:${outcome.verified}`);
+							return outcome;
+						}
+					};
+				}
+			});
+
+			expect(result.status).toBe('succeeded');
+			expect(events).toEqual([
+				'create:1',
+				'spawn:version-probe',
+				'close:1:true',
+				'create:2',
+				'spawn:model',
+				'close:2:true'
+			]);
+		}
+	);
+
+	it.each(['claude-code', 'codex'] as const)(
+		'rejects the %s version banner when probe containment closure is not verified',
+		async (provider) => {
+			const harness = await createHarness('success');
+			const spawnPurposes: string[] = [];
+			let containmentCreations = 0;
+			const result = await executeModelProcess(request(provider, harness.workspacePath), {
+				...harness.io,
+				beforeSpawn: (purpose) => spawnPurposes.push(purpose),
+				createModelProcessContainment: async (spawnFn) => {
+					containmentCreations += 1;
+					return {
+						spawn: spawnFn,
+						close: async () => ({ verified: false, detail: 'probe Job Object close was not verified' })
+					};
+				}
+			});
+
+			expect(result.status).toBe('termination-failed');
+			expect(result.summary).toMatch(/termination.*not.*verified/i);
+			expect(containmentCreations).toBe(1);
+			expect(spawnPurposes).toEqual(['version-probe']);
+			await expect(access(harness.capturePath)).rejects.toThrow();
+		}
+	);
+
+	it.each(['rejects', 'never settles'] as const)(
+		'fails closed and stays bounded when normal version-probe containment closure %s',
+		async (closeMode) => {
+			const harness = await createHarness('success');
+			const spawnPurposes: string[] = [];
+			let containmentCreations = 0;
+			const result = await executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				beforeSpawn: (purpose) => spawnPurposes.push(purpose),
+				createModelProcessContainment: async (spawnFn) => {
+					containmentCreations += 1;
+					return {
+						spawn: spawnFn,
+						close:
+							closeMode === 'rejects'
+								? async () => {
+										throw new Error('probe Job Object close rejected');
+									}
+								: () => new Promise(() => undefined)
+					};
+				}
+			});
+
+			expect(result.status).toBe('termination-failed');
+			expect(containmentCreations).toBe(1);
+			expect(spawnPurposes).toEqual(['version-probe']);
+			await expect(access(harness.capturePath)).rejects.toThrow();
+		},
+		5_000
+	);
+
+	it.runIf(process.platform === 'win32')(
+		'closes version-probe containment on output limit before a model can start',
+		async () => {
+			const harness = await createHarness('version-oversized');
+			const baseCreateContainment = harness.io.createModelProcessContainment!;
+			const spawnPurposes: string[] = [];
+			let containmentCreations = 0;
+			let closeCalls = 0;
+			const result = await executeModelProcess(request('codex', harness.workspacePath), {
+				...harness.io,
+				beforeSpawn: (purpose) => spawnPurposes.push(purpose),
+				createModelProcessContainment: async (spawnFn) => {
+					containmentCreations += 1;
+					const containment = await baseCreateContainment(spawnFn);
+					return {
+						...containment,
+						close: async () => {
+							closeCalls += 1;
+							return containment.close();
+						}
+					};
+				}
+			});
+
+			expect(result).toMatchObject({ status: 'output-limit', outputTruncated: true });
+			expect(containmentCreations).toBe(1);
+			expect(closeCalls).toBe(1);
+			expect(spawnPurposes).toEqual(['version-probe']);
+			await expect(access(harness.capturePath)).rejects.toThrow();
+		},
+		10_000
+	);
+
+	it.runIf(process.platform === 'win32')(
+		'closes version-probe containment on timeout before a model can start',
+		async () => {
+			const harness = await createHarness('version-hang');
+			const baseCreateContainment = harness.io.createModelProcessContainment!;
+			const spawnPurposes: string[] = [];
+			let closeCalls = 0;
+			const result = await executeModelProcess(
+				request('claude-code', harness.workspacePath, { timeoutMs: 500 }),
+				{
+					...harness.io,
+					beforeSpawn: (purpose) => spawnPurposes.push(purpose),
+					createModelProcessContainment: async (spawnFn) => {
+						const containment = await baseCreateContainment(spawnFn);
+						return {
+							...containment,
+							close: async () => {
+								closeCalls += 1;
+								return containment.close();
+							}
+						};
+					}
+				}
+			);
+
+			expect(result.status).toBe('timed-out');
+			expect(closeCalls).toBe(1);
+			expect(spawnPurposes).toEqual(['version-probe']);
+			await expect(access(harness.capturePath)).rejects.toThrow();
+		},
+		10_000
+	);
+
+	it.runIf(process.platform === 'win32')(
+		'closes version-probe containment on AbortSignal cancellation before a model can start',
+		async () => {
+			const harness = await createHarness('version-hang');
+			const baseCreateContainment = harness.io.createModelProcessContainment!;
+			const controller = new AbortController();
+			const spawnPurposes: string[] = [];
+			let closeCalls = 0;
+			const result = await executeModelProcess(
+				request('codex', harness.workspacePath, { signal: controller.signal }),
+				{
+					...harness.io,
+					beforeSpawn: (purpose) => {
+						spawnPurposes.push(purpose);
+						if (purpose === 'version-probe') setTimeout(() => controller.abort(), 50);
+					},
+					createModelProcessContainment: async (spawnFn) => {
+						const containment = await baseCreateContainment(spawnFn);
+						return {
+							...containment,
+							close: async () => {
+								closeCalls += 1;
+								return containment.close();
+							}
+						};
+					}
+				}
+			);
+
+			expect(result.status).toBe('cancelled');
+			expect(closeCalls).toBe(1);
+			expect(spawnPurposes).toEqual(['version-probe']);
+			await expect(access(harness.capturePath)).rejects.toThrow();
+		},
+		10_000
 	);
 
 	it('fails closed before model spawn when pre-spawn Job Object assignment cannot be established', async () => {
@@ -1065,8 +1284,7 @@ if (process.argv.includes('--version')) {
 		expect(result.status).toBe('containment-unavailable');
 		expect(result.summary).toMatch(/containment.*unavailable/i);
 		await expect(access(harness.capturePath)).rejects.toThrow();
-		const versionEnvironment = await readFile(`${harness.capturePath}.version.json`, 'utf8');
-		expect(versionEnvironment).not.toContain(FAKE_CODEX_CREDENTIAL);
+		await expect(access(`${harness.capturePath}.version.json`)).rejects.toThrow();
 		await new Promise((resolve) => setTimeout(resolve, 2_000));
 		await expect(access(harness.markerPath)).rejects.toThrow();
 	}, 10_000);
@@ -1076,6 +1294,7 @@ if (process.argv.includes('--version')) {
 		async () => {
 			const harness = await createHarness('hang-tree');
 			const createBaseContainment = createVerifiedTestContainment();
+			let containmentIndex = 0;
 			try {
 				const result = await executeModelProcess(
 					request('codex', harness.workspacePath, { timeoutMs: 1_000 }),
@@ -1083,7 +1302,9 @@ if (process.argv.includes('--version')) {
 						...harness.io,
 						platform: 'win32',
 						createModelProcessContainment: async (spawnFn) => {
+							containmentIndex += 1;
 							const containment = await createBaseContainment(spawnFn);
+							if (containmentIndex === 1) return containment;
 							return {
 								...containment,
 								close: async () => ({ verified: false, detail: 'Job Object close was not verified' })
@@ -1128,13 +1349,16 @@ if (process.argv.includes('--version')) {
 		async () => {
 			const harness = await createHarness('hang-tree');
 			const createBaseContainment = createVerifiedTestContainment();
+			let containmentIndex = 0;
 			let execution: Promise<Awaited<ReturnType<typeof executeModelProcess>>> | null = null;
 			try {
 				execution = executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
 					...harness.io,
 					platform: 'win32',
 					createModelProcessContainment: async (spawnFn) => {
+						containmentIndex += 1;
 						const containment = await createBaseContainment(spawnFn);
+						if (containmentIndex === 1) return containment;
 						return { ...containment, close: () => new Promise(() => undefined) };
 					}
 				});
@@ -1163,6 +1387,7 @@ if (process.argv.includes('--version')) {
 		async () => {
 			const harness = await createHarness('hang-tree');
 			const createBaseContainment = createVerifiedTestContainment();
+			let containmentIndex = 0;
 			try {
 				const result = await executeModelProcess(
 					request('codex', harness.workspacePath, { timeoutMs: 1_000 }),
@@ -1171,7 +1396,9 @@ if (process.argv.includes('--version')) {
 						parentEnv: { ...process.env, HTTP_PROXY: 'http://token-only@proxy.corp:8080' },
 						platform: 'win32',
 						createModelProcessContainment: async (spawnFn) => {
+							containmentIndex += 1;
 							const containment = await createBaseContainment(spawnFn);
+							if (containmentIndex === 1) return containment;
 							return {
 								...containment,
 								close: async () => ({ verified: false, detail: 'Job Object close failed safely' })
