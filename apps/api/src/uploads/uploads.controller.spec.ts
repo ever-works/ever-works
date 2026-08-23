@@ -6,13 +6,30 @@
 jest.mock('@ever-works/agent/database', () => ({
     UserUploadRepository: class {},
     WorkRepository: class {},
+    ownershipScopeMatches: (
+        row: { tenantId?: string | null; organizationId?: string | null },
+        scope?: { tenantId: string | null; organizationId: string | null },
+    ) => {
+        if (!scope) return true;
+        const tenantId = row.tenantId ?? null;
+        const organizationId = row.organizationId ?? null;
+        if (scope.organizationId) {
+            return tenantId === scope.tenantId && organizationId === scope.organizationId;
+        }
+        return (
+            organizationId === null &&
+            (tenantId === scope.tenantId || (scope.tenantId !== null && tenantId === null))
+        );
+    },
 }));
 
-import { BadRequestException, HttpStatus, Logger } from '@nestjs/common';
+import { BadRequestException, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import { SELF_DECLARED_DEPS_METADATA } from '@nestjs/common/constants';
 import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Test } from '@nestjs/testing';
+import { UserUploadRepository, WorkRepository } from '@ever-works/agent/database';
 import { UploadsController } from './uploads.controller';
 import { UploadsService } from './uploads.service';
 import { LocalFsStoragePlugin } from '@ever-works/local-fs-plugin';
@@ -20,6 +37,7 @@ import type { PluginContext } from '@ever-works/plugin';
 import type { AnonymousAuthService } from '../auth/services/anonymous-auth.service';
 import type { AuthProvider } from '../auth/providers/auth-provider.abstract';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { ScopeContextService } from '../scope/scope-context.service';
 
 const stubContext = (id: string): PluginContext => {
     const log = new Logger(`StoragePlugin/${id}`);
@@ -103,6 +121,29 @@ describe('UploadsController', () => {
     let root: string;
     let controller: UploadsController;
     let service: UploadsService;
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+    const yoScope = {
+        tenantId: everScope.tenantId,
+        organizationId: '33333333-3333-4333-8333-333333333333',
+    };
+    const workId = '44444444-4444-4444-8444-444444444444';
+
+    it('declares concrete Nest injection tokens for optional ownership repositories', () => {
+        const tokens = Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, UploadsController) ?? [];
+
+        expect(tokens).toEqual(
+            expect.arrayContaining([
+                { index: 3, param: WorkRepository },
+                { index: 4, param: UserUploadRepository },
+            ]),
+        );
+        expect(Reflect.getMetadata('design:paramtypes', UploadsController)[5]).toBe(
+            ScopeContextService,
+        );
+    });
 
     beforeEach(async () => {
         root = resolve(
@@ -129,8 +170,30 @@ describe('UploadsController', () => {
         const authProviderStub = {
             authenticate: async () => null,
         } as unknown as AuthProvider;
-        controller = new UploadsController(service, anonStub, authProviderStub);
+        controller = new UploadsController(
+            service,
+            anonStub,
+            authProviderStub,
+            undefined,
+            undefined,
+            { getScope: () => ({ tenantId: null, organizationId: null }) } as never,
+        );
     });
+
+    function workScopedController(
+        scope: object,
+        work: object | null,
+        userUploads?: { findOwnedByUser: jest.Mock },
+    ) {
+        return new UploadsController(
+            service,
+            {} as never,
+            { authenticate: jest.fn().mockResolvedValue(null) } as never,
+            { findById: jest.fn().mockResolvedValue(work) } as never,
+            userUploads as never,
+            { getScope: () => scope } as never,
+        );
+    }
 
     afterEach(async () => {
         try {
@@ -169,18 +232,49 @@ describe('UploadsController', () => {
             expect(r.mimeType).toBe('image/png');
             expect(r.url).toContain('/api/uploads/');
         });
+
+        it('opaque-404s a same-user known Yo Work before associating an image in Ever', async () => {
+            const saveImage = jest.spyOn(service, 'saveImage');
+            const scoped = workScopedController(everScope, {
+                id: workId,
+                userId: mkAuth().userId,
+                ...yoScope,
+            });
+
+            await expect(scoped.upload(mkAuth(), mkFile({}), workId)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(saveImage).not.toHaveBeenCalled();
+        });
+
+        it('opaque-404s a same-user known Yo Work before associating a general file in Ever', async () => {
+            const saveFile = jest.spyOn(service, 'saveFile');
+            const scoped = workScopedController(everScope, {
+                id: workId,
+                userId: mkAuth().userId,
+                ...yoScope,
+            });
+
+            await expect(scoped.uploadFile(mkAuth(), mkFile({}), workId)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(saveFile).not.toHaveBeenCalled();
+        });
+
+        it('allows a legacy personal Work from explicit personal scope', async () => {
+            const personalScope = { tenantId: everScope.tenantId, organizationId: null };
+            const result = await workScopedController(personalScope, {
+                id: workId,
+                userId: mkAuth().userId,
+                tenantId: null,
+                organizationId: null,
+            }).upload(mkAuth(), mkFile({}), workId);
+
+            expect(result.id).toMatch(/^[a-f0-9]{64}$/);
+        });
     });
 
     describe('GET /api/uploads/:userId/:filename', () => {
-        const everScope = {
-            tenantId: '11111111-1111-4111-8111-111111111111',
-            organizationId: '22222222-2222-4222-8222-222222222222',
-        };
-        const yoScope = {
-            tenantId: everScope.tenantId,
-            organizationId: '33333333-3333-4333-8333-333333333333',
-        };
-
         function guardedController(userUploads: { findOwnedByUser: jest.Mock }, scope: object) {
             return new UploadsController(
                 service,
@@ -305,6 +399,61 @@ describe('UploadsController', () => {
                 owner.userId,
                 personalScope,
             );
+            expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
+        });
+
+        it('opaque-404s an Ever upload whose same-user Work exists only in Yo before reading bytes', async () => {
+            const owner = mkAuth();
+            const stored = await controller.upload(owner, mkFile({}));
+            const userUploads = {
+                findOwnedByUser: jest.fn().mockResolvedValue({
+                    sha256: stored.id,
+                    userId: owner.userId,
+                    workId,
+                    ...everScope,
+                }),
+            };
+            const scoped = workScopedController(
+                everScope,
+                { id: workId, userId: owner.userId, ...yoScope },
+                userUploads,
+            );
+            const readFile = jest.spyOn(service, 'readFile');
+            const { res } = mkRes();
+
+            await expect(
+                scoped.serve(owner, owner.userId, stored.filename, res, workId),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(readFile).not.toHaveBeenCalled();
+        });
+
+        it('serves a legacy personal upload associated with a legacy personal Work', async () => {
+            const owner = mkAuth();
+            const stored = await controller.upload(owner, mkFile({}));
+            const personalScope = { tenantId: everScope.tenantId, organizationId: null };
+            const userUploads = {
+                findOwnedByUser: jest.fn().mockResolvedValue({
+                    sha256: stored.id,
+                    userId: owner.userId,
+                    workId,
+                    tenantId: null,
+                    organizationId: null,
+                }),
+            };
+            const scoped = workScopedController(
+                personalScope,
+                {
+                    id: workId,
+                    userId: owner.userId,
+                    tenantId: null,
+                    organizationId: null,
+                },
+                userUploads,
+            );
+            const { res, calls } = mkRes();
+
+            await scoped.serve(owner, owner.userId, stored.filename, res, workId);
+
             expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
         });
     });

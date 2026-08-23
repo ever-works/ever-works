@@ -137,17 +137,25 @@ function build(overrides: { goal?: Partial<Goal> } = {}) {
         ),
     };
     const tasksService = {
-        create: jest.fn(async (userId: string, input: any) => {
-            const task = {
-                id: `task-${tasks._rows.length + 1}`,
-                slug: `T-${tasks._rows.length + 1}`,
-                userId,
-                createdAt: new Date(Date.now() + tasks._rows.length),
-                ...input,
-            };
-            tasks._rows.push(task);
-            return task;
-        }),
+        create: jest.fn(
+            async (
+                userId: string,
+                input: any,
+                scope?: { tenantId: string | null; organizationId: string | null },
+            ) => {
+                const task = {
+                    id: `task-${tasks._rows.length + 1}`,
+                    slug: `T-${tasks._rows.length + 1}`,
+                    userId,
+                    createdAt: new Date(Date.now() + tasks._rows.length),
+                    tenantId: scope?.tenantId ?? null,
+                    organizationId: scope?.organizationId ?? null,
+                    ...input,
+                };
+                tasks._rows.push(task);
+                return task;
+            },
+        ),
     };
     const transitions = {
         dispatchAgentRun: jest.fn(async () => ({
@@ -587,6 +595,7 @@ describe('GoalOrchestratorService — advance', () => {
                 agentId: 'agent-7',
                 labels: ['goal-iteration'],
             }),
+            { tenantId: null, organizationId: null },
         );
         // The brief handed to the agent is built from persisted state, so
         // the open criterion and the session budget must both be in it.
@@ -610,7 +619,7 @@ describe('GoalOrchestratorService — advance', () => {
 
     it('routes a pinned known Agent UUID only through the Goal persisted Ever scope', async () => {
         const assignedAgentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
-        const { service, agents, transitions } = build({
+        const { service, agents, tasksService, transitions } = build({
             goal: {
                 loopStatus: 'running',
                 assignedAgentId,
@@ -622,9 +631,14 @@ describe('GoalOrchestratorService — advance', () => {
 
         expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', everScope);
         expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
-            expect.anything(),
+            expect.objectContaining(everScope),
             assignedAgentId,
             expect.anything(),
+        );
+        expect(tasksService.create).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ goalId: 'g1', agentId: assignedAgentId }),
+            everScope,
         );
     });
 

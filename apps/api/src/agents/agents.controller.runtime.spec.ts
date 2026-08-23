@@ -96,7 +96,14 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
         organizationId: '22222222-2222-4222-8222-222222222222',
     };
 
-    function scopedController(options: { steering?: any; dispatchGate?: any } = {}) {
+    function scopedController(
+        options: {
+            steering?: any;
+            dispatchGate?: any;
+            scope?: { tenantId: string | null; organizationId: string | null };
+            scopeError?: Error;
+        } = {},
+    ) {
         return new AgentsController(
             service,
             files,
@@ -114,7 +121,12 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             options.dispatchGate,
             undefined,
             options.steering,
-            { getScope: () => everScope } as never,
+            {
+                getScope: () => {
+                    if (options.scopeError) throw options.scopeError;
+                    return options.scope ?? everScope;
+                },
+            } as never,
         );
     }
 
@@ -331,6 +343,55 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 0,
                 everScope,
             );
+        });
+
+        it('shows an Ever heartbeat session in Ever but excludes it from explicit personal scope', async () => {
+            const heartbeat = {
+                id: runId,
+                agentId,
+                userId: 'u1',
+                status: 'queued',
+                triggerKind: 'heartbeat',
+                taskId: null,
+                workId: null,
+                tenantId: everScope.tenantId,
+                organizationId: everScope.organizationId,
+                createdAt: new Date('2026-08-23T00:00:00.000Z'),
+            };
+            agentRuns.listSessionsForUser.mockImplementation(
+                async (
+                    _userId: string,
+                    _filter: object,
+                    _limit: number,
+                    _offset: number,
+                    scope?: typeof everScope,
+                ) =>
+                    scope?.tenantId === heartbeat.tenantId &&
+                    scope.organizationId === heartbeat.organizationId
+                        ? [[heartbeat], 1]
+                        : [[], 0],
+            );
+
+            const ever = await scopedController().listRunSessions(auth, { kind: 'heartbeat' });
+            const personal = await scopedController({
+                scope: { tenantId: everScope.tenantId, organizationId: null },
+            }).listRunSessions(auth, { kind: 'heartbeat' });
+
+            expect(ever.data).toEqual([
+                expect.objectContaining({ triggerKind: 'heartbeat', ...everScope }),
+            ]);
+            expect(personal.data).toEqual([]);
+        });
+
+        it('does not query heartbeat sessions when revoked membership blocks active-scope resolution', async () => {
+            const revoked = new NotFoundException('Organization not found.');
+
+            await expect(
+                scopedController({ scopeError: revoked }).listRunSessions(auth, {
+                    kind: 'heartbeat',
+                }),
+            ).rejects.toBe(revoked);
+            expect(agentRuns.listSessionsForUser).not.toHaveBeenCalled();
         });
 
         it('is owner-scoped at the repository layer — userId always comes from auth', async () => {

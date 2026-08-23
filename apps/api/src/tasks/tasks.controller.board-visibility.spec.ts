@@ -43,6 +43,7 @@ describe('TasksController — includeHidden query mapping', () => {
             {} as never,
             {} as never,
             {} as never,
+            undefined as never,
         );
         return { controller, list };
     }

@@ -816,17 +816,21 @@ export class GoalOrchestratorService {
             metadata: { reasonCode: decision.reasonCode },
         });
 
-        const task = await this.tasksService.create(goal.userId, {
-            title: `[Goal] ${goal.title} — iteration ${iteration}`,
-            description: this.buildIterationBrief(goal, iteration),
-            status: TaskStatus.TODO,
-            priority: TaskPriority.P2,
-            labels: [GOAL_ITERATION_LABEL],
-            goalId: goal.id,
-            agentId,
-            createdByType: 'user',
-            createdById: goal.userId,
-        });
+        const task = await this.tasksService.create(
+            goal.userId,
+            {
+                title: `[Goal] ${goal.title} — iteration ${iteration}`,
+                description: this.buildIterationBrief(goal, iteration),
+                status: TaskStatus.TODO,
+                priority: TaskPriority.P2,
+                labels: [GOAL_ITERATION_LABEL],
+                goalId: goal.id,
+                agentId,
+                createdByType: 'user',
+                createdById: goal.userId,
+            },
+            ownershipScopeOf(goal),
+        );
 
         const dispatch = await this.transitions.dispatchAgentRun(task, agentId, {
             // Keyed on the iteration, so a double tick of the cron cannot

@@ -50,6 +50,7 @@ import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 import { DecisionConflictService } from '@ever-works/agent/services';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { ScopeContextService } from '../scope/scope-context.service';
 import {
     AddApproverDto,
     AddAssigneeDto,
@@ -133,6 +134,10 @@ export class TasksController {
         private readonly escalations: AgentEscalationService,
         // Kanban run cockpit (plan 04 M5/M6) — PR status pill + diff sheet.
         private readonly prInsights: TaskPrStatusService,
+        // Board run routes must use the active request scope, not only the
+        // authenticated user. Kept immediately before the optional tail so
+        // Nest treats this as a required production dependency.
+        private readonly scopeContext: ScopeContextService,
         // Tasks upgrades — per-Task activity feed. Appended LAST +
         // @Optional() so every existing positional construction in the
         // specs keeps compiling; the endpoint degrades to an empty feed
@@ -254,6 +259,7 @@ export class TasksController {
         return this.service.runTasksBatch(
             auth.userId,
             body.items.map((item) => ({ taskId: item.taskId, agentId: item.agentId ?? null })),
+            this.scopeContext.getScope(),
         );
     }
 
@@ -453,7 +459,13 @@ export class TasksController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        return { data: await this.service.listRunCandidates(auth.userId, id) };
+        return {
+            data: await this.service.listRunCandidates(
+                auth.userId,
+                id,
+                this.scopeContext.getScope(),
+            ),
+        };
     }
 
     @Post(':id/run')
@@ -468,7 +480,12 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: RunTaskDto,
     ) {
-        return this.service.runTask(auth.userId, id, { agentId: body?.agentId ?? null });
+        return this.service.runTask(
+            auth.userId,
+            id,
+            { agentId: body?.agentId ?? null },
+            this.scopeContext.getScope(),
+        );
     }
 
     // ── PR insights (kanban M5 / M6) ──────────────────────────────

@@ -398,6 +398,8 @@ export class TaskTransitionService {
                               triggerKind: 'task',
                               taskId: task.id,
                               workId: task.workId ?? null,
+                              tenantId: task.tenantId ?? null,
+                              organizationId: task.organizationId ?? null,
                               queuedReason: verdict.admitted
                                   ? null
                                   : (verdict.queuedReason ?? 'concurrency-limit'),

@@ -77,6 +77,15 @@ function makeService(overrides: Record<string, any> = {}) {
         ideas: {
             findByIdForUser: jest.fn(),
         },
+        agents: {
+            findByIdAndUser: jest.fn(),
+        },
+        teams: {
+            findOne: jest.fn(),
+        },
+        goals: {
+            findOne: jest.fn(),
+        },
         ...overrides,
     };
 
@@ -91,12 +100,14 @@ function makeService(overrides: Record<string, any> = {}) {
         repos.transitions as any,
         undefined,
         repos.attachments as any,
-        undefined,
+        repos.agents as any,
         undefined,
         repos.workUploads as any,
         repos.works as any,
         repos.missions as any,
         repos.ideas as any,
+        repos.teams as any,
+        repos.goals as any,
     );
 
     return { service, repos };
@@ -201,6 +212,48 @@ describe('TasksService authorization guardrails', () => {
         expect(repos.tasks.create).toHaveBeenCalledWith(
             expect.objectContaining({ userId: 'user-1', workId: 'work-1' }),
         );
+    });
+
+    it('stamps an explicit Goal background scope and validates its Agent in that same scope', async () => {
+        const created = makeTask({ id: 'task-created', goalId: 'goal-ever', ...everScope });
+        const { service, repos } = makeService();
+        repos.goals.findOne.mockResolvedValueOnce({
+            id: 'goal-ever',
+            userId: 'user-1',
+            ...everScope,
+        });
+        repos.agents.findByIdAndUser.mockResolvedValueOnce({
+            id: 'agent-ever',
+            userId: 'user-1',
+            ...everScope,
+        });
+        repos.tasks.create.mockResolvedValueOnce(created);
+
+        await expect(
+            service.create(
+                'user-1',
+                {
+                    title: 'Goal iteration',
+                    goalId: 'goal-ever',
+                    agentId: 'agent-ever',
+                    createdByType: 'user',
+                    createdById: 'user-1',
+                },
+                everScope,
+            ),
+        ).resolves.toEqual(created);
+
+        expect(repos.agents.findByIdAndUser).toHaveBeenCalledWith(
+            'agent-ever',
+            'user-1',
+            everScope,
+        );
+        expect(repos.goals.findOne).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: [{ id: 'goal-ever', userId: 'user-1', ...everScope }],
+            }),
+        );
+        expect(repos.tasks.create).toHaveBeenCalledWith(expect.objectContaining(everScope));
     });
 
     it('rejects Mission-scoped task creation when the Mission is not owned by the user', async () => {

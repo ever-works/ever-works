@@ -20,7 +20,11 @@ import {
     UploadedFile,
     UseInterceptors,
 } from '@nestjs/common';
-import { UserUploadRepository, WorkRepository } from '@ever-works/agent/database';
+import {
+    UserUploadRepository,
+    WorkRepository,
+    ownershipScopeMatches,
+} from '@ever-works/agent/database';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
@@ -76,9 +80,16 @@ export class UploadsController {
         // victim's GitHub credentials. WorkRepository is `@Optional()`
         // for unit tests that don't exercise the workId path; the
         // module provides it in production.
-        @Optional() private readonly workRepository?: WorkRepository,
-        @Optional() private readonly userUploads?: UserUploadRepository,
-        @Optional() private readonly scopeContext?: ScopeContextService,
+        @Optional()
+        @Inject(WorkRepository)
+        private readonly workRepository: WorkRepository | undefined,
+        @Optional()
+        @Inject(UserUploadRepository)
+        private readonly userUploads: UserUploadRepository | undefined,
+        // Every authenticated attach/read path needs an authoritative request
+        // scope. Unlike the repositories above, this must fail Nest startup if
+        // request-scope plumbing is absent rather than degrading to user-only.
+        private readonly scopeContext: ScopeContextService,
     ) {}
 
     /**
@@ -229,7 +240,11 @@ export class UploadsController {
             });
         }
         const work = await this.workRepository.findById(workId);
-        if (!work || work.userId !== userId) {
+        if (
+            !work ||
+            work.userId !== userId ||
+            !ownershipScopeMatches(work, this.scopeContext.getScope())
+        ) {
             throw new NotFoundException({
                 status: 'error',
                 message: 'Work not found',
@@ -482,7 +497,7 @@ export class UploadsController {
         // centralized ownership predicate in UserUploadRepository.
         if (this.userUploads) {
             const match = /^([0-9a-f]{64})(?:\.|$)/i.exec(filename);
-            const scope = this.scopeContext?.getScope();
+            const scope = this.scopeContext.getScope();
             const upload = match
                 ? await this.userUploads.findOwnedByUser(match[1].toLowerCase(), userId, scope)
                 : null;

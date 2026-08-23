@@ -42,7 +42,12 @@ import { TaskNotificationService } from './task-notification.service';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
-import { ownershipScopeMatches, type OwnershipScope } from '../database/ownership-scope';
+import {
+    ownershipScopeMatches,
+    ownershipStamp,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../database/ownership-scope';
 
 export interface CreateTaskInput {
     title: string;
@@ -467,12 +472,16 @@ export class TasksService {
         };
     }
 
-    async create(userId: string, input: CreateTaskInput): Promise<Task> {
+    async create(
+        userId: string,
+        input: CreateTaskInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<Task> {
         // Ownership is deliberately NOT exclusive. A Task may belong to a
         // Work and a Team and have been raised by a Mission at the same
         // time; the previous "exactly zero or one of missionId/ideaId/workId"
         // rule made that impossible to express.
-        await this.assertScopeReachable(userId, input);
+        await this.assertScopeReachable(userId, input, ownershipScope);
         this.assertTitle(input.title);
         if (input.description) assertNoSecrets(input.description, 'task.description');
 
@@ -533,6 +542,7 @@ export class TasksService {
 
         const created = await this.tasks.create({
             userId,
+            ...ownershipStamp(ownershipScope),
             slug,
             title: input.title.trim(),
             description: input.description ?? null,
@@ -867,8 +877,12 @@ export class TasksService {
      * failure degrades to the candidates gathered so far, so the picker
      * still opens with whatever is knowable).
      */
-    async listRunCandidates(userId: string, taskId: string): Promise<RunCandidateAgent[]> {
-        const task = await this.getOne(userId, taskId);
+    async listRunCandidates(
+        userId: string,
+        taskId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<RunCandidateAgent[]> {
+        const task = await this.getOne(userId, taskId, ownershipScope);
         const out = new Map<string, RunCandidateAgent>();
 
         const push = (id: string, source: RunCandidateAgent['source'], agent?: Agent | null) => {
@@ -886,7 +900,9 @@ export class TasksService {
             const assigned = await this.assignees.findAgentAssignees(taskId);
             for (const row of assigned) {
                 const agent = this.agents
-                    ? await this.agents.findByIdAndUser(row.assigneeId, userId).catch(() => null)
+                    ? await this.agents
+                          .findByIdAndUser(row.assigneeId, userId, ownershipScope)
+                          .catch(() => null)
                     : null;
                 // An assignee row whose Agent is gone (or belongs to
                 // someone else) is not a candidate — the picker must
@@ -898,16 +914,22 @@ export class TasksService {
         }
 
         if (task.agentId && this.agents) {
-            const agent = await this.agents.findByIdAndUser(task.agentId, userId).catch(() => null);
+            const agent = await this.agents
+                .findByIdAndUser(task.agentId, userId, ownershipScope)
+                .catch(() => null);
             if (agent) push(task.agentId, 'task', agent);
         }
 
         if (task.workId && this.agents) {
             try {
-                const { rows } = await this.agents.findByUserIdScoped(userId, {
-                    workId: task.workId,
-                    limit: 25,
-                });
+                const { rows } = await this.agents.findByUserIdScoped(
+                    userId,
+                    {
+                        workId: task.workId,
+                        limit: 25,
+                    },
+                    ownershipScope,
+                );
                 for (const agent of rows) push(agent.id, 'work-default', agent);
             } catch (err) {
                 this.logger.warn(`Run candidates: Work-agent lookup failed for ${taskId}: ${err}`);
@@ -936,13 +958,19 @@ export class TasksService {
         userId: string,
         taskId: string,
         opts: { agentId?: string | null } = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<RunTaskResult> {
-        const task = await this.getOne(userId, taskId);
-        const agentId = await this.resolveRunAgentId(userId, taskId, opts.agentId ?? null);
+        const task = await this.getOne(userId, taskId, ownershipScope);
+        const agentId = await this.resolveRunAgentId(
+            userId,
+            taskId,
+            opts.agentId ?? null,
+            ownershipScope,
+        );
 
         if (this.agentRuns) {
             const inFlight = await this.agentRuns
-                .findInFlightForTaskAgent(taskId, agentId)
+                .findInFlightForTaskAgent(taskId, agentId, userId, ownershipScope)
                 .catch(() => null);
             if (inFlight) {
                 throw new ConflictException({
@@ -991,6 +1019,7 @@ export class TasksService {
     async runTasksBatch(
         userId: string,
         items: { taskId: string; agentId?: string | null }[],
+        ownershipScope?: OwnershipScope,
     ): Promise<{ results: RunBatchItemResult[] }> {
         if (!Array.isArray(items) || items.length === 0) {
             throw new BadRequestException('At least one task is required.');
@@ -1003,7 +1032,12 @@ export class TasksService {
         const results: RunBatchItemResult[] = [];
         for (const item of items) {
             try {
-                const run = await this.runTask(userId, item.taskId, { agentId: item.agentId });
+                const run = await this.runTask(
+                    userId,
+                    item.taskId,
+                    { agentId: item.agentId },
+                    ownershipScope,
+                );
                 results.push({ taskId: item.taskId, ok: true, run });
             } catch (err) {
                 results.push({
@@ -1024,13 +1058,18 @@ export class TasksService {
         userId: string,
         taskId: string,
         explicitAgentId: string | null,
+        ownershipScope?: OwnershipScope,
     ): Promise<string> {
         if (explicitAgentId) {
             if (!this.agents) {
                 throw new BadRequestException('Agent repository not wired in this context.');
             }
-            const agent = await this.agents.findByIdAndUser(explicitAgentId, userId);
-            if (!agent) {
+            const agent = await this.agents.findByIdAndUser(
+                explicitAgentId,
+                userId,
+                ownershipScope,
+            );
+            if (!agent || !ownershipScopeMatches(agent, ownershipScope)) {
                 // 400 (not 404) and no existence leak: from the caller's
                 // side an id they do not own and an id that never existed
                 // are the same unusable input.
@@ -1042,7 +1081,7 @@ export class TasksService {
             return explicitAgentId;
         }
 
-        const candidates = await this.listRunCandidates(userId, taskId);
+        const candidates = await this.listRunCandidates(userId, taskId, ownershipScope);
         if (candidates.length === 1) return candidates[0].id;
         if (candidates.length === 0) {
             throw new BadRequestException({
@@ -1340,13 +1379,17 @@ export class TasksService {
         }
     }
 
-    private async assertScopeReachable(userId: string, input: CreateTaskInput): Promise<void> {
+    private async assertScopeReachable(
+        userId: string,
+        input: CreateTaskInput,
+        ownershipScope?: OwnershipScope,
+    ): Promise<void> {
         if (input.workId) {
             if (!this.works) {
                 throw new BadRequestException('Work repository not wired in this context.');
             }
             const work = await this.works.findById(input.workId);
-            if (!work || work.userId !== userId) {
+            if (!work || work.userId !== userId || !ownershipScopeMatches(work, ownershipScope)) {
                 throw new BadRequestException(`Work ${input.workId} not found.`);
             }
         }
@@ -1355,7 +1398,9 @@ export class TasksService {
                 throw new BadRequestException('Mission repository not wired in this context.');
             }
             const mission = await this.missions.findOne({
-                where: { id: input.missionId, userId },
+                where: ownershipWhereWith<Mission>(userId, ownershipScope, {
+                    id: input.missionId,
+                }),
                 select: ['id', 'userId'],
             });
             if (!mission) {
@@ -1367,7 +1412,7 @@ export class TasksService {
                 throw new BadRequestException('Idea repository not wired in this context.');
             }
             const idea = await this.ideas.findByIdForUser(input.ideaId, userId);
-            if (!idea) {
+            if (!idea || !ownershipScopeMatches(idea, ownershipScope)) {
                 throw new BadRequestException(`Idea ${input.ideaId} not found.`);
             }
         }
@@ -1382,7 +1427,7 @@ export class TasksService {
                 throw new BadRequestException('Team repository not wired in this context.');
             }
             const team = await this.teams.findOne({
-                where: { id: input.teamId, userId },
+                where: ownershipWhereWith<Team>(userId, ownershipScope, { id: input.teamId }),
                 select: ['id'],
             });
             if (!team) {
@@ -1393,8 +1438,8 @@ export class TasksService {
             if (!this.agents) {
                 throw new BadRequestException('Agent repository not wired in this context.');
             }
-            const agent = await this.agents.findByIdAndUser(input.agentId, userId);
-            if (!agent) {
+            const agent = await this.agents.findByIdAndUser(input.agentId, userId, ownershipScope);
+            if (!agent || !ownershipScopeMatches(agent, ownershipScope)) {
                 throw new BadRequestException(`Agent ${input.agentId} not found.`);
             }
         }
@@ -1403,7 +1448,7 @@ export class TasksService {
                 throw new BadRequestException('Goal repository not wired in this context.');
             }
             const goal = await this.goals.findOne({
-                where: { id: input.goalId, userId },
+                where: ownershipWhereWith<Goal>(userId, ownershipScope, { id: input.goalId }),
                 select: ['id'],
             });
             if (!goal) {

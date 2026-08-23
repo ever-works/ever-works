@@ -336,6 +336,21 @@ describe('AgentRunRepository — terminal transitions', () => {
             );
         });
 
+        it('applies that same exact Organization predicate to scheduled heartbeat sessions', async () => {
+            await runs.listSessionsForUser('u1', { triggerKind: 'heartbeat' }, 25, 0, everScope);
+
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith('run.triggerKind = :triggerKind', {
+                triggerKind: 'heartbeat',
+            });
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+                '(run.tenantId = :ownershipTenantId AND run.organizationId = :ownershipOrganizationId)',
+                {
+                    ownershipTenantId: everScope.tenantId,
+                    ownershipOrganizationId: everScope.organizationId,
+                },
+            );
+        });
+
         it('keeps explicit personal scope separate from both Organizations', async () => {
             await runs.listSessionsForUser('u1', {}, 25, 0, {
                 tenantId: everScope.tenantId,
