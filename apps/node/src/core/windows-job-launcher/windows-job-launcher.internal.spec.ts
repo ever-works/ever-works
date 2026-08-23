@@ -179,6 +179,26 @@ describe('internal Windows Job launcher adapter', () => {
 		expect(fake.messages.filter((message) => message.kind === ClientMessageKind.Cancel)).toHaveLength(1);
 	});
 
+	it.each([
+		['output-limit', 'WINDOWS_JOB_OUTPUT_LIMIT'],
+		['protocol-error', 'WINDOWS_JOB_PROTOCOL_ERROR']
+	] as const)('rejects a verified helper %s completion instead of treating it as success', async (status, code) => {
+		const fake = new FakeHelper();
+		fake.onMessage = (message) => {
+			if (message.kind === ClientMessageKind.Launch) {
+				fake.send(launched(78));
+			}
+		};
+		const run = await launchWindowsJobInternal(
+			{ helperPath: String.raw`C:\trusted\helper.exe`, ...request() },
+			dependencies(() => fake)
+		);
+
+		fake.send(completed(verifiedCompletion({ status, rootPid: 78, exitCode: undefined })));
+
+		await expect(run.completion).rejects.toMatchObject({ code });
+	});
+
 	it('rejects completion unless the root PID matches and both job counters prove empty', async () => {
 		const fake = new FakeHelper();
 		fake.onMessage = (message) => {
@@ -194,6 +214,23 @@ describe('internal Windows Job launcher adapter', () => {
 		fake.send(completed(verifiedCompletion({ rootPid: 52, processIds: [999] })));
 		await expect(run.completion).rejects.toMatchObject({ code: 'WINDOWS_JOB_UNVERIFIED' });
 		expect(String(await run.completion.catch((error: unknown) => error))).not.toContain('fixture-secret-marker');
+	});
+
+	it('rejects a verified exited completion that omits the root DWORD exit code', async () => {
+		const fake = new FakeHelper();
+		fake.onMessage = (message) => {
+			if (message.kind === ClientMessageKind.Launch) {
+				fake.send(launched(53));
+			}
+		};
+		const run = await launchWindowsJobInternal(
+			{ helperPath: String.raw`C:\trusted\helper.exe`, ...request() },
+			dependencies(() => fake)
+		);
+
+		fake.send(completed(verifiedCompletion({ rootPid: 53, exitCode: undefined })));
+
+		await expect(run.completion).rejects.toMatchObject({ code: 'WINDOWS_JOB_PROTOCOL_ERROR' });
 	});
 
 	it('fails closed when a helper violates the output cap or a consumer applies backpressure', async () => {
@@ -315,7 +352,7 @@ function output(kind: ServerMessageKind.Stdout | ServerMessageKind.Stderr, bytes
 }
 
 function completed(completion: WindowsJobCompletion): Buffer {
-	const payload = Buffer.alloc(24 + completion.processIds.length * 4);
+	const payload = Buffer.alloc(25 + completion.processIds.length * 4);
 	payload.writeUInt8(
 		[
 			'exited',
@@ -328,12 +365,13 @@ function completed(completion: WindowsJobCompletion): Buffer {
 		].indexOf(completion.status),
 		0
 	);
-	payload.writeInt32LE(completion.exitCode ?? -2_147_483_648, 1);
-	payload.writeUInt32LE(completion.rootPid, 5);
-	payload.writeUInt8(completion.terminationVerified ? 1 : 0, 9);
-	payload.writeUInt32LE(completion.activeProcesses, 10);
-	payload.writeUInt32LE(completion.processIds.length, 14);
-	completion.processIds.forEach((processId, index) => payload.writeUInt32LE(processId, 18 + index * 4));
+	payload.writeUInt8(completion.exitCode === undefined ? 0 : 1, 1);
+	payload.writeUInt32LE(completion.exitCode ?? 0, 2);
+	payload.writeUInt32LE(completion.rootPid, 6);
+	payload.writeUInt8(completion.terminationVerified ? 1 : 0, 10);
+	payload.writeUInt32LE(completion.activeProcesses, 11);
+	payload.writeUInt32LE(completion.processIds.length, 15);
+	completion.processIds.forEach((processId, index) => payload.writeUInt32LE(processId, 19 + index * 4));
 	payload.writeUInt16LE(
 		[
 			'none',
@@ -348,9 +386,9 @@ function completed(completion: WindowsJobCompletion): Buffer {
 			'cleanup',
 			'protocol'
 		].indexOf(completion.failureStage),
-		18 + completion.processIds.length * 4
+		19 + completion.processIds.length * 4
 	);
-	payload.writeUInt32LE(completion.osError, 20 + completion.processIds.length * 4);
+	payload.writeUInt32LE(completion.osError, 21 + completion.processIds.length * 4);
 	return serverFrame(ServerMessageKind.Completed, payload);
 }
 
@@ -371,7 +409,7 @@ function verifiedCompletion(overrides: Partial<WindowsJobCompletion> = {}): Wind
 function serverFrame(kind: ServerMessageKind, payload: Buffer): Buffer {
 	const header = Buffer.alloc(12);
 	header.write('EWJL', 0, 'ascii');
-	header.writeUInt16LE(1, 4);
+	header.writeUInt16LE(2, 4);
 	header.writeUInt16LE(kind, 6);
 	header.writeUInt32LE(payload.length, 8);
 	return Buffer.concat([header, payload]);

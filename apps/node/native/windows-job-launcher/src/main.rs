@@ -24,7 +24,7 @@ use ever_works_windows_job_launcher::{
     windows::WindowsKernel,
 };
 use windows_sys::Win32::{
-    Foundation::{STILL_ACTIVE, WAIT_OBJECT_0},
+    Foundation::{GetLastError, WAIT_OBJECT_0},
     System::Threading::{GetExitCodeProcess, WaitForSingleObject},
 };
 
@@ -47,6 +47,15 @@ fn run() -> Result<(), ()> {
     let control = spawn_control_reader();
     let request = match control.recv() {
         Ok(ControlEvent::Message(ClientMessage::Launch(request))) => request,
+        Ok(ControlEvent::TransportError(os_error)) => {
+            write_initial_failure(
+                &writer,
+                CompletionStatus::ProtocolError,
+                FailureStage::Protocol,
+                os_error,
+            );
+            return Err(());
+        }
         Ok(ControlEvent::ProtocolError)
         | Ok(ControlEvent::Eof)
         | Err(_)
@@ -114,7 +123,7 @@ fn run_prepared(
     let stdin_sender = spawn_stdin_writer(stdin);
     let output_overflow = Arc::new(AtomicBool::new(false));
     let output_reader_start_delay = test_output_reader_start_delay(&request);
-    let (output, output_streams_closed) = spawn_output_readers(
+    let output = spawn_output_readers(
         stdout,
         stderr,
         Arc::clone(&output_overflow),
@@ -125,6 +134,7 @@ fn run_prepared(
     let mut root_exit_code = None;
     let mut output_bytes = 0_u64;
     let mut output_limit_hit = false;
+    let mut output_streams = OutputStreamsState::default();
     let mut stdin_closed = false;
 
     let stop = loop {
@@ -139,6 +149,7 @@ fn run_prepared(
             break StopReason::ParentOutputClosed;
         }
 
+        let mut output_read_error = None;
         loop {
             match output.try_recv() {
                 Ok(OutputEvent::Bytes(stream, bytes)) => {
@@ -159,11 +170,24 @@ fn run_prepared(
                         break;
                     }
                 }
+                Ok(OutputEvent::Eof(stream)) => output_streams.mark_eof(stream),
+                Ok(OutputEvent::ReadError(os_error)) => {
+                    output_read_error = Some(os_error);
+                    break;
+                }
                 Err(TryRecvError::Empty) => break,
-                Err(TryRecvError::Disconnected) => break,
+                Err(TryRecvError::Disconnected) => {
+                    if !output_streams.all_eof() {
+                        output_read_error = Some(0);
+                    }
+                    break;
+                }
             }
         }
 
+        if let Some(os_error) = output_read_error {
+            break StopReason::OutputReadError(os_error);
+        }
         if output_limit_hit
             || output_overflow.load(Ordering::SeqCst)
             || writer.backpressured.load(Ordering::SeqCst)
@@ -175,8 +199,13 @@ fn run_prepared(
         }
 
         if process_has_exited(prepared.process) {
-            root_exit_code = process_exit_code(prepared.process);
-            break StopReason::Exited;
+            match process_exit_code(prepared.process) {
+                Ok(exit_code) => {
+                    root_exit_code = Some(exit_code);
+                    break StopReason::Exited;
+                }
+                Err(os_error) => break StopReason::ExitCodeUnavailable(os_error),
+            }
         }
         if Instant::now() >= deadline {
             break StopReason::TimedOut;
@@ -185,7 +214,11 @@ fn run_prepared(
     };
 
     drop(stdin_sender);
-    let (mut status, mut verification, failure_stage, os_error) = match stop {
+    let capture_exit_code_after_cleanup = !matches!(
+        stop,
+        StopReason::Exited | StopReason::ExitCodeUnavailable(_)
+    );
+    let (mut status, mut verification, mut failure_stage, mut os_error) = match stop {
         StopReason::Exited => terminate_and_verify(
             kernel,
             prepared.job,
@@ -226,6 +259,30 @@ fn run_prepared(
             FailureStage::Protocol,
             0,
         ),
+        StopReason::ControlTransportError(os_error) => terminate_and_verify(
+            kernel,
+            prepared.job,
+            request.cleanup_timeout_ms,
+            CompletionStatus::ProtocolError,
+            FailureStage::Protocol,
+            os_error,
+        ),
+        StopReason::ExitCodeUnavailable(os_error) => terminate_and_verify(
+            kernel,
+            prepared.job,
+            request.cleanup_timeout_ms,
+            CompletionStatus::ProtocolError,
+            FailureStage::Runtime,
+            os_error,
+        ),
+        StopReason::OutputReadError(os_error) => terminate_and_verify(
+            kernel,
+            prepared.job,
+            request.cleanup_timeout_ms,
+            CompletionStatus::ProtocolError,
+            FailureStage::Runtime,
+            os_error,
+        ),
         StopReason::ParentEof => terminate_and_verify(
             kernel,
             prepared.job,
@@ -251,7 +308,7 @@ fn run_prepared(
 
     match drain_output_after_cleanup(
         &output,
-        &output_streams_closed,
+        &mut output_streams,
         &output_overflow,
         &writer,
         &mut output_bytes,
@@ -260,6 +317,11 @@ fn run_prepared(
     ) {
         OutputDrainResult::Complete => {}
         OutputDrainResult::OutputLimit => status = CompletionStatus::OutputLimit,
+        OutputDrainResult::ReadFailed(error) => {
+            status = CompletionStatus::ProtocolError;
+            failure_stage = FailureStage::Runtime;
+            os_error = error;
+        }
         OutputDrainResult::WriterFailed => {
             kernel.close_handle(prepared.process);
             kernel.close_handle(prepared.job);
@@ -271,8 +333,8 @@ fn run_prepared(
         }
     }
 
-    if root_exit_code.is_none() {
-        root_exit_code = process_exit_code(prepared.process);
+    if root_exit_code.is_none() && capture_exit_code_after_cleanup {
+        root_exit_code = process_exit_code(prepared.process).ok();
     }
     let completion = build_completion(
         status,
@@ -287,7 +349,14 @@ fn run_prepared(
     kernel.close_handle(prepared.process);
     kernel.close_handle(prepared.job);
     let flushed = queued && writer.flush_bounded(Duration::from_secs(1));
-    if !flushed || completion_status == CompletionStatus::TerminationUnverified {
+    if !flushed
+        || matches!(
+            completion_status,
+            CompletionStatus::OutputLimit
+                | CompletionStatus::ProtocolError
+                | CompletionStatus::TerminationUnverified
+        )
+    {
         Err(())
     } else {
         Ok(())
@@ -300,7 +369,7 @@ fn build_completion(
     failure_stage: FailureStage,
     os_error: u32,
     root_pid: u32,
-    root_exit_code: Option<i32>,
+    root_exit_code: Option<u32>,
 ) -> Completion {
     let verified = verification.verified;
     Completion {
@@ -330,13 +399,14 @@ fn build_completion(
 enum OutputDrainResult {
     Complete,
     OutputLimit,
+    ReadFailed(u32),
     WriterFailed,
     TimedOut,
 }
 
 fn drain_output_after_cleanup(
     output: &Receiver<OutputEvent>,
-    streams_closed: &AtomicUsize,
+    streams: &mut OutputStreamsState,
     overflow: &AtomicBool,
     writer: &ProtocolWriter,
     output_bytes: &mut u64,
@@ -373,6 +443,10 @@ fn drain_output_after_cleanup(
                         };
                     }
                 }
+                Ok(OutputEvent::Eof(stream)) => streams.mark_eof(stream),
+                Ok(OutputEvent::ReadError(os_error)) => {
+                    return OutputDrainResult::ReadFailed(os_error);
+                }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
                     disconnected = true;
@@ -387,8 +461,11 @@ fn drain_output_after_cleanup(
         if writer.failed.load(Ordering::SeqCst) {
             return OutputDrainResult::WriterFailed;
         }
-        if disconnected || streams_closed.load(Ordering::SeqCst) >= 2 {
+        if streams.all_eof() {
             return OutputDrainResult::Complete;
+        }
+        if disconnected {
+            return OutputDrainResult::ReadFailed(0);
         }
         if Instant::now() >= deadline {
             return OutputDrainResult::TimedOut;
@@ -416,8 +493,12 @@ fn consume_control(
                 }
             }
             Ok(ControlEvent::Message(ClientMessage::Cancel)) => return Some(StopReason::Cancelled),
-            Ok(ControlEvent::Eof) | Err(TryRecvError::Disconnected) => {
-                return Some(StopReason::ParentEof);
+            Ok(ControlEvent::Eof) => return Some(StopReason::ParentEof),
+            Ok(ControlEvent::TransportError(os_error)) => {
+                return Some(StopReason::ControlTransportError(os_error));
+            }
+            Err(TryRecvError::Disconnected) => {
+                return Some(StopReason::ControlTransportError(0));
             }
             Ok(ControlEvent::ProtocolError) | Ok(ControlEvent::Message(_)) => {
                 return Some(StopReason::ProtocolError);
@@ -517,47 +598,55 @@ enum ControlEvent {
     Message(ClientMessage),
     Eof,
     ProtocolError,
+    TransportError(u32),
 }
 
 fn spawn_control_reader() -> Receiver<ControlEvent> {
     let (sender, receiver) = mpsc::sync_channel(CONTROL_QUEUE_CAPACITY);
     thread::spawn(move || {
         let stdin = std::io::stdin();
-        let mut stdin = stdin.lock();
-        let mut decoder = FrameDecoder::default();
-        let mut buffer = [0_u8; PIPE_CHUNK_SIZE];
-        loop {
-            match stdin.read(&mut buffer) {
-                Ok(0) => {
-                    let event = if decoder.has_pending_bytes() {
-                        ControlEvent::ProtocolError
-                    } else {
-                        ControlEvent::Eof
-                    };
-                    let _ = sender.send(event);
-                    return;
-                }
-                Ok(read) => match decoder.push(&buffer[..read]) {
-                    Ok(messages) => {
-                        for message in messages {
-                            if sender.send(ControlEvent::Message(message)).is_err() {
-                                return;
-                            }
-                        }
-                    }
-                    Err(_) => {
-                        let _ = sender.send(ControlEvent::ProtocolError);
-                        return;
-                    }
-                },
-                Err(_) => {
-                    let _ = sender.send(ControlEvent::Eof);
-                    return;
-                }
-            }
-        }
+        read_control(stdin.lock(), sender);
     });
     receiver
+}
+
+fn read_control<R: Read>(mut reader: R, sender: SyncSender<ControlEvent>) {
+    let mut decoder = FrameDecoder::default();
+    let mut buffer = [0_u8; PIPE_CHUNK_SIZE];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => {
+                let event = if decoder.has_pending_bytes() {
+                    ControlEvent::ProtocolError
+                } else {
+                    ControlEvent::Eof
+                };
+                let _ = sender.send(event);
+                return;
+            }
+            Ok(read) => match decoder.push(&buffer[..read]) {
+                Ok(messages) => {
+                    for message in messages {
+                        if sender.send(ControlEvent::Message(message)).is_err() {
+                            return;
+                        }
+                    }
+                }
+                Err(_) => {
+                    let _ = sender.send(ControlEvent::ProtocolError);
+                    return;
+                }
+            },
+            Err(error) => {
+                let os_error = error
+                    .raw_os_error()
+                    .and_then(|value| u32::try_from(value).ok())
+                    .unwrap_or(0);
+                let _ = sender.send(ControlEvent::TransportError(os_error));
+                return;
+            }
+        }
+    }
 }
 
 enum StdinCommand {
@@ -578,7 +667,7 @@ fn spawn_stdin_writer(mut file: File) -> SyncSender<StdinCommand> {
     sender
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum OutputStream {
     Stdout,
     Stderr,
@@ -595,6 +684,27 @@ impl OutputStream {
 
 enum OutputEvent {
     Bytes(OutputStream, Vec<u8>),
+    Eof(OutputStream),
+    ReadError(u32),
+}
+
+#[derive(Default)]
+struct OutputStreamsState {
+    stdout_eof: bool,
+    stderr_eof: bool,
+}
+
+impl OutputStreamsState {
+    fn mark_eof(&mut self, stream: OutputStream) {
+        match stream {
+            OutputStream::Stdout => self.stdout_eof = true,
+            OutputStream::Stderr => self.stderr_eof = true,
+        }
+    }
+
+    fn all_eof(&self) -> bool {
+        self.stdout_eof && self.stderr_eof
+    }
 }
 
 fn spawn_output_readers(
@@ -602,45 +712,37 @@ fn spawn_output_readers(
     stderr: File,
     overflow: Arc<AtomicBool>,
     start_delay: Duration,
-) -> (Receiver<OutputEvent>, Arc<AtomicUsize>) {
+) -> Receiver<OutputEvent> {
     let (sender, receiver) = mpsc::sync_channel(OUTPUT_QUEUE_CAPACITY);
-    let closed = Arc::new(AtomicUsize::new(0));
     spawn_output_reader(
         stdout,
         OutputStream::Stdout,
         sender.clone(),
         Arc::clone(&overflow),
-        Arc::clone(&closed),
         start_delay,
     );
-    spawn_output_reader(
-        stderr,
-        OutputStream::Stderr,
-        sender,
-        overflow,
-        Arc::clone(&closed),
-        start_delay,
-    );
-    (receiver, closed)
+    spawn_output_reader(stderr, OutputStream::Stderr, sender, overflow, start_delay);
+    receiver
 }
 
-fn spawn_output_reader(
-    mut file: File,
+fn spawn_output_reader<R: Read + Send + 'static>(
+    mut reader: R,
     stream: OutputStream,
     sender: SyncSender<OutputEvent>,
     overflow: Arc<AtomicBool>,
-    closed: Arc<AtomicUsize>,
     start_delay: Duration,
 ) {
     thread::spawn(move || {
-        let _close_signal = OutputReaderCloseSignal(closed);
         if !start_delay.is_zero() {
             thread::sleep(start_delay);
         }
         let mut buffer = [0_u8; PIPE_CHUNK_SIZE];
         loop {
-            match file.read(&mut buffer) {
-                Ok(0) => break,
+            match reader.read(&mut buffer) {
+                Ok(0) => {
+                    let _ = sender.send(OutputEvent::Eof(stream));
+                    return;
+                }
                 Ok(read) => {
                     match sender.try_send(OutputEvent::Bytes(stream, buffer[..read].to_vec())) {
                         Ok(()) => {}
@@ -651,7 +753,14 @@ fn spawn_output_reader(
                         Err(TrySendError::Disconnected(_)) => return,
                     }
                 }
-                Err(_) => break,
+                Err(error) => {
+                    let os_error = error
+                        .raw_os_error()
+                        .and_then(|value| u32::try_from(value).ok())
+                        .unwrap_or(0);
+                    let _ = sender.send(OutputEvent::ReadError(os_error));
+                    return;
+                }
             }
         }
     });
@@ -669,14 +778,6 @@ fn test_output_reader_start_delay(request: &LaunchRequest) -> Duration {
 #[cfg(not(feature = "test-fixtures"))]
 fn test_output_reader_start_delay(_request: &LaunchRequest) -> Duration {
     Duration::ZERO
-}
-
-struct OutputReaderCloseSignal(Arc<AtomicUsize>);
-
-impl Drop for OutputReaderCloseSignal {
-    fn drop(&mut self) {
-        self.0.fetch_add(1, Ordering::SeqCst);
-    }
 }
 
 struct ProtocolWriter {
@@ -783,10 +884,13 @@ impl ProtocolWriter {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum StopReason {
     Exited,
+    ExitCodeUnavailable(u32),
+    OutputReadError(u32),
     Cancelled,
     TimedOut,
     OutputLimit,
     ProtocolError,
+    ControlTransportError(u32),
     ParentEof,
     ParentOutputClosed,
 }
@@ -795,17 +899,41 @@ fn process_has_exited(process: NativeHandle) -> bool {
     (unsafe { WaitForSingleObject(process.0 as _, 0) }) == WAIT_OBJECT_0
 }
 
-fn process_exit_code(process: NativeHandle) -> Option<i32> {
-    let mut exit_code = STILL_ACTIVE as u32;
+fn process_exit_code(process: NativeHandle) -> Result<u32, u32> {
+    let mut exit_code = 0_u32;
     let success = unsafe { GetExitCodeProcess(process.0 as _, &mut exit_code) };
-    (success != 0 && exit_code != STILL_ACTIVE as u32).then_some(exit_code as i32)
+    if success == 0 {
+        Err(unsafe { GetLastError() })
+    } else {
+        Ok(exit_code)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ever_works_windows_job_launcher::runtime::JobSnapshot;
-    use std::collections::VecDeque;
+    use std::{
+        collections::VecDeque,
+        io::{self, Cursor},
+        sync::mpsc::RecvTimeoutError,
+    };
+
+    struct BytesThenReadError {
+        bytes: Cursor<Vec<u8>>,
+        os_error: i32,
+    }
+
+    impl Read for BytesThenReadError {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            let read = self.bytes.read(buffer)?;
+            if read == 0 {
+                Err(io::Error::from_raw_os_error(self.os_error))
+            } else {
+                Ok(read)
+            }
+        }
+    }
 
     struct FakeCleanupKernel {
         now_ms: u64,
@@ -913,14 +1041,14 @@ mod tests {
     fn cleanup_output_overflow_wins_over_a_simultaneous_stream_disconnect() {
         let (sender, output) = mpsc::sync_channel(1);
         drop(sender);
-        let streams_closed = AtomicUsize::new(2);
+        let mut streams = OutputStreamsState::default();
         let overflow = AtomicBool::new(true);
         let writer = ProtocolWriter::spawn();
         let mut output_bytes = 0;
 
         let result = drain_output_after_cleanup(
             &output,
-            &streams_closed,
+            &mut streams,
             &overflow,
             &writer,
             &mut output_bytes,
@@ -929,6 +1057,121 @@ mod tests {
         );
 
         assert!(matches!(result, OutputDrainResult::OutputLimit));
+    }
+
+    #[test]
+    fn cleanup_output_read_failure_is_never_treated_as_clean_eof() {
+        let (sender, output) = mpsc::sync_channel(1);
+        sender.send(OutputEvent::ReadError(109)).unwrap();
+        drop(sender);
+        let mut streams = OutputStreamsState::default();
+        let overflow = AtomicBool::new(false);
+        let writer = ProtocolWriter::spawn();
+        let mut output_bytes = 0;
+
+        let result = drain_output_after_cleanup(
+            &output,
+            &mut streams,
+            &overflow,
+            &writer,
+            &mut output_bytes,
+            1_024,
+            10,
+        );
+
+        assert!(matches!(result, OutputDrainResult::ReadFailed(109)));
+    }
+
+    #[test]
+    fn output_reader_queues_clean_eof_after_its_final_bytes() {
+        let (sender, output) = mpsc::sync_channel(4);
+        let overflow = Arc::new(AtomicBool::new(false));
+        spawn_output_reader(
+            Cursor::new(b"final".to_vec()),
+            OutputStream::Stdout,
+            sender,
+            Arc::clone(&overflow),
+            Duration::ZERO,
+        );
+
+        assert!(matches!(
+            output.recv_timeout(Duration::from_secs(1)),
+            Ok(OutputEvent::Bytes(OutputStream::Stdout, bytes)) if bytes == b"final"
+        ));
+        assert!(matches!(
+            output.recv_timeout(Duration::from_secs(1)),
+            Ok(OutputEvent::Eof(OutputStream::Stdout))
+        ));
+        assert!(!overflow.load(Ordering::SeqCst));
+        assert!(matches!(
+            output.recv_timeout(Duration::from_millis(10)),
+            Err(RecvTimeoutError::Disconnected)
+        ));
+    }
+
+    #[test]
+    fn output_reader_queues_read_failure_after_its_final_bytes() {
+        let (sender, output) = mpsc::sync_channel(4);
+        let overflow = Arc::new(AtomicBool::new(false));
+        spawn_output_reader(
+            BytesThenReadError {
+                bytes: Cursor::new(b"final".to_vec()),
+                os_error: 123,
+            },
+            OutputStream::Stderr,
+            sender,
+            Arc::clone(&overflow),
+            Duration::ZERO,
+        );
+
+        assert!(matches!(
+            output.recv_timeout(Duration::from_secs(1)),
+            Ok(OutputEvent::Bytes(OutputStream::Stderr, bytes)) if bytes == b"final"
+        ));
+        assert!(matches!(
+            output.recv_timeout(Duration::from_secs(1)),
+            Ok(OutputEvent::ReadError(123))
+        ));
+        assert!(!overflow.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn control_reader_reports_transport_failure_instead_of_eof() {
+        let (sender, control) = mpsc::sync_channel(1);
+        read_control(
+            BytesThenReadError {
+                bytes: Cursor::new(Vec::new()),
+                os_error: 995,
+            },
+            sender,
+        );
+
+        assert!(matches!(
+            control.recv_timeout(Duration::from_secs(1)),
+            Ok(ControlEvent::TransportError(995))
+        ));
+    }
+
+    #[test]
+    fn control_transport_failure_never_maps_to_verified_parent_eof() {
+        let (control_sender, control) = mpsc::sync_channel(1);
+        control_sender
+            .send(ControlEvent::TransportError(995))
+            .unwrap();
+        let (stdin, _stdin_receiver) = mpsc::sync_channel(1);
+        let mut stdin_closed = false;
+
+        assert_eq!(
+            consume_control(&control, &stdin, &mut stdin_closed),
+            Some(StopReason::ControlTransportError(995))
+        );
+    }
+
+    #[test]
+    fn exit_code_query_failure_is_not_conflated_with_an_absent_exit_code() {
+        let os_error = process_exit_code(NativeHandle(0)).unwrap_err();
+
+        assert_ne!(os_error, 0);
     }
 
     fn control_loss_completion(mut kernel: FakeCleanupKernel) -> Completion {

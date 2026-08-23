@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 pub const PROTOCOL_MAGIC: [u8; 4] = *b"EWJL";
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;
 pub const MAX_FRAME_SIZE: usize = 1_048_576;
 const HEADER_SIZE: usize = 12;
 const MAX_STRING_SIZE: usize = 32_768;
@@ -16,7 +16,6 @@ const KIND_LAUNCHED: u16 = 0x8001;
 const KIND_STDOUT: u16 = 0x8002;
 const KIND_STDERR: u16 = 0x8003;
 const KIND_COMPLETED: u16 = 0x8004;
-const NO_EXIT_CODE: i32 = i32::MIN;
 const MAX_REPORTED_PROCESS_IDS: usize = 4_096;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -132,7 +131,7 @@ impl TryFrom<u16> for FailureStage {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Completion {
     pub status: CompletionStatus,
-    pub exit_code: Option<i32>,
+    pub exit_code: Option<u32>,
     pub root_pid: u32,
     pub termination_verified: bool,
     pub active_processes: u32,
@@ -300,9 +299,18 @@ pub fn encode_server_message(message: &ServerMessage) -> Result<Vec<u8>, Protoco
             if completion.process_ids.len() > MAX_REPORTED_PROCESS_IDS {
                 return Err(ProtocolError::InvalidField);
             }
-            let mut payload = Vec::with_capacity(24 + completion.process_ids.len() * 4);
+            let mut payload = Vec::with_capacity(25 + completion.process_ids.len() * 4);
             payload.push(completion.status as u8);
-            payload.extend_from_slice(&completion.exit_code.unwrap_or(NO_EXIT_CODE).to_le_bytes());
+            match completion.exit_code {
+                Some(exit_code) => {
+                    payload.push(1);
+                    payload.extend_from_slice(&exit_code.to_le_bytes());
+                }
+                None => {
+                    payload.push(0);
+                    payload.extend_from_slice(&0_u32.to_le_bytes());
+                }
+            }
             payload.extend_from_slice(&completion.root_pid.to_le_bytes());
             payload.push(u8::from(completion.termination_verified));
             payload.extend_from_slice(&completion.active_processes.to_le_bytes());
@@ -420,7 +428,14 @@ fn decode_server_payload(kind: u16, payload: &[u8]) -> Result<ServerMessage, Pro
         KIND_COMPLETED => {
             let mut cursor = Cursor::new(payload);
             let status = CompletionStatus::try_from(cursor.u8()?)?;
-            let exit_code = cursor.i32()?;
+            let exit_code_present = cursor.u8()?;
+            let encoded_exit_code = cursor.u32()?;
+            let exit_code = match exit_code_present {
+                0 if encoded_exit_code == 0 => None,
+                0 => return Err(ProtocolError::InvalidField),
+                1 => Some(encoded_exit_code),
+                _ => return Err(ProtocolError::InvalidField),
+            };
             let root_pid = cursor.u32()?;
             let termination_verified = match cursor.u8()? {
                 0 => false,
@@ -443,7 +458,7 @@ fn decode_server_payload(kind: u16, payload: &[u8]) -> Result<ServerMessage, Pro
             }
             Ok(ServerMessage::Completed(Completion {
                 status,
-                exit_code: (exit_code != NO_EXIT_CODE).then_some(exit_code),
+                exit_code,
                 root_pid,
                 termination_verified,
                 active_processes,
@@ -590,11 +605,6 @@ impl<'a> Cursor<'a> {
     fn u16(&mut self) -> Result<u16, ProtocolError> {
         let bytes: [u8; 2] = self.take(2)?.try_into().expect("two-byte slice");
         Ok(u16::from_le_bytes(bytes))
-    }
-
-    fn i32(&mut self) -> Result<i32, ProtocolError> {
-        let bytes: [u8; 4] = self.take(4)?.try_into().expect("four-byte slice");
-        Ok(i32::from_le_bytes(bytes))
     }
 
     fn u64(&mut self) -> Result<u64, ProtocolError> {

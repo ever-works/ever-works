@@ -1,5 +1,5 @@
 const PROTOCOL_MAGIC = Buffer.from('EWJL', 'ascii');
-const PROTOCOL_VERSION = 1;
+const PROTOCOL_VERSION = 2;
 const HEADER_SIZE = 12;
 const MAX_FRAME_SIZE = 1_048_576;
 const MAX_STRING_SIZE = 32_768;
@@ -258,7 +258,11 @@ function decodeServerMessage(kind: number, payload: Buffer): DecodedServerMessag
 
 	const cursor = new PayloadCursor(payload);
 	const status = completionStatus(cursor.uint8());
-	const encodedExitCode = cursor.int32();
+	const exitCodePresent = cursor.uint8();
+	const encodedExitCode = cursor.uint32();
+	if ((exitCodePresent !== 0 && exitCodePresent !== 1) || (exitCodePresent === 0 && encodedExitCode !== 0)) {
+		throw new ProtocolError('invalid-field');
+	}
 	const rootPid = cursor.uint32();
 	const encodedVerified = cursor.uint8();
 	if (encodedVerified !== 0 && encodedVerified !== 1) {
@@ -282,7 +286,7 @@ function decodeServerMessage(kind: number, payload: Buffer): DecodedServerMessag
 		kind,
 		completion: {
 			status,
-			...(encodedExitCode === -2_147_483_648 ? {} : { exitCode: encodedExitCode }),
+			...(exitCodePresent === 0 ? {} : { exitCode: encodedExitCode }),
 			rootPid,
 			terminationVerified: encodedVerified === 1,
 			activeProcesses,
@@ -416,10 +420,6 @@ class PayloadCursor {
 
 	uint16(): number {
 		return this.take(2).readUInt16LE();
-	}
-
-	int32(): number {
-		return this.take(4).readInt32LE();
 	}
 
 	safeUInt64(): number {

@@ -18,10 +18,10 @@ fn minimal_request() -> LaunchRequest {
 }
 
 #[test]
-fn launch_frame_matches_the_v1_golden_vector() {
+fn launch_frame_matches_the_v2_golden_vector() {
     let encoded = encode_client_message(&ClientMessage::Launch(minimal_request())).unwrap();
     let expected = concat!(
-        "45574a4c010001003c000000",
+        "45574a4c020001003c000000",
         "08000000433a5c612e657865",
         "04000000433a5c77",
         "010000000100000078",
@@ -92,14 +92,14 @@ fn encoder_rejects_nul_and_invalid_environment_names() {
 #[test]
 fn decoder_rejects_oversized_and_unknown_frames_before_allocating_payloads() {
     let mut oversized = Vec::from(*b"EWJL");
-    oversized.extend_from_slice(&1_u16.to_le_bytes());
+    oversized.extend_from_slice(&2_u16.to_le_bytes());
     oversized.extend_from_slice(&1_u16.to_le_bytes());
     oversized.extend_from_slice(&(1_048_577_u32).to_le_bytes());
     let mut decoder = FrameDecoder::default();
     assert_eq!(decoder.push(&oversized), Err(ProtocolError::FrameTooLarge));
 
     let mut unknown = Vec::from(*b"EWJL");
-    unknown.extend_from_slice(&1_u16.to_le_bytes());
+    unknown.extend_from_slice(&2_u16.to_le_bytes());
     unknown.extend_from_slice(&99_u16.to_le_bytes());
     unknown.extend_from_slice(&0_u32.to_le_bytes());
     let mut decoder = FrameDecoder::default();
@@ -171,9 +171,32 @@ fn server_frames_round_trip_launched_output_and_verified_completion() {
 }
 
 #[test]
+fn completion_round_trip_preserves_every_legal_dword_exit_code() {
+    for expected in [259_u32, 0x8000_0000, u32::MAX] {
+        let message = ServerMessage::Completed(Completion {
+            status: CompletionStatus::Exited,
+            exit_code: Some(expected as _),
+            root_pid: 42,
+            termination_verified: true,
+            active_processes: 0,
+            process_ids: Vec::new(),
+            failure_stage: FailureStage::None,
+            os_error: 0,
+        });
+        let encoded = encode_server_message(&message).unwrap();
+        let decoded = ServerFrameDecoder::default().push(&encoded).unwrap();
+        let ServerMessage::Completed(completion) = &decoded[0] else {
+            panic!("expected completion");
+        };
+
+        assert_eq!(completion.exit_code, Some(expected));
+    }
+}
+
+#[test]
 fn launched_frame_matches_the_cross_language_golden_vector() {
     let encoded = encode_server_message(&ServerMessage::Launched { root_pid: 42 }).unwrap();
-    assert_eq!(hex(&encoded), "45574a4c01000180040000002a000000");
+    assert_eq!(hex(&encoded), "45574a4c02000180040000002a000000");
 }
 
 fn hex(bytes: &[u8]) -> String {

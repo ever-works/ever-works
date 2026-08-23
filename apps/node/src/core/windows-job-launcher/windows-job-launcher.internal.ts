@@ -235,6 +235,18 @@ export async function launchWindowsJobInternal(
 
 	const finish = (value: WindowsJobCompletion): void => {
 		if (settled) return;
+		if (value.status === 'output-limit') {
+			fail('WINDOWS_JOB_OUTPUT_LIMIT', value.failureStage, value.osError);
+			return;
+		}
+		if (value.status === 'protocol-error') {
+			fail('WINDOWS_JOB_PROTOCOL_ERROR', value.failureStage, value.osError);
+			return;
+		}
+		if (value.status === 'exited' && value.exitCode === undefined) {
+			fail('WINDOWS_JOB_PROTOCOL_ERROR', value.failureStage, value.osError);
+			return;
+		}
 		if (
 			rootPid === undefined ||
 			value.rootPid !== rootPid ||

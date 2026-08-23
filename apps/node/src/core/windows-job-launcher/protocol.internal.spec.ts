@@ -20,11 +20,11 @@ const minimalRequest = (): WindowsJobLaunchRequest => ({
 	maxOutputBytes: 3
 });
 
-describe('Windows Job launcher protocol v1', () => {
+describe('Windows Job launcher protocol v2', () => {
 	it('matches the native launch golden vector', () => {
 		expect(encodeLaunchFrame(minimalRequest()).toString('hex')).toBe(
 			[
-				'45574a4c010001003c000000',
+				'45574a4c020001003c000000',
 				'08000000433a5c612e657865',
 				'04000000433a5c77',
 				'010000000100000078',
@@ -62,30 +62,31 @@ describe('Windows Job launcher protocol v1', () => {
 	});
 
 	it('rejects oversized and unknown frames before buffering their payloads', () => {
-		const oversized = Buffer.from('45574a4c0100010001001000', 'hex');
+		const oversized = Buffer.from('45574a4c0200010001001000', 'hex');
 		const decoder = new ProtocolDecoder();
 		expect(() => decoder.push(oversized)).toThrowError('frame-too-large');
 
-		const unknown = Buffer.from('45574a4c0100630000000000', 'hex');
+		const unknown = Buffer.from('45574a4c0200630000000000', 'hex');
 		expect(() => new ProtocolDecoder().push(unknown)).toThrowError('unknown-message');
 	});
 
 	it('encodes cancellation as a zero-payload control frame', () => {
-		expect(encodeCancelFrame().toString('hex')).toBe('45574a4c0100040000000000');
+		expect(encodeCancelFrame().toString('hex')).toBe('45574a4c0200040000000000');
 	});
 
 	it('decodes fragmented server output and a verified empty-job completion', () => {
-		const launched = Buffer.from('45574a4c01000180040000002a000000', 'hex');
+		const launched = Buffer.from('45574a4c02000180040000002a000000', 'hex');
 		const stdout = frame(0x8002, Buffer.from('hello λ'));
-		const completedPayload = Buffer.alloc(24);
+		const completedPayload = Buffer.alloc(25);
 		completedPayload.writeUInt8(0, 0);
-		completedPayload.writeInt32LE(7, 1);
-		completedPayload.writeUInt32LE(42, 5);
-		completedPayload.writeUInt8(1, 9);
-		completedPayload.writeUInt32LE(0, 10);
-		completedPayload.writeUInt32LE(0, 14);
-		completedPayload.writeUInt16LE(0, 18);
-		completedPayload.writeUInt32LE(0, 20);
+		completedPayload.writeUInt8(1, 1);
+		completedPayload.writeUInt32LE(7, 2);
+		completedPayload.writeUInt32LE(42, 6);
+		completedPayload.writeUInt8(1, 10);
+		completedPayload.writeUInt32LE(0, 11);
+		completedPayload.writeUInt32LE(0, 15);
+		completedPayload.writeUInt16LE(0, 19);
+		completedPayload.writeUInt32LE(0, 21);
 		const encoded = Buffer.concat([launched, stdout, frame(0x8004, completedPayload)]);
 		const decoder = new ServerProtocolDecoder();
 		const messages = [...encoded].flatMap((byte) => decoder.push(Buffer.from([byte])));
@@ -108,12 +109,43 @@ describe('Windows Job launcher protocol v1', () => {
 			}
 		]);
 	});
+
+	it.each([259, 0x8000_0000, 0xffff_ffff])('preserves the legal DWORD exit code %d', (exitCode) => {
+		const payload = Buffer.alloc(25);
+		payload.writeUInt8(0, 0);
+		payload.writeUInt8(1, 1);
+		payload.writeUInt32LE(exitCode, 2);
+		payload.writeUInt32LE(42, 6);
+		payload.writeUInt8(1, 10);
+		payload.writeUInt32LE(0, 11);
+		payload.writeUInt32LE(0, 15);
+		payload.writeUInt16LE(0, 19);
+		payload.writeUInt32LE(0, 21);
+
+		const message = new ServerProtocolDecoder().push(frame(0x8004, payload));
+
+		expect(message).toEqual([
+			{
+				kind: ServerMessageKind.Completed,
+				completion: {
+					status: 'exited',
+					exitCode,
+					rootPid: 42,
+					terminationVerified: true,
+					activeProcesses: 0,
+					processIds: [],
+					failureStage: 'none',
+					osError: 0
+				}
+			}
+		]);
+	});
 });
 
 function frame(kind: number, payload: Buffer): Buffer {
 	const header = Buffer.alloc(12);
 	header.write('EWJL', 0, 'ascii');
-	header.writeUInt16LE(1, 4);
+	header.writeUInt16LE(2, 4);
 	header.writeUInt16LE(kind, 6);
 	header.writeUInt32LE(payload.length, 8);
 	return Buffer.concat([header, payload]);

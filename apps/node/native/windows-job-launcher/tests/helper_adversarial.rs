@@ -24,7 +24,7 @@ use windows_sys::Win32::{
             JOBOBJECT_BASIC_UI_RESTRICTIONS, JobObjectBasicUIRestrictions, SetInformationJobObject,
             TerminateJobObject,
         },
-        Threading::{OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject},
+        Threading::{ExitProcess, OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject},
     },
 };
 
@@ -38,6 +38,18 @@ fn fixture_exits_after_writing_both_streams() {
     }
     print!("stdout-λ");
     eprint!("stderr-งาน");
+}
+
+#[test]
+fn fixture_exits_with_requested_dword() {
+    if fixture_mode() != Some("exit-dword") {
+        return;
+    }
+    let exit_code = std::env::var("EWJL_FIXTURE_EXIT_CODE")
+        .unwrap()
+        .parse::<u32>()
+        .unwrap();
+    unsafe { ExitProcess(exit_code) }
 }
 
 #[test]
@@ -188,6 +200,31 @@ fn reports_streams_and_completion_only_after_the_real_job_is_verified_empty() {
     assert_eq!(completion.active_processes, 0);
     assert!(completion.process_ids.is_empty());
     assert_eq!(helper.wait().unwrap().code(), Some(0));
+}
+
+#[test]
+fn reports_every_legal_dword_root_exit_code_without_a_sentinel_collision() {
+    for expected in [259_u32, 0x8000_0000] {
+        let mut helper = spawn_helper();
+        let mut launch = request(
+            "exit-dword",
+            "fixture_exits_with_requested_dword",
+            10_000,
+            1_048_576,
+            TestFailure::None,
+        );
+        launch
+            .environment
+            .push(("EWJL_FIXTURE_EXIT_CODE".to_owned(), expected.to_string()));
+        send_launch(&mut helper, launch);
+
+        let messages = read_to_completion(&mut helper, Duration::from_secs(10));
+        let completion = completion(&messages);
+        assert_eq!(completion.status, CompletionStatus::Exited);
+        assert_eq!(completion.exit_code, Some(expected));
+        assert!(completion.termination_verified);
+        assert!(helper.wait().unwrap().success());
+    }
 }
 
 #[test]
@@ -396,7 +433,47 @@ fn output_limit_and_transport_backpressure_fail_closed() {
     assert_eq!(completion.status, CompletionStatus::OutputLimit);
     assert!(completion.termination_verified);
     assert!(collect_stream(&messages, true).len() <= 32_768);
-    assert_eq!(helper.wait().unwrap().code(), Some(0));
+    assert!(!helper.wait().unwrap().success());
+}
+
+#[test]
+fn post_launch_control_protocol_corruption_reports_failure_and_exits_nonzero() {
+    let marker = unique_marker("control-corruption");
+    let mut helper = spawn_helper();
+    send_launch(
+        &mut helper,
+        request_with_marker(
+            "wait",
+            "fixture_waits_after_writing_its_pid",
+            30_000,
+            1_048_576,
+            TestFailure::None,
+            &marker,
+        ),
+    );
+    let mut reader = MessageReader::new(helper.stdout.take().unwrap());
+    assert!(matches!(
+        reader.next(Duration::from_secs(10)),
+        ServerMessage::Launched { .. }
+    ));
+    wait_for_marker(&marker, Duration::from_secs(5));
+    helper
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(b"BAD!\x02\x00\x04\x00\x00\x00\x00\x00")
+        .unwrap();
+
+    let messages = reader.read_completion(Duration::from_secs(10));
+    let completion = completion(&messages);
+    assert_eq!(completion.status, CompletionStatus::ProtocolError);
+    assert!(completion.termination_verified);
+    assert_eq!(
+        completion.failure_stage,
+        ever_works_windows_job_launcher::protocol::FailureStage::Protocol
+    );
+    assert!(!helper.wait().unwrap().success());
+    let _ = fs::remove_file(marker);
 }
 
 #[test]
@@ -786,6 +863,7 @@ fn completion(messages: &[ServerMessage]) -> &Completion {
 fn fixture_mode() -> Option<&'static str> {
     match std::env::var("EWJL_FIXTURE_MODE").ok().as_deref() {
         Some("exit") => Some("exit"),
+        Some("exit-dword") => Some("exit-dword"),
         Some("wait") => Some("wait"),
         Some("flood") => Some("flood"),
         Some("trickle") => Some("trickle"),
