@@ -33,6 +33,7 @@ describe('ExistingWebsiteLinkService', () => {
     ) {
         const ownedWork = options.ownedWork ?? {
             id: workId,
+            userId,
             tenantId,
             organizationId,
         };
@@ -96,6 +97,74 @@ describe('ExistingWebsiteLinkService', () => {
         };
     }
 
+    function createLocklessRaceHarness() {
+        const ownedWork = { id: workId, userId, tenantId, organizationId };
+        let website: string | null = null;
+        const domains = new Map<string, Record<string, unknown>>();
+        let releaseDomainReads!: () => void;
+        const domainReadGate = new Promise<void>((resolve) => {
+            releaseDomainReads = resolve;
+        });
+        const ownership = {
+            ensureIsOwner: jest.fn().mockResolvedValue({ work: ownedWork }),
+        };
+        const scopeContext = {
+            getTenantId: jest.fn().mockReturnValue(tenantId),
+            getOrganizationId: jest.fn().mockReturnValue(organizationId),
+        };
+        const workRepository = {
+            findOne: jest.fn().mockImplementation(async () => ({ ...ownedWork, website })),
+            save: jest.fn().mockImplementation(async (work) => {
+                website = work.website;
+                return work;
+            }),
+        };
+        const domainRepository = {
+            findOne: jest.fn().mockImplementation(async ({ where }) => {
+                const snapshot = domains.get(where.domain) ?? null;
+                await domainReadGate;
+                return snapshot;
+            }),
+            create: jest.fn().mockImplementation((value) => ({
+                id: `domain-${value.domain}`,
+                ...value,
+            })),
+            save: jest.fn().mockImplementation(async (value) => {
+                if (domains.has(value.domain)) {
+                    const error = new Error('UNIQUE constraint failed');
+                    Object.assign(error, { code: 'SQLITE_CONSTRAINT' });
+                    throw error;
+                }
+                domains.set(value.domain, value);
+                return value;
+            }),
+        };
+        const manager = {
+            getRepository: jest.fn().mockImplementation((entity) => {
+                if (entity === Work) return workRepository;
+                if (entity === WorkCustomDomain) return domainRepository;
+                throw new Error('Unexpected entity');
+            }),
+        };
+        const dataSource = {
+            options: { type: 'sqlite' },
+            transaction: jest.fn().mockImplementation(async (callback) => callback(manager)),
+        };
+        const service = new ExistingWebsiteLinkService(
+            ownership as any,
+            scopeContext as any,
+            dataSource as any,
+        );
+
+        return {
+            domains,
+            domainRepository,
+            getWebsite: () => website,
+            releaseDomainReads,
+            service,
+        };
+    }
+
     it('atomically links the canonical URL to the scoped Work and existing domain model', async () => {
         const h = createHarness();
 
@@ -142,6 +211,7 @@ describe('ExistingWebsiteLinkService', () => {
         const h = createHarness({
             transactionWork: {
                 id: workId,
+                userId,
                 tenantId,
                 organizationId,
                 website: 'https://ever.works',
@@ -186,6 +256,7 @@ describe('ExistingWebsiteLinkService', () => {
         const h = createHarness({
             transactionWork: {
                 id: workId,
+                userId,
                 tenantId,
                 organizationId,
                 website: 'https://other.example',
@@ -256,6 +327,70 @@ describe('ExistingWebsiteLinkService', () => {
             response: expect.objectContaining({ message: 'Work not found' }),
         });
         expect(h.domainRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('keeps an ownership transfer opaque at the locked transactional reread', async () => {
+        const h = createHarness({
+            transactionWork: {
+                id: workId,
+                userId: '00000000-0000-0000-0000-0000000000ee',
+                tenantId,
+                organizationId,
+                website: null,
+            },
+        });
+
+        await expect(
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ).rejects.toMatchObject({
+            status: 404,
+            response: expect.objectContaining({ message: 'Work not found' }),
+        });
+        expect(h.domainRepository.findOne).not.toHaveBeenCalled();
+        expect(h.domainRepository.save).not.toHaveBeenCalled();
+        expect(h.workRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('converges identical concurrent links on a lockless driver', async () => {
+        const h = createLocklessRaceHarness();
+        const combined = Promise.all([
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+        ]);
+
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        h.releaseDomainReads();
+
+        await expect(combined).resolves.toEqual([
+            expect.objectContaining({ url: 'https://ever.works', created: true }),
+            expect.objectContaining({ url: 'https://ever.works', created: false }),
+        ]);
+        expect(h.domains.size).toBe(1);
+        expect(h.domainRepository.save).toHaveBeenCalledTimes(1);
+        expect(h.getWebsite()).toBe('https://ever.works');
+    });
+
+    it('never overwrites a different concurrent link on a lockless driver', async () => {
+        const h = createLocklessRaceHarness();
+        const combined = Promise.allSettled([
+            h.service.linkExistingWebsite(workId, userId, 'https://ever.works'),
+            h.service.linkExistingWebsite(workId, userId, 'https://other.works'),
+        ]);
+
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        h.releaseDomainReads();
+
+        const [first, second] = await combined;
+        expect(first).toMatchObject({
+            status: 'fulfilled',
+            value: expect.objectContaining({ url: 'https://ever.works', created: true }),
+        });
+        expect(second).toMatchObject({
+            status: 'rejected',
+            reason: expect.any(ConflictException),
+        });
+        expect([...h.domains.keys()]).toEqual(['ever.works']);
+        expect(h.getWebsite()).toBe('https://ever.works');
     });
 
     it('validates the URL before performing ownership or database lookups', async () => {

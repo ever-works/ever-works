@@ -17,6 +17,8 @@ import {
 
 @Injectable()
 export class ExistingWebsiteLinkService {
+    private readonly locklessWorkQueues = new Map<string, Promise<void>>();
+
     constructor(
         private readonly ownership: WorkOwnershipService,
         private readonly scopeContext: ScopeContextService,
@@ -53,65 +55,95 @@ export class ExistingWebsiteLinkService {
             throw this.workNotFound();
         }
 
-        return this.dataSource.transaction(async (manager) => {
-            const workRepository = manager.getRepository(Work);
-            const domainRepository = manager.getRepository(WorkCustomDomain);
-            const findOptions: FindOneOptions<Work> = {
-                where: { id: workId, tenantId, organizationId },
-                // Work.user is eager. Avoid joining it into a PostgreSQL
-                // FOR UPDATE query; this write only needs the Work row.
-                loadEagerRelations: false,
-            };
-            if (this.supportsPessimisticWriteLock()) {
-                findOptions.lock = { mode: 'pessimistic_write' };
-            }
-
-            const work = await workRepository.findOne(findOptions);
-            if (!work) {
-                throw this.workNotFound();
-            }
-
-            if (work.website) {
-                let currentUrl: string;
-                try {
-                    currentUrl = parseExistingWebsiteUrl(work.website).url;
-                } catch {
-                    throw this.websiteConflict();
+        const operation = () =>
+            this.dataSource.transaction(async (manager) => {
+                const workRepository = manager.getRepository(Work);
+                const domainRepository = manager.getRepository(WorkCustomDomain);
+                const findOptions: FindOneOptions<Work> = {
+                    where: { id: workId, tenantId, organizationId },
+                    // Work.user is eager. Avoid joining it into a PostgreSQL
+                    // FOR UPDATE query; this write only needs the Work row.
+                    loadEagerRelations: false,
+                };
+                if (this.supportsPessimisticWriteLock()) {
+                    findOptions.lock = { mode: 'pessimistic_write' };
                 }
-                if (currentUrl !== url) {
-                    throw this.websiteConflict();
+
+                const work = await workRepository.findOne(findOptions);
+                if (!work || work.userId !== userId) {
+                    throw this.workNotFound();
                 }
-            }
 
-            let domainRecord = await domainRepository.findOne({
-                where: { workId, domain },
-            });
-            let created = false;
+                if (work.website) {
+                    let currentUrl: string;
+                    try {
+                        currentUrl = parseExistingWebsiteUrl(work.website).url;
+                    } catch {
+                        throw this.websiteConflict();
+                    }
+                    if (currentUrl !== url) {
+                        throw this.websiteConflict();
+                    }
+                }
 
-            if (!domainRecord) {
-                domainRecord = domainRepository.create({
-                    workId,
-                    domain,
-                    environment: DomainEnvironment.PRODUCTION,
-                    verified: false,
+                let domainRecord = await domainRepository.findOne({
+                    where: { workId, domain },
                 });
-                domainRecord = await domainRepository.save(domainRecord);
-                created = true;
-            }
+                let created = false;
 
-            if (work.website !== url) {
-                work.website = url;
-                await workRepository.save(work);
-            }
+                if (!domainRecord) {
+                    domainRecord = domainRepository.create({
+                        workId,
+                        domain,
+                        environment: DomainEnvironment.PRODUCTION,
+                        verified: false,
+                    });
+                    domainRecord = await domainRepository.save(domainRecord);
+                    created = true;
+                }
 
-            return {
-                workId,
-                url,
-                domain,
-                created,
-                verified: Boolean(domainRecord.verified),
-            };
+                if (work.website !== url) {
+                    work.website = url;
+                    await workRepository.save(work);
+                }
+
+                return {
+                    workId,
+                    url,
+                    domain,
+                    created,
+                    verified: Boolean(domainRecord.verified),
+                };
+            });
+
+        return this.serializeLocklessWork(workId, operation);
+    }
+
+    private async serializeLocklessWork<T>(
+        workId: string,
+        operation: () => Promise<T>,
+    ): Promise<T> {
+        if (this.supportsPessimisticWriteLock()) {
+            return operation();
+        }
+
+        const previous = this.locklessWorkQueues.get(workId) ?? Promise.resolve();
+        let release!: () => void;
+        const gate = new Promise<void>((resolve) => {
+            release = resolve;
         });
+        const tail = previous.catch(() => undefined).then(() => gate);
+        this.locklessWorkQueues.set(workId, tail);
+
+        await previous.catch(() => undefined);
+        try {
+            return await operation();
+        } finally {
+            release();
+            if (this.locklessWorkQueues.get(workId) === tail) {
+                this.locklessWorkQueues.delete(workId);
+            }
+        }
     }
 
     private supportsPessimisticWriteLock(): boolean {

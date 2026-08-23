@@ -257,11 +257,14 @@ export class WorkImportService {
             };
         }
 
-        // ImportWorkDto names are explicit, validated user input. Preserve the
-        // requested display name (and derive its slug from the full name); only
-        // repository-derived fallback names are normalized.
-        const requestedName = dto.name;
-        let slug = slugifyText(requestedName);
+        // Linked imports preserve the explicit validated display name and
+        // derive their slug from the full name. Other import modes retain
+        // their legacy suffix normalization contract.
+        const workName =
+            dto.sourceType === ImportSourceTypeEnum.LINK_EXISTING
+                ? dto.name
+                : this.normalizeWorkName(dto.name, dto.sourceType);
+        let slug = slugifyText(workName);
 
         const existingDir = await this.workRepository.findByOwnerAndSlug({
             userId: user.id,
@@ -353,7 +356,7 @@ export class WorkImportService {
             const work = await this.workRepository.create(
                 {
                     slug,
-                    name: requestedName,
+                    name: workName,
                     description: `Imported from ${safeSourceUrl}`,
                     userId: user.id,
                     owner: workOwner,
