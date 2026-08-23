@@ -1606,7 +1606,12 @@ describe('Stripe Tax — every session that CHARGES asks for tax', () => {
         expect(params.automatic_tax).toEqual({ enabled: true });
         // Required alongside automatic_tax when an existing customer is passed: Stripe needs an
         // address to pick a jurisdiction, and without this the session errors instead of taxing.
-        expect(params.customer_update).toEqual({ address: 'auto' });
+        //
+        // 🛑 `name: 'auto'` is just as load-bearing, and this assertion previously said
+        // `{ address: 'auto' }` alone — which Stripe REJECTS with a 400 whenever
+        // `tax_id_collection` is on and the session names an existing customer. The test
+        // passed because it asserted the object we built, not the object Stripe accepts.
+        expect(params.customer_update).toEqual({ address: 'auto', name: 'auto' });
         // Lets a business supply its VAT/GST number, which is what triggers EU reverse charge.
         expect(params.tax_id_collection).toEqual({ enabled: true });
     });
@@ -1634,6 +1639,63 @@ describe('Stripe Tax — every session that CHARGES asks for tax', () => {
         expect(params.automatic_tax).toEqual({ enabled: true });
     });
 
+    /**
+     * 🛑 THE INVARIANT THIS FILE EXISTS TO PROTECT.
+     *
+     * Stripe refuses `tax_id_collection` on any session that passes an existing
+     * `customer` unless `customer_update.name` is also `'auto'`:
+     *
+     *   "Tax ID collection requires updating business name on the customer. To
+     *    enable tax ID collection for an existing customer, please set
+     *    `customer_update[name]` to `auto`."
+     *
+     * Every charging session here passes a customer, so dropping that one field
+     * does not degrade tax collection — it 400s EVERY purchase in the product:
+     * credit packs, plans and the perpetual licence alike.
+     *
+     * This cannot be caught by mocking harder. The Stripe client is a jest mock in
+     * these specs, so it accepts any shape; the rejection exists only at the real
+     * API. Verified against Stripe test mode on 2026-08-23:
+     *   address-only            -> 400 invalid_request_error
+     *   address + name = 'auto' -> 200, session created
+     * Re-run that probe if this ever needs changing; do not reason about it.
+     */
+    it('pairs tax_id_collection with customer_update.name on EVERY charging session', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession(taxPlanRequest as any);
+        await provider.createCreditCheckoutSession({
+            userId: 'u1',
+            userEmail: 'u1@example.com',
+            customerId: 'cus_1',
+            pack: {
+                packId: 'credits-1000',
+                label: '1,000 credits',
+                credits: 1000,
+                priceCents: 1000,
+                currency: 'usd',
+            },
+            successUrl: 'https://app.test/ok',
+            cancelUrl: 'https://app.test/no',
+            referenceId: 'u1:credits-1000',
+        } as any);
+        await provider.createPlanCheckoutSession({
+            ...taxPlanRequest,
+            plan: { ...taxPlanRequest.plan, mode: 'payment', code: 'selfhosted_pro' },
+        } as any);
+
+        const calls = client.checkout.sessions.create.mock.calls.map(([params]) => params);
+        expect(calls).toHaveLength(3);
+        for (const params of calls) {
+            if (!params.tax_id_collection?.enabled) continue;
+            expect(params.customer_update?.name).toBe('auto');
+        }
+        // Control: the loop must actually have inspected something. Without this, a
+        // future change that stops setting tax_id_collection would make the assertion
+        // vacuous and this test would keep passing while collecting no tax ids.
+        expect(calls.filter((p) => p.tax_id_collection?.enabled)).toHaveLength(3);
+    });
+
     it('does NOT enable automatic tax on a card-setup session', async () => {
         // `mode: 'setup'` charges nothing and Stripe rejects automatic_tax there, so this is not
         // an oversight to "fix" later — sending it would break saving a card outright.
@@ -1650,5 +1712,31 @@ describe('Stripe Tax — every session that CHARGES asks for tax', () => {
         expect(params.mode).toBe('setup');
         expect(params.automatic_tax).toBeUndefined();
         expect(params.tax_id_collection).toBeUndefined();
+    });
+
+    /**
+     * 🛑 A `mode: 'setup'` session needs EITHER `currency` or an explicit
+     * `payment_method_types`. With neither, Stripe answers
+     * "Missing required param: currency" and saving a card fails outright - it does
+     * not degrade, it 400s.
+     *
+     * This was live and unnoticed because the Stripe client is mocked here, so the
+     * incomplete shape looked fine to every test. Confirmed against Stripe test mode
+     * on 2026-08-23: without currency => 400, with currency => 200 and
+     * `payment_method_types: ["card"]` still resolved dynamically.
+     */
+    it('sends a currency on the setup session, or Stripe refuses it', async () => {
+        const { provider, client } = build();
+
+        await provider.createPaymentMethodSetupSession({
+            userId: 'u1',
+            customerId: 'cus_1',
+            successUrl: 'https://app.test/ok',
+            cancelUrl: 'https://app.test/no',
+        } as any);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('setup');
+        expect(Boolean(params.currency) || Boolean(params.payment_method_types?.length)).toBe(true);
     });
 });

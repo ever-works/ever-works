@@ -95,7 +95,21 @@ export const STRIPE_PERPETUAL_LICENCE = 'perpetual-commercial' as const;
  */
 const STRIPE_TAX_SESSION_FIELDS = {
     automatic_tax: { enabled: true },
-    customer_update: { address: 'auto' },
+    // 🛑 `name: 'auto'` is NOT optional here, and its absence is not a degraded
+    // experience - it is a hard 400 on EVERY session. Stripe refuses
+    // `tax_id_collection` on a session that passes an existing `customer` unless
+    // `customer_update.name` is also 'auto':
+    //
+    //   "Tax ID collection requires updating business name on the customer. To
+    //    enable tax ID collection for an existing customer, please set
+    //    `customer_update[name]` to `auto`."
+    //
+    // Every session this constant is spread into passes a `customer`, so without
+    // this line NOTHING in Ever Works can be bought - not credit packs, not plans,
+    // not the perpetual licence. No unit test can catch it either: the provider
+    // specs mock the Stripe client, so the rejection only exists at the real API.
+    // Verified against Stripe test mode: address-only => 400, address+name => 200.
+    customer_update: { address: 'auto', name: 'auto' },
     tax_id_collection: { enabled: true },
 } as const;
 
@@ -896,6 +910,17 @@ export class StripeBillingProvider extends BillingProvider {
         const session = await stripe.checkout.sessions.create({
             mode: 'setup',
             customer: request.customerId,
+            // 🛑 Required. Stripe rejects a `mode: 'setup'` session outright -
+            // "Missing required param: currency" - unless EITHER `currency` or an
+            // explicit `payment_method_types` is given. Neither was, so saving a card
+            // has been returning a 400 for every user, not degrading gracefully.
+            //
+            // Found by replaying this exact call against Stripe test mode; the unit
+            // specs mock the client, so they accept the incomplete shape happily.
+            // `currency` is preferred over pinning `payment_method_types: ['card']`
+            // because it lets Checkout keep offering whatever methods the account has
+            // enabled for that currency instead of hardcoding cards.
+            currency: this.getDefaultCurrency(),
             success_url: request.successUrl,
             cancel_url: request.cancelUrl,
             metadata: {
