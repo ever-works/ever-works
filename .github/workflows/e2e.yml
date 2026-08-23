@@ -38,8 +38,19 @@ name: E2E Tests
 # manually on the branch (`gh workflow run e2e.yml --ref <branch>`); that
 # one-off run is the pre-merge signal, replacing the old auto-on-push runs.
 #
-# The `concurrency` block below cancels a superseded run when a newer
-# commit reaches develop, so only the latest commit is ever validated.
+# The `concurrency` block below QUEUES a run that arrives while an older one
+# for the same ref is still going, instead of cancelling the older one.
+#
+# It used to be `cancel-in-progress: true` ("only the latest commit is ever
+# validated"). In practice NO commit was: the suite takes ~2 h (32 shards on
+# a 12-runner pool) and stage was being pushed to about hourly, so on
+# 2026-08-22/23 six consecutive stage runs were cancelled in a row and the
+# Promotion Gate (stage -> main) had no E2E verdict for a day. GitHub keeps at
+# most ONE pending run per concurrency group and cancels older *pending* ones,
+# so with `cancel-in-progress: false` the running suite finishes, the newest
+# push waits behind it, and every push still converges on the latest commit -
+# the runner load is the same either way (one run at a time), but the gate
+# now produces verdicts. Same policy as k8s-e2e.yml in this repo.
 #
 # See Workspace/knowledge/runbooks/CI_RELEASE_GATES.md for the policy.
 
@@ -54,7 +65,7 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   e2e:
