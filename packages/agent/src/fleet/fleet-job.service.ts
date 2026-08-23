@@ -128,12 +128,7 @@ export class FleetJobService {
             }
         }
 
-        const targetNodeId = await this.resolveTargetNodeId(
-            input.kind,
-            input.userId,
-            input.organizationId,
-            payload,
-        );
+        const targetNodeId = await this.resolveTargetNodeId(input.kind, input.userId, payload);
 
         const created = await this.jobs.create({
             userId: input.userId,
@@ -149,21 +144,36 @@ export class FleetJobService {
         return toJobView(created);
     }
 
-    private async resolveTargetNodeId(
-        kind: FleetJobKind,
-        userId: string,
-        organizationId: string | null | undefined,
-        payload: Record<string, unknown> | null,
-    ): Promise<string | null> {
-        if (kind !== 'agent-task' || typeof organizationId !== 'string' || !organizationId) {
-            return null;
-        }
-        const agentId = payload?.agentId;
+    /**
+     * The node an `agent-task` for this Agent is pinned to, or null when
+     * the Agent is unbound (or not a well-formed owned Agent id). The
+     * binding is resolved through the AGENT's own Organization — never
+     * through the scope a particular job or Task happens to carry, which
+     * is null for cron-spawned recurrence instances and can differ for a
+     * Task created under another of the owner's Organizations. Keying on
+     * the job would silently un-pin exactly the runs the owner bound.
+     *
+     * Public because the run router asks the same question BEFORE the
+     * job exists, to judge availability against the bound node instead
+     * of the whole fleet; both callers must agree on the answer.
+     */
+    async resolveAgentTaskTarget(userId: string, agentId: unknown): Promise<string | null> {
         if (typeof agentId !== 'string' || !isUUID(agentId)) {
             return null;
         }
-        const affinity = await this.affinities.findForAgent(userId, organizationId, agentId);
+        const affinity = await this.affinities.findForOwnedAgent(userId, agentId);
         return affinity?.nodeId ?? null;
+    }
+
+    private async resolveTargetNodeId(
+        kind: FleetJobKind,
+        userId: string,
+        payload: Record<string, unknown> | null,
+    ): Promise<string | null> {
+        if (kind !== 'agent-task') {
+            return null;
+        }
+        return this.resolveAgentTaskTarget(userId, payload?.agentId);
     }
 
     /**

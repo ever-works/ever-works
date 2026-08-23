@@ -1,6 +1,7 @@
 import {
     Body,
     Controller,
+    Delete,
     Get,
     HttpCode,
     HttpStatus,
@@ -59,6 +60,23 @@ export class FleetAgentAffinityController {
                 nodeId: body.nodeId,
             }),
         );
+    }
+
+    @Delete(':agentId/node-affinity')
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @ApiOperation({
+        summary:
+            'Return this Organization Agent to "any of my Fleet nodes". Idempotent — clearing an unbound Agent is a no-op. Jobs already queued keep the node they were enqueued for; only future jobs become unbound.',
+    })
+    async clear(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('agentId', ParseUUIDPipe) agentId: string,
+    ): Promise<void> {
+        await this.affinities.clearAffinity({
+            userId: auth.userId,
+            organizationId: this.scope.getOrganizationId(),
+            agentId,
+        });
     }
 }
 

@@ -1,7 +1,7 @@
 import { DataSource, Table } from 'typeorm';
-import { CreateFleetAgentNodeAffinity1786940000000 } from '../1786940000000-CreateFleetAgentNodeAffinity';
+import { CreateFleetAgentNodeAffinity1787508800000 } from '../1787508800000-create-fleet-agent-node-affinity';
 
-describe('CreateFleetAgentNodeAffinity1786940000000', () => {
+describe('CreateFleetAgentNodeAffinity1787508800000', () => {
     let dataSource: DataSource;
 
     beforeEach(async () => {
@@ -33,7 +33,7 @@ describe('CreateFleetAgentNodeAffinity1786940000000', () => {
 
     async function runUp(): Promise<void> {
         const runner = dataSource.createQueryRunner();
-        await new CreateFleetAgentNodeAffinity1786940000000().up(runner);
+        await new CreateFleetAgentNodeAffinity1787508800000().up(runner);
         await runner.release();
     }
 
@@ -96,7 +96,7 @@ describe('CreateFleetAgentNodeAffinity1786940000000', () => {
         await expect(runUp()).resolves.not.toThrow();
 
         const runner = dataSource.createQueryRunner();
-        await new CreateFleetAgentNodeAffinity1786940000000().down(runner);
+        await new CreateFleetAgentNodeAffinity1787508800000().down(runner);
         expect(await runner.hasTable('fleet_jobs')).toBe(true);
         expect(await runner.hasTable('fleet_agent_node_affinities')).toBe(true);
         expect(

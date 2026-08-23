@@ -54,6 +54,20 @@ export class FleetAgentNodeAffinityService {
         });
     }
 
+    /**
+     * Return an Agent to "any of my PCs" (idempotent). The same owner +
+     * active-Organization validation as `setAffinity` runs first, so a
+     * foreign or unknown Agent is a 404 whether or not a row exists.
+     * Already-queued jobs keep the snapshot they were enqueued with; only
+     * future jobs become unbound.
+     */
+    async clearAffinity(input: FleetAgentNodeAffinityScope): Promise<{ cleared: boolean }> {
+        const organizationId = this.requireOrganization(input.organizationId);
+        await this.requireOwnedOrganizationAgent(input.userId, organizationId, input.agentId);
+        const cleared = await this.affinities.remove(input.userId, organizationId, input.agentId);
+        return { cleared };
+    }
+
     private requireOrganization(organizationId: string | null | undefined): string {
         if (typeof organizationId !== 'string' || !organizationId.trim()) {
             throw new BadRequestException(

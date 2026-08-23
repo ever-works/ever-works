@@ -8,8 +8,8 @@ import { MigrationInterface, QueryRunner, Table, TableColumn, TableIndex } from 
  * be deleted as a side effect. The service validates ownership and active
  * Organization membership at the write boundary.
  */
-export class CreateFleetAgentNodeAffinity1786940000000 implements MigrationInterface {
-    name = 'CreateFleetAgentNodeAffinity1786940000000';
+export class CreateFleetAgentNodeAffinity1787508800000 implements MigrationInterface {
+    name = 'CreateFleetAgentNodeAffinity1787508800000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const jobs = await queryRunner.getTable('fleet_jobs');

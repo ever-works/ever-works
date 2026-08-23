@@ -27,10 +27,18 @@ import { FleetAgentNodeAffinityRepository } from '../fleet-agent-node-affinity.r
 const sha256Hex = (value: string): string =>
     createHash('sha256').update(value, 'utf8').digest('hex');
 
+/** The slice of an Agent row the affinity lookup reads: owner + Organization. */
+interface AgentRow {
+    id: string;
+    userId: string;
+    organizationId: string | null;
+}
+
 interface Stores {
     nodes: FleetNode[];
     jobs: FleetJob[];
     affinities: FleetAgentNodeAffinity[];
+    agents: AgentRow[];
 }
 
 /** Conditional update over an in-memory table, mirroring TypeORM's semantics. */
@@ -172,16 +180,20 @@ function makeRepos(stores: Stores): {
         findById: jest.fn(async (id: string) => stores.nodes.find((n) => n.id === id) ?? null),
     } as unknown as FleetNodeRepository;
 
+    const findForAgent = async (userId: string, organizationId: string, agentId: string) =>
+        stores.affinities.find(
+            (row) =>
+                row.userId === userId && row.organizationId === organizationId && row.agentId === agentId,
+        ) ?? null;
     const affinities = {
-        findForAgent: jest.fn(
-            async (userId: string, organizationId: string, agentId: string) =>
-                stores.affinities.find(
-                    (row) =>
-                        row.userId === userId &&
-                        row.organizationId === organizationId &&
-                        row.agentId === agentId,
-                ) ?? null,
-        ),
+        findForAgent: jest.fn(findForAgent),
+        // Mirrors the real repository: the binding is resolved through the
+        // AGENT's Organization, never through the job's.
+        findForOwnedAgent: jest.fn(async (userId: string, agentId: string) => {
+            const agent = stores.agents.find((row) => row.id === agentId && row.userId === userId);
+            if (!agent?.organizationId) return null;
+            return findForAgent(userId, agent.organizationId, agentId);
+        }),
     } as unknown as FleetAgentNodeAffinityRepository;
 
     return { jobs, nodes, affinities };
@@ -214,7 +226,7 @@ describe('FleetJobService', () => {
     const secretB = randomBytes(32).toString('base64url');
 
     beforeEach(() => {
-        stores = { nodes: [], jobs: [], affinities: [] };
+        stores = { nodes: [], jobs: [], affinities: [], agents: [] };
         const repos = makeRepos(stores);
         affinities = repos.affinities;
         service = new FleetJobService(repos.jobs, repos.nodes, repos.affinities);
@@ -265,6 +277,7 @@ describe('FleetJobService', () => {
         });
 
         it('snapshots the scoped Agent binding so a later change only affects future jobs', async () => {
+            stores.agents.push({ id: AGENT, userId: 'owner-1', organizationId: ORGANIZATION });
             stores.affinities.push({
                 id: '55555555-5555-4555-8555-555555555555',
                 userId: 'owner-1',
@@ -318,7 +331,80 @@ describe('FleetJobService', () => {
             });
 
             expect(job.targetNodeId).toBeNull();
-            expect(affinities.findForAgent).not.toHaveBeenCalled();
+            expect(affinities.findForOwnedAgent).not.toHaveBeenCalled();
+        });
+
+        it("resolves the binding through the AGENT's Organization, not the job's (a recurrence instance carries none)", async () => {
+            stores.agents.push({ id: AGENT, userId: 'owner-1', organizationId: ORGANIZATION });
+            stores.affinities.push({
+                id: '55555555-5555-4555-8555-555555555555',
+                userId: 'owner-1',
+                organizationId: ORGANIZATION,
+                agentId: AGENT,
+                nodeId: NODE_A,
+            } as FleetAgentNodeAffinity);
+
+            // A cron-spawned recurrence instance is cloned without a scope.
+            const personalScope = await service.enqueue({
+                userId: 'owner-1',
+                organizationId: null,
+                kind: 'agent-task',
+                payload: { taskId: 'task-1', agentId: AGENT },
+            });
+            // A Task created while ANOTHER of the owner's Organizations was active.
+            const otherOrganization = await service.enqueue({
+                userId: 'owner-1',
+                organizationId: '66666666-6666-4666-8666-666666666666',
+                kind: 'agent-task',
+                payload: { taskId: 'task-2', agentId: AGENT },
+            });
+
+            expect(personalScope.targetNodeId).toBe(NODE_A);
+            expect(otherOrganization.targetNodeId).toBe(NODE_A);
+        });
+
+        it("leaves the job unbound when the Agent is not the job owner's, even if a binding row exists", async () => {
+            stores.agents.push({ id: AGENT, userId: 'owner-2', organizationId: ORGANIZATION });
+            stores.affinities.push({
+                id: '55555555-5555-4555-8555-555555555555',
+                userId: 'owner-2',
+                organizationId: ORGANIZATION,
+                agentId: AGENT,
+                nodeId: NODE_A,
+            } as FleetAgentNodeAffinity);
+
+            const job = await service.enqueue({
+                userId: 'owner-1',
+                organizationId: ORGANIZATION,
+                kind: 'agent-task',
+                payload: { taskId: 'task-1', agentId: AGENT },
+            });
+
+            expect(job.targetNodeId).toBeNull();
+        });
+
+        it('answers the run router with the same target the enqueue path snapshots', async () => {
+            stores.agents.push({ id: AGENT, userId: 'owner-1', organizationId: ORGANIZATION });
+            await expect(service.resolveAgentTaskTarget('owner-1', AGENT)).resolves.toBeNull();
+
+            stores.affinities.push({
+                id: '55555555-5555-4555-8555-555555555555',
+                userId: 'owner-1',
+                organizationId: ORGANIZATION,
+                agentId: AGENT,
+                nodeId: NODE_B,
+            } as FleetAgentNodeAffinity);
+
+            await expect(service.resolveAgentTaskTarget('owner-1', AGENT)).resolves.toBe(NODE_B);
+            await expect(service.resolveAgentTaskTarget('owner-1', 'not-a-uuid')).resolves.toBeNull();
+            await expect(service.resolveAgentTaskTarget('owner-1', undefined)).resolves.toBeNull();
+            const job = await service.enqueue({
+                userId: 'owner-1',
+                organizationId: ORGANIZATION,
+                kind: 'agent-task',
+                payload: { taskId: 'task-1', agentId: AGENT },
+            });
+            expect(job.targetNodeId).toBe(NODE_B);
         });
     });
 
@@ -424,6 +510,29 @@ describe('FleetJobService', () => {
 
             expect(leased).toHaveLength(1);
             expect(leased?.[0].id).toBe(unbound.id);
+        });
+
+        it('keeps a reclaimed targeted job pinned to its node — a lapsed lease never relocates it', async () => {
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+            stores.jobs[0].targetNodeId = NODE_A;
+            const first = await service.lease({ nodeId: NODE_A, secret: secretA });
+            expect(first).toHaveLength(1);
+
+            // Node A dies holding the claim; its lease lapses.
+            stores.jobs[0].leaseExpiresAt = new Date(Date.now() - 1_000);
+
+            // B's poll reclaims the lapsed claim (the job is queued again)
+            // but may NOT take it: the snapshot survived the reclaim.
+            const leasedByB = await service.lease({ nodeId: NODE_B, secret: secretB });
+            expect(leasedByB).toEqual([]);
+            expect(stores.jobs[0].status).toBe('queued');
+            expect(stores.jobs[0].nodeId).toBeNull();
+            expect(stores.jobs[0].targetNodeId).toBe(NODE_A);
+
+            const backOnA = await service.lease({ nodeId: NODE_A, secret: secretA });
+            expect(backOnA).toHaveLength(1);
+            expect(backOnA?.[0].nodeId).toBe(NODE_A);
+            expect(backOnA?.[0].attempts).toBe(2);
         });
 
         it('reclaims lapsed claims inline, so a dead node does not freeze the queue', async () => {

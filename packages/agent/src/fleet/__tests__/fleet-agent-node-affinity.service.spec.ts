@@ -72,6 +72,14 @@ function makeService(stores: Stores): FleetAgentNodeAffinityService {
                 return created;
             },
         ),
+        remove: jest.fn(async (userId: string, organizationId: string, agentId: string) => {
+            const before = stores.affinities.length;
+            stores.affinities = stores.affinities.filter(
+                (row) =>
+                    !(row.userId === userId && row.organizationId === organizationId && row.agentId === agentId),
+            );
+            return stores.affinities.length < before;
+        }),
     } as unknown as FleetAgentNodeAffinityRepository;
 
     return new FleetAgentNodeAffinityService(affinities, agents as never, nodes);
@@ -145,6 +153,52 @@ describe('FleetAgentNodeAffinityService', () => {
             }),
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(stores.affinities).toEqual([]);
+    });
+
+    describe('clearAffinity', () => {
+        const scope = { userId: OWNER, organizationId: ORGANIZATION, agentId: AGENT };
+
+        it('returns the Agent to "any of my PCs" and is idempotent', async () => {
+            await service.setAffinity({ ...scope, nodeId: NODE });
+            expect(stores.affinities).toHaveLength(1);
+
+            await expect(service.clearAffinity(scope)).resolves.toEqual({ cleared: true });
+            expect(stores.affinities).toEqual([]);
+            await expect(service.getAffinity(scope)).resolves.toBeNull();
+
+            // Clearing an already-unbound Agent is a no-op, not an error.
+            await expect(service.clearAffinity(scope)).resolves.toEqual({ cleared: false });
+        });
+
+        it.each([
+            ['an unknown Agent', () => stores.agents.splice(0)],
+            ["another owner's Agent", () => (stores.agents[0].userId = OTHER_OWNER)],
+            [
+                'an Agent outside the active Organization',
+                () => (stores.agents[0].organizationId = OTHER_ORGANIZATION),
+            ],
+        ])('refuses to clear %s and leaves every binding in place', async (_label, arrange) => {
+            stores.affinities.push({
+                id: '88888888-8888-4888-8888-888888888888',
+                userId: OWNER,
+                organizationId: ORGANIZATION,
+                agentId: AGENT,
+                nodeId: NODE,
+            } as FleetAgentNodeAffinity);
+            arrange();
+
+            await expect(service.clearAffinity(scope)).rejects.toMatchObject({
+                constructor: NotFoundException,
+                message: 'Fleet Agent or node not found',
+            });
+            expect(stores.affinities).toHaveLength(1);
+        });
+
+        it('fails closed in personal scope before touching any row', async () => {
+            await expect(
+                service.clearAffinity({ ...scope, organizationId: null }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
     });
 
     it('returns null for an unbound owned Agent without weakening Agent validation', async () => {

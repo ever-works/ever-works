@@ -9,13 +9,14 @@ const NODE = '44444444-4444-4444-8444-444444444444';
 const auth = { userId: USER } as AuthenticatedUser;
 
 describe('FleetAgentAffinityController', () => {
-    let affinities: { getAffinity: jest.Mock; setAffinity: jest.Mock };
+    let affinities: { getAffinity: jest.Mock; setAffinity: jest.Mock; clearAffinity: jest.Mock };
     let scope: { getOrganizationId: jest.Mock };
     let controller: FleetAgentAffinityController;
 
     beforeEach(() => {
         affinities = {
             getAffinity: jest.fn(async () => null),
+            clearAffinity: jest.fn(async () => ({ cleared: true })),
             setAffinity: jest.fn(async (input) => ({
                 id: '55555555-5555-4555-8555-555555555555',
                 ...input,
@@ -59,5 +60,15 @@ describe('FleetAgentAffinityController', () => {
         expect(affinities.setAffinity).toHaveBeenCalledWith(
             expect.objectContaining({ organizationId: null }),
         );
+    });
+
+    it('clears the binding through the same owner and Organization scope', async () => {
+        await controller.clear(auth, AGENT);
+
+        expect(affinities.clearAffinity).toHaveBeenCalledWith({
+            userId: USER,
+            organizationId: ORGANIZATION,
+            agentId: AGENT,
+        });
     });
 });
