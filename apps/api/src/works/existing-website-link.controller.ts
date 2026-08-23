@@ -38,6 +38,7 @@ export class ExistingWebsiteLinkController {
     @ApiOperation({
         summary: 'Link an existing public website to a Work',
         description:
+            'Step 2 after POST /api/works/import with sourceType `link_existing`: pass the returned workId here. ' +
             'Registers an existing root HTTPS URL in the Work website and custom-domain records. ' +
             'This additive operation never deploys a website, configures DNS, contacts a deployment provider, or verifies the domain.',
     })
