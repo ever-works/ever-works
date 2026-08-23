@@ -2,6 +2,12 @@
 
 This package builds one `win32-x64` native helper. Phase 2 wires it into the private model-process factory, but this repository still does not publish, download, deploy, install, or register the helper as a Windows service. Production containment remains unavailable until a node operator supplies a complete trust policy for an externally signed, immutably installed artifact.
 
+The Cargo working directory is owned by the invoking user, who can rewrite its
+DACL. It is therefore not a boundary against a hostile concurrent process under
+that same Windows identity. Production signing must use a dedicated restricted
+builder identity in an isolated runner or VM; path and ACL revalidation alone
+does not satisfy that boundary.
+
 ## Reproducible unsigned build
 
 - `rust-toolchain.toml`, the exact `windows-sys` dependency, and committed `Cargo.lock` pin the Rust inputs.

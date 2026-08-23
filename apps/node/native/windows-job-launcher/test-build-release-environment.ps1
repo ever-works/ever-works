@@ -365,7 +365,8 @@ try {
 			) "Cargo was not invoked from a controlled config-discovery root"
 			Assert-True (
 				$cargoConfigDiscoveryProperty.Value.reparseComponents -ceq "forbidden" -and
-				$cargoConfigDiscoveryProperty.Value.mutationAccess -ceq "read-execute-only" -and
+				$cargoConfigDiscoveryProperty.Value.mutationAccess -ceq "same-user-owner-can-rewrite-dacl" -and
+				$cargoConfigDiscoveryProperty.Value.threatBoundary -ceq "production-forbidden-without-dedicated-builder-identity" -and
 				$cargoConfigDiscoveryProperty.Value.revalidation -ceq "immediately-before-each-cargo-command"
 			) "controlled Cargo directory did not record its reparse, ACL, and revalidation policy"
 		}

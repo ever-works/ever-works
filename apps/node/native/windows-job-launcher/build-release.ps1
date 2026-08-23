@@ -933,7 +933,8 @@ try {
 			manifestPath = "Cargo.toml"
 			ancestorConfigFiles = "required-absent"
 			reparseComponents = "forbidden"
-			mutationAccess = "read-execute-only"
+			mutationAccess = "same-user-owner-can-rewrite-dacl"
+			threatBoundary = "production-forbidden-without-dedicated-builder-identity"
 			revalidation = "immediately-before-each-cargo-command"
 		}
 		toolDiscovery = [ordered]@{
