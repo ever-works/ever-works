@@ -14,7 +14,12 @@ import { MissionGoal } from '../entities/mission-goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { GoalEvaluationService } from './goal-evaluation.service';
 import { validateGoalJudgment } from './goal-criteria';
-import { ownershipWhere, type OwnershipScope } from '../database/ownership-scope';
+import {
+    ownershipStamp,
+    ownershipWhere,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../database/ownership-scope';
 import {
     DEFAULT_CHECK_FREQUENCY_MINUTES,
     MIN_CHECK_FREQUENCY_MINUTES,
@@ -129,8 +134,13 @@ export class GoalsService {
      * Append-only observation history (progress sparkline / audit).
      * Newest-first; `limit` defaults to 100.
      */
-    async listSamples(userId: string, goalId: string, limit = 100): Promise<GoalMetricSampleDto[]> {
-        await this.findOrThrow(userId, goalId);
+    async listSamples(
+        userId: string,
+        goalId: string,
+        limit = 100,
+        scope?: OwnershipScope,
+    ): Promise<GoalMetricSampleDto[]> {
+        await this.findOrThrow(userId, goalId, scope);
         const rows = await this.samples.find({
             where: { goalId },
             order: { sampledAt: 'DESC' },
@@ -139,7 +149,7 @@ export class GoalsService {
         return rows.map(toGoalMetricSampleDto);
     }
 
-    async create(userId: string, input: CreateGoalInput): Promise<GoalDto> {
+    async create(userId: string, input: CreateGoalInput, scope?: OwnershipScope): Promise<GoalDto> {
         const metricSource = this.validateMetricSource(input.metricSource, {
             requireProvider: false,
         });
@@ -151,6 +161,7 @@ export class GoalsService {
         const saved = await this.goals.save(
             this.goals.create({
                 userId,
+                ...ownershipStamp(scope),
                 title: input.title.trim().slice(0, 200),
                 description: input.description?.trim() || null,
                 metricSource,
@@ -181,8 +192,13 @@ export class GoalsService {
      * writing `outcome: null` clears an auto-set outcome without
      * changing status (re-open via activate).
      */
-    async update(userId: string, goalId: string, input: UpdateGoalInput): Promise<GoalDto> {
-        const existing = await this.findOrThrow(userId, goalId);
+    async update(
+        userId: string,
+        goalId: string,
+        input: UpdateGoalInput,
+        scope?: OwnershipScope,
+    ): Promise<GoalDto> {
+        const existing = await this.findOrThrow(userId, goalId, scope);
 
         if (input.title !== undefined) existing.title = input.title.trim().slice(0, 200);
         if (input.description !== undefined) {
@@ -254,8 +270,12 @@ export class GoalsService {
         return toGoalDto(await this.goals.save(existing));
     }
 
-    async delete(userId: string, goalId: string): Promise<{ deleted: true }> {
-        const existing = await this.findOrThrow(userId, goalId);
+    async delete(
+        userId: string,
+        goalId: string,
+        scope?: OwnershipScope,
+    ): Promise<{ deleted: true }> {
+        const existing = await this.findOrThrow(userId, goalId, scope);
         // DB-level cascades remove samples + mission_goals edges.
         await this.goals.remove(existing);
         return { deleted: true };
@@ -271,8 +291,8 @@ export class GoalsService {
      * `nextCheckAt` is set to "now" so the next dispatcher tick
      * evaluates immediately.
      */
-    async activate(userId: string, goalId: string): Promise<GoalDto> {
-        const existing = await this.findOrThrow(userId, goalId);
+    async activate(userId: string, goalId: string, scope?: OwnershipScope): Promise<GoalDto> {
+        const existing = await this.findOrThrow(userId, goalId, scope);
         if (!ACTIVATABLE_STATUSES.includes(existing.status)) {
             throw new BadRequestException(
                 `Goal cannot be activated from status "${existing.status}". Allowed: ${ACTIVATABLE_STATUSES.join(', ')}.`,
@@ -286,8 +306,8 @@ export class GoalsService {
     }
 
     /** ACTIVE → PAUSED; clears `nextCheckAt` so the dispatcher skips it. */
-    async pause(userId: string, goalId: string): Promise<GoalDto> {
-        const existing = await this.findOrThrow(userId, goalId);
+    async pause(userId: string, goalId: string, scope?: OwnershipScope): Promise<GoalDto> {
+        const existing = await this.findOrThrow(userId, goalId, scope);
         if (!PAUSABLE_STATUSES.includes(existing.status)) {
             throw new BadRequestException(
                 `Goal cannot be paused from status "${existing.status}". Allowed: ${PAUSABLE_STATUSES.join(', ')}.`,
@@ -308,29 +328,36 @@ export class GoalsService {
     async evaluateNow(
         userId: string,
         goalId: string,
+        scope?: OwnershipScope,
     ): Promise<{ entry: GoalEvaluationEntry; goal: GoalDto }> {
-        const existing = await this.findOrThrow(userId, goalId);
+        const existing = await this.findOrThrow(userId, goalId, scope);
         if (existing.status !== GoalStatus.ACTIVE) {
             throw new BadRequestException(
                 `Goal must be active to evaluate now (status is "${existing.status}").`,
             );
         }
         const entry = await this.evaluationService.evaluateOne(existing);
-        const fresh = await this.findOrThrow(userId, goalId);
+        const fresh = await this.findOrThrow(userId, goalId, scope);
         return { entry, goal: toGoalDto(fresh) };
     }
 
     // ─── Mission ↔ Goal links ───────────────────────────────────────
 
-    async listForMission(userId: string, missionId: string): Promise<MissionGoalLinkDto[]> {
-        await this.findMissionOrThrow(userId, missionId);
+    async listForMission(
+        userId: string,
+        missionId: string,
+        scope?: OwnershipScope,
+    ): Promise<MissionGoalLinkDto[]> {
+        await this.findMissionOrThrow(userId, missionId, scope);
         const links = await this.missionGoals.find({
-            where: { missionId },
+            where: ownershipWhereWith<MissionGoal>(userId, scope, { missionId }),
             order: { createdAt: 'ASC' },
         });
         if (links.length === 0) return [];
         const goalRows = await this.goals.find({
-            where: { id: In(links.map((l) => l.goalId)) },
+            where: ownershipWhereWith<Goal>(userId, scope, {
+                id: In(links.map((l) => l.goalId)),
+            }),
         });
         const byId = new Map(goalRows.map((g) => [g.id, g]));
         return links.map((link) => toMissionGoalLinkDto(link, byId.get(link.goalId) ?? null));
@@ -352,17 +379,30 @@ export class GoalsService {
         missionId: string,
         goalId: string,
         isPrimary = false,
+        scope?: OwnershipScope,
     ): Promise<MissionGoalLinkDto> {
-        await this.findMissionOrThrow(userId, missionId);
-        const goal = await this.findOrThrow(userId, goalId);
+        await this.findMissionOrThrow(userId, missionId, scope);
+        const goal = await this.findOrThrow(userId, goalId, scope);
 
         if (isPrimary) {
             // Demote-before-promote so the Postgres partial unique
             // index never sees two primaries.
-            await this.missionGoals.update({ missionId, isPrimary: true }, { isPrimary: false });
+            const currentPrimaries = await this.missionGoals.find({
+                where: ownershipWhereWith<MissionGoal>(userId, scope, {
+                    missionId,
+                    isPrimary: true,
+                }),
+            });
+            await Promise.all(
+                currentPrimaries.map((primary) => {
+                    primary.isPrimary = false;
+                    return this.missionGoals.save(primary);
+                }),
+            );
         }
 
-        let link = await this.missionGoals.findOne({ where: { missionId, goalId } });
+        const linkWhere = ownershipWhereWith<MissionGoal>(userId, scope, { missionId, goalId });
+        let link = await this.missionGoals.findOne({ where: linkWhere });
         if (link) {
             if (link.isPrimary !== isPrimary) {
                 link.isPrimary = isPrimary;
@@ -373,14 +413,20 @@ export class GoalsService {
 
         try {
             link = await this.missionGoals.save(
-                this.missionGoals.create({ missionId, goalId, userId, isPrimary }),
+                this.missionGoals.create({
+                    missionId,
+                    goalId,
+                    userId,
+                    isPrimary,
+                    ...ownershipStamp(scope),
+                }),
             );
         } catch (err) {
             // Duplicate (missionId, goalId) race — re-read and apply
             // the isPrimary intent (mirrors the MissionAttachment
             // idempotency contract).
             if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
-                const existing = await this.missionGoals.findOne({ where: { missionId, goalId } });
+                const existing = await this.missionGoals.findOne({ where: linkWhere });
                 if (existing) {
                     if (existing.isPrimary !== isPrimary) {
                         existing.isPrimary = isPrimary;
@@ -402,9 +448,13 @@ export class GoalsService {
         userId: string,
         missionId: string,
         goalId: string,
+        scope?: OwnershipScope,
     ): Promise<{ deleted: true }> {
-        await this.findMissionOrThrow(userId, missionId);
-        const link = await this.missionGoals.findOne({ where: { missionId, goalId } });
+        await this.findMissionOrThrow(userId, missionId, scope);
+        await this.findOrThrow(userId, goalId, scope);
+        const link = await this.missionGoals.findOne({
+            where: ownershipWhereWith<MissionGoal>(userId, scope, { missionId, goalId }),
+        });
         if (!link) {
             throw new NotFoundException(`Goal link not found`);
         }
@@ -425,12 +475,7 @@ export class GoalsService {
         scope?: OwnershipScope,
     ): Promise<Goal> {
         const row = await this.goals.findOne({
-            where: scope
-                ? ownershipWhere<Goal>(userId, scope).map((branch) => ({
-                      ...branch,
-                      id: goalId,
-                  }))
-                : { id: goalId, userId },
+            where: ownershipWhereWith<Goal>(userId, scope, { id: goalId }),
         });
         if (!row) {
             throw new NotFoundException(`Goal not found`);
@@ -438,8 +483,14 @@ export class GoalsService {
         return row;
     }
 
-    private async findMissionOrThrow(userId: string, missionId: string): Promise<Mission> {
-        const row = await this.missions.findOne({ where: { id: missionId, userId } });
+    private async findMissionOrThrow(
+        userId: string,
+        missionId: string,
+        scope?: OwnershipScope,
+    ): Promise<Mission> {
+        const row = await this.missions.findOne({
+            where: ownershipWhereWith<Mission>(userId, scope, { id: missionId }),
+        });
         if (!row) {
             throw new NotFoundException(`Mission not found`);
         }

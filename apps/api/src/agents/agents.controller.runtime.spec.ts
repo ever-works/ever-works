@@ -116,7 +116,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             markFailed: jest.fn().mockResolvedValue(undefined),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
-            findByIdAndUser: jest.fn().mockResolvedValue(null),
+            findByIdAndUser: jest.fn().mockResolvedValue({ id: runId, agentId }),
             // Wave 4 M3 — org-wide Sessions list (owner-scoped variant).
             listSessionsForUser: jest.fn().mockResolvedValue([[], 0]),
         };
@@ -235,6 +235,42 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
     });
 
     describe('GET /runs — Sessions list (Wave 4 M3)', () => {
+        it('passes the exact active Organization to the repository boundary', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            const scopedController = new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                runCanceller,
+                undefined,
+                undefined,
+                undefined,
+                { getScope: () => everScope } as never,
+            );
+
+            await scopedController.listRunSessions(auth, {});
+
+            expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
+                'u1',
+                expect.any(Object),
+                25,
+                0,
+                everScope,
+            );
+        });
+
         it('is owner-scoped at the repository layer — userId always comes from auth', async () => {
             // Security: no agent ownership pre-check exists on this route
             // (it spans all the caller's Agents), so the repository-level
@@ -254,6 +290,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 },
                 25,
                 0,
+                undefined,
             );
         });
 
@@ -279,6 +316,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 },
                 5,
                 10,
+                undefined,
             );
         });
 
@@ -291,6 +329,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                 expect.objectContaining({ attention: true }),
                 25,
                 0,
+                undefined,
             );
         });
 
@@ -482,6 +521,18 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
 
         it('steer 404s a cross-user Agent before touching the run', async () => {
             service.getOne.mockRejectedValueOnce(new NotFoundException('nope'));
+            await expect(
+                controller.steerRun(auth, agentId, runId, { message: 'go left' }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(steering.steer).not.toHaveBeenCalled();
+        });
+
+        it('steer 404s a known run UUID bound to a different Agent', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce({
+                id: runId,
+                agentId: '00000000-0000-0000-0000-000000000099',
+            });
+
             await expect(
                 controller.steerRun(auth, agentId, runId, { message: 'go left' }),
             ).rejects.toBeInstanceOf(NotFoundException);
@@ -731,6 +782,18 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             await expect(controller.cancelRun(auth, agentId, runId)).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+        });
+
+        it('does not cancel a known run UUID bound to a different Agent', async () => {
+            agentRuns.findByIdAndUser.mockResolvedValueOnce({
+                id: runId,
+                agentId: '00000000-0000-0000-0000-000000000099',
+            });
+
+            await expect(controller.cancelRun(auth, agentId, runId)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(agentRuns.cancel).not.toHaveBeenCalled();
         });
 
         it('also cancels the Trigger.dev run when the row carries a triggerRunId', async () => {

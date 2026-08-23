@@ -152,6 +152,8 @@ export function toGoalMetricSampleDto(sample: GoalMetricSample): GoalMetricSampl
 /** Mission ↔ Goal edge, expanded with the Goal projection. */
 export interface MissionGoalLinkDto {
     id: string;
+    tenantId: string | null;
+    organizationId: string | null;
     missionId: string;
     goalId: string;
     isPrimary: boolean;
@@ -163,6 +165,8 @@ export function toMissionGoalLinkDto(link: MissionGoal, goal?: Goal | null): Mis
     const resolved = goal ?? link.goal ?? null;
     return {
         id: link.id,
+        tenantId: link.tenantId ?? null,
+        organizationId: link.organizationId ?? null,
         missionId: link.missionId,
         goalId: link.goalId,
         isPrimary: link.isPrimary,

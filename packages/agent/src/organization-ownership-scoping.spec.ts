@@ -295,6 +295,22 @@ describe('Organization ownership scoping', () => {
             expect(created).toMatchObject(EVER_SCOPE);
             expect(read).toMatchObject(EVER_SCOPE);
         });
+
+        it('does not update a known Mission UUID from another active Organization', async () => {
+            const hidden = mission({ id: 'mission-yo', title: 'Yo Mission', ...OTHER_SCOPE });
+            const { repo, service } = makeService([hidden]);
+
+            await expect(
+                (service.update as any)(
+                    'user-1',
+                    hidden.id,
+                    { title: 'Ever overwrite' },
+                    EVER_SCOPE,
+                ),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(repo.save).not.toHaveBeenCalled();
+            expect(hidden.title).toBe('Yo Mission');
+        });
     });
 
     describe('GoalsService', () => {
@@ -393,6 +409,16 @@ describe('Organization ownership scoping', () => {
             expect(created).toMatchObject(EVER_SCOPE);
             expect(read).toMatchObject(EVER_SCOPE);
         });
+
+        it('does not activate a known Goal UUID from another active Organization', async () => {
+            const hidden = goal({ id: 'goal-yo', title: 'Yo Goal', ...OTHER_SCOPE });
+            const service = makeService([hidden]);
+
+            await expect(
+                (service.activate as any)('user-1', hidden.id, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(hidden.status).toBe(GoalStatus.DRAFT);
+        });
     });
 
     describe('AgentsService', () => {
@@ -414,6 +440,7 @@ describe('Organization ownership scoping', () => {
                     rows.push(saved);
                     return saved;
                 }),
+                archiveById: jest.fn(),
             };
             return new AgentsService(agents as never, {} as never, {} as never);
         }
@@ -465,6 +492,153 @@ describe('Organization ownership scoping', () => {
             const read = await (service.getOne as any)('user-1', created.id, EVER_SCOPE);
             expect(created).toMatchObject(EVER_SCOPE);
             expect(read).toMatchObject(EVER_SCOPE);
+        });
+
+        it('does not archive a known Agent UUID from another active Organization', async () => {
+            const hidden = agent({ id: 'agent-yo', name: 'Yo Agent', ...OTHER_SCOPE });
+            const service = makeService([hidden]);
+
+            await expect(
+                (service.archive as any)('user-1', hidden.id, EVER_SCOPE),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('does not create an Agent with a bulk target from another Organization', async () => {
+            const foreignWork = {
+                id: 'work-yo',
+                userId: 'user-1',
+                ...OTHER_SCOPE,
+            } as Work;
+            const agents = {
+                findByUserIdAndSlug: jest.fn(async () => null),
+                create: jest.fn(async (partial: Partial<Agent>) => agent(partial)),
+            };
+            const memberships = { replaceForAgent: jest.fn(async () => undefined) };
+            const workRepo = {
+                findOne: jest.fn(
+                    async (options: {
+                        where?: FindOptionsWhere<Work> | FindOptionsWhere<Work>[];
+                    }) =>
+                        matchesWhere(
+                            foreignWork as unknown as Record<string, unknown>,
+                            options.where as never,
+                        )
+                            ? foreignWork
+                            : null,
+                ),
+            };
+            const service = new AgentsService(
+                agents as never,
+                memberships as never,
+                {} as never,
+                undefined,
+                workRepo as unknown as Repository<Work>,
+            );
+
+            await expect(
+                (service.create as any)(
+                    'user-1',
+                    {
+                        scope: AgentScope.TENANT,
+                        name: 'Ever operator',
+                        targets: [{ type: 'work', id: foreignWork.id }],
+                    },
+                    EVER_SCOPE,
+                ),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(agents.create).not.toHaveBeenCalled();
+        });
+
+        it('does not replace Agent targets with a known Work from another Organization', async () => {
+            const ownedAgent = agent({ id: 'agent-ever', ...EVER_SCOPE });
+            const foreignWork = {
+                id: 'work-yo',
+                userId: 'user-1',
+                ...OTHER_SCOPE,
+            } as Work;
+            const agents = {
+                findByIdAndUser: jest.fn(async () => ownedAgent),
+                findById: jest.fn(async () => ownedAgent),
+                updateById: jest.fn(async () => undefined),
+            };
+            const memberships = { replaceForAgent: jest.fn(async () => undefined) };
+            const workRepo = {
+                findOne: jest.fn(
+                    async (options: {
+                        where?: FindOptionsWhere<Work> | FindOptionsWhere<Work>[];
+                    }) =>
+                        matchesWhere(
+                            foreignWork as unknown as Record<string, unknown>,
+                            options.where as never,
+                        )
+                            ? foreignWork
+                            : null,
+                ),
+            };
+            const service = new AgentsService(
+                agents as never,
+                memberships as never,
+                {} as never,
+                undefined,
+                workRepo as unknown as Repository<Work>,
+            );
+
+            await expect(
+                (service.update as any)(
+                    'user-1',
+                    ownedAgent.id,
+                    { targets: [{ type: 'work', id: foreignWork.id }] },
+                    EVER_SCOPE,
+                ),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(agents.updateById).not.toHaveBeenCalled();
+            expect(memberships.replaceForAgent).not.toHaveBeenCalled();
+        });
+
+        it('does not assign an Environment from another Organization', async () => {
+            const ownedAgent = agent({ id: 'agent-ever', ...EVER_SCOPE });
+            const foreignEnvironment = {
+                id: 'environment-yo',
+                userId: 'user-1',
+                status: 'published',
+                ...OTHER_SCOPE,
+            };
+            const agents = {
+                findByIdAndUser: jest.fn(async () => ownedAgent),
+                findById: jest.fn(async () => ownedAgent),
+                updateById: jest.fn(async () => undefined),
+            };
+            const environmentRepo = {
+                findOne: jest.fn(
+                    async (options: {
+                        where?:
+                            | FindOptionsWhere<typeof foreignEnvironment>
+                            | FindOptionsWhere<typeof foreignEnvironment>[];
+                    }) =>
+                        matchesWhere(foreignEnvironment, options.where) ? foreignEnvironment : null,
+                ),
+            };
+            const service = new AgentsService(
+                agents as never,
+                { replaceForAgent: jest.fn() } as never,
+                {} as never,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                environmentRepo as never,
+            );
+
+            await expect(
+                (service.update as any)(
+                    'user-1',
+                    ownedAgent.id,
+                    { environmentId: foreignEnvironment.id },
+                    EVER_SCOPE,
+                ),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(agents.updateById).not.toHaveBeenCalled();
         });
     });
 

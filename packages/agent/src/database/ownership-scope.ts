@@ -6,6 +6,16 @@ export interface OwnershipScope {
     organizationId: string | null;
 }
 
+export interface OwnershipStamp {
+    tenantId?: string | null;
+    organizationId?: string | null;
+}
+
+export interface OwnershipSqlPredicate {
+    clause: string;
+    parameters: Record<string, string>;
+}
+
 /**
  * User + request-scope predicates for Tier C entities.
  *
@@ -39,4 +49,63 @@ export function ownershipWhere<T>(userId: string, scope?: OwnershipScope): FindO
         { ...personal, tenantId: scope.tenantId } as FindOptionsWhere<T>,
         { ...personal, tenantId: IsNull() } as FindOptionsWhere<T>,
     ];
+}
+
+/** Add an entity-specific predicate without weakening either ownership branch. */
+export function ownershipWhereWith<T>(
+    userId: string,
+    scope: OwnershipScope | undefined,
+    where: FindOptionsWhere<T>,
+): FindOptionsWhere<T> | FindOptionsWhere<T>[] {
+    if (!scope) {
+        return { ...where, ...ownershipWhere<T>(userId)[0] };
+    }
+    return ownershipWhere<T>(userId, scope).map((branch) => ({ ...where, ...branch }));
+}
+
+/** Explicit scope columns for new Tier C rows; omitted legacy calls keep subscriber behavior. */
+export function ownershipStamp(scope?: OwnershipScope): OwnershipStamp {
+    return scope ? { tenantId: scope.tenantId, organizationId: scope.organizationId } : {};
+}
+
+/**
+ * QueryBuilder equivalent of {@link ownershipWhere}. The parameter prefix
+ * keeps the primitive safe to compose more than once in a single query.
+ */
+export function ownershipSqlPredicate(
+    alias: string,
+    scope?: OwnershipScope,
+    parameterPrefix = 'ownership',
+): OwnershipSqlPredicate | undefined {
+    if (!scope) return undefined;
+
+    const tenantParameter = `${parameterPrefix}TenantId`;
+    const organizationParameter = `${parameterPrefix}OrganizationId`;
+    const tenantColumn = `${alias}.tenantId`;
+    const organizationColumn = `${alias}.organizationId`;
+
+    if (scope.organizationId) {
+        const tenantClause = scope.tenantId
+            ? `${tenantColumn} = :${tenantParameter}`
+            : `${tenantColumn} IS NULL`;
+        return {
+            clause: `(${tenantClause} AND ${organizationColumn} = :${organizationParameter})`,
+            parameters: {
+                ...(scope.tenantId ? { [tenantParameter]: scope.tenantId } : {}),
+                [organizationParameter]: scope.organizationId,
+            },
+        };
+    }
+
+    if (!scope.tenantId) {
+        return {
+            clause: `(${organizationColumn} IS NULL AND ${tenantColumn} IS NULL)`,
+            parameters: {},
+        };
+    }
+
+    return {
+        clause: `(${organizationColumn} IS NULL AND (${tenantColumn} = :${tenantParameter} OR ${tenantColumn} IS NULL))`,
+        parameters: { [tenantParameter]: scope.tenantId },
+    };
 }

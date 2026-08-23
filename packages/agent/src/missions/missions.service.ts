@@ -34,7 +34,12 @@ import { toMissionDto, type MissionDto } from './types';
 // validate full-URL forms of `missionTemplateRepo` so a malicious value can
 // never be persisted for the Phase 8 scaffolder to clone/fetch.
 import { isSafeWebhookUrl } from '../utils';
-import { ownershipWhere, type OwnershipScope } from '../database/ownership-scope';
+import {
+    ownershipStamp,
+    ownershipWhere,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../database/ownership-scope';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -268,7 +273,11 @@ export class MissionsService {
      * title from the description automatically when the caller
      * doesn't supply one. For now title is required.
      */
-    async create(userId: string, input: CreateMissionInput): Promise<MissionDto> {
+    async create(
+        userId: string,
+        input: CreateMissionInput,
+        scope?: OwnershipScope,
+    ): Promise<MissionDto> {
         this.assertScheduleConsistency(input.type, input.schedule);
         const description = input.description.trim();
         // Phase 3 PR I — when the caller doesn't pass a title (or
@@ -289,6 +298,7 @@ export class MissionsService {
         const saved = await this.missions.save(
             this.missions.create({
                 userId,
+                ...ownershipStamp(scope),
                 title,
                 description,
                 type: input.type,
@@ -321,8 +331,9 @@ export class MissionsService {
         userId: string,
         missionId: string,
         input: UpdateMissionInput,
+        scope?: OwnershipScope,
     ): Promise<MissionDto> {
-        const existing = await this.findOrThrow(userId, missionId);
+        const existing = await this.findOrThrow(userId, missionId, scope);
 
         const nextType = input.type ?? existing.type;
         const nextSchedule =
@@ -364,13 +375,15 @@ export class MissionsService {
      *   - 400 BadRequest when the current status doesn't allow the
      *     transition (e.g. pause-ing an already-PAUSED Mission).
      */
-    async pause(userId: string, missionId: string): Promise<MissionDto> {
+    async pause(userId: string, missionId: string, scope?: OwnershipScope): Promise<MissionDto> {
         const dto = await this.transition(
             userId,
             missionId,
             PAUSABLE_STATUSES,
             MissionStatus.PAUSED,
             'pause',
+            undefined,
+            scope,
         );
         await this.recordActivity(userId, ActivityActionType.MISSION_PAUSED, 'pause', {
             missionId,
@@ -378,13 +391,15 @@ export class MissionsService {
         return dto;
     }
 
-    async resume(userId: string, missionId: string): Promise<MissionDto> {
+    async resume(userId: string, missionId: string, scope?: OwnershipScope): Promise<MissionDto> {
         const dto = await this.transition(
             userId,
             missionId,
             RESUMABLE_STATUSES,
             MissionStatus.ACTIVE,
             'resume',
+            undefined,
+            scope,
         );
         await this.recordActivity(userId, ActivityActionType.MISSION_RESUMED, 'resume', {
             missionId,
@@ -406,6 +421,7 @@ export class MissionsService {
         userId: string,
         missionId: string,
         outcome?: MissionOutcome | null,
+        scope?: OwnershipScope,
     ): Promise<MissionDto> {
         if (outcome != null && !Object.values(MissionOutcome).includes(outcome)) {
             throw new BadRequestException(
@@ -422,6 +438,7 @@ export class MissionsService {
                 m.outcome = outcome ?? null;
                 m.completedAt = new Date();
             },
+            scope,
         );
         await this.recordActivity(userId, ActivityActionType.MISSION_COMPLETED, 'complete', {
             missionId,
@@ -442,8 +459,12 @@ export class MissionsService {
      * Returns `{ deleted: true }` on success, 404 when the Mission
      * doesn't exist for this user.
      */
-    async delete(userId: string, missionId: string): Promise<{ deleted: true }> {
-        const existing = await this.findOrThrow(userId, missionId);
+    async delete(
+        userId: string,
+        missionId: string,
+        scope?: OwnershipScope,
+    ): Promise<{ deleted: true }> {
+        const existing = await this.findOrThrow(userId, missionId, scope);
         await this.missions.remove(existing);
         await this.recordActivity(userId, ActivityActionType.MISSION_DELETED, 'delete', {
             missionId,
@@ -472,6 +493,7 @@ export class MissionsService {
     async runNow(
         userId: string,
         missionId: string,
+        scope?: OwnershipScope,
     ): Promise<{
         status:
             | 'noop-placeholder'
@@ -486,7 +508,7 @@ export class MissionsService {
         ideasQueued?: number;
         message?: string;
     }> {
-        const mission = await this.findOrThrow(userId, missionId);
+        const mission = await this.findOrThrow(userId, missionId, scope);
         if (!RUNNABLE_STATUSES.includes(mission.status)) {
             throw new BadRequestException(
                 `Mission cannot be run from status "${mission.status}". Allowed: ${RUNNABLE_STATUSES.join(', ')}.`,
@@ -514,8 +536,12 @@ export class MissionsService {
      * Returns an empty array when the attachments repo isn't wired
      * (hand-rolled tests) — same defensive shape as the tick service.
      */
-    async listAttachments(userId: string, missionId: string): Promise<MissionAttachment[]> {
-        await this.findOrThrow(userId, missionId);
+    async listAttachments(
+        userId: string,
+        missionId: string,
+        scope?: OwnershipScope,
+    ): Promise<MissionAttachment[]> {
+        await this.findOrThrow(userId, missionId, scope);
         if (!this.missionAttachments) return [];
         return this.missionAttachments.findByMissionId(missionId);
     }
@@ -530,8 +556,9 @@ export class MissionsService {
         userId: string,
         missionId: string,
         uploadId: string,
+        scope?: OwnershipScope,
     ): Promise<MissionAttachment> {
-        await this.findOrThrow(userId, missionId);
+        await this.findOrThrow(userId, missionId, scope);
         if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
         }
@@ -574,8 +601,9 @@ export class MissionsService {
         userId: string,
         missionId: string,
         attachmentId: string,
+        scope?: OwnershipScope,
     ): Promise<{ deleted: true }> {
-        await this.findOrThrow(userId, missionId);
+        await this.findOrThrow(userId, missionId, scope);
         if (!this.missionAttachments) {
             throw new NotFoundException(`Attachment not found`);
         }
@@ -703,12 +731,7 @@ export class MissionsService {
         scope?: OwnershipScope,
     ): Promise<Mission> {
         const row = await this.missions.findOne({
-            where: scope
-                ? ownershipWhere<Mission>(userId, scope).map((branch) => ({
-                      ...branch,
-                      id: missionId,
-                  }))
-                : { id: missionId, userId },
+            where: ownershipWhereWith<Mission>(userId, scope, { id: missionId }),
         });
         if (!row) {
             throw new NotFoundException(`Mission not found`);
@@ -723,8 +746,9 @@ export class MissionsService {
         target: MissionStatus,
         verb: string,
         mutate?: (mission: Mission) => void,
+        scope?: OwnershipScope,
     ): Promise<MissionDto> {
-        const existing = await this.findOrThrow(userId, missionId);
+        const existing = await this.findOrThrow(userId, missionId, scope);
         if (!allowedFrom.includes(existing.status)) {
             throw new BadRequestException(
                 `Mission cannot be ${verb}d from status "${existing.status}". Allowed: ${allowedFrom.join(', ')}.`,

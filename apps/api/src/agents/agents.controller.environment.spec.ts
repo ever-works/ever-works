@@ -117,6 +117,7 @@ describe('AgentsController — Environment assignment mapping', () => {
             'u1',
             agentId,
             expect.objectContaining({ environmentId }),
+            activeScope,
         );
     });
 
@@ -126,6 +127,7 @@ describe('AgentsController — Environment assignment mapping', () => {
             'u1',
             agentId,
             expect.objectContaining({ environmentId: null }),
+            activeScope,
         );
     });
 

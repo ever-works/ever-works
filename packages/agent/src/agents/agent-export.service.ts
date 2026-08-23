@@ -26,6 +26,11 @@ import { Mission } from '../entities/mission.entity';
 import { Work } from '../entities/work.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
+import {
+    ownershipStamp,
+    ownershipWhereWith,
+    type OwnershipScope,
+} from '../database/ownership-scope';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { ActivityLogService } from '../activity-log/activity-log.service';
@@ -222,8 +227,12 @@ export class AgentExportService {
         private readonly agentEntityRepo?: Repository<Agent>,
     ) {}
 
-    async exportOne(userId: string, agentId: string): Promise<AgentExportEnvelope> {
-        const agent = await this.agents.findByIdAndUser(agentId, userId);
+    async exportOne(
+        userId: string,
+        agentId: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<AgentExportEnvelope> {
+        const agent = await this.agents.findByIdAndUser(agentId, userId, ownershipScope);
         if (!agent) {
             throw new NotFoundException(`Agent ${agentId} not found.`);
         }
@@ -315,6 +324,7 @@ export class AgentExportService {
         userId: string,
         envelope: AgentExportEnvelope,
         options: AgentImportOptions = {},
+        ownershipScope?: OwnershipScope,
     ): Promise<AgentImportResult> {
         this.assertValidEnvelope(envelope);
 
@@ -353,7 +363,8 @@ export class AgentExportService {
         // (id, userId) and 404 — same not-found shape either way — when it
         // is missing or owned by someone else. Tenant scope has no target
         // id, so it is unaffected.
-        await this.assertScopeOwned(userId, scope, { missionId, ideaId, workId });
+        await this.assertScopeOwned(userId, scope, { missionId, ideaId, workId }, ownershipScope);
+        await this.assertTargetsOwned(userId, envelope.runtime.targets, ownershipScope);
 
         // Secret-scan every file body BEFORE persisting — same hard-reject
         // posture as live edits via AgentFileService.write.
@@ -386,11 +397,13 @@ export class AgentExportService {
         const originalSlug = slugifyText(envelope.identity.name) || envelope.identity.slug;
         const mode = options.onConflict ?? 'rename';
 
-        const conflict = await this.agents.findByUserIdAndSlug(userId, scope, originalSlug, {
-            missionId,
-            ideaId,
-            workId,
-        });
+        const conflict = await this.agents.findByUserIdAndSlug(
+            userId,
+            scope,
+            originalSlug,
+            { missionId, ideaId, workId },
+            ownershipScope,
+        );
 
         let finalSlug = originalSlug;
         let conflictResolution: AgentImportResult['conflictResolution'] = 'none';
@@ -403,7 +416,11 @@ export class AgentExportService {
             } else if (mode === 'overwrite') {
                 await this.applyEnvelopeToExisting(conflict, envelope);
                 conflictResolution = 'overwritten';
-                const refreshed = (await this.agents.findById(conflict.id)) as Agent;
+                const refreshed = (await this.agents.findByIdAndUser(
+                    conflict.id,
+                    userId,
+                    ownershipScope,
+                )) as Agent;
                 await this.logActivity({
                     userId,
                     agentId: conflict.id,
@@ -417,11 +434,13 @@ export class AgentExportService {
                 };
             } else {
                 // rename
-                finalSlug = await this.deriveUniqueSlug(userId, scope, originalSlug, {
-                    missionId,
-                    ideaId,
-                    workId,
-                });
+                finalSlug = await this.deriveUniqueSlug(
+                    userId,
+                    scope,
+                    originalSlug,
+                    { missionId, ideaId, workId },
+                    ownershipScope,
+                );
                 conflictResolution = 'renamed';
             }
         }
@@ -448,6 +467,7 @@ export class AgentExportService {
 
         const created = await this.agents.create({
             userId,
+            ...ownershipStamp(ownershipScope),
             scope,
             missionId: scope === AgentScope.MISSION ? missionId : null,
             ideaId: scope === AgentScope.IDEA ? ideaId : null,
@@ -553,6 +573,7 @@ export class AgentExportService {
         userId: string,
         scope: AgentScope,
         ids: { missionId: string | null; ideaId: string | null; workId: string | null },
+        ownershipScope?: OwnershipScope,
     ): Promise<void> {
         // TENANT scope carries no target id — nothing to own-check.
         if (scope === AgentScope.TENANT) return;
@@ -582,19 +603,55 @@ export class AgentExportService {
             throw new BadRequestException(`Missing target id for ${scope}-scoped import.`);
         }
 
+        await this.assertEntityOwned(
+            userId,
+            entity,
+            targetId,
+            `${scope} ${targetId}`,
+            ownershipScope,
+        );
+    }
+
+    /** Imported bulk targets cannot bypass AgentsService.addTarget ownership checks. */
+    private async assertTargetsOwned(
+        userId: string,
+        targets: AgentTarget[] | null,
+        ownershipScope?: OwnershipScope,
+    ): Promise<void> {
+        for (const target of targets ?? []) {
+            if (target.type === 'wildcard') continue;
+            if (!target.id) {
+                throw new BadRequestException(`Imported ${target.type} target requires an id.`);
+            }
+            const entity: EntityTarget<ObjectLiteral> =
+                target.type === 'mission' ? Mission : target.type === 'idea' ? WorkProposal : Work;
+            await this.assertEntityOwned(
+                userId,
+                entity,
+                target.id,
+                `${target.type} ${target.id}`,
+                ownershipScope,
+            );
+        }
+    }
+
+    private async assertEntityOwned(
+        userId: string,
+        entity: EntityTarget<ObjectLiteral>,
+        id: string,
+        label: string,
+        ownershipScope?: OwnershipScope,
+    ): Promise<void> {
         // Skip only when the repo isn't wired (mock-only unit harnesses);
         // production resolves a live Repository<Agent> and its `.manager`
         // reaches every entity in the same DataSource.
         if (!this.agentEntityRepo) return;
 
-        // Existence-by-owner: count instead of hydrating a full row just to
-        // assert ownership.
-        const ownedCount = await this.agentEntityRepo.manager
-            .getRepository(entity)
-            .count({ where: { id: targetId, userId } });
+        const ownedCount = await this.agentEntityRepo.manager.getRepository(entity).count({
+            where: ownershipWhereWith<ObjectLiteral>(userId, ownershipScope, { id }),
+        });
         if (ownedCount === 0) {
-            // 404 (not 403) — don't leak existence of another user's scope.
-            throw new NotFoundException(`${scope} ${targetId} not found.`);
+            throw new NotFoundException(`${label} not found.`);
         }
     }
 
@@ -666,11 +723,18 @@ export class AgentExportService {
         scope: AgentScope,
         base: string,
         ids: { missionId: string | null; ideaId: string | null; workId: string | null },
+        ownershipScope?: OwnershipScope,
         maxAttempts = 200,
     ): Promise<string> {
         for (let i = 2; i <= maxAttempts; i++) {
             const candidate = `${base}-${i}`;
-            const existing = await this.agents.findByUserIdAndSlug(userId, scope, candidate, ids);
+            const existing = await this.agents.findByUserIdAndSlug(
+                userId,
+                scope,
+                candidate,
+                ids,
+                ownershipScope,
+            );
             if (!existing) return candidate;
         }
         throw new ConflictException(

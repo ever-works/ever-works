@@ -53,6 +53,8 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
         toolsMd: '# Tools\nNone.',
         agentYml: 'version: 1\n',
         contentHash: 'abc123',
+        tenantId: null,
+        organizationId: null,
         createdAt: new Date('2026-01-01'),
         updatedAt: new Date('2026-01-01'),
         ...over,
@@ -228,7 +230,7 @@ describe('AgentExportService', () => {
         it('applies memoryRecallEnabled on the overwrite path, and omits it when absent', async () => {
             const existing = makeAgent({ id: 'existing-ceo' });
             agents.findByUserIdAndSlug.mockResolvedValueOnce(existing);
-            agents.findById.mockResolvedValueOnce(existing);
+            agents.findByIdAndUser.mockResolvedValueOnce(existing);
             const env = baseEnvelope();
             env.model.memoryRecallEnabled = false;
 
@@ -240,7 +242,7 @@ describe('AgentExportService', () => {
 
             agents.updateById.mockClear();
             agents.findByUserIdAndSlug.mockResolvedValueOnce(existing);
-            agents.findById.mockResolvedValueOnce(existing);
+            agents.findByIdAndUser.mockResolvedValueOnce(existing);
             await svc.importOne('u1', baseEnvelope(), { onConflict: 'overwrite' });
             expect('memoryRecallEnabled' in agents.updateById.mock.calls[0][1]).toBe(false);
         });
@@ -265,7 +267,7 @@ describe('AgentExportService', () => {
         it('conflict overwrite — patches existing row and returns conflictResolution=overwritten', async () => {
             const existing = makeAgent({ id: 'existing-ceo' });
             agents.findByUserIdAndSlug.mockResolvedValueOnce(existing);
-            agents.findById.mockResolvedValueOnce({
+            agents.findByIdAndUser.mockResolvedValueOnce({
                 ...existing,
                 name: baseEnvelope().identity.name,
                 soulMd: '# Hi',
@@ -276,6 +278,39 @@ describe('AgentExportService', () => {
                 'existing-ceo',
                 expect.objectContaining({ soulMd: '# Hi' }),
             );
+        });
+
+        it('does not overwrite the same logical slug in another active Organization', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            const hidden = makeAgent({
+                id: 'yo-ceo',
+                name: 'Yo CEO',
+                tenantId: everScope.tenantId,
+                organizationId: '33333333-3333-4333-8333-333333333333',
+            });
+            agents.findByUserIdAndSlug.mockImplementation(async (...args: unknown[]) =>
+                (args[4] as typeof everScope | undefined)?.organizationId ===
+                everScope.organizationId
+                    ? null
+                    : hidden,
+            );
+            agents.findByIdAndUser.mockResolvedValue(hidden);
+            agents.create.mockImplementation(async (partial: Partial<Agent>) => makeAgent(partial));
+
+            const result = await (svc.importOne as any)(
+                'u1',
+                baseEnvelope(),
+                { onConflict: 'overwrite' },
+                everScope,
+            );
+
+            expect(result.conflictResolution).toBe('none');
+            expect(result.created).toMatchObject(everScope);
+            expect(agents.updateById).not.toHaveBeenCalled();
+            expect(hidden.name).toBe('Yo CEO');
         });
 
         it('rejects secret in any file body', async () => {
@@ -321,7 +356,7 @@ describe('AgentExportService', () => {
             it('clamps permissions on the overwrite path too', async () => {
                 const existing = makeAgent({ id: 'existing-ceo' });
                 agents.findByUserIdAndSlug.mockResolvedValueOnce(existing);
-                agents.findById.mockResolvedValueOnce(existing);
+                agents.findByIdAndUser.mockResolvedValueOnce(existing);
                 await svc.importOne('u1', elevatedEnvelope(), { onConflict: 'overwrite' });
 
                 expect(agents.updateById).toHaveBeenCalledWith(
@@ -421,6 +456,39 @@ describe('AgentExportService', () => {
                 await svcWithRepo.importOne('u1', baseEnvelope());
                 expect(scopeCount).not.toHaveBeenCalled();
                 expect(agents.create).toHaveBeenCalled();
+            });
+
+            it('does not overwrite an Agent with an imported target from another Organization', async () => {
+                const everScope = {
+                    tenantId: '11111111-1111-4111-8111-111111111111',
+                    organizationId: '22222222-2222-4222-8222-222222222222',
+                };
+                const env = baseEnvelope();
+                env.runtime.targets = [{ type: 'work', id: 'work-yo' }];
+                const existing = makeAgent({ id: 'existing-ceo', ...everScope });
+                scopeCount.mockResolvedValue(0);
+                agents.findByUserIdAndSlug.mockResolvedValue(existing);
+                agents.findByIdAndUser.mockResolvedValue(existing);
+
+                await expect(
+                    (svcWithRepo.importOne as any)(
+                        'u1',
+                        env,
+                        { onConflict: 'overwrite' },
+                        everScope,
+                    ),
+                ).rejects.toBeInstanceOf(NotFoundException);
+                expect(agents.updateById).not.toHaveBeenCalled();
+                expect(scopeCount).toHaveBeenCalledWith({
+                    where: [
+                        expect.objectContaining({
+                            id: 'work-yo',
+                            userId: 'u1',
+                            tenantId: everScope.tenantId,
+                            organizationId: everScope.organizationId,
+                        }),
+                    ],
+                });
             });
         });
     });

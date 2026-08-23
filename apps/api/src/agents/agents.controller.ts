@@ -431,6 +431,7 @@ export class AgentsController {
             },
             limit,
             offset,
+            this.scopeContext?.getScope(),
         );
         return {
             data: rows.map((r) => this.toSessionRow(r)),
@@ -550,6 +551,7 @@ export class AgentsController {
         if (!run) {
             throw new NotFoundException(`AgentRun ${runId} not found.`);
         }
+        await this.service.getOne(auth.userId, run.agentId, this.scopeContext?.getScope());
         const limit = query.limit ?? 100;
         const after = parseTimelineCursor(query.cursor);
         const [timelineRows, messages, toolCalls] = await Promise.all([
@@ -623,13 +625,18 @@ export class AgentsController {
         if (!this.agentTemplates) {
             throw new InternalServerErrorException('Agent templates service is not available.');
         }
-        return this.agentTemplates.createFromTemplate(auth.userId, slug, {
-            name: body.name ?? null,
-            scope: body.scope,
-            missionId: body.missionId ?? null,
-            ideaId: body.ideaId ?? null,
-            workId: body.workId ?? null,
-        });
+        return this.agentTemplates.createFromTemplate(
+            auth.userId,
+            slug,
+            {
+                name: body.name ?? null,
+                scope: body.scope,
+                missionId: body.missionId ?? null,
+                ideaId: body.ideaId ?? null,
+                workId: body.workId ?? null,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Get(':id')
@@ -651,34 +658,39 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateAgentDto,
     ): Promise<AgentDto> {
-        return this.service.update(auth.userId, id, {
-            name: body.name,
-            title: body.title,
-            capabilities: body.capabilities,
-            aiProviderId: body.aiProviderId,
-            modelId: body.modelId,
-            // Environments — `undefined` leaves the assignment alone,
-            // `null` clears it, an id is validated by the service.
-            environmentId: body.environmentId,
-            maxSkillContextTokens: body.maxSkillContextTokens,
-            memoryRecallEnabled: body.memoryRecallEnabled,
-            heartbeatCadence: body.heartbeatCadence,
-            idleBehavior: body.idleBehavior,
-            pauseAfterFailures: body.pauseAfterFailures,
-            permissions: body.permissions,
-            targets: body.targets as AgentTarget[] | null | undefined,
-            avatarMode: body.avatarMode,
-            avatarIcon: body.avatarIcon,
-            avatarImageUploadId: body.avatarImageUploadId,
-            committerName: body.committerName,
-            committerEmail: body.committerEmail,
-            reportsToAgentId: body.reportsToAgentId,
-            scorecard: body.scorecard as AgentScorecardMetric[] | null | undefined,
-            // Merge-policy matrix (Wave 3, D4) — the Agent-scoped slice.
-            mergePolicy: body.mergePolicy,
-            // Capabilities tab — init script (advisory v1).
-            initScript: body.initScript,
-        });
+        return this.service.update(
+            auth.userId,
+            id,
+            {
+                name: body.name,
+                title: body.title,
+                capabilities: body.capabilities,
+                aiProviderId: body.aiProviderId,
+                modelId: body.modelId,
+                // Environments — `undefined` leaves the assignment alone,
+                // `null` clears it, an id is validated by the service.
+                environmentId: body.environmentId,
+                maxSkillContextTokens: body.maxSkillContextTokens,
+                memoryRecallEnabled: body.memoryRecallEnabled,
+                heartbeatCadence: body.heartbeatCadence,
+                idleBehavior: body.idleBehavior,
+                pauseAfterFailures: body.pauseAfterFailures,
+                permissions: body.permissions,
+                targets: body.targets as AgentTarget[] | null | undefined,
+                avatarMode: body.avatarMode,
+                avatarIcon: body.avatarIcon,
+                avatarImageUploadId: body.avatarImageUploadId,
+                committerName: body.committerName,
+                committerEmail: body.committerEmail,
+                reportsToAgentId: body.reportsToAgentId,
+                scorecard: body.scorecard as AgentScorecardMetric[] | null | undefined,
+                // Merge-policy matrix (Wave 3, D4) — the Agent-scoped slice.
+                mergePolicy: body.mergePolicy,
+                // Capabilities tab — init script (advisory v1).
+                initScript: body.initScript,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     /**
@@ -696,7 +708,12 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: AgentTargetBodyDto,
     ): Promise<AgentDto> {
-        return this.service.addTarget(auth.userId, id, { type: body.type, id: body.id });
+        return this.service.addTarget(
+            auth.userId,
+            id,
+            { type: body.type, id: body.id },
+            this.scopeContext?.getScope(),
+        );
     }
 
     /** Inverse of `addTarget` — also idempotent. */
@@ -715,7 +732,12 @@ export class AgentsController {
                 `Unsupported target type "${targetType}" — expected mission, idea or work.`,
             );
         }
-        return this.service.removeTarget(auth.userId, id, { type: targetType, id: targetId });
+        return this.service.removeTarget(
+            auth.userId,
+            id,
+            { type: targetType, id: targetId },
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Put(':id/guardrails')
@@ -732,7 +754,12 @@ export class AgentsController {
     ): Promise<AgentDto> {
         // Cross-user 404 (never 403) + defense-in-depth validation both
         // happen inside the service (`requireOwned` + `validateGuardrails`).
-        return this.service.setGuardrails(auth.userId, id, body.guardrails ?? null);
+        return this.service.setGuardrails(
+            auth.userId,
+            id,
+            body.guardrails ?? null,
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Delete(':id')
@@ -747,9 +774,9 @@ export class AgentsController {
         @Query('hard') hard?: string,
     ): Promise<{ archived?: true; deleted?: true }> {
         if (hard === 'true') {
-            return this.service.deleteHard(auth.userId, id);
+            return this.service.deleteHard(auth.userId, id, this.scopeContext?.getScope());
         }
-        return this.service.archive(auth.userId, id);
+        return this.service.archive(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/pause')
@@ -760,7 +787,7 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentDto> {
-        const dto = await this.service.pause(auth.userId, id);
+        const dto = await this.service.pause(auth.userId, id, this.scopeContext?.getScope());
         // agents/spec.md — status transitions MUST leave an activity
         // trail; surfaced in the /agents/[id]/activity feed via
         // GET :id/events.
@@ -781,7 +808,7 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentDto> {
-        const dto = await this.service.resume(auth.userId, id);
+        const dto = await this.service.resume(auth.userId, id, this.scopeContext?.getScope());
         void this.tryLog({
             userId: auth.userId,
             agentId: id,
@@ -802,7 +829,7 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentDto> {
-        const dto = await this.service.unarchive(auth.userId, id);
+        const dto = await this.service.unarchive(auth.userId, id, this.scopeContext?.getScope());
         void this.tryLog({
             userId: auth.userId,
             agentId: id,
@@ -826,6 +853,7 @@ export class AgentsController {
         @Param('name') name: string,
     ): Promise<{ name: AgentFileName; body: string; hash: string; storage: 'git' | 'db' }> {
         this.assertValidFileName(name);
+        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         return this.files.read(auth.userId, id, name as AgentFileName);
     }
 
@@ -846,6 +874,7 @@ export class AgentsController {
         @Body() body: { body: string; expectedHash?: string },
     ): Promise<{ newHash: string }> {
         this.assertValidFileName(name);
+        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         if (typeof body?.body !== 'string') {
             throw new BadRequestException('Request body must include a string `body` field.');
         }
@@ -879,7 +908,7 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<AgentExportEnvelope> {
-        return this.exportService.exportOne(auth.userId, id);
+        return this.exportService.exportOne(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post('import')
@@ -906,13 +935,18 @@ export class AgentsController {
             overrideScope && Object.values(AgentScope).includes(overrideScope as AgentScope)
                 ? (overrideScope as AgentScope)
                 : undefined;
-        return this.exportService.importOne(auth.userId, body, {
-            onConflict: mode,
-            overrideScope: scope,
-            missionId: missionId ?? null,
-            ideaId: ideaId ?? null,
-            workId: workId ?? null,
-        });
+        return this.exportService.importOne(
+            auth.userId,
+            body,
+            {
+                onConflict: mode,
+                overrideScope: scope,
+                missionId: missionId ?? null,
+                ideaId: ideaId ?? null,
+                workId: workId ?? null,
+            },
+            this.scopeContext?.getScope(),
+        );
     }
 
     // ── FU-2 — runtime endpoints (run-now / runs / cancel / skills / budget / assign-task) ─
@@ -929,7 +963,7 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<{ outcome: string; runId?: string; reason?: string }> {
         // Cross-user 404 via service-level access check.
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         if (!this.heartbeatTrigger) {
             throw new InternalServerErrorException(
                 'AGENT_HEARTBEAT_TRIGGER not bound — run-now is unavailable until the Trigger.dev adapter wires up.',
@@ -982,7 +1016,7 @@ export class AgentsController {
         }>;
         meta: { total: number; limit: number; offset: number };
     }> {
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         const limit = query.limit ?? 25;
         const offset = query.offset ?? 0;
         // Security (EW-710 wave M): use the user-scoped repository variants —
@@ -1041,13 +1075,7 @@ export class AgentsController {
             createdAt: string;
         }>;
     }> {
-        await this.service.getOne(auth.userId, id);
-        // Security: user-scoped lookup + agentId match — cross-user or
-        // cross-agent runIds 404 (architecture/security §9, no-existence-leak).
-        const run = await this.agentRuns.findByIdAndUser(runId, auth.userId);
-        if (!run || run.agentId !== id) {
-            throw new NotFoundException(`AgentRun ${runId} not found.`);
-        }
+        const run = await this.requireScopedRun(auth.userId, id, runId);
         const logs = await this.agentRunLogs.findByRun(runId, 500);
         return {
             id: run.id,
@@ -1092,7 +1120,7 @@ export class AgentsController {
         }>;
         meta: { total: number; limit: number; offset: number };
     }> {
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         const limit = query.limit ?? 25;
         const offset = query.offset ?? 0;
         // ActivityLogService is @Optional — when unbound the feed simply
@@ -1129,7 +1157,7 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('runId', ParseUUIDPipe) runId: string,
     ): Promise<{ cancelled: boolean; previousStatus?: string }> {
-        await this.service.getOne(auth.userId, id);
+        await this.requireScopedRun(auth.userId, id, runId);
         const result = await this.agentRuns.cancel(runId, auth.userId);
         if (!result.found) {
             throw new NotFoundException(`AgentRun ${runId} not found.`);
@@ -1201,7 +1229,7 @@ export class AgentsController {
         @Param('runId', ParseUUIDPipe) runId: string,
         @Body() body: SteerRunDto,
     ): Promise<{ dispatched: 'injected' | 'new-run'; runId: string; queuedCount?: number }> {
-        await this.service.getOne(auth.userId, id);
+        await this.requireScopedRun(auth.userId, id, runId);
         const steering = this.requireSteering();
         return steering.steer({ runId, userId: auth.userId, message: body.message });
     }
@@ -1230,7 +1258,7 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('runId', ParseUUIDPipe) runId: string,
     ): Promise<{ interrupted: boolean; runId: string }> {
-        await this.service.getOne(auth.userId, id);
+        await this.requireScopedRun(auth.userId, id, runId);
         const steering = this.requireSteering();
         const outcome = await steering.interrupt(runId, auth.userId);
         void this.tryLog({
@@ -1270,7 +1298,7 @@ export class AgentsController {
         carriedCliSession: boolean;
         queued: boolean;
     }> {
-        await this.service.getOne(auth.userId, id);
+        await this.requireScopedRun(auth.userId, id, runId);
         const steering = this.requireSteering();
         const outcome = await steering.resume(runId, auth.userId, body.message ?? null);
         void this.tryLog({
@@ -1297,6 +1325,19 @@ export class AgentsController {
         return this.steering;
     }
 
+    private async requireScopedRun(
+        userId: string,
+        agentId: string,
+        runId: string,
+    ): Promise<AgentRun> {
+        await this.service.getOne(userId, agentId, this.scopeContext?.getScope());
+        const run = await this.agentRuns.findByIdAndUser(runId, userId);
+        if (!run || run.agentId !== agentId) {
+            throw new NotFoundException(`AgentRun ${runId} not found.`);
+        }
+        return run;
+    }
+
     @Get(':id/skills')
     @ApiOperation({
         summary:
@@ -1314,7 +1355,7 @@ export class AgentsController {
             skill: { id: string; slug: string; title: string; version: string };
         }>;
     }> {
-        const agent = await this.service.getOne(auth.userId, id);
+        const agent = await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         const rows = await this.skillBindings.resolveActive({
             userId: auth.userId,
             agentId: id,
@@ -1354,7 +1395,7 @@ export class AgentsController {
         periodEnd: string;
         currency: string;
     }> {
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         // Default window — caller-tunable in a future revision; this
         // covers the rolling-30-day view shown in the budgets tab.
         const now = new Date();
@@ -1390,7 +1431,7 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: AssignTaskToAgentDto,
     ): Promise<{ runId: string; queued?: boolean; queuedReason?: string }> {
-        await this.service.getOne(auth.userId, id);
+        await this.service.getOne(auth.userId, id, this.scopeContext?.getScope());
         // Cross-user 404 on the Task too — surfaces via TasksService.
         const task = await this.tasks.getOne(auth.userId, body.taskId);
         if (!task) {
@@ -1547,7 +1588,7 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
     ) {
-        return this.service.listAttachments(auth.userId, id);
+        return this.service.listAttachments(auth.userId, id, this.scopeContext?.getScope());
     }
 
     @Post(':id/attachments')
@@ -1562,7 +1603,12 @@ export class AgentsController {
         // enforces a UUID `uploadId` instead of a raw inline object type.
         @Body() body: AddAgentAttachmentDto,
     ) {
-        return this.service.addAttachment(auth.userId, id, body?.uploadId);
+        return this.service.addAttachment(
+            auth.userId,
+            id,
+            body?.uploadId,
+            this.scopeContext?.getScope(),
+        );
     }
 
     @Delete(':id/attachments/:attachmentId')
@@ -1573,6 +1619,11 @@ export class AgentsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
     ) {
-        return this.service.removeAttachment(auth.userId, id, attachmentId);
+        return this.service.removeAttachment(
+            auth.userId,
+            id,
+            attachmentId,
+            this.scopeContext?.getScope(),
+        );
     }
 }

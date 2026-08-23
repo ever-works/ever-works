@@ -138,7 +138,7 @@ describe('AgentsController — session detail (Feature K)', () => {
             countByRunSteps: jest.fn().mockResolvedValue(0),
         };
         controller = new AgentsController(
-            {} as any, // service
+            { getOne: jest.fn().mockResolvedValue({ id: baseRun().agentId }) } as any, // service
             {} as any, // files
             {} as any, // exportService
             {} as any, // dispatcher

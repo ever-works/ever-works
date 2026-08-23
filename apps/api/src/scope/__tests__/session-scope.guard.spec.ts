@@ -1,7 +1,7 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, NotFoundException } from '@nestjs/common';
 import { ScopeContextService } from '../scope-context.service';
 import { SessionScopeGuard } from '../session-scope.guard';
 
@@ -21,6 +21,36 @@ function makeContext(request: { user?: unknown }): ExecutionContext {
     } as unknown as ExecutionContext;
 }
 
+function makeGuard(
+    scopeContext: ScopeContextService,
+    userRepository: ConstructorParameters<typeof SessionScopeGuard>[1],
+): SessionScopeGuard {
+    const tenantForOrganization = (organizationId: string): string => {
+        if (organizationId === 'o-mine') return 't-mine';
+        if (organizationId === 'o-other') return 't-other';
+        if (organizationId === 'o-resolved') return 't-resolved';
+        return 't-1';
+    };
+    return new SessionScopeGuard(
+        scopeContext,
+        userRepository,
+        {
+            findById: jest.fn(async (organizationId: string) => ({
+                id: organizationId,
+                tenantId: tenantForOrganization(organizationId),
+            })),
+        } as never,
+        {
+            findByOrgAndUser: jest.fn(async (organizationId: string, userId: string) => ({
+                organizationId,
+                userId,
+                tenantId: tenantForOrganization(organizationId),
+            })),
+        } as never,
+        { findById: jest.fn(async () => ({ ownerUserId: 'tenant-owner' })) } as never,
+    );
+}
+
 type FindByIdResult = {
     tenantId?: string | null;
     lastScopeOrganizationId?: string | null;
@@ -37,7 +67,7 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
         const userRepository = { findById } as unknown as ConstructorParameters<
             typeof SessionScopeGuard
         >[1];
-        guard = new SessionScopeGuard(scopeContext, userRepository);
+        guard = makeGuard(scopeContext, userRepository);
     });
 
     it('returns true and makes no DB call for non-HTTP contexts', async () => {
@@ -143,6 +173,85 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
 
         expect(reqUser.tenantId).toBe('t-1');
     });
+
+    it.each([
+        [
+            'a removed Ever membership while Yo membership keeps the Tenant active',
+            { id: 'o-ever', tenantId: 't-1' },
+        ],
+        ['an Organization that no longer exists', null],
+    ])('returns the same opaque 404 for %s', async (_label, organization) => {
+        findById.mockResolvedValue({
+            tenantId: 't-1',
+            lastScopeOrganizationId: 'o-yo',
+        });
+        const organizationRepository = {
+            findById: jest.fn().mockResolvedValue(organization),
+        };
+        const organizationMembers = {
+            // The user still belongs to Yo, but their Ever roster row was revoked.
+            findByOrgAndUser: jest.fn().mockResolvedValue(null),
+        };
+        const tenants = {
+            findById: jest.fn().mockResolvedValue({ ownerUserId: 'tenant-owner' }),
+        };
+        const membershipGuard = new (SessionScopeGuard as any)(
+            scopeContext,
+            { findById },
+            organizationRepository,
+            organizationMembers,
+            tenants,
+        );
+        const ctx = makeContext({ user: { userId: 'u-1' } });
+
+        await expect(
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-ever' }, () =>
+                membershipGuard.canActivate(ctx),
+            ),
+        ).rejects.toMatchObject({
+            constructor: NotFoundException,
+            message: 'Organization not found',
+        });
+    });
+
+    it('does not silently fall back to personal scope after the last-active membership is revoked', async () => {
+        findById.mockResolvedValue({
+            tenantId: 't-1',
+            lastScopeOrganizationId: 'o-ever',
+        });
+        const membershipGuard = new SessionScopeGuard(
+            scopeContext,
+            { findById } as never,
+            { findById: jest.fn().mockResolvedValue({ id: 'o-ever', tenantId: 't-1' }) } as never,
+            { findByOrgAndUser: jest.fn().mockResolvedValue(null) } as never,
+            { findById: jest.fn().mockResolvedValue({ ownerUserId: 'tenant-owner' }) } as never,
+        );
+        const ctx = makeContext({ user: { userId: 'u-1' } });
+
+        await expect(
+            scopeContext.runWith({ tenantId: null, organizationId: null }, () =>
+                membershipGuard.canActivate(ctx),
+            ),
+        ).rejects.toMatchObject({ status: 404, message: 'Organization not found' });
+    });
+
+    it('keeps Tenant-owner access even though owners intentionally have no roster row', async () => {
+        findById.mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-ever' });
+        const membershipGuard = new SessionScopeGuard(
+            scopeContext,
+            { findById } as never,
+            { findById: jest.fn().mockResolvedValue({ id: 'o-ever', tenantId: 't-1' }) } as never,
+            { findByOrgAndUser: jest.fn().mockResolvedValue(null) } as never,
+            { findById: jest.fn().mockResolvedValue({ ownerUserId: 'u-1' }) } as never,
+        );
+        const ctx = makeContext({ user: { userId: 'u-1' } });
+
+        await expect(
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-ever' }, () =>
+                membershipGuard.canActivate(ctx),
+            ),
+        ).resolves.toBe(true);
+    });
 });
 
 /**
@@ -173,7 +282,7 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
         const findById = jest
             .fn()
             .mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-1' });
-        const sessionGuard = new SessionScopeGuard(scopeContext, { findById } as never);
+        const sessionGuard = makeGuard(scopeContext, { findById } as never);
         const ownershipGuard = new ScopeOwnershipGuard(scopeContext);
 
         const reqUser: { userId: string; tenantId?: string | null } = { userId: 'u-1' };
@@ -200,7 +309,7 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
         const findById = jest
             .fn()
             .mockResolvedValue({ tenantId: 't-mine', lastScopeOrganizationId: null });
-        const sessionGuard = new SessionScopeGuard(scopeContext, { findById } as never);
+        const sessionGuard = makeGuard(scopeContext, { findById } as never);
         const ownershipGuard = new ScopeOwnershipGuard(scopeContext);
         const ctx = makeHttpContext({ user: { userId: 'u-1' } });
 
@@ -221,7 +330,7 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
         const findById = jest
             .fn()
             .mockResolvedValue({ tenantId: 't-mine', lastScopeOrganizationId: null });
-        const sessionGuard = new SessionScopeGuard(scopeContext, { findById } as never);
+        const sessionGuard = makeGuard(scopeContext, { findById } as never);
         const ownershipGuard = new ScopeOwnershipGuard(scopeContext);
         const ctx = makeHttpContext({ user: { userId: 'u-1' } });
 

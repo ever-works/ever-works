@@ -5,6 +5,7 @@ import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialE
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
 import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
+import { ownershipSqlPredicate, type OwnershipScope } from '../ownership-scope';
 import type { SubAgentScope } from '@ever-works/contracts';
 
 /**
@@ -1272,10 +1273,15 @@ export class AgentRunRepository {
         },
         limit = 25,
         offset = 0,
+        ownershipScope?: OwnershipScope,
     ): Promise<[AgentRun[], number]> {
         const qb = this.repository
             .createQueryBuilder('run')
             .where('run.userId = :userId', { userId });
+        const ownership = ownershipSqlPredicate('run', ownershipScope);
+        if (ownership) {
+            qb.andWhere(ownership.clause, ownership.parameters);
+        }
         if (filters.attention === true) {
             qb.andWhere('(run.awaitingInput = :isAwaiting OR run.attentionReason IS NOT NULL)', {
                 isAwaiting: true,

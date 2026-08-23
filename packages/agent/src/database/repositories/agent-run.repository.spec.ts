@@ -17,6 +17,9 @@ describe('AgentRunRepository — terminal transitions', () => {
         // Sweep path: findStuckNonTerminal is a SELECT terminating in getMany.
         select: jest.Mock;
         orderBy: jest.Mock;
+        take: jest.Mock;
+        skip: jest.Mock;
+        getManyAndCount: jest.Mock;
         limit: jest.Mock;
         getMany: jest.Mock;
     };
@@ -44,6 +47,9 @@ describe('AgentRunRepository — terminal transitions', () => {
             execute: jest.fn().mockResolvedValue({ affected: 1 }),
             select: jest.fn().mockReturnThis(),
             orderBy: jest.fn().mockReturnThis(),
+            take: jest.fn().mockReturnThis(),
+            skip: jest.fn().mockReturnThis(),
+            getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
             limit: jest.fn().mockReturnThis(),
             getMany: jest.fn().mockResolvedValue([]),
         };
@@ -268,6 +274,40 @@ describe('AgentRunRepository — terminal transitions', () => {
             repository.createQueryBuilder.mockClear();
             await expect(runs.markStuckFailed([], 'stuck-timeout: x')).resolves.toBe(0);
             expect(repository.createQueryBuilder).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('listSessionsForUser ownership scope', () => {
+        const everScope = {
+            tenantId: '11111111-1111-4111-8111-111111111111',
+            organizationId: '22222222-2222-4222-8222-222222222222',
+        };
+
+        it('adds the exact active Organization to the authenticated-user predicate', async () => {
+            await (runs.listSessionsForUser as any)('u1', {}, 25, 0, everScope);
+
+            expect(queryBuilder.where).toHaveBeenCalledWith('run.userId = :userId', {
+                userId: 'u1',
+            });
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+                '(run.tenantId = :ownershipTenantId AND run.organizationId = :ownershipOrganizationId)',
+                {
+                    ownershipTenantId: everScope.tenantId,
+                    ownershipOrganizationId: everScope.organizationId,
+                },
+            );
+        });
+
+        it('keeps explicit personal scope separate from both Organizations', async () => {
+            await (runs.listSessionsForUser as any)('u1', {}, 25, 0, {
+                tenantId: everScope.tenantId,
+                organizationId: null,
+            });
+
+            expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+                '(run.organizationId IS NULL AND (run.tenantId = :ownershipTenantId OR run.tenantId IS NULL))',
+                { ownershipTenantId: everScope.tenantId },
+            );
         });
     });
 
