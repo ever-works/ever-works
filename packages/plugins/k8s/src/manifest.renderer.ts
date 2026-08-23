@@ -26,6 +26,18 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 	const selector = SELECTOR_LABELS(input.workSlug);
 
 	const podSpec: Record<string, unknown> = {
+		// Prefer spreading replicas across failure domains when the cluster has
+		// them. This stays soft: older clusters do not understand
+		// nodeTaintsPolicy, and a hard constraint can count an untolerated
+		// control-plane as an empty domain and strand the next replica.
+		topologySpreadConstraints: [
+			{
+				maxSkew: 1,
+				topologyKey: 'kubernetes.io/hostname',
+				whenUnsatisfiable: 'ScheduleAnyway',
+				labelSelector: { matchLabels: selector }
+			}
+		],
 		containers: [
 			{
 				name: 'app',
@@ -43,6 +55,8 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				// gets a realistic timeout; a startupProbe absorbs the cold start so
 				// liveness never kills a warming container and loses its cache.
 				startupProbe: {
+					// Keep startup on the homepage: its successful render is what warms
+					// the catalogue cache before ongoing cheap health checks begin.
 					httpGet: { path: '/', port: 'http' },
 					periodSeconds: 10,
 					timeoutSeconds: 10,
@@ -72,11 +86,16 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				// exist. A Work genuinely needing more (mcp-servers) needs a bigger
 				// node or a smaller footprint, not a bigger number here.
 				//
-				// Requests stay small so scheduling is cheap. All four are overridable
-				// per Work via plugin settings.
+				// A 512Mi admission floor stops several roughly 500Mi processes from
+				// being advertised as 256Mi pods. It is NOT a sufficiency claim for
+				// sites measured in the 0.4–0.8Gi range: heavier catalogues still need
+				// an explicit measured per-Work request. All four values remain
+				// configurable through plugin settings.
 				resources: {
 					requests: {
 						cpu: input.cpuRequest ?? '100m',
+						// Managed deployments pass their 512Mi floor explicitly; BYOC
+						// keeps this provider-neutral historical fallback.
 						memory: input.memoryRequest ?? '256Mi'
 					},
 					limits: {
@@ -109,7 +128,16 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 		spec: {
 			replicas: input.replicas,
 			selector: { matchLabels: selector },
-			strategy: { type: 'RollingUpdate', rollingUpdate: { maxSurge: 1, maxUnavailable: 0 } },
+			// A single-replica rollout must not briefly double the site's memory
+			// footprint on a constrained node. The explicit tradeoff is a brief
+			// outage while the old pod stops and the replacement becomes Ready;
+			// this is NOT a zero-downtime strategy. Multi-replica Works retain
+			// their availability-first rollout.
+			strategy: {
+				type: 'RollingUpdate',
+				rollingUpdate:
+					input.replicas === 1 ? { maxSurge: 0, maxUnavailable: 1 } : { maxSurge: 1, maxUnavailable: 0 }
+			},
 			template: {
 				// Without a per-deploy annotation the rendered Deployment is
 				// byte-identical between deploys of the same branch (the tag is a

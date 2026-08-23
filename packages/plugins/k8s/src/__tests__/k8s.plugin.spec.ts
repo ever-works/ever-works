@@ -178,6 +178,14 @@ describe('KubernetesPlugin metadata', () => {
 		expect(ic?.['x-widget']).toBe('cluster-ingress-class');
 	});
 
+	it('publishes measured memory defaults without narrowing Kubernetes quantity syntax', () => {
+		const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+		expect(props.memoryRequest?.default).toBeUndefined();
+		expect(props.memoryLimit?.default).toBe('2Gi');
+		expect(props.memoryRequest?.pattern).toBeUndefined();
+		expect(props.memoryLimit?.pattern).toBeUndefined();
+	});
+
 	it('manifest hints verifiesOnSave so the UI labels the save button "Save & verify" and shows cluster info on success', () => {
 		const m = plugin.getManifest();
 		expect(m.uiHints?.verifiesOnSave).toBe(true);
@@ -188,6 +196,113 @@ describe('KubernetesPlugin metadata', () => {
 		expect(m.uiHints?.includeInOnboarding).toBe(true);
 		expect(m.uiHints?.onboardingPriority).toBe(4);
 		expect(m.uiHints?.onboardingDescription).toBeDefined();
+	});
+});
+
+describe('KubernetesPlugin.validateSettings', () => {
+	const plugin = new KubernetesPlugin();
+
+	it('accepts the managed minimum and preserves smaller requests for custom clusters', () => {
+		expect(
+			plugin.validateSettings({ clusterSource: 'k8s-works', memoryRequest: '512Mi', memoryLimit: '2Gi' })
+		).toEqual({ valid: true });
+		expect(
+			plugin.validateSettings({ clusterSource: 'k8s-works', memoryRequest: '0.5Gi', memoryLimit: '1e9' })
+		).toEqual({ valid: true });
+		expect(
+			plugin.validateSettings({ clusterSource: 'custom-kubeconfig', memoryRequest: '256Mi', memoryLimit: '2Gi' })
+		).toEqual({ valid: true });
+		expect(
+			plugin.validateSettings({ clusterSource: 'custom-kubeconfig', memoryRequest: '500M', memoryLimit: '1G' })
+		).toEqual({ valid: true });
+	});
+
+	it('rejects malformed memory quantities on a platform-managed cluster', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: 'not-a-quantity',
+			memoryLimit: '2Gi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'INVALID_MEMORY_QUANTITY' })
+			])
+		);
+	});
+
+	it('rejects unsupported quantity suffixes on a platform-managed cluster', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: '500K',
+			memoryLimit: '2Gi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'INVALID_MEMORY_QUANTITY' })
+			])
+		);
+	});
+
+	it('rejects a request larger than the limit', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: '3Gi',
+			memoryLimit: '2Gi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'MEMORY_REQUEST_EXCEEDS_LIMIT' })
+			])
+		);
+	});
+
+	it('rejects new sub-512Mi requests on platform-managed clusters', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works-shared',
+			memoryRequest: '256Mi',
+			memoryLimit: '2Gi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'MANAGED_MEMORY_REQUEST_TOO_LOW' })
+			])
+		);
+	});
+
+	it('validates a legacy low request and low limit as one invalid managed pair', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: '256Mi',
+			memoryLimit: '384Mi'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'MANAGED_MEMORY_REQUEST_TOO_LOW' }),
+				expect.objectContaining({ path: 'memoryLimit', code: 'MANAGED_MEMORY_LIMIT_TOO_LOW' })
+			])
+		);
+	});
+
+	it('recognizes valid DecimalSI quantities while applying the managed admission floor', () => {
+		const result = plugin.validateSettings({
+			clusterSource: 'k8s-works',
+			memoryRequest: '500M',
+			memoryLimit: '1G'
+		});
+		expect(result.valid).toBe(false);
+		expect(result.errors).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({ path: 'memoryRequest', code: 'MANAGED_MEMORY_REQUEST_TOO_LOW' })
+			])
+		);
+		expect(result.errors).not.toEqual(
+			expect.arrayContaining([expect.objectContaining({ code: 'INVALID_MEMORY_QUANTITY' })])
+		);
 	});
 });
 
@@ -486,6 +601,84 @@ describe('KubernetesPlugin.deploy (mocked api)', () => {
 		);
 		expect(result.status).toBe('error');
 		expect(result.error).not.toContain('leak-12345');
+	});
+
+	it('normalizes a legacy managed 256Mi request to the 512Mi admission floor', async () => {
+		await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'k8s-works', memoryRequest: '256Mi' }
+				}
+			},
+			VALID
+		);
+
+		const manifest = vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>;
+		expect(manifest.spec.template.spec.containers[0].resources.requests.memory).toBe('512Mi');
+	});
+
+	it('fails before any API write when a legacy managed limit is below the normalized request floor', async () => {
+		const result = await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: {
+						clusterSource: 'k8s-works',
+						memoryRequest: '256Mi',
+						memoryLimit: '384Mi'
+					}
+				}
+			},
+			VALID
+		);
+
+		expect(result.status).toBe('error');
+		expect(result.error).toMatch(/limit.*512Mi admission floor/i);
+		expect(api.ensureNamespace).not.toHaveBeenCalled();
+		expect(api.applyDeployment).not.toHaveBeenCalled();
+	});
+
+	it('preserves an explicit 256Mi request for a custom cluster', async () => {
+		await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'custom-kubeconfig', memoryRequest: '256Mi' }
+				}
+			},
+			VALID
+		);
+
+		const manifest = vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>;
+		expect(manifest.spec.template.spec.containers[0].resources.requests.memory).toBe('256Mi');
+	});
+
+	it('preserves the historical 256Mi fallback for a custom cluster without an override', async () => {
+		await plugin.deploy(
+			{
+				projectName: 'work-1',
+				sourceDir: '.',
+				options: {
+					githubOwner: 'acme',
+					websiteRepoIsPrivate: false,
+					settingsOverride: { clusterSource: 'custom-kubeconfig' }
+				}
+			},
+			VALID
+		);
+
+		const manifest = vi.mocked(api.applyDeployment).mock.calls[0]?.[1] as Record<string, any>;
+		expect(manifest.spec.template.spec.containers[0].resources.requests.memory).toBe('256Mi');
 	});
 });
 
