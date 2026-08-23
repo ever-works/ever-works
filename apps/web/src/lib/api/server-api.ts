@@ -1,8 +1,16 @@
 import 'server-only';
-import { ALLOWED_REDIRECT_URLS, API_URL, WEB_URL } from '../constants';
+import { ALLOWED_REDIRECT_URLS, API_URL, ROUTES, WEB_URL } from '../constants';
 import { headers } from 'next/headers';
 import { getAuthAccessCookie } from '../auth/cookies';
 import { getTranslations } from 'next-intl/server';
+import {
+    API_SCOPE_HEADER,
+    BROWSER_WORKSPACE_SCOPE_HEADER,
+    isOrganizationSlug,
+    parseWorkspaceSelector,
+    toApiScopeHeader,
+} from '../workspace-scope';
+import type { ActiveScopeResponse } from '@ever-works/contracts/api';
 
 export class ApiResponseError extends Error {
     constructor(
@@ -93,19 +101,23 @@ export async function serverFetch<T>(
     endpoint: string,
     options: ServerFetchOptions = {},
 ): Promise<T> {
+    const requestHeaders = await headers();
+    const selectedScope = parseWorkspaceSelector(
+        requestHeaders.get(BROWSER_WORKSPACE_SCOPE_HEADER),
+    );
     const frontendUrl = await getFrontendUrl();
     const t = await getTranslations('api.errors');
     const { rawResponse, ...fetchOptions } = options;
 
     const doFetch = async (authToken?: string) => {
-        const reqHeaders: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'X-Frontend-URL': frontendUrl,
-            ...((fetchOptions.headers as Record<string, string>) || {}),
-        };
+        const reqHeaders = new Headers(fetchOptions.headers);
+        if (!reqHeaders.has('Content-Type')) reqHeaders.set('Content-Type', 'application/json');
+        reqHeaders.set('X-Frontend-URL', frontendUrl);
+        reqHeaders.delete(BROWSER_WORKSPACE_SCOPE_HEADER);
+        reqHeaders.set(API_SCOPE_HEADER, toApiScopeHeader(selectedScope));
 
         if (authToken) {
-            reqHeaders['Authorization'] = `Bearer ${authToken}`;
+            reqHeaders.set('Authorization', `Bearer ${authToken}`);
         }
 
         return fetch(`${API_URL}${endpoint}`, {
@@ -211,6 +223,16 @@ export async function serverFetch<T>(
     } catch {
         return text as T;
     }
+}
+
+/** Resolve the mutable preference exactly once: as a fresh-login destination. */
+export async function getLoginDefaultWorkspaceHref(): Promise<string> {
+    const scope = await serverFetch<ActiveScopeResponse>('/users/me/scope', { method: 'GET' });
+    if (scope.organizationSlug === null) return ROUTES.DASHBOARD;
+    if (!isOrganizationSlug(scope.organizationSlug)) {
+        throw new Error('Invalid workspace scope');
+    }
+    return `/org/${scope.organizationSlug}/dashboard`;
 }
 
 // Type-safe server-side mutations (for use in server actions)

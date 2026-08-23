@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 type RouteContext = { params: Promise<{ id: string; runId: string }> };
 
@@ -41,11 +42,21 @@ export async function GET(request: NextRequest, ctx: RouteContext) {
     }
     const suffix = query.toString() ? `?${query.toString()}` : '';
 
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
+
     const upstream = await fetch(
         `${API_URL}/agents/${id}/runs/${runId}/terminal/transcript${suffix}`,
         {
             method: 'GET',
-            headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            headers,
             cache: 'no-store',
         },
     );

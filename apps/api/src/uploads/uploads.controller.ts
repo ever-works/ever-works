@@ -663,21 +663,13 @@ export class UploadsController {
                 this.opaqueScopeNotFound();
             }
 
-            // ScopeResolverMiddleware leaves a headerless public request at
-            // EMPTY_SCOPE because @Public() skips SessionScopeGuard. Mirror
-            // that guard's default-Organization behavior here: a persisted
-            // default must still exist and retain exact roster access. An
-            // explicit personal scope already carries the user's tenant and
-            // therefore does not enter this fallback.
-            const defaultOrganizationId =
-                requested.tenantId === null ? (user.lastScopeOrganizationId ?? null) : null;
-            if (userTenantId && defaultOrganizationId) {
-                return this.requireAuthenticatedOrganizationScope(
-                    auth.userId,
-                    userTenantId,
-                    defaultOrganizationId,
-                );
-            }
+            // ScopeResolverMiddleware leaves a headerless (or explicit
+            // `@personal`) public request at EMPTY_SCOPE because @Public()
+            // skips SessionScopeGuard. Mirror that guard exactly: the request
+            // resolves to the user's bare personal scope. The mutable
+            // `users.lastScopeOrganizationId` preference is a fresh-login
+            // navigation default only and is never read as request authority;
+            // an Organization must be selected explicitly via `X-Scope-Slug`.
             return { tenantId: userTenantId, organizationId: null };
         }
 

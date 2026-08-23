@@ -1,10 +1,16 @@
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import { NextRequest, NextResponse } from 'next/server';
-import { LOCALES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
+import { ALLOWED_REDIRECT_URLS, LOCALES, PUBLIC_ROUTES, ROUTES } from './lib/constants';
 import { AUTH_COOKIE_NAME } from './lib/auth/cookies';
 import { match } from 'path-to-regexp';
 import { getAuthFromRequest } from './lib/auth';
+import {
+    BROWSER_WORKSPACE_SCOPE_HEADER,
+    getLegacyOrganizationDashboardRedirect,
+    parseWorkspacePath,
+    serializeWorkspaceScope,
+} from './lib/workspace-scope';
 
 const nextIntlMiddleware = createMiddleware(routing);
 
@@ -117,6 +123,58 @@ function isPublicRoute(pathname: string): boolean {
 }
 
 /**
+ * next-intl emits an absolute `x-middleware-rewrite` URL. Behind a reverse
+ * proxy (and in the IPv4 E2E harness), Next's internal request origin can be
+ * `localhost` while the browser origin is a different host. Next then treats
+ * the locale rewrite as external and performs a second proxy request, losing
+ * the original Organization URL rewrite. Locale targets are app-internal by
+ * contract, so align their origin with the validated request authority while
+ * preserving next-intl's path/query.
+ */
+const SAFE_REQUEST_HOST = /^(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::\d{1,5})?$/i;
+
+function isAllowedRequestHostname(hostname: string): boolean {
+    const normalized = hostname.toLowerCase();
+    return ALLOWED_REDIRECT_URLS.some((allowed) => {
+        const candidate = allowed
+            .replace(/^https?:\/\//, '')
+            .toLowerCase()
+            .trim();
+        if (candidate.startsWith('*.')) {
+            const domain = candidate.slice(2);
+            return normalized !== domain && normalized.endsWith(`.${domain}`);
+        }
+        return normalized === candidate;
+    });
+}
+
+function alignLocaleRewriteOrigin(req: NextRequest, response: NextResponse): NextResponse {
+    const rewrite = response.headers.get('x-middleware-rewrite');
+    if (!rewrite) return response;
+
+    const target = new URL(rewrite, 'http://internal.invalid');
+    const locale = target.pathname.split('/').filter(Boolean)[0];
+    if (locale && LOCALE_SET.has(locale)) {
+        const requestHost = req.headers.get('host')?.trim();
+        const requestOrigin = new URL(req.nextUrl.origin);
+        if (requestHost && SAFE_REQUEST_HOST.test(requestHost)) {
+            try {
+                const authority = new URL(`${requestOrigin.protocol}//${requestHost}`);
+                if (isAllowedRequestHostname(authority.hostname)) {
+                    requestOrigin.host = authority.host;
+                }
+            } catch {
+                // Keep Next's parsed request origin for an invalid authority.
+            }
+        }
+        target.protocol = requestOrigin.protocol;
+        target.host = requestOrigin.host;
+        response.headers.set('x-middleware-rewrite', target.toString());
+    }
+    return response;
+}
+
+/**
  * Strip a legacy `/<locale>/...` prefix from a pathname.
  *
  * Until 2026-05 the app served every route under `/<locale>/...` (default
@@ -169,10 +227,48 @@ export default async function proxy(req: NextRequest) {
         return applySecurityHeaders(response);
     }
 
+    // Safe compatibility for the one Organization URL shape shipped before
+    // the canonical namespace. Locale and reserved app segments never enter
+    // this branch, so `/en/dashboard` remains a locale compatibility URL.
+    const organizationLegacyTarget = getLegacyOrganizationDashboardRedirect(
+        `${pathname}${req.nextUrl.search}`,
+        LOCALES,
+    );
+    if (organizationLegacyTarget) {
+        const target = new URL(organizationLegacyTarget, req.url);
+        const response = NextResponse.redirect(target, 307);
+        response.headers.set('Cache-Control', 'no-store');
+        return applySecurityHeaders(response);
+    }
+
+    // The visible URL is the per-tab authority. Overwrite any inbound selector
+    // and strip the canonical `/org/{slug}` prefix only for the internal App
+    // Router match. next-intl then applies its locale rewrite to that request.
+    let selectedScope;
+    try {
+        selectedScope = parseWorkspacePath(pathname);
+    } catch {
+        return applySecurityHeaders(new NextResponse(null, { status: 404 }));
+    }
+    const scopedHeaders = new Headers(req.headers);
+    scopedHeaders.set(BROWSER_WORKSPACE_SCOPE_HEADER, serializeWorkspaceScope(selectedScope));
+    const scopedRequest = new NextRequest(req, { headers: scopedHeaders });
+    if (selectedScope.kind === 'organization') {
+        const prefix = `/org/${selectedScope.slug}`;
+        const internalPath = pathname.slice(prefix.length);
+        scopedRequest.nextUrl.pathname =
+            internalPath === '' ||
+            internalPath === '/' ||
+            internalPath === '/dashboard' ||
+            internalPath === '/dashboard/'
+                ? '/'
+                : internalPath;
+    }
+
     // 2) Let next-intl resolve the locale from the cookie / Accept-Language.
     //    In `localePrefix: 'never'` mode this rewrites the request
     //    internally (the visible URL stays unprefixed).
-    const intlResponse = await nextIntlMiddleware(req);
+    const intlResponse = alignLocaleRewriteOrigin(req, await nextIntlMiddleware(scopedRequest));
 
     // 3) Public routes need no auth check.
     if (isPublicRoute(pathname)) {

@@ -357,28 +357,29 @@ describe('UploadsController', () => {
             expect(ctx.uploads.getBackend).toHaveBeenCalledTimes(1);
         });
 
-        it('hydrates and validates the persisted Ever default for a bearer with no explicit scope', async () => {
+        it('resolves a headerless bearer to bare personal scope and never reads the persisted Organization pointer', async () => {
             const ctx = publicController({
                 activeScope: { tenantId: null, organizationId: null },
                 bearer: true,
                 user: {
                     id: bearerUserId,
                     tenantId: everScope.tenantId,
+                    // Another tab may have persisted Ever as the login default;
+                    // that preference is never request authority.
                     lastScopeOrganizationId: everScope.organizationId,
                     isActive: true,
                 },
             });
+            const personalScope = { tenantId: everScope.tenantId, organizationId: null };
 
             await ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined);
 
-            expect(ctx.members.findByOrgAndUser).toHaveBeenCalledWith(
-                everScope.organizationId,
-                bearerUserId,
-            );
+            expect(ctx.organizations.findById).not.toHaveBeenCalled();
+            expect(ctx.members.findByOrgAndUser).not.toHaveBeenCalled();
             expect(ctx.uploads.saveImage).toHaveBeenCalledWith(bearerUserId, expect.anything(), {
-                ownershipScope: everScope,
+                ownershipScope: personalScope,
             });
-            expect(ctx.scopeContext.setScope).toHaveBeenCalledWith(everScope);
+            expect(ctx.scopeContext.setScope).toHaveBeenCalledWith(personalScope);
         });
 
         it.each([
@@ -396,7 +397,7 @@ describe('UploadsController', () => {
                     ),
             ],
         ] as const)(
-            'hydrates and validates the persisted Ever default before a headerless %s',
+            'keeps a headerless %s in bare personal scope even when the persisted default is revoked or unknown',
             async (label, invoke) => {
                 const ctx = publicController({
                     activeScope: { tenantId: null, organizationId: null },
@@ -407,88 +408,44 @@ describe('UploadsController', () => {
                         lastScopeOrganizationId: everScope.organizationId,
                         isActive: true,
                     },
+                    // A revoked roster row / missing Organization must be
+                    // irrelevant: the pointer is not consulted at all.
+                    member: null,
+                    organization: null,
+                    tenant: { id: everScope.tenantId, ownerUserId: 'other' },
                 });
+                const personalScope = { tenantId: everScope.tenantId, organizationId: null };
 
                 await invoke(ctx);
 
-                expect(ctx.members.findByOrgAndUser).toHaveBeenCalledWith(
-                    everScope.organizationId,
-                    bearerUserId,
-                );
+                expect(ctx.organizations.findById).not.toHaveBeenCalled();
+                expect(ctx.members.findByOrgAndUser).not.toHaveBeenCalled();
                 if (label === 'file') {
                     expect(ctx.uploads.saveFile).toHaveBeenCalledWith(
                         bearerUserId,
                         expect.anything(),
-                        { ownershipScope: everScope },
+                        { ownershipScope: personalScope },
                     );
                 } else {
                     expect(ctx.uploads.getBackend).toHaveBeenCalledTimes(1);
                 }
-                expect(ctx.scopeContext.setScope).toHaveBeenCalledWith(everScope);
+                expect(ctx.scopeContext.setScope).toHaveBeenCalledWith(personalScope);
             },
         );
 
-        it.each([
-            [
-                'image',
-                (ctx: ReturnType<typeof publicController>) =>
-                    ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined),
-            ],
-            [
-                'file',
-                (ctx: ReturnType<typeof publicController>) =>
-                    ctx.controller.uploadAnonymousFile(mkFile({}), ctx.req),
-            ],
-        ] as const)(
-            'opaquely rejects a revoked persisted Ever default before a headerless %s upload',
-            async (_label, invoke) => {
-                const ctx = publicController({
-                    activeScope: { tenantId: null, organizationId: null },
-                    bearer: true,
-                    user: {
-                        id: bearerUserId,
-                        tenantId: everScope.tenantId,
-                        lastScopeOrganizationId: everScope.organizationId,
-                        isActive: true,
-                    },
-                    member: null,
-                    tenant: { id: everScope.tenantId, ownerUserId: 'other' },
-                });
+        it('still requires exact roster access when the bearer explicitly selects Ever', async () => {
+            const ctx = publicController({
+                activeScope: everScope,
+                bearer: true,
+                member: null,
+                tenant: { id: everScope.tenantId, ownerUserId: 'other' },
+            });
 
-                await expect(invoke(ctx)).rejects.toBeInstanceOf(NotFoundException);
-                expect(ctx.uploads.saveImage).not.toHaveBeenCalled();
-                expect(ctx.uploads.saveFile).not.toHaveBeenCalled();
-            },
-        );
-
-        it.each([
-            ['revoked', { member: null }],
-            ['unknown', { organization: null }],
-        ] as const)(
-            'opaquely rejects a bearer whose persisted Ever default is %s before presigning',
-            async (_label, overrides) => {
-                const ctx = publicController({
-                    activeScope: { tenantId: null, organizationId: null },
-                    bearer: true,
-                    user: {
-                        id: bearerUserId,
-                        tenantId: everScope.tenantId,
-                        lastScopeOrganizationId: everScope.organizationId,
-                        isActive: true,
-                    },
-                    tenant: { id: everScope.tenantId, ownerUserId: 'other' },
-                    ...overrides,
-                });
-
-                await expect(
-                    ctx.controller.presign(
-                        { filename: 'direct.png', mimeType: 'image/png', size: 100 },
-                        ctx.req,
-                    ),
-                ).rejects.toBeInstanceOf(NotFoundException);
-                expect(ctx.uploads.getBackend).not.toHaveBeenCalled();
-            },
-        );
+            await expect(
+                ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(ctx.uploads.saveImage).not.toHaveBeenCalled();
+        });
 
         it.each([
             [

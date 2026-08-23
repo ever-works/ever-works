@@ -22,6 +22,7 @@ type NextFn = (err?: unknown) => void;
  * are embedded in log lines so they cannot forge extra entries.
  */
 const CONTROL_CHARS = new RegExp('[\\u0000-\\u001F\\u007F-\\u009F]+', 'g');
+const PERSONAL_SCOPE_SENTINEL = '@personal';
 
 /**
  * EW-659 (Tenants & Organizations Phase 7) — slug routing middleware.
@@ -77,7 +78,7 @@ export class ScopeResolverMiddleware implements NestMiddleware {
     async use(req: MiddlewareRequest, _res: unknown, next: NextFn): Promise<void> {
         const slug = this.extractSlug(req);
 
-        if (!slug) {
+        if (!slug || slug === PERSONAL_SCOPE_SENTINEL) {
             // Legacy un-prefixed route, or an exempt path. Run under
             // EMPTY_SCOPE so the subscriber's beforeInsert hook sees
             // `null` for both fields and doesn't stamp anything.
