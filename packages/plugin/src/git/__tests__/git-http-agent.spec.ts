@@ -19,11 +19,13 @@ import { http } from '../git-operations.js';
 const SERVER_DELAY_MS = 8_000;
 const TEST_TIMEOUT_MS = 30_000;
 
-let server: Server;
+// Every started server is tracked so afterAll can close ALL of them. Tracking a single handle would
+// leak the first server (each test starts its own), which can keep the vitest process alive in CI.
+const servers: Server[] = [];
 
 function startSlowServer(): Promise<string> {
 	return new Promise((resolve) => {
-		server = createServer((req, res) => {
+		const server = createServer((req, res) => {
 			// Drain the request body, then deliberately stay silent past the 5s global-agent deadline.
 			req.resume();
 			req.on('end', () => {
@@ -33,6 +35,7 @@ function startSlowServer(): Promise<string> {
 				}, SERVER_DELAY_MS);
 			});
 		});
+		servers.push(server);
 		server.listen(0, '127.0.0.1', () => {
 			const { port } = server.address() as AddressInfo;
 			resolve(`http://127.0.0.1:${port}/slow`);
@@ -40,8 +43,15 @@ function startSlowServer(): Promise<string> {
 	});
 }
 
-afterAll(() => {
-	server?.close();
+afterAll(async () => {
+	await Promise.all(
+		servers.map(
+			(s) =>
+				new Promise<void>((resolve) => {
+					s.close(() => resolve());
+				})
+		)
+	);
 });
 
 describe('git HTTP client agent timeout', () => {
