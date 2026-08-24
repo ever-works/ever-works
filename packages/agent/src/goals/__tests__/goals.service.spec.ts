@@ -33,12 +33,10 @@ function makeRepo(prefix: string) {
     ) => {
         if (Array.isArray(where)) return where.some((branch) => matches(row, branch));
         return Object.entries(where).every(([k, value]) => {
-            if (
-                typeof value === 'object' &&
-                value !== null &&
-                (value as { _type?: string })._type === 'isNull'
-            ) {
-                return row[k] == null;
+            if (typeof value === 'object' && value !== null) {
+                const op = value as { _type?: string; _value?: unknown };
+                if (op._type === 'isNull') return row[k] == null;
+                if (op._type === 'in') return (op._value as unknown[]).includes(row[k]);
             }
             return row[k] === value;
         });
@@ -367,6 +365,92 @@ describe('GoalsService', () => {
             missionsRepo._rows.push({ id: 'm1', userId: 'u1' });
             goalsRepo._rows.push(makeGoalRow({ id: 'gA', userId: 'u1' }));
             goalsRepo._rows.push(makeGoalRow({ id: 'gB', userId: 'u1' }));
+        });
+
+        it('demotes a legacy (pre-stamping) primary edge when promoting under an Organization scope', async () => {
+            const EVER = { tenantId: 't-ever', organizationId: 'o-ever' };
+            missionsRepo._rows.push({ id: 'm-ever', userId: 'u1', ...EVER });
+            goalsRepo._rows.push(makeGoalRow({ id: 'gEver', userId: 'u1', ...EVER } as never));
+            // Edge created before scope stamping: null/null yet still the
+            // Mission's primary. The one-primary invariant (and the Postgres
+            // partial unique index uq_mission_goals_primary) is per-MISSION
+            // and knows nothing about stamps, so the demotion query must see
+            // this row - a scope-filtered demote would miss it and the new
+            // primary's save would hit the index and 500.
+            missionGoalsRepo._rows.push({
+                id: 'edge-legacy',
+                missionId: 'm-ever',
+                goalId: 'gA',
+                userId: 'u1',
+                isPrimary: true,
+                tenantId: null,
+                organizationId: null,
+                createdAt: new Date('2026-07-19T00:00:00.000Z'),
+            });
+
+            const link = await service.linkToMission('u1', 'm-ever', 'gEver', true, EVER);
+            expect(link.isPrimary).toBe(true);
+            expect(missionGoalsRepo._rows.find((r) => r.id === 'edge-legacy')?.isPrimary).toBe(
+                false,
+            );
+            expect(
+                missionGoalsRepo._rows.filter((r) => r.missionId === 'm-ever' && r.isPrimary),
+            ).toHaveLength(1);
+        });
+
+        it('lists and unlinks a legacy (pre-stamping) edge of an in-scope Mission and Goal', async () => {
+            const EVER = { tenantId: 't-ever', organizationId: 'o-ever' };
+            missionsRepo._rows.push({ id: 'm-ever', userId: 'u1', ...EVER });
+            goalsRepo._rows.push(makeGoalRow({ id: 'gEver', userId: 'u1', ...EVER } as never));
+            missionGoalsRepo._rows.push({
+                id: 'edge-legacy',
+                missionId: 'm-ever',
+                goalId: 'gEver',
+                userId: 'u1',
+                isPrimary: false,
+                tenantId: null,
+                organizationId: null,
+                createdAt: new Date('2026-07-19T00:00:00.000Z'),
+            });
+
+            // Both endpoints are visible in the active scope; the edge is a
+            // pure join row and must follow them, not its own stamp
+            // (upgrade-from-account backfills missions but not
+            // mission_goals).
+            const links = await service.listForMission('u1', 'm-ever', EVER);
+            expect(links).toHaveLength(1);
+            expect(links[0]).toMatchObject({ goalId: 'gEver', missionId: 'm-ever' });
+
+            await expect(service.unlinkFromMission('u1', 'm-ever', 'gEver', EVER)).resolves.toEqual(
+                { deleted: true },
+            );
+            expect(missionGoalsRepo._rows.find((r) => r.id === 'edge-legacy')).toBeUndefined();
+        });
+
+        it('hides a link whose Goal is not visible in the active scope (no goalId disclosure)', async () => {
+            const EVER = { tenantId: 't-ever', organizationId: 'o-ever' };
+            missionsRepo._rows.push({ id: 'm-ever', userId: 'u1', ...EVER });
+            // The linked Goal lives in ANOTHER workspace of the same user.
+            goalsRepo._rows.push(
+                makeGoalRow({
+                    id: 'gYo',
+                    userId: 'u1',
+                    tenantId: 't-ever',
+                    organizationId: 'o-yo',
+                } as never),
+            );
+            missionGoalsRepo._rows.push({
+                id: 'edge-cross',
+                missionId: 'm-ever',
+                goalId: 'gYo',
+                userId: 'u1',
+                isPrimary: false,
+                tenantId: 't-ever',
+                organizationId: 'o-yo',
+                createdAt: new Date('2026-07-19T00:00:00.000Z'),
+            });
+
+            await expect(service.listForMission('u1', 'm-ever', EVER)).resolves.toEqual([]);
         });
 
         it('promoting a second primary demotes the prior primary edge', async () => {

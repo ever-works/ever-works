@@ -21,6 +21,9 @@ import {
     type CheckoutSessionSnapshot,
     type CreditCheckoutRequest,
     type CreditCheckoutSession,
+    type MeterEventOutcome,
+    type MeterEventRequest,
+    type MeteredSubscriptionRequest,
     type OffSessionChargeRequest,
     type OffSessionChargeResult,
     type PaymentMethodSetupRequest,
@@ -119,6 +122,14 @@ export const STRIPE_PURCHASE_KINDS = {
     autoRecharge: 'credit-auto-recharge',
     /** A recurring plan subscription (audit B24). */
     planSubscription: 'plan-subscription',
+    /**
+     * The usage-only pay-as-you-go subscription (billing spec §3.5). Its
+     * `customer.subscription.*` events normalize to `payg.updated` and
+     * NEVER to the plan-tier kinds, and its invoices are tagged
+     * `subscriptionKind: 'payg'` so dunning on it suspends overflow rather
+     * than touching the plan.
+     */
+    paygSubscription: 'payg-subscription',
 } as const;
 
 /**
@@ -327,9 +338,9 @@ export class StripeBillingProvider extends BillingProvider {
             // implementation; this one is Stripe's.
             success_url: withSessionIdTemplate(request.successUrl),
             cancel_url: request.cancelUrl,
+            ...STRIPE_TAX_SESSION_FIELDS,
             line_items: lineItems,
             metadata,
-            ...STRIPE_TAX_SESSION_FIELDS,
             // A `mode: 'payment'` sale emits no `invoice.*` event unless invoice
             // creation is asked for explicitly. Without this, a successful $99
             // perpetual-licence payment produces NO invoice, NO ledger row and NO
@@ -660,6 +671,131 @@ export class StripeBillingProvider extends BillingProvider {
         return { url: session.url };
     }
 
+    // ── Pay-as-you-go (billing spec §3.5) ─────────────────────────────
+
+    /**
+     * The usage-only subscription the meter bills against. ONE item — the
+     * catalog's metered, graduated price resolved by `lookup_key` (never
+     * an inline `price_data`: a metered price must reference the Billing
+     * Meter, which only the synced catalog object does). `billing_thresholds`
+     * makes Stripe invoice mid-cycle once accrued usage reaches the
+     * threshold (exposure control); `collection_method` +
+     * `default_payment_method` make those invoices charge the stored card.
+     *
+     * Metadata kind is `payg-subscription`, so the lifecycle events of this
+     * subscription can never be mistaken for a plan purchase.
+     */
+    async createMeteredSubscription(
+        request: MeteredSubscriptionRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        const stripe = this.requireClient();
+        const priceId = await this.resolvePriceId(request.lookupKey);
+        if (!priceId) {
+            throw new BillingProviderError(
+                `Pay-as-you-go price "${request.lookupKey}" is not available in this Stripe account. ` +
+                    'Run scripts/stripe-sync-catalog.mjs to publish the catalog (meter + metered price).',
+                'payg-price-missing',
+            );
+        }
+        const subscription = await stripe.subscriptions.create(
+            {
+                customer: request.customerId,
+                items: [{ price: priceId }],
+                collection_method: 'charge_automatically',
+                default_payment_method: request.paymentMethodRef,
+                billing_thresholds: {
+                    amount_gte: request.invoiceThresholdCents,
+                    reset_billing_cycle_anchor: false,
+                },
+                // Stripe Tax, same posture as every charging Checkout session
+                // (see STRIPE_TAX_SESSION_FIELDS). Only `automatic_tax` applies
+                // here: `customer_update` / `tax_id_collection` are Checkout-only
+                // params and Stripe rejects them on a subscription.
+                automatic_tax: { enabled: true },
+                metadata: {
+                    [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.paygSubscription,
+                    [STRIPE_METADATA_KEYS.userId]: request.userId,
+                    [STRIPE_METADATA_KEYS.referenceId]: request.referenceId,
+                },
+            },
+            // One usage subscription per owner: a retried enable resolves to
+            // the same provider object instead of a second meter target.
+            { idempotencyKey: request.idempotencyKey },
+        );
+        return toSubscriptionSnapshot(subscription);
+    }
+
+    /**
+     * Immediate cancel + invoice now (billing spec FR-17). `prorate: false`
+     * because there is no flat fee to prorate; `invoice_now: true` so the
+     * usage accrued since the last invoice is billed at once.
+     */
+    async cancelMeteredSubscriptionNow(
+        request: SubscriptionMutationRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        const stripe = this.requireClient();
+        const subscription = await stripe.subscriptions.cancel(request.subscriptionId, {
+            invoice_now: true,
+            prorate: false,
+        });
+        return toSubscriptionSnapshot(subscription);
+    }
+
+    async retrieveSubscriptionSnapshot(
+        subscriptionId: string,
+    ): Promise<BillingSubscriptionSnapshot> {
+        const stripe = this.requireClient();
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        return toSubscriptionSnapshot(subscription);
+    }
+
+    /**
+     * One usage report to the Billing Meter. The identifier is ALSO the
+     * request idempotency key, so a retried send of the same run cannot
+     * double-count within Stripe's de-duplication window. Provider refusals
+     * are returned, not thrown — the caller decides retry vs. give-up; the
+     * only terminal refusal we recognize is a timestamp outside Stripe's
+     * acceptance window (35 days past / 5 minutes future). The caller uses
+     * a shorter retry window because Stripe's idempotency guarantees expire
+     * after 24 hours.
+     */
+    async reportMeterEvent(request: MeterEventRequest): Promise<MeterEventOutcome> {
+        const stripe = this.requireClient();
+        try {
+            await stripe.billing.meterEvents.create(
+                {
+                    event_name: request.eventName,
+                    identifier: request.identifier,
+                    timestamp: Math.floor(request.timestamp.getTime() / 1000),
+                    payload: {
+                        stripe_customer_id: request.customerId,
+                        value: String(Math.max(0, Math.trunc(request.value))),
+                    },
+                },
+                { idempotencyKey: request.identifier },
+            );
+            return { status: 'accepted' };
+        } catch (error) {
+            const err = error as {
+                code?: string;
+                message?: string;
+                statusCode?: number;
+                type?: string;
+            };
+            const message = String(err?.message ?? '');
+            const code =
+                err?.code ?? err?.type ?? (err?.statusCode ? `http_${err.statusCode}` : 'unknown');
+            // Stripe rejects timestamps older than 35 days / more than 5 min in the future.
+            const terminal =
+                /timestamp/i.test(message) && /(past|future|window|old)/i.test(message);
+            // Never log the error object wholesale; a short code is enough to act on.
+            this.logger.warn(
+                `Meter event ${request.identifier} refused by Stripe (code=${code}, terminal=${terminal})`,
+            );
+            return { status: 'failed', failureCode: code, terminal };
+        }
+    }
+
     async verifyAndParseWebhook(
         rawBody: string,
         signature: string | undefined,
@@ -804,7 +940,10 @@ export class StripeBillingProvider extends BillingProvider {
                     customerId: asId(invoice.customer),
                     currency: invoice.currency ?? null,
                     amountCents: invoice.total ?? null,
-                    invoice: toInvoiceSnapshot(invoice),
+                    invoice: {
+                        ...toInvoiceSnapshot(invoice),
+                        paymentFailed: event.type === 'invoice.payment_failed',
+                    },
                 };
             }
 
@@ -815,6 +954,31 @@ export class StripeBillingProvider extends BillingProvider {
             case 'customer.subscription.deleted': {
                 const subscription = event.data.object as Stripe.Subscription;
                 const meta = subscription.metadata ?? {};
+                // The pay-as-you-go usage subscription (billing spec §3.5):
+                // a lifecycle snapshot for `PaygService`, never a tier move.
+                // Handled BEFORE the plan branch so the two can never be
+                // confused, and a delete is terminal regardless of status.
+                if (meta[STRIPE_METADATA_KEYS.kind] === STRIPE_PURCHASE_KINDS.paygSubscription) {
+                    const snapshot = toSubscriptionSnapshot(subscription);
+                    return {
+                        ...base,
+                        kind: 'payg.updated',
+                        customerId: asId(subscription.customer),
+                        referenceId: meta[STRIPE_METADATA_KEYS.referenceId] ?? null,
+                        subscriptionId: subscription.id,
+                        currentPeriodEnd: snapshot.currentPeriodEnd,
+                        cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+                        currency: subscription.currency ?? null,
+                        subscription:
+                            event.type === 'customer.subscription.deleted'
+                                ? {
+                                      ...snapshot,
+                                      status: 'canceled' as const,
+                                      cancelAtPeriodEnd: false,
+                                  }
+                                : snapshot,
+                    };
+                }
                 // Only subscriptions WE sold carry a plan code. Anything
                 // else on this account is not ours to act on.
                 if (meta[STRIPE_METADATA_KEYS.kind] !== STRIPE_PURCHASE_KINDS.planSubscription) {
@@ -1101,8 +1265,40 @@ function toUnixDate(seconds: number | null | undefined): Date | null {
         : null;
 }
 
+/**
+ * Which of OUR subscriptions an invoice belongs to, if any. The current
+ * API puts the subscription + a metadata SNAPSHOT under
+ * `invoice.parent.subscription_details`; older deliveries carried a
+ * top-level `subscription` and `subscription_details`. Read both.
+ */
+function invoiceSubscriptionAttribution(invoice: Stripe.Invoice): {
+    subscriptionId: string | null;
+    subscriptionKind: 'plan' | 'payg' | null;
+} {
+    const raw = invoice as unknown as Record<string, unknown>;
+    const parent = (raw['parent'] ?? null) as {
+        subscription_details?: { subscription?: unknown; metadata?: Record<string, string> | null };
+    } | null;
+    const details =
+        parent?.subscription_details ??
+        ((raw['subscription_details'] ?? null) as {
+            subscription?: unknown;
+            metadata?: Record<string, string> | null;
+        } | null);
+    const subscriptionId = asId(details?.subscription ?? raw['subscription']) ?? null;
+    const kindMeta = details?.metadata?.[STRIPE_METADATA_KEYS.kind] ?? null;
+    const subscriptionKind =
+        kindMeta === STRIPE_PURCHASE_KINDS.paygSubscription
+            ? 'payg'
+            : kindMeta === STRIPE_PURCHASE_KINDS.planSubscription
+              ? 'plan'
+              : null;
+    return { subscriptionId, subscriptionKind };
+}
+
 function toInvoiceSnapshot(invoice: Stripe.Invoice): BillingInvoiceSnapshot {
     const raw = invoice as unknown as Record<string, unknown>;
+    const attribution = invoiceSubscriptionAttribution(invoice);
     const lines: BillingInvoiceLine[] = (invoice.lines?.data ?? []).map((line) => ({
         description: line.description ?? '',
         quantity: line.quantity ?? 1,
@@ -1121,6 +1317,8 @@ function toInvoiceSnapshot(invoice: Stripe.Invoice): BillingInvoiceSnapshot {
         providerInvoiceId: invoice.id ?? '',
         number: invoice.number ?? null,
         status: statusMap[invoice.status ?? ''] ?? 'open',
+        subscriptionId: attribution.subscriptionId,
+        subscriptionKind: attribution.subscriptionKind,
         periodStart: toUnixDate(invoice.period_start),
         periodEnd: toUnixDate(invoice.period_end),
         subtotalCents: invoice.subtotal ?? 0,
@@ -1169,6 +1367,18 @@ function subscriptionPeriodEnd(subscription: Stripe.Subscription): Date | null {
     return typeof legacy === 'number' ? toUnixDate(legacy) : null;
 }
 
+function subscriptionPeriodStart(subscription: Stripe.Subscription): Date | null {
+    const items = subscription.items?.data ?? [];
+    for (const item of items) {
+        const start = (item as unknown as Record<string, unknown>)['current_period_start'];
+        if (typeof start === 'number') {
+            return toUnixDate(start);
+        }
+    }
+    const legacy = (subscription as unknown as Record<string, unknown>)['current_period_start'];
+    return typeof legacy === 'number' ? toUnixDate(legacy) : null;
+}
+
 function toSubscriptionSnapshot(subscription: Stripe.Subscription): BillingSubscriptionSnapshot {
     return {
         subscriptionId: subscription.id,
@@ -1176,6 +1386,8 @@ function toSubscriptionSnapshot(subscription: Stripe.Subscription): BillingSubsc
         cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
         currentPeriodEnd: subscriptionPeriodEnd(subscription),
         canceledAt: toUnixDate(subscription.canceled_at),
+        currentPeriodStart: subscriptionPeriodStart(subscription),
+        subscriptionItemId: subscription.items?.data?.[0]?.id ?? null,
     };
 }
 

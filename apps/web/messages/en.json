@@ -3557,7 +3557,7 @@
                     "maxWorks": "Up to {count} Works",
                     "cadences": "{count} schedule cadences",
                     "dailyFreeCredits": "{amount} daily free credits",
-                    "payAsYouGo": "Pay-as-you-go from your credits balance",
+                    "payAsYouGo": "Usage is billed from your credits balance",
                     "current": "Current plan",
                     "switchFree": "Switch to {name}",
                     "upgrade": "Upgrade",
@@ -3606,6 +3606,32 @@
                     "loadError": "Your payment methods could not be loaded. Refresh the page to try again.",
                     "lastOnPaidPlan": "Add another card before removing the last one while a paid plan is active.",
                     "hostedNotice": "Card details are entered on the payment provider's secure page and never reach our servers. We only ever store the brand, last four digits and expiry."
+                },
+                "payg": {
+                    "title": "Pay-as-you-go",
+                    "comingSoon": "Pay-as-you-go arrives with the payments launch.",
+                    "needsPaymentMethod": "Buy credits once to save a payment method, then pay-as-you-go can be enabled.",
+                    "description": "When your credits run out, keep going and pay for what you use at the end of the month.",
+                    "toggle": "Enable pay-as-you-go",
+                    "capLabel": "Monthly cap (credits)",
+                    "capHint": "Usage beyond your balance is billed in arrears at the rates below, up to this cap. Runs pause at the cap until you raise it, buy credits, or the cycle resets.",
+                    "capRange": "Between {min} and {max} credits",
+                    "statusOn": "On",
+                    "statusOff": "Off",
+                    "statusPastDue": "Payment failed",
+                    "thisCycle": "This cycle: {used} of {cap} credits · ≈ {estimate}",
+                    "cycleEnds": "Cycle resets {date}",
+                    "capEstimate": "≈ {estimate} / cycle at the cap",
+                    "invoiceThreshold": "Usage is invoiced when it reaches {amount} and at the end of each cycle.",
+                    "tiersTitle": "Pay-as-you-go rates (per cycle)",
+                    "tierRow": "{from}–{to} credits",
+                    "tierRowOpen": "{from}+ credits",
+                    "perCredit": "{rate} per credit",
+                    "pastDue": "Your last pay-as-you-go invoice could not be collected. Pay-as-you-go is paused until it is settled; prepaid credits keep working.",
+                    "save": "Save",
+                    "saved": "Pay-as-you-go updated",
+                    "saveError": "Failed to update pay-as-you-go",
+                    "disableConfirm": "Turning pay-as-you-go off invoices what you have used so far immediately."
                 },
                 "autoRecharge": {
                     "title": "Auto-recharge",
@@ -3687,7 +3713,9 @@
                     "tasksCompleted": "Tasks completed",
                     "worksActive": "Works active",
                     "agentRuns": "Agent runs",
-                    "periodNote": "Showing period {period}"
+                    "periodNote": "Showing period {period}",
+                    "pricingNote": "{perDollar} credits = $1 of platform-billed usage.",
+                    "pricingNoteWithMargin": "{perDollar} credits = $1 of platform-billed usage. The platform rate includes a {margin}% service margin over provider list prices."
                 },
                 "charts": {
                     "byDay": "Usage per day",

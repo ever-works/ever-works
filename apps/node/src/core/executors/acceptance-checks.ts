@@ -379,10 +379,7 @@ async function resolveStepCwd(rootCwd: string, declared: string | undefined): Pr
 	} catch {
 		throw new AcceptanceChecksPayloadError('Step cwd is missing, linked, or not a directory');
 	}
-	const canonicalDeclaredCandidate = resolve(
-		canonicalRoot,
-		relative(lexicalRoot, lexicalCandidate)
-	);
+	const canonicalDeclaredCandidate = resolve(canonicalRoot, relative(lexicalRoot, lexicalCandidate));
 	if (
 		!sameFilesystemPath(canonicalCandidate, canonicalDeclaredCandidate) ||
 		!isStrictDescendantPath(canonicalRoot, canonicalCandidate)

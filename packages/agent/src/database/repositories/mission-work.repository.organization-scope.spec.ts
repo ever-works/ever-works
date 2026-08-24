@@ -34,14 +34,19 @@ function queryHarness() {
         execute: jest.fn(async () => ({ affected: 1 })),
         getRawMany: jest.fn(async () => []),
     };
+    const deleted: Record<string, unknown>[] = [];
     const repository = {
         createQueryBuilder: jest.fn(() => query),
+        delete: jest.fn(async (criteria: Record<string, unknown>) => {
+            deleted.push(criteria);
+            return { affected: 1 };
+        }),
     } as unknown as Repository<MissionWork>;
-    return { repository, selected, predicates, parameters };
+    return { repository, selected, predicates, parameters, deleted };
 }
 
 describe('MissionWorkRepository Organization scope', () => {
-    it('returns relation ownership and constrains both relation and Work to the active Organization', async () => {
+    it('returns relation ownership, constrains the joined Work to the active Organization, and leaves the edge row to follow its validated Mission endpoint', async () => {
         const harness = queryHarness();
         const repository = new MissionWorkRepository(harness.repository);
 
@@ -53,8 +58,13 @@ describe('MissionWorkRepository Organization scope', () => {
                 'rel.organizationId AS "organizationId"',
             ]),
         );
-        expect(harness.predicates.join('\n')).toContain('rel.tenantId');
-        expect(harness.predicates.join('\n')).toContain('rel.organizationId');
+        // The edge row is a pure join keyed by its validated endpoints;
+        // filtering it by its own STAMP would hide legacy pre-stamping
+        // relations (upgrade-from-account backfills missions/works but not
+        // mission_works) from their own owner.
+        expect(harness.predicates.join('\n')).not.toContain('rel.tenantId');
+        expect(harness.predicates.join('\n')).not.toContain('rel.organizationId IS');
+        expect(harness.predicates.join('\n')).toContain('rel.userId');
         expect(harness.predicates.join('\n')).toContain('work.tenantId');
         expect(harness.predicates.join('\n')).toContain('work.organizationId');
         expect(Object.assign({}, ...harness.parameters)).toMatchObject({
@@ -72,8 +82,8 @@ describe('MissionWorkRepository Organization scope', () => {
             organizationId: null,
         });
 
-        expect(harness.predicates.join('\n')).toContain('rel.organizationId IS NULL');
         expect(harness.predicates.join('\n')).toContain('work.organizationId IS NULL');
+        expect(harness.predicates.join('\n')).not.toContain('rel.organizationId IS NULL');
     });
 
     it('constrains the reverse relation lookup and its Mission parent to the active Organization', async () => {
@@ -90,6 +100,7 @@ describe('MissionWorkRepository Organization scope', () => {
         );
         expect(harness.predicates.join('\n')).toContain('mission.tenantId');
         expect(harness.predicates.join('\n')).toContain('mission.organizationId');
+        expect(harness.predicates.join('\n')).not.toContain('rel.tenantId');
     });
 
     it('uses canonical IS NULL semantics for an Organization whose Tenant is null', async () => {
@@ -103,17 +114,17 @@ describe('MissionWorkRepository Organization scope', () => {
 
         const predicates = harness.predicates.join('\n');
         const parameters = Object.assign({}, ...harness.parameters);
-        expect(predicates).toContain('rel.tenantId IS NULL');
         expect(predicates).toContain('work.tenantId IS NULL');
+        expect(predicates).not.toContain('rel.tenantId IS NULL');
         expect(predicates).not.toContain('tenantId = :scopeTenantId');
         expect(parameters).not.toHaveProperty('scopeTenantId');
     });
 
-    it('builds scoped detach from portable property criteria with no scope object parameter', async () => {
+    it('detaches by the validated endpoint keys alone, never by the edge stamp', async () => {
         const harness = queryHarness();
         const repository = new MissionWorkRepository(harness.repository);
 
-        await repository.detach({
+        const removed = await repository.detach({
             missionId: 'mission-1',
             workId: 'work-1',
             userId: 'user-1',
@@ -121,21 +132,23 @@ describe('MissionWorkRepository Organization scope', () => {
             scope: EVER_SCOPE,
         });
 
-        expect(harness.repository.createQueryBuilder).toHaveBeenCalledWith();
-        expect(
-            (harness.repository.createQueryBuilder as jest.Mock).mock.results[0].value.where,
-        ).toHaveBeenCalledWith([
+        // The calling service already ownership-validated the Mission in the
+        // active scope; a stamp-filtered delete would leave a legacy
+        // (pre-stamping) edge of an in-scope Mission permanently
+        // un-detachable (404 forever).
+        expect(removed).toBe(true);
+        expect(harness.repository.createQueryBuilder).not.toHaveBeenCalled();
+        expect(harness.deleted).toEqual([
             {
                 missionId: 'mission-1',
                 workId: 'work-1',
                 userId: 'user-1',
                 relation: 'created',
-                ...EVER_SCOPE,
             },
         ]);
     });
 
-    it('emits portable quoted PostgreSQL detach SQL with only scalar ownership parameters', async () => {
+    it('issues the real detach as a plain criteria delete with only scalar endpoint keys', async () => {
         const dataSource = new DataSource({
             type: 'postgres',
             host: '127.0.0.1',
@@ -146,17 +159,11 @@ describe('MissionWorkRepository Organization scope', () => {
         });
         await (dataSource as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
         const orm = dataSource.getRepository(MissionWork);
-        const query = orm.createQueryBuilder().delete().from(MissionWork);
-        let emitted: [string, unknown[]] | undefined;
-        let namedParameters: Record<string, unknown> | undefined;
-        jest.spyOn(query, 'execute').mockImplementation(async () => {
-            emitted = query.getQueryAndParameters();
-            namedParameters = query.getParameters();
+        const captured: unknown[] = [];
+        jest.spyOn(orm, 'delete').mockImplementation(async (criteria: unknown) => {
+            captured.push(criteria);
             return { affected: 1, raw: [] } as DeleteResult;
         });
-        jest.spyOn(orm, 'createQueryBuilder').mockReturnValue({
-            delete: jest.fn(() => query),
-        } as never);
 
         await new MissionWorkRepository(orm).detach({
             missionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -166,17 +173,17 @@ describe('MissionWorkRepository Organization scope', () => {
             scope: EVER_SCOPE,
         });
 
-        expect(emitted).toBeDefined();
-        expect(emitted![0]).toContain('"missionId"');
-        expect(emitted![0]).toContain('"workId"');
-        expect(emitted![0]).toContain('"userId"');
-        expect(emitted![0]).toContain('"tenantId"');
-        expect(emitted![0]).toContain('"organizationId"');
-        expect(emitted![1]).toHaveLength(6);
-        expect(Object.values(namedParameters ?? {})).toHaveLength(6);
-        expect(Object.values(namedParameters ?? {})).not.toContainEqual(EVER_SCOPE);
-        expect(
-            Object.values(namedParameters ?? {}).every((value) => typeof value === 'string'),
-        ).toBe(true);
+        expect(captured).toEqual([
+            {
+                missionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+                workId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                userId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+                relation: 'created',
+            },
+        ]);
+        const criteria = captured[0] as Record<string, unknown>;
+        expect(criteria).not.toHaveProperty('tenantId');
+        expect(criteria).not.toHaveProperty('organizationId');
+        expect(Object.values(criteria).every((value) => typeof value === 'string')).toBe(true);
     });
 });

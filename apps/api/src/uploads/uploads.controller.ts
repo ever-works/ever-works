@@ -43,6 +43,7 @@ import { toHeaders } from '../auth/providers/request-headers';
 import { UploadsService } from './uploads.service';
 import { PresignUploadDto } from './dto/presign-upload.dto';
 import { ScopeContextService } from '../scope/scope-context.service';
+import { ApiKeyService } from '../auth/services/api-key.service';
 
 const MAX_UPLOAD_BYTES = Number(process.env.UPLOADS_MAX_BYTES) || 5 * 1024 * 1024;
 
@@ -107,6 +108,7 @@ export class UploadsController {
         @Optional()
         @Inject(TenantRepository)
         private readonly tenantRepository?: TenantRepository,
+        private readonly apiKeyService?: ApiKeyService,
     ) {}
 
     /**
@@ -450,10 +452,14 @@ export class UploadsController {
         description: 'Backend does not support presign — use POST /api/uploads',
     })
     async presign(@Body() body: PresignUploadDto, @Req() req: AnonRequest) {
-        // Authenticate + hydrate ownership before touching even the backend
-        // capability surface. A revoked bearer must not receive a presign
-        // oracle or a key in a fallback personal scope.
-        const { userId, anonAccessToken, anonymousExpiresAt } = await this.resolveActingUser(req);
+        // Capability is public and independent of caller identity. Reject an
+        // unsupported backend before creating the otherwise-unused anonymous
+        // User row. Supplied credentials are still validated first so revoked
+        // callers do not gain a capability oracle; only a truly anonymous
+        // request defers identity creation until support is confirmed.
+        let actingUser = this.hasSuppliedCredential(req)
+            ? await this.resolveActingUser(req)
+            : undefined;
         const backend = await this.uploads.getBackend();
         if (!backend.presignPut) {
             throw new NotImplementedException({
@@ -463,6 +469,8 @@ export class UploadsController {
                     'Active storage backend does not support presigned uploads — use POST /api/uploads with multipart form data instead.',
             });
         }
+        actingUser ??= await this.resolveActingUser(req);
+        const { userId, anonAccessToken, anonymousExpiresAt } = actingUser;
 
         const presign = await backend.presignPut({
             filename: body.filename,
@@ -522,11 +530,26 @@ export class UploadsController {
         // centralized ownership predicate in UserUploadRepository.
         if (this.userUploads) {
             const match = /^([0-9a-f]{64})(?:\.|$)/i.exec(filename);
+            if (!match) {
+                res.status(HttpStatus.NOT_FOUND).json({ status: 'error', message: 'Not found' });
+                return;
+            }
             const scope = this.scopeContext.getScope();
-            const upload = match
-                ? await this.userUploads.findOwnedByUser(match[1].toLowerCase(), userId, scope)
-                : null;
-            if (!upload || (upload.workId ?? null) !== (workId ?? null)) {
+            const sha256 = match[1].toLowerCase();
+            const upload = await this.userUploads.findOwnedByUser(
+                sha256,
+                userId,
+                scope,
+                workId ?? null,
+            );
+            // Pre-user_uploads objects have no metadata row. Preserve their
+            // historical owner-keyed read path only when no row exists in any
+            // scope; a same-user row hidden by the active scope must remain an
+            // opaque 404 rather than being mistaken for legacy storage.
+            const indexedElsewhere = upload
+                ? null
+                : await this.userUploads.findOwnedByUser(sha256, userId);
+            if (indexedElsewhere) {
                 res.status(HttpStatus.NOT_FOUND).json({ status: 'error', message: 'Not found' });
                 return;
             }
@@ -586,15 +609,26 @@ export class UploadsController {
         ownershipScope: OwnershipScope;
     }> {
         const authorization = req.headers?.authorization;
+        const apiKeyHeader = req.headers?.['x-api-key'];
+        const headerApiKey =
+            typeof apiKeyHeader === 'string' && apiKeyHeader.trim().length > 0
+                ? apiKeyHeader.trim()
+                : null;
+        const bearerApiKey = Array.isArray(authorization)
+            ? null
+            : (/^Bearer\s+(ew_live_\S+)$/i.exec(authorization?.trim() ?? '')?.[1] ?? null);
+        const apiKey = headerApiKey ?? bearerApiKey;
         const hasBearer = Array.isArray(authorization)
             ? authorization.some((value) => value.trim().length > 0)
             : typeof authorization === 'string' && authorization.trim().length > 0;
 
-        if (hasBearer) {
+        if (apiKey || hasBearer) {
             // @Public() skips the global session/scope guards, so reproduce
             // their authoritative half here. A supplied-but-invalid bearer
             // is never reinterpreted as an anonymous request.
-            const existing = await this.authenticateBearer(req);
+            const existing = apiKey
+                ? await this.authenticateApiKey(apiKey)
+                : await this.authenticateBearer(req);
             const ownershipScope = await this.hydrateAuthenticatedScope(existing);
             req.user = existing;
             this.scopeContext.setScope(ownershipScope);
@@ -637,6 +671,16 @@ export class UploadsController {
         throw new NotFoundException({ status: 'error', message: 'Resource not found' });
     }
 
+    private hasSuppliedCredential(req: AnonRequest): boolean {
+        const authorization = req.headers?.authorization;
+        const apiKey = req.headers?.['x-api-key'];
+        return [authorization, apiKey].some((value) =>
+            Array.isArray(value)
+                ? value.some((entry) => entry.trim().length > 0)
+                : typeof value === 'string' && value.trim().length > 0,
+        );
+    }
+
     private async authenticateBearer(req: AnonRequest): Promise<AuthenticatedUser> {
         try {
             const authenticated = await this.authProvider.authenticate(
@@ -644,6 +688,29 @@ export class UploadsController {
             );
             if (!authenticated?.userId) this.opaqueScopeNotFound();
             return authenticated;
+        } catch {
+            this.opaqueScopeNotFound();
+        }
+    }
+
+    private async authenticateApiKey(apiKey: string): Promise<AuthenticatedUser> {
+        try {
+            const keyRecord = await this.apiKeyService?.validateKey(apiKey);
+            if (!keyRecord?.userId || !this.userRepository) this.opaqueScopeNotFound();
+            const user = await this.userRepository.findById(keyRecord.userId);
+            if (!user?.isActive) this.opaqueScopeNotFound();
+            return {
+                userId: user.id,
+                email: user.email,
+                username: user.username,
+                provider: user.registrationProvider,
+                emailVerified: user.emailVerified,
+                isActive: user.isActive,
+                avatar: user.avatar || null,
+                iat: Math.floor(Date.now() / 1000),
+                iss: 'ever-works',
+                aud: 'ever-works',
+            };
         } catch {
             this.opaqueScopeNotFound();
         }

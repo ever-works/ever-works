@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { UsageByDayChart } from '@/components/settings/usage/UsageByDayChart';
 import { UsageBreakdownChart } from '@/components/settings/usage/UsageBreakdownChart';
 import {
+    type CreditsPricing,
     buildUsageExportQuery,
     buildUsageSummaryQuery,
     currentUsageMonth,
@@ -42,6 +43,8 @@ interface UsageCreditsSettingsProps {
     initialByAgent: UsageSummaryGrouped | null;
     initialByWork: UsageSummaryGrouped | null;
     accountWide: AccountWideUsage | null;
+    /** How a credit is priced (billing spec FR-13); null when the API call failed. */
+    pricing?: CreditsPricing | null;
 }
 
 /** How many calendar months the month picker offers (B20). */
@@ -100,6 +103,7 @@ export function UsageCreditsSettings({
     initialByAgent,
     initialByWork,
     accountWide,
+    pricing = null,
 }: UsageCreditsSettingsProps) {
     const t = useTranslations('dashboard.settings.usage');
 
@@ -316,6 +320,19 @@ export function UsageCreditsSettings({
             {totals ? (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark -mt-4">
                     {t('tiles.periodNote', { period: totals.period })}
+                </p>
+            ) : null}
+            {pricing ? (
+                <p
+                    className="text-xs text-text-muted dark:text-text-muted-dark -mt-2"
+                    data-testid="usage-pricing-note"
+                >
+                    {pricing.marginPercent > 0
+                        ? t('tiles.pricingNoteWithMargin', {
+                              perDollar: pricing.creditsPerDollar,
+                              margin: pricing.marginPercent,
+                          })
+                        : t('tiles.pricingNote', { perDollar: pricing.creditsPerDollar })}
                 </p>
             ) : null}
 

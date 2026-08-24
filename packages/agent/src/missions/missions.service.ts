@@ -543,17 +543,18 @@ export class MissionsService {
     ): Promise<MissionAttachment[]> {
         await this.findOrThrow(userId, missionId, scope);
         if (!this.missionAttachments) return [];
-        const rows = await this.missionAttachments.findByMissionId(missionId);
-        if (rows.length === 0 || !this.uploadsRepo) return rows;
-        const uploads = await this.uploadsRepo.find({
-            where: ownershipWhereWith<UserUpload>(userId, scope, {
-                sha256: In(rows.map((row) => row.uploadId)),
-            }),
-        });
-        if (new Set(rows.map((row) => row.uploadId)).size !== uploads.length) {
-            throw new NotFoundException(`Attachment not found`);
-        }
-        return rows;
+        // The Mission itself is the authority: it was ownership-validated
+        // above, and an attachment row carries only (missionId, uploadId)
+        // where uploadId is a hash the caller supplied at attach time — no
+        // cross-user or cross-Organization data can leak through it. Do NOT
+        // re-filter (or fail) the list against the caller's `user_uploads`
+        // visibility in the CURRENT scope: legacy rows pre-date scope
+        // stamping (upgrade-from-account backfills `missions` but not
+        // `user_uploads`), and pre-fix rows may be stored uppercase — either
+        // would 404 the owner's entire attachment list of an in-scope
+        // Mission and make individual attachments impossible to discover
+        // and remove.
+        return this.missionAttachments.findByMissionId(missionId);
     }
 
     /**
@@ -572,13 +573,19 @@ export class MissionsService {
         if (!uploadId || !SHA256_RE.test(uploadId)) {
             throw new BadRequestException(`Invalid uploadId`);
         }
+        // Canonicalize ONCE and use the canonical value for the ownership
+        // lookup, persistence, and duplicate recovery alike (mirrors
+        // AgentsService.addAttachment). `user_uploads.sha256` is stored
+        // lowercase, so persisting a raw uppercase input would create an
+        // attachment edge the upload join can never resolve again.
+        const canonicalUploadId = uploadId.toLowerCase();
         // Security: the uploadId must reference a real upload owned by the
         // caller (404 — don't leak existence). Closes the dangling/foreign
         // attachment edge the hunt found.
         if (this.uploadsRepo) {
             const owned = await this.uploadsRepo.findOne({
                 where: ownershipWhereWith<UserUpload>(userId, scope, {
-                    sha256: uploadId.toLowerCase(),
+                    sha256: canonicalUploadId,
                 }),
             });
             if (!owned) throw new NotFoundException(`Upload ${uploadId} not found.`);
@@ -589,13 +596,13 @@ export class MissionsService {
             );
         }
         try {
-            return await this.missionAttachments.add(missionId, uploadId);
+            return await this.missionAttachments.add(missionId, canonicalUploadId);
         } catch (err) {
             // Duplicate (missionId, uploadId) — swallow and re-read.
             // Mirrors the idempotency contract on Task attachments.
             if (err instanceof Error && /duplicate key|unique constraint/i.test(err.message)) {
                 const existing = (await this.missionAttachments.findByMissionId(missionId)).find(
-                    (a) => a.uploadId === uploadId,
+                    (a) => a.uploadId === canonicalUploadId,
                 );
                 if (existing) return existing;
             }

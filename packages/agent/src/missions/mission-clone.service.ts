@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { IsNull, Not, Repository, type FindOptionsWhere } from 'typeorm';
 import { Mission, MissionGuardrailsOverride, MissionStatus } from '../entities/mission.entity';
 import {
     WorkProposal,
@@ -199,10 +199,28 @@ export class MissionCloneService {
             // ALL non-PENDING source statuses for the "skipped"
             // metric below (just DISMISSED), so the caller can
             // surface a "we skipped N dismissed Ideas" hint.
-            const sourceIdeas = await tx.find(WorkProposal, {
-                where: ownershipWhereWith<WorkProposal>(userId, scope, {
+            const scopedIdeaWhere = ownershipWhereWith<WorkProposal>(userId, scope, {
+                missionId: source.id,
+            });
+            const sourceIdeaWhere: FindOptionsWhere<WorkProposal>[] = Array.isArray(scopedIdeaWhere)
+                ? scopedIdeaWhere
+                : [scopedIdeaWhere];
+            if (scope?.organizationId) {
+                // Scheduled ticks run outside HTTP/ALS under EMPTY_SCOPE, so
+                // their Ideas are stamped NULL/NULL even when the Mission is
+                // Organization-scoped. The already-authorized Mission FK plus
+                // userId makes those rows safe to recover. Keep the exact
+                // Organization branches too, and never admit a differently
+                // stamped Organization row.
+                sourceIdeaWhere.push({
+                    userId,
                     missionId: source.id,
-                }),
+                    tenantId: IsNull(),
+                    organizationId: IsNull(),
+                });
+            }
+            const sourceIdeas = await tx.find(WorkProposal, {
+                where: sourceIdeaWhere,
             });
             const eligible = sourceIdeas.filter(
                 (idea) => idea.status !== WorkProposalStatus.DISMISSED,

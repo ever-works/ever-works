@@ -151,6 +151,41 @@ export async function updateAutoRechargeAction(settings: {
 }
 
 /**
+ * Enable / disable / re-cap pay-as-you-go (billing spec §3.5). Returns a
+ * discriminated union rather than throwing — production redacts thrown
+ * server-action messages, so the client branches on the return value.
+ */
+export async function updatePaygAction(settings: {
+    enabled?: boolean;
+    monthlyCapCredits?: number;
+}) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await billingAPI.updatePayg(settings);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_BILLING);
+        const { status: _status, ...payg } = result;
+        return { success: true as const, payg, error: null };
+    } catch (error) {
+        console.error('[updatePaygAction]', error);
+        let message = 'Failed to update pay-as-you-go';
+        if (error instanceof ApiResponseError) {
+            if (error.statusCode === 409) {
+                message = 'Add a payment method before enabling pay-as-you-go.';
+            } else if (error.statusCode === 503) {
+                message = 'Card payments are not enabled on this deployment yet.';
+            } else if (error.statusCode === 400) {
+                message = 'That monthly cap is outside the allowed range.';
+            }
+        }
+        return { success: false as const, payg: null, error: message };
+    }
+}
+
+/**
  * Cancel the subscription at the end of the paid period (audit B07).
  *
  * Returns a discriminated union rather than throwing — production

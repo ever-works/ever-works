@@ -26,6 +26,39 @@ function makeService(repoOverrides: Record<string, jest.Mock> = {}) {
 }
 
 describe('NotificationService', () => {
+    it('creates a fresh PAYG cap notification in each billing cycle', async () => {
+        const rows: Array<Record<string, any>> = [];
+        const repository = makeRepository({
+            findByDeduplicationKey: jest.fn(async (userId: string, key: string) =>
+                rows.find((row) => row.userId === userId && row.deduplicationKey === key),
+            ),
+            create: jest.fn(async (dto: Record<string, any>) => {
+                const row = { id: `n${rows.length + 1}`, isDismissed: false, ...dto };
+                rows.push(row);
+                return row;
+            }),
+        });
+        const service = new NotificationService(repository as any);
+
+        await service.notifyPaygCapThreshold({
+            userId: 'u1',
+            percent: 80,
+            usedCredits: 800,
+            capCredits: 1000,
+            periodEnd: new Date('2026-09-01T00:00:00.000Z'),
+        });
+        await service.notifyPaygCapThreshold({
+            userId: 'u1',
+            percent: 80,
+            usedCredits: 800,
+            capCredits: 1000,
+            periodEnd: new Date('2026-10-01T00:00:00.000Z'),
+        });
+
+        expect(rows).toHaveLength(2);
+        expect(rows[0].deduplicationKey).not.toBe(rows[1].deduplicationKey);
+    });
+
     describe('create — deduplication', () => {
         it('returns the existing notification when one with the dedup key is present and not dismissed', async () => {
             const existing = { id: 'n1', isDismissed: false };

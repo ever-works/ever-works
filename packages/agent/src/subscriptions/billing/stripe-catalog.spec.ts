@@ -3,8 +3,12 @@ import {
     allCatalogLookupKeys,
     billableSeats,
     catalog,
+    catalogCreditsMarginPercent,
     creditPackLookupKey,
+    estimatePaygCents,
     findPlan,
+    getPaygCatalog,
+    paygLookupKey,
     planLookupKey,
     planProductName,
     resolveCatalogSku,
@@ -258,6 +262,83 @@ describe('stripe-catalog', () => {
                 expect(pack.credits).toBe(source!.credits);
                 expect(pack.label).toBe(source!.label);
             }
+        });
+    });
+
+    /**
+     * Billing spec §3.4 — the margin is the one number that decides whether a credit pack is
+     * sold at a loss, so it lives in the catalog and is pinned here WITH the arithmetic.
+     *
+     * Inputs: metered cost = provider list price (OpenRouter) × 1.055 (OpenRouter's purchase
+     * fee); Stripe ≈ 2.9% + 30¢ per charge. With margin m, N credits buy N/(1+m) cents of list.
+     *
+     *   | pack     | price | credits | list AI at m=35% | provider cost (×1.055) | net of Stripe | result |
+     *   |----------|-------|---------|------------------|------------------------|---------------|--------|
+     *   | 1,000    |  $10  |  1,000  |   $7.41          |  $7.81                 |  $9.41        | +$1.60 |
+     *   | 5,500    |  $50  |  5,500  |  $40.74          | $42.98                 | $48.25        | +$5.27 |
+     *   | 25,000   | $200  | 25,000  | $185.19          | $195.37                | $193.90       | −$1.47 |
+     *   | PAYG 1¢  |  —    |      1  |  0.741¢          |  0.781¢                |  ~0.97¢       | +0.19¢ |
+     *
+     * The largest pack sits at break-even by design (acquisition SKU); everything else is
+     * positive. Change the number in `stripe-catalog.data.json` and this test tells you what
+     * happens to the table.
+     */
+    describe('margin (billing spec §3.4)', () => {
+        const OPENROUTER_FEE = 1.055;
+        const stripeFeeCents = (priceCents: number) => Math.round(priceCents * 0.029) + 30;
+        const providerCostCents = (credits: number) =>
+            (credits / (1 + catalogCreditsMarginPercent() / 100)) * OPENROUTER_FEE;
+
+        it('is 35% in the catalog and is what config falls back to', () => {
+            expect(catalog.creditsMarginPercent).toBe(35);
+            expect(catalogCreditsMarginPercent()).toBe(35);
+        });
+
+        it('keeps every pack at or above break-even after provider and Stripe fees (largest pack ≈ 0)', () => {
+            for (const pack of catalog.creditPacks) {
+                const net = pack.amountCents - stripeFeeCents(pack.amountCents);
+                const cost = providerCostCents(pack.credits);
+                const marginCents = net - cost;
+                // The 25,000 pack is the deliberate break-even SKU: allow it to sit within
+                // one percent of zero; the smaller packs must be clearly positive.
+                if (pack.packId === 'credits-25000') {
+                    expect(Math.abs(marginCents)).toBeLessThan(pack.amountCents * 0.01);
+                } else {
+                    expect(marginCents).toBeGreaterThan(pack.amountCents * 0.1);
+                }
+            }
+        });
+
+        it('prices the PAYG base tier above provider cost', () => {
+            const baseCentsPerCredit = Number(getPaygCatalog().tiers[0].centsPerCredit);
+            expect(baseCentsPerCredit).toBeGreaterThan(providerCostCents(1));
+        });
+    });
+
+    describe('pay-as-you-go (billing spec §3.5)', () => {
+        it('declares one meter and one graduated monthly price inside the works namespace', () => {
+            const payg = getPaygCatalog();
+            expect(payg.meterEventName).toBe('ever_works_credits');
+            expect(paygLookupKey()).toBe('ever_works_payg_credits_monthly');
+            expect(allCatalogLookupKeys()).toContain(paygLookupKey());
+            expect(payg.tiers.map((t) => t.upTo)).toEqual([5000, 25000, null]);
+            // Stripe's monetary-threshold floor is 50 currency units.
+            expect(payg.invoiceThresholdCents).toBeGreaterThanOrEqual(5000);
+            expect(payg.defaultMonthlyCapCredits).toBeLessThanOrEqual(payg.maxMonthlyCapCredits);
+        });
+
+        it('never undercuts the prepaid packs at the same volume — packs are the commitment discount', () => {
+            for (const pack of catalog.creditPacks) {
+                expect(estimatePaygCents(pack.credits)).toBeGreaterThanOrEqual(pack.amountCents);
+            }
+        });
+
+        it('estimatePaygCents applies the tiers graduated (each span at its own rate)', () => {
+            expect(estimatePaygCents(0)).toBe(0);
+            expect(estimatePaygCents(5000)).toBe(5000); // 5,000 × 1.00¢
+            expect(estimatePaygCents(6000)).toBe(5000 + 910); // + 1,000 × 0.91¢
+            expect(estimatePaygCents(30000)).toBe(5000 + 18200 + 4000); // + 20,000 × 0.91¢ + 5,000 × 0.80¢
+            expect(estimatePaygCents(-5)).toBe(0);
         });
     });
 

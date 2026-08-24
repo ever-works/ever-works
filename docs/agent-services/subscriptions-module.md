@@ -280,12 +280,16 @@ export class StripeBillingProvider extends BillingProvider {
     }
 
     async recordUsageCharge(entry: UsageLedgerEntry): Promise<void> {
-        await this.stripe.invoiceItems.create({
-            customer: entry.userId, // Resolve to Stripe customer ID
-            amount: entry.amountCents,
-            currency: entry.currency,
-            description: `Work update: ${entry.workId}`,
-        });
+        // LEGACY EXAMPLE — the per-run pay-per-use path is deprecated
+        // (billing spec FR-25). Real usage billing goes through Stripe
+        // Billing Meters; see docs/advanced/subscription-billing.md.
+        //
+        // await this.stripe.invoiceItems.create({
+        //     customer: entry.userId, // Resolve to Stripe customer ID
+        //     amount: entry.amountCents,
+        //     currency: entry.currency,
+        //     description: `Work update: ${entry.workId}`,
+        // });
     }
 }
 

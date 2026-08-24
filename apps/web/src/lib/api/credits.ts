@@ -6,6 +6,7 @@ import {
     type CreditLedgerKind,
     type CreditsBalance,
     type CreditsLedgerPage,
+    type CreditsPricing,
     type SubscriptionPlanList,
     type SubscriptionPlanSummary,
     type UsagePeriod,
@@ -18,6 +19,7 @@ export type {
     CreditLedgerKind,
     CreditsBalance,
     CreditsLedgerPage,
+    CreditsPricing,
     SubscriptionPlanList,
     SubscriptionPlanSummary,
     UsagePeriod,
@@ -37,6 +39,11 @@ export const creditsAPI = {
     /** Current credits balance for the signed-in user. */
     async balance(): Promise<CreditsBalance> {
         return serverFetch<CreditsBalance>('/credits/balance', { method: 'GET' });
+    },
+
+    /** How a credit is priced on this deployment (billing spec FR-13). */
+    async pricing(): Promise<CreditsPricing> {
+        return serverFetch<CreditsPricing>('/credits/pricing', { method: 'GET' });
     },
 
     /** Paginated credits ledger (period YYYY-MM + kind filters). */

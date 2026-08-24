@@ -64,6 +64,8 @@ function makeLedger(overrides: Record<string, jest.Mock> = {}) {
         })),
         getBalance: jest.fn().mockResolvedValue(0),
         creditsForCostCents: jest.fn((cents: number) => cents),
+        // Billing spec FR-3 — the gate's lazy daily grant.
+        grantDailyForUser: jest.fn().mockResolvedValue('granted'),
         ...overrides,
     };
 }
@@ -109,6 +111,8 @@ function makeService(
         users?: Record<string, jest.Mock>;
         notifications?: Record<string, jest.Mock> | null;
         settings?: Record<string, jest.Mock> | null;
+        /** Pay-as-you-go collaborator (billing spec §3.5); absent by default. */
+        payg?: Record<string, jest.Mock>;
     } = {},
 ) {
     const agentRuns = makeAgentRuns(parts.agentRuns);
@@ -119,6 +123,7 @@ function makeService(
     const notifications =
         parts.notifications === null ? undefined : makeNotifications(parts.notifications);
     const settings = parts.settings === null ? undefined : makeSettings(parts.settings);
+    const payg = parts.payg;
     const service = new RunCostSettlementService(
         agentRuns as any,
         usage as any,
@@ -127,8 +132,20 @@ function makeService(
         users as any,
         notifications as any,
         settings as any,
+        undefined, // auto-recharge — covered by its own spec
+        payg as any,
     );
-    return { service, agentRuns, usage, ledger, entitlements, users, notifications, settings };
+    return {
+        service,
+        agentRuns,
+        usage,
+        ledger,
+        entitlements,
+        users,
+        notifications,
+        settings,
+        payg,
+    };
 }
 
 describe('RunCostSettlementService', () => {
@@ -305,6 +322,86 @@ describe('RunCostSettlementService', () => {
         });
     });
 
+    describe('settleRun — pay-as-you-go overflow (billing spec FR-18)', () => {
+        it('meters the uncovered remainder when PAYG takes it, and does NOT raise the exhaustion notification', async () => {
+            const payg = {
+                recordOverflow: jest.fn().mockResolvedValue({
+                    status: 'metered',
+                    billedCredits: 17,
+                    writtenOffCredits: 0,
+                    sent: true,
+                    capReached: false,
+                }),
+            };
+            const { service, ledger, notifications } = makeService({
+                ledger: {
+                    consumeForRun: jest
+                        .fn()
+                        .mockRejectedValue(new InsufficientCreditsError('user-1', 37, 20)),
+                },
+                payg,
+            });
+
+            const result = await service.settleRun('run-1');
+
+            // Prepaid part still debited down to zero…
+            expect(ledger.record).toHaveBeenCalledWith(
+                expect.objectContaining({ amountCredits: -20, idempotencyKey: 'run:run-1' }),
+            );
+            // …and the remainder (37 − 20) goes to the meter.
+            expect(payg.recordOverflow).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 'user-1', runId: 'run-1', remainderCredits: 17 }),
+            );
+            expect(result).toMatchObject({
+                status: 'metered',
+                debitedCredits: 20,
+                meteredCredits: 17,
+                writtenOffCredits: 0,
+            });
+            expect(notifications!.notifyCreditsBalanceExhausted).not.toHaveBeenCalled();
+        });
+
+        it('falls back to the partial/exhausted policy (with notification) when PAYG is off or capped out', async () => {
+            const payg = {
+                recordOverflow: jest.fn().mockResolvedValue({
+                    status: 'not-eligible',
+                    billedCredits: 0,
+                    writtenOffCredits: 37,
+                }),
+            };
+            const { service, notifications } = makeService({
+                ledger: {
+                    consumeForRun: jest
+                        .fn()
+                        .mockRejectedValue(new InsufficientCreditsError('user-1', 37, 0)),
+                },
+                payg,
+            });
+
+            const result = await service.settleRun('run-1');
+
+            expect(result).toMatchObject({
+                status: 'exhausted',
+                meteredCredits: 0,
+                writtenOffCredits: 37,
+            });
+            expect(notifications!.notifyCreditsBalanceExhausted).toHaveBeenCalled();
+        });
+
+        it('a PAYG failure never reddens the settlement', async () => {
+            const payg = { recordOverflow: jest.fn().mockRejectedValue(new Error('stripe down')) };
+            const { service } = makeService({
+                ledger: {
+                    consumeForRun: jest
+                        .fn()
+                        .mockRejectedValue(new InsufficientCreditsError('user-1', 37, 20)),
+                },
+                payg,
+            });
+            await expect(service.settleRun('run-1')).resolves.toMatchObject({ status: 'partial' });
+        });
+    });
+
     describe('settleRun — BYOK/BYOS exemption (founder decision P2/P3)', () => {
         it('excludes plugins whose apiKey resolved from USER settings; stamp keeps the full total', async () => {
             const { service, agentRuns, ledger } = makeService({
@@ -414,6 +511,63 @@ describe('RunCostSettlementService', () => {
             });
 
             await expect(service.shouldQueueForCredits('user-1')).resolves.toBe(true);
+        });
+
+        it("grants today's daily allowance lazily before reading the balance (billing spec FR-3)", async () => {
+            process.env.CREDITS_ENFORCEMENT = 'on';
+            const { service, ledger } = makeService({
+                entitlements: { getNumber: jest.fn().mockResolvedValue(1) },
+                ledger: { getBalance: jest.fn().mockResolvedValue(50) },
+            });
+            await expect(service.shouldQueueForCredits('user-1')).resolves.toBe(false);
+            expect(ledger.grantDailyForUser).toHaveBeenCalledWith('user-1', 'free');
+            // Grant BEFORE balance read.
+            expect(ledger.grantDailyForUser.mock.invocationCallOrder[0]).toBeLessThan(
+                ledger.getBalance.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('admits a zero-balance user who still has pay-as-you-go headroom (billing spec FR-19)', async () => {
+            process.env.CREDITS_ENFORCEMENT = 'on';
+            const withHeadroom = makeService({
+                entitlements: { getNumber: jest.fn().mockResolvedValue(1) },
+                ledger: { getBalance: jest.fn().mockResolvedValue(0) },
+                payg: { headroom: jest.fn().mockResolvedValue(400) },
+            });
+            await expect(withHeadroom.service.shouldQueueForCredits('user-1')).resolves.toBe(false);
+
+            const capped = makeService({
+                entitlements: { getNumber: jest.fn().mockResolvedValue(1) },
+                ledger: { getBalance: jest.fn().mockResolvedValue(0) },
+                payg: { headroom: jest.fn().mockResolvedValue(0) },
+            });
+            await expect(capped.service.shouldQueueForCredits('user-1')).resolves.toBe(true);
+        });
+
+        it('enforcement defaults ON when the billing provider is configured and OFF otherwise (billing spec FR-30)', async () => {
+            delete process.env.CREDITS_ENFORCEMENT;
+            process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+            const configured = makeService({
+                entitlements: { getNumber: jest.fn().mockResolvedValue(1) },
+                ledger: { getBalance: jest.fn().mockResolvedValue(0) },
+            });
+            await expect(configured.service.shouldQueueForCredits('user-1')).resolves.toBe(true);
+
+            delete process.env.STRIPE_SECRET_KEY;
+            const unconfigured = makeService({
+                entitlements: { getNumber: jest.fn().mockResolvedValue(1) },
+                ledger: { getBalance: jest.fn().mockResolvedValue(0) },
+            });
+            await expect(unconfigured.service.shouldQueueForCredits('user-1')).resolves.toBe(false);
+
+            process.env.CREDITS_ENFORCEMENT = 'off';
+            process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+            const explicitOff = makeService({
+                entitlements: { getNumber: jest.fn().mockResolvedValue(1) },
+                ledger: { getBalance: jest.fn().mockResolvedValue(0) },
+            });
+            await expect(explicitOff.service.shouldQueueForCredits('user-1')).resolves.toBe(false);
+            delete process.env.STRIPE_SECRET_KEY;
         });
 
         it('returns false (fail-open) when the balance is positive or resolution throws', async () => {

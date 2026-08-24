@@ -5,6 +5,10 @@ export * from './billing/billing.provider';
 // The money path (billing PRD B5) — server-side packs, the real provider
 // implementation, checkout/webhook orchestration and auto-recharge.
 export * from './billing/credit-packs';
+// Credits pricing view (billing spec FR-13) + the pay-as-you-go catalog helpers the API/UI need.
+export * from './billing/credits-pricing';
+export { estimatePaygCents, getPaygCatalog, paygLookupKey } from './billing/stripe-catalog';
+export type { CatalogPayg, CatalogPaygTier } from './billing/stripe-catalog';
 export * from './billing/stripe-billing.provider';
 export * from './billing/billing.service';
 export * from './billing/auto-recharge.service';
@@ -12,6 +16,8 @@ export * from './billing/auto-recharge.service';
 export * from './billing/plan-subscription.service';
 // Payment-method management (billing PRD §3.3, audit B10 + B25)
 export * from './billing/payment-method.service';
+// Pay-as-you-go on Stripe Billing Meters (billing spec §3.5)
+export * from './billing/payg.service';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credits/credit-ledger.service';
 export * from './credits/entitlements.service';
