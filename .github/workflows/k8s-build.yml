@@ -5,7 +5,7 @@ on:
     branches: [develop, stage, main, master]
 concurrency:
   group: k8s-build-${{ github.ref }}
-  # 🛑 Deploy-bearing branches QUEUE; everything else still cancels.
+  # 🛑 Every ref that can trigger this workflow is deploy-bearing and QUEUES.
   #
   # This workflow is the ONLY one that publishes the tags the clusters pull
   # (`:dev`/`:stage`/`:prod` + `:sha-<sha>`); `docker-build-publish-*.yml`
@@ -22,7 +22,7 @@ concurrency:
   # Queueing costs a little runner time and bounds the wait at one build.
   # Cancelling makes the wait unbounded. Same shape as #2210 for the stage
   # E2E gate.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/stage' && github.ref != 'refs/heads/develop' }}
+  cancel-in-progress: false
 permissions:
   contents: read
   packages: write
