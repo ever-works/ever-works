@@ -11,6 +11,8 @@ describe('UserUploadRepository — ownership scope', () => {
         tenantId: everScope.tenantId,
         organizationId: '33333333-3333-4333-8333-333333333333',
     };
+    const workId = '44444444-4444-4444-8444-444444444444';
+    const otherWorkId = '55555555-5555-4555-8555-555555555555';
 
     let orm: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock };
     let uploads: UserUploadRepository;
@@ -88,12 +90,61 @@ describe('UserUploadRepository — ownership scope', () => {
         });
 
         expect(orm.findOne).toHaveBeenNthCalledWith(1, {
-            where: [{ userId, sha256, ...everScope }],
+            where: [
+                {
+                    userId,
+                    sha256,
+                    workId: expect.objectContaining({ _type: 'isNull' }),
+                    ...everScope,
+                },
+            ],
         });
         expect(orm.findOne).toHaveBeenNthCalledWith(2, {
-            where: [{ userId, sha256, ...yoScope }],
+            where: [
+                {
+                    userId,
+                    sha256,
+                    workId: expect.objectContaining({ _type: 'isNull' }),
+                    ...yoScope,
+                },
+            ],
         });
         expect(orm.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not dedupe identical bytes across different Works in the same scope', async () => {
+        await uploads.record({
+            userId,
+            sha256,
+            workId,
+            ...everScope,
+            storageProvider: 'github-storage',
+            storagePath: `dr:${workId}:${sha256}.png`,
+        });
+        await uploads.record({
+            userId,
+            sha256,
+            workId: otherWorkId,
+            ...everScope,
+            storageProvider: 'github-storage',
+            storagePath: `dr:${otherWorkId}:${sha256}.png`,
+        });
+
+        expect(orm.findOne).toHaveBeenNthCalledWith(1, {
+            where: [{ userId, sha256, workId, ...everScope }],
+        });
+        expect(orm.findOne).toHaveBeenNthCalledWith(2, {
+            where: [{ userId, sha256, workId: otherWorkId, ...everScope }],
+        });
+        expect(orm.save).toHaveBeenCalledTimes(2);
+    });
+
+    it('can resolve the exact Work-associated upload behind a workId URL', async () => {
+        await (uploads.findOwnedByUser as any)(sha256, userId, everScope, workId);
+
+        expect(orm.findOne).toHaveBeenCalledWith({
+            where: [{ sha256, userId, workId, ...everScope }],
+        });
     });
 
     it('dedupes current and legacy personal uploads without matching an Organization row', async () => {
@@ -129,6 +180,7 @@ describe('UserUploadRepository — ownership scope', () => {
             where: {
                 userId: expect.objectContaining({ _type: 'isNull' }),
                 sha256,
+                workId: expect.objectContaining({ _type: 'isNull' }),
                 tenantId: expect.objectContaining({ _type: 'isNull' }),
                 organizationId: expect.objectContaining({ _type: 'isNull' }),
             },
@@ -147,7 +199,14 @@ describe('UserUploadRepository — ownership scope', () => {
         });
 
         expect(orm.findOne).toHaveBeenCalledWith({
-            where: [{ userId, sha256, ...everScope }],
+            where: [
+                {
+                    userId,
+                    sha256,
+                    workId: expect.objectContaining({ _type: 'isNull' }),
+                    ...everScope,
+                },
+            ],
         });
         expect(orm.create).toHaveBeenCalledWith(
             expect.objectContaining({ userId, sha256, ...everScope }),

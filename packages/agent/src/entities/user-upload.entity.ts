@@ -24,7 +24,7 @@ import { User } from './user.entity';
  * This row makes an upload an OWNABLE, QUERYABLE record:
  *   - `userId` — the owner (NULL for an anonymous upload).
  *   - `sha256` — the content hash returned to clients as the upload id; what
- *     attachments reference. Deduped per `(userId, sha256)`.
+ *     attachments reference. Deduped by repository within ownership + Work scope.
  *   - OPTIONAL scope links — `workId` is stamped today (from `?workId=`); the
  *     `missionId` / `ideaId` / `tenantId` / `organizationId` columns let an
  *     upload also be associated with those scopes as the upload surface grows

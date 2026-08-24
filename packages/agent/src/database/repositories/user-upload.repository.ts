@@ -38,8 +38,8 @@ export class UserUploadRepository {
 
     /**
      * Insert the upload-ownership record, deduped within the exact persisted
-     * ownership scope. Organization uploads never collapse into another
-     * Organization merely because their bytes (and therefore sha256) match.
+     * ownership + Work scope. Organization or Work uploads never collapse into
+     * another scope merely because their bytes (and therefore sha256) match.
      * Personal scope deliberately includes legacy null/null rows through the
      * centralized ownership predicate.
      */
@@ -53,18 +53,21 @@ export class UserUploadRepository {
             organizationId: normalizedInput.organizationId ?? null,
         };
         const userId = normalizedInput.userId ?? null;
+        const workId = normalizedInput.workId ?? null;
         const existing = await this.repo.findOne({
             where:
                 userId === null
                     ? {
                           userId: IsNull(),
                           sha256: normalizedInput.sha256,
+                          workId: workId === null ? IsNull() : workId,
                           tenantId: scope.tenantId === null ? IsNull() : scope.tenantId,
                           organizationId:
                               scope.organizationId === null ? IsNull() : scope.organizationId,
                       }
                     : ownershipWhereWith<UserUpload>(userId, scope, {
                           sha256: normalizedInput.sha256,
+                          workId: workId === null ? IsNull() : workId,
                       }),
         });
         if (existing) return existing;
@@ -72,16 +75,19 @@ export class UserUploadRepository {
         return this.repo.save(entity);
     }
 
-    /** An upload with this `sha256` owned by `userId`, else null. */
+    /** An upload with this `sha256` owned by `userId` (and optional Work), else null. */
     async findOwnedByUser(
         sha256: string,
         userId: string,
         scope?: OwnershipScope,
+        workId?: string | null,
     ): Promise<UserUpload | null> {
+        const relation = {
+            sha256: normalizeUploadSha256(sha256),
+            ...(workId !== undefined ? { workId: workId === null ? IsNull() : workId } : {}),
+        };
         return this.repo.findOne({
-            where: ownershipWhereWith<UserUpload>(userId, scope, {
-                sha256: normalizeUploadSha256(sha256),
-            }),
+            where: ownershipWhereWith<UserUpload>(userId, scope, relation),
         });
     }
 
