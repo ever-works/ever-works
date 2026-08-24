@@ -42,6 +42,14 @@ import proxy from './proxy';
  * Both outages are the same defect with different symptoms, so this asserts
  * the invariant that actually matters: behind ingress, on a real public host,
  * the locale rewrite must carry the runtime origin and never the public one.
+ *
+ * Deliberately NOT asserted here: "/login does not respond with a redirect".
+ * That reads like the natural regression test for ERR_TOO_MANY_REDIRECTS, but
+ * it cannot fail — the `location: /login` came from Next's RUNTIME handling of
+ * an external rewrite, not from `proxy()`, which never sets one. Reintroducing
+ * the defect leaves such a test green, so it would be coverage theatre. The
+ * origin of the emitted rewrite is the only thing this layer can actually
+ * observe, and it is sufficient: an internal origin cannot be proxied out.
  */
 describe('ingress locale rewrite — production shape', () => {
     beforeEach(() => {
@@ -80,31 +88,5 @@ describe('ingress locale rewrite — production shape', () => {
         // (redirect loop). Both are the public authority; neither is internal.
         expect(rewrite).not.toContain('app.ever.works');
         expect(rewrite).toBe('http://ever-works-web-76bbcb5d5f-h2m5m:3000/en/login');
-    });
-
-    it('never emits a redirect for /login behind ingress', async () => {
-        vi.stubEnv('HOSTNAME', 'ever-works-web-pod');
-        vi.stubEnv('PORT', '3000');
-        intlMock.mockResolvedValueOnce(
-            new Response(null, {
-                status: 200,
-                headers: { 'x-middleware-rewrite': 'http://localhost:3000/en/login' },
-            }),
-        );
-
-        const response = await proxy(
-            new NextRequest('https://app.ever.works/login', {
-                headers: {
-                    host: 'app.ever.works',
-                    'x-forwarded-host': 'app.ever.works',
-                    'x-forwarded-proto': 'https',
-                },
-            }),
-        );
-
-        // ERR_TOO_MANY_REDIRECTS was `location: /login` on the /login request
-        // itself. A rewrite is not a redirect: status must stay non-3xx here.
-        expect(response.status).toBeLessThan(300);
-        expect(response.headers.get('location')).toBeNull();
     });
 });
