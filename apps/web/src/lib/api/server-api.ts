@@ -95,6 +95,8 @@ export async function getFrontendUrl(): Promise<string> {
 
 interface ServerFetchOptions extends RequestInit {
     rawResponse?: boolean;
+    /** Public server routes outside the workspace proxy may opt into personal scope only. */
+    publicRouteScope?: 'personal';
 }
 
 export async function serverFetch<T>(
@@ -102,12 +104,13 @@ export async function serverFetch<T>(
     options: ServerFetchOptions = {},
 ): Promise<T> {
     const requestHeaders = await headers();
-    const selectedScope = parseWorkspaceSelector(
-        requestHeaders.get(BROWSER_WORKSPACE_SCOPE_HEADER),
-    );
+    const { rawResponse, publicRouteScope, ...fetchOptions } = options;
+    const selectedScope =
+        publicRouteScope === 'personal'
+            ? { kind: 'personal' as const }
+            : parseWorkspaceSelector(requestHeaders.get(BROWSER_WORKSPACE_SCOPE_HEADER));
     const frontendUrl = await getFrontendUrl();
     const t = await getTranslations('api.errors');
-    const { rawResponse, ...fetchOptions } = options;
 
     const doFetch = async (authToken?: string) => {
         const reqHeaders = new Headers(fetchOptions.headers);
@@ -242,16 +245,19 @@ export async function serverMutation<T>({
     method = 'POST',
     wrapInData = false,
     headers,
+    publicRouteScope,
 }: {
     endpoint: string;
     data: any;
     method: 'POST' | 'PUT' | 'PATCH' | 'DELETE';
     wrapInData: boolean;
     headers?: Record<string, string>;
+    publicRouteScope?: 'personal';
 }): Promise<T> {
     return serverFetch<T>(endpoint, {
         method,
         headers,
         body: JSON.stringify(wrapInData ? { data } : data),
+        publicRouteScope,
     });
 }
