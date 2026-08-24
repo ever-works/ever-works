@@ -122,15 +122,9 @@ function isPublicRoute(pathname: string): boolean {
     });
 }
 
-/**
- * next-intl emits an absolute `x-middleware-rewrite` URL. Behind a reverse
- * proxy (and in the IPv4 E2E harness), Next's internal request origin can be
- * `localhost` while the browser origin is a different host. Next then treats
- * the locale rewrite as external and performs a second proxy request, losing
- * the original Organization URL rewrite. Locale targets are app-internal by
- * contract, so align their origin with the validated request authority while
- * preserving next-intl's path/query.
- */
+// Compatibility implementation retained behind an opt-in gate. The default
+// delegates locale-rewrite normalization to Next itself; that is the only mode
+// proven by the real ingress-shaped production smoke.
 const SAFE_REQUEST_HOST = /^(?:\[[0-9a-f:.]+\]|[a-z0-9.-]+)(?::\d{1,5})?$/i;
 
 function isAllowedRequestHostname(hostname: string): boolean {
@@ -148,34 +142,11 @@ function isAllowedRequestHostname(hostname: string): boolean {
     });
 }
 
-/**
- * Force next-intl's locale rewrite to stay RELATIVE.
- *
- * Next only treats an `x-middleware-rewrite` as internal when it is relative or
- * its origin matches the server's init URL. Behind ingress, next-intl derives
- * its rewrite from `req.nextUrl.origin` — which is the PUBLIC authority — so it
- * emits an absolute URL, Next treats it as external, and answers with a
- * redirect instead of rendering. The redirect re-enters this middleware and
- * loops.
- *
- * Measured on the running production pod, same pod, same build (2026-08-24):
- *
- *   GET /login  (no forwarded headers) -> 200, rewrite '/en/login'
- *   GET /login  + X-Forwarded-Host     -> 307 'location: /login',
- *                                        rewrite '<absolute>/en/login'
- *
- * Three previous attempts changed WHICH origin was emitted and all three
- * failed, because any absolute origin loses this comparison:
- *   7e1f58a44 (#2152)  public authority + :3000  -> undialable -> 500
- *   14bd578a2 (#2219)  public authority          -> redirect loop
- *   57d44302e (#2227)  http://$HOSTNAME:$PORT    -> redirect loop
- *   #2243              relative-only early return -> never fired, because the
- *                      rewrite is ALREADY absolute in this path
- *
- * So drop the origin entirely and hand Next a path. That is the one form it
- * cannot treat as external.
- */
 function alignLocaleRewriteOrigin(_req: NextRequest, response: NextResponse): NextResponse {
+    if (process.env.LEGACY_LOCALE_REWRITE_OVERRIDE_ENABLED !== 'true') {
+        return response;
+    }
+
     const rewrite = response.headers.get('x-middleware-rewrite');
     if (!rewrite) return response;
     if (rewrite.startsWith('/')) return response;
@@ -184,7 +155,6 @@ function alignLocaleRewriteOrigin(_req: NextRequest, response: NextResponse): Ne
     try {
         target = new URL(rewrite);
     } catch {
-        // Not an absolute URL we can parse — leave it exactly as emitted.
         return response;
     }
 
@@ -197,6 +167,7 @@ function alignLocaleRewriteOrigin(_req: NextRequest, response: NextResponse): Ne
     );
     return response;
 }
+
 /**
  * Strip a legacy `/<locale>/...` prefix from a pathname.
  *
