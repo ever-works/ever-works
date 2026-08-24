@@ -99,12 +99,24 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: t
         run: |
+          set -uo pipefail
           case "${GITHUB_REF_NAME}" in
-            develop) echo "tag=dev" >> "$GITHUB_OUTPUT" ;;
-            stage) echo "tag=stage" >> "$GITHUB_OUTPUT" ;;
-            main|master) echo "tag=prod" >> "$GITHUB_OUTPUT" ;;
-            *) echo "tag=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT" ;;
+            develop) MOVING=dev ;;
+            stage) MOVING=stage ;;
+            main|master) MOVING=prod ;;
+            *) MOVING="${GITHUB_REF_NAME//\//-}" ;;
           esac
+          echo "tag=${MOVING}" >> "$GITHUB_OUTPUT"
+
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/${MATRIX_IMAGE}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          {
+            echo "tags<<__TAGS__"
+            echo "${IMAGE}:sha-${GITHUB_SHA}"
+            echo "__TAGS__"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          MATRIX_IMAGE: ${{ matrix.image }}
       # Build/release identity baked into the images so the app footer shows a
       # real version + commit link + build time (web NEXT_PUBLIC_* are inlined by
       # next build; api/mcp read BUILD_*/GIT_* at runtime). Without this the
@@ -158,9 +170,10 @@ jobs:
             NEXT_PUBLIC_BUILD_REF=${{ github.ref_name }}
             NEXT_PUBLIC_BUILD_RUN=${{ github.run_number }}
             NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.t.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
+          # Build only the immutable tag. A final post-build step promotes the
+          # moving env tag after re-reading the branch tip, closing the hours-long
+          # check-then-build race.
+          tags: ${{ steps.t.outputs.tags }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
       # Back off to let the transient ghcr rate-limit window clear.
@@ -187,8 +200,43 @@ jobs:
             NEXT_PUBLIC_BUILD_REF=${{ github.ref_name }}
             NEXT_PUBLIC_BUILD_RUN=${{ github.run_number }}
             NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.t.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
+          # Build only the immutable tag; promotion happens after this retry too.
+          tags: ${{ steps.t.outputs.tags }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
+
+      # 🛑 Re-check only AFTER the hours-long build has published its immutable
+      # sha tag. Checking before the build is a TOCTOU bug: a newer commit can
+      # arrive during the build and make the old "I am tip" answer stale before
+      # the tag is pushed, recreating the silent rollback this guard prevents.
+      - name: Promote the moving tag only from the current branch tip
+        env:
+          IMAGE: ${{ steps.t.outputs.image }}
+          MOVING: ${{ steps.t.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          TIP=""
+          for attempt in 1 2 3; do
+            if TIP="$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" 2>/dev/null | cut -f1)" && [ -n "${TIP}" ]; then
+              break
+            fi
+            echo "::warning::Could not resolve ${GITHUB_REF_NAME} tip (attempt ${attempt}/3)."
+            TIP=""
+            sleep 5
+          done
+
+          # Fail closed and loudly. The immutable image is already published,
+          # but an unverified build must never move an ArgoCD-tracked tag.
+          if [ -z "${TIP}" ]; then
+            echo "::error::Cannot prove the current ${GITHUB_REF_NAME} tip; leaving ${IMAGE}:${MOVING} unchanged."
+            exit 1
+          fi
+          if [ "${TIP}" != "${GITHUB_SHA}" ]; then
+            echo "::warning::${GITHUB_REF_NAME} advanced to ${TIP}; leaving ${IMAGE}:${MOVING} for that build."
+            exit 0
+          fi
+
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${MOVING}" \
+            "${IMAGE}:sha-${GITHUB_SHA}"
