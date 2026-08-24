@@ -50,7 +50,7 @@ describe('AgentEscalationRepository Task resolution ownership', () => {
         );
     });
 
-    it('CAS-resolves only the exact user, routed Task, tenant and Organization', async () => {
+    it('CAS-resolves a listed legacy escalation through its authorized Organization Task', async () => {
         const { repository, qb } = build();
 
         await expect(
@@ -67,7 +67,7 @@ describe('AgentEscalationRepository Task resolution ownership', () => {
             taskId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
         });
         expect(qb.andWhere).toHaveBeenCalledWith(
-            '(tenantId = :escalationOwnershipTenantId AND organizationId = :escalationOwnershipOrganizationId)',
+            '((tenantId = :escalationOwnershipTenantId AND organizationId = :escalationOwnershipOrganizationId) OR (tenantId IS NULL AND organizationId IS NULL))',
             {
                 escalationOwnershipTenantId: everScope.tenantId,
                 escalationOwnershipOrganizationId: everScope.organizationId,
