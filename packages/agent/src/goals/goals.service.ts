@@ -349,8 +349,16 @@ export class GoalsService {
         scope?: OwnershipScope,
     ): Promise<MissionGoalLinkDto[]> {
         await this.findMissionOrThrow(userId, missionId, scope);
+        // The edge row is a pure join keyed by its ownership-validated
+        // endpoints — do NOT re-filter it by its own stamp: edges created
+        // before scope stamping (and edges of an upgraded-from-account
+        // Mission, whose backfill covers `missions` but not `mission_goals`)
+        // would silently vanish from an in-scope Mission and become
+        // impossible to manage. Link visibility instead follows the GOAL
+        // endpoint below: a link whose Goal is not visible in the current
+        // scope is dropped, so out-of-scope goalIds still are not disclosed.
         const links = await this.missionGoals.find({
-            where: ownershipWhereWith<MissionGoal>(userId, scope, { missionId }),
+            where: { userId, missionId },
             order: { createdAt: 'ASC' },
         });
         if (links.length === 0) return [];
@@ -360,7 +368,9 @@ export class GoalsService {
             }),
         });
         const byId = new Map(goalRows.map((g) => [g.id, g]));
-        return links.map((link) => toMissionGoalLinkDto(link, byId.get(link.goalId) ?? null));
+        return links
+            .filter((link) => byId.has(link.goalId))
+            .map((link) => toMissionGoalLinkDto(link, byId.get(link.goalId) ?? null));
     }
 
     /**
@@ -386,12 +396,16 @@ export class GoalsService {
 
         if (isPrimary) {
             // Demote-before-promote so the Postgres partial unique
-            // index never sees two primaries.
+            // index never sees two primaries. The index
+            // (`uq_mission_goals_primary`) is per-MISSION and knows nothing
+            // about scope stamps, so the demotion query must not be
+            // scope-filtered either: a legacy (null/null-stamped) primary
+            // edge that the current scope's filter cannot see would
+            // otherwise survive, and saving the new primary would hit the
+            // index and 500 instead of demoting. The Mission was
+            // ownership-validated above; `userId` confines the write.
             const currentPrimaries = await this.missionGoals.find({
-                where: ownershipWhereWith<MissionGoal>(userId, scope, {
-                    missionId,
-                    isPrimary: true,
-                }),
+                where: { userId, missionId, isPrimary: true },
             });
             await Promise.all(
                 currentPrimaries.map((primary) => {
@@ -401,7 +415,12 @@ export class GoalsService {
             );
         }
 
-        const linkWhere = ownershipWhereWith<MissionGoal>(userId, scope, { missionId, goalId });
+        // Both endpoints were ownership-validated above; the edge itself is
+        // keyed by them. A scope filter here would make a legacy
+        // (pre-stamping) edge invisible, so the create below would hit the
+        // unique (missionId, goalId) index and the duplicate-recovery
+        // re-read would ALSO miss it and rethrow a 500.
+        const linkWhere = { userId, missionId, goalId };
         let link = await this.missionGoals.findOne({ where: linkWhere });
         if (link) {
             if (link.isPrimary !== isPrimary) {
@@ -452,8 +471,11 @@ export class GoalsService {
     ): Promise<{ deleted: true }> {
         await this.findMissionOrThrow(userId, missionId, scope);
         await this.findOrThrow(userId, goalId, scope);
+        // Endpoints validated above; do not scope-filter the edge itself or
+        // a legacy (pre-stamping) link of an in-scope pair becomes
+        // impossible to unlink.
         const link = await this.missionGoals.findOne({
-            where: ownershipWhereWith<MissionGoal>(userId, scope, { missionId, goalId }),
+            where: { userId, missionId, goalId },
         });
         if (!link) {
             throw new NotFoundException(`Goal link not found`);

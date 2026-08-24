@@ -2,12 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MissionWork, type MissionWorkRelation } from '../../entities/mission-work.entity';
-import {
-    ownershipSqlPredicate,
-    ownershipWhere,
-    ownershipWhereWith,
-    type OwnershipScope,
-} from '../ownership-scope';
+import { ownershipSqlPredicate, type OwnershipScope } from '../ownership-scope';
 
 /** A mission_works row hydrated with the Work's display fields. */
 export interface MissionWorkWithWork {
@@ -79,20 +74,14 @@ export class MissionWorkRepository {
         relation: MissionWorkRelation;
         scope?: OwnershipScope;
     }): Promise<boolean> {
-        if (input.scope) {
-            const where = ownershipWhereWith<MissionWork>(input.userId, input.scope, {
-                missionId: input.missionId,
-                workId: input.workId,
-                relation: input.relation,
-            });
-            const res = await this.repository
-                .createQueryBuilder()
-                .delete()
-                .from(MissionWork)
-                .where(where)
-                .execute();
-            return (res.affected ?? 0) > 0;
-        }
+        // The edge is a pure join row: the calling service has already
+        // ownership-validated the Mission endpoint in the active scope, and
+        // the delete is confined by userId + both endpoint ids. Filtering by
+        // the edge row STAMP here would make a legacy (pre-stamping) edge of
+        // an in-scope Mission impossible to detach — the row predates scope
+        // stamping (and upgrade-from-account backfills missions/works but
+        // not mission_works), so the scoped delete matches nothing and the
+        // caller 404s forever.
         const res = await this.repository.delete({
             missionId: input.missionId,
             workId: input.workId,
@@ -124,7 +113,11 @@ export class MissionWorkRepository {
             ])
             .where('rel.missionId = :missionId AND rel.userId = :userId', { missionId, userId })
             .orderBy('rel.createdAt', 'DESC');
-        this.applyOwnershipScope(query, ['rel', 'work'], scope);
+        // Scope only the joined Work endpoint (fail-closed non-disclosure of
+        // out-of-scope Works); the edge row itself follows its validated
+        // Mission endpoint — see detach() for why filtering the edge STAMP
+        // hides legacy rows from their own owner.
+        this.applyOwnershipScope(query, ['work'], scope);
         return query.getRawMany<MissionWorkWithWork>();
     }
 
@@ -150,7 +143,8 @@ export class MissionWorkRepository {
             ])
             .where('rel.workId = :workId AND rel.userId = :userId', { workId, userId })
             .orderBy('rel.createdAt', 'DESC');
-        this.applyOwnershipScope(query, ['rel', 'mission'], scope);
+        // Scope only the joined Mission endpoint — same rationale as above.
+        this.applyOwnershipScope(query, ['mission'], scope);
         return query.getRawMany<MissionWorkWithMission>();
     }
 
@@ -160,13 +154,14 @@ export class MissionWorkRepository {
         userId: string,
         scope?: OwnershipScope,
     ): Promise<string[]> {
+        // Edge rows follow their endpoints; the ids returned here feed a
+        // mission query that is itself scope-filtered, so nothing
+        // out-of-scope is disclosed by leaving the edge stamp out of the
+        // predicate (a scoped predicate would hide legacy pre-stamping
+        // edges from the workId filter).
+        void scope;
         const rows = await this.repository.find({
-            where: scope
-                ? ownershipWhere<MissionWork>(userId, scope).map((branch) => ({
-                      ...branch,
-                      workId,
-                  }))
-                : { workId, userId },
+            where: { workId, userId },
             select: { missionId: true },
         });
         return [...new Set(rows.map((r) => r.missionId))];

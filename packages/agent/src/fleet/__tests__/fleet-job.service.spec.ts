@@ -205,7 +205,9 @@ function makeRepos(stores: Stores): {
     const findForAgent = async (userId: string, organizationId: string, agentId: string) =>
         stores.affinities.find(
             (row) =>
-                row.userId === userId && row.organizationId === organizationId && row.agentId === agentId,
+                row.userId === userId &&
+                row.organizationId === organizationId &&
+                row.agentId === agentId,
         ) ?? null;
     const affinities = {
         findForAgent: jest.fn(findForAgent),
@@ -420,7 +422,9 @@ describe('FleetJobService', () => {
             } as FleetAgentNodeAffinity);
 
             await expect(service.resolveAgentTaskTarget('owner-1', AGENT)).resolves.toBe(NODE_B);
-            await expect(service.resolveAgentTaskTarget('owner-1', 'not-a-uuid')).resolves.toBeNull();
+            await expect(
+                service.resolveAgentTaskTarget('owner-1', 'not-a-uuid'),
+            ).resolves.toBeNull();
             await expect(service.resolveAgentTaskTarget('owner-1', undefined)).resolves.toBeNull();
             const job = await service.enqueue({
                 userId: 'owner-1',

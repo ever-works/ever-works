@@ -203,7 +203,9 @@ describe('fleet agent node affinity — repository integration (better-sqlite3)'
 
         const forA = await jobs.findQueuedForNode(ownerId, NODE_A, 10);
         expect(forA).toHaveLength(7);
-        expect(forA.every((job) => job.targetNodeId === NODE_A || job.targetNodeId === null)).toBe(true);
+        expect(forA.every((job) => job.targetNodeId === NODE_A || job.targetNodeId === null)).toBe(
+            true,
+        );
         expect(forA.some((job) => job.id === strangers.id)).toBe(false);
     });
 });

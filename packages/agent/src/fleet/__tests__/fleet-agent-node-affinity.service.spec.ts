@@ -76,7 +76,11 @@ function makeService(stores: Stores): FleetAgentNodeAffinityService {
             const before = stores.affinities.length;
             stores.affinities = stores.affinities.filter(
                 (row) =>
-                    !(row.userId === userId && row.organizationId === organizationId && row.agentId === agentId),
+                    !(
+                        row.userId === userId &&
+                        row.organizationId === organizationId &&
+                        row.agentId === agentId
+                    ),
             );
             return stores.affinities.length < before;
         }),

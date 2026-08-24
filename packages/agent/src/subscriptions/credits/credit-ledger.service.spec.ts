@@ -1,8 +1,5 @@
 import { Logger } from '@nestjs/common';
-import {
-    CreditLedgerService,
-    InsufficientCreditsError,
-} from './credit-ledger.service';
+import { CreditLedgerService, InsufficientCreditsError } from './credit-ledger.service';
 import { CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
 
 /**
