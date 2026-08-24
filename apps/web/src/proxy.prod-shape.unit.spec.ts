@@ -18,31 +18,46 @@ vi.mock('./lib/constants', async (importOriginal) => ({
 import proxy from './proxy';
 
 /**
- * next-intl emits a RELATIVE `x-middleware-rewrite` in the deployed app, and a
- * relative rewrite is internal by construction. Absolutising it is what caused
- * both production outages on 2026-08-23/24 — first as a 500 (public authority
- * plus port 3000, undialable), then as ERR_TOO_MANY_REDIRECTS once the port was
- * dropped, and STILL as a redirect when the runtime origin was pinned instead.
+ * The locale rewrite must reach Next as a PATH, never as an absolute URL.
  *
- * Measured on the running prod pod, same build, same pod:
+ * Next treats an absolute `x-middleware-rewrite` as internal only when its
+ * origin matches the server's init URL. Behind ingress, next-intl derives its
+ * rewrite from `req.nextUrl.origin` — the PUBLIC authority — so it emits an
+ * absolute URL, Next answers with a redirect instead of rendering, and the
+ * redirect re-enters this middleware and loops.
+ *
+ * Three fixes changed WHICH origin was emitted and all three failed in
+ * production, because any absolute origin loses that comparison:
+ *   7e1f58a44 (#2152)  public authority + :3000  -> undialable -> HTTP 500
+ *   14bd578a2 (#2219)  public authority          -> ERR_TOO_MANY_REDIRECTS
+ *   57d44302e (#2227)  http://$HOSTNAME:$PORT    -> still looping
+ *   #2243              early-return if relative  -> never fired; behind ingress
+ *                                                   the rewrite is ALREADY absolute
+ *
+ * Measured on the running prod pod carrying the #2243 image, same pod:
  *   GET /login  (bare)             -> 200, rewrite '/en/login'
  *   GET /login  + X-Forwarded-Host -> 307 'location: /login',
  *                                     rewrite 'http://<pod>:3000/en/login'
  *
- * So the invariant is not "which origin" — it is "do not add one".
+ * The first case below is the one that matters: it feeds the middleware the
+ * ABSOLUTE rewrite next-intl really emits behind ingress and asserts a bare
+ * path comes out. No previous test modelled that input, which is why three
+ * fixes shipped green while production stayed broken.
  */
-describe('ingress locale rewrite must stay relative', () => {
+describe('ingress locale rewrite reaches Next as a path', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getAuthFromRequestMock.mockResolvedValue({ isAuthenticated: true, isExpired: false });
+        vi.stubEnv('HOSTNAME', 'ever-works-web-767565cfbc-qr6rv');
+        vi.stubEnv('PORT', '3000');
     });
 
     afterEach(() => {
         vi.unstubAllEnvs();
     });
 
-    function ingressRequest() {
-        return new NextRequest('https://app.ever.works/login', {
+    function ingressRequest(path = '/login') {
+        return new NextRequest(`https://app.ever.works${path}`, {
             headers: {
                 host: 'app.ever.works',
                 'x-forwarded-host': 'app.ever.works',
@@ -51,9 +66,40 @@ describe('ingress locale rewrite must stay relative', () => {
         });
     }
 
-    it('leaves a relative rewrite untouched behind ingress', async () => {
-        vi.stubEnv('HOSTNAME', 'ever-works-web-6bc7f79765-7hvpd');
-        vi.stubEnv('PORT', '3000');
+    it('strips the origin from the absolute rewrite next-intl emits behind ingress', async () => {
+        intlMock.mockResolvedValueOnce(
+            new Response(null, {
+                status: 200,
+                // Exactly what next-intl produces when req.nextUrl.origin is the
+                // public authority — i.e. every request arriving via ingress.
+                headers: { 'x-middleware-rewrite': 'https://app.ever.works/en/login' },
+            }),
+        );
+
+        const response = await proxy(ingressRequest());
+        const rewrite = response.headers.get('x-middleware-rewrite');
+
+        expect(rewrite).toBe('/en/login');
+        // Belt and braces: no scheme, no authority, in any form.
+        expect(rewrite).not.toMatch(/^[a-z]+:\/\//i);
+    });
+
+    it('preserves the query string when stripping the origin', async () => {
+        intlMock.mockResolvedValueOnce(
+            new Response(null, {
+                status: 200,
+                headers: {
+                    'x-middleware-rewrite': 'https://app.ever.works/en/missions?status=active',
+                },
+            }),
+        );
+
+        const response = await proxy(ingressRequest('/missions?status=active'));
+
+        expect(response.headers.get('x-middleware-rewrite')).toBe('/en/missions?status=active');
+    });
+
+    it('leaves an already-relative rewrite exactly as emitted', async () => {
         intlMock.mockResolvedValueOnce(
             new Response(null, {
                 status: 200,
@@ -63,25 +109,21 @@ describe('ingress locale rewrite must stay relative', () => {
 
         const response = await proxy(ingressRequest());
 
-        // Any absolute origin — public OR runtime — makes Next treat the
-        // rewrite as external and answer with a redirect, which loops.
         expect(response.headers.get('x-middleware-rewrite')).toBe('/en/login');
     });
 
-    it('still realigns an already-absolute rewrite (the reverse-proxy case)', async () => {
-        vi.stubEnv('HOSTNAME', 'ever-works-web-pod');
-        vi.stubEnv('PORT', '3000');
+    it('does not touch a rewrite whose first segment is not a locale', async () => {
         intlMock.mockResolvedValueOnce(
             new Response(null, {
                 status: 200,
-                headers: { 'x-middleware-rewrite': 'http://localhost:3000/en/login' },
+                headers: { 'x-middleware-rewrite': 'https://app.ever.works/api/health' },
             }),
         );
 
         const response = await proxy(ingressRequest());
 
         expect(response.headers.get('x-middleware-rewrite')).toBe(
-            'http://ever-works-web-pod:3000/en/login',
+            'https://app.ever.works/api/health',
         );
     });
 });

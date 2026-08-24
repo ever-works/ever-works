@@ -148,90 +148,55 @@ function isAllowedRequestHostname(hostname: string): boolean {
     });
 }
 
-function alignLocaleRewriteOrigin(req: NextRequest, response: NextResponse): NextResponse {
+/**
+ * Force next-intl's locale rewrite to stay RELATIVE.
+ *
+ * Next only treats an `x-middleware-rewrite` as internal when it is relative or
+ * its origin matches the server's init URL. Behind ingress, next-intl derives
+ * its rewrite from `req.nextUrl.origin` — which is the PUBLIC authority — so it
+ * emits an absolute URL, Next treats it as external, and answers with a
+ * redirect instead of rendering. The redirect re-enters this middleware and
+ * loops.
+ *
+ * Measured on the running production pod, same pod, same build (2026-08-24):
+ *
+ *   GET /login  (no forwarded headers) -> 200, rewrite '/en/login'
+ *   GET /login  + X-Forwarded-Host     -> 307 'location: /login',
+ *                                        rewrite '<absolute>/en/login'
+ *
+ * Three previous attempts changed WHICH origin was emitted and all three
+ * failed, because any absolute origin loses this comparison:
+ *   7e1f58a44 (#2152)  public authority + :3000  -> undialable -> 500
+ *   14bd578a2 (#2219)  public authority          -> redirect loop
+ *   57d44302e (#2227)  http://$HOSTNAME:$PORT    -> redirect loop
+ *   #2243              relative-only early return -> never fired, because the
+ *                      rewrite is ALREADY absolute in this path
+ *
+ * So drop the origin entirely and hand Next a path. That is the one form it
+ * cannot treat as external.
+ */
+function alignLocaleRewriteOrigin(_req: NextRequest, response: NextResponse): NextResponse {
     const rewrite = response.headers.get('x-middleware-rewrite');
     if (!rewrite) return response;
-
-    // 🛑 A RELATIVE rewrite is already internal by construction — Next resolves
-    // it against its own origin and renders in-process. Absolutising it is what
-    // breaks the request: Next only treats an absolute rewrite as internal when
-    // the origin matches its server init URL, and behind ingress NOTHING we can
-    // construct here reliably matches it. Measured on the running prod pod
-    // (2026-08-24), same pod, same build:
-    //
-    //   GET /login  (no forwarded headers) -> 200, rewrite '/en/login'
-    //   GET /login  + X-Forwarded-Host     -> 307 'location: /login',
-    //                                         rewrite 'http://<pod>:3000/en/login'
-    //
-    // The 307 then re-enters the middleware and loops (ERR_TOO_MANY_REDIRECTS);
-    // when the absolutised URL additionally carried the public authority it was
-    // undialable and surfaced as a 500 instead. Pinning the RUNTIME origin (the
-    // previous attempt) does not help — `http://$HOSTNAME:$PORT` is still not
-    // the origin Next compares against here. So leave relative rewrites exactly
-    // as next-intl emitted them; only realign one that is ALREADY absolute,
-    // which is the reverse-proxy/E2E case this helper was written for.
     if (rewrite.startsWith('/')) return response;
 
-    const target = new URL(rewrite, 'http://internal.invalid');
-    const locale = target.pathname.split('/').filter(Boolean)[0];
-    if (locale && LOCALE_SET.has(locale)) {
-        const requestOrigin = new URL(req.nextUrl.origin);
-        const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-        const requestHost = req.headers.get('host')?.trim();
-        const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
-        const runtimeHostname = process.env.HOSTNAME?.trim();
-        const runtimePort = process.env.PORT?.trim();
-        let usedRuntimeOrigin = false;
-
-        if (forwardedHost && SAFE_REQUEST_HOST.test(forwardedHost)) {
-            try {
-                const forwardedAuthority = new URL(`${requestOrigin.protocol}//${forwardedHost}`);
-                const runtimeAuthority = runtimePort
-                    ? `${runtimeHostname}:${runtimePort}`
-                    : runtimeHostname;
-                if (
-                    isAllowedRequestHostname(forwardedAuthority.hostname) &&
-                    runtimeAuthority &&
-                    SAFE_REQUEST_HOST.test(runtimeAuthority)
-                ) {
-                    // Next's router only treats a middleware rewrite as internal
-                    // when its origin matches the standalone server's init URL.
-                    // Behind ingress that URL is http://$HOSTNAME:$PORT, not the
-                    // browser authority carried by X-Forwarded-Host.
-                    requestOrigin.protocol = 'http:';
-                    requestOrigin.hostname = runtimeHostname!;
-                    requestOrigin.port = runtimePort || '';
-                    usedRuntimeOrigin = true;
-                }
-            } catch {
-                // Fall through to the validated request authority.
-            }
-        }
-
-        for (const requestAuthority of usedRuntimeOrigin ? [] : [forwardedHost, requestHost]) {
-            if (!requestAuthority || !SAFE_REQUEST_HOST.test(requestAuthority)) continue;
-            try {
-                const authority = new URL(`${requestOrigin.protocol}//${requestAuthority}`);
-                if (isAllowedRequestHostname(authority.hostname)) {
-                    requestOrigin.hostname = authority.hostname;
-                    requestOrigin.port = authority.port;
-                    break;
-                }
-            } catch {
-                // Try the next authority, then keep Next's parsed origin.
-            }
-        }
-        if (!usedRuntimeOrigin && (forwardedProto === 'http' || forwardedProto === 'https')) {
-            requestOrigin.protocol = `${forwardedProto}:`;
-        }
-        target.protocol = requestOrigin.protocol;
-        target.hostname = requestOrigin.hostname;
-        target.port = requestOrigin.port;
-        response.headers.set('x-middleware-rewrite', target.toString());
+    let target: URL;
+    try {
+        target = new URL(rewrite);
+    } catch {
+        // Not an absolute URL we can parse — leave it exactly as emitted.
+        return response;
     }
+
+    const locale = target.pathname.split('/').filter(Boolean)[0];
+    if (!locale || !LOCALE_SET.has(locale)) return response;
+
+    response.headers.set(
+        'x-middleware-rewrite',
+        `${target.pathname}${target.search}${target.hash}`,
+    );
     return response;
 }
-
 /**
  * Strip a legacy `/<locale>/...` prefix from a pathname.
  *
