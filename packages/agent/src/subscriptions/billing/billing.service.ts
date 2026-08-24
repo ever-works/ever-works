@@ -605,11 +605,22 @@ export class BillingService {
     }
 
     private async applyRefund(event: BillingWebhookEvent): Promise<WebhookOutcome> {
-        const profile = await this.resolveProfile(event);
-        if (!profile) {
-            return this.unattributed(event);
-        }
-
+        // 🛑 The originating ledger row is looked up BEFORE the owner is
+        // resolved, because on a CHARGEBACK it is the only thing that knows
+        // who the owner is. A Stripe `Dispute` object carries no `customer`
+        // field at all — only `charge` and `payment_intent` — so
+        // `charge.dispute.created` normalises with `customerId: null` (the
+        // `base` default) and no `referenceId`, and those are the only two
+        // inputs `resolveProfile` has. It therefore returned null and the
+        // whole reversal was skipped as "unattributed": the customer kept the
+        // credits AND got the money back, with nothing in the ledger to show
+        // for it. `charge.refunded` was never affected because it does set
+        // `customerId` from `charge.customer`.
+        //
+        // The purchase row is the better identity anyway: it is the row that
+        // GRANTED these credits, so reversing against its owner cannot debit
+        // the wrong account even if a billing profile is later re-pointed at
+        // a different Stripe customer.
         // Size the reversal from what was actually GRANTED for this
         // payment, scaled by the refunded share. Re-deriving from the pack
         // table would misprice a refund of a pack that has since changed.
@@ -626,6 +637,15 @@ export class BillingService {
             return { eventId: event.id, kind: event.kind, action: 'ignored' };
         }
 
+        // The purchase row is the authority for ownership as well as amount.
+        // A billing profile can be re-pointed after purchase; using its current
+        // owner could debit an unrelated account for an older payment.
+        const owner = {
+            userId: original.userId,
+            organizationId: original.organizationId ?? null,
+            tenantId: original.tenantId ?? null,
+        };
+
         const chargedCents = original.costCentsRef ?? 0;
         const refundedCents = event.amountCents ?? chargedCents;
         const share = chargedCents > 0 ? Math.min(1, Math.max(0, refundedCents / chargedCents)) : 1;
@@ -638,9 +658,9 @@ export class BillingService {
         const already = await this.creditLedgerRepository.findByIdempotencyKey(idempotencyKey);
 
         await this.creditLedgerService.record({
-            userId: profile.userId,
-            organizationId: profile.organizationId ?? null,
-            tenantId: profile.tenantId ?? null,
+            userId: owner.userId,
+            organizationId: owner.organizationId,
+            tenantId: owner.tenantId,
             kind: CreditLedgerKind.ADJUSTMENT,
             amountCredits: -reverseCredits,
             costCentsRef: refundedCents,
