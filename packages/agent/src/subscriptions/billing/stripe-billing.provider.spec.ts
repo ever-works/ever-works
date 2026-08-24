@@ -1080,6 +1080,20 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         );
     });
 
+    it('passes the durable licence attempt key to Stripe', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, mode: 'payment', code: 'selfhosted_pro' },
+            idempotencyKey: 'licence:u1:selfhosted_pro:1',
+        });
+
+        expect(client.checkout.sessions.create.mock.calls[0][1]).toEqual({
+            idempotencyKey: 'licence:u1:selfhosted_pro:1',
+        });
+    });
+
     it('marks a licence sale so manual fulfilment can find it', async () => {
         const { provider, client } = build();
 
@@ -1089,8 +1103,9 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         });
 
         const params = client.checkout.sessions.create.mock.calls[0][0];
-        // Issuing the licence document is manual for now, so this marker is the only way to list
-        // who is owed one. It must be on BOTH objects.
+        // Issuing the licence document is manual for now. The durable local record is the product
+        // view; this marker keeps the same sale independently auditable in Stripe. It must be on
+        // BOTH objects.
         expect(params.metadata[STRIPE_METADATA_KEYS.licence]).toBe(STRIPE_PERPETUAL_LICENCE);
         expect(params.payment_intent_data.metadata[STRIPE_METADATA_KEYS.licence]).toBe(
             STRIPE_PERPETUAL_LICENCE,
@@ -1442,6 +1457,9 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
             payment_status: 'paid',
             customer: 'cus_1',
             subscription: { id: 'sub_1', current_period_end: 1790000000 },
+            payment_intent: 'pi_1',
+            amount_total: 2900,
+            currency: 'usd',
             metadata: {
                 [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
                 [STRIPE_METADATA_KEYS.userId]: 'u1',
@@ -1462,6 +1480,9 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
                 planCode: 'standard',
                 customerId: 'cus_1',
                 subscriptionId: 'sub_1',
+                paymentId: 'pi_1',
+                amountCents: 2900,
+                currency: 'usd',
             }),
         );
         expect(snapshot.currentPeriodEnd).toEqual(new Date(1790000000 * 1000));
@@ -1548,6 +1569,7 @@ describe('StripeBillingProvider — subscription event normalization (audit B24)
                     customer: 'cus_1',
                     client_reference_id: 'u1:standard',
                     subscription: 'sub_1',
+                    payment_intent: 'pi_1',
                     amount_total: 2900,
                     currency: 'usd',
                     metadata: planMeta,
@@ -1560,6 +1582,7 @@ describe('StripeBillingProvider — subscription event normalization (audit B24)
                 kind: 'subscription.activated',
                 planCode: 'standard',
                 subscriptionId: 'sub_1',
+                paymentId: 'pi_1',
                 customerId: 'cus_1',
                 referenceId: 'u1:standard',
             }),

@@ -44,6 +44,7 @@ import { GitHubAppInstallationRepoRepository } from './repositories/github-app-i
 import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
 import { InvoiceRepository } from './repositories/invoice.repository';
+import { LicencePurchaseRepository } from './repositories/licence-purchase.repository';
 import { CreditMeterEventRepository } from './repositories/credit-meter-event.repository';
 import { MemoryFolderRepository } from './repositories/memory-folder.repository';
 import { NotificationChannelDeliveryLogRepository } from './repositories/notification-channel-delivery-log.repository';
@@ -101,6 +102,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     GitHubAppInstallationRepository,
     GitHubAppUserLinkRepository,
     InvoiceRepository,
+    LicencePurchaseRepository,
     CreditMeterEventRepository,
     MemoryFolderRepository,
     NotificationChannelDeliveryLogRepository,

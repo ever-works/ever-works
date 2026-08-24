@@ -166,6 +166,8 @@ export interface PlanCheckoutRequest {
     readonly cancelUrl: string;
     /** `{userId}:{planCode}` — echoed back on the signed provider event. */
     readonly referenceId: string;
+    /** Stable provider retry key for one logical checkout attempt. */
+    readonly idempotencyKey?: string | null;
 }
 
 export interface PlanCheckoutSession {
@@ -198,6 +200,10 @@ export interface CheckoutSessionSnapshot {
     readonly customerId: string | null;
     /** Provider subscription id, for plan sessions. */
     readonly subscriptionId: string | null;
+    /** Provider payment id, present for a settled one-off licence. */
+    readonly paymentId: string | null;
+    readonly amountCents: number | null;
+    readonly currency: string | null;
     readonly currentPeriodEnd: Date | null;
 }
 

@@ -135,6 +135,16 @@ function makeSubscriptionService(overrides: Record<string, unknown> = {}) {
     } as any;
 }
 
+function makeLicencePurchaseRepository(overrides: Record<string, unknown> = {}) {
+    return {
+        findActiveByUserAndPlan: jest.fn().mockResolvedValue(null),
+        countByUserAndPlan: jest.fn().mockResolvedValue(0),
+        listActivePlanCodes: jest.fn().mockResolvedValue([]),
+        recordPurchase: jest.fn().mockResolvedValue({ id: 'licence-1', status: 'active' }),
+        ...overrides,
+    } as any;
+}
+
 function build(
     overrides: {
         provider?: any;
@@ -144,6 +154,7 @@ function build(
         userRepository?: any;
         subscriptionService?: any;
         planCreditGrantService?: any;
+        licencePurchaseRepository?: any;
     } = {},
 ) {
     const provider = overrides.provider ?? makeProvider();
@@ -153,13 +164,16 @@ function build(
     const userRepository = overrides.userRepository ?? makeUserRepository();
     const subscriptionService = overrides.subscriptionService ?? makeSubscriptionService();
     const planCreditGrantService = overrides.planCreditGrantService;
-    const service = new PlanSubscriptionService(
+    const licencePurchaseRepository =
+        overrides.licencePurchaseRepository ?? makeLicencePurchaseRepository();
+    const service = new (PlanSubscriptionService as any)(
         provider,
         planRepository,
         subscriptionRepository,
         profileRepository,
         userRepository,
         subscriptionService,
+        licencePurchaseRepository,
         planCreditGrantService,
     );
     return {
@@ -171,6 +185,7 @@ function build(
         userRepository,
         subscriptionService,
         planCreditGrantService,
+        licencePurchaseRepository,
     };
 }
 
@@ -215,8 +230,45 @@ describe('startPlanCheckout — the server prices everything', () => {
             }),
         ).resolves.toBeDefined();
         expect(provider.createPlanCheckoutSession).toHaveBeenCalledWith(
-            expect.objectContaining({ plan: expect.objectContaining({ mode: 'payment' }) }),
+            expect.objectContaining({
+                plan: expect.objectContaining({ mode: 'payment' }),
+                idempotencyKey: 'licence:u1:selfhosted_pro:1',
+            }),
         );
+    });
+
+    it('refuses another lifetime checkout when the licence is already owned', async () => {
+        const licencePurchaseRepository = makeLicencePurchaseRepository({
+            findActiveByUserAndPlan: jest.fn().mockResolvedValue({ id: 'licence-1' }),
+        });
+        const { service, provider } = build({ licencePurchaseRepository });
+
+        const error = await service
+            .startPlanCheckout({
+                ...checkoutOptions,
+                planCode: 'selfhosted_pro',
+                interval: 'lifetime',
+            })
+            .catch((caught) => caught);
+        expect(error).toMatchObject({ name: 'LicenceAlreadyOwnedError' });
+        // The existing checkout controller maps this parent error to HTTP 409.
+        expect(error).toBeInstanceOf(ActivePlanSubscriptionError);
+        expect(provider.ensureCustomer).not.toHaveBeenCalled();
+        expect(provider.createPlanCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('lists the active licence plan codes for an owner', async () => {
+        const licencePurchaseRepository = makeLicencePurchaseRepository({
+            listActivePlanCodes: jest
+                .fn()
+                .mockResolvedValue(['selfhosted_pro', 'selfhosted_enterprise']),
+        });
+        const { service } = build({ licencePurchaseRepository });
+
+        await expect((service as any).listOwnedLicenceCodes('u1')).resolves.toEqual([
+            'selfhosted_pro',
+            'selfhosted_enterprise',
+        ]);
     });
 
     it('prices the checkout from the SERVER plan row', async () => {
@@ -524,6 +576,9 @@ describe('syncCheckoutReturn — a session id is not an authorization', () => {
             packId: null,
             customerId: 'cus_1',
             subscriptionId: 'sub_1',
+            paymentId: null,
+            amountCents: 2900,
+            currency: 'usd',
             currentPeriodEnd: new Date('2026-09-01T00:00:00Z'),
             ...overrides,
         };
@@ -554,6 +609,33 @@ describe('syncCheckoutReturn — a session id is not an authorization', () => {
             expect.objectContaining({ id: 'u1' }),
             'standard',
         );
+    });
+
+    it('records a settled lifetime licence from the provider read-back', async () => {
+        const licencePurchaseRepository = makeLicencePurchaseRepository();
+        const { service, subscriptionRepository } = build({
+            provider: makeProvider({
+                retrieveCheckoutSession: jest.fn().mockResolvedValue(
+                    paidPlanSnapshot({
+                        planCode: 'selfhosted_pro',
+                        subscriptionId: null,
+                        paymentId: 'pi_licence_1',
+                        amountCents: 9900,
+                    }),
+                ),
+            }),
+            licencePurchaseRepository,
+        });
+
+        await expect(service.syncCheckoutReturn('u1', 'cs_plan_1')).resolves.toEqual({
+            status: 'active',
+            activated: true,
+            planCode: 'selfhosted_pro',
+        });
+        expect(licencePurchaseRepository.recordPurchase).toHaveBeenCalledWith(
+            expect.objectContaining({ providerPaymentId: 'pi_licence_1', amountCents: 9900 }),
+        );
+        expect(subscriptionRepository.createOrUpdate).not.toHaveBeenCalled();
     });
 
     it('REFUSES a session belonging to another account, without leaking existence', async () => {
@@ -747,9 +829,40 @@ describe('applyWebhook — activation and revocation', () => {
         });
 
         await expect(
-            service.applyWebhook(event({ planCode: 'selfhosted_pro', subscriptionId: null })),
+            service.applyWebhook(
+                event({
+                    planCode: 'selfhosted_pro',
+                    subscriptionId: null,
+                    paymentId: 'pi_licence_1',
+                }),
+            ),
         ).resolves.toBe('subscription-activated');
         expect(planCreditGrantService.grantCurrentAllowance).not.toHaveBeenCalled();
+    });
+
+    it('acknowledges a recurring self-hosted licence without treating it as perpetual ownership', async () => {
+        const { service, subscriptionService, subscriptionRepository, licencePurchaseRepository } =
+            build({
+                planRepository: makePlanRepository({
+                    findByCode: jest.fn().mockResolvedValue(SELFHOSTED_PRO_PLAN),
+                }),
+                profileRepository: makeProfileRepository({
+                    findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+                }),
+            });
+
+        await expect(
+            service.applyWebhook(
+                event({
+                    planCode: 'selfhosted_pro',
+                    subscriptionId: 'sub_selfhosted_1',
+                    paymentId: null,
+                }),
+            ),
+        ).resolves.toBe('subscription-activated');
+        expect(licencePurchaseRepository.recordPurchase).not.toHaveBeenCalled();
+        expect(subscriptionRepository.createOrUpdate).not.toHaveBeenCalled();
+        expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
     });
 
     /**
@@ -760,12 +873,13 @@ describe('applyWebhook — activation and revocation', () => {
      * nothing and grants nothing, because a licence applies to the buyer's own deployment. This is
      * the path that runs for every $99 sale.
      */
-    it('activates a perpetual licence even though it carries NO subscription id', async () => {
-        const { service, subscriptionService, subscriptionRepository } = build({
-            profileRepository: makeProfileRepository({
-                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
-            }),
-        });
+    it('records a perpetual licence even though it carries NO subscription id', async () => {
+        const { service, subscriptionService, subscriptionRepository, licencePurchaseRepository } =
+            build({
+                profileRepository: makeProfileRepository({
+                    findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+                }),
+            });
 
         await expect(
             service.applyWebhook(
@@ -773,14 +887,21 @@ describe('applyWebhook — activation and revocation', () => {
                     planCode: 'selfhosted_pro',
                     referenceId: 'u1:selfhosted_pro',
                     subscriptionId: null,
+                    paymentId: 'pi_licence_1',
                     amountCents: 9900,
                     currentPeriodEnd: null,
                 }),
             ),
         ).resolves.toBe('subscription-activated');
 
-        // Nothing is written and nothing granted — the licence lives on the Stripe payment intent
-        // (stamped ever_works_licence), which is what manual fulfilment searches.
+        expect(licencePurchaseRepository.recordPurchase).toHaveBeenCalledWith({
+            userId: 'u1',
+            planCode: 'selfhosted_pro',
+            provider: 'stripe',
+            providerPaymentId: 'pi_licence_1',
+            amountCents: 9900,
+            currency: 'usd',
+        });
         expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
         expect(subscriptionRepository.createOrUpdate).not.toHaveBeenCalled();
     });
@@ -794,11 +915,12 @@ describe('applyWebhook — activation and revocation', () => {
      * know they hold a licence, for support and for the manual document fulfilment.
      */
     it('writes NO subscription row and grants NO tier for a self-hosted licence', async () => {
-        const { service, subscriptionService, subscriptionRepository } = build({
-            profileRepository: makeProfileRepository({
-                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
-            }),
-        });
+        const { service, subscriptionService, subscriptionRepository, licencePurchaseRepository } =
+            build({
+                profileRepository: makeProfileRepository({
+                    findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+                }),
+            });
 
         await expect(
             service.applyWebhook(
@@ -806,6 +928,7 @@ describe('applyWebhook — activation and revocation', () => {
                     planCode: 'selfhosted_pro',
                     referenceId: 'u1:selfhosted_pro',
                     subscriptionId: null,
+                    paymentId: 'pi_licence_1',
                     amountCents: 9900,
                     currentPeriodEnd: null,
                 }),
@@ -821,6 +944,7 @@ describe('applyWebhook — activation and revocation', () => {
         // Assert the OUTCOME (nothing written, nothing granted), not the guard.
         expect(subscriptionRepository.createOrUpdate).not.toHaveBeenCalled();
         expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
+        expect(licencePurchaseRepository.recordPurchase).toHaveBeenCalledTimes(1);
     });
 
     it('still grants a CLOUD purchase as the tier — the guard must not break the paying path', async () => {
@@ -839,23 +963,28 @@ describe('applyWebhook — activation and revocation', () => {
     });
 
     it('is idempotent for a licence too — a replayed delivery records it once, not twice', async () => {
-        const { service, subscriptionService, subscriptionRepository } = build({
-            profileRepository: makeProfileRepository({
-                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
-            }),
-        });
+        const { service, subscriptionService, subscriptionRepository, licencePurchaseRepository } =
+            build({
+                profileRepository: makeProfileRepository({
+                    findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+                }),
+            });
 
         const licence = event({
             planCode: 'selfhosted_pro',
             referenceId: 'u1:selfhosted_pro',
             subscriptionId: null,
+            paymentId: 'pi_licence_1',
             amountCents: 9900,
             currentPeriodEnd: null,
         });
         await service.applyWebhook(licence);
         await service.applyWebhook(licence);
 
-        // Replaying a licence delivery must stay inert: no row, no grant, however many times.
+        expect(licencePurchaseRepository.recordPurchase).toHaveBeenCalledTimes(2);
+        expect(licencePurchaseRepository.recordPurchase.mock.calls[0][0]).toEqual(
+            licencePurchaseRepository.recordPurchase.mock.calls[1][0],
+        );
         expect(subscriptionRepository.createOrUpdate).not.toHaveBeenCalled();
         expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
     });

@@ -191,6 +191,8 @@ export interface SubscriptionPlanListItem {
     overagePricePerRun: string;
     currency: string;
     isCurrent: boolean;
+    /** True when this owner holds an active durable self-hosted licence. */
+    owned?: boolean;
     dailyFreeCredits: number;
 }
 
