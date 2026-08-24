@@ -305,10 +305,10 @@ export class TasksService {
     /**
      * Review-fix I4: shared validator for assignee / reviewer / approver
      * add paths. The persisted Task scope is authoritative: an Agent must
-     * exist in that exact scope, and a user actor must be an active member
-     * of the exact Organization roster (or the Tenant owner). Personal
-     * Tasks can only point back to their owner. Every mismatch shares one
-     * response so a known UUID is not an Organization-roster oracle.
+     * exist in that exact scope, and a user actor must be active in the same
+     * Tenant. The Organization roster records invitation provenance but does
+     * not grant access. Personal Tasks can only point back to their owner.
+     * Every mismatch shares one response so a known UUID is not a scope oracle.
      */
     private async assertActorIsValid(
         userId: string,
