@@ -615,11 +615,23 @@ export class StripeBillingProvider extends BillingProvider {
             };
         } catch (error) {
             const code = (error as { code?: string })?.code;
+            const type = (error as { type?: string })?.type;
             // Never log the error object wholesale — it can echo request
             // params including the payment-method reference.
             this.logger.warn(
-                `Off-session charge failed for user ${request.userId} (code=${code ?? 'unknown'})`,
+                `Off-session charge failed for user ${request.userId} (type=${
+                    type ?? 'unknown'
+                }, code=${code ?? 'unknown'})`,
             );
+
+            // Stripe documents connection and API errors as indeterminate:
+            // the request may have reached Stripe even though no response
+            // reached us. Keep the persisted claim/idempotency key in flight
+            // until a webhook confirms the payment outcome.
+            if (type === 'StripeConnectionError' || type === 'StripeAPIError') {
+                return { paymentId: '', status: 'pending' };
+            }
+
             return { paymentId: '', status: 'failed', failureCode: code };
         }
     }

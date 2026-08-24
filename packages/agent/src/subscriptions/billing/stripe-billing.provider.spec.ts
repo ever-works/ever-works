@@ -237,6 +237,38 @@ describe('StripeBillingProvider — checkout', () => {
 
         expect(result).toEqual({ paymentId: '', status: 'failed', failureCode: 'card_declined' });
     });
+
+    it.each(['StripeConnectionError', 'StripeAPIError'])(
+        'reports %s as pending because Stripe may still have created the payment',
+        async (type) => {
+            const client = fakeClient({
+                paymentIntents: {
+                    create: jest
+                        .fn()
+                        .mockRejectedValue(
+                            Object.assign(new Error('Stripe request outcome unknown'), { type }),
+                        ),
+                },
+            });
+            const { provider } = build(client);
+
+            const result = await provider.chargeOffSession({
+                customerId: 'cus_1',
+                paymentMethodRef: 'pm_1',
+                userId: 'u1',
+                idempotencyKey: 'auto:u1:credits-1000:1',
+                pack: {
+                    id: 'credits-1000',
+                    priceCents: 1000,
+                    credits: 1000,
+                    currency: 'usd',
+                    label: '1,000 credits',
+                },
+            });
+
+            expect(result).toEqual({ paymentId: '', status: 'pending' });
+        },
+    );
 });
 
 describe('StripeBillingProvider — payment methods (billing PRD §3.3)', () => {
