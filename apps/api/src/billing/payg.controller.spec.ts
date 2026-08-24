@@ -119,6 +119,17 @@ describe('PaygController', () => {
         expect(service.disable).not.toHaveBeenCalled();
     });
 
+    it('rejects a disable request that also carries a cap instead of silently ignoring it', async () => {
+        const service = makeService();
+        const controller = new PaygController(service);
+
+        await expect(
+            controller.update(auth, { enabled: false, monthlyCapCredits: 2500 }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(service.disable).not.toHaveBeenCalled();
+        expect(service.updateCap).not.toHaveBeenCalled();
+    });
+
     it('maps the domain errors: 409 no card / provider refusal, 400 bad cap, 503 unconfigured', async () => {
         const cases: Array<[Error, unknown]> = [
             [new FakePaygPaymentMethodRequiredError(), ConflictException],
