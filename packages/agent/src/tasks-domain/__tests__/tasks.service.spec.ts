@@ -76,6 +76,7 @@ function makeService(overrides: Record<string, any> = {}) {
         },
         works: {
             findById: jest.fn(),
+            findByIds: jest.fn(),
         },
         missions: {
             findOne: jest.fn(),
@@ -309,6 +310,27 @@ describe('TasksService authorization guardrails', () => {
         expect(repos.reviewers.add).toHaveBeenCalledTimes(1);
     });
 
+    it('lets a legacy Task accept its same-owner current-tenant Agent actor', async () => {
+        const legacy = makeTask({ tenantId: null, organizationId: null, userId: taskOwnerId });
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValueOnce(legacy);
+        repos.agents.findByIdAndUser.mockImplementationOnce(
+            async (id: string, userId: string, scope: unknown) =>
+                scope === undefined ? { id, userId, ...everScope } : null,
+        );
+
+        await expect(
+            service.addAssignee(taskOwnerId, legacy.id, 'agent', 'agent-ever'),
+        ).resolves.toBeDefined();
+
+        expect(repos.agents.findByIdAndUser).toHaveBeenCalledWith(
+            'agent-ever',
+            taskOwnerId,
+            undefined,
+        );
+        expect(repos.assignees.add).toHaveBeenCalled();
+    });
+
     it('scopes the includeRun batch lookup instead of trusting a Task latestRunId pointer', async () => {
         const knownRunId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
         const task = makeTask({ latestRunId: knownRunId, ...everScope });
@@ -353,6 +375,25 @@ describe('TasksService authorization guardrails', () => {
         await expect(
             (service.getOne as any)('user-1', hiddenWorkTask.id, everScope),
         ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('omits a Work-scoped Task from list when detail would 404 for a Work scope mismatch', async () => {
+        const visible = makeTask({ id: 'task-visible', workId: 'work-ever', ...everScope });
+        const hidden = makeTask({ id: 'task-hidden', workId: 'work-yo', ...everScope });
+        const { service, repos } = makeService();
+        repos.tasks.findByUserIdFiltered.mockResolvedValueOnce({
+            rows: [visible, hidden],
+            total: 2,
+        });
+        repos.works.findByIds.mockResolvedValueOnce([
+            { id: 'work-ever', userId: 'user-1', ...everScope },
+            { id: 'work-yo', userId: 'user-1', ...yoScope },
+        ]);
+
+        await expect(service.list('user-1', {}, {}, everScope)).resolves.toEqual({
+            rows: [visible],
+            total: 1,
+        });
     });
 
     it('keeps legacy personal Task and Work rows reachable in personal scope', async () => {

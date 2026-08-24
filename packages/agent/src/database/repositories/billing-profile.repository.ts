@@ -43,6 +43,18 @@ export interface SubscriptionStateWrite {
     subscriptionCanceledAt?: Date | null;
 }
 
+/** Pay-as-you-go columns (billing spec §3.5). Presence of a key = write it. */
+export interface PaygStateWrite {
+    paygEnabled?: boolean;
+    paygSubscriptionId?: string | null;
+    paygSubscriptionItemId?: string | null;
+    paygStatus?: BillingSubscriptionStatus | null;
+    paygPeriodStart?: Date | null;
+    paygPeriodEnd?: Date | null;
+    paygMonthlyCapCredits?: number | null;
+    paygCapNotifiedPercent?: number;
+}
+
 /**
  * Billing profiles (billing PRD §5.3(3)).
  *
@@ -161,6 +173,45 @@ export class BillingProfileRepository {
             await this.repository.update({ userId }, patch);
         }
         return this.findByUserId(userId);
+    }
+
+    // ── Pay-as-you-go (billing spec §3.5) ───────────────────────────
+
+    /**
+     * Patch the pay-as-you-go columns. Same "only keys that are present are
+     * written" contract as {@link updateSubscriptionState}: a status-only
+     * reconcile cannot wipe the cap, an explicit `null` IS a write.
+     */
+    async updatePayg(userId: string, state: PaygStateWrite): Promise<BillingProfile | null> {
+        const patch: PaygStateWrite = {};
+        if ('paygEnabled' in state) patch.paygEnabled = state.paygEnabled ?? false;
+        if ('paygSubscriptionId' in state) {
+            patch.paygSubscriptionId = state.paygSubscriptionId ?? null;
+        }
+        if ('paygSubscriptionItemId' in state) {
+            patch.paygSubscriptionItemId = state.paygSubscriptionItemId ?? null;
+        }
+        if ('paygStatus' in state) patch.paygStatus = state.paygStatus ?? null;
+        if ('paygPeriodStart' in state) patch.paygPeriodStart = state.paygPeriodStart ?? null;
+        if ('paygPeriodEnd' in state) patch.paygPeriodEnd = state.paygPeriodEnd ?? null;
+        if ('paygMonthlyCapCredits' in state) {
+            patch.paygMonthlyCapCredits = state.paygMonthlyCapCredits ?? null;
+        }
+        if ('paygCapNotifiedPercent' in state) {
+            patch.paygCapNotifiedPercent = state.paygCapNotifiedPercent ?? 0;
+        }
+        if (Object.keys(patch).length > 0) {
+            await this.repository.update({ userId }, patch);
+        }
+        return this.findByUserId(userId);
+    }
+
+    /** The owner whose pay-as-you-go subscription this is, if any. */
+    findByPaygSubscriptionId(
+        provider: string,
+        paygSubscriptionId: string,
+    ): Promise<BillingProfile | null> {
+        return this.repository.findOne({ where: { provider, paygSubscriptionId } });
     }
 
     /**

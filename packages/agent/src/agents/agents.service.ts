@@ -995,9 +995,14 @@ export class AgentsService {
             }),
         });
         const bySha = new Map(uploads.map((u) => [u.sha256, u]));
-        if (new Set(rows.map((row) => row.uploadId)).size !== bySha.size) {
-            throw new NotFoundException(`Attachment not found`);
-        }
+        // The Agent itself is the authority: it was ownership-validated
+        // above, and each row carries only (agentId, uploadId) where the
+        // uploadId is a hash the caller supplied at attach time. An upload
+        // row that is not visible in the CURRENT scope (legacy rows pre-date
+        // scope stamping; upgrade-from-account backfills `agents` but not
+        // `user_uploads`) must NOT fail the whole list — the row below just
+        // stays un-enriched (`if (!u) return r`), exactly like any other
+        // metadata miss.
         return rows.map((r) => {
             const u = bySha.get(r.uploadId);
             if (!u) return r;

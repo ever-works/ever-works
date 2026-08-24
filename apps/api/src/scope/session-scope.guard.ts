@@ -5,12 +5,7 @@ import {
     Logger,
     NotFoundException,
 } from '@nestjs/common';
-import {
-    OrganizationMemberRepository,
-    OrganizationRepository,
-    TenantRepository,
-    UserRepository,
-} from '@ever-works/agent/database';
+import { OrganizationRepository, UserRepository } from '@ever-works/agent/database';
 import { ScopeContextService } from './scope-context.service';
 
 /**
@@ -47,9 +42,11 @@ import { ScopeContextService } from './scope-context.service';
  *   - Otherwise: load the user row once and HYDRATE
  *     `req.user.tenantId` (the auth layer never sets it). This happens
  *     on BOTH legacy and slug-prefixed routes — see below.
- *   - An Organization scope must still have an exact roster membership;
- *     the Tenant owner is the sole row-less exception. A revoked/missing
- *     Organization is an opaque 404.
+ *   - An Organization scope uses the same tenant-wide membership semantics
+ *     as `OrganizationService.listForUser` and `OrganizationMembershipService`:
+ *     every user whose `tenantId` matches may use every Organization listed
+ *     in that Tenant. Tenant owners remain authorized without roster rows.
+ *     A missing/cross-Tenant Organization is an opaque 404.
  *   - Then SEED personal scope only if no Organization slug resolved one
  *     (`scope.tenantId === null`) AND the user has a Tenant →
  *     `{ tenantId, organizationId: null }`.
@@ -75,8 +72,6 @@ export class SessionScopeGuard implements CanActivate {
         private readonly scopeContext: ScopeContextService,
         private readonly userRepository: UserRepository,
         private readonly organizationRepository: OrganizationRepository,
-        private readonly organizationMembers: OrganizationMemberRepository,
-        private readonly tenants: TenantRepository,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -123,7 +118,7 @@ export class SessionScopeGuard implements CanActivate {
             scope.tenantId !== null &&
             scope.tenantId === tenantId
         ) {
-            await this.requireActiveOrganization(user.userId, scope.tenantId, scope.organizationId);
+            await this.requireActiveOrganization(scope.tenantId, scope.organizationId);
         }
         if (scope.tenantId === null && tenantId !== null) {
             this.scopeContext.setScope({
@@ -144,7 +139,6 @@ export class SessionScopeGuard implements CanActivate {
      * the same non-enumerating 404.
      */
     private async requireActiveOrganization(
-        userId: string,
         tenantId: string,
         organizationId: string,
     ): Promise<void> {
@@ -153,17 +147,12 @@ export class SessionScopeGuard implements CanActivate {
             throw new NotFoundException('Organization not found');
         }
 
-        const [membership, tenant] = await Promise.all([
-            this.organizationMembers.findByOrgAndUser(organizationId, userId),
-            this.tenants.findById(tenantId),
-        ]);
-        if (
-            tenant?.ownerUserId === userId ||
-            (membership !== null && membership.tenantId === tenantId)
-        ) {
-            return;
-        }
-
-        throw new NotFoundException('Organization not found');
+        // `users.tenantId` is the authorization grant in the current v1
+        // model. organization_members records invitation provenance and a
+        // future per-Organization role seam, but is deliberately not an
+        // authorization input. `canActivate` calls this method only after
+        // proving the resolved scope tenant equals the hydrated user tenant,
+        // so the Organization equality above is sufficient and keeps the
+        // row-less Tenant-owner exception intact.
     }
 }

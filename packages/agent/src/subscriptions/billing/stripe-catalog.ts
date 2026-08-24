@@ -1,4 +1,8 @@
-import catalogJson from './stripe-catalog.data.json';
+// `import * as` + a `.default` fallback resolves the JSON the same way under every transform in
+// the monorepo: the agent package's own SWC build (esModuleInterop → `{ default }`), apps/api's
+// ts-jest harness (CommonJS object) and the tasks worker bundle. A plain default import is
+// `undefined` under one of them, which is invisible until something touches the catalog.
+import * as catalogJsonModule from './stripe-catalog.data.json';
 
 /**
  * Typed view over {@link ./stripe-catalog.data.json}, Ever Works' catalog in the SHARED Stripe account
@@ -34,6 +38,11 @@ import catalogJson from './stripe-catalog.data.json';
  *    using Ever's own model access still spends credits. Runs on the customer's own model keys
  *    spend nothing, on any plan. {@link ./credit-packs.ts} stays the authority on how many credits
  *    a pack grants; this table only mirrors its PRICE into Stripe.
+ *
+ * …and, since v2 (billing spec §3.5), **pay-as-you-go**: one Stripe Billing Meter plus one metered,
+ * graduated price billed monthly in arrears for credits consumed beyond the prepaid balance. The
+ * catalog also carries `creditsMarginPercent` (§3.4) so the one number that decides whether a pack
+ * is sold at a loss lives next to the pack prices and ships with a test, not in an env var.
  */
 
 export type CatalogHosting = 'cloud' | 'selfhosted';
@@ -81,6 +90,30 @@ export interface CatalogCreditPack {
     readonly label: string;
 }
 
+/** One graduated pay-as-you-go tier. `upTo: null` is the open-ended last tier (Stripe `inf`). */
+export interface CatalogPaygTier {
+    /** Cumulative credits in the cycle this tier runs up to (inclusive), or `null` for the last tier. */
+    readonly upTo: number | null;
+    /** Price per credit in CENTS as a decimal string — Stripe `unit_amount_decimal` (up to 12 dp). */
+    readonly centsPerCredit: string;
+}
+
+export interface CatalogPayg {
+    /** Billing Meter `event_name`; also what `billing.meterEvents.create` is keyed on. */
+    readonly meterEventName: string;
+    readonly meterDisplayName: string;
+    /** `ever_works_payg_credits_monthly` — one metered, graduated, monthly price in the shared account. */
+    readonly lookupKey: string;
+    readonly productName: string;
+    readonly tiers: readonly CatalogPaygTier[];
+    /** `billing_thresholds.amount_gte` on the PAYG subscription (mid-cycle invoicing; Stripe min 50 units). */
+    readonly invoiceThresholdCents: number;
+    /** Cap applied when an owner enables PAYG without choosing one. */
+    readonly defaultMonthlyCapCredits: number;
+    /** Hard ceiling for a self-service cap; raised per deployment via `PAYG_MAX_MONTHLY_CAP_CREDITS`. */
+    readonly maxMonthlyCapCredits: number;
+}
+
 export interface Catalog {
     readonly version: number;
     /** Ever Works' key inside the shared, account-wide lookup-key namespace. */
@@ -90,11 +123,66 @@ export interface Catalog {
     /** Every Ever price is USD, regardless of the account's EUR default. */
     readonly currency: string;
     readonly dailyFreeCredits: number;
+    /**
+     * Platform margin over metered provider list cost, in percent (billing spec §3.4). The
+     * default for `CREDITS_MARGIN_PERCENT`; an explicit env value still wins (self-hosters).
+     */
+    readonly creditsMarginPercent: number;
     readonly plans: readonly CatalogPlan[];
     readonly creditPacks: readonly CatalogCreditPack[];
+    readonly payg: CatalogPayg;
 }
 
-export const catalog = catalogJson as unknown as Catalog;
+// The JSON default import resolves to the object itself under the agent package's own
+// transform and to `{ default: … }` under some consumers' Jest transforms (apps/api). Accept
+// both so nothing that touches the catalog at module-init time can explode in a test harness.
+export const catalog = ((catalogJsonModule as unknown as { default?: Catalog }).default ??
+    (catalogJsonModule as unknown as Catalog)) as Catalog;
+
+/** The catalog's platform margin (see {@link Catalog.creditsMarginPercent}). */
+export function catalogCreditsMarginPercent(): number {
+    const value = Number(catalog.creditsMarginPercent);
+    return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+export function getPaygCatalog(): CatalogPayg {
+    return catalog.payg;
+}
+
+/** The catalog's self-service PAYG cap ceiling (config may raise it per deployment). */
+export function catalogPaygMaxMonthlyCapCredits(): number {
+    const value = Number(catalog.payg.maxMonthlyCapCredits);
+    return Number.isFinite(value) && value > 0 ? value : 100_000;
+}
+
+/** `ever_works_payg_credits_monthly`. Lazy on purpose — never touch the catalog at module init. */
+export function paygLookupKey(): string {
+    return catalog.payg.lookupKey;
+}
+
+/**
+ * What Stripe will bill for `credits` consumed in ONE cycle under the graduated PAYG tiers,
+ * in whole cents (rounded half-up at the end, like Stripe's invoice line rounding). Exported so
+ * the API, the Billing page and the tests all compute the estimate the same way.
+ */
+export function estimatePaygCents(
+    credits: number,
+    tiers: readonly CatalogPaygTier[] = catalog.payg.tiers,
+): number {
+    if (!Number.isFinite(credits) || credits <= 0) return 0;
+    let remaining = Math.floor(credits);
+    let previousUpTo = 0;
+    let totalCents = 0;
+    for (const tier of tiers) {
+        if (remaining <= 0) break;
+        const span = tier.upTo === null ? remaining : Math.max(0, tier.upTo - previousUpTo);
+        const inTier = Math.min(remaining, span);
+        totalCents += inTier * Number(tier.centsPerCredit);
+        remaining -= inTier;
+        if (tier.upTo !== null) previousUpTo = tier.upTo;
+    }
+    return Math.round(totalCents);
+}
 
 export const CATALOG_PRODUCT_KEY = catalog.product;
 export const CATALOG_CURRENCY = catalog.currency;
@@ -157,6 +245,11 @@ export function seatProductName(plan: CatalogPlan): string {
 /** e.g. "Ever Works — 5,500 credits". */
 export function creditPackProductName(pack: CatalogCreditPack): string {
     return `${catalog.name} — ${pack.label}`;
+}
+
+/** Stripe product name for the pay-as-you-go price. */
+export function paygProductName(): string {
+    return catalog.payg.productName;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -293,5 +386,6 @@ export function allCatalogLookupKeys(): string[] {
     for (const pack of catalog.creditPacks) {
         keys.push(creditPackLookupKey(pack.packId));
     }
+    keys.push(catalog.payg.lookupKey);
     return keys;
 }

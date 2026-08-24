@@ -57,4 +57,22 @@ export class OrganizationMemberRepository {
     async countForOrganization(organizationId: string): Promise<number> {
         return this.repository.count({ where: { organizationId } });
     }
+
+    /**
+     * DISTINCT people holding a membership anywhere in one Tenant — the
+     * "employees" half of the seat count (billing spec §3.6 / FR-27).
+     *
+     * Distinct on purpose: access is tenant-wide, so somebody who belongs
+     * to three Organizations in the same Tenant occupies ONE seat, not
+     * three. Counting rows instead would over-bill every team that
+     * organizes itself into more than one Organization.
+     */
+    async countDistinctUsersForTenant(tenantId: string): Promise<number> {
+        const row = await this.repository
+            .createQueryBuilder('m')
+            .select('COUNT(DISTINCT m.userId)', 'seats')
+            .where('m.tenantId = :tenantId', { tenantId })
+            .getRawOne<{ seats: string | number }>();
+        return Number(row?.seats ?? 0);
+    }
 }

@@ -101,6 +101,19 @@ describe('UploadsService', () => {
             );
         });
 
+        it('keeps uploads compatible when the optional metadata repository is unavailable', async () => {
+            const legacyCompatible = new (UploadsService as any)(backend, undefined, undefined, {
+                getScope: () => everScope,
+            }) as UploadsService;
+
+            await expect(legacyCompatible.saveImage(userId, fakeFile({}))).resolves.toEqual(
+                expect.objectContaining({
+                    id: expect.stringMatching(/^[a-f0-9]{64}$/),
+                    url: expect.stringContaining(`/api/uploads/${userId}/`),
+                }),
+            );
+        });
+
         it.each(['saveImage', 'saveFile'] as const)(
             'uses the explicit ownership scope for %s even when request ALS is stale',
             async (method) => {

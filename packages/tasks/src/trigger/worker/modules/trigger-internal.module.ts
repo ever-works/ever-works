@@ -33,7 +33,11 @@ import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
-import { CreditLedgerService, CreditsSweepService } from '@ever-works/agent/subscriptions';
+import {
+    CreditLedgerService,
+    CreditsSweepService,
+    PaygService,
+} from '@ever-works/agent/subscriptions';
 import { FleetJobService } from '@ever-works/agent/fleet';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
@@ -361,6 +365,15 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'CreditsSweepService'),
             inject: [TriggerInternalApiClient],
         },
+        // Billing spec §3.5 — the credits-meter-flush cron calls
+        // `flushPending()` on this proxy, which RPCs to the live API where
+        // the meter-event repository + billing provider are wired.
+        {
+            provide: PaygService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'PaygService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Memory consolidation cadence (memory upgrades M9) — the
         // memory-consolidation-tick cron calls `dispatchDue()` on this
         // proxy, which RPCs to the live API where the org/tenant
@@ -419,6 +432,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         DigestService,
         CreditLedgerService,
         CreditsSweepService,
+        PaygService,
         MemoryConsolidationScheduleService,
         TerminalTranscriptService,
     ],

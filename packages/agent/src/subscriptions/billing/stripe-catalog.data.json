@@ -28,16 +28,43 @@
         "line reads consistently. The only numbers with no Gauzy counterpart are the credit allowances.",
         "",
         "`seatsIncluded: null` means unbounded - no seat price is emitted for that plan.",
-        "An empty `prices` array means the tier is a free download with NO Stripe object at all."
+        "An empty `prices` array means the tier is a free download with NO Stripe object at all.",
+        "",
+        "v2 (billing spec docs/specs/features/billing/spec.md, 2026-08-23):",
+        "  creditsMarginPercent - platform margin applied when metered provider cost is converted to",
+        "             credits (1 credit = 1 cent of platform-billed usage = 1/(1+margin) cents of",
+        "             provider list cost). Default for CREDITS_MARGIN_PERCENT; an explicit env wins.",
+        "  payg     - pay-as-you-go: ONE Stripe Billing Meter (`meterEventName`) plus ONE metered,",
+        "             graduated price (`ever_works_payg_credits_monthly`) billed monthly in arrears.",
+        "             `tiers[].centsPerCredit` are `unit_amount_decimal` strings in CENTS; `upTo: null`",
+        "             is Stripe's `inf`. `invoiceThresholdCents` is the subscription's",
+        "             billing_thresholds.amount_gte (Stripe minimum: 50 currency units)."
     ],
 
-    "version": 1,
+    "version": 2,
     "product": "works",
     "name": "Ever Works",
     "site": "https://ever.works",
     "currency": "usd",
 
     "dailyFreeCredits": 50,
+
+    "creditsMarginPercent": 35,
+
+    "payg": {
+        "meterEventName": "ever_works_credits",
+        "meterDisplayName": "Ever Works credits",
+        "lookupKey": "ever_works_payg_credits_monthly",
+        "productName": "Ever Works — Pay-as-you-go credits",
+        "tiers": [
+            { "upTo": 5000, "centsPerCredit": "1" },
+            { "upTo": 25000, "centsPerCredit": "0.91" },
+            { "upTo": null, "centsPerCredit": "0.8" }
+        ],
+        "invoiceThresholdCents": 5000,
+        "defaultMonthlyCapCredits": 10000,
+        "maxMonthlyCapCredits": 100000
+    },
 
     "plans": [
         {

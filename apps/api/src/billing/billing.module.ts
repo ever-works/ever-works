@@ -6,16 +6,18 @@ import { BillingController, CreditsCheckoutController } from './billing.controll
 import { BillingWebhookController } from './billing-webhook.controller';
 import { PlanCheckoutController } from './plan-checkout.controller';
 import { PaymentMethodController } from './payment-method.controller';
+import { PaygController } from './payg.controller';
 
 /**
  * The money path (billing PRD B5) — thin API module over the agent-side
  * `BillingService` / `BillingProvider` seam.
  *
- * Five controllers, two auth postures:
+ * Six controllers, two auth postures:
  *   - `BillingController` + `CreditsCheckoutController` +
- *     `PlanCheckoutController` + `PaymentMethodController`:
- *     session-guarded, owner-scoped (overview, invoices, auto-recharge,
- *     packs, credit checkout, plan checkout, payment methods).
+ *     `PlanCheckoutController` + `PaymentMethodController` +
+ *     `PaygController`: session-guarded, owner-scoped (overview, invoices,
+ *     auto-recharge, packs, credit checkout, plan checkout, payment
+ *     methods, pay-as-you-go).
  *   - `BillingWebhookController`: @Public, authenticated by the provider
  *     request signature and fail-closed when unconfigured.
  *
@@ -35,6 +37,8 @@ import { PaymentMethodController } from './payment-method.controller';
         CreditsCheckoutController,
         PlanCheckoutController,
         PaymentMethodController,
+        // Pay-as-you-go (billing spec §3.5) — enable/disable/cap + state.
+        PaygController,
         BillingWebhookController,
     ],
 })

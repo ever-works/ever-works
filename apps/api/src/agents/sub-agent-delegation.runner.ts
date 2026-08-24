@@ -10,6 +10,7 @@ import {
     AgentCollaboratorRepository,
     AgentRepository,
     AgentRunRepository,
+    ownershipRelationScopeOf,
     ownershipScopeOf,
 } from '@ever-works/agent/database';
 import { TasksService, TaskTransitionService, type Task } from '@ever-works/agent/tasks-domain';
@@ -99,13 +100,10 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
             return this.failure(request, 'parent agent no longer exists');
         }
         const ownershipScope = ownershipScopeOf(parent);
+        const relationScope = ownershipRelationScopeOf(parent);
 
         const childAgentId = request.childAgentId ?? parent.id;
-        const child = await this.agents.findByIdAndUser(
-            childAgentId,
-            parent.userId,
-            ownershipScope,
-        );
+        const child = await this.agents.findByIdAndUser(childAgentId, parent.userId, relationScope);
         if (!child) {
             return this.failure(request, `child agent ${childAgentId} not found`);
         }
@@ -173,7 +171,7 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         const parentTaskId = await this.resolveParentTaskId(request);
         if (parentTaskId) {
             try {
-                await this.tasks.getOne(parent.userId, parentTaskId, ownershipScope);
+                await this.tasks.getOne(parent.userId, parentTaskId, relationScope);
             } catch {
                 return this.failure(request, 'parent Task not found');
             }

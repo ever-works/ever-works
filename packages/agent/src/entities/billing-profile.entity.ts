@@ -201,6 +201,47 @@ export class BillingProfile {
     @PortableDateColumn({ nullable: true })
     subscriptionCanceledAt?: Date | null;
 
+    // ── Pay-as-you-go (billing spec §3.5) ───────────────────────────
+    /**
+     * Owner opted in: credits consumed beyond the prepaid balance are
+     * reported to the provider's usage meter and invoiced in arrears.
+     * Flipped OFF synchronously on disable (before the provider call) so
+     * overflow stops even if cancelling the metered subscription fails.
+     */
+    @Column({ type: 'boolean', default: false })
+    paygEnabled: boolean;
+
+    /** The provider's metered (usage-only) subscription. Opaque, never a secret. */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    paygSubscriptionId?: string | null;
+
+    /** The metered subscription item (threshold / price updates address it). */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    paygSubscriptionItemId?: string | null;
+
+    /** Last reconciled lifecycle status of the metered subscription. */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    paygStatus?: BillingSubscriptionStatus | null;
+
+    /** Current provider billing cycle — the window `cycleUsed` is computed over. */
+    @PortableDateColumn({ nullable: true })
+    paygPeriodStart?: Date | null;
+
+    @PortableDateColumn({ nullable: true })
+    paygPeriodEnd?: Date | null;
+
+    /** Owner's monthly cap in credits; NULL = catalog default applies. */
+    @Column({ type: 'int', nullable: true })
+    paygMonthlyCapCredits?: number | null;
+
+    /**
+     * Once-per-cycle notification latch: the highest cap percentage
+     * (0 / 80 / 100) already notified for the current `paygPeriodStart`.
+     * Reset when the period rolls.
+     */
+    @Column({ type: 'int', default: 0 })
+    paygCapNotifiedPercent: number;
+
     @CreateDateColumn()
     createdAt: Date;
 

@@ -207,6 +207,8 @@ const OWNER = '11111111-1111-4111-8111-111111111111';
 const AGENT_ID = '22222222-2222-4222-8222-222222222222';
 const OWNED_TASK_ID = '33333333-3333-4333-8333-333333333333';
 const FOREIGN_TASK_ID = '44444444-4444-4444-8444-444444444444';
+const TENANT_ID = '55555555-5555-4555-8555-555555555555';
+const ORGANIZATION_ID = '66666666-6666-4666-8666-666666666666';
 
 describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
     let appContext: {
@@ -362,7 +364,14 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
         // rejected by TasksService.getOne exactly like the real
         // `findByIdAndUser` lookup (throws NotFoundException).
         agents.findByIdAndUser.mockImplementation(async (agentId: string, userId: string) =>
-            agentId === AGENT_ID && userId === OWNER ? { id: AGENT_ID, userId: OWNER } : null,
+            agentId === AGENT_ID && userId === OWNER
+                ? {
+                      id: AGENT_ID,
+                      userId: OWNER,
+                      tenantId: TENANT_ID,
+                      organizationId: ORGANIZATION_ID,
+                  }
+                : null,
         );
         tasks.getOne.mockImplementation(async (userId: string, taskId: string) => {
             if (userId === OWNER && taskId === OWNED_TASK_ID) {
@@ -377,6 +386,8 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                     missionId: null,
                     ideaId: null,
                     workId: null,
+                    tenantId: TENANT_ID,
+                    organizationId: ORGANIZATION_ID,
                 };
             }
             throw new Error(`Task ${taskId} not found.`);
@@ -466,6 +477,8 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 taskId: OWNED_TASK_ID,
                 // Wave 4 M1 — workId denorm at creation (owner-scoped taskRow).
                 workId: null,
+                tenantId: TENANT_ID,
+                organizationId: ORGANIZATION_ID,
             });
             // Null here only because this call omits the Trigger.dev run
             // params; see the ctx test below for the real-runtime path.
@@ -485,6 +498,32 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 taskId: OWNED_TASK_ID,
                 runId: 'run-1',
             });
+        });
+
+        it('does not combine a personal Task tenant stamp with the Agent Organization stamp', async () => {
+            tasks.getOne.mockResolvedValueOnce({
+                id: OWNED_TASK_ID,
+                slug: 'personal-task',
+                title: 'Personal Task',
+                description: null,
+                status: 'in_progress',
+                priority: 'medium',
+                labels: [],
+                missionId: null,
+                ideaId: null,
+                workId: null,
+                tenantId: TENANT_ID,
+                organizationId: null,
+            });
+
+            await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    tenantId: TENANT_ID,
+                    organizationId: null,
+                }),
+            );
         });
 
         it('feeds the owned task fields into the agent immediateInput', async () => {
@@ -897,7 +936,9 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
 
                 const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
 
-                expect(runner.checkBudget).toHaveBeenCalledWith({ id: AGENT_ID, userId: OWNER });
+                expect(runner.checkBudget).toHaveBeenCalledWith(
+                    expect.objectContaining({ id: AGENT_ID, userId: OWNER }),
+                );
                 expect(runner.execute).toHaveBeenCalledTimes(1); // no iterate spend
                 expect(gateRunner.runChecks).toHaveBeenCalledTimes(1);
                 expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();

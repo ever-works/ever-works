@@ -1553,7 +1553,11 @@ if (process.argv.includes('--version')) {
 					(result) => ({ kind: 'resolved' as const, result }),
 					(error: unknown) => ({ kind: 'rejected' as const, error })
 				),
-				new Promise<{ kind: 'hung' }>((resolve) => setTimeout(() => resolve({ kind: 'hung' }), 1_500))
+				// The cleanup itself is bounded to 3 x 250 ms, but this race
+				// covers the complete real-process execution as well. Keep enough
+				// headroom for process startup on loaded/Windows CI runners while
+				// still proving that a never-settling cleanup cannot hang forever.
+				new Promise<{ kind: 'hung' }>((resolve) => setTimeout(() => resolve({ kind: 'hung' }), 4_000))
 			]);
 
 			expect(outcome.kind).toBe('resolved');
@@ -1563,7 +1567,7 @@ if (process.argv.includes('--version')) {
 		} finally {
 			if (cleanupPath) await rm(cleanupPath, { recursive: true, force: true });
 		}
-	}, 5_000);
+	}, 8_000);
 });
 
 describe('executeModelProcess — request refusal', () => {
