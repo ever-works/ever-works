@@ -38,7 +38,34 @@ jobs:
     # x64-16 (maxRunners=5) is referenced by no other workflow and was completely idle.
     # The chain falls back to x64-4 and then ubuntu-latest, so nothing breaks if the
     # variable is unset.
-    runs-on: ${{ vars.RUNNER_LINUX_X64_16 || vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    # 🛑 x64-8, NOT x64-16 — because x64-16 is currently unschedulable, not merely busy.
+    #
+    # Measured 2026-08-24 11:26Z: all five `ever-works-linux-x64-16` pods `Pending`
+    # (two for 3h38m / 3h44m) on `Insufficient cpu/memory`, while eight
+    # `ever-works-linux-x64-8` pods were `2/2 Running` with visible turnover
+    # (ages 8m / 14m / 15m alongside 3h). That is the distinction that matters:
+    # x64-8 is CONTENDED BUT ALIVE, x64-16 is DEAD. Queueing behind runners that
+    # cycle resolves; waiting on pods that never schedule does not. Four hours of
+    # 0/4 jobs started, twice, held a production credit-ledger fix AND a login
+    # outage fix out of prod.
+    #
+    # The tier delta is only memory REQUEST: x64-16 asks 1 CPU/12Gi, x64-8 asks
+    # 1 CPU/8Gi. This workflow ran on x64-4 (6Gi) until `c447c3417` moved it, and
+    # that move was to escape a JAMMED pool, not because the build needed 12Gi —
+    # so 8Gi is amply evidenced.
+    #
+    # ⚠️ Honest risk, not a free win: `work` (16Gi) and `docker-storage` (32Gi) are
+    # still `emptyDir medium=Memory`, and their sizeLimits do NOT shrink with the
+    # tier. Lowering the request lowers the GUARANTEE, not the usage, so a heavy
+    # layer could push the pod past its request and be evicted mid-build. That
+    # failure reads as "the repoint did not work" — so it must be watched for
+    # explicitly (Evicted/OOMKilled), never inferred from a job merely starting.
+    #
+    # REVERT when x64-16 has capacity again: restore `vars.RUNNER_LINUX_X64_16` as
+    # the first term. The fallback chain is CONFIG-time, not runtime — it will
+    # never move off a pool that cannot schedule, which is why this needed an edit
+    # rather than resolving itself.
+    runs-on: ${{ vars.RUNNER_LINUX_X64_8 || vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
