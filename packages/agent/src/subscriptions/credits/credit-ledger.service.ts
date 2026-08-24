@@ -333,11 +333,23 @@ export class CreditLedgerService {
 
     /**
      * Daily free-credit sweep (RPC target of the `credits-daily-grant`
-     * cron, 00:05 UTC). For every active user, on EVERY plan, tops the
-     * balance back UP TO the plan's `daily-free-credits` level (platform
-     * default 50) — non-accumulating per the PRD: a balance already at or
-     * above the level receives nothing. Idempotency key
-     * `daily:{userId}:{date}` makes cron re-runs a no-op.
+     * cron, 00:05 UTC). For every active user, on EVERY plan, GRANTS the
+     * plan's `daily-free-credits` level (platform default 50). Idempotency
+     * key `daily:{userId}:{date}` makes cron re-runs a no-op.
+     *
+     * 🛑 This is ADDITIVE and does NOT expire. It is not a top-up to a
+     * ceiling, whatever the PRD says — see the long comment in
+     * `grantDailyForPlan` for why the `maxBalanceAfter` ceiling was removed
+     * (it silently denied the advertised daily credits to paid tiers and to
+     * anyone who had BOUGHT a credit pack). An idle free user therefore
+     * accrues 50 credits/day without bound, which is a deliberate, accepted
+     * consequence and NOT an oversight.
+     *
+     * This docstring previously described the removed ceiling behaviour and
+     * claimed the grant was "non-accumulating" — the exact opposite of what
+     * the code does. Corrected 2026-08-25. Whether accrual should be bounded
+     * is EW-753; if it ever is, bound it by lot expiry or by a cap scoped to
+     * `DAILY_FREE` buckets, never by a total-balance ceiling.
      */
     async dispatchDailyGrants(now: Date = new Date()): Promise<DailyGrantSummary> {
         const summary: DailyGrantSummary = {
