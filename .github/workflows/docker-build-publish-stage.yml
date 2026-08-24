@@ -8,7 +8,8 @@ on:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
-  cancel-in-progress: true
+  # Same reasoning as the prod lane: queue rather than burn the slot.
+  cancel-in-progress: false
 
 permissions:
   contents: read

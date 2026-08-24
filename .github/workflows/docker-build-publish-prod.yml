@@ -8,7 +8,11 @@ on:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
-  cancel-in-progress: true
+  # Runs only on `main`. Cancelling it burned ~50-90 min of runner time per
+  # cascade for no benefit, on the same pools the deploy-bearing k8s-build
+  # lane is starved for. Queue instead. (This lane publishes `:latest`, which
+  # no Deployment tracks — see the note in k8s-build.yml.)
+  cancel-in-progress: false
 
 permissions:
   contents: read
