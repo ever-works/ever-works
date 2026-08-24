@@ -47,7 +47,14 @@ export class AddPlanHostingSeatsAndCredits1786940000000 implements MigrationInte
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const table = await queryRunner.getTable('subscription_plans');
-        if (!table) return;
+        if (!table) {
+            // Returning here would make TypeORM record the migration as applied
+            // even though none of its columns exist. A missing prerequisite is
+            // schema drift, not an idempotent rerun, so stop startup loudly.
+            throw new Error(
+                'Cannot add plan hosting, seats, and credits: prerequisite table "subscription_plans" does not exist',
+            );
+        }
 
         const addColumn = async (name: string, ddl: string) => {
             if (!table.findColumnByName(name)) {
