@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AgentRepository } from '../agent.repository';
-import { Agent, AgentStatus } from '../../../entities/agent.entity';
+import { Agent, AgentScope, AgentStatus } from '../../../entities/agent.entity';
 
 /**
  * Repository tests for the CAS-claim primitive used by the heartbeat
@@ -72,6 +72,33 @@ describe('AgentRepository', () => {
         }).compile();
 
         repo = module.get(AgentRepository);
+    });
+
+    describe('findByUserIdAndSlug (durable uniqueness)', () => {
+        it('checks the unscoped database key across Organizations without returning a broader catalog', async () => {
+            inner.findOne.mockResolvedValueOnce(null);
+
+            await repo.findByUserIdAndSlug(
+                'user-1',
+                AgentScope.TENANT,
+                'ceo',
+                {},
+                {
+                    tenantId: '11111111-1111-4111-8111-111111111111',
+                    organizationId: '22222222-2222-4222-8222-222222222222',
+                },
+            );
+
+            const [{ where }] = inner.findOne.mock.calls[0];
+            expect(Array.isArray(where)).toBe(false);
+            expect(where).toMatchObject({
+                userId: 'user-1',
+                scope: AgentScope.TENANT,
+                slug: 'ceo',
+            });
+            expect(where).not.toHaveProperty('tenantId');
+            expect(where).not.toHaveProperty('organizationId');
+        });
     });
 
     describe('tryClaimForRun (CAS pattern)', () => {

@@ -28,6 +28,7 @@ import { WorkProposal } from '../entities/work-proposal.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import {
     ownershipStamp,
+    ownershipScopeMatches,
     ownershipWhereWith,
     type OwnershipScope,
 } from '../database/ownership-scope';
@@ -419,6 +420,16 @@ export class AgentExportService {
                     `Agent with slug "${originalSlug}" already exists in this scope — skip mode.`,
                 );
             } else if (mode === 'overwrite') {
+                // The uniqueness probe intentionally sees same-user rows in
+                // every Organization because the durable index does too. An
+                // overwrite, however, is an ownership-sensitive mutation:
+                // re-resolve through the active scope and return the same
+                // generic conflict when the colliding row is hidden.
+                if (!ownershipScopeMatches(conflict, ownershipScope)) {
+                    throw new ConflictException(
+                        `Agent with slug "${originalSlug}" already exists in this scope.`,
+                    );
+                }
                 await this.applyEnvelopeToExisting(conflict, envelope);
                 conflictResolution = 'overwritten';
                 const refreshed = (await this.agents.findByIdAndUser(

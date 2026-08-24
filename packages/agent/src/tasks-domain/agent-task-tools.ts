@@ -7,6 +7,7 @@ import type {
     TaskApproverRepository,
 } from '../database/repositories/task-side.repositories';
 import type { TaskStatus } from '../entities/task.entity';
+import { ownershipScopeOf } from '../database/ownership-scope';
 
 /**
  * Tasks feature — Phase 16.2 / 16.3 / 16.4.
@@ -109,17 +110,21 @@ export function buildAgentTaskTools(args: {
             invoke: async (raw) => {
                 const a = raw as CreateTaskArgs;
                 try {
-                    const created = await args.tasksService.create(args.agent.userId, {
-                        title: a.title,
-                        description: a.description ?? null,
-                        priority: a.priority as any,
-                        missionId: args.agent.missionId ?? null,
-                        ideaId: args.agent.ideaId ?? null,
-                        workId: args.agent.workId ?? null,
-                        parentTaskId: a.parentTaskId ?? null,
-                        createdByType: 'agent',
-                        createdById: args.agent.id,
-                    });
+                    const created = await args.tasksService.create(
+                        args.agent.userId,
+                        {
+                            title: a.title,
+                            description: a.description ?? null,
+                            priority: a.priority as any,
+                            missionId: args.agent.missionId ?? null,
+                            ideaId: args.agent.ideaId ?? null,
+                            workId: args.agent.workId ?? null,
+                            parentTaskId: a.parentTaskId ?? null,
+                            createdByType: 'agent',
+                            createdById: args.agent.id,
+                        },
+                        ownershipScopeOf(args.agent),
+                    );
                     return { id: created.id, slug: created.slug };
                 } catch (err) {
                     return { error: err instanceof Error ? err.message : String(err) };

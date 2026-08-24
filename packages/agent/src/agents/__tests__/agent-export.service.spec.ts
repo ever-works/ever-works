@@ -292,7 +292,7 @@ describe('AgentExportService', () => {
             );
         });
 
-        it('does not overwrite the same logical slug in another active Organization', async () => {
+        it('returns a generic conflict instead of overwriting the same database slug in another Organization', async () => {
             const everScope = {
                 tenantId: '11111111-1111-4111-8111-111111111111',
                 organizationId: '22222222-2222-4222-8222-222222222222',
@@ -303,26 +303,49 @@ describe('AgentExportService', () => {
                 tenantId: everScope.tenantId,
                 organizationId: '33333333-3333-4333-8333-333333333333',
             });
-            agents.findByUserIdAndSlug.mockImplementation(async (...args: unknown[]) =>
-                (args[4] as typeof everScope | undefined)?.organizationId ===
-                everScope.organizationId
-                    ? null
-                    : hidden,
-            );
-            agents.findByIdAndUser.mockResolvedValue(hidden);
+            agents.findByUserIdAndSlug.mockResolvedValue(hidden);
+            agents.findByIdAndUser.mockResolvedValue(null);
+
+            await expect(
+                (svc.importOne as any)(
+                    'u1',
+                    baseEnvelope(),
+                    { onConflict: 'overwrite' },
+                    everScope,
+                ),
+            ).rejects.toThrow(ConflictException);
+
+            expect(agents.updateById).not.toHaveBeenCalled();
+            expect(agents.create).not.toHaveBeenCalled();
+            expect(hidden.name).toBe('Yo CEO');
+        });
+
+        it('auto-renames around a hidden same-slug Agent and preserves the active Organization stamp', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            agents.findByUserIdAndSlug
+                .mockResolvedValueOnce(makeAgent({ id: 'hidden-ceo', slug: 'ceo' }))
+                .mockResolvedValueOnce(null);
             agents.create.mockImplementation(async (partial: Partial<Agent>) => makeAgent(partial));
 
             const result = await (svc.importOne as any)(
                 'u1',
                 baseEnvelope(),
-                { onConflict: 'overwrite' },
+                { onConflict: 'rename' },
                 everScope,
             );
 
-            expect(result.conflictResolution).toBe('none');
-            expect(result.created).toMatchObject(everScope);
+            expect(result).toMatchObject({
+                conflictResolution: 'renamed',
+                originalSlug: 'ceo',
+                finalSlug: 'ceo-2',
+            });
+            expect(agents.create).toHaveBeenCalledWith(
+                expect.objectContaining({ ...everScope, slug: 'ceo-2' }),
+            );
             expect(agents.updateById).not.toHaveBeenCalled();
-            expect(hidden.name).toBe('Yo CEO');
         });
 
         it('rejects secret in any file body', async () => {
