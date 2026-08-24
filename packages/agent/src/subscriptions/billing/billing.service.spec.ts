@@ -95,11 +95,36 @@ function makeInvoiceRepository(overrides: Record<string, unknown> = {}) {
 }
 
 function makeLedgerRepository(overrides: Record<string, unknown> = {}) {
-    return {
+    const repository = {
         findByIdempotencyKey: jest.fn().mockResolvedValue(null),
         findLatestByRef: jest.fn().mockResolvedValue(null),
         ...overrides,
     } as any;
+    repository.recordCumulativeRefundAtomic =
+        (overrides.recordCumulativeRefundAtomic as jest.Mock | undefined) ??
+        jest.fn().mockImplementation(async (write: any) => {
+            const existing = await repository.findByIdempotencyKey(write.idempotencyKey);
+            if (existing) {
+                return { status: 'idempotent', entry: existing, creditsReversed: 0 };
+            }
+            const purchase = await repository.findLatestByRef(write.refType, write.refId);
+            if (!purchase) {
+                return { status: 'missing-purchase', creditsReversed: 0 };
+            }
+            const chargedCents = purchase.costCentsRef ?? 0;
+            const refundedCents = write.cumulativeRefundedCents ?? chargedCents;
+            const share = chargedCents > 0 ? Math.min(1, refundedCents / chargedCents) : 1;
+            const creditsReversed = Math.min(
+                purchase.amountCredits,
+                Math.round(purchase.amountCredits * share),
+            );
+            return {
+                status: 'created',
+                entry: { ...purchase, amountCredits: -creditsReversed },
+                creditsReversed,
+            };
+        });
+    return repository;
 }
 
 function makeLedgerService(overrides: Record<string, unknown> = {}) {
@@ -430,15 +455,20 @@ describe('BillingService — webhook: refunds', () => {
 
         const outcome = await service.handleWebhook('{}', 'sig');
 
-        expect(outcome.action).toBe('reversed');
-        expect(ledgerService.record).toHaveBeenCalledWith(
+        expect(outcome).toEqual({
+            eventId: 'evt_ref',
+            kind: 'credits.refunded',
+            action: 'reversed',
+            creditsDelta: -5500,
+        });
+        expect(ledgerRepo.recordCumulativeRefundAtomic).toHaveBeenCalledWith(
             expect.objectContaining({
-                kind: CreditLedgerKind.ADJUSTMENT,
-                amountCredits: -5500,
+                refId: 'pi_1',
+                cumulativeRefundedCents: 5000,
                 idempotencyKey: 'stripe:evt:evt_ref',
-                allowNegativeBalance: true,
             }),
         );
+        expect(ledgerService.record).not.toHaveBeenCalled();
     });
 
     it('reverses proportionally on a partial refund', async () => {
@@ -458,11 +488,11 @@ describe('BillingService — webhook: refunds', () => {
                 }),
             ),
         });
-        const { service, ledgerService } = build({ provider, profiles, ledgerRepo });
+        const { service } = build({ provider, profiles, ledgerRepo });
 
-        await service.handleWebhook('{}', 'sig');
+        const outcome = await service.handleWebhook('{}', 'sig');
 
-        expect(ledgerService.record.mock.calls[0][0].amountCredits).toBe(-2750);
+        expect(outcome.creditsDelta).toBe(-2750);
     });
 
     it('never reverses more than was granted, even if the event over-reports', async () => {
@@ -482,11 +512,11 @@ describe('BillingService — webhook: refunds', () => {
                 }),
             ),
         });
-        const { service, ledgerService } = build({ provider, profiles, ledgerRepo });
+        const { service } = build({ provider, profiles, ledgerRepo });
 
-        await service.handleWebhook('{}', 'sig');
+        const outcome = await service.handleWebhook('{}', 'sig');
 
-        expect(ledgerService.record.mock.calls[0][0].amountCredits).toBe(-1000);
+        expect(outcome.creditsDelta).toBe(-1000);
     });
 
     it('is idempotent on replay of the same refund event', async () => {
@@ -552,16 +582,11 @@ describe('BillingService — webhook: refunds', () => {
         const outcome = await service.handleWebhook('{}', 'sig');
 
         expect(outcome.action).toBe('reversed');
-        expect(ledgerService.record).toHaveBeenCalledWith(
-            expect.objectContaining({
-                userId: 'u_disputed',
-                organizationId: 'org_9',
-                tenantId: 't_9',
-                kind: CreditLedgerKind.ADJUSTMENT,
-                amountCredits: -25000,
-                allowNegativeBalance: true,
-            }),
+        expect(outcome.creditsDelta).toBe(-25000);
+        expect(ledgerRepo.recordCumulativeRefundAtomic).toHaveBeenCalledWith(
+            expect.objectContaining({ refId: 'pi_disputed' }),
         );
+        expect(ledgerService.record).not.toHaveBeenCalled();
     });
 
     it('always reverses the purchase owner even when the current billing profile points elsewhere', async () => {
@@ -591,13 +616,10 @@ describe('BillingService — webhook: refunds', () => {
 
         await service.handleWebhook('{}', 'sig');
 
-        expect(ledgerService.record).toHaveBeenCalledWith(
-            expect.objectContaining({
-                userId: 'u_original',
-                organizationId: 'org_original',
-                tenantId: 'tenant_original',
-            }),
+        expect(ledgerRepo.recordCumulativeRefundAtomic).toHaveBeenCalledWith(
+            expect.objectContaining({ refId: 'pi_repointed' }),
         );
+        expect(ledgerService.record).not.toHaveBeenCalled();
     });
 
     it('ignores a refund with no matching purchase rather than guessing', async () => {
@@ -617,6 +639,45 @@ describe('BillingService — webhook: refunds', () => {
         const outcome = await service.handleWebhook('{}', 'sig');
 
         expect(outcome.action).toBe('ignored');
+        expect(ledgerService.record).not.toHaveBeenCalled();
+    });
+
+    it('delegates cumulative refund accounting to the atomic ledger path', async () => {
+        const ledgerRepo = makeLedgerRepository({
+            recordCumulativeRefundAtomic: jest.fn().mockResolvedValue({
+                status: 'created',
+                entry: { id: 'refund-2', amountCredits: -2750 },
+                creditsReversed: 2750,
+            }),
+        });
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    id: 'evt_refund_2',
+                    kind: 'credits.refunded',
+                    customerId: 'cus_1',
+                    amountCents: 5000,
+                    paymentId: 'pi_1',
+                }),
+            ),
+        });
+        const { service, ledgerService } = build({ provider, ledgerRepo });
+
+        const outcome = await service.handleWebhook('{}', 'sig');
+
+        expect(ledgerRepo.recordCumulativeRefundAtomic).toHaveBeenCalledWith({
+            refType: BILLING_PAYMENT_REF_TYPE,
+            refId: 'pi_1',
+            cumulativeRefundedCents: 5000,
+            idempotencyKey: 'stripe:evt:evt_refund_2',
+            description: 'Refund / chargeback reversal',
+        });
+        expect(outcome).toEqual({
+            eventId: 'evt_refund_2',
+            kind: 'credits.refunded',
+            action: 'reversed',
+            creditsDelta: -2750,
+        });
         expect(ledgerService.record).not.toHaveBeenCalled();
     });
 });

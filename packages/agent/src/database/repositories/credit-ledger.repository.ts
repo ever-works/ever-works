@@ -72,6 +72,21 @@ export type RecordAtomicResult =
     /** maxBalanceAfter ceiling clamped the amount to ≤ 0 — no write. */
     | { status: 'skipped'; balance: number };
 
+export interface CumulativeRefundWrite {
+    refType: string;
+    refId: string;
+    /** Stripe's charge.amount_refunded: total refunded so far, not this event's delta. */
+    cumulativeRefundedCents: number | null;
+    idempotencyKey: string;
+    description?: string | null;
+}
+
+export type CumulativeRefundResult =
+    | { status: 'created'; entry: CreditLedgerEntry; creditsReversed: number }
+    | { status: 'idempotent'; entry: CreditLedgerEntry; creditsReversed: 0 }
+    | { status: 'covered'; creditsReversed: 0 }
+    | { status: 'missing-purchase'; creditsReversed: 0 };
+
 export interface CreditLedgerQuery {
     from?: Date;
     to?: Date;
@@ -177,6 +192,119 @@ export class CreditLedgerRepository {
                 const existing = await this.findByIdempotencyKey(write.idempotencyKey);
                 if (existing) {
                     return { status: 'idempotent', entry: existing };
+                }
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Atomically reconcile one provider's CUMULATIVE refund total.
+     *
+     * Stripe sends `charge.amount_refunded`, which grows across partial
+     * refunds. Serializing on the purchase owner's row before summing prior
+     * reversals makes sequential, concurrent, duplicate, and out-of-order
+     * deliveries converge on one target instead of reversing that cumulative
+     * amount once per event.
+     */
+    async recordCumulativeRefundAtomic(
+        write: CumulativeRefundWrite,
+        now: Date = new Date(),
+    ): Promise<CumulativeRefundResult> {
+        try {
+            return await this.repository.manager.transaction(async (manager) => {
+                const repo = manager.getRepository(CreditLedgerEntry);
+                const existing = await repo.findOne({
+                    where: { idempotencyKey: write.idempotencyKey },
+                });
+                if (existing) {
+                    return {
+                        status: 'idempotent' as const,
+                        entry: existing,
+                        creditsReversed: 0 as const,
+                    };
+                }
+
+                const purchase = await repo.findOne({
+                    where: {
+                        refType: write.refType,
+                        refId: write.refId,
+                        kind: CreditLedgerKind.PURCHASE,
+                    },
+                    order: { createdAt: 'DESC' },
+                });
+                if (!purchase || purchase.amountCredits <= 0) {
+                    return { status: 'missing-purchase' as const, creditsReversed: 0 as const };
+                }
+
+                await this.lockUserRow(manager, purchase.userId);
+
+                const priorAdjustmentTotal = await repo.sum('amountCredits', {
+                    refType: write.refType,
+                    refId: write.refId,
+                    kind: CreditLedgerKind.ADJUSTMENT,
+                });
+                const alreadyReversed = Math.min(
+                    purchase.amountCredits,
+                    Math.max(0, -Number(priorAdjustmentTotal ?? 0)),
+                );
+
+                const chargedCents = purchase.costCentsRef ?? 0;
+                const refundedCents = Math.max(0, write.cumulativeRefundedCents ?? chargedCents);
+                const share =
+                    chargedCents > 0
+                        ? Math.min(1, refundedCents / chargedCents)
+                        : write.cumulativeRefundedCents === null || refundedCents > 0
+                          ? 1
+                          : 0;
+                const targetReversed = Math.min(
+                    purchase.amountCredits,
+                    Math.max(0, Math.round(purchase.amountCredits * share)),
+                );
+                const creditsReversed = targetReversed - alreadyReversed;
+                if (creditsReversed <= 0) {
+                    return { status: 'covered' as const, creditsReversed: 0 as const };
+                }
+
+                await this.expireDueBucketsInTx(manager, purchase.userId, now);
+                const balance = await this.sumBalance(manager, purchase.userId);
+                const incrementalRefundedCents =
+                    chargedCents > 0
+                        ? Math.min(
+                              refundedCents,
+                              Math.max(
+                                  1,
+                                  Math.round(
+                                      (chargedCents * creditsReversed) / purchase.amountCredits,
+                                  ),
+                              ),
+                          )
+                        : refundedCents;
+                const entry = await repo.save(
+                    repo.create({
+                        userId: purchase.userId,
+                        organizationId: purchase.organizationId ?? null,
+                        tenantId: purchase.tenantId ?? null,
+                        kind: CreditLedgerKind.ADJUSTMENT,
+                        amountCredits: -creditsReversed,
+                        costCentsRef: incrementalRefundedCents,
+                        refType: write.refType,
+                        refId: write.refId,
+                        description: write.description ?? null,
+                        idempotencyKey: write.idempotencyKey,
+                        balanceAfter: balance - creditsReversed,
+                        remainingCredits: null,
+                        expiresAt: null,
+                    }),
+                );
+                await this.allocateDebit(manager, purchase.userId, creditsReversed, now);
+                return { status: 'created' as const, entry, creditsReversed };
+            });
+        } catch (error) {
+            if (this.isUniqueViolation(error)) {
+                const existing = await this.findByIdempotencyKey(write.idempotencyKey);
+                if (existing) {
+                    return { status: 'idempotent', entry: existing, creditsReversed: 0 };
                 }
             }
             throw error;
