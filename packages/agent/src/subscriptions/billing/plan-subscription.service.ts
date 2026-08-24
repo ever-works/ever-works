@@ -43,6 +43,16 @@ export class PlanNotPurchasableError extends Error {
     }
 }
 
+/** A recurring checkout would create a second live provider subscription. */
+export class ActivePlanSubscriptionError extends Error {
+    constructor() {
+        super(
+            'An active paid subscription already exists. Manage or cancel it before starting another recurring plan checkout.',
+        );
+        this.name = 'ActivePlanSubscriptionError';
+    }
+}
+
 /**
  * The caller asked to finalize a checkout session that is not theirs (or
  * does not exist). Deliberately ONE error for both, so a session id in a
@@ -188,6 +198,17 @@ export class PlanSubscriptionService {
         }
 
         const interval: CatalogInterval = options.interval ?? 'monthly';
+
+        // The local model tracks one provider subscription per owner. A second
+        // recurring checkout can create a second live Stripe subscription while
+        // overwriting that pointer, leaving one renewal unmanaged. One-off
+        // lifetime licences do not create a subscription and remain buyable.
+        if (interval !== 'lifetime') {
+            const active = await this.userSubscriptionRepository.findActiveByUser(options.userId);
+            if (active?.providerSubscriptionId) {
+                throw new ActivePlanSubscriptionError();
+            }
+        }
 
         const plan = await this.resolveSellablePlan(options.planCode, interval);
         const catalogSku = resolveSkuForPlanRow({
@@ -382,6 +403,8 @@ export class PlanSubscriptionService {
                 providerSubscriptionId: event.subscriptionId ?? null,
                 currentPeriodEnd: event.currentPeriodEnd ?? null,
                 cancelAtPeriodEnd: event.cancelAtPeriodEnd ?? false,
+                seats: event.subscription?.seats,
+                seatItemId: event.subscription?.seatItemId,
             });
             return activated ? 'subscription-activated' : 'ignored';
         }
@@ -430,6 +453,9 @@ export class PlanSubscriptionService {
         providerSubscriptionId: string | null;
         currentPeriodEnd: Date | null;
         cancelAtPeriodEnd: boolean;
+        /** Extra seats the provider bills for; `undefined` = no snapshot here. */
+        seats?: number | null;
+        seatItemId?: string | null;
     }): Promise<boolean> {
         const plan = input.planCode ? await this.findPlanByCode(input.planCode) : null;
         if (!plan) {
@@ -473,6 +499,12 @@ export class PlanSubscriptionService {
             currentPeriodEnd: input.currentPeriodEnd ?? null,
             cancelAtPeriodEnd: input.cancelAtPeriodEnd,
             providerSubscriptionId: input.providerSubscriptionId ?? null,
+            // Billing spec FR-26 — seats come from the provider's own items,
+            // never from a local guess. `undefined` (no snapshot on this
+            // delivery) leaves the stored value alone; a snapshot with no seat
+            // item means "no extras", which is 0.
+            ...(input.seats === undefined ? {} : { seats: input.seats ?? 0 }),
+            ...(input.seatItemId === undefined ? {} : { providerSeatItemId: input.seatItemId }),
         });
 
         // THE privileged grant (`assignPlanToUser`) — documented as

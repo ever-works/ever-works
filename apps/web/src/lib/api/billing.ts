@@ -4,6 +4,7 @@ import type {
     BillingOverview,
     BillingPortalResponse,
     PaygMutationResponse,
+    SeatsResponse,
     CreditCheckoutResponse,
     InvoiceListPage,
     PlanCheckoutResponse,
@@ -17,6 +18,7 @@ export type {
     BillingOverview,
     BillingPortalResponse,
     PaygMutationResponse,
+    SeatsResponse,
     CreditCheckoutResponse,
     InvoiceListPage,
     PlanCheckoutResponse,
@@ -136,6 +138,22 @@ export const billingAPI = {
         return serverFetch<PaygMutationResponse>('/billing/payg', {
             method: 'PUT',
             body: JSON.stringify(settings),
+        });
+    },
+
+    /** Seat allowance + usage (billing spec §3.6). */
+    async seats(): Promise<SeatsResponse> {
+        return serverFetch<SeatsResponse>('/billing/seats', { method: 'GET' });
+    },
+
+    /**
+     * Set the TOTAL seats wanted. A total, not a delta: a delta double-charges
+     * on a retry. The API bills the extras from the stored plan row.
+     */
+    async setSeats(seats: number): Promise<SeatsResponse> {
+        return serverFetch<SeatsResponse>('/billing/seats', {
+            method: 'POST',
+            body: JSON.stringify({ seats }),
         });
     },
 

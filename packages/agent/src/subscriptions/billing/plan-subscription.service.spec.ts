@@ -1,4 +1,5 @@
 import {
+    ActivePlanSubscriptionError,
     CheckoutSessionNotFoundError,
     PlanNotPurchasableError,
     PlanSubscriptionService,
@@ -181,6 +182,43 @@ const checkoutOptions = {
 };
 
 describe('startPlanCheckout — the server prices everything', () => {
+    it('refuses to create a second checkout while a provider subscription is active', async () => {
+        const subscriptionRepository = makeSubscriptionRepository({
+            findActiveByUser: jest.fn().mockResolvedValue({
+                id: 'sub-row-1',
+                providerSubscriptionId: 'sub_live_1',
+            }),
+        });
+        const { service, provider } = build({ subscriptionRepository });
+
+        await expect(service.startPlanCheckout(checkoutOptions)).rejects.toBeInstanceOf(
+            ActivePlanSubscriptionError,
+        );
+        expect(provider.ensureCustomer).not.toHaveBeenCalled();
+        expect(provider.createPlanCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('still permits a one-off lifetime licence alongside an active subscription', async () => {
+        const subscriptionRepository = makeSubscriptionRepository({
+            findActiveByUser: jest.fn().mockResolvedValue({
+                id: 'sub-row-1',
+                providerSubscriptionId: 'sub_live_1',
+            }),
+        });
+        const { service, provider } = build({ subscriptionRepository });
+
+        await expect(
+            service.startPlanCheckout({
+                ...checkoutOptions,
+                planCode: 'selfhosted_pro',
+                interval: 'lifetime',
+            }),
+        ).resolves.toBeDefined();
+        expect(provider.createPlanCheckoutSession).toHaveBeenCalledWith(
+            expect.objectContaining({ plan: expect.objectContaining({ mode: 'payment' }) }),
+        );
+    });
+
     it('prices the checkout from the SERVER plan row', async () => {
         const { service, provider } = build();
 
