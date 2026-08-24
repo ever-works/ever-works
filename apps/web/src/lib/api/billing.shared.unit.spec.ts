@@ -9,6 +9,7 @@ import {
     canCancelSubscription,
     canConfigureAutoRecharge,
     canConfigurePayg,
+    canManageSeats,
     estimatePaygCents,
     formatCentsPerCredit,
     canResumeSubscription,
@@ -25,6 +26,7 @@ import {
     canRemovePaymentMethod,
     type BillingOverview,
     type PaygState,
+    type SeatsState,
     type SubscriptionState,
     type PaymentMethodRow,
 } from './billing.shared';
@@ -452,5 +454,36 @@ describe('formatCentsPerCredit — display rate', () => {
         expect(formatCentsPerCredit('1')).toBe('1.00¢');
         expect(formatCentsPerCredit('0.91')).toBe('0.91¢');
         expect(formatCentsPerCredit('0.8')).toBe('0.80¢');
+    });
+});
+
+// ── Seats (billing spec §3.6) ──────────────────────────────────────────
+
+function seatsState(partial: Partial<SeatsState> = {}): SeatsState {
+    return {
+        included: 10,
+        purchased: 0,
+        allowance: 10,
+        members: 3,
+        agents: 2,
+        used: 5,
+        available: 5,
+        seatPriceCents: 500,
+        purchasable: true,
+        ...partial,
+    };
+}
+
+describe('canManageSeats — payments on + the plan actually sells seats', () => {
+    it('offers the control only when it can do something', () => {
+        expect(canManageSeats(seatsState(), true)).toBe(true);
+        // Master switch off.
+        expect(canManageSeats(seatsState(), false)).toBe(false);
+        // Deployment cannot charge (no provider / subscriptions off / no live subscription).
+        expect(canManageSeats(seatsState({ purchasable: false }), true)).toBe(false);
+        // Unbounded plan: there is no allowance to adjust.
+        expect(canManageSeats(seatsState({ allowance: null, included: null }), true)).toBe(false);
+        // The seats call failed.
+        expect(canManageSeats(null, true)).toBe(false);
     });
 });

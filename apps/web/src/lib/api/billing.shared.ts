@@ -153,6 +153,36 @@ export interface BillingOverview {
 /** `PUT /api/billing/payg` response: the success envelope spread over the state. */
 export type PaygMutationResponse = { status: string } & PaygState;
 
+/** `GET/POST /api/billing/seats` — seats are employees OR agents (billing spec §3.6). */
+export interface SeatsState {
+    /** Seats the plan includes. `null` = unbounded. */
+    included: number | null;
+    /** Additional seats bought on top of the plan. */
+    purchased: number;
+    /** `included + purchased`, or `null` when unbounded. */
+    allowance: number | null;
+    members: number;
+    agents: number;
+    used: number;
+    /** Seats left, or `null` when unbounded. */
+    available: number | null;
+    /** Per additional seat per month, in cents. `null` when the plan sells none. */
+    seatPriceCents: number | null;
+    /** False when this deployment cannot sell seats at all. */
+    purchasable: boolean;
+}
+
+export type SeatsResponse = { status: string } & SeatsState;
+
+/**
+ * Seats are only adjustable when the deployment can charge for them AND the
+ * plan actually sells them. Same single-testable-place rule as the other
+ * `can*` gates, so the JSX never re-derives it.
+ */
+export function canManageSeats(seats: SeatsState | null, paymentsEnabled: boolean): boolean {
+    return Boolean(paymentsEnabled && seats?.purchasable && seats.allowance !== null);
+}
+
 export interface SubscriptionMutationResponse {
     status: string;
     subscription: SubscriptionState;

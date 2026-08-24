@@ -201,6 +201,21 @@ describe('CreditLedgerRepository.recordAtomic', () => {
 });
 
 describe('CreditLedgerRepository reads', () => {
+    it('findLatestByRef selects the original purchase, not a later refund movement', async () => {
+        const { repository, topLevelRepository } = makeHarness();
+
+        await repository.findLatestByRef('billing-payment', 'pi_1');
+
+        expect(topLevelRepository.findOne).toHaveBeenCalledWith({
+            where: {
+                refType: 'billing-payment',
+                refId: 'pi_1',
+                kind: CreditLedgerKind.PURCHASE,
+            },
+            order: { createdAt: 'DESC' },
+        });
+    });
+
     it('getBalance sums the signed movements (string aggregates coerced to number)', async () => {
         const { repository, manager } = makeHarness({ balance: '42' });
         // getBalance goes through the top-level manager, not a transaction.

@@ -144,7 +144,16 @@ export class CreateTerminalTranscriptChunks1784300000000 implements MigrationInt
                 .createQueryBuilder()
                 .select('pe.id', 'id')
                 .from('plan_entitlements', 'pe')
-                .where('pe.planId = :planId AND pe.key = :key', {
+                // 🛑 DOUBLE-QUOTED on purpose. This builder has no entity metadata
+                // (raw `.from('plan_entitlements', 'pe')`), so TypeORM emits the
+                // reference verbatim — verified against the Postgres driver:
+                // `pe.planId = :planId` comes out unquoted, Postgres folds it to
+                // `pe.planid`, and the migration dies with 42703 on every Postgres
+                // environment. The sqlite suite cannot catch it: sqlite matches
+                // unquoted identifiers case-insensitively, so CI stays green while
+                // a fresh Postgres boot fails. Same fix as the 1786950000000 /
+                // 1786960000000 seeds.
+                .where('pe."planId" = :planId AND pe."key" = :key', {
                     planId: seed.planId,
                     key: seed.key,
                 })

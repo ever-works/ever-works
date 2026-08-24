@@ -362,7 +362,19 @@ export class NotificationService {
      * Billing spec FR-21 — a pay-as-you-go invoice could not be collected.
      * Overflow is suspended until it is paid (the portal link recovers it).
      */
-    async notifyPaygPastDue(args: { userId: string; amountCents: number | null }): Promise<void> {
+    async notifyPaygPastDue(args: {
+        userId: string;
+        amountCents: number | null;
+        /**
+         * End of the cycle this failure belongs to. Same re-arming reason as
+         * the cap notice above: a PERSISTENT row cannot be dismissed and
+         * `create()` returns the existing row for a live
+         * `(userId, deduplicationKey)` pair, so a FIXED key announces dunning
+         * once per account — ever. A second failed invoice, a month later,
+         * would be silent.
+         */
+        periodEnd?: Date | null;
+    }): Promise<void> {
         const amount =
             typeof args.amountCents === 'number'
                 ? ` ($${(args.amountCents / 100).toFixed(2)})`
@@ -381,7 +393,9 @@ export class NotificationService {
             actionLabel: 'Fix payment',
             isPersistent: true,
             metadata: { amountCents: args.amountCents },
-            deduplicationKey: 'payg_past_due',
+            deduplicationKey: `payg_past_due_${
+                args.periodEnd?.toISOString().slice(0, 10) ?? 'unknown-period'
+            }`,
         });
         await this.dispatchFanout({
             userId: args.userId,

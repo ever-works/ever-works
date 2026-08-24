@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     ForbiddenException,
     Injectable,
     Logger,
@@ -588,6 +589,34 @@ export class SubscriptionService implements OnModuleInit {
                 'Self-hosted editions cannot be self-assigned on a hosted deployment.',
             );
         }
+
+        // 🛑 A self-service switch to Free is NOT a cancellation, and must not be
+        // allowed to masquerade as one.
+        //
+        // `persistDefaultPlan` writes `users.defaultPlanId` and nothing else. It does
+        // not touch the provider. So a paying customer who clicks "Switch to Free" in
+        // the plan switcher (`BillingSettings.tsx` -> `changePlanAction`) saw their
+        // plan become Free while their Stripe subscription kept renewing and kept
+        // charging them — with the tier label now saying they get nothing for it.
+        // Cancelling is a different button (`cancelSubscriptionAction` ->
+        // `BillingService.cancelSubscription`), which does cancel at the provider.
+        //
+        // Fail CLOSED rather than cancelling implicitly: silently terminating a paid
+        // subscription from a plan-switcher click would be a worse surprise than an
+        // error. Refuse, and name the action that actually works.
+        //
+        // Scoped to a LIVE provider subscription (`providerSubscriptionId` set on an
+        // active/trialing row), so it cannot block: a user with no subscription, a
+        // user whose subscription is already cancelled, or a deployment with no
+        // billing provider at all — in every one of those cases the switch is exactly
+        // what it appears to be.
+        const live = await this.userSubscriptionRepository.findActiveByUser(user.id);
+        if (live?.providerSubscriptionId) {
+            throw new ConflictException(
+                'You still have an active paid subscription. Cancel it first — switching the plan here would relabel your tier while the provider kept billing you.',
+            );
+        }
+
         return this.persistDefaultPlan(user, plan);
     }
 

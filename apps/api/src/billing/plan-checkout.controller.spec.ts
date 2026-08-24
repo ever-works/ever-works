@@ -39,6 +39,12 @@ class FakePlanNotPurchasableError extends Error {
         this.name = 'PlanNotPurchasableError';
     }
 }
+class FakeActivePlanSubscriptionError extends Error {
+    constructor() {
+        super('An active provider subscription already exists');
+        this.name = 'ActivePlanSubscriptionError';
+    }
+}
 class FakeCheckoutSessionNotFoundError extends Error {
     constructor() {
         super('Checkout session not found');
@@ -51,6 +57,7 @@ jest.mock('@ever-works/agent/subscriptions', () => ({
     BillingProviderError: FakeBillingProviderError,
     UnknownSubscriptionPlanError: FakeUnknownSubscriptionPlanError,
     PlanNotPurchasableError: FakePlanNotPurchasableError,
+    ActivePlanSubscriptionError: FakeActivePlanSubscriptionError,
     CheckoutSessionNotFoundError: FakeCheckoutSessionNotFoundError,
     PlanSubscriptionService: class PlanSubscriptionService {},
 }));
@@ -286,6 +293,21 @@ describe('POST /api/billing/checkout/plan — owner scoping', () => {
                 startPlanCheckout: jest
                     .fn()
                     .mockRejectedValue(new FakeBillingProviderError('provider said no')),
+            }),
+            makeMembership(),
+        );
+
+        await expect(
+            controller.createPlanCheckout(auth, { planCode: 'standard' } as never),
+        ).rejects.toBeInstanceOf(ConflictException);
+    });
+
+    it('maps an existing active subscription to 409', async () => {
+        const controller = new PlanCheckoutController(
+            makeService({
+                startPlanCheckout: jest
+                    .fn()
+                    .mockRejectedValue(new FakeActivePlanSubscriptionError()),
             }),
             makeMembership(),
         );

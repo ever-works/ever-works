@@ -52,6 +52,14 @@ const EXPECTED_COLLABORATORS = [
     'TenantBootstrapService',
     'OrganizationMembershipService',
     'MailService',
+    // Seats (billing spec §3.6) — `SeatGuard`, injected by the SEAT_GUARD
+    // token. It is an INTERFACE, so TypeScript erases it and emits `Object`
+    // as the design-time paramtype; that is expected here and is exactly why
+    // the injection uses an explicit token rather than a class. Importing the
+    // implementation (`SeatsService`) instead would drag the whole agent
+    // subscriptions barrel — and AuthModule with it — into this module's load
+    // graph, which is the circular import the assertions below exist to catch.
+    'Object',
 ];
 
 describe('Organization invitations — module wiring', () => {

@@ -185,6 +185,34 @@ export async function updatePaygAction(settings: {
     }
 }
 
+/** Set the TOTAL seats the account wants (billing spec §3.6 / FR-29). */
+export async function updateSeatsAction(seats: number) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await billingAPI.setSeats(seats);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_BILLING);
+        const { status: _status, ...seatsState } = result;
+        return { success: true as const, seats: seatsState, error: null };
+    } catch (error) {
+        console.error('[updateSeatsAction]', error);
+        let message = 'Failed to update seats';
+        if (error instanceof ApiResponseError) {
+            if (error.statusCode === 400) {
+                message = 'That is fewer seats than you are already using.';
+            } else if (error.statusCode === 409) {
+                message = 'This plan does not sell additional seats.';
+            } else if (error.statusCode === 503) {
+                message = 'Card payments are not enabled on this deployment yet.';
+            }
+        }
+        return { success: false as const, seats: null, error: message };
+    }
+}
+
 /**
  * Cancel the subscription at the end of the paid period (audit B07).
  *

@@ -728,6 +728,57 @@ describe('SubscriptionService', () => {
         });
     });
 
+    describe('changePlanSelfService — switching to Free is not a cancellation', () => {
+        // 🛑 `persistDefaultPlan` writes users.defaultPlanId and nothing else — it never
+        // touches the payment provider. So before this guard, a paying customer clicking
+        // "Switch to Free" in the plan switcher had their tier relabelled while Stripe kept
+        // renewing and charging. Cancelling is a different action entirely
+        // (BillingService.cancelSubscription).
+        it('refuses while a LIVE provider subscription exists, and does not touch the plan', async () => {
+            const { service, userRepository } = makeService(
+                { findByCode: jest.fn().mockResolvedValue(FREE_PLAN) },
+                {
+                    findActiveByUser: jest.fn().mockResolvedValue({
+                        id: 'sub-1',
+                        providerSubscriptionId: 'sub_live_123',
+                    }),
+                },
+            );
+
+            await expect(
+                service.changePlanSelfService({ id: 'u1' } as never, SubscriptionPlanCode.FREE),
+            ).rejects.toThrow(/active paid subscription/i);
+            expect(userRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('allows the switch when the subscription was already cancelled (no active row)', async () => {
+            const { service, userRepository } = makeService(
+                { findByCode: jest.fn().mockResolvedValue(FREE_PLAN) },
+                { findActiveByUser: jest.fn().mockResolvedValue(null) },
+            );
+
+            await expect(
+                service.changePlanSelfService({ id: 'u1' } as never, SubscriptionPlanCode.FREE),
+            ).resolves.toBeDefined();
+            expect(userRepository.update).toHaveBeenCalled();
+        });
+
+        it('allows the switch when an active row carries no provider subscription', async () => {
+            const { service, userRepository } = makeService(
+                { findByCode: jest.fn().mockResolvedValue(FREE_PLAN) },
+                {
+                    findActiveByUser: jest
+                        .fn()
+                        .mockResolvedValue({ id: 's', providerSubscriptionId: null }),
+                },
+            );
+
+            await expect(
+                service.changePlanSelfService({ id: 'u1' } as never, SubscriptionPlanCode.FREE),
+            ).resolves.toBeDefined();
+            expect(userRepository.update).toHaveBeenCalled();
+        });
+    });
     describe('getDefaultCadence', () => {
         it('returns the LAST entry of plan.allowedCadences (smallest interval = best slot)', () => {
             const { service } = makeService();
