@@ -90,10 +90,24 @@ describe('UserUploadRepository — ownership scope', () => {
         });
 
         expect(orm.findOne).toHaveBeenNthCalledWith(1, {
-            where: [{ userId, sha256, workId: null, ...everScope }],
+            where: [
+                {
+                    userId,
+                    sha256,
+                    workId: expect.objectContaining({ _type: 'isNull' }),
+                    ...everScope,
+                },
+            ],
         });
         expect(orm.findOne).toHaveBeenNthCalledWith(2, {
-            where: [{ userId, sha256, workId: null, ...yoScope }],
+            where: [
+                {
+                    userId,
+                    sha256,
+                    workId: expect.objectContaining({ _type: 'isNull' }),
+                    ...yoScope,
+                },
+            ],
         });
         expect(orm.save).toHaveBeenCalledTimes(2);
     });
@@ -152,6 +166,27 @@ describe('UserUploadRepository — ownership scope', () => {
         }
     });
 
+    it('uses explicit SQL NULL predicates when deduping a fully anonymous upload', async () => {
+        await uploads.record({
+            userId: null,
+            sha256,
+            tenantId: null,
+            organizationId: null,
+            storageProvider: 'local-fs',
+            storagePath: `anonymous/${sha256}.png`,
+        });
+
+        expect(orm.findOne).toHaveBeenCalledWith({
+            where: {
+                userId: expect.objectContaining({ _type: 'isNull' }),
+                sha256,
+                workId: expect.objectContaining({ _type: 'isNull' }),
+                tenantId: expect.objectContaining({ _type: 'isNull' }),
+                organizationId: expect.objectContaining({ _type: 'isNull' }),
+            },
+        });
+    });
+
     it('normalizes uppercase SHA-256 before scoped lookup and persistence', async () => {
         const uppercaseSha256 = sha256.toUpperCase();
 
@@ -164,7 +199,14 @@ describe('UserUploadRepository — ownership scope', () => {
         });
 
         expect(orm.findOne).toHaveBeenCalledWith({
-            where: [{ userId, sha256, workId: null, ...everScope }],
+            where: [
+                {
+                    userId,
+                    sha256,
+                    workId: expect.objectContaining({ _type: 'isNull' }),
+                    ...everScope,
+                },
+            ],
         });
         expect(orm.create).toHaveBeenCalledWith(
             expect.objectContaining({ userId, sha256, ...everScope }),

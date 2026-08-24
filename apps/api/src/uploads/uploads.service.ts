@@ -276,6 +276,7 @@ export class UploadsService {
         // Ownership index for plain uploads. Current Nest graphs provide it;
         // optional construction preserves compatibility with legacy/minimal
         // deployments that predate user_uploads.
+        @Optional()
         @Inject(USER_UPLOAD_REPOSITORY)
         private readonly userUploads?: UserUploadRepository,
         // Globally provided in the API. The default keeps direct unit

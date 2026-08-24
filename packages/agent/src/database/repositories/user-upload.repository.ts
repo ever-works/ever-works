@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { UserUpload } from '../../entities/user-upload.entity';
 import { ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 
@@ -58,15 +58,16 @@ export class UserUploadRepository {
             where:
                 userId === null
                     ? {
-                          userId: null,
+                          userId: IsNull(),
                           sha256: normalizedInput.sha256,
-                          workId,
-                          tenantId: scope.tenantId,
-                          organizationId: scope.organizationId,
+                          workId: workId === null ? IsNull() : workId,
+                          tenantId: scope.tenantId === null ? IsNull() : scope.tenantId,
+                          organizationId:
+                              scope.organizationId === null ? IsNull() : scope.organizationId,
                       }
                     : ownershipWhereWith<UserUpload>(userId, scope, {
                           sha256: normalizedInput.sha256,
-                          workId,
+                          workId: workId === null ? IsNull() : workId,
                       }),
         });
         if (existing) return existing;
@@ -83,7 +84,7 @@ export class UserUploadRepository {
     ): Promise<UserUpload | null> {
         const relation = {
             sha256: normalizeUploadSha256(sha256),
-            ...(workId !== undefined ? { workId } : {}),
+            ...(workId !== undefined ? { workId: workId === null ? IsNull() : workId } : {}),
         };
         return this.repo.findOne({
             where: ownershipWhereWith<UserUpload>(userId, scope, relation),
