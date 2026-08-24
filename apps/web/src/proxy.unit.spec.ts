@@ -84,6 +84,26 @@ describe('canonical Organization workspace proxy', () => {
         );
     });
 
+    it('uses the allowlisted forwarded authority without leaking the internal service port', async () => {
+        intlMock.mockResolvedValueOnce(
+            new Response(null, {
+                status: 200,
+                headers: { 'x-middleware-rewrite': 'http://localhost:3000/en/login' },
+            }),
+        );
+        const ingressRequest = new NextRequest('https://127.0.0.1:3000/login', {
+            headers: {
+                host: '127.0.0.1:3000',
+                'x-forwarded-host': '127.0.0.1',
+                'x-forwarded-proto': 'https',
+            },
+        });
+
+        const response = await proxy(ingressRequest);
+
+        expect(response.headers.get('x-middleware-rewrite')).toBe('https://127.0.0.1/en/login');
+    });
+
     it('does not align an internal rewrite to a non-allowlisted Host header', async () => {
         intlMock.mockResolvedValueOnce(
             new Response(null, {
@@ -98,6 +118,26 @@ describe('canonical Organization workspace proxy', () => {
         const response = await proxy(hostileRequest);
 
         expect(response.headers.get('x-middleware-rewrite')).toBe('http://localhost:3000/en/login');
+    });
+
+    it('ignores an untrusted forwarded authority and falls back to the allowlisted Host', async () => {
+        intlMock.mockResolvedValueOnce(
+            new Response(null, {
+                status: 200,
+                headers: { 'x-middleware-rewrite': 'http://localhost:3000/en/login' },
+            }),
+        );
+        const requestWithHostFallback = new NextRequest('http://127.0.0.1:3000/login', {
+            headers: {
+                host: '127.0.0.1:3000',
+                'x-forwarded-host': 'malicious.invalid',
+                'x-forwarded-proto': 'javascript',
+            },
+        });
+
+        const response = await proxy(requestWithHostFallback);
+
+        expect(response.headers.get('x-middleware-rewrite')).toBe('http://127.0.0.1:3000/en/login');
     });
 
     it.each(['/settings/dashboard', '/org/dashboard'])(

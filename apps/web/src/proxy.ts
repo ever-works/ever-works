@@ -155,20 +155,30 @@ function alignLocaleRewriteOrigin(req: NextRequest, response: NextResponse): Nex
     const target = new URL(rewrite, 'http://internal.invalid');
     const locale = target.pathname.split('/').filter(Boolean)[0];
     if (locale && LOCALE_SET.has(locale)) {
-        const requestHost = req.headers.get('host')?.trim();
         const requestOrigin = new URL(req.nextUrl.origin);
-        if (requestHost && SAFE_REQUEST_HOST.test(requestHost)) {
+        const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+        const requestHost = req.headers.get('host')?.trim();
+        const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+
+        for (const requestAuthority of [forwardedHost, requestHost]) {
+            if (!requestAuthority || !SAFE_REQUEST_HOST.test(requestAuthority)) continue;
             try {
-                const authority = new URL(`${requestOrigin.protocol}//${requestHost}`);
+                const authority = new URL(`${requestOrigin.protocol}//${requestAuthority}`);
                 if (isAllowedRequestHostname(authority.hostname)) {
-                    requestOrigin.host = authority.host;
+                    requestOrigin.hostname = authority.hostname;
+                    requestOrigin.port = authority.port;
+                    break;
                 }
             } catch {
-                // Keep Next's parsed request origin for an invalid authority.
+                // Try the next authority, then keep Next's parsed origin.
             }
         }
+        if (forwardedProto === 'http' || forwardedProto === 'https') {
+            requestOrigin.protocol = `${forwardedProto}:`;
+        }
         target.protocol = requestOrigin.protocol;
-        target.host = requestOrigin.host;
+        target.hostname = requestOrigin.hostname;
+        target.port = requestOrigin.port;
         response.headers.set('x-middleware-rewrite', target.toString());
     }
     return response;
