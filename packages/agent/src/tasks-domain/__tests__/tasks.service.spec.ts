@@ -186,8 +186,27 @@ describe('TasksService authorization guardrails', () => {
         },
     ] as const;
 
+    /**
+     * RE-POINTED (guard-roster-asymmetry, PR #2213 punch list).
+     *
+     * These two blocks asserted ROSTER-STRICT actor reachability, introduced by
+     * `dc0639e33` (2026-08-23) together with the roster gate in
+     * `assertActorIsValid` — the same drift wave that reached UploadsController.
+     * `b7550481a` (PR #2218) reverted `SessionScopeGuard` to TENANT-WIDE the next
+     * morning; neither copy was reconciled.
+     *
+     * Tenant equality is the authorization decision. The roster records who was
+     * invited by whom, and its own entity says so: "because access is
+     * tenant-wide, a member of one Organization can see every Organization in
+     * that Tenant. The owner accepted this explicitly for v1."
+     *
+     * Both users below carry `tenantId === everScope.tenantId`, so both are
+     * reachable actors. Kept and re-pointed rather than deleted, so the
+     * behaviour change is visible in the diff. The cross-Tenant and inactive-user
+     * rejections that follow are untouched — those are the boundaries that matter.
+     */
     it.each(actorCases)(
-        'rejects a known same-Tenant Yo user as an Ever Task $label without inserting or notifying',
+        'admits a same-Tenant user from another Organization as an Ever Task $label',
         async ({ invoke, inserted }) => {
             const task = makeTask({ userId: taskOwnerId, ...everScope });
             const { service, repos } = makeService();
@@ -197,8 +216,8 @@ describe('TasksService authorization guardrails', () => {
                 tenantId: everScope.tenantId,
                 isActive: true,
             });
-            // Even a repository bug returning the known Yo roster row must
-            // not weaken the exact Organization comparison in the service.
+            // A roster row for a DIFFERENT Organization in the same Tenant. It is
+            // provenance, not authorization, so it neither grants nor withholds.
             repos.organizationMembers.findByOrgAndUser.mockResolvedValueOnce({
                 userId: yoMemberId,
                 tenantId: yoScope.tenantId,
@@ -209,16 +228,13 @@ describe('TasksService authorization guardrails', () => {
                 ownerUserId: taskOwnerId,
             });
 
-            await expect(invoke(service, task.id, yoMemberId, everScope)).rejects.toThrow(
-                BadRequestException,
-            );
-            expect(inserted(repos)).not.toHaveBeenCalled();
-            expect(repos.notifications.emit).not.toHaveBeenCalled();
+            await expect(invoke(service, task.id, yoMemberId, everScope)).resolves.toBeDefined();
+            expect(inserted(repos)).toHaveBeenCalled();
         },
     );
 
     it.each(actorCases)(
-        'rejects a revoked Ever user as a Task $label with the same opaque failure',
+        'admits a same-Tenant user with NO roster row as a Task $label',
         async ({ invoke, inserted }) => {
             const task = makeTask({ userId: taskOwnerId, ...everScope });
             const { service, repos } = makeService();
@@ -228,17 +244,16 @@ describe('TasksService authorization guardrails', () => {
                 tenantId: everScope.tenantId,
                 isActive: true,
             });
+            // The normal case in production: `organization_members` is empty, so
+            // nobody except the Tenant owner would ever have been reachable.
             repos.organizationMembers.findByOrgAndUser.mockResolvedValueOnce(null);
             repos.tenants.findById.mockResolvedValueOnce({
                 id: everScope.tenantId,
                 ownerUserId: taskOwnerId,
             });
 
-            await expect(invoke(service, task.id, everMemberId, everScope)).rejects.toThrow(
-                BadRequestException,
-            );
-            expect(inserted(repos)).not.toHaveBeenCalled();
-            expect(repos.notifications.emit).not.toHaveBeenCalled();
+            await expect(invoke(service, task.id, everMemberId, everScope)).resolves.toBeDefined();
+            expect(inserted(repos)).toHaveBeenCalled();
         },
     );
 
