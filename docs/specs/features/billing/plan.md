@@ -59,7 +59,7 @@ Backfill: `remainingCredits = amountCredits` for existing positive rows, then re
 | `writtenOffCredits`                      | int default 0       | part beyond the cap that was not billed                               |
 | `costCentsRef`                           | int NULL            | metered provider cost this derived from                               |
 | `periodStart` / `periodEnd`              | timestamp           | PAYG cycle at record time                                             |
-| `status`                                 | varchar(16)         | `pending` → `sent` / `failed` (terminal after 35 days)                |
+| `status`                                 | varchar(16)         | `pending` → `sent` / `failed` (terminal after 23 hours)               |
 | `attempts`                               | int default 0       |                                                                       |
 | `lastError`                              | varchar(256) NULL   | never the full provider error                                         |
 | `sentAt`                                 | timestamp NULL      |                                                                       |
@@ -143,7 +143,7 @@ Indexes: `(userId, periodStart)`, `(status, createdAt)`.
 - **Stripe provider**: metadata kind `payg-subscription`; `stripe.subscriptions.create({customer, items:[{price}], collection_method:'charge_automatically', default_payment_method, billing_thresholds:{amount_gte, reset_billing_cycle_anchor:false}, metadata, automatic_tax?})`; `stripe.billing.meterEvents.create({event_name, payload:{stripe_customer_id, value: String(credits)}, identifier, timestamp})` with `idempotencyKey = identifier`; `stripe.subscriptions.cancel(id, {invoice_now:true, prorate:false})`; normalization routes `customer.subscription.*` with kind `payg-subscription` → `payg.updated`; invoice events read `invoice.parent.subscription_details` (new API) falling back to `invoice.subscription` and the subscription metadata on the line's `parent.subscription_item_details` to stamp `subscriptionKind`.
 - **`PaygService`** (`subscriptions/billing/payg.service.ts`): `getState(userId)`, `enable(userId, {monthlyCapCredits})`, `updateCap`, `disable`, `cycleUsage(userId)` (from `CreditMeterEventRepository.sumForPeriod`), `headroom(userId)`, `recordOverflow({...})` (row → send → mark), `applyWebhook(event)`, `flushPending(limit)`, `notifyIfThresholdCrossed`.
 - **Settlement**: `settleInsufficient` → after partial debit, `paygService.recordOverflow` when eligible; `shouldQueueForCredits` → lazy daily grant; `balance > 0 || headroom > 0`.
-- **Config**: `CREDITS_ENFORCEMENT` default-on-when-provider-configured; `PAYG_MAX_MONTHLY_CAP_CREDITS`; `STRIPE_AUTOMATIC_TAX`.
+- **Config**: `CREDITS_ENFORCEMENT` default-on-when-provider-configured; `PAYG_MAX_MONTHLY_CAP_CREDITS`. (Stripe Tax needs no flag — it landed unconditionally on every charging session in #2203.)
 - **Trigger task** `credits-meter-flush` (`*/5 * * * *`) → `paygService.flushPending(500)`.
 - **API** (`apps/api/src/billing/payg.controller.ts`): `GET /billing/payg`, `PUT /billing/payg` (DTO: `enabled: boolean`, `monthlyCapCredits?: int 100..max`, `forbidNonWhitelisted`), throttled like plan checkout. Overview gains `payg`.
 - **Web**: server actions `updatePaygAction`; `BillingSettings` PAYG card; `billing.shared.ts` helpers (`canConfigurePayg`, `estimatePaygCents` re-export); Usage page tile; en.json keys under `dashboard.settings.billing.payg.*`; plan-card label change (`plans.paygFromBalance` → "Usage is billed from your credits balance").
@@ -175,7 +175,7 @@ A and B are independent; C depends on A (buckets) and B (pricing endpoint); D is
 
 ## 5. Test plan
 
-- **Unit (Jest, `packages/agent`)**: bucket allocation order; expiry sweep idempotency; available-balance math; allowance-period arithmetic (Jan 31 → Feb 28/29, anchor day clamping, DST-free UTC); margin table; `estimatePaygCents` tiers; `PaygService.recordOverflow` cap/written-off maths + idempotency + send-failure → pending; `flushPending` 35-day terminal; webhook normalization for `payg-subscription` and PAYG invoices; seats math and assert; provider calls shaped correctly (fake Stripe client via `STRIPE_CLIENT_FACTORY`).
+- **Unit (Jest, `packages/agent`)**: bucket allocation order; expiry sweep idempotency; available-balance math; allowance-period arithmetic (Jan 31 → Feb 28/29, anchor day clamping, DST-free UTC); margin table; `estimatePaygCents` tiers; `PaygService.recordOverflow` cap/written-off maths + idempotency + send-failure → pending; `flushPending` 23-hour terminal; webhook normalization for `payg-subscription` and PAYG invoices; seats math and assert; provider calls shaped correctly (fake Stripe client via `STRIPE_CLIENT_FACTORY`).
 - **API (Jest, `apps/api`)**: `PUT /billing/payg` DTO guards (extra fields rejected, cap bounds, no payment method → 409), `GET /billing/payg`, seats endpoints, 402 mapping for seat limit; webhook controller routes `payg.updated`.
 - **Integration (sqlite)**: settlement end-to-end: balance 120 + run 500 → ledger −120, meter row 380 `pending/sent`; cap 1000 with 900 used + run 500 → row credits 100, writtenOff 400, notification 100 %.
 - **Sync script**: `--dry-run` against a catalog fixture (pure `buildIntents` extracted for test) — meter + price intents emitted; `--verify` drift strings.
@@ -185,5 +185,5 @@ A and B are independent; C depends on A (buckets) and B (pricing endpoint); D is
 
 1. Merge A–E to `develop` → stage → main via the normal cascade.
 2. Operator: sync catalog in **test** mode (done in this branch), then **live** (owner confirms; legacy Chargebee `*` webhook caveat in the script banner).
-3. Operator: set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYMENTS_ENABLED=true`, `SUBSCRIPTIONS_ENABLED=true` per environment (dev → stage → prod), `STRIPE_AUTOMATIC_TAX=true` once Stripe Tax is activated on the account. Enforcement turns on automatically with the secret key; the daily sweep + lazy grant make free users' 50 credits available immediately.
+3. Operator: set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYMENTS_ENABLED=true`, `SUBSCRIPTIONS_ENABLED=true` per environment (dev → stage → prod). Enforcement turns on automatically with the secret key; the daily sweep + lazy grant make free users' 50 credits available immediately.
 4. Watch: `credits-meter-flush` failures, `payg past_due` counts, first PAYG invoices.

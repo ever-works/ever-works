@@ -3,6 +3,7 @@ import { serverFetch } from './server-api';
 import type {
     BillingOverview,
     BillingPortalResponse,
+    PaygMutationResponse,
     CreditCheckoutResponse,
     InvoiceListPage,
     PlanCheckoutResponse,
@@ -15,6 +16,7 @@ import type {
 export type {
     BillingOverview,
     BillingPortalResponse,
+    PaygMutationResponse,
     CreditCheckoutResponse,
     InvoiceListPage,
     PlanCheckoutResponse,
@@ -120,6 +122,20 @@ export const billingAPI = {
     async cancelSubscription(): Promise<SubscriptionMutationResponse> {
         return serverFetch<SubscriptionMutationResponse>('/billing/subscription/cancel', {
             method: 'POST',
+        });
+    },
+
+    /**
+     * Pay-as-you-go (billing spec §3.5): enable / disable / re-cap. The
+     * body carries no price — the per-credit rate is the server catalog's.
+     */
+    async updatePayg(settings: {
+        enabled?: boolean;
+        monthlyCapCredits?: number;
+    }): Promise<PaygMutationResponse> {
+        return serverFetch<PaygMutationResponse>('/billing/payg', {
+            method: 'PUT',
+            body: JSON.stringify(settings),
         });
     },
 

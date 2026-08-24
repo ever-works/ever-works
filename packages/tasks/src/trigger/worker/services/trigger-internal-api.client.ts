@@ -63,6 +63,8 @@ const RETRY_SAFE_REMOTE_METHODS: ReadonlySet<string> = new Set<string>([
     // Three idempotent passes (`expiry:<entryId>`, `daily:<userId>:<date>`,
     // `grant:plan:<userId>:<monthStart>`), each checked before its write.
     'CreditsSweepService.runDailySweep',
+    // Each row is sent once (`markSent`), and the provider de-duplicates on the identifier.
+    'PaygService.flushPending',
     // Explicit already-marked guard / absolute SET recomputed from the anchor.
     'WorkScheduleService.markRunCompleted',
     'WorkScheduleService.markRunFailed',

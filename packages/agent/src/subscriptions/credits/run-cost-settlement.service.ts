@@ -19,6 +19,7 @@ import { UserRepository } from '@src/database/repositories/user.repository';
 // RUN_CREDITS_PRECHECK token by the api-side @Global() SubscriptionsModule).
 import type { RunCreditsPrecheck } from '../../agents/run-credits-precheck';
 import { AutoRechargeService } from '../billing/auto-recharge.service';
+import { PaygService } from '../billing/payg.service';
 
 /**
  * Pricing Wave 9 M2 — wires real usage metering into the credits ledger.
@@ -77,6 +78,10 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
         // without the money path; a missing binding simply means no
         // auto-recharge, never a failed settlement.
         @Optional() private readonly autoRechargeService?: AutoRechargeService,
+        // Billing spec §3.5 — the pay-as-you-go overflow after the prepaid
+        // debit. @Optional() for the same reason as auto-recharge: a missing
+        // binding means no overflow metering, never a failed settlement.
+        @Optional() private readonly paygService?: PaygService,
     ) {}
 
     /** Never rejects — see the RunCostSettler contract. */
@@ -196,20 +201,49 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
             }
         }
 
-        try {
-            await this.notificationService?.notifyCreditsBalanceExhausted({
-                userId: run.userId,
-                runId: run.id,
-                requiredCredits: err.requestedCredits,
-                balanceCredits: balance,
-            });
-        } catch (notifyErr) {
-            this.logger.warn(
-                `Run ${run.id}: exhaustion notification failed (ignored): ${notifyErr}`,
-            );
+        // Billing spec FR-18 — the uncovered remainder goes to pay-as-you-go
+        // when the owner opted in (metered to the provider, invoiced in
+        // arrears, capped by the owner's monthly headroom). Best-effort and
+        // idempotent on `run:{runId}`; a PAYG hiccup never reddens the run.
+        const remainder = Math.max(0, Math.trunc(err.requestedCredits) - result.debitedCredits);
+        let metered = false;
+        if (remainder > 0 && this.paygService) {
+            try {
+                const overflow = await this.paygService.recordOverflow({
+                    userId: run.userId,
+                    runId: run.id,
+                    remainderCredits: remainder,
+                    costCentsRef: result.billableCostCents,
+                    organizationId: run.organizationId ?? null,
+                    tenantId: run.tenantId ?? null,
+                });
+                result.meteredCredits = overflow.billedCredits;
+                result.writtenOffCredits = overflow.writtenOffCredits;
+                metered = overflow.status === 'metered' && overflow.billedCredits > 0;
+            } catch (paygErr) {
+                this.logger.warn(
+                    `Run ${run.id}: pay-as-you-go overflow failed (ignored): ${paygErr}`,
+                );
+            }
         }
 
-        result.status = result.debitedCredits > 0 ? 'partial' : 'exhausted';
+        // "Balance exhausted" is only news when nothing picked the remainder up.
+        if (!metered) {
+            try {
+                await this.notificationService?.notifyCreditsBalanceExhausted({
+                    userId: run.userId,
+                    runId: run.id,
+                    requiredCredits: err.requestedCredits,
+                    balanceCredits: balance,
+                });
+            } catch (notifyErr) {
+                this.logger.warn(
+                    `Run ${run.id}: exhaustion notification failed (ignored): ${notifyErr}`,
+                );
+            }
+        }
+
+        result.status = metered ? 'metered' : result.debitedCredits > 0 ? 'partial' : 'exhausted';
         // An exhausted balance is the strongest possible threshold
         // crossing — try to top up here too.
         await this.maybeAutoRecharge(run.userId);
@@ -273,12 +307,17 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
     }
 
     /**
-     * Dispatch-gate soft precheck (Wave 9 M2, ship-dark). Blocks only
-     * when EVERY lever agrees: `CREDITS_ENFORCEMENT=on` (the gate also
-     * early-outs on this), the user's plan carries the `credit-limited`
-     * entitlement (> 0 — no rows are seeded, so default is never
-     * limited), AND the balance is ≤ 0. Any resolution failure returns
-     * false — a broken precheck must never stop work.
+     * Dispatch-gate precheck (Wave 9 M2; billing spec FR-3 / FR-19 / FR-30).
+     * Parks a run only when EVERY lever agrees: enforcement is on (unset ⇒
+     * on iff the billing provider is configured), the user's plan carries
+     * the `credit-limited` entitlement (seeded for the cloud tiers), the
+     * available balance is ≤ 0 AND there is no pay-as-you-go headroom.
+     *
+     * Before reading the balance it grants today's daily allowance lazily
+     * (same idempotency key as the sweep), so a deployment whose cron has
+     * not fired yet never parks a user who is owed free credits. Any
+     * resolution failure returns false — a broken precheck must never stop
+     * work.
      */
     async shouldQueueForCredits(userId: string): Promise<boolean> {
         try {
@@ -295,8 +334,22 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 0,
             );
             if (creditLimited <= 0) return false;
+
+            try {
+                await this.creditLedgerService.grantDailyForUser(userId, planCode);
+            } catch (grantErr) {
+                this.logger.warn(
+                    `Credits precheck: lazy daily grant failed for user ${userId} (ignored): ${grantErr}`,
+                );
+            }
+
             const balance = await this.creditLedgerService.getBalance(userId);
-            return balance <= 0;
+            if (balance > 0) return false;
+            if (this.paygService) {
+                const headroom = await this.paygService.headroom(userId);
+                if (headroom > 0) return false;
+            }
+            return true;
         } catch (err) {
             this.logger.warn(`Credits precheck failed for user ${userId} (fail-open): ${err}`);
             return false;

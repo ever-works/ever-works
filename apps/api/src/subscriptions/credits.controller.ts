@@ -22,6 +22,7 @@ import {
     USAGE_EXPORT_COLUMNS,
     USAGE_SUMMARY_GROUP_BYS,
     UsageSummaryService,
+    creditsPricingView,
     type UsageExportRow,
     type UsageExportStream,
     type UsageSummaryGroupBy,
@@ -134,6 +135,20 @@ export class CreditsController {
     async getBalance(@CurrentUser() auth: AuthenticatedUser) {
         const balanceCredits = await this.creditLedgerService.getBalance(auth.userId);
         return { status: 'success', balanceCredits };
+    }
+
+    @Get('pricing')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Get credits pricing',
+        description:
+            'How a credit is priced on this deployment (billing spec FR-13): credits per dollar, ' +
+            'platform margin, daily allowance, credit packs and the pay-as-you-go tiers. Read-only; ' +
+            'server-authored; nothing here is writable over HTTP.',
+    })
+    @ApiResponse({ status: 200, description: 'Credits pricing view' })
+    getPricing() {
+        return { status: 'success', ...creditsPricingView() };
     }
 
     @Get('ledger')

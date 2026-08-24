@@ -9,6 +9,7 @@ import {
     type BillingSubscriptionSnapshot,
     type BillingWebhookEvent,
 } from './billing.provider';
+import type { PaygService } from './payg.service';
 import { CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
 
 /**
@@ -130,6 +131,8 @@ function build(parts: Partial<Record<string, any>> = {}) {
     // Paid-plan lifecycle collaborator (audit B24) — OPTIONAL, so the
     // credit-path specs keep the original 6-argument construction.
     const plans = parts.plans;
+    // Pay-as-you-go collaborator (billing spec §3.5) — OPTIONAL, appended last.
+    const payg = parts.payg;
     const service = new BillingService(
         provider,
         profiles,
@@ -138,8 +141,9 @@ function build(parts: Partial<Record<string, any>> = {}) {
         ledgerService,
         users,
         plans,
+        payg,
     );
-    return { service, provider, profiles, invoices, ledgerRepo, ledgerService, users, plans };
+    return { service, provider, profiles, invoices, ledgerRepo, ledgerService, users, plans, payg };
 }
 
 const CHECKOUT = {
@@ -1134,5 +1138,182 @@ describe('BillingService — subscription webhook reconciliation (B08)', () => {
         expect(overview.subscription.status).toBe('none');
         expect(overview.subscription.manageable).toBe(false);
         expect(overview.subscription.pastDue).toBe(false);
+    });
+});
+
+describe('BillingService — pay-as-you-go wiring (billing spec §3.5)', () => {
+    type PaygDouble = jest.Mocked<Pick<PaygService, 'getState' | 'applyWebhook' | 'applyInvoice'>>;
+
+    function makePayg(overrides: Partial<PaygDouble> = {}): PaygDouble {
+        return {
+            getState: jest.fn().mockResolvedValue({
+                available: true,
+                enabled: true,
+                subscriptionStatus: 'active',
+                pastDue: false,
+                monthlyCapCredits: 10000,
+                defaultMonthlyCapCredits: 10000,
+                maxMonthlyCapCredits: 100000,
+                minMonthlyCapCredits: 500,
+                cycleUsedCredits: 380,
+                cycleEstimateCents: 380,
+                periodStart: null,
+                periodEnd: null,
+                tiers: [],
+                invoiceThresholdCents: 5000,
+            }),
+            applyWebhook: jest.fn().mockResolvedValue('payg-reconciled'),
+            applyInvoice: jest.fn().mockResolvedValue(undefined),
+            ...overrides,
+        } as PaygDouble;
+    }
+
+    it('overview carries the pay-as-you-go state, and null when the collaborator is absent or failing', async () => {
+        const wired = build({ payg: makePayg() });
+        const overview = await wired.service.getOverview('u1');
+        expect(overview.payg).toEqual(
+            expect.objectContaining({ enabled: true, cycleUsedCredits: 380 }),
+        );
+
+        const absent = build();
+        expect((await absent.service.getOverview('u1')).payg).toBeNull();
+
+        const failing = build({
+            payg: makePayg({ getState: jest.fn().mockRejectedValue(new Error('boom')) }),
+        });
+        expect((await failing.service.getOverview('u1')).payg).toBeNull();
+    });
+
+    it('routes payg.updated to PaygService and never to the plan-tier collaborator', async () => {
+        const plans = { applyWebhook: jest.fn() } as any;
+        const payg = makePayg();
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'payg.updated',
+                    customerId: 'cus_1',
+                    subscriptionId: 'sub_payg',
+                }),
+            ),
+        });
+        const { service } = build({ provider, plans, payg });
+
+        const outcome = await service.handleWebhook('{}', 'sig');
+
+        expect(outcome.action).toBe('payg-reconciled');
+        expect(payg.applyWebhook).toHaveBeenCalledTimes(1);
+        expect(plans.applyWebhook).not.toHaveBeenCalled();
+    });
+
+    it('acknowledges payg.updated as ignored when PAYG is not wired (never a 500 → provider retry storm)', async () => {
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'payg.updated',
+                    customerId: 'cus_1',
+                    subscriptionId: 'sub_payg',
+                }),
+            ),
+        });
+        const { service } = build({ provider });
+        await expect(service.handleWebhook('{}', 'sig')).resolves.toMatchObject({
+            action: 'ignored',
+        });
+    });
+
+    it('a mirrored pay-as-you-go invoice also reaches PaygService.applyInvoice; a plan invoice does not', async () => {
+        const profiles = makeProfileRepository(PROFILE);
+        const payg = makePayg();
+        const invoiceSnapshot = (kind: 'payg' | 'plan') => ({
+            providerInvoiceId: `in_${kind}`,
+            number: 'EW-0002',
+            status: 'open' as const,
+            periodStart: null,
+            periodEnd: null,
+            subtotalCents: 380,
+            totalCents: 380,
+            amountPaidCents: 0,
+            currency: 'usd',
+            hostedUrl: null,
+            pdfUrl: null,
+            lines: [],
+            issuedAt: null,
+            subscriptionId: `sub_${kind}`,
+            subscriptionKind: kind,
+            paymentFailed: true,
+        });
+
+        const paygProvider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'invoice.updated',
+                    customerId: 'cus_1',
+                    invoice: invoiceSnapshot('payg'),
+                }),
+            ),
+        });
+        const a = build({ provider: paygProvider, profiles, payg });
+        await expect(a.service.handleWebhook('{}', 'sig')).resolves.toMatchObject({
+            action: 'invoice-mirrored',
+        });
+        expect(payg.applyInvoice).toHaveBeenCalledWith(
+            expect.objectContaining({ userId: 'u1' }),
+            expect.objectContaining({ subscriptionKind: 'payg', paymentFailed: true }),
+        );
+
+        payg.applyInvoice.mockClear();
+        const planProvider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'invoice.updated',
+                    customerId: 'cus_1',
+                    invoice: invoiceSnapshot('plan'),
+                }),
+            ),
+        });
+        const b = build({ provider: planProvider, profiles, payg });
+        await b.service.handleWebhook('{}', 'sig');
+        expect(payg.applyInvoice).not.toHaveBeenCalled();
+    });
+
+    it('does not regress PAYG to past_due when a stale payment_failed event follows paid', async () => {
+        const profiles = makeProfileRepository(PROFILE);
+        const payg = makePayg();
+        const invoices = makeInvoiceRepository({
+            mirror: jest.fn().mockResolvedValue({ id: 'inv-1', status: 'paid' }),
+        });
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'invoice.updated',
+                    customerId: 'cus_1',
+                    invoice: {
+                        providerInvoiceId: 'in_payg',
+                        number: 'EW-0002',
+                        status: 'open',
+                        periodStart: null,
+                        periodEnd: null,
+                        subtotalCents: 380,
+                        totalCents: 380,
+                        amountPaidCents: 0,
+                        currency: 'usd',
+                        hostedUrl: null,
+                        pdfUrl: null,
+                        lines: [],
+                        issuedAt: null,
+                        subscriptionId: 'sub_payg',
+                        subscriptionKind: 'payg',
+                        paymentFailed: true,
+                    },
+                }),
+            ),
+        });
+
+        await build({ provider, profiles, invoices, payg }).service.handleWebhook('{}', 'sig');
+
+        expect(payg.applyInvoice).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ status: 'paid', paymentFailed: false }),
+        );
     });
 });

@@ -55,6 +55,31 @@ describe('InvoiceRepository', () => {
         );
     });
 
+    it('does not regress a paid invoice when an older open delivery arrives late', async () => {
+        const existing = {
+            id: 'inv-1',
+            provider: 'stripe',
+            providerInvoiceId: 'in_1',
+            status: InvoiceStatus.PAID,
+            amountPaidCents: 5000,
+        };
+        const { repository, repo } = makeHarness({ existing });
+
+        await repository.mirror({
+            ...WRITE,
+            status: InvoiceStatus.OPEN,
+            amountPaidCents: 0,
+        });
+
+        expect(repo.update).toHaveBeenCalledWith(
+            { id: 'inv-1' },
+            expect.objectContaining({
+                status: InvoiceStatus.PAID,
+                amountPaidCents: 5000,
+            }),
+        );
+    });
+
     it('keys the upsert on (provider, providerInvoiceId)', async () => {
         const { repository, repo } = makeHarness();
 

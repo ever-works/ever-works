@@ -44,6 +44,7 @@ export * from './workflow-run.task';
 export * from './run-plugin-operation.task';
 // Pricing Wave 9 M1 — daily free-credit grant (idempotent per user/day).
 export * from './credits-daily-grant.task';
+export * from './credits-meter-flush.task';
 // Memory upgrades M9 — scheduled consolidation pass (opt-in per org,
 // dry-run by default, never auto-applied).
 export * from './memory-consolidation-tick.task';

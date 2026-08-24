@@ -12,6 +12,7 @@ import { BillingService } from './billing/billing.service';
 import { AutoRechargeService } from './billing/auto-recharge.service';
 import { PlanSubscriptionService } from './billing/plan-subscription.service';
 import { PaymentMethodService } from './billing/payment-method.service';
+import { PaygService } from './billing/payg.service';
 import { CreditLedgerService } from './credits/credit-ledger.service';
 import { PlanCreditGrantService } from './credits/plan-credit-grant.service';
 import { CreditsSweepService } from './credits/credits-sweep.service';
@@ -76,6 +77,9 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         // §3.3, audit B10 + B25). Capture happens on the provider's
         // hosted element — no card datum ever reaches this process.
         PaymentMethodService,
+        // Pay-as-you-go on the provider's usage meter (billing spec §3.5):
+        // enable/disable, overflow metering, cap, flush, webhooks.
+        PaygService,
         // Both provider implementations are instantiable; the factory
         // below picks one PER DEPLOYMENT from configuration. Keeping
         // ManualBillingProvider as a real provider means the fallback is
@@ -108,6 +112,7 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         AutoRechargeService,
         PlanSubscriptionService,
         PaymentMethodService,
+        PaygService,
         BillingProvider,
     ],
 })

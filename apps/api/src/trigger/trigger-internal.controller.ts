@@ -79,7 +79,11 @@ import {
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
 import { MemoryConsolidationScheduleService } from '@ever-works/agent/services';
-import { CreditLedgerService, CreditsSweepService } from '@ever-works/agent/subscriptions';
+import {
+    CreditLedgerService,
+    CreditsSweepService,
+    PaygService,
+} from '@ever-works/agent/subscriptions';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -378,6 +382,11 @@ export class TriggerInternalController implements OnModuleInit {
         // wired. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly creditsSweepService?: CreditsSweepService,
+        // Billing spec §3.5 — backs the `credits-meter-flush` cron: the
+        // worker proxy calls `flushPending()` over the internal RPC
+        // channel. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly paygService?: PaygService,
     ) {}
 
     onModuleInit() {
@@ -473,6 +482,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Billing spec §3.2 — `credits-daily-grant` calls
             // `runDailySweep()` here (allow-list auto-derived).
             CreditsSweepService: this.creditsSweepService,
+            // Billing spec §3.5 — `credits-meter-flush` calls
+            // `flushPending()` here (allow-list auto-derived).
+            PaygService: this.paygService,
             // Streaming-terminal M9 / D1 — `terminal-transcript-gc` calls
             // `sweepExpired()` here (allow-list auto-derived).
             TerminalTranscriptService: this.terminalTranscriptService,
