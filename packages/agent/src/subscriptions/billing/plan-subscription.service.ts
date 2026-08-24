@@ -3,18 +3,23 @@ import { BillingProfileRepository } from '@src/database/repositories/billing-pro
 import { SubscriptionPlanRepository } from '@src/database/repositories/subscription-plan.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
 import { UserSubscriptionRepository } from '@src/database/repositories/user-subscription.repository';
+import { LicencePurchaseRepository } from '@src/database/repositories/licence-purchase.repository';
 import { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
 import { SubscriptionPlanCode } from '@src/entities/types';
 import {
     SubscriptionBillingProvider,
     SubscriptionStatus,
+    type UserSubscription,
 } from '@src/entities/user-subscription.entity';
 import { SubscriptionService } from '../subscription.service';
 import { PlanCreditGrantService } from '../credits/plan-credit-grant.service';
 import {
+    BILLING_PROVIDER_ERROR_CODES,
     BillingProvider,
+    BillingProviderError,
     BillingProviderNotConfiguredError,
     type BillingWebhookEvent,
+    type CheckoutSessionSnapshot,
 } from './billing.provider';
 import {
     billableSeats,
@@ -50,6 +55,15 @@ export class ActivePlanSubscriptionError extends Error {
             'An active paid subscription already exists. Manage or cancel it before starting another recurring plan checkout.',
         );
         this.name = 'ActivePlanSubscriptionError';
+    }
+}
+
+/** A perpetual licence is already active for this owner and plan. */
+class LicenceAlreadyOwnedError extends ActivePlanSubscriptionError {
+    constructor() {
+        super();
+        this.message = 'This commercial licence is already owned.';
+        this.name = 'LicenceAlreadyOwnedError';
     }
 }
 
@@ -136,6 +150,10 @@ export type PlanWebhookAction =
     | 'ignored'
     | 'unattributed';
 
+export interface PlanPaymentReversalResult {
+    action: 'plan-revoked' | 'licence-refunded' | 'reversed-idempotent' | 'ignored';
+}
+
 /**
  * Paid-plan purchase (audit B24).
  *
@@ -172,6 +190,7 @@ export class PlanSubscriptionService {
         private readonly billingProfileRepository: BillingProfileRepository,
         private readonly userRepository: UserRepository,
         private readonly subscriptionService: SubscriptionService,
+        private readonly licencePurchaseRepository: LicencePurchaseRepository,
         /**
          * Monthly plan-allowance grants (billing spec FR-4). Appended
          * LAST + `@Optional()` so every positional construction in the
@@ -198,6 +217,25 @@ export class PlanSubscriptionService {
         }
 
         const interval: CatalogInterval = options.interval ?? 'monthly';
+        let licenceIdempotencyKey: string | null = null;
+
+        if (interval === 'lifetime') {
+            const owned = await this.licencePurchaseRepository.findActiveByUserAndPlan(
+                options.userId,
+                options.planCode,
+            );
+            if (owned) throw new LicenceAlreadyOwnedError();
+
+            // Concurrent/retried clicks before the first webhook share one
+            // provider session. A refunded prior purchase increments the
+            // generation so a legitimate repurchase gets a fresh session.
+            const generation =
+                (await this.licencePurchaseRepository.countByUserAndPlan(
+                    options.userId,
+                    options.planCode,
+                )) + 1;
+            licenceIdempotencyKey = `licence:${options.userId}:${options.planCode}:${generation}`;
+        }
 
         // The local model tracks one provider subscription per owner. A second
         // recurring checkout can create a second live Stripe subscription while
@@ -276,6 +314,7 @@ export class PlanSubscriptionService {
             successUrl: options.successUrl,
             cancelUrl: options.cancelUrl,
             referenceId: `${options.userId}:${plan.code}`,
+            ...(licenceIdempotencyKey ? { idempotencyKey: licenceIdempotencyKey } : {}),
         });
 
         return {
@@ -352,7 +391,18 @@ export class PlanSubscriptionService {
             throw new BillingProviderNotConfiguredError();
         }
 
-        const snapshot = await this.billingProvider.retrieveCheckoutSession(sessionId);
+        let snapshot: CheckoutSessionSnapshot;
+        try {
+            snapshot = await this.billingProvider.retrieveCheckoutSession(sessionId);
+        } catch (error) {
+            if (
+                error instanceof BillingProviderError &&
+                error.code === BILLING_PROVIDER_ERROR_CODES.CHECKOUT_SESSION_NOT_FOUND
+            ) {
+                throw new CheckoutSessionNotFoundError();
+            }
+            throw error;
+        }
         if (!snapshot.userId || snapshot.userId !== userId) {
             throw new CheckoutSessionNotFoundError();
         }
@@ -371,6 +421,9 @@ export class PlanSubscriptionService {
             providerSubscriptionId: snapshot.subscriptionId,
             currentPeriodEnd: snapshot.currentPeriodEnd,
             cancelAtPeriodEnd: false,
+            providerPaymentId: snapshot.paymentId,
+            amountCents: snapshot.amountCents,
+            currency: snapshot.currency,
         });
 
         return {
@@ -405,6 +458,9 @@ export class PlanSubscriptionService {
                 cancelAtPeriodEnd: event.cancelAtPeriodEnd ?? false,
                 seats: event.subscription?.seats,
                 seatItemId: event.subscription?.seatItemId,
+                providerPaymentId: event.paymentId,
+                amountCents: event.amountCents,
+                currency: event.currency,
             });
             return activated ? 'subscription-activated' : 'ignored';
         }
@@ -441,6 +497,68 @@ export class PlanSubscriptionService {
 
     // ── Persistence ──────────────────────────────────────────────────
 
+    listOwnedLicenceCodes(userId: string): Promise<string[]> {
+        return this.licencePurchaseRepository.listActivePlanCodes(userId);
+    }
+
+    /**
+     * Reconcile a signature-verified full refund or dispute after the credit
+     * purchase path has proved the payment is not a credit pack. Correlation
+     * is exact: perpetual licences use their durable payment row; recurring
+     * plans use Stripe's Invoice Payment -> Subscription mapping.
+     */
+    async applyPaymentReversal(event: BillingWebhookEvent): Promise<PlanPaymentReversalResult> {
+        if (!event.paymentId || !event.reversal?.fullyReversed) {
+            return { action: 'ignored' };
+        }
+
+        const provider = this.billingProvider.getProviderId();
+        const licence = await this.licencePurchaseRepository.findByProviderPayment(
+            provider,
+            event.paymentId,
+        );
+        if (licence) {
+            const changed = await this.licencePurchaseRepository.markRefunded(licence.id);
+            return { action: changed ? 'licence-refunded' : 'reversed-idempotent' };
+        }
+
+        const providerSubscriptionId = await this.billingProvider.findPlanSubscriptionIdForPayment(
+            event.paymentId,
+        );
+        if (!providerSubscriptionId) {
+            const pendingLicence = await this.billingProvider.findPerpetualLicenceForPayment(
+                event.paymentId,
+            );
+            if (pendingLicence) {
+                throw new Error(
+                    `Plan payment reversal ${event.id} is ours but its licence purchase is not on file yet`,
+                );
+            }
+            return { action: 'ignored' };
+        }
+
+        const subscription =
+            await this.userSubscriptionRepository.findByProviderSubscriptionId(
+                providerSubscriptionId,
+            );
+        if (!subscription) {
+            throw new Error(
+                `Plan payment reversal ${event.id} is ours but its subscription is not on file yet`,
+            );
+        }
+
+        // Cancel first so the daily sweep cannot select this row for another
+        // allowance grant while the clawback is being appended.
+        await this.cancelSubscriptionRow(subscription);
+        if (this.planCreditGrantService) {
+            await this.planCreditGrantService.reverseCurrentAllowance(
+                subscription,
+                `${provider}:evt:${event.id}`,
+            );
+        }
+        return { action: 'plan-revoked' };
+    }
+
     /**
      * Put a user on a paid plan. Idempotent: re-running for the same
      * plan rewrites the same row and re-asserts the same default plan, so
@@ -456,6 +574,9 @@ export class PlanSubscriptionService {
         /** Extra seats the provider bills for; `undefined` = no snapshot here. */
         seats?: number | null;
         seatItemId?: string | null;
+        providerPaymentId?: string | null;
+        amountCents?: number | null;
+        currency?: string | null;
     }): Promise<boolean> {
         const plan = input.planCode ? await this.findPlanByCode(input.planCode) : null;
         if (!plan) {
@@ -479,12 +600,43 @@ export class PlanSubscriptionService {
         //     cloud customer who also bought a licence would have their real subscription row
         //     OVERWRITTEN — losing the plan, the period end and the provider subscription id.
         //
-        // The licence is still recorded where it actually matters: on the Stripe payment intent,
-        // stamped `ever_works_licence=perpetual-commercial`, which is what the manual fulfilment
-        // process searches. Nothing here needs a row to know the sale happened.
+        // The licence gets its own durable purchase row below. It also remains stamped on the
+        // Stripe PaymentIntent (`ever_works_licence=perpetual-commercial`) for provider-side audit
+        // and manual document fulfilment. Neither record is a hosted tier grant.
         if (plan.hosting === 'selfhosted') {
+            // Monthly/annual self-hosted commercial subscriptions are also
+            // licences, but they are not the one-off perpetual SKU this table
+            // models. Preserve their existing acknowledgement without turning
+            // them into a hosted tier; provider lifecycle remains on the
+            // subscription id.
+            if (input.providerSubscriptionId) {
+                this.logger.log(
+                    `Recorded recurring self-hosted licence subscription for user ${input.userId} ` +
+                        `(plan '${plan.code}', provider subscription present). No hosted tier granted.`,
+                );
+                return true;
+            }
+            if (
+                !input.providerPaymentId ||
+                input.amountCents === null ||
+                input.amountCents === undefined ||
+                !input.currency
+            ) {
+                this.logger.warn(
+                    `Licence activation skipped for user ${input.userId}: settled payment details are missing`,
+                );
+                return false;
+            }
+            await this.licencePurchaseRepository.recordPurchase({
+                userId: input.userId,
+                planCode: plan.code,
+                provider: this.billingProvider.getProviderId(),
+                providerPaymentId: input.providerPaymentId,
+                amountCents: input.amountCents,
+                currency: input.currency,
+            });
             this.logger.log(
-                `Recorded a self-hosted licence purchase for user ${input.userId} (plan ` +
+                `Recorded durable self-hosted licence ownership for user ${input.userId} (plan ` +
                     `'${plan.code}'). No hosted subscription row written and no tier granted — a ` +
                     `licence applies to the buyer's OWN deployment, not to this one.`,
             );
@@ -574,10 +726,15 @@ export class PlanSubscriptionService {
             );
             return false;
         }
+        await this.cancelSubscriptionRow(subscription);
+        return Boolean(subscription);
+    }
+
+    private async cancelSubscriptionRow(subscription: UserSubscription): Promise<void> {
         await this.userSubscriptionRepository.cancel(subscription.id);
 
         if (this.subscriptionService.isEnabled()) {
-            const user = await this.userRepository.findById(userId);
+            const user = await this.userRepository.findById(subscription.userId);
             if (user) {
                 // Free plans are exactly what `changePlanSelfService`
                 // permits (sign-up default / downgrade / cancel).
@@ -587,7 +744,6 @@ export class PlanSubscriptionService {
                 );
             }
         }
-        return Boolean(subscription);
     }
 
     // ── Resolution helpers ───────────────────────────────────────────

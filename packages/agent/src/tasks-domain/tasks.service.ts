@@ -305,10 +305,10 @@ export class TasksService {
     /**
      * Review-fix I4: shared validator for assignee / reviewer / approver
      * add paths. The persisted Task scope is authoritative: an Agent must
-     * exist in that exact scope, and a user actor must be an active member
-     * of the exact Organization roster (or the Tenant owner). Personal
-     * Tasks can only point back to their owner. Every mismatch shares one
-     * response so a known UUID is not an Organization-roster oracle.
+     * exist in that exact scope, and a user actor must be active in the same
+     * Tenant. The Organization roster records invitation provenance but does
+     * not grant access. Personal Tasks can only point back to their owner.
+     * Every mismatch shares one response so a known UUID is not a scope oracle.
      */
     private async assertActorIsValid(
         userId: string,
@@ -335,23 +335,35 @@ export class TasksService {
         let reachable = Boolean(actor?.isActive);
 
         if (reachable && taskScope.organizationId) {
+            // Tenant equality IS the authorization decision. `organization_members`
+            // is invitation provenance, not an authorization input — stated on the
+            // table itself: "Nothing here grants access"
+            // (packages/agent/src/database/repositories/organization-member.repository.ts)
+            // and on its entity: "because access is tenant-wide, a member of one
+            // Organization can see every Organization in that Tenant. The owner
+            // accepted this explicitly for v1."
+            //
+            // This block used to OVERWRITE the correct predicate below with the
+            // roster result (plus a Tenant-owner escape hatch), which is the same
+            // `guard-roster-asymmetry` drift that reached UploadsController: both
+            // were copied from SessionScopeGuard on 2026-08-23 while it was briefly
+            // roster-strict, and neither was reconciled when `b7550481a` (PR #2218)
+            // reverted the guard to tenant-wide the next morning. With
+            // `organization_members` empty in production it admitted only the
+            // Tenant owner.
             reachable = actor?.tenantId === taskScope.tenantId;
             if (reachable && taskScope.tenantId) {
+                // Retained as provenance/telemetry only — deliberately NOT assigned
+                // back into `reachable`.
                 const member = this.organizationMembers
                     ? await this.organizationMembers
                           .findByOrgAndUser(taskScope.organizationId, actorId)
                           .catch(() => null)
                     : null;
-                reachable = Boolean(
-                    member?.organizationId === taskScope.organizationId &&
-                    member?.tenantId === taskScope.tenantId &&
-                    member?.userId === actorId,
-                );
-                if (!reachable) {
-                    const tenant = this.tenants
-                        ? await this.tenants.findById(taskScope.tenantId).catch(() => null)
-                        : null;
-                    reachable = tenant?.ownerUserId === actorId;
+                if (!member) {
+                    this.logger.debug(
+                        `Task actor admitted without a roster row: actor=${actorId} org=${taskScope.organizationId}`,
+                    );
                 }
             } else {
                 reachable = false;

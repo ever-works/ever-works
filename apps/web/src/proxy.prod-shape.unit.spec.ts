@@ -17,6 +17,34 @@ vi.mock('./lib/constants', async (importOriginal) => ({
 
 import proxy from './proxy';
 
+/**
+ * 🛑 THIS SUITE CANNOT CATCH THE /login LOCALE-REWRITE DEFECT. Do not treat it
+ * as the regression guard for it, and do not add assertions here hoping to.
+ *
+ * It mocks `next-intl/middleware` wholesale and asserts the header string
+ * `proxy()` RETURNS. The defect happens AFTER `proxy()` returns, inside Next's
+ * middleware adapter, which reparses `x-middleware-rewrite`:
+ *   - an absolute origin that does not match the server's init URL is treated
+ *     as an EXTERNAL rewrite -> redirect -> the request re-enters and loops;
+ *   - a path-only value is reparsed as `new NextURL(value)` with NO base and
+ *     throws `ERR_INVALID_URL` -> HTTP 500.
+ * Neither outcome is reachable from this file, because the adapter is mocked away.
+ *
+ * Concretely: `https://app.ever.works/en/login` is the value `proxy()` returns
+ * in the FIXED state AND the value it returned in broken state `14bd578a2`
+ * (#2219, ERR_TOO_MANY_REDIRECTS). Identical on both sides, so no assertion on
+ * it can discriminate. This suite was green through all five states of an
+ * ~8.5 h production outage on 2026-08-24.
+ *
+ * What it legitimately pins: `proxy()` must not MANGLE the rewrite (that is how
+ * #2243/#2244 broke it) and must not introduce a `location` header of its own.
+ * That is a narrow, real property — just not the outage guard.
+ *
+ * THE ACTUAL GUARD is the "Guard: /login renders behind a foreign authority"
+ * step in `.github/workflows/ci.yml` (`lint-and-test`), which boots the built
+ * artifact and makes one request that CROSSES the adapter boundary. If you are
+ * here because that guard went red, the bug is real — do not weaken it here.
+ */
 describe('proxy delegates ingress locale rewrite normalization to Next', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -52,8 +80,12 @@ describe('proxy delegates ingress locale rewrite normalization to Next', () => {
         const response = await proxy(ingressRequest());
         const rewrite = response.headers.get('x-middleware-rewrite');
 
+        // OUTCOME at this seam: unmangled passthrough + proxy() added no redirect
+        // of its own. Status/redirect behaviour proper is Next's, and is asserted by
+        // the CI guard, not here.
         expect(rewrite).toBe('https://app.ever.works/en/login');
         expect(response.headers.get('location')).toBeNull();
+        expect(response.status).toBe(200);
     });
 
     it('preserves the complete rewrite including its query string', async () => {

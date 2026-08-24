@@ -815,7 +815,15 @@ export function BillingSettings({
                                 <p className="mt-2 text-xs text-muted-foreground">
                                     {t('licence.explainer')}
                                 </p>
-                                {licenceConfirmCode === licence.code ? (
+                                {licence.owned ? (
+                                    <Button
+                                        className="mt-3 text-xs"
+                                        data-testid={`billing-licence-owned-${licence.code}`}
+                                        disabled
+                                    >
+                                        {t('invoices.statuses.paid')}
+                                    </Button>
+                                ) : licenceConfirmCode === licence.code ? (
                                     <div className="mt-3 flex flex-col gap-2">
                                         <p className="text-xs text-muted-foreground">
                                             {t('licence.confirmBody')}

@@ -37,7 +37,17 @@ module.exports = {
     // recommendation for CI stability.
     testTimeout: 30000,
     moduleNameMapper: {
-        '^@src/generators/(.*)$': '<rootDir>/../../../packages/agent/src/generators/$1/index.ts',
+        // 🛑 ARRAY, not a single target. This rule appended `/index.ts`
+        // unconditionally, so a DEEP file import
+        // (`@src/generators/data-generator/data-generator.service`) resolved to
+        // `.../data-generator.service/index.ts` and could not be found. It also
+        // SHADOWS the generic `^@src/(.*)$` fallback below for this prefix, so
+        // fixing that rule alone did not help. Try the path as given first,
+        // then the directory-index form the original rule assumed.
+        '^@src/generators/(.*)$': [
+            '<rootDir>/../../../packages/agent/src/generators/$1',
+            '<rootDir>/../../../packages/agent/src/generators/$1/index.ts',
+        ],
         // Items-generator's source lives under @ever-works/agent, but
         // entities import it via the api `@src/...` alias. Map it through
         // so cross-package tests (claim-account.service.spec,

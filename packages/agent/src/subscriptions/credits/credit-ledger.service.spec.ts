@@ -160,6 +160,36 @@ describe('CreditLedgerService', () => {
 
             expect(entry).toBe(existing);
         });
+
+        it('passes a ref-window ceiling into the atomic write path', async () => {
+            const { service, ledgerRepository } = makeService();
+            const from = new Date('2026-08-23T10:00:00.000Z');
+            const to = new Date('2026-09-23T10:00:00.000Z');
+
+            await service.record({
+                userId: 'u1',
+                kind: CreditLedgerKind.GRANT,
+                amountCredits: 25000,
+                refType: 'plan-allowance',
+                maxRefTypeAmountInWindow: {
+                    from,
+                    to,
+                    maxAmountCredits: 25000,
+                },
+            });
+
+            expect(ledgerRepository.recordAtomic).toHaveBeenCalledWith(
+                expect.objectContaining({ refType: 'plan-allowance', amountCredits: 25000 }),
+                expect.objectContaining({
+                    maxRefTypeAmountInWindow: {
+                        refType: 'plan-allowance',
+                        from,
+                        to,
+                        maxAmountCredits: 25000,
+                    },
+                }),
+            );
+        });
     });
 
     describe('consumeForRun — the costCents → credits bridge', () => {

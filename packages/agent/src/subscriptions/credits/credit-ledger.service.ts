@@ -48,6 +48,16 @@ export interface RecordCreditEntryOptions {
     /** Ceiling for non-accumulating grants; a full clamp returns null. */
     maxBalanceAfter?: number | null;
     /**
+     * Atomically top this ref type up to a target inside a half-open time
+     * window. Used for plan upgrades whose idempotency key changes with the
+     * plan code while the user's allowance period stays the same.
+     */
+    maxRefTypeAmountInWindow?: {
+        from: Date;
+        to: Date;
+        maxAmountCredits: number;
+    } | null;
+    /**
      * Bucket expiry for a positive write (plan allowance grants carry
      * their allowance-month end). Ignored on debits; absent = never.
      */
@@ -148,6 +158,9 @@ export class CreditLedgerService {
         if (options.amountCredits === 0) {
             throw new Error('amountCredits must be non-zero');
         }
+        if (options.maxRefTypeAmountInWindow && !options.refType) {
+            throw new Error('refType is required for a ref-window credit ceiling');
+        }
 
         const allowNegative =
             options.allowNegativeBalance ?? config.billing.credits.allowOverdraft();
@@ -171,6 +184,12 @@ export class CreditLedgerService {
         const result = await this.creditLedgerRepository.recordAtomic(write, {
             minBalanceAfter: options.amountCredits < 0 && !allowNegative ? 0 : null,
             maxBalanceAfter: options.maxBalanceAfter ?? null,
+            maxRefTypeAmountInWindow: options.maxRefTypeAmountInWindow
+                ? {
+                      ...options.maxRefTypeAmountInWindow,
+                      refType: options.refType!,
+                  }
+                : null,
             now: options.now,
         });
 

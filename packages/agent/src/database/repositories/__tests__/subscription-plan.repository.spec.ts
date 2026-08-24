@@ -3,7 +3,7 @@ import { SubscriptionPlanRepository } from '../subscription-plan.repository';
 import { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
 import { SubscriptionPlanCode } from '@src/entities/types';
 type Mocked = jest.Mocked<
-    Pick<Repository<SubscriptionPlan>, 'find' | 'findOne' | 'update' | 'create' | 'save'>
+    Pick<Repository<SubscriptionPlan>, 'find' | 'findOne' | 'update' | 'upsert' | 'create' | 'save'>
 >;
 
 describe('SubscriptionPlanRepository', () => {
@@ -15,6 +15,7 @@ describe('SubscriptionPlanRepository', () => {
             find: jest.fn(),
             findOne: jest.fn(),
             update: jest.fn(),
+            upsert: jest.fn(),
             create: jest.fn(),
             save: jest.fn(),
         };
@@ -59,35 +60,56 @@ describe('SubscriptionPlanRepository', () => {
     });
 
     describe('upsert', () => {
-        it('updates by id and refetches when an existing plan with the same code is found', async () => {
-            const existing = { id: 'p1', code: SubscriptionPlanCode.FREE } as SubscriptionPlan;
+        it('uses one database-atomic conflict operation for a coded plan', async () => {
+            const persisted = {
+                id: 'p1',
+                code: SubscriptionPlanCode.FREE,
+                maxWorks: 5,
+            } as SubscriptionPlan;
+            repository.upsert.mockResolvedValueOnce({} as never);
+            repository.findOne.mockResolvedValueOnce(persisted);
+
+            await expect(
+                service.upsert({ code: SubscriptionPlanCode.FREE, maxWorks: 5 }),
+            ).resolves.toBe(persisted);
+
+            expect(repository.upsert).toHaveBeenCalledWith(
+                { code: SubscriptionPlanCode.FREE, maxWorks: 5 },
+                { conflictPaths: ['code'] },
+            );
+            expect(repository.update).not.toHaveBeenCalled();
+            expect(repository.create).not.toHaveBeenCalled();
+            expect(repository.save).not.toHaveBeenCalled();
+        });
+
+        it('atomically updates and refetches when a plan with the same code exists', async () => {
             const updated = {
                 id: 'p1',
                 code: SubscriptionPlanCode.FREE,
                 maxWorks: 5,
             } as SubscriptionPlan;
-            repository.findOne
-                .mockResolvedValueOnce(existing) // findByCode lookup
-                .mockResolvedValueOnce(updated); // refetch by id
+            repository.upsert.mockResolvedValueOnce({} as never);
+            repository.findOne.mockResolvedValueOnce(updated);
 
             const result = await service.upsert({ code: SubscriptionPlanCode.FREE, maxWorks: 5 });
 
             expect(result).toBe(updated);
-            expect(repository.update).toHaveBeenCalledWith(existing.id, {
-                code: SubscriptionPlanCode.FREE,
-                maxWorks: 5,
-            });
+            expect(repository.upsert).toHaveBeenCalledWith(
+                { code: SubscriptionPlanCode.FREE, maxWorks: 5 },
+                { conflictPaths: ['code'] },
+            );
+            expect(repository.update).not.toHaveBeenCalled();
             expect(repository.create).not.toHaveBeenCalled();
             expect(repository.save).not.toHaveBeenCalled();
-            expect(repository.findOne).toHaveBeenNthCalledWith(2, { where: { id: existing.id } });
+            expect(repository.findOne).toHaveBeenCalledWith({
+                where: { code: SubscriptionPlanCode.FREE },
+            });
         });
 
-        it('creates and saves when no plan with the code exists', async () => {
-            const created = { code: SubscriptionPlanCode.PREMIUM } as SubscriptionPlan;
+        it('atomically inserts and refetches when no plan with the code exists', async () => {
             const saved = { id: 'p2', code: SubscriptionPlanCode.PREMIUM } as SubscriptionPlan;
-            repository.findOne.mockResolvedValueOnce(null);
-            repository.create.mockReturnValueOnce(created);
-            repository.save.mockResolvedValueOnce(saved);
+            repository.upsert.mockResolvedValueOnce({} as never);
+            repository.findOne.mockResolvedValueOnce(saved);
 
             const result = await service.upsert({
                 code: SubscriptionPlanCode.PREMIUM,
@@ -95,12 +117,25 @@ describe('SubscriptionPlanRepository', () => {
             });
 
             expect(result).toBe(saved);
-            expect(repository.create).toHaveBeenCalledWith({
-                code: SubscriptionPlanCode.PREMIUM,
-                displayName: 'Premium',
-            });
-            expect(repository.save).toHaveBeenCalledWith(created);
+            expect(repository.upsert).toHaveBeenCalledWith(
+                {
+                    code: SubscriptionPlanCode.PREMIUM,
+                    displayName: 'Premium',
+                },
+                { conflictPaths: ['code'] },
+            );
+            expect(repository.create).not.toHaveBeenCalled();
+            expect(repository.save).not.toHaveBeenCalled();
             expect(repository.update).not.toHaveBeenCalled();
+        });
+
+        it('fails loudly if the coded row cannot be read after the atomic write', async () => {
+            repository.upsert.mockResolvedValueOnce({} as never);
+            repository.findOne.mockResolvedValueOnce(null);
+
+            await expect(
+                service.upsert({ code: SubscriptionPlanCode.STANDARD, displayName: 'Standard' }),
+            ).rejects.toThrow('Subscription plan standard missing after upsert');
         });
 
         it('skips the findByCode lookup entirely when the partial has no code', async () => {

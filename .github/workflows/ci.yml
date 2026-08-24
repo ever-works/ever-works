@@ -186,6 +186,176 @@ jobs:
         if: steps.scope.outputs.code == 'true'
         run: pnpm test
 
+      # --- Regression guard: the /login locale-rewrite defect class -----------
+      #
+      # On 2026-08-24 `app.ever.works/login` was down ~8.5 h. FIVE fixes were
+      # attempted; FOUR shipped with a fully green CI. Nothing here could catch
+      # it, because every test stops short of the boundary where it fails: the
+      # unit specs mock `next-intl/middleware` and assert the header string
+      # `proxy()` RETURNS, but the failure happens AFTER `proxy()` returns,
+      # inside Next's middleware adapter when it reparses `x-middleware-rewrite`:
+      #   * an ABSOLUTE origin not matching the server's init URL is treated as
+      #     an EXTERNAL rewrite -> 307 -> re-enters middleware -> infinite loop;
+      #   * a PATH-ONLY value is reparsed as `new NextURL(v)` with NO base and
+      #     throws ERR_INVALID_URL -> HTTP 500.
+      #
+      # This boots the artifact the previous step already built and makes ONE
+      # request that CROSSES that boundary. Three ingredients, each necessary,
+      # each missing from at least one existing test:
+      #
+      #  1. Host / X-Forwarded-Host must DIFFER from the listen address. That
+      #     difference IS the defect. `e2e.yml` uses 127.0.0.1 with no forwarded
+      #     headers, so its reconstructed authority equals the internal one and
+      #     the bug cannot manifest there at all.
+      #  2. X-Forwarded-Proto: https MUST be sent. Next derives its comparison
+      #     URL's SCHEME from it, and the #2243 attempt hardcoded 'http:' - host
+      #     and port matched, only the scheme diverged. Without this header a
+      #     broken build answers 200 and this guard would pass. Recorded nowhere
+      #     else in the repo; do not drop it.
+      #  3. ALLOWED_REDIRECT_URLS must contain the authority spoofed below. It
+      #     defaults to 'localhost,127.0.0.1' (apps/web/src/lib/constants.ts),
+      #     and dev/stage allowlist only ONE of their two public hostnames -
+      #     which is why "green on stage" was never evidence about prod.
+      #     Inheriting a stage-shaped allowlist here would rebuild that blind
+      #     spot inside CI.
+      #
+      # ASSERT THE OUTCOME - status + absence of Location + a body marker. NEVER
+      # assert the `x-middleware-rewrite` value: pinning that header is exactly
+      # what left the two unit specs unable to fail (the value is identical in
+      # the fixed state and in broken state 14bd578a2).
+      #
+      # The step proves itself on every run:
+      #   * KNOWN-PRESENT CONTROL - the same request WITHOUT forwarded headers
+      #     must also be 200, so a green can never come from a probe that was
+      #     incapable of succeeding.
+      #   * BITE PROOF - a SECOND server on its own port with
+      #     LEGACY_LOCALE_REWRITE_OVERRIDE_ENABLED=true re-enables the collapse and
+      #     MUST NOT return 200. Measured locally 2026-08-24: it returns 500 with
+      #     ERR_INVALID_URL. No rebuild is needed because `proxy.ts` reads that
+      #     flag per request, so this costs seconds. Without a bite proof the step
+      #     could be structurally incapable of going red - the exact failure mode
+      #     of the two unit specs it replaces.
+      #     A DEAD bite server also fails the guard, which would satisfy the proof
+      #     vacuously, so a 000 (no answer) is treated as an ERROR, not a pass.
+      - name: 'Guard: /login renders behind a foreign authority'
+        if: steps.scope.outputs.code == 'true'
+        working-directory: apps/web
+        env:
+          NODE_ENV: production
+          ALLOWED_REDIRECT_URLS: https://app.ever.works
+          # A secret under 32 chars makes every auth route 500, which would turn
+          # this guard red for the wrong reason. Probe-only; unused elsewhere.
+          AUTH_SECRET: ci-guard-probe-secret-at-least-32-chars
+          COOKIE_SECRET: ci-guard-probe-secret-at-least-32-chars
+        run: |
+          set -uo pipefail
+
+          # Two servers on two ports, started once and never restarted mid-step. Killing a
+          # `pnpm start` wrapper orphans its `next start` child, which keeps holding the
+          # port and then silently answers the next probe from the WRONG configuration —
+          # that is a real failure this harness hit while being written, and it made the
+          # bite proof report a false pass. Separate ports remove the possibility.
+          HEALTHY_PORT=34119
+          BITE_PORT=34120
+
+          start_server() { # $1=label $2=port $3=optional extra env assignment
+            local label="$1" port="$2" extra="${3:-}"
+            local log="/tmp/guard-$label.log"
+            rm -f "$log"
+            if [ -n "$extra" ]; then
+              ( export "$extra"; pnpm exec next start -p "$port" ) >"$log" 2>&1 &
+            else
+              ( pnpm exec next start -p "$port" ) >"$log" 2>&1 &
+            fi
+            for _ in $(seq 1 90); do
+              # Readiness must name OUR port: on a shared runner a stale listener would
+              # otherwise serve these probes and the result would describe someone else's
+              # process.
+              if grep -qiE 'ready in' "$log" && grep -q "$port" "$log"; then
+                echo "  [$label] ready on $port"
+                return 0
+              fi
+              sleep 1
+            done
+            echo "::error::[$label] web server never became ready on port $port"
+            sed -n '1,40p' "$log"
+            return 1
+          }
+
+          probe() { # $1=port $2=fwd|bare -> "status|location|marker"
+            local port="$1" mode="$2" code loc mark
+            if [ "$mode" = fwd ]; then
+              if ! code=$(curl -sS -o /tmp/g.html -D /tmp/g.hdr --max-redirs 0 -m 30 -w '%{http_code}' \
+                -H 'Host: app.ever.works' -H 'X-Forwarded-Host: app.ever.works' \
+                -H 'X-Forwarded-Proto: https' "http://127.0.0.1:$port/login" 2>/dev/null); then
+                code=000
+              fi
+            else
+              if ! code=$(curl -sS -o /tmp/g.html -D /tmp/g.hdr --max-redirs 0 -m 30 -w '%{http_code}' \
+                "http://127.0.0.1:$port/login" 2>/dev/null); then
+                code=000
+              fi
+            fi
+            loc=no; grep -qi '^location:' /tmp/g.hdr 2>/dev/null && loc=yes
+            mark=no; grep -q 'Sign In' /tmp/g.html 2>/dev/null && mark=yes
+            echo "${code}|${loc}|${mark}"
+          }
+
+          PASS="200|no|yes"
+          rc=0
+
+          start_server healthy "$HEALTHY_PORT" "" || exit 1
+          start_server bite    "$BITE_PORT" "LEGACY_LOCALE_REWRITE_OVERRIDE_ENABLED=true" || exit 1
+
+          GUARD=$(probe "$HEALTHY_PORT" fwd)
+          echo "guard   (foreign authority + https) -> $GUARD   [want $PASS]"
+          if [ "$GUARD" != "$PASS" ]; then
+            echo "::error::/login FAILED behind a foreign authority ($GUARD). This is the defect"
+            echo "::error::class behind the 2026-08-24 outage: a 3xx WITH a location header is the"
+            echo "::error::redirect loop; a 500 is the ERR_INVALID_URL path-only variant. Start with"
+            echo "::error::apps/web/src/proxy.ts and next.config.ts (skipProxyUrlNormalize)."
+            sed -n '1,60p' /tmp/guard-healthy.log
+            rc=1
+          fi
+
+          CONTROL=$(probe "$HEALTHY_PORT" bare)
+          echo "control (no forwarded headers)      -> $CONTROL   [want $PASS]"
+          if [ "$CONTROL" != "$PASS" ]; then
+            echo "::error::KNOWN-PRESENT CONTROL failed ($CONTROL) - the harness itself is broken"
+            echo "::error::(build, env or port), so the guard line above proves nothing in either"
+            echo "::error::direction. Fix this before trusting any green here."
+            rc=1
+          fi
+
+          BITE=$(probe "$BITE_PORT" fwd)
+          BITE_CODE="${BITE%%|*}"
+          echo "bite    (legacy override enabled)   -> $BITE   [want a real HTTP status that is NOT $PASS]"
+          if [ "$BITE_CODE" = "000" ]; then
+            # A dead bite server also "is not 200", so without this branch a failed server
+            # would silently satisfy the bite proof. That is the exact vacuity this step
+            # exists to prevent, so it must be an error, not a pass.
+            echo "::error::BITE PROOF INCONCLUSIVE: the bite server did not answer at all (000)."
+            echo "::error::A dead server trivially 'fails' the guard, which proves nothing. The"
+            echo "::error::bite proof only counts when a LIVE server answers with a non-200."
+            sed -n '1,40p' /tmp/guard-bite.log
+            rc=1
+          elif [ "$BITE_CODE" = "200" ]; then
+            echo "::error::BITE PROOF FAILED: with LEGACY_LOCALE_REWRITE_OVERRIDE_ENABLED=true the"
+            echo "::error::bite server still answered HTTP 200, so the guard cannot detect the defect"
+            echo "::error::regardless of its Location/body markers, and its green above is"
+            echo "::error::worthless. Either the override no longer re-enables the rewrite collapse"
+            echo "::error::(apps/web/src/proxy.ts) or the probe never reached the middleware."
+            rc=1
+          else
+            echo "  bite proof OK: the guard demonstrably goes red when the defect is re-enabled."
+          fi
+
+          # Best-effort cleanup; the runner is ephemeral, so a survivor harms nothing.
+          pkill -f "next start -p $HEALTHY_PORT" 2>/dev/null || true
+          pkill -f "next start -p $BITE_PORT" 2>/dev/null || true
+
+          exit $rc
+
       - name: Build Internal CLI
         if: steps.scope.outputs.code == 'true'
         working-directory: apps/internal-cli
@@ -540,4 +710,3 @@ jobs:
 
       - name: Test @ever-works/secret-store-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/secret-store-${{ matrix.provider }}-plugin test
-

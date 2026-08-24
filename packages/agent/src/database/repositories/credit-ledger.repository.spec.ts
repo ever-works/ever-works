@@ -45,6 +45,7 @@ function makeHarness(options: { balance?: number | string; driver?: string } = {
         update: jest.fn().mockResolvedValue(undefined),
         create: jest.fn((value: any) => value),
         save: jest.fn(async (value: any) => ({ id: 'entry-1', ...value })),
+        sum: jest.fn().mockResolvedValue(0),
         createQueryBuilder: jest.fn(() => makeQb(options.balance ?? 0)),
         findAndCount: jest.fn().mockResolvedValue([[], 0]),
     };
@@ -100,6 +101,23 @@ describe('CreditLedgerRepository.recordAtomic', () => {
 
         expect(result).toEqual({ status: 'idempotent', entry: existing });
         expect(entryRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('locks before the idempotency read so ref-window sums cannot inherit a stale mysql snapshot', async () => {
+        const { repository, entryRepo, userRepo } = makeHarness({ driver: 'mysql' });
+        entryRepo.findOne.mockResolvedValue({
+            id: 'existing',
+            idempotencyKey: 'grant:plan:user-1:2026-08-23:standard',
+        });
+
+        await repository.recordAtomic({
+            ...BASE_WRITE,
+            idempotencyKey: 'grant:plan:user-1:2026-08-23:standard',
+        });
+
+        expect(userRepo.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+            entryRepo.findOne.mock.invocationCallOrder[0],
+        );
     });
 
     it('resolves a concurrent-duplicate unique violation to the surviving row', async () => {
@@ -170,6 +188,72 @@ describe('CreditLedgerRepository.recordAtomic', () => {
         expect(entryRepo.save).not.toHaveBeenCalled();
     });
 
+    it('sizes a plan grant from the ref-window total while holding the user lock', async () => {
+        const { repository, entryRepo, userRepo } = makeHarness({
+            balance: 3000,
+            driver: 'postgres',
+        });
+        const windowTotal = makeQb(0);
+        windowTotal.getRawOne.mockResolvedValue({ total: 3000 });
+        entryRepo.createQueryBuilder
+            .mockReturnValueOnce(makeQb(3000))
+            .mockReturnValueOnce(windowTotal);
+
+        const result = await repository.recordAtomic(
+            {
+                ...BASE_WRITE,
+                amountCredits: 25000,
+                refType: 'plan-allowance',
+                idempotencyKey: 'grant:plan:user-1:2026-08-23:premium',
+            },
+            {
+                maxRefTypeAmountInWindow: {
+                    refType: 'plan-allowance',
+                    from: new Date('2026-08-23T10:00:00.000Z'),
+                    to: new Date('2026-09-23T10:00:00.000Z'),
+                    maxAmountCredits: 25000,
+                },
+            },
+        );
+
+        expect(result.status).toBe('created');
+        expect(entryRepo.save).toHaveBeenCalledWith(
+            expect.objectContaining({ amountCredits: 22000, balanceAfter: 25000 }),
+        );
+        expect(userRepo.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+            entryRepo.createQueryBuilder.mock.invocationCallOrder[0],
+        );
+    });
+
+    it('skips a differently-keyed plan grant once the ref-window target is covered', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 25000 });
+        const windowTotal = makeQb(0);
+        windowTotal.getRawOne.mockResolvedValue({ total: 25000 });
+        entryRepo.createQueryBuilder
+            .mockReturnValueOnce(makeQb(25000))
+            .mockReturnValueOnce(windowTotal);
+
+        const result = await repository.recordAtomic(
+            {
+                ...BASE_WRITE,
+                amountCredits: 25000,
+                refType: 'plan-allowance',
+                idempotencyKey: 'grant:plan:user-1:2026-08-23:premium',
+            },
+            {
+                maxRefTypeAmountInWindow: {
+                    refType: 'plan-allowance',
+                    from: new Date('2026-08-23T10:00:00.000Z'),
+                    to: new Date('2026-09-23T10:00:00.000Z'),
+                    maxAmountCredits: 25000,
+                },
+            },
+        );
+
+        expect(result).toEqual({ status: 'skipped', balance: 25000 });
+        expect(entryRepo.save).not.toHaveBeenCalled();
+    });
+
     it('locks the user row on postgres WITHOUT joining eager relations, and skips the lock on sqlite', async () => {
         const pg = makeHarness({ driver: 'postgres' });
         await pg.repository.recordAtomic({ ...BASE_WRITE });
@@ -197,6 +281,143 @@ describe('CreditLedgerRepository.recordAtomic', () => {
         const sqlite = makeHarness({ driver: 'better-sqlite3' });
         await sqlite.repository.recordAtomic({ ...BASE_WRITE });
         expect(sqlite.userRepo.findOne).not.toHaveBeenCalled();
+    });
+});
+
+describe('CreditLedgerRepository.recordCumulativeRefundAtomic', () => {
+    const PURCHASE = {
+        id: 'purchase-1',
+        userId: 'user-1',
+        organizationId: 'org-1',
+        tenantId: 'tenant-1',
+        kind: CreditLedgerKind.PURCHASE,
+        amountCredits: 5500,
+        costCentsRef: 5000,
+        refType: 'billing-payment',
+        refId: 'pi_1',
+    };
+
+    it('writes only the incremental credits for a later cumulative partial-refund event', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 6000, driver: 'postgres' });
+        entryRepo.findOne.mockImplementation(async ({ where }: any) => {
+            if (where.idempotencyKey) return null;
+            if (where.kind === CreditLedgerKind.PURCHASE) return PURCHASE;
+            return null;
+        });
+        // First Stripe event reported 50% cumulative and already reversed 2,750 credits.
+        entryRepo.sum.mockResolvedValue(-2750);
+
+        const result = await repository.recordCumulativeRefundAtomic({
+            refType: 'billing-payment',
+            refId: 'pi_1',
+            cumulativeRefundedCents: 5000,
+            idempotencyKey: 'stripe:evt:evt_refund_2',
+            description: 'Refund / chargeback reversal',
+        });
+
+        expect(result.status).toBe('created');
+        expect(result.creditsReversed).toBe(2750);
+        expect(entryRepo.sum).toHaveBeenCalledWith('amountCredits', {
+            refType: 'billing-payment',
+            refId: 'pi_1',
+            kind: CreditLedgerKind.ADJUSTMENT,
+        });
+        expect(entryRepo.save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'user-1',
+                amountCredits: -2750,
+                balanceAfter: 3250,
+                idempotencyKey: 'stripe:evt:evt_refund_2',
+            }),
+        );
+    });
+
+    it('caps an over-reported cumulative amount at the original credit grant', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 6000, driver: 'postgres' });
+        entryRepo.findOne.mockImplementation(async ({ where }: any) => {
+            if (where.idempotencyKey) return null;
+            if (where.kind === CreditLedgerKind.PURCHASE) return PURCHASE;
+            return null;
+        });
+
+        const result = await repository.recordCumulativeRefundAtomic({
+            refType: 'billing-payment',
+            refId: 'pi_1',
+            cumulativeRefundedCents: 999999,
+            idempotencyKey: 'stripe:evt:evt_overreported',
+        });
+
+        expect(result.creditsReversed).toBe(5500);
+        expect(entryRepo.save).toHaveBeenCalledWith(
+            expect.objectContaining({ amountCredits: -5500, balanceAfter: 500 }),
+        );
+    });
+
+    it('locks the purchase owner before reading prior reversals and ignores an older out-of-order total', async () => {
+        const { repository, entryRepo, userRepo } = makeHarness({
+            balance: 500,
+            driver: 'postgres',
+        });
+        entryRepo.findOne.mockImplementation(async ({ where }: any) => {
+            if (where.idempotencyKey) return null;
+            if (where.kind === CreditLedgerKind.PURCHASE) return PURCHASE;
+            return null;
+        });
+        // A newer full-refund event won the race and already reversed the whole grant.
+        entryRepo.sum.mockResolvedValue(-5500);
+
+        const result = await repository.recordCumulativeRefundAtomic({
+            refType: 'billing-payment',
+            refId: 'pi_1',
+            cumulativeRefundedCents: 2500,
+            idempotencyKey: 'stripe:evt:evt_older_half',
+        });
+
+        expect(result).toEqual({ status: 'covered', creditsReversed: 0 });
+        expect(entryRepo.save).not.toHaveBeenCalled();
+        expect(userRepo.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+            entryRepo.sum.mock.invocationCallOrder[0],
+        );
+    });
+
+    it('returns the existing row before doing refund math when the event was already recorded', async () => {
+        const { repository, entryRepo, userRepo } = makeHarness({ driver: 'postgres' });
+        const existing = { id: 'refund-1', idempotencyKey: 'stripe:evt:evt_refund_1' };
+        entryRepo.findOne.mockResolvedValue(existing);
+
+        const result = await repository.recordCumulativeRefundAtomic({
+            refType: 'billing-payment',
+            refId: 'pi_1',
+            cumulativeRefundedCents: 2500,
+            idempotencyKey: 'stripe:evt:evt_refund_1',
+        });
+
+        expect(result).toEqual({ status: 'idempotent', entry: existing, creditsReversed: 0 });
+        expect(userRepo.findOne).not.toHaveBeenCalled();
+        expect(entryRepo.sum).not.toHaveBeenCalled();
+    });
+
+    it('fully reverses a legacy purchase with no stored charge amount when the event has no amount', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 6000, driver: 'postgres' });
+        entryRepo.findOne.mockImplementation(async ({ where }: any) => {
+            if (where.idempotencyKey) return null;
+            if (where.kind === CreditLedgerKind.PURCHASE) {
+                return { ...PURCHASE, costCentsRef: null };
+            }
+            return null;
+        });
+
+        const result = await repository.recordCumulativeRefundAtomic({
+            refType: 'billing-payment',
+            refId: 'pi_legacy',
+            cumulativeRefundedCents: null,
+            idempotencyKey: 'stripe:evt:evt_legacy_refund',
+        });
+
+        expect(result.creditsReversed).toBe(5500);
+        expect(entryRepo.save).toHaveBeenCalledWith(
+            expect.objectContaining({ amountCredits: -5500, balanceAfter: 500 }),
+        );
     });
 });
 

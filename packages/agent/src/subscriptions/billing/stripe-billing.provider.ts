@@ -8,6 +8,7 @@ import Stripe from 'stripe';
 import { config } from '@src/config';
 import type { BillingSubscriptionStatus } from '@src/entities/billing-profile.entity';
 import {
+    BILLING_PROVIDER_ERROR_CODES,
     BillingProvider,
     BillingProviderError,
     BillingProviderNotConfiguredError,
@@ -116,6 +117,9 @@ const STRIPE_TAX_SESSION_FIELDS = {
     customer_update: { address: 'auto', name: 'auto' },
     tax_id_collection: { enabled: true },
 } as const;
+
+/** Stripe Tax code for prepaid hosted AI / API credits. */
+const STRIPE_CREDIT_TAX_CODE = 'txcd_10105002' as const;
 
 /** `kind` metadata values — how a purchase at the provider originated. */
 export const STRIPE_PURCHASE_KINDS = {
@@ -331,7 +335,7 @@ export class StripeBillingProvider extends BillingProvider {
 
         const lineItems = await this.buildPlanLineItems(request);
 
-        const session = await stripe.checkout.sessions.create({
+        const params: Stripe.Checkout.SessionCreateParams = {
             mode: isPerpetual ? 'payment' : 'subscription',
             customer: customerId,
             client_reference_id: request.referenceId,
@@ -343,17 +347,8 @@ export class StripeBillingProvider extends BillingProvider {
             line_items: lineItems,
             metadata,
             // A `mode: 'payment'` sale emits no `invoice.*` event unless invoice
-            // creation is asked for explicitly. Without this, a successful $99
-            // perpetual-licence payment produces NO invoice, NO ledger row and NO
-            // subscription row — by design, since a licence grants no hosted
-            // tier — so the billing page after paying is byte-identical to
-            // before, with the same enabled "$99" button. The buyer concludes it
-            // failed and pays again, and nothing on this path is idempotent
-            // (`checkout.sessions.create` carries no idempotency key here).
-            //
-            // Turning it on routes the sale through the existing
-            // `invoice.updated` -> `mirrorInvoice` path, so the buyer gets a
-            // receipt in-app through plumbing that already exists.
+            // creation is asked for explicitly. Turning it on routes the sale
+            // through the existing invoice mirror so the buyer gets a receipt.
             ...(isPerpetual ? { invoice_creation: { enabled: true } } : {}),
             // `subscription_data` is rejected outright in payment mode; the one-off equivalent is
             // `payment_intent_data`, which is also where the licence marker has to be mirrored so a
@@ -361,7 +356,12 @@ export class StripeBillingProvider extends BillingProvider {
             ...(isPerpetual
                 ? { payment_intent_data: { metadata } }
                 : { subscription_data: { metadata } }),
-        });
+        };
+        const session = request.idempotencyKey
+            ? await stripe.checkout.sessions.create(params, {
+                  idempotencyKey: request.idempotencyKey,
+              })
+            : await stripe.checkout.sessions.create(params);
 
         if (!session.url) {
             throw new BillingProviderError('Checkout session did not return a redirect URL');
@@ -514,8 +514,14 @@ export class StripeBillingProvider extends BillingProvider {
             session = await stripe.checkout.sessions.retrieve(sessionId, {
                 expand: ['subscription'],
             });
-        } catch {
+        } catch (error) {
             // Never echo the provider message — it can quote request params.
+            if (isStripeResourceMissing(error)) {
+                throw new BillingProviderError(
+                    'Checkout session not found',
+                    BILLING_PROVIDER_ERROR_CODES.CHECKOUT_SESSION_NOT_FOUND,
+                );
+            }
             throw new BillingProviderError('Checkout session could not be read');
         }
 
@@ -540,6 +546,9 @@ export class StripeBillingProvider extends BillingProvider {
             packId: meta[STRIPE_METADATA_KEYS.packId] ?? null,
             customerId: asId(session.customer),
             subscriptionId: asId(subscription),
+            paymentId: asId(session.payment_intent),
+            amountCents: session.amount_total ?? null,
+            currency: session.currency ?? null,
             currentPeriodEnd:
                 subscription && typeof subscription === 'object'
                     ? readCurrentPeriodEnd(subscription as Stripe.Subscription)
@@ -548,57 +557,107 @@ export class StripeBillingProvider extends BillingProvider {
     }
 
     /**
-     * 🛑 THIS PATH COLLECTS NO TAX. It can be made to - see the flow below -
-     * but it is not wired, and the difference is real money.
+     * Stripe does not copy Subscription metadata onto the invoice's
+     * PaymentIntent/Charge. Invoice Payments are the provider-owned mapping
+     * from that PaymentIntent back to its Invoice; the Invoice carries an
+     * immutable snapshot of the originating Subscription metadata.
+     */
+    async findPlanSubscriptionIdForPayment(paymentId: string): Promise<string | null> {
+        const stripe = this.requireClient();
+        const payments = await stripe.invoicePayments.list({
+            payment: { type: 'payment_intent', payment_intent: paymentId },
+            status: 'paid',
+            limit: 1,
+            expand: ['data.invoice'],
+        });
+        const invoice = payments.data[0]?.invoice;
+        if (!invoice || typeof invoice === 'string' || !('parent' in invoice)) return null;
+        const parent = invoice.parent;
+        const details =
+            parent?.type === 'subscription_details' ? parent.subscription_details : null;
+        if (
+            details?.metadata?.[STRIPE_METADATA_KEYS.kind] !==
+            STRIPE_PURCHASE_KINDS.planSubscription
+        ) {
+            return null;
+        }
+        return asId(details.subscription);
+    }
+
+    async findPerpetualLicenceForPayment(
+        paymentId: string,
+    ): Promise<{ userId: string; planCode: string } | null> {
+        const intent = await this.requireClient().paymentIntents.retrieve(paymentId);
+        const metadata = intent.metadata ?? {};
+        if (
+            metadata[STRIPE_METADATA_KEYS.kind] !== STRIPE_PURCHASE_KINDS.planSubscription ||
+            metadata[STRIPE_METADATA_KEYS.licence] !== STRIPE_PERPETUAL_LICENCE
+        ) {
+            return null;
+        }
+        const userId = metadata[STRIPE_METADATA_KEYS.userId];
+        const planCode = metadata[STRIPE_METADATA_KEYS.planCode];
+        return userId && planCode ? { userId, planCode } : null;
+    }
+
+    /**
+     * Tax-inclusive off-session credit-pack charge.
      *
-     * The Checkout credit-pack purchase asks for `automatic_tax`, so a German
-     * buyer of the 5,500-credit pack pays $50 + $9.50 VAT. The SAME pack bought
-     * through auto-recharge goes out as a bare PaymentIntent and is charged at
-     * $50 flat. Under the account's OSS registration that VAT is owed either
-     * way, so the difference comes out of margin - and the two prices for one
-     * product is the kind of thing an audit finds.
+     * Checkout uses `automatic_tax`, but PaymentIntents use Stripe Tax's custom
+     * flow instead: calculate against the existing Customer (address + tax IDs),
+     * charge the calculation's `amount_total`, and link the calculation through
+     * `hooks.inputs.tax.calculation`. Stripe then commits the tax transaction
+     * when the intent succeeds and automatically reverses it on a later refund.
      *
-     * `automatic_tax` is not the mechanism here - PaymentIntents reject it
-     * outright (verified 2026-08-23: `POST /v1/payment_intents`
-     * `automatic_tax[enabled]=true` -> 400 "Received unknown parameter"). But a
-     * supported off-session flow DOES exist, and it is smaller than an Invoice
-     * rewrite:
-     *
-     *   1. `POST /v1/tax/calculations` with the pack amount, the product tax
-     *      code and the customer's address -> `amount_total` including tax;
-     *   2. create the PaymentIntent for that total, passing the calculation id
-     *      as `hooks[inputs][tax][calculation]`;
-     *   3. after it succeeds, `POST /v1/tax/transactions/create_from_calculation`
-     *      so the collected tax is actually reported.
-     *
-     * Step 2 is confirmed accepted on this account (2026-08-23; control: a bogus
-     * `hooks[inputs][tax][not_a_field]` on the same call IS rejected, so the
-     * probe discriminates). It is left unimplemented deliberately - it changes
-     * the amount charged, and shipping a new tax path on a money route with no
-     * end-to-end test would be worse than the gap it closes.
-     *
-     * EXPOSURE TODAY IS ZERO, and the reason is worth knowing because it is
-     * about to change: `autoRechargeEnabled` defaults false and is opt-in, and
-     * turning it on requires a saved card - which was impossible, because the
-     * setup session was rejected by Stripe for want of a `currency`. Measured:
-     * zero live Stripe customers carry an Ever Works userId (control: 1 of 8
-     * live customers in the shared account does have a default payment method,
-     * so the probe discriminates).
-     *
-     * Fixing that setup session is what makes this path reachable for the first
-     * time. Resolve the tax question BEFORE auto-recharge is advertised.
+     * Both POSTs carry stable, related idempotency keys. A calculation failure
+     * happens before any money call and is safe to release for retry; an
+     * indeterminate PaymentIntent response stays pending because Stripe may have
+     * charged even when this process did not receive the response.
      */
     async chargeOffSession(request: OffSessionChargeRequest): Promise<OffSessionChargeResult> {
         const stripe = this.requireClient();
+        let calculation: Stripe.Tax.Calculation;
+        try {
+            calculation = await stripe.tax.calculations.create(
+                {
+                    currency: request.pack.currency,
+                    customer: request.customerId,
+                    line_items: [
+                        {
+                            amount: request.pack.priceCents,
+                            reference: request.pack.id,
+                            tax_behavior: 'exclusive',
+                            tax_code: STRIPE_CREDIT_TAX_CODE,
+                        },
+                    ],
+                },
+                { idempotencyKey: `${request.idempotencyKey}:tax` },
+            );
+        } catch (error) {
+            const code = (error as { code?: string })?.code;
+            const type = (error as { type?: string })?.type;
+            this.logger.warn(
+                `Auto-recharge tax calculation failed for user ${request.userId} (type=${
+                    type ?? 'unknown'
+                }, code=${code ?? 'unknown'})`,
+            );
+            return {
+                paymentId: '',
+                status: 'failed',
+                failureCode: 'tax_calculation_failed',
+            };
+        }
+
         try {
             const intent = await stripe.paymentIntents.create(
                 {
-                    amount: request.pack.priceCents,
+                    amount: calculation.amount_total,
                     currency: request.pack.currency,
                     customer: request.customerId,
                     payment_method: request.paymentMethodRef,
                     off_session: true,
                     confirm: true,
+                    hooks: { inputs: { tax: { calculation: calculation.id } } },
                     metadata: {
                         [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.autoRecharge,
                         [STRIPE_METADATA_KEYS.userId]: request.userId,
@@ -615,11 +674,23 @@ export class StripeBillingProvider extends BillingProvider {
             };
         } catch (error) {
             const code = (error as { code?: string })?.code;
+            const type = (error as { type?: string })?.type;
             // Never log the error object wholesale — it can echo request
             // params including the payment-method reference.
             this.logger.warn(
-                `Off-session charge failed for user ${request.userId} (code=${code ?? 'unknown'})`,
+                `Off-session charge failed for user ${request.userId} (type=${
+                    type ?? 'unknown'
+                }, code=${code ?? 'unknown'})`,
             );
+
+            // Stripe documents connection and API errors as indeterminate:
+            // the request may have reached Stripe even though no response
+            // reached us. Keep the persisted claim/idempotency key in flight
+            // until a webhook confirms the payment outcome.
+            if (type === 'StripeConnectionError' || type === 'StripeAPIError') {
+                return { paymentId: '', status: 'pending' };
+            }
+
             return { paymentId: '', status: 'failed', failureCode: code };
         }
     }
@@ -928,6 +999,7 @@ export class StripeBillingProvider extends BillingProvider {
                         referenceId: session.client_reference_id ?? null,
                         planCode: meta[STRIPE_METADATA_KEYS.planCode] ?? null,
                         subscriptionId: asId(session.subscription),
+                        paymentId: asId(session.payment_intent),
                         amountCents: session.amount_total ?? null,
                         currency: session.currency ?? null,
                         cancelAtPeriodEnd: false,
@@ -981,6 +1053,7 @@ export class StripeBillingProvider extends BillingProvider {
                     amountCents: charge.amount_refunded ?? null,
                     currency: charge.currency ?? null,
                     paymentId: asId(charge.payment_intent),
+                    reversal: { reason: 'refund', fullyReversed: charge.refunded === true },
                 };
             }
 
@@ -992,6 +1065,7 @@ export class StripeBillingProvider extends BillingProvider {
                     amountCents: dispute.amount ?? null,
                     currency: dispute.currency ?? null,
                     paymentId: asId(dispute.payment_intent),
+                    reversal: { reason: 'dispute', fullyReversed: true },
                 };
             }
 
@@ -1181,6 +1255,11 @@ export class StripeBillingProvider extends BillingProvider {
         const session = await stripe.checkout.sessions.create({
             mode: 'setup',
             customer: request.customerId,
+            // Auto-recharge calculates tax from the existing Customer. Always
+            // collect a complete billing address here and persist it, so a user
+            // who only saved a payment method still has a tax-ready Customer.
+            billing_address_collection: 'required',
+            customer_update: { address: 'auto' },
             // 🛑 Required. Stripe rejects a `mode: 'setup'` session outright -
             // "Missing required param: currency" - unless EITHER `currency` or an
             // explicit `payment_method_types` is given. Neither was, so saving a card
@@ -1269,6 +1348,22 @@ function defaultStripeClient(secretKey: string): Stripe {
 
 function nonEmpty(value: string | undefined | null): boolean {
     return typeof value === 'string' && value.trim().length > 0;
+}
+
+/** Stripe's stable missing-resource shape; no provider message or requested id escapes. */
+function isStripeResourceMissing(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const candidate = error as {
+        code?: unknown;
+        statusCode?: unknown;
+        raw?: { code?: unknown; statusCode?: unknown };
+    };
+    return (
+        candidate.code === 'resource_missing' ||
+        candidate.raw?.code === 'resource_missing' ||
+        candidate.statusCode === 404 ||
+        candidate.raw?.statusCode === 404
+    );
 }
 
 /** Stripe expandable fields are `string | Object | null`. */

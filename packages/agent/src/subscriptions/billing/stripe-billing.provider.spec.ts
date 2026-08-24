@@ -56,6 +56,15 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
         },
         paymentIntents: {
             create: jest.fn().mockResolvedValue({ id: 'pi_1', status: 'succeeded' }),
+            retrieve: jest.fn().mockResolvedValue({ id: 'pi_1', metadata: {} }),
+        },
+        invoicePayments: {
+            list: jest.fn().mockResolvedValue({ data: [] }),
+        },
+        tax: {
+            calculations: {
+                create: jest.fn().mockResolvedValue({ id: 'taxcalc_1', amount_total: 1190 }),
+            },
         },
         paymentMethods: {
             list: jest.fn().mockResolvedValue({ data: [] }),
@@ -184,7 +193,7 @@ describe('StripeBillingProvider — checkout', () => {
         expect(params.payment_intent_data).toBeUndefined();
     });
 
-    it('passes the claim key as the provider idempotency key on an off-session charge', async () => {
+    it('calculates tax and links it to the idempotent off-session PaymentIntent', async () => {
         const { provider, client } = build();
 
         const result = await provider.chargeOffSession({
@@ -202,11 +211,63 @@ describe('StripeBillingProvider — checkout', () => {
         });
 
         expect(result).toEqual({ paymentId: 'pi_1', status: 'succeeded' });
+        expect(client.tax.calculations.create).toHaveBeenCalledWith(
+            {
+                currency: 'usd',
+                customer: 'cus_1',
+                line_items: [
+                    {
+                        amount: 1000,
+                        reference: 'credits-1000',
+                        tax_behavior: 'exclusive',
+                        tax_code: 'txcd_10105002',
+                    },
+                ],
+            },
+            { idempotencyKey: 'auto:u1:credits-1000:1:tax' },
+        );
         const [params, options] = client.paymentIntents.create.mock.calls[0];
-        expect(params.amount).toBe(1000);
+        expect(params.amount).toBe(1190);
         expect(params.off_session).toBe(true);
+        expect(params.hooks).toEqual({ inputs: { tax: { calculation: 'taxcalc_1' } } });
         expect(params.metadata[STRIPE_METADATA_KEYS.kind]).toBe(STRIPE_PURCHASE_KINDS.autoRecharge);
         expect(options).toEqual({ idempotencyKey: 'auto:u1:credits-1000:1' });
+    });
+
+    it('releases the recharge slot when tax calculation fails before any payment call', async () => {
+        const client = fakeClient({
+            tax: {
+                calculations: {
+                    create: jest.fn().mockRejectedValue(
+                        Object.assign(new Error('Tax location unavailable'), {
+                            type: 'StripeConnectionError',
+                        }),
+                    ),
+                },
+            },
+        });
+        const { provider } = build(client);
+
+        const result = await provider.chargeOffSession({
+            customerId: 'cus_1',
+            paymentMethodRef: 'pm_1',
+            userId: 'u1',
+            idempotencyKey: 'auto:u1:credits-1000:1',
+            pack: {
+                id: 'credits-1000',
+                priceCents: 1000,
+                credits: 1000,
+                currency: 'usd',
+                label: '1,000 credits',
+            },
+        });
+
+        expect(result).toEqual({
+            paymentId: '',
+            status: 'failed',
+            failureCode: 'tax_calculation_failed',
+        });
+        expect(client.paymentIntents.create).not.toHaveBeenCalled();
     });
 
     it('reports a declined charge as failed instead of throwing', async () => {
@@ -237,6 +298,38 @@ describe('StripeBillingProvider — checkout', () => {
 
         expect(result).toEqual({ paymentId: '', status: 'failed', failureCode: 'card_declined' });
     });
+
+    it.each(['StripeConnectionError', 'StripeAPIError'])(
+        'reports %s as pending because Stripe may still have created the payment',
+        async (type) => {
+            const client = fakeClient({
+                paymentIntents: {
+                    create: jest
+                        .fn()
+                        .mockRejectedValue(
+                            Object.assign(new Error('Stripe request outcome unknown'), { type }),
+                        ),
+                },
+            });
+            const { provider } = build(client);
+
+            const result = await provider.chargeOffSession({
+                customerId: 'cus_1',
+                paymentMethodRef: 'pm_1',
+                userId: 'u1',
+                idempotencyKey: 'auto:u1:credits-1000:1',
+                pack: {
+                    id: 'credits-1000',
+                    priceCents: 1000,
+                    credits: 1000,
+                    currency: 'usd',
+                    label: '1,000 credits',
+                },
+            });
+
+            expect(result).toEqual({ paymentId: '', status: 'pending' });
+        },
+    );
 });
 
 describe('StripeBillingProvider — payment methods (billing PRD §3.3)', () => {
@@ -259,6 +352,8 @@ describe('StripeBillingProvider — payment methods (billing PRD §3.3)', () => 
         // the provider's page, not to us.
         expect(params.mode).toBe('setup');
         expect(params.customer).toBe('cus_1');
+        expect(params.billing_address_collection).toBe('required');
+        expect(params.customer_update).toEqual({ address: 'auto' });
         // No card datum is ever passed out of this process.
         expect(JSON.stringify(params)).not.toMatch(/card|number|cvc/i);
         expect(session).toEqual({ url: 'https://pay.example/cs_1', sessionId: 'cs_1' });
@@ -563,7 +658,7 @@ describe('StripeBillingProvider — event normalization', () => {
         );
     });
 
-    it('normalizes a refund and a dispute to credits.refunded', async () => {
+    it('normalizes a refund and a dispute with an explicit entitlement-reversal posture', async () => {
         const refund = await parse({
             id: 'evt_6',
             type: 'charge.refunded',
@@ -571,6 +666,7 @@ describe('StripeBillingProvider — event normalization', () => {
                 object: {
                     customer: 'cus_1',
                     amount_refunded: 2500,
+                    refunded: false,
                     currency: 'usd',
                     payment_intent: 'pi_1',
                 },
@@ -581,6 +677,7 @@ describe('StripeBillingProvider — event normalization', () => {
                 kind: 'credits.refunded',
                 amountCents: 2500,
                 paymentId: 'pi_1',
+                reversal: { reason: 'refund', fullyReversed: false },
             }),
         );
 
@@ -590,8 +687,89 @@ describe('StripeBillingProvider — event normalization', () => {
             data: { object: { amount: 5000, currency: 'usd', payment_intent: 'pi_2' } },
         });
         expect(dispute).toEqual(
-            expect.objectContaining({ kind: 'credits.refunded', amountCents: 5000 }),
+            expect.objectContaining({
+                kind: 'credits.refunded',
+                amountCents: 5000,
+                reversal: { reason: 'dispute', fullyReversed: true },
+            }),
         );
+    });
+
+    it('maps a recurring plan payment intent back to our exact subscription through Invoice Payments', async () => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        const client = fakeClient();
+        client.invoicePayments.list.mockResolvedValue({
+            data: [
+                {
+                    invoice: {
+                        parent: {
+                            type: 'subscription_details',
+                            subscription_details: {
+                                subscription: 'sub_plan_1',
+                                metadata: {
+                                    [STRIPE_METADATA_KEYS.kind]:
+                                        STRIPE_PURCHASE_KINDS.planSubscription,
+                                },
+                            },
+                        },
+                    },
+                },
+            ],
+        });
+        const { provider } = build(client);
+
+        await expect(provider.findPlanSubscriptionIdForPayment('pi_plan_1')).resolves.toBe(
+            'sub_plan_1',
+        );
+        expect(client.invoicePayments.list).toHaveBeenCalledWith({
+            payment: { type: 'payment_intent', payment_intent: 'pi_plan_1' },
+            status: 'paid',
+            limit: 1,
+            expand: ['data.invoice'],
+        });
+    });
+
+    it('does not map an invoice payment whose subscription metadata is not ours', async () => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        const client = fakeClient();
+        client.invoicePayments.list.mockResolvedValue({
+            data: [
+                {
+                    invoice: {
+                        parent: {
+                            type: 'subscription_details',
+                            subscription_details: {
+                                subscription: 'sub_foreign',
+                                metadata: {},
+                            },
+                        },
+                    },
+                },
+            ],
+        });
+        const { provider } = build(client);
+
+        await expect(provider.findPlanSubscriptionIdForPayment('pi_foreign')).resolves.toBeNull();
+    });
+
+    it('recognizes a perpetual licence from PaymentIntent metadata copied to its charge', async () => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        const client = fakeClient();
+        client.paymentIntents.retrieve.mockResolvedValue({
+            id: 'pi_licence',
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                [STRIPE_METADATA_KEYS.licence]: STRIPE_PERPETUAL_LICENCE,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.planCode]: 'selfhosted_pro',
+            },
+        });
+        const { provider } = build(client);
+
+        await expect(provider.findPerpetualLicenceForPayment('pi_licence')).resolves.toEqual({
+            userId: 'u1',
+            planCode: 'selfhosted_pro',
+        });
     });
 
     it('normalizes an invoice event into a vendor-neutral snapshot', async () => {
@@ -989,6 +1167,20 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         );
     });
 
+    it('passes the durable licence attempt key to Stripe', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession({
+            ...planRequest,
+            plan: { ...planRequest.plan, mode: 'payment', code: 'selfhosted_pro' },
+            idempotencyKey: 'licence:u1:selfhosted_pro:1',
+        });
+
+        expect(client.checkout.sessions.create.mock.calls[0][1]).toEqual({
+            idempotencyKey: 'licence:u1:selfhosted_pro:1',
+        });
+    });
+
     it('marks a licence sale so manual fulfilment can find it', async () => {
         const { provider, client } = build();
 
@@ -998,8 +1190,9 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         });
 
         const params = client.checkout.sessions.create.mock.calls[0][0];
-        // Issuing the licence document is manual for now, so this marker is the only way to list
-        // who is owed one. It must be on BOTH objects.
+        // Issuing the licence document is manual for now. The durable local record is the product
+        // view; this marker keeps the same sale independently auditable in Stripe. It must be on
+        // BOTH objects.
         expect(params.metadata[STRIPE_METADATA_KEYS.licence]).toBe(STRIPE_PERPETUAL_LICENCE);
         expect(params.payment_intent_data.metadata[STRIPE_METADATA_KEYS.licence]).toBe(
             STRIPE_PERPETUAL_LICENCE,
@@ -1351,6 +1544,9 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
             payment_status: 'paid',
             customer: 'cus_1',
             subscription: { id: 'sub_1', current_period_end: 1790000000 },
+            payment_intent: 'pi_1',
+            amount_total: 2900,
+            currency: 'usd',
             metadata: {
                 [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
                 [STRIPE_METADATA_KEYS.userId]: 'u1',
@@ -1371,6 +1567,9 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
                 planCode: 'standard',
                 customerId: 'cus_1',
                 subscriptionId: 'sub_1',
+                paymentId: 'pi_1',
+                amountCents: 2900,
+                currency: 'usd',
             }),
         );
         expect(snapshot.currentPeriodEnd).toEqual(new Date(1790000000 * 1000));
@@ -1412,7 +1611,24 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         expect(snapshot.planCode).toBeNull();
     });
 
-    it('never echoes the provider message when a session cannot be read', async () => {
+    it('classifies Stripe resource_missing without echoing the requested session id', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest.fn().mockRejectedValue({
+            type: 'StripeInvalidRequestError',
+            code: 'resource_missing',
+            statusCode: 404,
+            message: 'No such checkout.session: cs_secret; req_123',
+        });
+        const { provider } = build(client);
+
+        await expect(provider.retrieveCheckoutSession('cs_missing')).rejects.toMatchObject({
+            name: 'BillingProviderError',
+            message: 'Checkout session not found',
+            code: 'checkout-session-not-found',
+        });
+    });
+
+    it('never echoes the provider message when a non-missing session read fails', async () => {
         const client = fakeClient();
         client.checkout.sessions.retrieve = jest
             .fn()
@@ -1457,6 +1673,7 @@ describe('StripeBillingProvider — subscription event normalization (audit B24)
                     customer: 'cus_1',
                     client_reference_id: 'u1:standard',
                     subscription: 'sub_1',
+                    payment_intent: 'pi_1',
                     amount_total: 2900,
                     currency: 'usd',
                     metadata: planMeta,
@@ -1469,6 +1686,7 @@ describe('StripeBillingProvider — subscription event normalization (audit B24)
                 kind: 'subscription.activated',
                 planCode: 'standard',
                 subscriptionId: 'sub_1',
+                paymentId: 'pi_1',
                 customerId: 'cus_1',
                 referenceId: 'u1:standard',
             }),
