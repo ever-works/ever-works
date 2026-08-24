@@ -8,6 +8,8 @@ on:
 
 concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
+  # This lane publishes only `:latest`, which no Deployment tracks. Cancel a
+  # superseded build to reclaim its runner for the deploy-bearing k8s-build.
   cancel-in-progress: true
 
 permissions:
@@ -222,4 +224,3 @@ jobs:
     #  - name: Push to CW Registry
     #    run: |
     #      docker push ${{ secrets.CW_DOCKER_REGISTRY }}/ever-co/ever-works-web:latest
-
