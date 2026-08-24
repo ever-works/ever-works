@@ -1,12 +1,13 @@
 import { Global, Module } from '@nestjs/common';
 import { AuthModule } from '@src/auth';
 import {
+    SeatsService,
     SubscriptionsModule as AgentSubscriptionsModule,
     RunCostSettlementService,
     PlanRunLimitsService,
 } from '@ever-works/agent/subscriptions';
 import { RUN_COST_SETTLER } from '@ever-works/agent/database';
-import { RUN_CREDITS_PRECHECK, RUN_PLAN_LIMITS } from '@ever-works/agent/agents';
+import { RUN_CREDITS_PRECHECK, RUN_PLAN_LIMITS, SEAT_GUARD } from '@ever-works/agent/agents';
 import { SubscriptionsController } from './subscriptions.controller';
 import { CreditsController } from './credits.controller';
 import { CostsController } from './costs.controller';
@@ -44,7 +45,13 @@ import { CostsController } from './costs.controller';
         // (and leave `max-concurrent-runs` unread, exactly as before) if
         // this binding were not global.
         { provide: RUN_PLAN_LIMITS, useExisting: PlanRunLimitsService },
+        // Seats (billing spec §3.6 / FR-28) — an agent occupies a seat like an
+        // employee does, so AgentsService asks this token before it creates
+        // one. Same @Global() reasoning as the three above: AgentsService
+        // consults it through an @Optional() @Inject() and would silently
+        // resolve undefined (never seat-checking) without a global binding.
+        { provide: SEAT_GUARD, useExisting: SeatsService },
     ],
-    exports: [RUN_COST_SETTLER, RUN_CREDITS_PRECHECK, RUN_PLAN_LIMITS],
+    exports: [RUN_COST_SETTLER, RUN_CREDITS_PRECHECK, RUN_PLAN_LIMITS, SEAT_GUARD],
 })
 export class SubscriptionsModule {}

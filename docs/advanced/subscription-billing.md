@@ -47,6 +47,32 @@ Plan codes are identities (`free` / `standard` / `premium`) and never change;
    with no balance and no pay-as-you-go headroom (`CREDITS_ENFORCEMENT`
    defaults on iff Stripe is configured).
 
+## Seats
+
+A seat is an **employee OR an agent** — interchangeable, which is the point of
+the product. Paid plans include 10; extras are billed per seat per month from
+the catalog ($5 Pro / $10 Enterprise).
+
+- **Counted tenant-wide.** Access in Ever Works is tenant-wide, so somebody
+  who belongs to three Organizations in one Tenant occupies ONE seat, and an
+  agent built by a team member is capacity exactly like one the owner built.
+  Archiving an agent frees its seat.
+- **Persisted from the provider.** `user_subscriptions.seats` /
+  `providerSeatItemId` are reconciled from the subscription's items on every
+  `subscription.*` delivery (the seat item is the one whose price
+  `lookup_key` carries the `_seat_` infix), never guessed locally. NULL means
+  "fall back to the plan's `seatsIncluded`" — never zero, which would read as
+  "no seats allowed".
+- **Enforced before the write.** Inviting a member (at invite AND at accept)
+  and creating an agent ask `SeatsService.assertSeatAvailable` for the Tenant
+  owner first; a full allowance surfaces as **402** with the counts. The check
+  fails OPEN on everything else: subscriptions disabled, an unbounded plan, or
+  any resolution error never blocks adding a teammate.
+- **Adjustable.** `POST /api/billing/seats` takes the TOTAL wanted (a total,
+  not a delta — a delta double-charges on a retry); the server bills
+  `max(0, total − included)` from the stored plan row and refuses to drop the
+  allowance below what is already in use.
+
 ## Stripe integration (the provider seam)
 
 `BillingProvider` is the vendor-neutral seam; `StripeBillingProvider` is the

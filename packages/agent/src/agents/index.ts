@@ -51,6 +51,7 @@ export * from './sub-agent-delegation.port';
 export * from './sub-agent-delegation.service';
 export * from './run-steering.service';
 export * from './run-credits-precheck';
+export * from './seat-guard';
 export * from './run-plan-limits';
 export * from './terminal-session-dispatcher';
 export * from './terminal-session-launcher.service';

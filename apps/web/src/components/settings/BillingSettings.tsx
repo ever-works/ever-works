@@ -11,6 +11,7 @@ import {
     FileText,
     Gauge,
     RefreshCw,
+    Users,
     ShieldCheck,
     Wallet,
     Zap,
@@ -30,6 +31,7 @@ import {
     startPlanCheckoutAction,
     updateAutoRechargeAction,
     updatePaygAction,
+    updateSeatsAction,
 } from '@/app/actions/dashboard/billing';
 import {
     CREDIT_LEDGER_KINDS,
@@ -50,6 +52,7 @@ import {
     canCancelSubscription,
     canConfigureAutoRecharge,
     canConfigurePayg,
+    canManageSeats,
     canUpgradePlan,
     estimatePaygCents,
     formatCentsPerCredit,
@@ -66,6 +69,7 @@ import {
     type InvoiceListPage,
     type PlanCheckoutReturnResponse,
     type PaygState,
+    type SeatsState,
     type SubscriptionState,
 } from '@/lib/api/billing.shared';
 
@@ -83,6 +87,8 @@ interface BillingSettingsProps {
      * Null when this is an ordinary page load.
      */
     checkoutReturn?: PlanCheckoutReturnResponse | null;
+    /** Seats (billing spec §3.6). Null ⇒ the seats call failed. */
+    initialSeats?: SeatsState | null;
 }
 
 const LEDGER_PAGE_SIZE = 10;
@@ -175,6 +181,7 @@ export function BillingSettings({
     initialOverview,
     initialInvoices,
     checkoutReturn,
+    initialSeats = null,
 }: BillingSettingsProps) {
     const t = useTranslations('dashboard.settings.billing');
     const [isPending, startTransition] = useTransition();
@@ -275,6 +282,34 @@ export function BillingSettings({
             setPaygSaving(false);
         }
     }, [paygCap, paygOn, t]);
+
+    // ── Seats (billing spec §3.6) — employees OR agents ───────────────
+    const [seats, setSeats] = useState<SeatsState | null>(initialSeats);
+    const [seatsInput, setSeatsInput] = useState(
+        initialSeats?.allowance != null ? String(initialSeats.allowance) : '',
+    );
+    const [seatsSaving, setSeatsSaving] = useState(false);
+    const seatsManageable = canManageSeats(seats, paymentsEnabled);
+
+    const handleSaveSeats = useCallback(async () => {
+        const wanted = Number(seatsInput);
+        if (!Number.isFinite(wanted) || wanted < 0) {
+            return;
+        }
+        setSeatsSaving(true);
+        try {
+            const result = await updateSeatsAction(Math.round(wanted));
+            if (result.success && result.seats) {
+                setSeats(result.seats);
+                setSeatsInput(result.seats.allowance != null ? String(result.seats.allowance) : '');
+                toast.success(t('seats.saved'));
+            } else {
+                toast.error(result.error ?? t('seats.saveError'));
+            }
+        } finally {
+            setSeatsSaving(false);
+        }
+    }, [seatsInput, t]);
 
     const invoices = initialInvoices?.invoices ?? [];
     const paymentMethodLabel = formatPaymentMethod(overview?.paymentMethod ?? null);
@@ -1018,6 +1053,74 @@ export function BillingSettings({
                     )}
                 </SectionCard>
             </div>
+
+            {/* ── Seats (billing spec §3.6) — employees OR agents ────────── */}
+            {seats ? (
+                <SectionCard icon={Users} title={t('seats.title')} testId="billing-seats">
+                    <div className="space-y-3">
+                        <p
+                            className="text-sm text-text dark:text-text-dark"
+                            data-testid="billing-seats-usage"
+                        >
+                            {seats.allowance === null
+                                ? t('seats.unlimited', { used: seats.used.toLocaleString('en-US') })
+                                : t('seats.usage', {
+                                      used: seats.used.toLocaleString('en-US'),
+                                      allowance: seats.allowance.toLocaleString('en-US'),
+                                  })}
+                        </p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('seats.breakdown', {
+                                members: seats.members.toLocaleString('en-US'),
+                                agents: seats.agents.toLocaleString('en-US'),
+                            })}
+                            {seats.included !== null
+                                ? ` · ${t('seats.included', {
+                                      included: seats.included.toLocaleString('en-US'),
+                                      purchased: seats.purchased.toLocaleString('en-US'),
+                                  })}`
+                                : ''}
+                        </p>
+                        {seatsManageable ? (
+                            <div className="flex flex-wrap items-end gap-3">
+                                <label className="flex flex-col gap-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('seats.totalLabel')}
+                                    <input
+                                        type="number"
+                                        min={seats.used}
+                                        step="1"
+                                        inputMode="numeric"
+                                        value={seatsInput}
+                                        data-testid="billing-seats-input"
+                                        onChange={(e) => setSeatsInput(e.target.value)}
+                                        className="w-28 rounded-md border border-border dark:border-border-dark bg-transparent px-3 py-1.5 text-xs text-text dark:text-text-dark"
+                                    />
+                                </label>
+                                {seats.seatPriceCents ? (
+                                    <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                        {t('seats.price', {
+                                            price: formatCreditsAsDollars(seats.seatPriceCents),
+                                        })}
+                                    </span>
+                                ) : null}
+                                <Button
+                                    variant="secondary"
+                                    className="text-xs"
+                                    disabled={seatsSaving}
+                                    data-testid="billing-seats-save"
+                                    onClick={() => void handleSaveSeats()}
+                                >
+                                    {t('seats.save')}
+                                </Button>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('seats.notManageable')}
+                            </p>
+                        )}
+                    </div>
+                </SectionCard>
+            ) : null}
 
             {/* ── Pay-as-you-go (billing spec §3.5) ─────────────────────── */}
             <SectionCard icon={Gauge} title={t('payg.title')} testId="billing-payg">

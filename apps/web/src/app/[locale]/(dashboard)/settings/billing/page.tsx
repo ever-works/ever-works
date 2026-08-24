@@ -9,7 +9,7 @@ import type {
     SubscriptionPlanList,
     SubscriptionPlanSummary,
 } from '@/lib/api/credits.shared';
-import type { BillingOverview, InvoiceListPage } from '@/lib/api/billing.shared';
+import type { BillingOverview, InvoiceListPage, SeatsResponse } from '@/lib/api/billing.shared';
 import { BillingSettings } from '@/components/settings/BillingSettings';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -57,7 +57,7 @@ export default async function BillingSettingsPage({ searchParams }: BillingSetti
 
     // Each fetch degrades independently: a failed call renders that
     // section's error/empty state instead of failing the whole page.
-    const [plan, plans, balance, ledger, overview, invoices] = await Promise.all([
+    const [plan, plans, balance, ledger, overview, invoices, seats] = await Promise.all([
         subscriptionsAPI.currentPlan().catch((): SubscriptionPlanSummary | null => null),
         subscriptionsAPI.listPlans().catch((): SubscriptionPlanList | null => null),
         creditsAPI.balance().catch((): CreditsBalance | null => null),
@@ -66,6 +66,9 @@ export default async function BillingSettingsPage({ searchParams }: BillingSetti
         // flag, payment-method summary and auto-recharge in one call.
         billingAPI.overview().catch((): BillingOverview | null => null),
         billingAPI.invoices({ pageSize: 10 }).catch((): InvoiceListPage | null => null),
+        // Seats (billing spec §3.6) — employees OR agents, against the plan's
+        // included allowance plus anything bought.
+        billingAPI.seats().catch((): SeatsResponse | null => null),
     ]);
 
     // PRD §3.2/§3.7 — the purchase / payment-method / auto-recharge
@@ -85,6 +88,7 @@ export default async function BillingSettingsPage({ searchParams }: BillingSetti
             initialLedger={ledger}
             initialOverview={overview}
             initialInvoices={invoices}
+            initialSeats={seats}
             checkoutReturn={checkoutReturn}
         />
     );

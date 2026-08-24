@@ -120,6 +120,12 @@ Plans carry additive entitlement keys. A missing row always means "use the platf
 
 Credit enforcement follows the money: `CREDITS_ENFORCEMENT` unset resolves to **on when the billing provider is configured** (`STRIPE_SECRET_KEY` present) and **off otherwise**, and `credit-limited = 1` is seeded for the three cloud tiers. The dispatch gate parks a run only when the plan is credit-limited, the available balance is ≤ 0 **and** there is no pay-as-you-go headroom — and it grants today's daily allowance lazily first, so a cron hiccup never blocks a user who is owed free credits. Self-hosted plan codes carry no `credit-limited` row and are never gated.
 
+## Seats
+
+Seats are a separate axis from credits: a seat is a person **or** an agent, and
+the Billing page shows the allowance, what is using it, and the per-seat price.
+See [Subscription & Billing](../advanced/subscription-billing.md#seats).
+
 ## Related
 
 - [Budgets & Usage](./budgets-and-usage.md) · [Sessions & Steering](./sessions-and-steering.md)

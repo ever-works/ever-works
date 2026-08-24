@@ -382,6 +382,8 @@ export class PlanSubscriptionService {
                 providerSubscriptionId: event.subscriptionId ?? null,
                 currentPeriodEnd: event.currentPeriodEnd ?? null,
                 cancelAtPeriodEnd: event.cancelAtPeriodEnd ?? false,
+                seats: event.subscription?.seats,
+                seatItemId: event.subscription?.seatItemId,
             });
             return activated ? 'subscription-activated' : 'ignored';
         }
@@ -430,6 +432,9 @@ export class PlanSubscriptionService {
         providerSubscriptionId: string | null;
         currentPeriodEnd: Date | null;
         cancelAtPeriodEnd: boolean;
+        /** Extra seats the provider bills for; `undefined` = no snapshot here. */
+        seats?: number | null;
+        seatItemId?: string | null;
     }): Promise<boolean> {
         const plan = input.planCode ? await this.findPlanByCode(input.planCode) : null;
         if (!plan) {
@@ -473,6 +478,12 @@ export class PlanSubscriptionService {
             currentPeriodEnd: input.currentPeriodEnd ?? null,
             cancelAtPeriodEnd: input.cancelAtPeriodEnd,
             providerSubscriptionId: input.providerSubscriptionId ?? null,
+            // Billing spec FR-26 — seats come from the provider's own items,
+            // never from a local guess. `undefined` (no snapshot on this
+            // delivery) leaves the stored value alone; a snapshot with no seat
+            // item means "no extras", which is 0.
+            ...(input.seats === undefined ? {} : { seats: input.seats ?? 0 }),
+            ...(input.seatItemId === undefined ? {} : { providerSeatItemId: input.seatItemId }),
         });
 
         // THE privileged grant (`assignPlanToUser`) — documented as
