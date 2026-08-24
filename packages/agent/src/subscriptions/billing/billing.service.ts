@@ -667,7 +667,7 @@ export class BillingService {
             return this.unattributed(event);
         }
         const snapshot = event.invoice;
-        await this.invoiceRepository.mirror({
+        const mirrored = await this.invoiceRepository.mirror({
             userId: profile.userId,
             organizationId: profile.organizationId ?? null,
             tenantId: profile.tenantId ?? null,
@@ -695,7 +695,15 @@ export class BillingService {
         // must not un-mirror the invoice or 500 the delivery.
         if (snapshot.subscriptionKind === 'payg' && this.paygService) {
             try {
-                await this.paygService.applyInvoice(profile, snapshot);
+                const effectiveStatus = mirrored.status ?? snapshot.status;
+                await this.paygService.applyInvoice(profile, {
+                    ...snapshot,
+                    status: effectiveStatus,
+                    // A retained PAID mirror means this is an older failure
+                    // delivery for the same invoice, not a new dunning event.
+                    paymentFailed:
+                        Boolean(snapshot.paymentFailed) && effectiveStatus !== InvoiceStatus.PAID,
+                });
             } catch (error) {
                 this.logger.warn(
                     `Billing webhook ${event.id}: pay-as-you-go invoice handling failed (ignored): ${

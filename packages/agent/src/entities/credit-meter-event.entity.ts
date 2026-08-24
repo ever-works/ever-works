@@ -9,7 +9,8 @@ import { PortableDateColumn } from './_types';
  * owner had pay-as-you-go enabled. The row is written FIRST, in the same
  * settlement pass as the ledger debit; the Stripe meter event is sent
  * second and can fail — `status` tracks that, and the
- * `credits-meter-flush` cron retries `pending`/`failed` rows. Stripe is
+ * `credits-meter-flush` cron retries `pending` rows. Failed rows require
+ * manual reconciliation. Stripe is
  * the billing source of truth (it rates and invoices the meter); this
  * table is what lets the platform enforce the monthly cap in real time,
  * show "this cycle" usage on the Billing page, and reconcile.

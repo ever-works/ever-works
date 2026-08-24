@@ -332,6 +332,12 @@ export interface MeteredSubscriptionRequest {
     readonly invoiceThresholdCents: number;
     /** `{userId}:payg` — echoed back on the signed provider events. */
     readonly referenceId: string;
+    /**
+     * Server-generated provider idempotency key. It is stable across
+     * retries of one enable generation, but changes after a cancellation
+     * so re-enabling cannot replay the canceled subscription.
+     */
+    readonly idempotencyKey: string;
 }
 
 /** One usage report to the provider's meter. `value` is whole credits. */

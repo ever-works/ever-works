@@ -1805,6 +1805,7 @@ describe('StripeBillingProvider — pay-as-you-go (billing spec §3.5)', () => {
         lookupKey: 'ever_works_payg_credits_monthly',
         invoiceThresholdCents: 5000,
         referenceId: 'u1:payg',
+        idempotencyKey: 'payg-enable:u1:cus_1:initial',
     };
 
     it('creates the usage subscription from the CATALOG price (never inline), with thresholds, card and our metadata', async () => {
@@ -1832,7 +1833,7 @@ describe('StripeBillingProvider — pay-as-you-go (billing spec §3.5)', () => {
                     [STRIPE_METADATA_KEYS.referenceId]: 'u1:payg',
                 },
             },
-            { idempotencyKey: 'payg-enable:u1:cus_1' },
+            { idempotencyKey: 'payg-enable:u1:cus_1:initial' },
         );
         expect(snapshot).toEqual({
             subscriptionId: 'sub_payg',

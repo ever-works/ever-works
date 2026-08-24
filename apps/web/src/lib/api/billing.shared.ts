@@ -323,7 +323,10 @@ export function canConfigurePayg(
     return (
         canBuyCredits(overview, paymentsEnabled) &&
         Boolean(overview?.payg?.available) &&
-        Boolean(overview?.paymentMethod)
+        // A card is required to ENABLE arrears billing, but an already
+        // enabled owner must retain the control needed to turn it off after
+        // a card is detached or expires.
+        (Boolean(overview?.paymentMethod) || Boolean(overview?.payg?.enabled))
     );
 }
 

@@ -65,7 +65,9 @@ only file that imports the Stripe SDK. It uses:
 - **Billing Meters** — `ever_works_credits`, aggregation `sum` by
   `stripe_customer_id`; meter events are keyed `run:{runId}` (identifier =
   request idempotency key), retried by the `credits-meter-flush` cron and
-  given up past Stripe's 35-day backdating window.
+  given up after 23 hours for manual reconciliation. This stays inside
+  Stripe's 24-hour idempotency window and prevents a late retry from
+  double-counting usage after the request key expires.
 - **Webhooks** — signature-verified, normalized to a closed event union;
   every ledger write is idempotent on the provider event id. The
   pay-as-you-go subscription's lifecycle normalizes to `payg.updated` and can

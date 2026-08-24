@@ -3621,6 +3621,7 @@
                     "statusPastDue": "Payment failed",
                     "thisCycle": "This cycle: {used} of {cap} credits · ≈ {estimate}",
                     "cycleEnds": "Cycle resets {date}",
+                    "capEstimate": "≈ {estimate} / cycle at the cap",
                     "invoiceThreshold": "Usage is invoiced when it reaches {amount} and at the end of each cycle.",
                     "tiersTitle": "Pay-as-you-go rates (per cycle)",
                     "tierRow": "{from}–{to} credits",
@@ -3713,8 +3714,8 @@
                     "worksActive": "Works active",
                     "agentRuns": "Agent runs",
                     "periodNote": "Showing period {period}",
-                    "pricingNote": "1 credit = 1¢ of platform-billed usage ({perDollar} credits per $1).",
-                    "pricingNoteWithMargin": "1 credit = 1¢ of platform-billed usage ({perDollar} credits per $1). The platform rate includes a {margin}% service margin over provider list prices."
+                    "pricingNote": "{perDollar} credits = $1 of platform-billed usage.",
+                    "pricingNoteWithMargin": "{perDollar} credits = $1 of platform-billed usage. The platform rate includes a {margin}% service margin over provider list prices."
                 },
                 "charts": {
                     "byDay": "Usage per day",

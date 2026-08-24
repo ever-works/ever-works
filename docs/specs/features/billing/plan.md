@@ -59,7 +59,7 @@ Backfill: `remainingCredits = amountCredits` for existing positive rows, then re
 | `writtenOffCredits`                      | int default 0       | part beyond the cap that was not billed                               |
 | `costCentsRef`                           | int NULL            | metered provider cost this derived from                               |
 | `periodStart` / `periodEnd`              | timestamp           | PAYG cycle at record time                                             |
-| `status`                                 | varchar(16)         | `pending` → `sent` / `failed` (terminal after 35 days)                |
+| `status`                                 | varchar(16)         | `pending` → `sent` / `failed` (terminal after 23 hours)               |
 | `attempts`                               | int default 0       |                                                                       |
 | `lastError`                              | varchar(256) NULL   | never the full provider error                                         |
 | `sentAt`                                 | timestamp NULL      |                                                                       |
@@ -175,7 +175,7 @@ A and B are independent; C depends on A (buckets) and B (pricing endpoint); D is
 
 ## 5. Test plan
 
-- **Unit (Jest, `packages/agent`)**: bucket allocation order; expiry sweep idempotency; available-balance math; allowance-period arithmetic (Jan 31 → Feb 28/29, anchor day clamping, DST-free UTC); margin table; `estimatePaygCents` tiers; `PaygService.recordOverflow` cap/written-off maths + idempotency + send-failure → pending; `flushPending` 35-day terminal; webhook normalization for `payg-subscription` and PAYG invoices; seats math and assert; provider calls shaped correctly (fake Stripe client via `STRIPE_CLIENT_FACTORY`).
+- **Unit (Jest, `packages/agent`)**: bucket allocation order; expiry sweep idempotency; available-balance math; allowance-period arithmetic (Jan 31 → Feb 28/29, anchor day clamping, DST-free UTC); margin table; `estimatePaygCents` tiers; `PaygService.recordOverflow` cap/written-off maths + idempotency + send-failure → pending; `flushPending` 23-hour terminal; webhook normalization for `payg-subscription` and PAYG invoices; seats math and assert; provider calls shaped correctly (fake Stripe client via `STRIPE_CLIENT_FACTORY`).
 - **API (Jest, `apps/api`)**: `PUT /billing/payg` DTO guards (extra fields rejected, cap bounds, no payment method → 409), `GET /billing/payg`, seats endpoints, 402 mapping for seat limit; webhook controller routes `payg.updated`.
 - **Integration (sqlite)**: settlement end-to-end: balance 120 + run 500 → ledger −120, meter row 380 `pending/sent`; cap 1000 with 900 used + run 500 → row credits 100, writtenOff 400, notification 100 %.
 - **Sync script**: `--dry-run` against a catalog fixture (pure `buildIntents` extracted for test) — meter + price intents emitted; `--verify` drift strings.

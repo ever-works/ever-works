@@ -341,7 +341,6 @@ export class StripeBillingProvider extends BillingProvider {
             ...STRIPE_TAX_SESSION_FIELDS,
             line_items: lineItems,
             metadata,
-            ...STRIPE_TAX_SESSION_FIELDS,
             // A `mode: 'payment'` sale emits no `invoice.*` event unless invoice
             // creation is asked for explicitly. Without this, a successful $99
             // perpetual-licence payment produces NO invoice, NO ledger row and NO
@@ -721,7 +720,7 @@ export class StripeBillingProvider extends BillingProvider {
             },
             // One usage subscription per owner: a retried enable resolves to
             // the same provider object instead of a second meter target.
-            { idempotencyKey: `payg-enable:${request.userId}:${request.customerId}` },
+            { idempotencyKey: request.idempotencyKey },
         );
         return toSubscriptionSnapshot(subscription);
     }
@@ -756,7 +755,9 @@ export class StripeBillingProvider extends BillingProvider {
      * double-count within Stripe's de-duplication window. Provider refusals
      * are returned, not thrown — the caller decides retry vs. give-up; the
      * only terminal refusal we recognize is a timestamp outside Stripe's
-     * backdating window (35 days past / 5 minutes future).
+     * acceptance window (35 days past / 5 minutes future). The caller uses
+     * a shorter retry window because Stripe's idempotency guarantees expire
+     * after 24 hours.
      */
     async reportMeterEvent(request: MeterEventRequest): Promise<MeterEventOutcome> {
         const stripe = this.requireClient();

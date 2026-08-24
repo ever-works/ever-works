@@ -327,6 +327,7 @@ export class NotificationService {
             ? ` The cycle resets on ${args.periodEnd.toISOString().slice(0, 10)}.`
             : '';
         const reached = args.percent >= 100;
+        const cycleKey = args.periodEnd?.toISOString().slice(0, 10) ?? 'unknown-period';
         const title = reached ? 'Pay-as-you-go cap reached' : 'Pay-as-you-go at 80% of cap';
         const message = reached
             ? `Your pay-as-you-go usage reached your monthly cap (${used} of ${cap} credits). New runs ` +
@@ -344,7 +345,7 @@ export class NotificationService {
             actionLabel: 'Manage pay-as-you-go',
             isPersistent: reached,
             metadata: { percent: args.percent, usedCredits: used, capCredits: cap },
-            deduplicationKey: `payg_cap_${args.percent}`,
+            deduplicationKey: `payg_cap_${args.percent}_${cycleKey}`,
         });
         await this.dispatchFanout({
             userId: args.userId,

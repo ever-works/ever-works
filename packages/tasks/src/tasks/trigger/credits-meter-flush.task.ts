@@ -15,9 +15,9 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
  * Idempotency: each row's `identifier` (`run:{runId}`) is also the
  * provider's meter-event identifier and request idempotency key, so a
  * resend of an event that actually landed cannot double-count within the
- * provider's de-duplication window. Rows older than the provider's
- * backdating window are marked `failed` and logged for reconciliation
- * instead of being retried forever.
+ * provider's de-duplication window. Rows older than 23 hours are marked
+ * `failed` and logged for reconciliation instead of being retried after
+ * Stripe's 24-hour request-idempotency guarantee expires.
  */
 export const creditsMeterFlushTask = schedules.task({
     id: 'credits-meter-flush',

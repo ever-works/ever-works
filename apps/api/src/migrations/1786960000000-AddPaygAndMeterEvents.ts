@@ -124,7 +124,7 @@ export class AddPaygAndMeterEvents1786960000000 implements MigrationInterface {
                     .createQueryBuilder()
                     .select('pe.id', 'id')
                     .from('plan_entitlements', 'pe')
-                    .where('pe.planId = :planId AND pe.key = :key', {
+                    .where('pe."planId" = :planId AND pe."key" = :key', {
                         planId,
                         key: 'credit-limited',
                     })

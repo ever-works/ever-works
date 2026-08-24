@@ -71,6 +71,20 @@ export class InvoiceRepository {
         };
 
         if (existing) {
+            // Provider webhooks are at-least-once and may arrive out of
+            // order. Once an invoice is paid, an older draft/open snapshot
+            // must not reopen it or zero the collected amount. A later
+            // refund remains a valid forward transition and is preserved.
+            if (
+                existing.status === InvoiceStatus.PAID &&
+                (write.status === InvoiceStatus.DRAFT || write.status === InvoiceStatus.OPEN)
+            ) {
+                values.status = InvoiceStatus.PAID;
+                values.amountPaidCents = Math.max(
+                    existing.amountPaidCents ?? 0,
+                    values.amountPaidCents,
+                );
+            }
             await this.repository.update({ id: existing.id }, values);
             return (await this.repository.findOne({ where: { id: existing.id } })) ?? existing;
         }

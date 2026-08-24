@@ -52,8 +52,12 @@ export const PAYG_MIN_MONTHLY_CAP_CREDITS = 500;
 /** Usage statuses under which overflow may be metered. */
 const OVERFLOW_STATUSES: readonly BillingSubscriptionStatus[] = ['active', 'trialing'];
 
-/** Stripe refuses meter events older than this; older unsent rows are terminal. */
-const METER_BACKDATE_WINDOW_MS = 35 * 24 * 60 * 60 * 1000;
+/**
+ * Stripe's request-idempotency and meter-identifier de-duplication windows
+ * are 24 hours. Past this point an automatic retry could double-bill an
+ * event that Stripe accepted before our local `markSent` write failed.
+ */
+const METER_SAFE_RETRY_WINDOW_MS = 23 * 60 * 60 * 1000;
 
 /** Flush only rows older than this so the settlement path's own send has had its chance. */
 const FLUSH_MIN_AGE_MS = 60 * 1000;
@@ -214,18 +218,12 @@ export class PaygService {
             profile.paygStatus !== 'canceled' &&
             profile.paygStatus !== 'incomplete_expired';
         if (hasLiveSubscription) {
-            // Re-read so an enable after a provider-side change reconciles.
-            try {
-                snapshot = await this.billingProvider.retrieveSubscriptionSnapshot(
-                    profile.paygSubscriptionId as string,
-                );
-            } catch (error) {
-                this.logger.warn(
-                    `PAYG enable: could not re-read subscription for user ${userId}: ${
-                        (error as Error).message
-                    }`,
-                );
-            }
+            // Re-read so an enable after a provider-side change reconciles. A
+            // provider failure must propagate: treating "unknown" as "missing"
+            // could create a second live metered subscription.
+            snapshot = await this.billingProvider.retrieveSubscriptionSnapshot(
+                profile.paygSubscriptionId as string,
+            );
         }
         if (
             !snapshot ||
@@ -239,6 +237,11 @@ export class PaygService {
                 lookupKey: paygLookupKey(),
                 invoiceThresholdCents: getPaygCatalog().invoiceThresholdCents,
                 referenceId: `${userId}:payg`,
+                idempotencyKey:
+                    `payg-enable:${userId}:${profile.providerCustomerId}:` +
+                    (profile.paygSubscriptionId
+                        ? `after:${profile.paygSubscriptionId}`
+                        : 'initial'),
             });
         }
 
@@ -334,55 +337,47 @@ export class PaygService {
         }
 
         const cap = this.effectiveCap(profile);
-        const used = await this.creditMeterEventRepository.sumCreditsForPeriod(
-            request.userId,
-            profile.paygPeriodStart,
-            profile.paygPeriodEnd,
-        );
-        const headroom = Math.max(0, cap - used);
-        const billed = Math.min(remainder, headroom);
-        const writtenOff = remainder - billed;
+        const reservation = await this.creditMeterEventRepository.reserveIdempotentWithinCap({
+            write: {
+                userId: request.userId,
+                organizationId: request.organizationId ?? null,
+                tenantId: request.tenantId ?? null,
+                runId: request.runId,
+                identifier: `run:${request.runId}`,
+                costCentsRef: request.costCentsRef ?? null,
+                periodStart: profile.paygPeriodStart,
+                periodEnd: profile.paygPeriodEnd,
+            },
+            requestedCredits: remainder,
+            capCredits: cap,
+        });
 
-        if (billed <= 0) {
-            await this.notifyCapIfCrossed(profile, cap, used);
+        if (reservation.status === 'cap-exhausted') {
+            await this.notifyCapIfCrossed(profile, cap, reservation.usedCreditsAfter);
             return { status: 'cap-exhausted', billedCredits: 0, writtenOffCredits: remainder };
         }
 
-        const inserted = await this.creditMeterEventRepository.insertIdempotent({
-            userId: request.userId,
-            organizationId: request.organizationId ?? null,
-            tenantId: request.tenantId ?? null,
-            runId: request.runId,
-            identifier: `run:${request.runId}`,
-            credits: billed,
-            writtenOffCredits: writtenOff,
-            costCentsRef: request.costCentsRef ?? null,
-            periodStart: profile.paygPeriodStart,
-            periodEnd: profile.paygPeriodEnd,
-        });
-
-        let sent = inserted.event.status === CreditMeterEventStatus.SENT;
-        if (inserted.status === 'created') {
-            sent = await this.send(inserted.event, profile, now);
+        let sent = reservation.event.status === CreditMeterEventStatus.SENT;
+        if (reservation.status === 'created') {
+            sent = await this.send(reservation.event, profile, now);
         }
 
-        const usedAfter = used + (inserted.status === 'created' ? billed : 0);
-        await this.notifyCapIfCrossed(profile, cap, usedAfter);
+        await this.notifyCapIfCrossed(profile, cap, reservation.usedCreditsAfter);
 
         return {
             status: 'metered',
-            billedCredits: inserted.event.credits,
-            writtenOffCredits: inserted.event.writtenOffCredits,
+            billedCredits: reservation.event.credits,
+            writtenOffCredits: reservation.event.writtenOffCredits,
             sent,
-            capReached: usedAfter >= cap,
+            capReached: reservation.usedCreditsAfter >= cap,
         };
     }
 
     /**
      * Resend meter events the settlement path could not deliver (billing
      * spec FR-23 — `credits-meter-flush`, every 5 minutes). Rows older
-     * than Stripe's backdating window are marked `failed` and logged for
-     * manual reconciliation rather than retried forever.
+     * than Stripe's safe de-duplication window are marked `failed` and
+     * logged for manual reconciliation rather than risking a double bill.
      */
     async flushPending(limit = 500, now: Date = new Date()): Promise<FlushSummary> {
         const summary: FlushSummary = { scanned: 0, sent: 0, retried: 0, failed: 0 };
@@ -394,16 +389,16 @@ export class PaygService {
         );
         for (const row of rows) {
             summary.scanned += 1;
-            if (now.getTime() - row.createdAt.getTime() > METER_BACKDATE_WINDOW_MS) {
+            if (now.getTime() - row.createdAt.getTime() > METER_SAFE_RETRY_WINDOW_MS) {
                 await this.creditMeterEventRepository.recordAttempt(
                     row.id,
-                    'older than the provider backdating window — not sent',
+                    'older than the provider idempotency window — automatic retry stopped',
                     true,
                 );
                 summary.failed += 1;
                 this.logger.error(
                     `Meter event ${row.identifier} (${row.credits} credits, user ${row.userId}) ` +
-                        `was never accepted and is now too old to send — reconcile manually.`,
+                        `is outside the safe idempotency window — reconcile manually before sending.`,
                 );
                 continue;
             }
@@ -463,6 +458,9 @@ export class PaygService {
             await this.billingProfileRepository.updatePayg(profile.userId, {
                 paygStatus: 'active',
             });
+            await this.notify(() =>
+                this.notificationService?.clearByDeduplicationKey(profile.userId, 'payg_past_due'),
+            );
         }
     }
 

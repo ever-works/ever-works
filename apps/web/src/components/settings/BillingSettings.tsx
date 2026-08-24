@@ -1101,8 +1101,9 @@ export function BillingSettings({
                             </label>
                             {paygCapEstimateCents !== null ? (
                                 <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                    ≈ {formatCreditsAsDollars(paygCapEstimateCents)} / cycle at the
-                                    cap
+                                    {t('payg.capEstimate', {
+                                        estimate: formatCreditsAsDollars(paygCapEstimateCents),
+                                    })}
                                 </span>
                             ) : null}
                         </div>

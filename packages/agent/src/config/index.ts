@@ -598,7 +598,7 @@ export const config = {
             getMaxMonthlyCapCredits() {
                 const parsed = parseInt(process.env.PAYG_MAX_MONTHLY_CAP_CREDITS || '');
                 return Number.isFinite(parsed) && parsed > 0
-                    ? parsed
+                    ? Math.max(500, parsed)
                     : catalogPaygMaxMonthlyCapCredits();
             },
         },

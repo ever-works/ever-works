@@ -57,7 +57,7 @@ This spec closes the five gaps found in the 2026-08-23 audit:
 
 ### 2.3 Pay-as-you-go (new)
 
-- **Given** I have a stored payment method, **when** I enable Pay-as-you-go and set a monthly cap (default 10,000 credits = $100), **then** a metered Stripe subscription (no flat fee) is created for my customer with the PAYG price and a $50 billing threshold, and the Billing page shows "Pay-as-you-go: on · this cycle 0 credits · cap 10,000".
+- **Given** I have a stored payment method, **when** I enable Pay-as-you-go and set a monthly cap (default 10,000 credits), **then** a metered Stripe subscription (no flat fee) is created for my customer with the PAYG price and a $50 billing threshold, and the Billing page shows "Pay-as-you-go: on · this cycle 0 credits · cap 10,000".
 - **Given** PAYG is on and my prepaid balance is 120 credits, **when** a run costs 500 credits, **then** 120 credits are debited from the ledger (balance → 0) and **380 credits are reported to the Stripe meter**; the run completes normally.
 - **Given** PAYG is on, **when** my cycle usage reaches 80 % of the cap, **then** I receive a notification; **when** it reaches the cap, **then** new runs are parked with `queuedReason=insufficient-credits` until I raise the cap, buy a pack, or the cycle rolls.
 - **Given** PAYG accrual in the cycle reaches $50, **when** Stripe evaluates the threshold, **then** Stripe issues and charges an invoice for the accrued usage mid-cycle (exposure control); **at period end** the remainder is invoiced. Invoices appear in my invoice history.
@@ -80,7 +80,7 @@ This spec closes the five gaps found in the 2026-08-23 audit:
 ### 2.6 Edge cases & failures
 
 - A webhook replay (same Stripe event id) moves the ledger zero times and creates zero meter events.
-- A meter event that fails to send (Stripe outage) is retried by the flush job every 5 minutes; events older than 35 days (Stripe's backdating window) are marked `failed` and logged — never silently dropped.
+- A meter event that fails to send (Stripe outage) is retried by the flush job every 5 minutes; events older than 23 hours are marked `failed` and logged for manual reconciliation — never silently dropped. This cutoff stays inside Stripe's 24-hour idempotency window and prevents a late retry from double-counting usage.
 - The credits gate is **fail-open**: any exception in the precheck admits the run and logs.
 - The ledger never records negative balances from consumption; refund reversals remain the only allowed negative-balance write.
 - A self-hosted licence purchase grants neither a cloud tier nor credits (unchanged).
@@ -123,7 +123,7 @@ This spec closes the five gaps found in the 2026-08-23 audit:
 - **FR-20** Notifications MUST fire at 80 % and 100 % of the cap (once per cycle each).
 - **FR-21** Webhooks: `customer.subscription.*` with kind `payg-subscription` → `payg.updated` (status/period reconcile, never touches the plan tier); `invoice.payment_failed` whose subscription is the PAYG one → `paygStatus=past_due` + notification; `invoice.paid` on it → `paygStatus=active`; all invoices keep being mirrored.
 - **FR-22** Every provider session that CHARGES (credit pack, plan, licence) and the PAYG subscription MUST carry Stripe Tax. On hosted checkout that means `automatic_tax` + `customer_update: {address:'auto', name:'auto'}` + `tax_id_collection`; on the PAYG subscription only `automatic_tax` (the other two are Checkout-only and Stripe rejects them). `mode: 'setup'` sessions MUST NOT ask for tax — saving a card charges nothing. No env flag: the shared account has Stripe Tax active with live registrations.
-- **FR-23** A Trigger.dev task `credits-meter-flush` (every 5 min) MUST resend `pending|failed` meter events (< 35 days old) and a daily task MUST run expiries, daily grants and plan grants (extend `credits-daily-grant`).
+- **FR-23** A Trigger.dev task `credits-meter-flush` (every 5 min) MUST resend `pending` meter events less than 23 hours old, mark older rows `failed` for manual reconciliation, and a daily task MUST run expiries, daily grants and plan grants (extend `credits-daily-grant`). The retry cutoff MUST remain inside Stripe's 24-hour request-idempotency window.
 - **FR-24** The Billing page MUST show a PAYG card: toggle, cap input, this-cycle credits + estimated amount (computed from the catalog tiers), status chip (on/off/past due), next invoice date, explanatory copy with the tier table; the Usage page MUST show "Pay-as-you-go this cycle" in the tiles.
 - **FR-25** The legacy per-run `billingMode=usage` path (`UsageLedgerService`, `PAY_PER_USE_PRICE_USD`, `recordUsageCharge`) is **deprecated** by this spec, left in place (removal needs owner confirmation — tracked in Jira), and documented as dead.
 

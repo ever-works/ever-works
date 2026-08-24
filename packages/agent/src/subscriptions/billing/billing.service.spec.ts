@@ -9,6 +9,7 @@ import {
     type BillingSubscriptionSnapshot,
     type BillingWebhookEvent,
 } from './billing.provider';
+import type { PaygService } from './payg.service';
 import { CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
 
 /**
@@ -1141,7 +1142,9 @@ describe('BillingService — subscription webhook reconciliation (B08)', () => {
 });
 
 describe('BillingService — pay-as-you-go wiring (billing spec §3.5)', () => {
-    function makePayg(overrides: Record<string, unknown> = {}) {
+    type PaygDouble = jest.Mocked<Pick<PaygService, 'getState' | 'applyWebhook' | 'applyInvoice'>>;
+
+    function makePayg(overrides: Partial<PaygDouble> = {}): PaygDouble {
         return {
             getState: jest.fn().mockResolvedValue({
                 available: true,
@@ -1162,7 +1165,7 @@ describe('BillingService — pay-as-you-go wiring (billing spec §3.5)', () => {
             applyWebhook: jest.fn().mockResolvedValue('payg-reconciled'),
             applyInvoice: jest.fn().mockResolvedValue(undefined),
             ...overrides,
-        } as any;
+        } as PaygDouble;
     }
 
     it('overview carries the pay-as-you-go state, and null when the collaborator is absent or failing', async () => {
@@ -1271,5 +1274,46 @@ describe('BillingService — pay-as-you-go wiring (billing spec §3.5)', () => {
         const b = build({ provider: planProvider, profiles, payg });
         await b.service.handleWebhook('{}', 'sig');
         expect(payg.applyInvoice).not.toHaveBeenCalled();
+    });
+
+    it('does not regress PAYG to past_due when a stale payment_failed event follows paid', async () => {
+        const profiles = makeProfileRepository(PROFILE);
+        const payg = makePayg();
+        const invoices = makeInvoiceRepository({
+            mirror: jest.fn().mockResolvedValue({ id: 'inv-1', status: 'paid' }),
+        });
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'invoice.updated',
+                    customerId: 'cus_1',
+                    invoice: {
+                        providerInvoiceId: 'in_payg',
+                        number: 'EW-0002',
+                        status: 'open',
+                        periodStart: null,
+                        periodEnd: null,
+                        subtotalCents: 380,
+                        totalCents: 380,
+                        amountPaidCents: 0,
+                        currency: 'usd',
+                        hostedUrl: null,
+                        pdfUrl: null,
+                        lines: [],
+                        issuedAt: null,
+                        subscriptionId: 'sub_payg',
+                        subscriptionKind: 'payg',
+                        paymentFailed: true,
+                    },
+                }),
+            ),
+        });
+
+        await build({ provider, profiles, invoices, payg }).service.handleWebhook('{}', 'sig');
+
+        expect(payg.applyInvoice).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ status: 'paid', paymentFailed: false }),
+        );
     });
 });

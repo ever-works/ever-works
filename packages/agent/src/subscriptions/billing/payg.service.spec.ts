@@ -100,10 +100,36 @@ function makeHarness(options: { profile?: any; used?: number; configured?: boole
         }),
         recordAttempt: jest.fn(async () => undefined),
         findForUserInPeriod: jest.fn(async () => []),
-    };
+    } as any;
+    creditMeterEventRepository.reserveIdempotentWithinCap = jest.fn(async (reservation: any) => {
+        const used = await creditMeterEventRepository.sumCreditsForPeriod();
+        const billed = Math.min(
+            reservation.requestedCredits,
+            Math.max(0, reservation.capCredits - used),
+        );
+        if (billed <= 0) {
+            return {
+                status: 'cap-exhausted',
+                event: null,
+                billedCredits: 0,
+                writtenOffCredits: reservation.requestedCredits,
+                usedCreditsAfter: used,
+            };
+        }
+        const inserted = await creditMeterEventRepository.insertIdempotent({
+            ...reservation.write,
+            credits: billed,
+            writtenOffCredits: reservation.requestedCredits - billed,
+        });
+        return {
+            ...inserted,
+            usedCreditsAfter: used + (inserted.status === 'created' ? billed : 0),
+        };
+    });
     const notificationService = {
         notifyPaygCapThreshold: jest.fn(async () => undefined),
         notifyPaygPastDue: jest.fn(async () => undefined),
+        clearByDeduplicationKey: jest.fn(async () => undefined),
     };
     const service = new PaygService(
         billingProvider as any,
@@ -187,10 +213,24 @@ describe('PaygService.enable', () => {
         expect(h.billingProvider.createMeteredSubscription).not.toHaveBeenCalled();
     });
 
+    it('does not create a duplicate when re-reading an existing live subscription fails', async () => {
+        const h = makeHarness();
+        h.billingProvider.retrieveSubscriptionSnapshot.mockRejectedValueOnce(
+            new Error('provider timeout'),
+        );
+
+        await expect(h.service.enable('u1', {}, NOW)).rejects.toThrow('provider timeout');
+        expect(h.billingProvider.createMeteredSubscription).not.toHaveBeenCalled();
+    });
+
     it('re-creates when the previous usage subscription is canceled', async () => {
         const h = makeHarness({ profile: profile({ paygStatus: 'canceled' }) });
         await h.service.enable('u1', {}, NOW);
-        expect(h.billingProvider.createMeteredSubscription).toHaveBeenCalledTimes(1);
+        expect(h.billingProvider.createMeteredSubscription).toHaveBeenCalledWith(
+            expect.objectContaining({
+                idempotencyKey: 'payg-enable:u1:cus_1:after:sub_payg',
+            }),
+        );
     });
 
     it('rejects a cap outside the catalog/deployment bounds', async () => {
@@ -206,6 +246,19 @@ describe('PaygService.enable', () => {
         ).resolves.toMatchObject({
             monthlyCapCredits: PAYG_MIN_MONTHLY_CAP_CREDITS,
         });
+    });
+
+    it('never exposes an operator maximum below the supported minimum', async () => {
+        const previous = process.env.PAYG_MAX_MONTHLY_CAP_CREDITS;
+        process.env.PAYG_MAX_MONTHLY_CAP_CREDITS = '100';
+        try {
+            const state = await makeHarness().service.getState('u1', NOW);
+            expect(state.maxMonthlyCapCredits).toBe(PAYG_MIN_MONTHLY_CAP_CREDITS);
+            expect(state.monthlyCapCredits).toBe(PAYG_MIN_MONTHLY_CAP_CREDITS);
+        } finally {
+            if (previous === undefined) delete process.env.PAYG_MAX_MONTHLY_CAP_CREDITS;
+            else process.env.PAYG_MAX_MONTHLY_CAP_CREDITS = previous;
+        }
     });
 });
 
@@ -422,7 +475,7 @@ describe('PaygService.headroom', () => {
 });
 
 describe('PaygService.flushPending', () => {
-    it('resends pending rows, marks accepted ones sent, and gives up on rows older than the backdating window', async () => {
+    it('resends fresh rows but stops before Stripe idempotency expires, preventing a late retry from double-billing', async () => {
         const h = makeHarness();
         const fresh = {
             id: 'e1',
@@ -431,14 +484,18 @@ describe('PaygService.flushPending', () => {
             credits: 10,
             createdAt: new Date(NOW.getTime() - 5 * 60_000),
         };
-        const ancient = {
+        const outsideSafeRetryWindow = {
             id: 'e2',
             userId: 'u1',
             identifier: 'run:b',
             credits: 10,
-            createdAt: new Date(NOW.getTime() - 40 * 24 * 60 * 60_000),
+            // Stripe retains request idempotency / meter-identifier
+            // de-duplication for 24h. Past that point the platform cannot
+            // distinguish "accepted, local mark failed" from "never sent",
+            // so automatic retry must stop before it can double-charge.
+            createdAt: new Date(NOW.getTime() - 25 * 60 * 60_000),
         };
-        h.creditMeterEventRepository.findUnsent.mockResolvedValue([fresh, ancient]);
+        h.creditMeterEventRepository.findUnsent.mockResolvedValue([fresh, outsideSafeRetryWindow]);
 
         const summary = await h.service.flushPending(100, NOW);
 
@@ -450,7 +507,7 @@ describe('PaygService.flushPending', () => {
         expect(h.creditMeterEventRepository.markSent).toHaveBeenCalledWith('e1', NOW);
         expect(h.creditMeterEventRepository.recordAttempt).toHaveBeenCalledWith(
             'e2',
-            expect.stringContaining('backdating'),
+            expect.stringContaining('idempotency'),
             true,
         );
     });
@@ -558,6 +615,10 @@ describe('PaygService webhooks', () => {
         expect(h.billingProfileRepository.updatePayg).toHaveBeenCalledWith('u1', {
             paygStatus: 'active',
         });
+        expect(h.notificationService.clearByDeduplicationKey).toHaveBeenCalledWith(
+            'u1',
+            'payg_past_due',
+        );
 
         // A PLAN invoice never touches pay-as-you-go.
         h.billingProfileRepository.updatePayg.mockClear();

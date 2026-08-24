@@ -421,6 +421,16 @@ describe('canConfigurePayg — buy gates + a card on file + the feature being av
         ).toBe(false);
         expect(canConfigurePayg(null, true)).toBe(false);
     });
+
+    it('keeps the controls available to disable an existing subscription after its card is detached', () => {
+        const enabledWithoutCard = overview({
+            providerConfigured: true,
+            paymentMethod: null,
+            payg: paygState({ enabled: true, subscriptionStatus: 'active' }),
+        });
+
+        expect(canConfigurePayg(enabledWithoutCard, true)).toBe(true);
+    });
 });
 
 describe('estimatePaygCents — graduated arithmetic shared with the API', () => {

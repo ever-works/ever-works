@@ -111,6 +111,14 @@ describe('PaygController', () => {
         expect(service.updateCap).toHaveBeenCalledWith('user-1', 7000);
     });
 
+    it('rejects an empty PUT instead of treating an omitted intent as disable', async () => {
+        const service = makeService();
+        const controller = new PaygController(service);
+
+        await expect(controller.update(auth, {})).rejects.toBeInstanceOf(BadRequestException);
+        expect(service.disable).not.toHaveBeenCalled();
+    });
+
     it('maps the domain errors: 409 no card / provider refusal, 400 bad cap, 503 unconfigured', async () => {
         const cases: Array<[Error, unknown]> = [
             [new FakePaygPaymentMethodRequiredError(), ConflictException],

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThan, Repository } from 'typeorm';
+import { BillingProfile } from '@src/entities/billing-profile.entity';
 import { CreditMeterEvent, CreditMeterEventStatus } from '@src/entities/credit-meter-event.entity';
 
 export interface CreditMeterEventWrite {
@@ -20,11 +21,32 @@ export type CreditMeterEventInsert =
     | { status: 'created'; event: CreditMeterEvent }
     | { status: 'idempotent'; event: CreditMeterEvent };
 
+export interface CreditMeterEventCapReservation {
+    write: Omit<CreditMeterEventWrite, 'credits' | 'writtenOffCredits'>;
+    requestedCredits: number;
+    capCredits: number;
+}
+
+export type CreditMeterEventCapReservationResult =
+    | {
+          status: 'created' | 'idempotent';
+          event: CreditMeterEvent;
+          usedCreditsAfter: number;
+      }
+    | {
+          status: 'cap-exhausted';
+          event: null;
+          billedCredits: 0;
+          writtenOffCredits: number;
+          usedCreditsAfter: number;
+      };
+
 /**
  * Pay-as-you-go meter events (billing spec §3.5) — the platform-side
  * mirror of what is reported to the provider's usage meter. Idempotent
  * on `identifier` (`run:{runId}`), so a retried settlement writes one
- * row; `pending`/`failed` rows are what the flush cron resends.
+ * row; the flush cron resends `pending` rows. `failed` is terminal and
+ * retained for manual reconciliation.
  */
 @Injectable()
 export class CreditMeterEventRepository {
@@ -64,6 +86,95 @@ export class CreditMeterEventRepository {
         }
     }
 
+    /**
+     * Atomically reserve aggregate cycle headroom and insert one run event.
+     *
+     * A no-op update locks the owner's billing-profile row for the duration
+     * of the transaction on every supported database. That serializes the
+     * sum + insert across all API replicas: two runs that finish together
+     * cannot both observe the same headroom and exceed the promised cap.
+     * The identifier is checked again after the lock, so concurrent retries
+     * of one run collapse to the same event as well.
+     */
+    async reserveIdempotentWithinCap(
+        reservation: CreditMeterEventCapReservation,
+    ): Promise<CreditMeterEventCapReservationResult> {
+        const requested = Math.max(0, Math.trunc(reservation.requestedCredits));
+        const cap = Math.max(0, Math.trunc(reservation.capCredits));
+        return this.repository.manager.transaction(async (manager) => {
+            const events = manager.getRepository(CreditMeterEvent);
+            const profiles = manager.getRepository(BillingProfile);
+
+            let existing = await events.findOne({
+                where: { identifier: reservation.write.identifier },
+            });
+            if (existing) {
+                return {
+                    status: 'idempotent' as const,
+                    event: existing,
+                    usedCreditsAfter: await this.sumWithRepository(
+                        events,
+                        reservation.write.userId,
+                        reservation.write.periodStart,
+                        reservation.write.periodEnd,
+                    ),
+                };
+            }
+
+            await profiles
+                .createQueryBuilder()
+                .update(BillingProfile)
+                .set({ paygCapNotifiedPercent: () => '"paygCapNotifiedPercent"' })
+                .where('userId = :userId', { userId: reservation.write.userId })
+                .execute();
+
+            existing = await events.findOne({
+                where: { identifier: reservation.write.identifier },
+            });
+            const used = await this.sumWithRepository(
+                events,
+                reservation.write.userId,
+                reservation.write.periodStart,
+                reservation.write.periodEnd,
+            );
+            if (existing) {
+                return { status: 'idempotent' as const, event: existing, usedCreditsAfter: used };
+            }
+
+            const billedCredits = Math.min(requested, Math.max(0, cap - used));
+            const writtenOffCredits = requested - billedCredits;
+            if (billedCredits <= 0) {
+                return {
+                    status: 'cap-exhausted' as const,
+                    event: null,
+                    billedCredits: 0 as const,
+                    writtenOffCredits,
+                    usedCreditsAfter: used,
+                };
+            }
+
+            const event = await events.save(
+                events.create({
+                    ...reservation.write,
+                    organizationId: reservation.write.organizationId ?? null,
+                    tenantId: reservation.write.tenantId ?? null,
+                    costCentsRef: reservation.write.costCentsRef ?? null,
+                    credits: billedCredits,
+                    writtenOffCredits,
+                    status: CreditMeterEventStatus.PENDING,
+                    attempts: 0,
+                    lastError: null,
+                    sentAt: null,
+                }),
+            );
+            return {
+                status: 'created' as const,
+                event,
+                usedCreditsAfter: used + billedCredits,
+            };
+        });
+    }
+
     findById(id: string): Promise<CreditMeterEvent | null> {
         return this.repository.findOne({ where: { id } });
     }
@@ -78,7 +189,16 @@ export class CreditMeterEventRepository {
      * must treat it as spent; `failed` rows were given up on and do not.
      */
     async sumCreditsForPeriod(userId: string, periodStart: Date, periodEnd: Date): Promise<number> {
-        const row = await this.repository
+        return this.sumWithRepository(this.repository, userId, periodStart, periodEnd);
+    }
+
+    private async sumWithRepository(
+        repository: Repository<CreditMeterEvent>,
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<number> {
+        const row = await repository
             .createQueryBuilder('e')
             .select('COALESCE(SUM(e.credits), 0)', 'credits')
             .where('e.userId = :userId', { userId })

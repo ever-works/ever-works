@@ -81,6 +81,9 @@ export class PaygController {
         @CurrentUser() auth: AuthenticatedUser,
         @Body() body: UpdatePaygDto,
     ): Promise<{ status: string } & PaygStateView> {
+        if (body.enabled === undefined && body.monthlyCapCredits === undefined) {
+            throw new BadRequestException('Specify enabled or monthlyCapCredits');
+        }
         try {
             let state: PaygStateView;
             if (body.enabled) {

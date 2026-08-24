@@ -70,9 +70,10 @@ first 00:05 UTC sweep.
   `credit_meter_events` (identifier `run:{runId}` is also the Stripe meter
   event identifier).
 - **Meter events that never landed**: rows with `status='pending'` are retried
-  by `credits-meter-flush`; rows older than Stripe's 35-day backdating window
-  flip to `failed` with an ERROR log — reconcile those manually (they were
-  consumed but never billed).
+  by `credits-meter-flush`; rows older than 23 hours flip to `failed` with an
+  ERROR log — reconcile those manually (they were consumed but never billed).
+  The 23-hour cutoff is deliberately shorter than Stripe's 24-hour request
+  idempotency window, so a late retry cannot double-count usage.
 - **Reconciliation query** (billed vs mirrored, one cycle):
 
 ```sql
