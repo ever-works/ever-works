@@ -273,9 +273,9 @@ export class UploadsService {
         @Optional()
         @Inject(WORK_REPO_RESOLVER)
         private readonly workRepoResolver?: WorkRepoResolver,
-        // Authoritative ownership index for plain uploads. Required in the
-        // Nest graph: returning success without this row would create bytes
-        // that no scoped attach/read path can authorize.
+        // Ownership index for plain uploads. Current Nest graphs provide it;
+        // optional construction preserves compatibility with legacy/minimal
+        // deployments that predate user_uploads.
         @Inject(USER_UPLOAD_REPOSITORY)
         private readonly userUploads?: UserUploadRepository,
         // Globally provided in the API. The default keeps direct unit
@@ -304,10 +304,10 @@ export class UploadsService {
     }
 
     /**
-     * Persist the authoritative ownership row before reporting upload success.
+     * Persist the authoritative ownership row when the repository is available.
      * Storage writes happen first because the plugin contract has no shared DB
-     * transaction, but metadata failure is never swallowed: callers receive an
-     * error rather than a URL that every scoped attach/read path must reject.
+     * transaction. A configured repository failure is never swallowed; only a
+     * genuinely absent optional repository keeps the legacy storage-only path.
      */
     private async recordUpload(input: {
         userId: string;
@@ -319,9 +319,7 @@ export class UploadsService {
         workId?: string;
         ownershipScope?: OwnershipScope;
     }): Promise<void> {
-        if (!this.userUploads) {
-            throw new Error('Upload metadata repository is not configured');
-        }
+        if (!this.userUploads) return;
         const scope = input.ownershipScope ?? this.scopeContext.getScope();
         await this.userUploads.record({
             userId: input.userId,

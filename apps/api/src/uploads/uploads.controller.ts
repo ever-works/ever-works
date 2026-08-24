@@ -522,11 +522,26 @@ export class UploadsController {
         // centralized ownership predicate in UserUploadRepository.
         if (this.userUploads) {
             const match = /^([0-9a-f]{64})(?:\.|$)/i.exec(filename);
+            if (!match) {
+                res.status(HttpStatus.NOT_FOUND).json({ status: 'error', message: 'Not found' });
+                return;
+            }
             const scope = this.scopeContext.getScope();
-            const upload = match
-                ? await this.userUploads.findOwnedByUser(match[1].toLowerCase(), userId, scope)
-                : null;
-            if (!upload || (upload.workId ?? null) !== (workId ?? null)) {
+            const sha256 = match[1].toLowerCase();
+            const upload = await this.userUploads.findOwnedByUser(
+                sha256,
+                userId,
+                scope,
+                workId ?? null,
+            );
+            // Pre-user_uploads objects have no metadata row. Preserve their
+            // historical owner-keyed read path only when no row exists in any
+            // scope; a same-user row hidden by the active scope must remain an
+            // opaque 404 rather than being mistaken for legacy storage.
+            const indexedElsewhere = upload
+                ? null
+                : await this.userUploads.findOwnedByUser(sha256, userId);
+            if (indexedElsewhere) {
                 res.status(HttpStatus.NOT_FOUND).json({ status: 'error', message: 'Not found' });
                 return;
             }

@@ -728,9 +728,64 @@ describe('UploadsController', () => {
                 stored.id,
                 owner.userId,
                 everScope,
+                null,
             );
             expect(calls.statusCode).toBeUndefined();
             expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
+        });
+
+        it('serves a pre-index legacy upload only when no metadata row exists in any scope', async () => {
+            const owner = mkAuth();
+            const stored = await controller.upload(owner, mkFile({}));
+            const userUploads = {
+                findOwnedByUser: jest.fn().mockResolvedValue(null),
+            };
+            const { res, calls } = mkRes();
+
+            await guardedController(userUploads, everScope).serve(
+                owner,
+                owner.userId,
+                stored.filename,
+                res,
+            );
+
+            expect(userUploads.findOwnedByUser).toHaveBeenNthCalledWith(
+                1,
+                stored.id,
+                owner.userId,
+                everScope,
+                null,
+            );
+            expect(userUploads.findOwnedByUser).toHaveBeenNthCalledWith(2, stored.id, owner.userId);
+            expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
+        });
+
+        it('does not treat a differently scoped metadata row as a legacy upload', async () => {
+            const owner = mkAuth();
+            const stored = await controller.upload(owner, mkFile({}));
+            const userUploads = {
+                findOwnedByUser: jest
+                    .fn()
+                    .mockResolvedValueOnce(null)
+                    .mockResolvedValueOnce({
+                        sha256: stored.id,
+                        userId: owner.userId,
+                        workId: null,
+                        ...yoScope,
+                    }),
+            };
+            const readFile = jest.spyOn(service, 'readFile');
+            const { res, calls } = mkRes();
+
+            await guardedController(userUploads, everScope).serve(
+                owner,
+                owner.userId,
+                stored.filename,
+                res,
+            );
+
+            expect(calls.statusCode).toBe(HttpStatus.NOT_FOUND);
+            expect(readFile).not.toHaveBeenCalled();
         });
 
         it('opaque-404s the same-user known hash in Yo before reading bytes from Ever', async () => {
@@ -744,8 +799,10 @@ describe('UploadsController', () => {
             };
             const userUploads = {
                 findOwnedByUser: jest.fn(
-                    async (_sha: string, _userId: string, scope: typeof everScope) =>
-                        scope.organizationId === yoUpload.organizationId ? yoUpload : null,
+                    async (_sha: string, _userId: string, scope?: typeof everScope) =>
+                        !scope || scope.organizationId === yoUpload.organizationId
+                            ? yoUpload
+                            : null,
                 ),
             };
             const readFile = jest.spyOn(service, 'readFile');
@@ -790,6 +847,7 @@ describe('UploadsController', () => {
                 stored.id,
                 owner.userId,
                 personalScope,
+                null,
             );
             expect((calls.sent as Buffer).equals(TINY_PNG)).toBe(true);
         });
