@@ -99,7 +99,11 @@ const nextConfig: NextConfig = {
     // Next normalizes next-intl's rewrite back to its internal `localhost`
     // origin; behind a differently named listener/reverse proxy that becomes
     // an external rewrite and re-enters the proxy.
-    skipProxyUrlNormalize: true,
+    //
+    // Compatibility note: the hypothesis above was disproven by a real
+    // ingress-shaped `next start` probe. Retain the switch, but default to
+    // Next's native normalization; opt-in is for rollback/debug only.
+    skipProxyUrlNormalize: process.env.LEGACY_LOCALE_REWRITE_OVERRIDE_ENABLED === 'true',
     // Dev-only (Next ignores this in production builds): let the e2e/CI
     // harness reach the dev server over 127.0.0.1. The self-hosted CI
     // runner resolves `localhost` to IPv6 `::1`, where the dev servers
