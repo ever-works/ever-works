@@ -140,7 +140,7 @@ describe('SubscriptionService', () => {
 
     describe('onModuleInit + seedPlans (idempotent boot-time seeding)', () => {
         it('upserts every PLAN_SEED_DATA row via the plan repository on boot', async () => {
-            process.env.BILLING_DEFAULT_CURRENCY = 'eur';
+            process.env.BILLING_DEFAULT_CURRENCY = 'usd';
             const { service, planRepository } = makeService();
 
             await service.onModuleInit();
@@ -245,12 +245,25 @@ describe('SubscriptionService', () => {
             ).toBe(true);
         });
 
-        it('forwards the configured default currency on every upsert + sets active=true', async () => {
+        it('refuses to seed plan rows in a currency that disagrees with the Stripe catalog', async () => {
             process.env.BILLING_DEFAULT_CURRENCY = 'eur';
             const { service, planRepository } = makeService();
+
+            await expect(service.seedPlans()).rejects.toThrow(
+                /BILLING_DEFAULT_CURRENCY.*eur.*catalog.*usd/i,
+            );
+            expect(planRepository.upsert).not.toHaveBeenCalled();
+        });
+
+        it('normalizes equivalent configured currency casing and seeds the catalog currency', async () => {
+            process.env.BILLING_DEFAULT_CURRENCY = ' USD ';
+            const { service, planRepository } = makeService();
+
             await service.seedPlans();
+
+            expect(planRepository.upsert).toHaveBeenCalledTimes(6);
             for (const call of planRepository.upsert.mock.calls) {
-                expect(call[0].currency).toBe('eur');
+                expect(call[0].currency).toBe('usd');
                 expect(call[0].active).toBe(true);
             }
         });
