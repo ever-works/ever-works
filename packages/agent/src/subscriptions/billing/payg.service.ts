@@ -449,6 +449,7 @@ export class PaygService {
                     this.notificationService?.notifyPaygPastDue({
                         userId: profile.userId,
                         amountCents: invoice.totalCents ?? null,
+                        periodEnd: profile.paygPeriodEnd ?? null,
                     }),
                 );
             }
