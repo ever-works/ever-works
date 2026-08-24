@@ -99,12 +99,50 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: t
         run: |
+          set -uo pipefail
           case "${GITHUB_REF_NAME}" in
-            develop) echo "tag=dev" >> "$GITHUB_OUTPUT" ;;
-            stage) echo "tag=stage" >> "$GITHUB_OUTPUT" ;;
-            main|master) echo "tag=prod" >> "$GITHUB_OUTPUT" ;;
-            *) echo "tag=${GITHUB_REF_NAME//\//-}" >> "$GITHUB_OUTPUT" ;;
+            develop) MOVING=dev ;;
+            stage) MOVING=stage ;;
+            main|master) MOVING=prod ;;
+            *) MOVING="${GITHUB_REF_NAME//\//-}" ;;
           esac
+          echo "tag=${MOVING}" >> "$GITHUB_OUTPUT"
+
+          # 🛑 Only the CURRENT TIP of the branch may move `:prod` / `:stage` / `:dev`.
+          #
+          # These tags are what ArgoCD tracks, so whichever build writes one LAST
+          # decides what production runs. That was safe only while
+          # `cancel-in-progress: true` guaranteed at most one live run per ref.
+          # Now that deploy-bearing refs QUEUE instead of cancelling (so a
+          # promoted commit always gets an image), two builds for the same branch
+          # can be in flight at once — and the older one can finish second and
+          # quietly pin `:prod` to an EARLIER commit. That is a silent rollback,
+          # far harder to notice than a build that simply never ran.
+          #
+          # An out-of-date build still publishes its immutable `sha-<sha>` tag,
+          # so nothing is lost and it stays deployable by digest.
+          #
+          # Fails SAFE, matching `ci.yml`'s scope gate: any unexpected condition
+          # (ls-remote unavailable, no credentials, empty answer) leaves
+          # IS_TIP=1 and behaves exactly as before. The tag is only WITHHELD on a
+          # positive determination that a newer commit exists.
+          IS_TIP=1
+          if TIP="$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" 2>/dev/null | cut -f1)"; then
+            if [ -n "${TIP}" ] && [ "${TIP}" != "${GITHUB_SHA}" ]; then
+              IS_TIP=0
+              echo "::warning::${GITHUB_REF_NAME} has advanced to ${TIP}; publishing only sha-${GITHUB_SHA} and leaving :${MOVING} for that build."
+            fi
+          fi
+
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/${MATRIX_IMAGE}"
+          {
+            echo "tags<<__TAGS__"
+            echo "${IMAGE}:sha-${GITHUB_SHA}"
+            if [ "${IS_TIP}" -eq 1 ]; then echo "${IMAGE}:${MOVING}"; fi
+            echo "__TAGS__"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          MATRIX_IMAGE: ${{ matrix.image }}
       # Build/release identity baked into the images so the app footer shows a
       # real version + commit link + build time (web NEXT_PUBLIC_* are inlined by
       # next build; api/mcp read BUILD_*/GIT_* at runtime). Without this the
@@ -158,9 +196,8 @@ jobs:
             NEXT_PUBLIC_BUILD_REF=${{ github.ref_name }}
             NEXT_PUBLIC_BUILD_RUN=${{ github.run_number }}
             NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.t.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
+          # Computed in step `t` — a stale build contributes only its sha- tag.
+          tags: ${{ steps.t.outputs.tags }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
       # Back off to let the transient ghcr rate-limit window clear.
@@ -187,8 +224,7 @@ jobs:
             NEXT_PUBLIC_BUILD_REF=${{ github.ref_name }}
             NEXT_PUBLIC_BUILD_RUN=${{ github.run_number }}
             NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
-          tags: |
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.t.outputs.tag }}
-            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
+          # Computed in step `t` — a stale build contributes only its sha- tag.
+          tags: ${{ steps.t.outputs.tags }}
           cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
