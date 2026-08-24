@@ -226,15 +226,43 @@ describe('AutoRechargeService', () => {
         expect(profiles.state.autoRechargeInFlightKey).toBeNull();
     });
 
-    it('releases the guard when the provider call throws outright', async () => {
+    it('keeps the guard while an indeterminate provider result awaits a webhook', async () => {
+        const provider = makeProvider({
+            chargeOffSession: jest.fn().mockResolvedValue({
+                paymentId: '',
+                status: 'pending',
+            }),
+        });
+        const profiles = makeProfileRepository();
+        const service = new AutoRechargeService(provider, profiles, makeLedgerService(0));
+
+        expect(await service.maybeRecharge('u1')).toEqual({
+            status: 'pending',
+            paymentId: '',
+            packId: 'credits-5500',
+        });
+        expect(profiles.recordAutoRechargeFailure).not.toHaveBeenCalled();
+        expect(profiles.state.autoRechargeInFlightKey).toEqual(
+            expect.stringMatching(/^auto:u1:credits-5500:/),
+        );
+    });
+
+    it('keeps the guard when the provider call throws with an indeterminate outcome', async () => {
         const provider = makeProvider({
             chargeOffSession: jest.fn().mockRejectedValue(new Error('network down')),
         });
         const profiles = makeProfileRepository();
         const service = new AutoRechargeService(provider, profiles, makeLedgerService(0));
 
-        expect(await service.maybeRecharge('u1')).toEqual({ status: 'failed' });
-        expect(profiles.recordAutoRechargeFailure).toHaveBeenCalled();
+        expect(await service.maybeRecharge('u1')).toEqual({
+            status: 'pending',
+            paymentId: '',
+            packId: 'credits-5500',
+        });
+        expect(profiles.recordAutoRechargeFailure).not.toHaveBeenCalled();
+        expect(profiles.state.autoRechargeInFlightKey).toEqual(
+            expect.stringMatching(/^auto:u1:credits-5500:/),
+        );
     });
 
     it('NEVER writes to the ledger — credits appear only via the webhook', async () => {
