@@ -145,6 +145,27 @@ jobs:
             'MCP server — health JSON|https://mcp.ever.works/health|"status":"ok"'
           )
 
+          # Surfaces whose failure means customers cannot USE the product, as
+          # opposed to a secondary surface being unavailable.
+          #
+          # 🛑 Why this list is separate rather than a 4th field on TARGETS: the
+          # parser takes everything after the SECOND '|' as the marker, so that
+          # markers may themselves contain '|' ("Sign In | Ever Works"). A
+          # trailing severity field would be silently swallowed into the marker
+          # and every target would look non-critical.
+          #
+          # Motivation (EW-760): on 2026-08-23 the whole web app went down while
+          # an alert issue was already open for demo.ever.works. The new, far
+          # worse failure folded into that already-triaged issue and went
+          # unnoticed for ~18 hours. Detection worked; presentation did not.
+          CRITICAL_URLS=(
+            'https://ever.works/'
+            'https://app.ever.works/login'
+            'https://app.ever.works/api/health'
+            'https://api.ever.works/'
+            'https://api.ever.works/api/version'
+          )
+
           # --- Probe one URL once ------------------------------------------
           # Emits: http_code dns connect appconnect starttransfer total size
           # into $W, and the curl exit code into $CURL_RC.
@@ -321,10 +342,39 @@ jobs:
           # comments while an outage is unchanged.
           FINGERPRINT="$(printf '%s' "${FAILING_URLS}" | sort | sha256sum | cut -c1-16)"
 
+          # Is any CUSTOMER-FACING surface among the failures? This is what
+          # decides whether the alert shouts or merely notes. Without it a total
+          # outage and a flaky demo produce an identical-looking issue.
+          CRITICAL_DOWN=0
+          CRITICAL_LIST=""
+          while IFS= read -r U; do
+            [ -n "${U}" ] || continue
+            for C in "${CRITICAL_URLS[@]}"; do
+              if [ "${U}" = "${C}" ]; then
+                CRITICAL_DOWN=1
+                CRITICAL_LIST="${CRITICAL_LIST}${U} "
+              fi
+            done
+          done <<< "${FAILING_URLS}"
+
+          # A short human summary for the issue TITLE, so the title always names
+          # what is CURRENTLY failing rather than staying frozen at whatever the
+          # first failure was.
+          FAIL_COUNT="$(printf '%s' "${FAILING_URLS}" | grep -c . || true)"
+          FIRST_FAIL="$(printf '%s' "${FAILING_URLS}" | grep . | head -1 | sed 's#https\?://##; s#/$##')"
+          if [ "${FAIL_COUNT}" -gt 1 ]; then
+            FAIL_SUMMARY="${FIRST_FAIL} +$(( FAIL_COUNT - 1 )) more"
+          else
+            FAIL_SUMMARY="${FIRST_FAIL}"
+          fi
+
           {
             echo "report_path=${REPORT}"
             echo "egress_ip=${EGRESS_IP}"
             echo "fingerprint=${FINGERPRINT}"
+            echo "critical=${CRITICAL_DOWN}"
+            echo "fail_summary=${FAIL_SUMMARY}"
+            echo "critical_list=${CRITICAL_LIST}"
             if [ "${OVERALL_OK}" -eq 1 ]; then echo "status=up"; else echo "status=down"; fi
           } >> "${GITHUB_OUTPUT}"
 
@@ -335,8 +385,13 @@ jobs:
           GH_REPO: ${{ github.repository }}
           REPORT_PATH: ${{ steps.probe.outputs.report_path }}
           FINGERPRINT: ${{ steps.probe.outputs.fingerprint }}
+          CRITICAL: ${{ steps.probe.outputs.critical }}
+          FAIL_SUMMARY: ${{ steps.probe.outputs.fail_summary }}
           ALERT_LABEL: uptime-alert
-          ALERT_TITLE: '🔴 Uptime: Ever Works endpoints unreachable from outside the homelab'
+          # Stable substring used ONLY to re-find the issue when the label
+          # lookup misses. The visible title is computed per-run now, so it
+          # must never be matched exactly.
+          ALERT_TITLE_SEARCH: 'Uptime:'
         run: |
           set -uo pipefail
 
@@ -363,11 +418,25 @@ jobs:
             # Fallback for the case where a previous run created the issue but could not label it.
             # A search-index miss is tolerable here; a hard failure is not, because reaching this
             # line already means the labelled lookup succeeded and found nothing.
-            EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE}\" in:title" --limit 1 \
+            EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE_SEARCH}\" in:title" --limit 1 \
                           --json number --jq '.[0].number // empty' 2>/dev/null || true)"
           fi
 
           MARK="<!-- uptime-fingerprint: ${FINGERPRINT} -->"
+
+          # 🛑 The title names what is failing RIGHT NOW, and shouts when a
+          # customer-facing surface is among them.
+          #
+          # It used to be a constant, and that is what made EW-760 possible: an
+          # issue opened for demo.ever.works kept its wording while the entire
+          # web app went down underneath it. The escalation was invisible in
+          # every issue list, notification and mobile preview - a reader saw a
+          # title they had already triaged and moved on. For ~18 hours.
+          if [ "${CRITICAL}" = "1" ]; then
+            ALERT_TITLE="🚨 Uptime: CRITICAL — ${FAIL_SUMMARY} unreachable"
+          else
+            ALERT_TITLE="🔴 Uptime: ${FAIL_SUMMARY} unreachable"
+          fi
 
           if [ -z "${EXISTING}" ]; then
             echo "No open alert issue — creating one."
@@ -390,6 +459,19 @@ jobs:
           fi
 
           echo "Reusing open alert issue #${EXISTING}."
+
+          # Re-title when the failing set moved on. The throttle below already
+          # forces a COMMENT on a fingerprint change, but a comment appended to
+          # a long-open issue is low-salience; the title is what people re-read.
+          # Escalating "demo is flaky" -> "the whole app is down" has to change
+          # the words at the top, not just add to the bottom.
+          CURRENT_TITLE="$(gh issue view "${EXISTING}" --json title --jq '.title' 2>/dev/null || true)"
+          if [ -n "${CURRENT_TITLE}" ] && [ "${CURRENT_TITLE}" != "${ALERT_TITLE}" ]; then
+            echo "Failing set changed - retitling #${EXISTING}"
+            echo "  was: ${CURRENT_TITLE}"
+            echo "  now: ${ALERT_TITLE}"
+            gh issue edit "${EXISTING}" --title "${ALERT_TITLE}" >/dev/null 2>&1               || echo "::warning::Could not retitle #${EXISTING}; the comment below still records the change."
+          fi
 
           # Only add a comment when something actually changed, or once an hour.
           # Without this, a multi-hour outage produces a comment every 15 min.
@@ -430,14 +512,17 @@ jobs:
           GH_REPO: ${{ github.repository }}
           REPORT_PATH: ${{ steps.probe.outputs.report_path }}
           ALERT_LABEL: uptime-alert
-          ALERT_TITLE: '🔴 Uptime: Ever Works endpoints unreachable from outside the homelab'
+          # Stable substring used ONLY to re-find the issue when the label
+          # lookup misses. The visible title is computed per-run now, so it
+          # must never be matched exactly.
+          ALERT_TITLE_SEARCH: 'Uptime:'
         run: |
           set -uo pipefail
 
           EXISTING="$(gh issue list --label "${ALERT_LABEL}" --state open --limit 1 \
                         --json number --jq '.[0].number // empty' 2>/dev/null || true)"
           if [ -z "${EXISTING}" ]; then
-            EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE}\" in:title" --limit 1 \
+            EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE_SEARCH}\" in:title" --limit 1 \
                           --json number --jq '.[0].number // empty' 2>/dev/null || true)"
           fi
 

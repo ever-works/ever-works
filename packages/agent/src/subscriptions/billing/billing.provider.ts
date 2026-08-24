@@ -39,6 +39,10 @@ export class BillingProviderNotConfiguredError extends Error {
     }
 }
 
+export const BILLING_PROVIDER_ERROR_CODES = {
+    CHECKOUT_SESSION_NOT_FOUND: 'checkout-session-not-found',
+} as const;
+
 /** A provider call failed for a reason the caller may surface as 4xx. */
 export class BillingProviderError extends Error {
     constructor(
@@ -166,6 +170,8 @@ export interface PlanCheckoutRequest {
     readonly cancelUrl: string;
     /** `{userId}:{planCode}` — echoed back on the signed provider event. */
     readonly referenceId: string;
+    /** Stable provider retry key for one logical checkout attempt. */
+    readonly idempotencyKey?: string | null;
 }
 
 export interface PlanCheckoutSession {
@@ -198,6 +204,10 @@ export interface CheckoutSessionSnapshot {
     readonly customerId: string | null;
     /** Provider subscription id, for plan sessions. */
     readonly subscriptionId: string | null;
+    /** Provider payment id, present for a settled one-off licence. */
+    readonly paymentId: string | null;
+    readonly amountCents: number | null;
+    readonly currency: string | null;
     readonly currentPeriodEnd: Date | null;
 }
 
@@ -471,6 +481,15 @@ export interface BillingWebhookEvent {
     readonly subscription?: BillingSubscriptionSnapshot;
     /** Provider payment id, for correlation on refunds. */
     readonly paymentId: string | null;
+    /**
+     * Provider truth about a payment reversal. `charge.refunded` is also
+     * emitted for partial refunds, so entitlement code must never infer a
+     * full reversal from the event type alone.
+     */
+    readonly reversal?: {
+        readonly reason: 'refund' | 'dispute';
+        readonly fullyReversed: boolean;
+    };
     /** Raw provider event type, for logging/diagnostics. Never a secret. */
     readonly providerType: string;
     /**
@@ -485,6 +504,11 @@ export interface BillingWebhookEvent {
     readonly currentPeriodEnd?: Date | null;
     /** The provider will not renew at `currentPeriodEnd`. */
     readonly cancelAtPeriodEnd?: boolean | null;
+}
+
+export interface PerpetualLicencePaymentReference {
+    readonly userId: string;
+    readonly planCode: string;
 }
 
 export abstract class BillingProvider {
@@ -549,6 +573,22 @@ export abstract class BillingProvider {
      */
     async retrieveCheckoutSession(_sessionId: string): Promise<CheckoutSessionSnapshot> {
         throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Resolve a settled invoice PaymentIntent back to a recurring plan
+     * subscription sold by this application. Providers without an invoice
+     * payment graph return null; callers must never guess by customer id.
+     */
+    async findPlanSubscriptionIdForPayment(_paymentId: string): Promise<string | null> {
+        return null;
+    }
+
+    /** Resolve a one-off perpetual licence PaymentIntent stamped by us. */
+    async findPerpetualLicenceForPayment(
+        _paymentId: string,
+    ): Promise<PerpetualLicencePaymentReference | null> {
+        return null;
     }
 
     /** Off-session charge against a stored payment method (auto-recharge). */

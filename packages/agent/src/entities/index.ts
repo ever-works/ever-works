@@ -150,6 +150,7 @@ export * from './plan-entitlement.entity';
 // payment-method summary + auto-recharge state, and the invoice mirror
 export * from './billing-profile.entity';
 export * from './invoice.entity';
+export * from './licence-purchase.entity';
 export * from './credit-meter-event.entity';
 // Fleet (Wave 12, slice 1) — enrolled execution nodes with heartbeat
 export * from './fleet-node.entity';

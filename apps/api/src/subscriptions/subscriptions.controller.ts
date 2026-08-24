@@ -13,6 +13,7 @@ import { AuthSessionGuard, AuthService, CurrentUser } from '@src/auth';
 import {
     ENTITLEMENT_KEYS,
     EntitlementsService,
+    PlanSubscriptionService,
     SubscriptionService,
 } from '@ever-works/agent/subscriptions';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
@@ -35,6 +36,7 @@ export class SubscriptionsController {
         // Wave 13 (Billing page) — per-plan daily-free-credits for the
         // credits-forward plan switcher (`GET plans` below).
         private readonly entitlementsService: EntitlementsService,
+        private readonly planSubscriptionService: PlanSubscriptionService,
     ) {}
 
     @Get('plan')
@@ -82,11 +84,13 @@ export class SubscriptionsController {
     @ApiResponse({ status: 200, description: 'Active plans + current plan code' })
     async listPlans(@CurrentUser() auth: AuthenticatedUser) {
         const user = await this.authService.getUser(auth.userId);
-        const [summary, plans, licences] = await Promise.all([
+        const [summary, plans, licences, ownedLicenceCodes] = await Promise.all([
             this.subscriptionService.summarizePlan(user),
             this.subscriptionService.listPlans(),
             this.subscriptionService.listSelfHostedPlans(),
+            this.planSubscriptionService.listOwnedLicenceCodes(auth.userId),
         ]);
+        const ownedLicenceSet = new Set(ownedLicenceCodes);
         const currentPlanCode = summary.enabled ? summary.plan.code : 'free';
 
         // Plan count is tiny (seeded catalog) and EntitlementsService
@@ -143,6 +147,7 @@ export class SubscriptionsController {
             currency: plan.currency,
             // A licence never becomes "your current plan" on this deployment.
             isCurrent: false,
+            owned: ownedLicenceSet.has(plan.code),
             dailyFreeCredits: 0,
         }));
 

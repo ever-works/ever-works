@@ -2,6 +2,61 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
+ * Deployed history: changing any of these filenames or timestamps can make
+ * TypeORM treat an old migration as new. Keep the debt visible and frozen;
+ * only genuinely new collisions should fail the contract below.
+ */
+const LEGACY_DUPLICATE_TIMESTAMPS: Record<string, string[]> = {
+    '1779800000000': [
+        '1779800000000-AddMagicLinkToken.ts',
+        '1779800000000-AddWorkProposalGeneratedPrompt.ts',
+    ],
+    '1781600000000': [
+        '1781600000000-CreateIdeaWorksTable.ts',
+        '1781600000000-CreateTeamResources.ts',
+    ],
+    '1781700000000': [
+        '1781700000000-CreateAgentActionProposals.ts',
+        '1781700000000-CreateMissionWorksTable.ts',
+    ],
+    '1781800000000': [
+        '1781800000000-AddAgentScorecard.ts',
+        '1781800000000-AddMissionOutcomeToMissions.ts',
+    ],
+    '1781900000000': [
+        '1781900000000-AddAgentGuardrailsAndProposalDecidedVia.ts',
+        '1781900000000-AddOrganizationVision.ts',
+    ],
+    '1782000000000': [
+        '1782000000000-AddKbDocumentConsolidation.ts',
+        '1782000000000-RenameWorkAgentGoalsToWorkBuildRequests.ts',
+    ],
+    '1782100000000': [
+        '1782100000000-CreateGoalsTables.ts',
+        '1782100000000-CreateInboundTriggers.ts',
+    ],
+    '1782300000000': [
+        '1782300000000-AddTaskOwnerScopeColumns.ts',
+        '1782300000000-AddWorkDeployDatabaseMode.ts',
+    ],
+    '1784200000000': [
+        '1784200000000-AddWorkExternalRefs.ts',
+        '1784200000000-CreateFleetJobs.ts',
+        '1784200000000-CreateIngestInstallBindings.ts',
+    ],
+    '1784300000000': [
+        '1784300000000-AddTaskPrStatusColumns.ts',
+        '1784300000000-CreateBillingProfilesAndInvoices.ts',
+        '1784300000000-CreateKbRetrievalLogsAndMemoryCadence.ts',
+        '1784300000000-CreateTerminalTranscriptChunks.ts',
+    ],
+    '1786950000000': [
+        '1786950000000-AddCreditLedgerBuckets.ts',
+        '1786950000000-AddUserUploadScopeIndex.ts',
+    ],
+};
+
+/**
  * `apps/api/src/migrations/` is not an ordinary source directory — it is
  * the input to a RUNTIME glob.
  *
@@ -39,6 +94,22 @@ describe('src/migrations directory contract', () => {
         const strays = flatFiles.filter((name) => !/^\d{13}-[A-Za-z0-9]+\.ts$/.test(name));
 
         expect(strays).toEqual([]);
+    });
+
+    it('introduces no timestamp collision beyond the exact frozen deployed history', () => {
+        const filesByTimestamp = new Map<string, string[]>();
+        for (const name of flatFiles) {
+            const timestamp = name.slice(0, 13);
+            filesByTimestamp.set(timestamp, [...(filesByTimestamp.get(timestamp) ?? []), name]);
+        }
+
+        const duplicates = Object.fromEntries(
+            [...filesByTimestamp.entries()]
+                .filter(([, names]) => names.length > 1)
+                .map(([timestamp, names]) => [timestamp, names.sort()]),
+        );
+
+        expect(duplicates).toEqual(LEGACY_DUPLICATE_TIMESTAMPS);
     });
 
     it('no flat migration file references Jest globals', () => {

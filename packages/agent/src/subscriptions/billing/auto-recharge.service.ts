@@ -13,6 +13,8 @@ export type AutoRechargeOutcome =
     | { status: 'already-in-flight' }
     /** Off-session charge placed; the webhook will credit the ledger. */
     | { status: 'charged'; paymentId: string; packId: string }
+    /** Provider outcome is indeterminate; keep the guard until a webhook resolves it. */
+    | { status: 'pending'; paymentId: string; packId: string }
     /** The provider declined; the guard is released and the count bumped. */
     | { status: 'failed'; failureCode?: string };
 
@@ -35,7 +37,8 @@ export type AutoRechargeOutcome =
  *      provider idempotency key so even a retried call resolves to one
  *      payment.
  *   5. The slot is released by the webhook that credits the ledger
- *      (`BillingService.applyPurchase`) or immediately on failure.
+ *      (`BillingService.applyPurchase`) or immediately on a definite
+ *      failure. An indeterminate provider outcome keeps the slot claimed.
  *
  * This service NEVER writes to the ledger. Credits appear only when the
  * signature-verified webhook confirms the money actually moved.
@@ -112,15 +115,18 @@ export class AutoRechargeService {
             // Slot stays claimed until the webhook credits the ledger —
             // that is what prevents a second charge while the first
             // payment is still settling.
+            if (result.status === 'pending') {
+                return { status: 'pending', paymentId: result.paymentId, packId: pack.id };
+            }
+
             return { status: 'charged', paymentId: result.paymentId, packId: pack.id };
         } catch (error) {
-            await this.billingProfileRepository.recordAutoRechargeFailure(userId, now);
             this.logger.warn(
-                `Auto-recharge failed for user ${userId}: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
+                `Auto-recharge provider call had an indeterminate outcome for user ${userId} (${
+                    error instanceof Error ? error.name : 'unknown error'
+                })`,
             );
-            return { status: 'failed' };
+            return { status: 'pending', paymentId: '', packId: pack.id };
         }
     }
 }

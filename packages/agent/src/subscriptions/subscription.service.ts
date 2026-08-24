@@ -17,6 +17,7 @@ import { UserRepository } from '@src/database/repositories/user.repository';
 import { PlanEntitlementRepository } from '@src/database/repositories/plan-entitlement.repository';
 import { WorkScheduleBillingMode, WorkScheduleCadence, SubscriptionPlanCode } from '@src/entities';
 import type { SubscriptionPlanHosting } from '@src/entities/types';
+import { CATALOG_CURRENCY } from './billing/stripe-catalog';
 
 const ALL_CADENCES: WorkScheduleCadence[] = [
     WorkScheduleCadence.MONTHLY,
@@ -278,11 +279,18 @@ export class SubscriptionService implements OnModuleInit {
     }
 
     async seedPlans() {
+        const configuredCurrency = config.billing.getDefaultCurrency().trim().toLowerCase();
+        if (configuredCurrency !== CATALOG_CURRENCY) {
+            throw new Error(
+                `BILLING_DEFAULT_CURRENCY resolves to "${configuredCurrency}", but the git-backed Stripe catalog currency is "${CATALOG_CURRENCY}". Refusing to seed plan rows that checkout would charge in a different currency.`,
+            );
+        }
+
         await Promise.all(
             PLAN_SEED_DATA.map((plan) =>
                 this.planRepository.upsert({
                     ...plan,
-                    currency: config.billing.getDefaultCurrency(),
+                    currency: CATALOG_CURRENCY,
                     active: true,
                 }),
             ),

@@ -19,11 +19,17 @@ export class SubscriptionPlanRepository {
     }
 
     async upsert(plan: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
-        let existing = plan.code ? await this.findByCode(plan.code as SubscriptionPlanCode) : null;
-
-        if (existing) {
-            await this.repository.update(existing.id, plan);
-            return this.repository.findOne({ where: { id: existing.id } });
+        if (plan.code) {
+            // API replicas seed the same catalog concurrently during rolling starts.
+            // A find-then-save sequence lets both replicas observe a missing code and
+            // makes one lose the UNIQUE(code) race inside onModuleInit. Let the database
+            // resolve that conflict atomically on every supported driver instead.
+            await this.repository.upsert(plan, { conflictPaths: ['code'] });
+            const persisted = await this.findByCode(plan.code as SubscriptionPlanCode);
+            if (!persisted) {
+                throw new Error(`Subscription plan ${plan.code} missing after upsert`);
+            }
+            return persisted;
         }
 
         const created = this.repository.create(plan);

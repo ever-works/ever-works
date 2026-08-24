@@ -25,6 +25,8 @@ export type PlanGrantOutcome =
     /** No active cloud subscription with a monthly allowance. */
     | 'not-eligible';
 
+export type PlanGrantReversalOutcome = 'reversed' | 'already-reversed' | 'nothing-to-reverse';
+
 export interface PlanGrantSummary {
     scanned: number;
     granted: number;
@@ -101,6 +103,48 @@ export class PlanCreditGrantService {
     }
 
     /**
+     * Claw back the allowance month in force when a full plan payment is
+     * reversed. The debit may take the account negative: already-spent
+     * credits cannot become free merely because the provider returned the
+     * money. The provider event key makes delivery replay a no-op.
+     */
+    async reverseCurrentAllowance(
+        subscription: UserSubscription,
+        providerEventKey: string,
+        now: Date = new Date(),
+    ): Promise<PlanGrantReversalOutcome> {
+        const idempotencyKey = `revoke:plan:${providerEventKey}`;
+        if (await this.creditLedgerService.hasEntry(idempotencyKey)) {
+            return 'already-reversed';
+        }
+
+        const anchor = subscription.createdAt ?? now;
+        const period = PlanCreditGrantService.allowancePeriodFor(anchor, now);
+        const granted = await this.creditLedgerService.sumByRefTypeInWindow(
+            subscription.userId,
+            PLAN_GRANT_REF_TYPE,
+            period.start,
+            period.end,
+        );
+        if (granted <= 0) return 'nothing-to-reverse';
+
+        await this.creditLedgerService.record({
+            userId: subscription.userId,
+            organizationId: subscription.organizationId ?? null,
+            tenantId: subscription.tenantId ?? null,
+            kind: CreditLedgerKind.ADJUSTMENT,
+            amountCredits: -granted,
+            refType: PLAN_GRANT_REF_TYPE,
+            refId: subscription.id,
+            description: 'Plan allowance reversed after payment reversal',
+            idempotencyKey,
+            allowNegativeBalance: true,
+            now,
+        });
+        return 'reversed';
+    }
+
+    /**
      * Daily sweep over every active subscription (RPC target, via
      * `CreditsSweepService`). Bounded batches; per-user failures are
      * logged and never stop the pass.
@@ -167,14 +211,7 @@ export class PlanCreditGrantService {
             return 'already-granted';
         }
 
-        const alreadyGranted = await this.creditLedgerService.sumByRefTypeInWindow(
-            subscription.userId,
-            PLAN_GRANT_REF_TYPE,
-            period.start,
-            period.end,
-        );
-        const amountCredits = Math.trunc(monthlyCredits) - alreadyGranted;
-        if (amountCredits <= 0) return 'already-granted';
+        const amountCredits = Math.trunc(monthlyCredits);
 
         const entry = await this.creditLedgerService.record({
             userId: subscription.userId,
@@ -189,9 +226,14 @@ export class PlanCreditGrantService {
                 .slice(0, 10)})`,
             idempotencyKey,
             expiresAt: period.end,
+            maxRefTypeAmountInWindow: {
+                from: period.start,
+                to: period.end,
+                maxAmountCredits: amountCredits,
+            },
             now,
         });
-        return entry ? 'granted' : 'not-eligible';
+        return entry ? 'granted' : 'already-granted';
     }
 }
 
