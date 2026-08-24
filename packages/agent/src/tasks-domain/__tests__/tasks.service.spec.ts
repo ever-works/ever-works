@@ -76,6 +76,7 @@ function makeService(overrides: Record<string, any> = {}) {
         },
         works: {
             findById: jest.fn(),
+            findByIds: jest.fn(),
         },
         missions: {
             findOne: jest.fn(),
@@ -374,6 +375,25 @@ describe('TasksService authorization guardrails', () => {
         await expect(
             (service.getOne as any)('user-1', hiddenWorkTask.id, everScope),
         ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('omits a Work-scoped Task from list when detail would 404 for a Work scope mismatch', async () => {
+        const visible = makeTask({ id: 'task-visible', workId: 'work-ever', ...everScope });
+        const hidden = makeTask({ id: 'task-hidden', workId: 'work-yo', ...everScope });
+        const { service, repos } = makeService();
+        repos.tasks.findByUserIdFiltered.mockResolvedValueOnce({
+            rows: [visible, hidden],
+            total: 2,
+        });
+        repos.works.findByIds.mockResolvedValueOnce([
+            { id: 'work-ever', userId: 'user-1', ...everScope },
+            { id: 'work-yo', userId: 'user-1', ...yoScope },
+        ]);
+
+        await expect(service.list('user-1', {}, {}, everScope)).resolves.toEqual({
+            rows: [visible],
+            total: 1,
+        });
     });
 
     it('keeps legacy personal Task and Work rows reachable in personal scope', async () => {
