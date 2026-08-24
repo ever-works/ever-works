@@ -1,10 +1,22 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { WorkScheduleBillingMode } from '@/lib/api/enums';
 
-const updateWorkSchedule = vi.fn(async () => ({ success: true, message: 'ok' }));
+type ScheduleUpdatePayload = Record<string, unknown> & {
+    billingMode: WorkScheduleBillingMode;
+};
+type UpdateWorkScheduleMock = (
+    workId: string,
+    payload: ScheduleUpdatePayload,
+) => Promise<{ success: boolean; message: string }>;
+
+const updateWorkSchedule = vi.fn<UpdateWorkScheduleMock>(async () => ({
+    success: true,
+    message: 'ok',
+}));
 
 vi.mock('@/app/actions/dashboard/work-schedule', () => ({
-    updateWorkSchedule: (...args: unknown[]) => updateWorkSchedule(...(args as [])),
+    updateWorkSchedule: (...args: Parameters<UpdateWorkScheduleMock>) =>
+        updateWorkSchedule(...args),
     runWorkSchedule: vi.fn(),
     cancelWorkSchedule: vi.fn(),
 }));
@@ -37,30 +49,30 @@ describe('setSchedule — billing mode is not silently upgraded', () => {
 
     it('sends SUBSCRIPTION, never USAGE', async () => {
         const { setSchedule } = await import('./schedule.tools');
-        await (setSchedule as unknown as {
-            execute: (a: Record<string, unknown>) => Promise<unknown>;
-        }).execute({ workId: 'w1', enable: true, cadence: 'daily' });
+        await (
+            setSchedule as unknown as {
+                execute: (a: Record<string, unknown>) => Promise<unknown>;
+            }
+        ).execute({ workId: 'w1', enable: true, cadence: 'daily' });
 
         expect(updateWorkSchedule).toHaveBeenCalledTimes(1);
-        const payload = updateWorkSchedule.mock.calls[0]![1] as {
-            billingMode: WorkScheduleBillingMode;
-        };
+        const payload = updateWorkSchedule.mock.calls[0]![1];
         expect(payload.billingMode).toBe(WorkScheduleBillingMode.SUBSCRIPTION);
         expect(payload.billingMode).not.toBe(WorkScheduleBillingMode.USAGE);
     });
 
     it('holds for every cadence, including the default when none is given', async () => {
         const { setSchedule } = await import('./schedule.tools');
-        const exec = (setSchedule as unknown as {
-            execute: (a: Record<string, unknown>) => Promise<unknown>;
-        }).execute;
+        const exec = (
+            setSchedule as unknown as {
+                execute: (a: Record<string, unknown>) => Promise<unknown>;
+            }
+        ).execute;
 
         for (const cadence of ['hourly', 'daily', 'weekly', 'monthly', undefined]) {
             updateWorkSchedule.mockClear();
             await exec({ workId: 'w1', enable: true, cadence });
-            const payload = updateWorkSchedule.mock.calls[0]![1] as {
-                billingMode: WorkScheduleBillingMode;
-            };
+            const payload = updateWorkSchedule.mock.calls[0]![1];
             expect(payload.billingMode).toBe(WorkScheduleBillingMode.SUBSCRIPTION);
         }
     });
