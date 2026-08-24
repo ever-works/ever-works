@@ -9,6 +9,7 @@ import {
     HttpCode,
     HttpStatus,
     Inject,
+    Logger,
     NotFoundException,
     NotImplementedException,
     Optional,
@@ -67,6 +68,8 @@ type AnonRequest = {
 @ApiTags('Uploads')
 @Controller('api/uploads')
 export class UploadsController {
+    private readonly logger = new Logger(UploadsController.name);
+
     constructor(
         private readonly uploads: UploadsService,
         private readonly anonymousAuthService: AnonymousAuthService,
@@ -105,6 +108,12 @@ export class UploadsController {
         @Optional()
         @Inject(OrganizationMemberRepository)
         private readonly organizationMembers?: OrganizationMemberRepository,
+        // Retained deliberately. It backed the Tenant-owner escape hatch that
+        // `requireAuthenticatedOrganizationScope` needed while this controller
+        // was roster-strict; that gate is gone, but the parameter must stay:
+        // uploads.controller.spec.ts asserts the exact positional DI token
+        // indices, so removing it would silently rewire every later parameter
+        // (ApiKeyService) to the wrong repository while still compiling.
         @Optional()
         @Inject(TenantRepository)
         private readonly tenantRepository?: TenantRepository,
@@ -750,6 +759,42 @@ export class UploadsController {
         );
     }
 
+    /**
+     * Authorize an explicit Organization scope, in agreement with
+     * [`SessionScopeGuard.requireActiveOrganization`](../scope/session-scope.guard.ts).
+     *
+     * The model is TENANT-WIDE and that is deliberate, not an omission. The
+     * roster's own entity states it:
+     *
+     *   "This table is the ROSTER, not the authorization check. Access is still
+     *    decided by `OrganizationMembershipService.ensureMember`, which compares
+     *    `user.tenantId` to `organization.tenantId` ... because access is
+     *    tenant-wide, a member of one Organization can see every Organization in
+     *    that Tenant. The owner accepted this explicitly for v1."
+     *   (packages/agent/src/entities/organization-member.entity.ts)
+     *
+     * and its repository is blunter still: "Nothing here grants access."
+     * `OrganizationService.listForUser`, `OrganizationMembershipService.ensureMember`,
+     * `ScopeOwnershipGuard` and `TeamsService` all authorize the same way.
+     *
+     * This method previously ALSO required an exact `organization_members` row,
+     * with a Tenant-owner escape hatch. That was copied here in `d220ee00f`
+     * (PR #2152) while the guard was briefly roster-strict; `b7550481a` (PR #2218)
+     * reverted the guard the next morning and this copy was left behind. Because
+     * `organization_members` has zero rows in production, the stale copy admitted
+     * only the Tenant owner and 404'd the first invited member — the
+     * `guard-roster-asymmetry` finding on PR #2213.
+     *
+     * The roster is still READ, and deliberately so: it is invitation provenance
+     * and a future per-Organization role seam. It simply does not decide.
+     *
+     * Still enforced here and unchanged: the caller
+     * ({@link hydrateAuthenticatedScope}) has already proven
+     * `user.tenantId === requested.tenantId`, and the Organization must exist AND
+     * belong to that Tenant. A cross-Tenant Organization, a missing one and an
+     * unauthorized one all collapse to the same opaque 404, so ids stay
+     * non-enumerable.
+     */
     private async requireAuthenticatedOrganizationScope(
         userId: string,
         tenantId: string,
@@ -772,10 +817,13 @@ export class UploadsController {
             member?.organizationId === organizationId,
         );
         if (!exactMember) {
-            const tenant = this.tenantRepository
-                ? await this.tenantRepository.findById(tenantId).catch(() => null)
-                : null;
-            if (tenant?.ownerUserId !== userId) this.opaqueScopeNotFound();
+            // NOT an authorization decision — see the docblock. Tenant equality
+            // was already proven by the caller, and a rosterless admit is the
+            // NORMAL case today (zero rows in production, and the Tenant owner
+            // never gets a row by construction).
+            this.logger.debug(
+                `Organization scope admitted without a roster row: user=${userId} org=${organizationId}`,
+            );
         }
         return { tenantId, organizationId };
     }

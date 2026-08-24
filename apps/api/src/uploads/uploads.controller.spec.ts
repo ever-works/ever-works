@@ -464,23 +464,33 @@ describe('UploadsController', () => {
             },
         );
 
-        it('still requires exact roster access when the bearer explicitly selects Ever', async () => {
-            const ctx = publicController({
-                activeScope: everScope,
-                bearer: true,
-                member: null,
-                tenant: { id: everScope.tenantId, ownerUserId: 'other' },
-            });
-
-            await expect(
-                ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined),
-            ).rejects.toBeInstanceOf(NotFoundException);
-            expect(ctx.uploads.saveImage).not.toHaveBeenCalled();
-        });
-
+        /**
+         * RE-POINTED (guard-roster-asymmetry, PR #2213 punch list).
+         *
+         * These cases previously asserted ROSTER-STRICT authorization. That was
+         * introduced here on 2026-08-23 by `d220ee00f` / `dc0639e33` to mirror
+         * `SessionScopeGuard`, which was briefly roster-strict at the time.
+         * `b7550481a` (PR #2218) reverted the guard to TENANT-WIDE the next
+         * morning and this controller was never reconciled — so these tests were
+         * pinning a one-day-old regression, and with `organization_members`
+         * empty in production they described a total lockout for the first
+         * invited member.
+         *
+         * Tenant-wide is the ratified model, stated on the roster entity itself:
+         * "because access is tenant-wide, a member of one Organization can see
+         *  every Organization in that Tenant. The owner accepted this explicitly
+         *  for v1." (packages/agent/src/entities/organization-member.entity.ts)
+         *
+         * The cases are kept and re-pointed rather than deleted, so the
+         * behaviour change is explicit in the diff.
+         */
         it.each([
             [
-                'known Yo member',
+                'no roster row at all (the normal case — nothing writes one today)',
+                { member: null, tenant: { id: everScope.tenantId, ownerUserId: 'other' } },
+            ],
+            [
+                'a roster row for a DIFFERENT Organization in the same Tenant',
                 {
                     member: {
                         userId: bearerUserId,
@@ -490,11 +500,35 @@ describe('UploadsController', () => {
                     tenant: { id: everScope.tenantId, ownerUserId: 'other' },
                 },
             ],
-            [
-                'revoked Ever member',
-                { member: null, tenant: { id: everScope.tenantId, ownerUserId: 'other' } },
-            ],
+        ] as const)(
+            'admits a Tenant member with %s (tenant-wide access, matching SessionScopeGuard)',
+            async (_label, overrides) => {
+                const ctx = publicController({
+                    activeScope: everScope,
+                    bearer: true,
+                    ...overrides,
+                });
+
+                await expect(
+                    ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined),
+                ).resolves.toBeDefined();
+                expect(ctx.uploads.saveImage).toHaveBeenCalled();
+            },
+        );
+
+        it.each([
             ['unknown Organization', { organization: null }],
+            [
+                // The boundary that must NOT move: tenant-wide widens access
+                // WITHIN a Tenant, never across one.
+                'an Organization belonging to another Tenant',
+                {
+                    organization: {
+                        id: everScope.organizationId,
+                        tenantId: '99999999-9999-4999-8999-999999999999',
+                    },
+                },
+            ],
         ] as const)(
             'opaquely rejects a bearer with %s before upload or presign',
             async (_label, overrides) => {
