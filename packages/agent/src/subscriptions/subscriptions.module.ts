@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '@src/database/database.module';
+import { Agent } from '@src/entities/agent.entity';
 import { AgentRun } from '@src/entities/agent-run.entity';
+import { AgentRepository } from '@src/database/repositories/agent.repository';
 import { AgentRunRepository } from '@src/database/repositories/agent-run.repository';
 import { NotificationsModule } from '@src/notifications/notifications.module';
 import { SubscriptionService } from './subscription.service';
@@ -29,15 +31,13 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         // Wave 9 M2 — RunCostSettlementService emits the balance-exhausted
         // notification through the existing NotificationService.
         NotificationsModule,
-        // Costs dashboard — `AgentRunRepository` is not in the
-        // `_repository-inventory` DatabaseModule exports (it is owned by
-        // AgentsModule), so it is provided locally here. Same pattern,
-        // and same reason, as `TerminalTranscriptModule`: importing
-        // AgentsModule for two read-only aggregations would drag the
-        // whole agent runtime into this module's graph. The local
-        // instance never writes a terminal transition, so it never
-        // exercises the RUN_COST_SETTLER hook.
-        TypeOrmModule.forFeature([AgentRun]),
+        // Costs + seats — AgentRunRepository and AgentRepository are not in
+        // the `_repository-inventory` DatabaseModule exports (both are owned
+        // by AgentsModule), so they are provided locally here. Importing the
+        // whole AgentsModule for read-only aggregations would drag the agent
+        // runtime into this graph. The local AgentRunRepository never writes
+        // a terminal transition, so it never exercises RUN_COST_SETTLER.
+        TypeOrmModule.forFeature([Agent, AgentRun]),
     ],
     providers: [
         SubscriptionService,
@@ -64,6 +64,7 @@ import { CostsSummaryService } from './credits/costs-summary.service';
         // Costs dashboard — the `GET /api/usage/costs/*` aggregations
         // (spend by day/agent/model + top runs). Read-only; derived from
         // the same metering rows the usage summary reads.
+        AgentRepository,
         AgentRunRepository,
         CostsSummaryService,
         // The money path (billing PRD B5) — checkout, webhook, invoices,
