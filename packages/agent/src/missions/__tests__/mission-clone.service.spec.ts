@@ -396,6 +396,38 @@ describe('MissionCloneService', () => {
             expect(copies).toHaveLength(1);
             expect(copies[0]).toMatchObject({ title: 'Ever idea', ...everScope });
         });
+
+        it('retains an unscoped scheduled-tick Idea for the authorized Mission without cloning another Organization Idea', async () => {
+            const everScope = {
+                tenantId: '11111111-1111-4111-8111-111111111111',
+                organizationId: '22222222-2222-4222-8222-222222222222',
+            };
+            const source = store.seedMission({ userId: 'u1', ...everScope });
+            store.seedProposal({
+                userId: 'u1',
+                missionId: source.id,
+                title: 'Scheduled tick under EMPTY_SCOPE',
+                tenantId: null,
+                organizationId: null,
+            });
+            store.seedProposal({
+                userId: 'u1',
+                missionId: source.id,
+                title: 'Other Organization idea',
+                tenantId: everScope.tenantId,
+                organizationId: '33333333-3333-4333-8333-333333333333',
+            });
+
+            const result = await service.cloneForUser('u1', source.id, {}, everScope);
+            const copies = store.proposals.filter((idea) => idea.missionId === result.mission.id);
+
+            expect(result.ideasCloned).toBe(1);
+            expect(copies).toHaveLength(1);
+            expect(copies[0]).toMatchObject({
+                title: 'Scheduled tick under EMPTY_SCOPE',
+                ...everScope,
+            });
+        });
     });
 
     describe('countClonesOf', () => {

@@ -370,13 +370,15 @@ export class TasksService {
         opts: { includeRun?: boolean } = {},
         ownershipScope?: OwnershipScope,
     ): Promise<{ rows: TaskWithRun[]; total: number }> {
-        const { rows, total } = await this.tasks.findByUserIdFiltered(
+        const { rows: scopedRows, total } = await this.tasks.findByUserIdFiltered(
             userId,
             filter,
             ownershipScope,
         );
+        const rows = await this.filterTasksByReachableWork(userId, scopedRows, ownershipScope);
+        const reachableTotal = Math.max(0, total - (scopedRows.length - rows.length));
         if (!opts.includeRun || rows.length === 0 || !this.agentRuns) {
-            return { rows, total };
+            return { rows, total: reachableTotal };
         }
         // Kanban run cockpit (Wave 2 M2) — batch-embed the latest AgentRun
         // per returned row via ONE IN query on the denormalized
@@ -397,7 +399,7 @@ export class TasksService {
             ),
         ];
         if (runIds.length === 0) {
-            return { rows, total };
+            return { rows, total: reachableTotal };
         }
         let runsById = new Map<string, TaskRunEmbed>();
         try {
@@ -421,13 +423,40 @@ export class TasksService {
             // Best-effort embed: the list itself must not fail because the
             // runs table hiccuped — rows simply ship without `run`.
             this.logger.warn(`includeRun embed failed (${runIds.length} run ids): ${err}`);
-            return { rows, total };
+            return { rows, total: reachableTotal };
         }
         const withRuns: TaskWithRun[] = rows.map((row) => ({
             ...row,
             run: (row.latestRunId && runsById.get(row.latestRunId)) || null,
         }));
-        return { rows: withRuns, total };
+        return { rows: withRuns, total: reachableTotal };
+    }
+
+    /**
+     * Keep board/list visibility aligned with {@link getOne}: a Task whose
+     * referenced Work is missing, foreign, or in another active scope must
+     * not be listed and then immediately 404 when opened.
+     */
+    private async filterTasksByReachableWork(
+        userId: string,
+        rows: Task[],
+        scope?: OwnershipScope,
+    ): Promise<Task[]> {
+        if (!scope) return rows;
+
+        const workIds = [
+            ...new Set(rows.map((task) => task.workId).filter((id): id is string => Boolean(id))),
+        ];
+        if (workIds.length === 0) return rows;
+        if (!this.works) return rows.filter((task) => !task.workId);
+
+        const works = await this.works.findByIds(workIds).catch(() => []);
+        const reachableWorkIds = new Set(
+            works
+                .filter((work) => work.userId === userId && ownershipScopeMatches(work, scope))
+                .map((work) => work.id),
+        );
+        return rows.filter((task) => !task.workId || reachableWorkIds.has(task.workId));
     }
 
     async getOne(userId: string, id: string, scope?: OwnershipScope): Promise<Task> {

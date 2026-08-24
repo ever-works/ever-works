@@ -34,24 +34,12 @@ function makeGuard(
         if (organizationId === 'o-resolved') return 't-resolved';
         return 't-1';
     };
-    return new SessionScopeGuard(
-        scopeContext,
-        userRepository,
-        {
-            findById: jest.fn(async (organizationId: string) => ({
-                id: organizationId,
-                tenantId: tenantForOrganization(organizationId),
-            })),
-        } as never,
-        {
-            findByOrgAndUser: jest.fn(async (organizationId: string, userId: string) => ({
-                organizationId,
-                userId,
-                tenantId: tenantForOrganization(organizationId),
-            })),
-        } as never,
-        { findById: jest.fn(async () => ({ ownerUserId: 'tenant-owner' })) } as never,
-    );
+    return new SessionScopeGuard(scopeContext, userRepository, {
+        findById: jest.fn(async (organizationId: string) => ({
+            id: organizationId,
+            tenantId: tenantForOrganization(organizationId),
+        })),
+    } as never);
 }
 
 type FindByIdResult = {
@@ -195,33 +183,36 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
         expect(reqUser.tenantId).toBe('t-1');
     });
 
-    it.each([
-        [
-            'a removed Ever membership while Yo membership keeps the Tenant active',
-            { id: 'o-ever', tenantId: 't-1' },
-        ],
-        ['an Organization that no longer exists', null],
-    ])('returns the same opaque 404 for %s', async (_label, organization) => {
+    it('allows an invited Tenant member to use every Organization returned by the tenant-wide list', async () => {
         findById.mockResolvedValue({
             tenantId: 't-1',
             lastScopeOrganizationId: 'o-yo',
         });
         const organizationRepository = {
-            findById: jest.fn().mockResolvedValue(organization),
+            findById: jest.fn().mockResolvedValue({ id: 'o-ever', tenantId: 't-1' }),
         };
-        const organizationMembers = {
-            // The user still belongs to Yo, but their Ever roster row was revoked.
-            findByOrgAndUser: jest.fn().mockResolvedValue(null),
-        };
-        const tenants = {
-            findById: jest.fn().mockResolvedValue({ ownerUserId: 'tenant-owner' }),
-        };
-        const membershipGuard = new (SessionScopeGuard as any)(
+        // The invitation was nominally for Yo. The roster is audit metadata;
+        // users.tenantId grants access to every Organization listed in t-1.
+        const membershipGuard = new SessionScopeGuard(
             scopeContext,
-            { findById },
-            organizationRepository,
-            organizationMembers,
-            tenants,
+            { findById } as never,
+            organizationRepository as never,
+        );
+        const ctx = makeContext({ user: { userId: 'u-1' } });
+
+        await expect(
+            scopeContext.runWith({ tenantId: 't-1', organizationId: 'o-ever' }, () =>
+                membershipGuard.canActivate(ctx),
+            ),
+        ).resolves.toBe(true);
+    });
+
+    it('returns the opaque 404 when the Organization no longer exists', async () => {
+        findById.mockResolvedValue({ tenantId: 't-1', lastScopeOrganizationId: 'o-yo' });
+        const membershipGuard = new SessionScopeGuard(
+            scopeContext,
+            { findById } as never,
+            { findById: jest.fn().mockResolvedValue(null) } as never,
         );
         const ctx = makeContext({ user: { userId: 'u-1' } });
 
@@ -248,8 +239,6 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
             scopeContext,
             { findById } as never,
             organizationRepository as never,
-            organizationMembers as never,
-            { findById: jest.fn().mockResolvedValue({ ownerUserId: 'tenant-owner' }) } as never,
         );
         const ctx = makeContext({ user: { userId: 'u-1' } });
 
@@ -275,8 +264,6 @@ describe('SessionScopeGuard (EW-664 Phase 12)', () => {
             scopeContext,
             { findById } as never,
             { findById: jest.fn().mockResolvedValue({ id: 'o-ever', tenantId: 't-1' }) } as never,
-            { findByOrgAndUser: jest.fn().mockResolvedValue(null) } as never,
-            { findById: jest.fn().mockResolvedValue({ ownerUserId: 'u-1' }) } as never,
         );
         const ctx = makeContext({ user: { userId: 'u-1' } });
 
