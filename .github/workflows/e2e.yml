@@ -349,6 +349,11 @@ jobs:
           # b709f9cb) but several specs assert paid-tier transitions
           # that only fire when the module is on.
           SUBSCRIPTIONS_ENABLED: 'true'
+          # The suite enables subscriptions to cover billing behavior, while
+          # hundreds of unrelated scenarios create agents/members as fixtures.
+          # Fresh free users already consume their one included seat, so keep
+          # fixture setup unbounded. The config getter ignores this in prod.
+          E2E_BYPASS_SEAT_LIMITS: 'true'
           # E2E-only escape hatch (hard-gated off in production â€” ignored
           # unless NODE_ENV !== 'production'). Without a real billing
           # integration wired in, the only path to a PAID plan is the

@@ -132,7 +132,9 @@ export class SeatsService {
      * agent). Fail-open on every axis except a genuinely full allowance.
      */
     async assertSeatAvailable(ownerUserId: string, count = 1): Promise<void> {
-        if (!config.subscriptions.isEnabled()) return;
+        if (!config.subscriptions.isEnabled() || config.subscriptions.bypassSeatLimitsInE2E()) {
+            return;
+        }
         let seats: SeatsView;
         try {
             seats = await this.getSeats(ownerUserId);
