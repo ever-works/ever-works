@@ -170,12 +170,28 @@ describe('CreditLedgerRepository.recordAtomic', () => {
         expect(entryRepo.save).not.toHaveBeenCalled();
     });
 
-    it('takes a pessimistic user-row lock on postgres but skips it on sqlite', async () => {
+    it('locks the user row on postgres WITHOUT joining eager relations, and skips the lock on sqlite', async () => {
         const pg = makeHarness({ driver: 'postgres' });
         await pg.repository.recordAtomic({ ...BASE_WRITE });
+        // 🛑 `loadEagerRelations: false` is the whole point of this assertion.
+        // `User.defaultPlan` is an eager @ManyToOne, so without it TypeORM
+        // LEFT JOINs `subscription_plans` and PostgreSQL rejects the lock with
+        // "FOR UPDATE cannot be applied to the nullable side of an outer join".
+        // That throw escaped every recordAtomic call — the single write path for
+        // the entire ledger — so on Postgres NOTHING could be credited: not the
+        // daily free grant, not a monthly plan allowance, and not a paid credit
+        // pack (the customer was charged, the webhook 500d, Stripe retried).
+        // Measured in production before the fix: the 00:05Z sweep on 2026-08-24
+        // returned granted: 0, scanned: 30, failed: 30 with an empty ledger.
+        //
+        // This asserts the OPTION rather than the behaviour because the suite
+        // runs on sqlite, where the lock is skipped entirely and the broken
+        // statement is never executed. The behaviour was verified separately by
+        // replaying both queries against a real PostgreSQL 16.
         expect(pg.userRepo.findOne).toHaveBeenCalledWith({
             where: { id: 'user-1' },
             lock: { mode: 'pessimistic_write' },
+            loadEagerRelations: false,
         });
 
         const sqlite = makeHarness({ driver: 'better-sqlite3' });
