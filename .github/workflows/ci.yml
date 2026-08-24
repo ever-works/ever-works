@@ -285,12 +285,16 @@ jobs:
           probe() { # $1=port $2=fwd|bare -> "status|location|marker"
             local port="$1" mode="$2" code loc mark
             if [ "$mode" = fwd ]; then
-              code=$(curl -sS -o /tmp/g.html -D /tmp/g.hdr --max-redirs 0 -m 30 -w '%{http_code}' \
+              if ! code=$(curl -sS -o /tmp/g.html -D /tmp/g.hdr --max-redirs 0 -m 30 -w '%{http_code}' \
                 -H 'Host: app.ever.works' -H 'X-Forwarded-Host: app.ever.works' \
-                -H 'X-Forwarded-Proto: https' "http://127.0.0.1:$port/login" 2>/dev/null || echo 000)
+                -H 'X-Forwarded-Proto: https' "http://127.0.0.1:$port/login" 2>/dev/null); then
+                code=000
+              fi
             else
-              code=$(curl -sS -o /tmp/g.html -D /tmp/g.hdr --max-redirs 0 -m 30 -w '%{http_code}' \
-                "http://127.0.0.1:$port/login" 2>/dev/null || echo 000)
+              if ! code=$(curl -sS -o /tmp/g.html -D /tmp/g.hdr --max-redirs 0 -m 30 -w '%{http_code}' \
+                "http://127.0.0.1:$port/login" 2>/dev/null); then
+                code=000
+              fi
             fi
             loc=no; grep -qi '^location:' /tmp/g.hdr 2>/dev/null && loc=yes
             mark=no; grep -q 'Sign In' /tmp/g.html 2>/dev/null && mark=yes
@@ -335,9 +339,10 @@ jobs:
             echo "::error::bite proof only counts when a LIVE server answers with a non-200."
             sed -n '1,40p' /tmp/guard-bite.log
             rc=1
-          elif [ "$BITE" = "$PASS" ]; then
+          elif [ "$BITE_CODE" = "200" ]; then
             echo "::error::BITE PROOF FAILED: with LEGACY_LOCALE_REWRITE_OVERRIDE_ENABLED=true the"
-            echo "::error::guard still passed, so it cannot detect the defect and its green above is"
+            echo "::error::bite server still answered HTTP 200, so the guard cannot detect the defect"
+            echo "::error::regardless of its Location/body markers, and its green above is"
             echo "::error::worthless. Either the override no longer re-enables the rewrite collapse"
             echo "::error::(apps/web/src/proxy.ts) or the probe never reached the middleware."
             rc=1
@@ -705,4 +710,3 @@ jobs:
 
       - name: Test @ever-works/secret-store-${{ matrix.provider }}-plugin
         run: pnpm --filter @ever-works/secret-store-${{ matrix.provider }}-plugin test
-

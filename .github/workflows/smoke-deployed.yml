@@ -34,6 +34,9 @@ concurrency:
   group: smoke-${{ github.event.workflow_run.head_branch || inputs.environment }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   smoke:
     # Only for branches that map to an environment, and only when the deploy
@@ -110,6 +113,8 @@ jobs:
           exit 1
 
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
