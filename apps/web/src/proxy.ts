@@ -152,6 +152,26 @@ function alignLocaleRewriteOrigin(req: NextRequest, response: NextResponse): Nex
     const rewrite = response.headers.get('x-middleware-rewrite');
     if (!rewrite) return response;
 
+    // 🛑 A RELATIVE rewrite is already internal by construction — Next resolves
+    // it against its own origin and renders in-process. Absolutising it is what
+    // breaks the request: Next only treats an absolute rewrite as internal when
+    // the origin matches its server init URL, and behind ingress NOTHING we can
+    // construct here reliably matches it. Measured on the running prod pod
+    // (2026-08-24), same pod, same build:
+    //
+    //   GET /login  (no forwarded headers) -> 200, rewrite '/en/login'
+    //   GET /login  + X-Forwarded-Host     -> 307 'location: /login',
+    //                                         rewrite 'http://<pod>:3000/en/login'
+    //
+    // The 307 then re-enters the middleware and loops (ERR_TOO_MANY_REDIRECTS);
+    // when the absolutised URL additionally carried the public authority it was
+    // undialable and surfaced as a 500 instead. Pinning the RUNTIME origin (the
+    // previous attempt) does not help — `http://$HOSTNAME:$PORT` is still not
+    // the origin Next compares against here. So leave relative rewrites exactly
+    // as next-intl emitted them; only realign one that is ALREADY absolute,
+    // which is the reverse-proxy/E2E case this helper was written for.
+    if (rewrite.startsWith('/')) return response;
+
     const target = new URL(rewrite, 'http://internal.invalid');
     const locale = target.pathname.split('/').filter(Boolean)[0];
     if (locale && LOCALE_SET.has(locale)) {
