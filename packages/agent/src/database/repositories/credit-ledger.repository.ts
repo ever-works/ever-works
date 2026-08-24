@@ -464,12 +464,45 @@ export class CreditLedgerRepository {
      * throws `LockNotSupportedOnGivenDriverError` AND serializes writes
      * at the connection anyway, so the lock is safely skipped there.
      */
+    /**
+     * Serialise concurrent ledger writes for one user by locking their
+     * `users` row for the rest of the transaction.
+     *
+     * 🛑 `loadEagerRelations: false` is load-bearing, not tidiness.
+     * `User.defaultPlan` is `@ManyToOne(..., { eager: true })`, so a plain
+     * `findOne` LEFT JOINs `subscription_plans` — and PostgreSQL refuses
+     * `SELECT ... FOR UPDATE` over the nullable side of an outer join:
+     *
+     *     FOR UPDATE cannot be applied to the nullable side of an outer join
+     *
+     * That throw propagated out of EVERY `recordAtomic` call, which is the
+     * single write path for the whole credit ledger — daily free grants,
+     * monthly plan allowances, refunds, and a PAID credit-pack purchase
+     * (`BillingService.applyPurchase` -> `record` -> `recordAtomic`). In
+     * production it meant a customer could be charged for a pack and
+     * receive nothing while the webhook 500d and Stripe retried forever.
+     *
+     * Measured before the fix: the 2026-08-24 00:05Z production run of
+     * `credits-daily-grant` returned `granted: 0, scanned: 30, failed: 30`,
+     * and the prod, stage and dev ledgers all held zero rows.
+     *
+     * 🛑 Why no test caught it: the lock is deliberately skipped on sqlite
+     * (below), and sqlite is what the whole suite runs on. The failing
+     * statement is therefore never executed in CI on ANY driver. The
+     * regression test beside this asserts the option is set, because that
+     * is the only thing a sqlite-backed test can observe; the behaviour
+     * itself was verified by replaying both the broken and fixed query
+     * against a real PostgreSQL 16, including a control proving the lock
+     * still blocks a competing `FOR UPDATE`.
+     */
     private async lockUserRow(manager: EntityManager, userId: string): Promise<void> {
         const driver = manager.connection.options.type;
         if (driver === 'postgres' || driver === 'mysql' || driver === 'mariadb') {
             await manager.getRepository(User).findOne({
                 where: { id: userId },
                 lock: { mode: 'pessimistic_write' },
+                // Lock the row, join nothing. See the docblock above.
+                loadEagerRelations: false,
             });
         }
     }

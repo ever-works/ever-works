@@ -159,8 +159,36 @@ function alignLocaleRewriteOrigin(req: NextRequest, response: NextResponse): Nex
         const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
         const requestHost = req.headers.get('host')?.trim();
         const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+        const runtimeHostname = process.env.HOSTNAME?.trim();
+        const runtimePort = process.env.PORT?.trim();
+        let usedRuntimeOrigin = false;
 
-        for (const requestAuthority of [forwardedHost, requestHost]) {
+        if (forwardedHost && SAFE_REQUEST_HOST.test(forwardedHost)) {
+            try {
+                const forwardedAuthority = new URL(`${requestOrigin.protocol}//${forwardedHost}`);
+                const runtimeAuthority = runtimePort
+                    ? `${runtimeHostname}:${runtimePort}`
+                    : runtimeHostname;
+                if (
+                    isAllowedRequestHostname(forwardedAuthority.hostname) &&
+                    runtimeAuthority &&
+                    SAFE_REQUEST_HOST.test(runtimeAuthority)
+                ) {
+                    // Next's router only treats a middleware rewrite as internal
+                    // when its origin matches the standalone server's init URL.
+                    // Behind ingress that URL is http://$HOSTNAME:$PORT, not the
+                    // browser authority carried by X-Forwarded-Host.
+                    requestOrigin.protocol = 'http:';
+                    requestOrigin.hostname = runtimeHostname!;
+                    requestOrigin.port = runtimePort || '';
+                    usedRuntimeOrigin = true;
+                }
+            } catch {
+                // Fall through to the validated request authority.
+            }
+        }
+
+        for (const requestAuthority of usedRuntimeOrigin ? [] : [forwardedHost, requestHost]) {
             if (!requestAuthority || !SAFE_REQUEST_HOST.test(requestAuthority)) continue;
             try {
                 const authority = new URL(`${requestOrigin.protocol}//${requestAuthority}`);
@@ -173,7 +201,7 @@ function alignLocaleRewriteOrigin(req: NextRequest, response: NextResponse): Nex
                 // Try the next authority, then keep Next's parsed origin.
             }
         }
-        if (forwardedProto === 'http' || forwardedProto === 'https') {
+        if (!usedRuntimeOrigin && (forwardedProto === 'http' || forwardedProto === 'https')) {
             requestOrigin.protocol = `${forwardedProto}:`;
         }
         target.protocol = requestOrigin.protocol;
