@@ -612,6 +612,26 @@ describe('agent/config', () => {
             expect(config.subscriptions.isEnabled()).toBe(false);
         });
 
+        describe('bypassSeatLimitsInE2E', () => {
+            it('is off by default and requires the literal true flag outside production', () => {
+                process.env.NODE_ENV = 'test';
+                expect(config.subscriptions.bypassSeatLimitsInE2E()).toBe(false);
+
+                process.env.E2E_BYPASS_SEAT_LIMITS = 'true';
+                expect(config.subscriptions.bypassSeatLimitsInE2E()).toBe(true);
+
+                process.env.E2E_BYPASS_SEAT_LIMITS = '1';
+                expect(config.subscriptions.bypassSeatLimitsInE2E()).toBe(false);
+            });
+
+            it('is hard-gated off in production even when the flag is set', () => {
+                process.env.NODE_ENV = 'production';
+                process.env.E2E_BYPASS_SEAT_LIMITS = 'true';
+
+                expect(config.subscriptions.bypassSeatLimitsInE2E()).toBe(false);
+            });
+        });
+
         describe('scheduledUpdatesEnabled (default-on)', () => {
             it('defaults to true when unset', () => {
                 expect(config.subscriptions.scheduledUpdatesEnabled()).toBe(true);
