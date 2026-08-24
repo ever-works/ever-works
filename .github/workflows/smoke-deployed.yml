@@ -144,7 +144,17 @@ jobs:
           SMOKE_BASE_URL: ${{ steps.target.outputs.web }}
           SMOKE_API_URL: ${{ steps.target.outputs.api }}
           SMOKE_ALLOW_WRITES: ${{ steps.target.outputs.writes }}
-        run: npx playwright test -c playwright.smoke.config.ts --project=smoke
+        run: |
+          # `login-ingress-rewrite.spec.ts` reads SMOKE_FORWARDED_HOST and, when it
+          # is unset, takes the `undefined` branch of its ternary and sends NO
+          # ingress-shaped headers at all - i.e. the one capability that spec
+          # exists for was dead. It was set by nothing repo-wide until now.
+          # Derive it from the target so each environment spoofs its own authority.
+          SMOKE_FORWARDED_HOST="${SMOKE_BASE_URL#*://}"
+          SMOKE_FORWARDED_HOST="${SMOKE_FORWARDED_HOST%%/*}"
+          export SMOKE_FORWARDED_HOST
+          echo "smoke target=$SMOKE_BASE_URL forwarded-host=$SMOKE_FORWARDED_HOST"
+          npx playwright test -c playwright.smoke.config.ts --project=smoke
 
       - name: Upload report on failure
         if: failure()
