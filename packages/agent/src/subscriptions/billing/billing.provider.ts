@@ -311,6 +311,35 @@ export interface BillingSubscriptionSnapshot {
     readonly currentPeriodStart?: Date | null;
     /** The first (metered) subscription item, for pay-as-you-go subscriptions. */
     readonly subscriptionItemId?: string | null;
+    /**
+     * Total seats the subscription bills for — included allowance + extras,
+     * summed over the items priced per seat (billing spec §3.6 / FR-26).
+     * `null` when the provider gave us nothing to count from.
+     */
+    readonly seats?: number | null;
+    /** The item carrying the per-seat price, so a quantity change addresses it. */
+    readonly seatItemId?: string | null;
+}
+
+/**
+ * Change how many seats a subscription bills for (billing spec FR-29).
+ *
+ * `quantity` is the number of ADDITIONAL seats beyond the plan's included
+ * allowance — already clamped by the caller against the plan row, so the
+ * provider never has to know what a plan includes. Zero removes the seat
+ * line entirely.
+ */
+export interface SeatQuantityRequest {
+    readonly subscriptionId: string;
+    /**
+     * Catalog `lookup_key`s for both intervals. The provider selects the one
+     * matching the subscription's actual base-price interval; local row dates
+     * cannot reliably identify a renewed monthly subscription.
+     */
+    readonly seatLookupKeys: Readonly<Record<'monthly' | 'annual', string>>;
+    /** Existing seat item, when the subscription already has one. */
+    readonly seatItemId?: string | null;
+    readonly quantity: number;
 }
 
 // ── Pay-as-you-go (billing spec §3.5) ─────────────────────────────────
@@ -635,6 +664,15 @@ export abstract class BillingProvider {
 
     /** Report usage to the provider's meter. Never throws for a provider refusal — returns it. */
     async reportMeterEvent(_request: MeterEventRequest): Promise<MeterEventOutcome> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Set the additional-seat quantity on a subscription (billing spec FR-29).
+     * Prorated by the provider's default behaviour: the customer pays for the
+     * part of the period they actually get the seats for.
+     */
+    async updateSeatQuantity(_request: SeatQuantityRequest): Promise<BillingSubscriptionSnapshot> {
         throw new BillingProviderNotConfiguredError();
     }
 

@@ -3607,6 +3607,19 @@
                     "lastOnPaidPlan": "Add another card before removing the last one while a paid plan is active.",
                     "hostedNotice": "Card details are entered on the payment provider's secure page and never reach our servers. We only ever store the brand, last four digits and expiry."
                 },
+                "seats": {
+                    "title": "Seats",
+                    "usage": "{used} of {allowance} seats in use",
+                    "unlimited": "{used} seats in use · unlimited on this plan",
+                    "breakdown": "{members} people · {agents} agents",
+                    "included": "{included} included + {purchased} added",
+                    "totalLabel": "Total seats",
+                    "price": "{price} per additional seat / month",
+                    "notManageable": "Seats are adjusted on a paid plan once card payments are enabled.",
+                    "save": "Save",
+                    "saved": "Seats updated",
+                    "saveError": "Failed to update seats"
+                },
                 "payg": {
                     "title": "Pay-as-you-go",
                     "comingSoon": "Pay-as-you-go arrives with the payments launch.",

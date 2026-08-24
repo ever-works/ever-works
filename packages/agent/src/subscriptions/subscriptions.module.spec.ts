@@ -205,6 +205,10 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     // Payment methods (audit B10/B25)
                     'PaymentMethodService',
                     'PaygService',
+                    'SeatsService',
+                    'SeatLimitExceededError',
+                    'SeatsNotPurchasableError',
+                    'SeatsBelowUsageError',
                     'PaygPaymentMethodRequiredError',
                     'PaygCapOutOfRangeError',
                     'PAYG_MIN_MONTHLY_CAP_CREDITS',

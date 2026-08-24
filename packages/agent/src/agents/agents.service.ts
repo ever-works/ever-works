@@ -2,12 +2,14 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
     Optional,
     UnprocessableEntityException,
 } from '@nestjs/common';
+import { SEAT_GUARD, type SeatGuard } from './seat-guard';
 import {
     AGENT_PERMISSIONS_DEFAULT,
     Agent,
@@ -259,6 +261,15 @@ export class AgentsService {
         @Optional()
         @InjectRepository(Environment)
         private readonly environmentRepo?: Repository<Environment>,
+        // Seats (billing spec §3.6 / FR-28) — an agent occupies a seat
+        // exactly like an employee does. Token + `@Optional()` rather than a
+        // direct dependency: SubscriptionsModule already imports the agent
+        // graph, so injecting SeatsService here would cycle (the same dodge
+        // as RUN_CREDITS_PRECHECK). Unbound ⇒ never checked; bound but with
+        // subscriptions disabled ⇒ a no-op inside the guard.
+        @Optional()
+        @Inject(SEAT_GUARD)
+        private readonly seatGuard?: SeatGuard,
     ) {}
 
     async list(
@@ -290,6 +301,14 @@ export class AgentsService {
         this.validateScopeOwnership(input);
         await this.assertScopeParentExists(userId, input, ownershipScope);
         await this.assertTargetsExist(userId, input.targets, ownershipScope);
+
+        // Billing spec FR-28 — refuse BEFORE any write, so a refused create
+        // leaves nothing behind. Charged to the tenant owner, not the actor:
+        // a member creating an agent spends the owner's seat.
+        if (this.seatGuard) {
+            const owner = await this.seatGuard.resolveBillingOwner(userId);
+            await this.seatGuard.assertSeatAvailable(owner);
+        }
 
         const slug = slugifyText(input.name);
         // `slugifyText('---')` returns `-` (dash), not the empty string,
