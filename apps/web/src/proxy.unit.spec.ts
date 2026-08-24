@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { BROWSER_WORKSPACE_SCOPE_HEADER } from './lib/workspace-scope';
 
@@ -22,6 +22,10 @@ describe('canonical Organization workspace proxy', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getAuthFromRequestMock.mockResolvedValue({ isAuthenticated: true, isExpired: false });
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
     });
 
     it.each([
@@ -84,7 +88,9 @@ describe('canonical Organization workspace proxy', () => {
         );
     });
 
-    it('uses the allowlisted forwarded authority without leaking the internal service port', async () => {
+    it('keeps a reverse-proxy locale rewrite on the runtime server origin', async () => {
+        vi.stubEnv('HOSTNAME', 'ever-works-web-pod');
+        vi.stubEnv('PORT', '3000');
         intlMock.mockResolvedValueOnce(
             new Response(null, {
                 status: 200,
@@ -101,7 +107,9 @@ describe('canonical Organization workspace proxy', () => {
 
         const response = await proxy(ingressRequest);
 
-        expect(response.headers.get('x-middleware-rewrite')).toBe('https://127.0.0.1/en/login');
+        expect(response.headers.get('x-middleware-rewrite')).toBe(
+            'http://ever-works-web-pod:3000/en/login',
+        );
     });
 
     it('does not align an internal rewrite to a non-allowlisted Host header', async () => {
