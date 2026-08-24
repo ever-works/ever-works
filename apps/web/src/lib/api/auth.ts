@@ -293,6 +293,9 @@ export const authAPI = {
             data,
             method: 'POST',
             wrapInData: false,
+            // Email callbacks live under /api and intentionally bypass the
+            // workspace proxy. Authentication tokens are never org-scoped.
+            publicRouteScope: 'personal',
         });
     },
 
@@ -323,6 +326,7 @@ export const authAPI = {
     validatePasswordResetToken: async (token: string) => {
         return serverFetch<TokenValidationResponse>(
             `/auth/validate-reset-token?token=${encodeURIComponent(token)}`,
+            { publicRouteScope: 'personal' },
         );
     },
 
