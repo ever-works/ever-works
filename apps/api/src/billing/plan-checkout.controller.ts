@@ -18,6 +18,7 @@ import { AuthSessionGuard, CurrentUser } from '@src/auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { config } from '@src/config/constants';
 import {
+    ActivePlanSubscriptionError,
     BillingProviderError,
     BillingProviderNotConfiguredError,
     CheckoutSessionNotFoundError,
@@ -180,6 +181,9 @@ export function mapPlanBillingError(error: unknown): unknown {
         // Existence-leak contract: "not yours" is indistinguishable from
         // "does not exist".
         return new NotFoundException(error.message);
+    }
+    if (error instanceof ActivePlanSubscriptionError) {
+        return new ConflictException(error.message);
     }
     if (error instanceof BillingProviderError) {
         return new ConflictException(error.message);

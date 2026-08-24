@@ -43,6 +43,16 @@ export class PlanNotPurchasableError extends Error {
     }
 }
 
+/** A recurring checkout would create a second live provider subscription. */
+export class ActivePlanSubscriptionError extends Error {
+    constructor() {
+        super(
+            'An active paid subscription already exists. Manage or cancel it before starting another recurring plan checkout.',
+        );
+        this.name = 'ActivePlanSubscriptionError';
+    }
+}
+
 /**
  * The caller asked to finalize a checkout session that is not theirs (or
  * does not exist). Deliberately ONE error for both, so a session id in a
@@ -188,6 +198,17 @@ export class PlanSubscriptionService {
         }
 
         const interval: CatalogInterval = options.interval ?? 'monthly';
+
+        // The local model tracks one provider subscription per owner. A second
+        // recurring checkout can create a second live Stripe subscription while
+        // overwriting that pointer, leaving one renewal unmanaged. One-off
+        // lifetime licences do not create a subscription and remain buyable.
+        if (interval !== 'lifetime') {
+            const active = await this.userSubscriptionRepository.findActiveByUser(options.userId);
+            if (active?.providerSubscriptionId) {
+                throw new ActivePlanSubscriptionError();
+            }
+        }
 
         const plan = await this.resolveSellablePlan(options.planCode, interval);
         const catalogSku = resolveSkuForPlanRow({
