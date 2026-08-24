@@ -57,6 +57,11 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
         paymentIntents: {
             create: jest.fn().mockResolvedValue({ id: 'pi_1', status: 'succeeded' }),
         },
+        tax: {
+            calculations: {
+                create: jest.fn().mockResolvedValue({ id: 'taxcalc_1', amount_total: 1190 }),
+            },
+        },
         paymentMethods: {
             list: jest.fn().mockResolvedValue({ data: [] }),
             retrieve: jest.fn().mockResolvedValue({ id: 'pm_1', customer: 'cus_1', card: {} }),
@@ -184,7 +189,7 @@ describe('StripeBillingProvider — checkout', () => {
         expect(params.payment_intent_data).toBeUndefined();
     });
 
-    it('passes the claim key as the provider idempotency key on an off-session charge', async () => {
+    it('calculates tax and links it to the idempotent off-session PaymentIntent', async () => {
         const { provider, client } = build();
 
         const result = await provider.chargeOffSession({
@@ -202,11 +207,63 @@ describe('StripeBillingProvider — checkout', () => {
         });
 
         expect(result).toEqual({ paymentId: 'pi_1', status: 'succeeded' });
+        expect(client.tax.calculations.create).toHaveBeenCalledWith(
+            {
+                currency: 'usd',
+                customer: 'cus_1',
+                line_items: [
+                    {
+                        amount: 1000,
+                        reference: 'credits-1000',
+                        tax_behavior: 'exclusive',
+                        tax_code: 'txcd_10105002',
+                    },
+                ],
+            },
+            { idempotencyKey: 'auto:u1:credits-1000:1:tax' },
+        );
         const [params, options] = client.paymentIntents.create.mock.calls[0];
-        expect(params.amount).toBe(1000);
+        expect(params.amount).toBe(1190);
         expect(params.off_session).toBe(true);
+        expect(params.hooks).toEqual({ inputs: { tax: { calculation: 'taxcalc_1' } } });
         expect(params.metadata[STRIPE_METADATA_KEYS.kind]).toBe(STRIPE_PURCHASE_KINDS.autoRecharge);
         expect(options).toEqual({ idempotencyKey: 'auto:u1:credits-1000:1' });
+    });
+
+    it('releases the recharge slot when tax calculation fails before any payment call', async () => {
+        const client = fakeClient({
+            tax: {
+                calculations: {
+                    create: jest.fn().mockRejectedValue(
+                        Object.assign(new Error('Tax location unavailable'), {
+                            type: 'StripeConnectionError',
+                        }),
+                    ),
+                },
+            },
+        });
+        const { provider } = build(client);
+
+        const result = await provider.chargeOffSession({
+            customerId: 'cus_1',
+            paymentMethodRef: 'pm_1',
+            userId: 'u1',
+            idempotencyKey: 'auto:u1:credits-1000:1',
+            pack: {
+                id: 'credits-1000',
+                priceCents: 1000,
+                credits: 1000,
+                currency: 'usd',
+                label: '1,000 credits',
+            },
+        });
+
+        expect(result).toEqual({
+            paymentId: '',
+            status: 'failed',
+            failureCode: 'tax_calculation_failed',
+        });
+        expect(client.paymentIntents.create).not.toHaveBeenCalled();
     });
 
     it('reports a declined charge as failed instead of throwing', async () => {
@@ -291,6 +348,8 @@ describe('StripeBillingProvider — payment methods (billing PRD §3.3)', () => 
         // the provider's page, not to us.
         expect(params.mode).toBe('setup');
         expect(params.customer).toBe('cus_1');
+        expect(params.billing_address_collection).toBe('required');
+        expect(params.customer_update).toEqual({ address: 'auto' });
         // No card datum is ever passed out of this process.
         expect(JSON.stringify(params)).not.toMatch(/card|number|cvc/i);
         expect(session).toEqual({ url: 'https://pay.example/cs_1', sessionId: 'cs_1' });

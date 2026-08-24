@@ -117,6 +117,9 @@ const STRIPE_TAX_SESSION_FIELDS = {
     tax_id_collection: { enabled: true },
 } as const;
 
+/** Stripe Tax code for prepaid hosted AI / API credits. */
+const STRIPE_CREDIT_TAX_CODE = 'txcd_10105002' as const;
+
 /** `kind` metadata values — how a purchase at the provider originated. */
 export const STRIPE_PURCHASE_KINDS = {
     checkout: 'credit-topup',
@@ -548,57 +551,63 @@ export class StripeBillingProvider extends BillingProvider {
     }
 
     /**
-     * 🛑 THIS PATH COLLECTS NO TAX. It can be made to - see the flow below -
-     * but it is not wired, and the difference is real money.
+     * Tax-inclusive off-session credit-pack charge.
      *
-     * The Checkout credit-pack purchase asks for `automatic_tax`, so a German
-     * buyer of the 5,500-credit pack pays $50 + $9.50 VAT. The SAME pack bought
-     * through auto-recharge goes out as a bare PaymentIntent and is charged at
-     * $50 flat. Under the account's OSS registration that VAT is owed either
-     * way, so the difference comes out of margin - and the two prices for one
-     * product is the kind of thing an audit finds.
+     * Checkout uses `automatic_tax`, but PaymentIntents use Stripe Tax's custom
+     * flow instead: calculate against the existing Customer (address + tax IDs),
+     * charge the calculation's `amount_total`, and link the calculation through
+     * `hooks.inputs.tax.calculation`. Stripe then commits the tax transaction
+     * when the intent succeeds and automatically reverses it on a later refund.
      *
-     * `automatic_tax` is not the mechanism here - PaymentIntents reject it
-     * outright (verified 2026-08-23: `POST /v1/payment_intents`
-     * `automatic_tax[enabled]=true` -> 400 "Received unknown parameter"). But a
-     * supported off-session flow DOES exist, and it is smaller than an Invoice
-     * rewrite:
-     *
-     *   1. `POST /v1/tax/calculations` with the pack amount, the product tax
-     *      code and the customer's address -> `amount_total` including tax;
-     *   2. create the PaymentIntent for that total, passing the calculation id
-     *      as `hooks[inputs][tax][calculation]`;
-     *   3. after it succeeds, `POST /v1/tax/transactions/create_from_calculation`
-     *      so the collected tax is actually reported.
-     *
-     * Step 2 is confirmed accepted on this account (2026-08-23; control: a bogus
-     * `hooks[inputs][tax][not_a_field]` on the same call IS rejected, so the
-     * probe discriminates). It is left unimplemented deliberately - it changes
-     * the amount charged, and shipping a new tax path on a money route with no
-     * end-to-end test would be worse than the gap it closes.
-     *
-     * EXPOSURE TODAY IS ZERO, and the reason is worth knowing because it is
-     * about to change: `autoRechargeEnabled` defaults false and is opt-in, and
-     * turning it on requires a saved card - which was impossible, because the
-     * setup session was rejected by Stripe for want of a `currency`. Measured:
-     * zero live Stripe customers carry an Ever Works userId (control: 1 of 8
-     * live customers in the shared account does have a default payment method,
-     * so the probe discriminates).
-     *
-     * Fixing that setup session is what makes this path reachable for the first
-     * time. Resolve the tax question BEFORE auto-recharge is advertised.
+     * Both POSTs carry stable, related idempotency keys. A calculation failure
+     * happens before any money call and is safe to release for retry; an
+     * indeterminate PaymentIntent response stays pending because Stripe may have
+     * charged even when this process did not receive the response.
      */
     async chargeOffSession(request: OffSessionChargeRequest): Promise<OffSessionChargeResult> {
         const stripe = this.requireClient();
+        let calculation: Stripe.Tax.Calculation;
+        try {
+            calculation = await stripe.tax.calculations.create(
+                {
+                    currency: request.pack.currency,
+                    customer: request.customerId,
+                    line_items: [
+                        {
+                            amount: request.pack.priceCents,
+                            reference: request.pack.id,
+                            tax_behavior: 'exclusive',
+                            tax_code: STRIPE_CREDIT_TAX_CODE,
+                        },
+                    ],
+                },
+                { idempotencyKey: `${request.idempotencyKey}:tax` },
+            );
+        } catch (error) {
+            const code = (error as { code?: string })?.code;
+            const type = (error as { type?: string })?.type;
+            this.logger.warn(
+                `Auto-recharge tax calculation failed for user ${request.userId} (type=${
+                    type ?? 'unknown'
+                }, code=${code ?? 'unknown'})`,
+            );
+            return {
+                paymentId: '',
+                status: 'failed',
+                failureCode: 'tax_calculation_failed',
+            };
+        }
+
         try {
             const intent = await stripe.paymentIntents.create(
                 {
-                    amount: request.pack.priceCents,
+                    amount: calculation.amount_total,
                     currency: request.pack.currency,
                     customer: request.customerId,
                     payment_method: request.paymentMethodRef,
                     off_session: true,
                     confirm: true,
+                    hooks: { inputs: { tax: { calculation: calculation.id } } },
                     metadata: {
                         [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.autoRecharge,
                         [STRIPE_METADATA_KEYS.userId]: request.userId,
@@ -1193,6 +1202,11 @@ export class StripeBillingProvider extends BillingProvider {
         const session = await stripe.checkout.sessions.create({
             mode: 'setup',
             customer: request.customerId,
+            // Auto-recharge calculates tax from the existing Customer. Always
+            // collect a complete billing address here and persist it, so a user
+            // who only saved a payment method still has a tax-ready Customer.
+            billing_address_collection: 'required',
+            customer_update: { address: 'auto' },
             // 🛑 Required. Stripe rejects a `mode: 'setup'` session outright -
             // "Missing required param: currency" - unless EITHER `currency` or an
             // explicit `payment_method_types` is given. Neither was, so saving a card
