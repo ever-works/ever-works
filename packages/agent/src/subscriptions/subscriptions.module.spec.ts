@@ -1,4 +1,5 @@
 import * as subscriptionsBarrel from './index';
+import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { SubscriptionsModule } from './subscriptions.module';
 import { SubscriptionService } from './subscription.service';
@@ -22,6 +23,7 @@ import {
     PaymentMethodService,
 } from './billing/payment-method.service';
 import {
+    ActivePlanSubscriptionError,
     CheckoutSessionNotFoundError,
     PlanNotPurchasableError,
     PlanSubscriptionService,
@@ -152,6 +154,9 @@ describe('SubscriptionsModule + barrel re-exports', () => {
 
         it('re-exports the paid-plan purchase path (audit B24)', () => {
             expect(subscriptionsBarrel.PlanSubscriptionService).toBe(PlanSubscriptionService);
+            expect(subscriptionsBarrel.ActivePlanSubscriptionError).toBe(
+                ActivePlanSubscriptionError,
+            );
             expect(subscriptionsBarrel.PaymentMethodService).toBe(PaymentMethodService);
             expect(subscriptionsBarrel.PaymentMethodNotFoundError).toBe(PaymentMethodNotFoundError);
             expect(subscriptionsBarrel.LastPaymentMethodError).toBe(LastPaymentMethodError);
@@ -199,6 +204,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'AutoRechargeService',
                     // Paid-plan purchase (audit B24)
                     'PlanSubscriptionService',
+                    'ActivePlanSubscriptionError',
                     'UnknownSubscriptionPlanError',
                     'PlanNotPurchasableError',
                     'CheckoutSessionNotFoundError',
@@ -294,13 +300,15 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(getMeta('exports')).toContain(CostsSummaryService);
         });
 
-        it('provides AgentRunRepository locally so CostsSummaryService can resolve it', () => {
-            // AgentRunRepository is owned by AgentsModule, not the
-            // DatabaseModule repository inventory — without this local
-            // provider CostsSummaryService fails to instantiate at boot.
+        it('provides agent repositories locally so costs and seats can resolve at boot', () => {
+            // Both repositories are owned by AgentsModule, not the
+            // DatabaseModule repository inventory. Without these local
+            // providers CostsSummaryService / SeatsService fail to instantiate.
+            expect(getMeta('providers')).toContain(AgentRepository);
             expect(getMeta('providers')).toContain(AgentRunRepository);
             // Module-local on purpose: exporting it would hand consumers a
-            // second AgentRunRepository instance beside AgentsModule's.
+            // second repository instance beside AgentsModule's.
+            expect(getMeta('exports')).not.toContain(AgentRepository);
             expect(getMeta('exports')).not.toContain(AgentRunRepository);
         });
 
