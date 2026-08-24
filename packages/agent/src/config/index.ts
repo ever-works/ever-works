@@ -499,6 +499,23 @@ export const config = {
                 process.env.SUBSCRIPTIONS_ALLOW_SELF_SERVE_PAID === 'true'
             );
         },
+        /**
+         * E2E-only fixture escape hatch for seat-consuming setup writes.
+         *
+         * The sharded suite enables subscriptions so billing scenarios can
+         * exercise real plan behavior, but its unrelated scenarios create
+         * agents and members for fresh users. A fresh free user already uses
+         * the plan's one seat, so those fixture writes otherwise fail with a
+         * 402 before the behavior under test is reached.
+         *
+         * Production ignores this value even if it is configured by mistake.
+         */
+        bypassSeatLimitsInE2E() {
+            return (
+                process.env.NODE_ENV !== 'production' &&
+                process.env.E2E_BYPASS_SEAT_LIMITS === 'true'
+            );
+        },
         scheduledUpdatesEnabled() {
             return process.env.SCHEDULED_UPDATES_ENABLED !== 'false';
         },

@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from './helpers/api';
+import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 import { createOrganizationViaAPI } from './helpers/organizations';
 
 /**
@@ -33,9 +33,10 @@ import { createOrganizationViaAPI } from './helpers/organizations';
  *     GET /api/memory with workId null AND GET /works/:id/kb/inheritable).
  *
  * ── PROBED CONTRACTS (verified live) ─────────────────────────────────────
- *  A fresh POST /api/organizations becomes the caller's active scope; a Work
- *    created afterward (organization:false) inherits `work.organizationId` =
- *    that org, so its KB docs fan into GET /api/memory.
+ *  Organization routes are selected per request. A Work created with an
+ *    explicit `X-Scope-Slug` (organization:false) inherits
+ *    `work.organizationId` = that org, so its KB docs fan into GET /api/memory
+ *    when the same scope header is present.
  *  POST /api/works/:id/kb/documents {path,title,class,body,...} → 201 full
  *    KbDocumentBodyDto { id, workId, organizationId:null, path, slug, title,
  *    class, tags, categories, status:'active', locked:false, lockMode:null,
@@ -159,35 +160,56 @@ interface ConsolReport {
 
 interface Chain {
     token: string;
-    userId: string;
+    headers: Record<string, string>;
     orgId: string;
     workId: string;
 }
 
-/** Register a fresh user, mint an Org (→ active scope), and a Work in it. */
+function scopedHeaders(token: string, orgSlug: string): Record<string, string> {
+    return { ...authedHeaders(token), 'X-Scope-Slug': orgSlug };
+}
+
+/** Register a fresh user, mint an Org, and explicitly create a Work in it. */
 async function buildChain(request: APIRequestContext): Promise<Chain> {
     const user = await registerUserViaAPI(request);
     const org = await createOrganizationViaAPI(request, user.access_token, `Cortex Org ${stamp()}`);
-    const work = await createWorkViaAPI(request, user.access_token, {
-        name: `Cortex Work ${stamp()}`,
-        slug: `cortex-work-${stamp()}`,
+    const headers = scopedHeaders(user.access_token, org.slug);
+    const workCreate = await request.post(`${API_BASE}/api/works`, {
+        headers,
+        data: {
+            name: `Cortex Work ${stamp()}`,
+            slug: `cortex-work-${stamp()}`,
+            description: 'org-scoped KB lifecycle chain',
+            organization: false,
+        },
     });
-    expect(work.id).toMatch(UUID_RE);
-    // The Work must join the active Org, else its KB docs never surface.
-    const workRead = await request.get(`${API_BASE}/api/works/${work.id}`, {
-        headers: authedHeaders(user.access_token),
+    expect(
+        [200, 201],
+        `scoped Work create body=${await workCreate.text().catch(() => '')}`,
+    ).toContain(workCreate.status());
+    const workBody = await workCreate.json();
+    const workId = workBody?.work?.id ?? workBody?.id ?? workBody?.data?.id ?? '';
+    expect(workId).toMatch(UUID_RE);
+    // The Work must join the explicitly selected Org, else its KB docs never surface.
+    const workRead = await request.get(`${API_BASE}/api/works/${workId}`, {
+        headers,
     });
     const wb = (await workRead.json()) as {
         work?: { organizationId?: string };
         organizationId?: string;
     };
     expect((wb.work ?? wb).organizationId).toBe(org.id);
-    return { token: user.access_token, userId: user.user.id, orgId: org.id, workId: work.id };
+    return {
+        token: user.access_token,
+        headers,
+        orgId: org.id,
+        workId,
+    };
 }
 
 async function createKbDoc(
     request: APIRequestContext,
-    token: string,
+    headers: Record<string, string>,
     workId: string,
     body: {
         path: string;
@@ -199,7 +221,7 @@ async function createKbDoc(
     },
 ): Promise<KbDoc> {
     const res = await request.post(`${API_BASE}/api/works/${workId}/kb/documents`, {
-        headers: authedHeaders(token),
+        headers,
         data: body,
     });
     expect(res.status(), `kb create body=${await res.text().catch(() => '')}`).toBe(201);
@@ -210,12 +232,12 @@ async function createKbDoc(
 
 async function createOrgDoc(
     request: APIRequestContext,
-    token: string,
+    headers: Record<string, string>,
     orgId: string,
     body: { path: string; title: string; class: string; body: string },
 ): Promise<KbDoc> {
     const res = await request.post(`${API_BASE}/api/organizations/${orgId}/kb/documents`, {
-        headers: authedHeaders(token),
+        headers,
         data: body,
     });
     expect(res.status(), `org kb create body=${await res.text().catch(() => '')}`).toBe(201);
@@ -224,11 +246,11 @@ async function createOrgDoc(
 
 async function getMemory(
     request: APIRequestContext,
-    token: string,
+    headers: Record<string, string>,
     query = '',
 ): Promise<MemoryResult> {
     const res = await request.get(`${API_BASE}/api/memory${query ? `?${query}` : ''}`, {
-        headers: authedHeaders(token),
+        headers,
     });
     expect(res.status(), `memory body=${await res.text().catch(() => '')}`).toBe(200);
     return res.json();
@@ -236,11 +258,11 @@ async function getMemory(
 
 async function consolidate(
     request: APIRequestContext,
-    token: string,
+    headers: Record<string, string>,
     apply?: boolean,
 ): Promise<ConsolReport> {
     const res = await request.post(`${API_BASE}/api/memory/consolidate`, {
-        headers: authedHeaders(token),
+        headers,
         data: apply === undefined ? {} : { apply },
     });
     expect(res.status(), `consolidate body=${await res.text().catch(() => '')}`).toBe(200);
@@ -253,12 +275,12 @@ function itemById(result: MemoryResult, id: string): MemoryItem | undefined {
 
 async function getWorkDocRaw(
     request: APIRequestContext,
-    token: string,
+    headers: Record<string, string>,
     workId: string,
     docId: string,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
     const res = await request.get(`${API_BASE}/api/works/${workId}/kb/documents/${docId}`, {
-        headers: authedHeaders(token),
+        headers,
     });
     const body = res.status() === 200 ? ((await res.json()) as Record<string, unknown>) : {};
     return { status: res.status(), body };
@@ -273,8 +295,8 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
     test('a per-Work KB doc surfaces in org Memory with a coherent id and the aggregation-only projection (no body / no locked)', async ({
         request,
     }) => {
-        const { token, orgId, workId } = await buildChain(request);
-        const doc = await createKbDoc(request, token, workId, {
+        const { headers, orgId, workId } = await buildChain(request);
+        const doc = await createKbDoc(request, headers, workId, {
             path: 'research/notes.md',
             title: `Research Notes ${stamp()}`,
             class: 'research',
@@ -290,7 +312,7 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
         expect(typeof doc.body).toBe('string');
 
         // The org Memory item is the SAME row, projected as an aggregation item.
-        const mem = await getMemory(request, token);
+        const mem = await getMemory(request, headers);
         const item = itemById(mem, doc.id);
         expect(item, 'the Work KB doc must surface in org Memory').toBeTruthy();
         expect(item!.title).toBe(doc.title);
@@ -317,8 +339,8 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
     test('an org-level inheritable doc is DUAL-projected: Memory (workId null) + the Work inheritable resolution; a non-inheritable org class is rejected and never surfaces', async ({
         request,
     }) => {
-        const { token, orgId, workId } = await buildChain(request);
-        const orgDoc = await createOrgDoc(request, token, orgId, {
+        const { headers, orgId, workId } = await buildChain(request);
+        const orgDoc = await createOrgDoc(request, headers, orgId, {
             path: 'legal/privacy.md',
             title: `Privacy ${stamp()}`,
             class: 'legal',
@@ -328,7 +350,7 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
         expect(orgDoc.organizationId).toBe(orgId);
 
         // Projection 1: the org doc appears in Memory with a null Work.
-        const mem = await getMemory(request, token, 'type=legal');
+        const mem = await getMemory(request, headers, 'type=legal');
         const memItem = itemById(mem, orgDoc.id);
         expect(memItem, 'org doc must surface in Memory').toBeTruthy();
         expect(memItem!.workId).toBeNull();
@@ -339,7 +361,7 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
         // the Work in that org (full KbDocumentDto array).
         const inh = await request.get(
             `${API_BASE}/api/works/${workId}/kb/inheritable?orgId=${orgId}`,
-            { headers: authedHeaders(token) },
+            { headers },
         );
         expect(inh.status()).toBe(200);
         const inherited = (await inh.json()) as Array<{
@@ -356,31 +378,31 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
         // A foreign orgId on the inheritable route is walled off (403).
         const foreign = await request.get(
             `${API_BASE}/api/works/${workId}/kb/inheritable?orgId=${UNKNOWN_UUID}`,
-            { headers: authedHeaders(token) },
+            { headers },
         );
         expect(foreign.status()).toBe(403);
 
         // A non-inheritable org class is rejected outright and never surfaces.
         const bad = await request.post(`${API_BASE}/api/organizations/${orgId}/kb/documents`, {
-            headers: authedHeaders(token),
+            headers,
             data: { path: 'research/x.md', title: 'X', class: 'research', body: 'nope' },
         });
         expect(bad.status()).toBe(400);
-        const memAfter = await getMemory(request, token);
+        const memAfter = await getMemory(request, headers);
         expect(memAfter.documents.every((d) => d.class !== 'research')).toBe(true);
     });
 
     test('the ?work filter isolates the Work rows and DROPS org-level rows, while the per-Work KB list shows only that Work — the chain projected two ways', async ({
         request,
     }) => {
-        const { token, orgId, workId } = await buildChain(request);
-        const workDoc = await createKbDoc(request, token, workId, {
+        const { headers, orgId, workId } = await buildChain(request);
+        const workDoc = await createKbDoc(request, headers, workId, {
             path: 'research/w.md',
             title: `WorkDoc ${stamp()}`,
             class: 'research',
             body: 'work scoped document body with several distinct words in it here now',
         });
-        const orgDoc = await createOrgDoc(request, token, orgId, {
+        const orgDoc = await createOrgDoc(request, headers, orgId, {
             path: 'seo/meta.md',
             title: `OrgSeo ${stamp()}`,
             class: 'seo',
@@ -388,21 +410,21 @@ test.describe('KB → Memory chain — one document across surfaces', () => {
         });
 
         // Unfiltered: both the Work doc and the org doc are present.
-        const all = await getMemory(request, token);
+        const all = await getMemory(request, headers);
         expect(all.documents.map((d) => d.id)).toEqual(
             expect.arrayContaining([workDoc.id, orgDoc.id]),
         );
 
         // ?work=WORK: the org-level row is DROPPED (a Work selection is about
         // Work documents), leaving only the Work doc.
-        const byWork = await getMemory(request, token, `work=${workId}`);
+        const byWork = await getMemory(request, headers, `work=${workId}`);
         expect(byWork.documents.map((d) => d.id)).toContain(workDoc.id);
         expect(byWork.documents.map((d) => d.id)).not.toContain(orgDoc.id);
 
         // The per-Work KB list shows the Work's own doc (never the org row,
         // which has workId null).
         const list = await request.get(`${API_BASE}/api/works/${workId}/kb/documents`, {
-            headers: authedHeaders(token),
+            headers,
         });
         expect(list.status()).toBe(200);
         const listed = (await list.json()) as
@@ -419,9 +441,9 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
     test('a PATCH title on the per-Work doc relabels the Memory item (q finds the new title, misses the old)', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
+        const { headers, workId } = await buildChain(request);
         const oldTitle = `OldName ${stamp()}`;
-        const doc = await createKbDoc(request, token, workId, {
+        const doc = await createKbDoc(request, headers, workId, {
             path: 'research/t.md',
             title: oldTitle,
             class: 'research',
@@ -431,7 +453,7 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
         const patch = await request.patch(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}`,
             {
-                headers: authedHeaders(token),
+                headers,
                 data: { title: newTitle },
             },
         );
@@ -441,7 +463,7 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
         // The Memory feed relabels: a lexical q on the new title finds it…
         const hit = await getMemory(
             request,
-            token,
+            headers,
             `q=${encodeURIComponent(newTitle.split(' ')[0])}`,
         );
         expect(hit.documents.map((d) => d.id)).toContain(doc.id);
@@ -449,7 +471,7 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
         // …and the old title no longer matches.
         const miss = await getMemory(
             request,
-            token,
+            headers,
             `q=${encodeURIComponent(oldTitle.split(' ')[0])}`,
         );
         expect(miss.documents.map((d) => d.id)).not.toContain(doc.id);
@@ -458,14 +480,14 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
     test('a PATCH class re-buckets the Memory TYPE facet and the item agrees on the new class', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        const doc = await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        const doc = await createKbDoc(request, headers, workId, {
             path: 'research/c.md',
             title: `Classy ${stamp()}`,
             class: 'research',
             body: 'a document that will be reclassified from research to glossary soon',
         });
-        expect((await getMemory(request, token)).facets.types).toContainEqual({
+        expect((await getMemory(request, headers)).facets.types).toContainEqual({
             value: 'research',
             label: 'research',
             count: 1,
@@ -474,14 +496,14 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
         const patch = await request.patch(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}`,
             {
-                headers: authedHeaders(token),
+                headers,
                 data: { class: 'glossary' },
             },
         );
         expect(patch.status()).toBe(200);
         expect((await patch.json()).class).toBe('glossary');
 
-        const mem = await getMemory(request, token);
+        const mem = await getMemory(request, headers);
         expect(mem.facets.types).toContainEqual({ value: 'glossary', label: 'glossary', count: 1 });
         expect(mem.facets.types.map((f) => f.value)).not.toContain('research');
         expect(itemById(mem, doc.id)!.class).toBe('glossary');
@@ -490,8 +512,8 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
     test('a PATCH status active→archived keeps the doc in the feed (no default status gate) and moves the status facet + filters', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        const doc = await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        const doc = await createKbDoc(request, headers, workId, {
             path: 'style/s.md',
             title: `Styleful ${stamp()}`,
             class: 'style',
@@ -500,14 +522,14 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
         const patch = await request.patch(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}`,
             {
-                headers: authedHeaders(token),
+                headers,
                 data: { status: 'archived' },
             },
         );
         expect(patch.status()).toBe(200);
 
         // Default feed has NO status gate: the archived doc still surfaces.
-        const mem = await getMemory(request, token);
+        const mem = await getMemory(request, headers);
         expect(itemById(mem, doc.id)!.status).toBe('archived');
         expect(mem.facets.statuses).toContainEqual({
             value: 'archived',
@@ -516,10 +538,10 @@ test.describe('Per-Work KB edits re-project into Memory', () => {
         });
         // ?status=archived finds it; ?status=draft does not.
         expect(
-            (await getMemory(request, token, 'status=archived')).documents.map((d) => d.id),
+            (await getMemory(request, headers, 'status=archived')).documents.map((d) => d.id),
         ).toContain(doc.id);
         expect(
-            (await getMemory(request, token, 'status=draft')).documents.map((d) => d.id),
+            (await getMemory(request, headers, 'status=draft')).documents.map((d) => d.id),
         ).not.toContain(doc.id);
     });
 });
@@ -529,8 +551,8 @@ test.describe('Lock / restore / history as chain hops', () => {
     test('full-lock a surfaced doc → it STILL surfaces in Memory; PATCH+DELETE gate 403; unlock reopens PATCH; the Memory item never carries a lock field', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        const doc = await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        const doc = await createKbDoc(request, headers, workId, {
             path: 'research/lock.md',
             title: `Lockable ${stamp()}`,
             class: 'research',
@@ -539,7 +561,7 @@ test.describe('Lock / restore / history as chain hops', () => {
 
         const lock = await request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}/lock`,
-            { headers: authedHeaders(token), data: { mode: 'full' } },
+            { headers, data: { mode: 'full' } },
         );
         expect(lock.status()).toBe(200);
         const locked = (await lock.json()) as KbDoc;
@@ -547,7 +569,7 @@ test.describe('Lock / restore / history as chain hops', () => {
         expect(locked.lockMode).toBe('full');
 
         // Still in Memory (no locked facet), and the item exposes no lock field.
-        const mem = await getMemory(request, token);
+        const mem = await getMemory(request, headers);
         const item = itemById(mem, doc.id);
         expect(item).toBeTruthy();
         expect('locked' in item!).toBe(false);
@@ -557,26 +579,26 @@ test.describe('Lock / restore / history as chain hops', () => {
         const patch = await request.patch(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}`,
             {
-                headers: authedHeaders(token),
+                headers,
                 data: { body: 'blocked edit' },
             },
         );
         expect(patch.status()).toBe(403);
         const del = await request.delete(`${API_BASE}/api/works/${workId}/kb/documents/${doc.id}`, {
-            headers: authedHeaders(token),
+            headers,
         });
         expect(del.status()).toBe(403);
 
         // Unlock reopens editing.
         const unlock = await request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}/unlock`,
-            { headers: authedHeaders(token) },
+            { headers },
         );
         expect(unlock.status()).toBe(200);
         expect((await unlock.json()).locked).toBe(false);
         const patch2 = await request.patch(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}`,
-            { headers: authedHeaders(token), data: { title: `Reopened ${stamp()}` } },
+            { headers, data: { title: `Reopened ${stamp()}` } },
         );
         expect(patch2.status()).toBe(200);
     });
@@ -584,8 +606,8 @@ test.describe('Lock / restore / history as chain hops', () => {
     test('additions-only lock still allows a body PATCH and the doc keeps surfacing; an off-enum mode → 400; a non-UUID docId → 400', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        const doc = await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        const doc = await createKbDoc(request, headers, workId, {
             path: 'glossary/g.md',
             title: `Additive ${stamp()}`,
             class: 'glossary',
@@ -593,7 +615,7 @@ test.describe('Lock / restore / history as chain hops', () => {
         });
         const lock = await request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}/lock`,
-            { headers: authedHeaders(token), data: { mode: 'additions-only' } },
+            { headers, data: { mode: 'additions-only' } },
         );
         expect(lock.status()).toBe(200);
         expect((await lock.json()).lockMode).toBe('additions-only');
@@ -602,23 +624,23 @@ test.describe('Lock / restore / history as chain hops', () => {
         const patch = await request.patch(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}`,
             {
-                headers: authedHeaders(token),
+                headers,
                 data: { body: 'appended body under additions-only lock' },
             },
         );
         expect(patch.status()).toBe(200);
-        expect((await getMemory(request, token)).documents.map((d) => d.id)).toContain(doc.id);
+        expect((await getMemory(request, headers)).documents.map((d) => d.id)).toContain(doc.id);
 
         // Off-enum lock mode → 400 with the enum message.
         const badMode = await request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}/lock`,
-            { headers: authedHeaders(token), data: { mode: 'nonsense' } },
+            { headers, data: { mode: 'nonsense' } },
         );
         expect(badMode.status()).toBe(400);
         // Non-UUID docId is rejected at the ParseUUIDPipe.
         const badId = await request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/not-a-uuid/lock`,
-            { headers: authedHeaders(token), data: { mode: 'full' } },
+            { headers, data: { mode: 'full' } },
         );
         expect(badId.status()).toBe(400);
     });
@@ -626,8 +648,8 @@ test.describe('Lock / restore / history as chain hops', () => {
     test('restore + history are git-gated (repoless) → 409, yet the doc + its Memory surfacing survive; a non-hex commitSha → 400 before the git hop', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        const doc = await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        const doc = await createKbDoc(request, headers, workId, {
             path: 'research/r.md',
             title: `Restorable ${stamp()}`,
             class: 'research',
@@ -638,7 +660,7 @@ test.describe('Lock / restore / history as chain hops', () => {
         // account → NoGitCredentials 409 (tolerate the repoless failure band).
         const restore = await request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}/restore`,
-            { headers: authedHeaders(token), data: { commitSha: 'abc1234' } },
+            { headers, data: { commitSha: 'abc1234' } },
         );
         expect([409, 400, 404, 500, 503]).toContain(restore.status());
         expect(restore.status()).toBe(409);
@@ -646,22 +668,22 @@ test.describe('Lock / restore / history as chain hops', () => {
         // The history read is git-gated the same way.
         const history = await request.get(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}/history`,
-            { headers: authedHeaders(token) },
+            { headers },
         );
         expect([409, 400, 404, 500, 503]).toContain(history.status());
 
         // A symbolic / non-hex ref is rejected at the DTO BEFORE the git hop.
         const badSha = await request.post(
             `${API_BASE}/api/works/${workId}/kb/documents/${doc.id}/restore`,
-            { headers: authedHeaders(token), data: { commitSha: 'HEAD~1' } },
+            { headers, data: { commitSha: 'HEAD~1' } },
         );
         expect(badSha.status()).toBe(400);
 
         // The failed git hops changed nothing: the doc still reads (200) and
         // still surfaces in Memory.
-        const read = await getWorkDocRaw(request, token, workId, doc.id);
+        const read = await getWorkDocRaw(request, headers, workId, doc.id);
         expect(read.status).toBe(200);
-        expect((await getMemory(request, token)).documents.map((d) => d.id)).toContain(doc.id);
+        expect((await getMemory(request, headers)).documents.map((d) => d.id)).toContain(doc.id);
     });
 });
 
@@ -670,21 +692,21 @@ test.describe('Consolidation markers project onto Memory, not the per-Work DTO',
     test('a bare POST is a dry-run: it COMPUTES the supersede pair it would create, yet writes NOTHING (every feed marker stays null)', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        const a = await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        const a = await createKbDoc(request, headers, workId, {
             path: 'research/d1.md',
             title: `Twin ${stamp()}`,
             class: 'research',
             body: DUP_BODY,
         });
-        const b = await createKbDoc(request, token, workId, {
+        const b = await createKbDoc(request, headers, workId, {
             path: 'research/d2.md',
             title: 'Twin',
             class: 'research',
             body: DUP_BODY,
         });
 
-        const report = await consolidate(request, token); // bare POST
+        const report = await consolidate(request, headers); // bare POST
         expect(report.dryRun).toBe(true);
         expect(report.scanned).toBe(2);
         expect(report.superseded).toBe(1);
@@ -697,34 +719,34 @@ test.describe('Consolidation markers project onto Memory, not the per-Work DTO',
         expect(report.notes.some((n) => /dry run/i.test(n))).toBe(true);
 
         // …but NO marker is persisted — the feed stays clean.
-        const mem = await getMemory(request, token);
+        const mem = await getMemory(request, headers);
         expect(mem.documents.every((d) => d.consolidation === null)).toBe(true);
     });
 
     test('apply persists the report’s markers ONLY on the Memory item (loser superseded → survivor; survivor promoted with a numeric score); the per-Work DTO carries no marker', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        const a = await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        const a = await createKbDoc(request, headers, workId, {
             path: 'research/e1.md',
             title: `Echo ${stamp()}`,
             class: 'research',
             body: DUP_BODY,
         });
-        const b = await createKbDoc(request, token, workId, {
+        const b = await createKbDoc(request, headers, workId, {
             path: 'research/e2.md',
             title: 'Echo',
             class: 'research',
             body: DUP_BODY,
         });
 
-        const report = await consolidate(request, token, true);
+        const report = await consolidate(request, headers, true);
         expect(report.dryRun).toBe(false);
         expect(report.superseded).toBe(1);
         const [loserId, survivorId] = report.details.supersededPairs[0];
         expect(report.details.promotedIds).toContain(survivorId);
 
-        const mem = await getMemory(request, token);
+        const mem = await getMemory(request, headers);
         const loser = itemById(mem, loserId)!;
         const survivor = itemById(mem, survivorId)!;
 
@@ -743,8 +765,8 @@ test.describe('Consolidation markers project onto Memory, not the per-Work DTO',
 
         // The marker lives ONLY on the aggregation projection — the per-Work
         // KB doc DTO exposes no `consolidation` key on either row.
-        const loserRaw = await getWorkDocRaw(request, token, workId, loserId);
-        const survivorRaw = await getWorkDocRaw(request, token, workId, survivorId);
+        const loserRaw = await getWorkDocRaw(request, headers, workId, loserId);
+        const survivorRaw = await getWorkDocRaw(request, headers, workId, survivorId);
         expect(loserRaw.status).toBe(200);
         expect('consolidation' in loserRaw.body).toBe(false);
         expect('consolidation' in survivorRaw.body).toBe(false);
@@ -755,39 +777,39 @@ test.describe('Consolidation markers project onto Memory, not the per-Work DTO',
     test('the superseded loser is NEVER deleted: still in the feed (state superseded), still GET-able per-Work (200), and an unrelated edit leaves the marker intact', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        await createKbDoc(request, headers, workId, {
             path: 'research/f1.md',
             title: `Fox ${stamp()}`,
             class: 'research',
             body: DUP_BODY,
         });
-        await createKbDoc(request, token, workId, {
+        await createKbDoc(request, headers, workId, {
             path: 'research/f2.md',
             title: 'Fox',
             class: 'research',
             body: DUP_BODY,
         });
-        const report = await consolidate(request, token, true);
+        const report = await consolidate(request, headers, true);
         const [loserId] = report.details.supersededPairs[0];
 
         // Still surfaced with the superseded state.
-        const before = itemById(await getMemory(request, token), loserId)!;
+        const before = itemById(await getMemory(request, headers), loserId)!;
         expect(before.consolidation!.state).toBe('superseded');
         const runAtBefore = before.consolidation!.runAt;
 
         // Still fully readable via the per-Work route (never hard-deleted).
-        const read = await getWorkDocRaw(request, token, workId, loserId);
+        const read = await getWorkDocRaw(request, headers, workId, loserId);
         expect(read.status).toBe(200);
         expect(read.body.id).toBe(loserId);
 
         // An unrelated per-Work metadata edit does not disturb the marker.
         const patch = await request.patch(
             `${API_BASE}/api/works/${workId}/kb/documents/${loserId}`,
-            { headers: authedHeaders(token), data: { title: `Fox Renamed ${stamp()}` } },
+            { headers, data: { title: `Fox Renamed ${stamp()}` } },
         );
         expect(patch.status()).toBe(200);
-        const after = itemById(await getMemory(request, token), loserId)!;
+        const after = itemById(await getMemory(request, headers), loserId)!;
         expect(after.consolidation!.state).toBe('superseded');
         expect(after.consolidation!.supersededById).toBe(before.consolidation!.supersededById);
         expect(after.consolidation!.runAt).toBe(runAtBefore);
@@ -796,49 +818,49 @@ test.describe('Consolidation markers project onto Memory, not the per-Work DTO',
     test('apply is idempotent (a re-run supersedes 0 and the marker is stable); distinct docs apply to all-promoted / none-superseded', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        await createKbDoc(request, headers, workId, {
             path: 'research/g1.md',
             title: `Golf ${stamp()}`,
             class: 'research',
             body: DUP_BODY,
         });
-        await createKbDoc(request, token, workId, {
+        await createKbDoc(request, headers, workId, {
             path: 'research/g2.md',
             title: 'Golf',
             class: 'research',
             body: DUP_BODY,
         });
-        const first = await consolidate(request, token, true);
+        const first = await consolidate(request, headers, true);
         expect(first.superseded).toBe(1);
         const [loserId, survivorId] = first.details.supersededPairs[0];
 
         // Re-apply: the already-superseded loser is left alone (0 new
         // supersedes), the survivor stays promoted.
-        const second = await consolidate(request, token, true);
+        const second = await consolidate(request, headers, true);
         expect(second.superseded).toBe(0);
-        const after = itemById(await getMemory(request, token), loserId)!;
+        const after = itemById(await getMemory(request, headers), loserId)!;
         expect(after.consolidation!.state).toBe('superseded');
         expect(after.consolidation!.supersededById).toBe(survivorId);
 
         // A chain of two DISTINCT docs → both promoted, none superseded.
         const distinct = await buildChain(request);
-        await createKbDoc(request, distinct.token, distinct.workId, {
+        await createKbDoc(request, distinct.headers, distinct.workId, {
             path: 'research/h1.md',
             title: `Alpha ${stamp()}`,
             class: 'research',
             body: 'astronomy and stars in the deep night sky above the quiet ocean',
         });
-        await createKbDoc(request, distinct.token, distinct.workId, {
+        await createKbDoc(request, distinct.headers, distinct.workId, {
             path: 'glossary/h2.md',
             title: `Beta ${stamp()}`,
             class: 'glossary',
             body: 'geology and tectonic plates shifting beneath the vast continents',
         });
-        const distinctReport = await consolidate(request, distinct.token, true);
+        const distinctReport = await consolidate(request, distinct.headers, true);
         expect(distinctReport.superseded).toBe(0);
         expect(distinctReport.promoted).toBe(2);
-        const distinctMem = await getMemory(request, distinct.token);
+        const distinctMem = await getMemory(request, distinct.headers);
         expect(distinctMem.documents.every((d) => d.consolidation?.state === 'promoted')).toBe(
             true,
         );
@@ -847,16 +869,16 @@ test.describe('Consolidation markers project onto Memory, not the per-Work DTO',
     test('a 3-cluster of a non-inheritable class supersedes 2 with an “inheritable classes” note and synthesized:0 (keyless-safe)', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
+        const { headers, workId } = await buildChain(request);
         for (const n of ['x1', 'x2', 'x3']) {
-            await createKbDoc(request, token, workId, {
+            await createKbDoc(request, headers, workId, {
                 path: `research/${n}.md`,
                 title: `Cluster ${stamp()}`,
                 class: 'research',
                 body: DUP_BODY,
             });
         }
-        const report = await consolidate(request, token); // dry-run is enough
+        const report = await consolidate(request, headers); // dry-run is enough
         expect(report.scanned).toBe(3);
         // survivor + 2 losers → 2 supersede pairs sharing one survivor.
         expect(report.superseded).toBe(2);
@@ -875,13 +897,13 @@ test.describe('Consolidation markers project onto Memory, not the per-Work DTO',
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
 
-        const mem = await getMemory(request, token);
+        const mem = await getMemory(request, authedHeaders(token));
         expect(mem.documents).toEqual([]);
         expect(mem.counts).toEqual({ documents: 0, indexed: 0 });
         expect(mem.facets).toEqual({ types: [], works: [], statuses: [], sources: [] });
 
         for (const apply of [undefined, false, true] as const) {
-            const report = await consolidate(request, token, apply);
+            const report = await consolidate(request, authedHeaders(token), apply);
             expect(report.scanned).toBe(0);
             expect(report.promoted).toBe(0);
             expect(report.superseded).toBe(0);
@@ -897,46 +919,46 @@ test.describe('Cross-surface isolation + scope stability', () => {
         request,
     }) => {
         const owner = await buildChain(request);
-        const ownerDoc = await createKbDoc(request, owner.token, owner.workId, {
+        const ownerDoc = await createKbDoc(request, owner.headers, owner.workId, {
             path: 'research/secret.md',
             title: `Secret ${stamp()}`,
             class: 'research',
             body: 'confidential research the stranger must never see in their feed',
         });
         // Owner applies markers.
-        await createKbDoc(request, owner.token, owner.workId, {
+        await createKbDoc(request, owner.headers, owner.workId, {
             path: 'research/secret2.md',
             title: 'Secret',
             class: 'research',
             body: DUP_BODY,
         });
-        await createKbDoc(request, owner.token, owner.workId, {
+        await createKbDoc(request, owner.headers, owner.workId, {
             path: 'research/secret3.md',
             title: 'Secret',
             class: 'research',
             body: DUP_BODY,
         });
-        await consolidate(request, owner.token, true);
+        await consolidate(request, owner.headers, true);
 
         // A stranger with their own org sees NONE of it.
         const stranger = await buildChain(request);
-        const strangerMem = await getMemory(request, stranger.token);
+        const strangerMem = await getMemory(request, stranger.headers);
         expect(strangerMem.documents.map((d) => d.id)).not.toContain(ownerDoc.id);
 
         // The stranger's consolidate is bounded to their own (single-doc,
         // no-dup) org — it never touches the owner's chain.
-        await createKbDoc(request, stranger.token, stranger.workId, {
+        await createKbDoc(request, stranger.headers, stranger.workId, {
             path: 'research/mine.md',
             title: `Mine ${stamp()}`,
             class: 'research',
             body: 'the strangers own solitary document with unique content here',
         });
-        const strangerReport = await consolidate(request, stranger.token, true);
+        const strangerReport = await consolidate(request, stranger.headers, true);
         expect(strangerReport.superseded).toBe(0);
         expect(strangerReport.details.supersededPairs).toEqual([]);
 
         // The owner's markers are untouched by the stranger's run.
-        const ownerMem = await getMemory(request, owner.token);
+        const ownerMem = await getMemory(request, owner.headers);
         expect(ownerMem.documents.some((d) => d.consolidation?.state === 'superseded')).toBe(true);
     });
 
@@ -944,7 +966,7 @@ test.describe('Cross-surface isolation + scope stability', () => {
         request,
     }) => {
         const owner = await buildChain(request);
-        await createKbDoc(request, owner.token, owner.workId, {
+        await createKbDoc(request, owner.headers, owner.workId, {
             path: 'research/o.md',
             title: `Owned ${stamp()}`,
             class: 'research',
@@ -975,7 +997,7 @@ test.describe('Cross-surface isolation + scope stability', () => {
 
         // Cross-tenant Memory is EMPTY, not an error (the stranger with no org
         // gets the zeroed aggregation — never the owner's rows).
-        const mem = await getMemory(request, stranger.access_token);
+        const mem = await getMemory(request, authedHeaders(stranger.access_token));
         expect(mem.documents).toEqual([]);
     });
 
@@ -983,7 +1005,7 @@ test.describe('Cross-surface isolation + scope stability', () => {
         request,
     }) => {
         const owner = await buildChain(request);
-        const ownerDoc = await createKbDoc(request, owner.token, owner.workId, {
+        const ownerDoc = await createKbDoc(request, owner.headers, owner.workId, {
             path: 'research/p.md',
             title: `Peer ${stamp()}`,
             class: 'research',
@@ -993,13 +1015,13 @@ test.describe('Cross-surface isolation + scope stability', () => {
         // A different user filters THEIR memory by the owner's Work id → the
         // intersect drops it (never widens beyond the caller's own org).
         const other = await buildChain(request);
-        await createKbDoc(request, other.token, other.workId, {
+        await createKbDoc(request, other.headers, other.workId, {
             path: 'research/mine.md',
             title: `OtherOwn ${stamp()}`,
             class: 'research',
             body: 'the other users own doc which is the only thing they may see here',
         });
-        const filtered = await getMemory(request, other.token, `work=${owner.workId}`);
+        const filtered = await getMemory(request, other.headers, `work=${owner.workId}`);
         expect(filtered.documents.map((d) => d.id)).not.toContain(ownerDoc.id);
         expect(filtered.documents).toEqual([]);
 
@@ -1014,23 +1036,23 @@ test.describe('Cross-surface isolation + scope stability', () => {
         ).toBe(401);
     });
 
-    test('creating a SECOND Organization does not flip the active Memory scope — the feed keeps surfacing the first org’s chain', async ({
+    test('creating a SECOND Organization does not alter an explicitly pinned Memory scope — the feed keeps surfacing the first org’s chain', async ({
         request,
     }) => {
-        const { token, orgId, workId } = await buildChain(request);
-        const doc = await createKbDoc(request, token, workId, {
+        const { token, headers, orgId, workId } = await buildChain(request);
+        const doc = await createKbDoc(request, headers, workId, {
             path: 'research/first.md',
             title: `FirstOrg ${stamp()}`,
             class: 'research',
             body: 'a document authored in the first organization that must stay visible',
         });
-        expect((await getMemory(request, token)).documents.map((d) => d.id)).toContain(doc.id);
+        expect((await getMemory(request, headers)).documents.map((d) => d.id)).toContain(doc.id);
 
-        // Mint a SECOND org (no docs). The active scope is the validated
-        // last-active org (org #1), not the newest — so the feed is unchanged.
+        // Mint a SECOND org (no docs). The explicit header remains pinned to
+        // org #1, so mutable navigation preference cannot change this request.
         const second = await createOrganizationViaAPI(request, token, `Second Org ${stamp()}`);
         expect(second.id).not.toBe(orgId);
-        const mem = await getMemory(request, token);
+        const mem = await getMemory(request, headers);
         expect(mem.documents.map((d) => d.id)).toContain(doc.id);
         expect(mem.counts.documents).toBeGreaterThanOrEqual(1);
     });
@@ -1041,14 +1063,14 @@ test.describe('Validation guards along the chain', () => {
     test('Memory query guards: unknown type/status/source enum → 400; limit 0 and limit 201 → 400; a valid limit caps the page while counts.documents holds', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
-        await createKbDoc(request, token, workId, {
+        const { headers, workId } = await buildChain(request);
+        await createKbDoc(request, headers, workId, {
             path: 'research/v1.md',
             title: `V1 ${stamp()}`,
             class: 'research',
             body: 'first document of two used to prove the limit caps the page not the count',
         });
-        await createKbDoc(request, token, workId, {
+        await createKbDoc(request, headers, workId, {
             path: 'glossary/v2.md',
             title: `V2 ${stamp()}`,
             class: 'glossary',
@@ -1063,14 +1085,14 @@ test.describe('Validation guards along the chain', () => {
             'limit=201',
         ]) {
             const res = await request.get(`${API_BASE}/api/memory?${bad}`, {
-                headers: authedHeaders(token),
+                headers,
             });
             expect(res.status(), `expected 400 for ?${bad}`).toBe(400);
         }
 
         // A valid limit caps the returned page while counts.documents stays
         // the TRUE match total (2), not the page length (1).
-        const capped = await getMemory(request, token, 'limit=1');
+        const capped = await getMemory(request, headers, 'limit=1');
         expect(capped.documents).toHaveLength(1);
         expect(capped.counts.documents).toBe(2);
     });
@@ -1078,11 +1100,11 @@ test.describe('Validation guards along the chain', () => {
     test('Consolidate + KB body guards: apply string/number → 400, unknown property → 400, malformed workId → 400, unknown docId → 404', async ({
         request,
     }) => {
-        const { token, workId } = await buildChain(request);
+        const { headers, workId } = await buildChain(request);
 
         for (const bad of [{ apply: 'yes' }, { apply: 1 }, { bogusField: true }]) {
             const res = await request.post(`${API_BASE}/api/memory/consolidate`, {
-                headers: authedHeaders(token),
+                headers,
                 data: bad,
             });
             expect(res.status(), `expected 400 for ${JSON.stringify(bad)}`).toBe(400);
@@ -1090,20 +1112,20 @@ test.describe('Validation guards along the chain', () => {
 
         // Malformed workId in a KB route → 400 at the ParseUUIDPipe.
         const malformed = await request.get(`${API_BASE}/api/works/not-a-uuid/kb/documents`, {
-            headers: authedHeaders(token),
+            headers,
         });
         expect(malformed.status()).toBe(400);
 
         // A well-formed but unknown docId → 404.
         const unknown = await request.get(
             `${API_BASE}/api/works/${workId}/kb/documents/${UNKNOWN_UUID}`,
-            { headers: authedHeaders(token) },
+            { headers },
         );
         expect(unknown.status()).toBe(404);
 
         // A KB path that does not start with a known class folder → 400.
         const badPath = await request.post(`${API_BASE}/api/works/${workId}/kb/documents`, {
-            headers: authedHeaders(token),
+            headers,
             data: { path: 'toplevel.md', title: 'X', class: 'research', body: 'body' },
         });
         expect(badPath.status()).toBe(400);

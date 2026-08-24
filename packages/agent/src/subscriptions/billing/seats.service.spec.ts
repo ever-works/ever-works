@@ -131,6 +131,7 @@ function makeHarness(
 
 afterEach(() => {
     delete process.env.SUBSCRIPTIONS_ENABLED;
+    delete process.env.E2E_BYPASS_SEAT_LIMITS;
 });
 
 describe('SeatsService.getSeats', () => {
@@ -212,6 +213,15 @@ describe('SeatsService.getSeats', () => {
 });
 
 describe('SeatsService.assertSeatAvailable', () => {
+    it('bypasses seat admission only through the non-production E2E escape hatch', async () => {
+        process.env.NODE_ENV = 'test';
+        process.env.E2E_BYPASS_SEAT_LIMITS = 'true';
+        const h = makeHarness({ members: 99, agents: 99 });
+
+        await expect(h.service.assertSeatAvailable('owner-1')).resolves.toBeUndefined();
+        expect(h.userSubscriptionRepository.findActiveByUser).not.toHaveBeenCalled();
+    });
+
     it('admits while a seat is left and refuses when the next one would exceed the allowance', async () => {
         const full = makeHarness({ members: 10, agents: 4 }); // 14 used, allowance 10
         await expect(full.service.assertSeatAvailable('owner-1')).rejects.toBeInstanceOf(

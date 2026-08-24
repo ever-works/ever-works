@@ -129,22 +129,20 @@ test.describe('flow: KB org→Work inheritance acceptance (A33/A34/A35)', () => 
             body: `# Policy ${id}\n\norg-level policy inherited by paired Works\n`,
         });
 
-        // Before pairing, the org doc is not visible to the Work.
-        const beforePair = await resolveInheritable(request, owner.access_token, workId, orgId);
-        // Without a pairing, the inheritable endpoint still trusts the orgId
-        // query and returns the org doc — but the kb page server component
-        // never calls it without a paired Work.organizationId. Pin pairing
-        // explicitly so the assertion below isn't dependent on that quirk.
+        // Before pairing, the attacker-controlled orgId query must not widen
+        // the Work's scope. The route derives scope from Work.organizationId
+        // and rejects the mismatched query.
+        const beforePair = await request.get(
+            `${API_BASE}/api/works/${workId}/kb/inheritable?orgId=${encodeURIComponent(orgId)}`,
+            { headers: authedHeaders(owner.access_token) },
+        );
+        expect(beforePair.status(), 'unpaired Work rejects the orgId query').toBe(403);
+
         await setWorkOrganizationId(request, owner.access_token, workId, orgId);
         const afterPair = await resolveInheritable(request, owner.access_token, workId, orgId);
 
         const orgScoped = afterPair.filter((d) => d.workId === null).map((d) => d.path);
         expect(orgScoped, 'paired Work sees the org doc as inherited').toContain(orgPath);
-
-        // beforePair is sanity — also surfaces it (trust-the-query-param
-        // behaviour) so flipping that contract is caught by the spec rather
-        // than going silent.
-        expect(beforePair.some((d) => d.path === orgPath)).toBeTruthy();
     });
 
     test('A34 — Work-scope override at same path hides the org-scope sibling', async ({

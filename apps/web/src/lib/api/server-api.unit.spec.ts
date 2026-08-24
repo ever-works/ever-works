@@ -67,6 +67,20 @@ describe('serverFetch workspace scope transport', () => {
         expect(fetch).not.toHaveBeenCalled();
     });
 
+    it('allows a server-owned public auth call to select personal scope explicitly', async () => {
+        headersMock.mockResolvedValue(new Headers({ host: 'app.example' }));
+
+        await serverFetch('/auth/verify-email', {
+            method: 'POST',
+            body: '{}',
+            publicRouteScope: 'personal',
+        });
+
+        const init = vi.mocked(fetch).mock.calls[0][1];
+        expect(new Headers(init?.headers).get(API_SCOPE_HEADER)).toBe('@personal');
+        expect(init).not.toHaveProperty('publicRouteScope');
+    });
+
     it.each([
         ['ever', '/org/ever/dashboard'],
         [null, '/'],

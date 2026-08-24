@@ -361,11 +361,19 @@ jobs:
           # what is CURRENTLY failing rather than staying frozen at whatever the
           # first failure was.
           FAIL_COUNT="$(printf '%s' "${FAILING_URLS}" | grep -c . || true)"
-          FIRST_FAIL="$(printf '%s' "${FAILING_URLS}" | grep . | head -1 | sed 's#https\?://##; s#/$##')"
-          if [ "${FAIL_COUNT}" -gt 1 ]; then
-            FAIL_SUMMARY="${FIRST_FAIL} +$(( FAIL_COUNT - 1 )) more"
+          if [ "${FAIL_COUNT}" -eq 0 ]; then
+            # An all-green run has no first failure. Do not feed the empty list
+            # through `grep | head`: the inherited `bash -e -o pipefail` turns
+            # grep's expected no-match status into a failed monitor run.
+            FIRST_FAIL=""
+            FAIL_SUMMARY=""
           else
-            FAIL_SUMMARY="${FIRST_FAIL}"
+            FIRST_FAIL="$(sed -n '/./{s#https\?://##; s#/$##; p; q;}' <<< "${FAILING_URLS}")"
+            if [ "${FAIL_COUNT}" -gt 1 ]; then
+              FAIL_SUMMARY="${FIRST_FAIL} +$(( FAIL_COUNT - 1 )) more"
+            else
+              FAIL_SUMMARY="${FIRST_FAIL}"
+            fi
           fi
 
           {
