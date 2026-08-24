@@ -563,6 +563,43 @@ describe('BillingService — webhook: refunds', () => {
             }),
         );
     });
+
+    it('always reverses the purchase owner even when the current billing profile points elsewhere', async () => {
+        const profiles = makeProfileRepository(PROFILE);
+        const ledgerRepo = makeLedgerRepository({
+            findLatestByRef: jest.fn().mockResolvedValue({
+                id: 'cle_original',
+                userId: 'u_original',
+                organizationId: 'org_original',
+                tenantId: 'tenant_original',
+                amountCredits: 1000,
+                costCentsRef: 1000,
+            }),
+        });
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    id: 'evt_repointed',
+                    kind: 'credits.refunded',
+                    customerId: 'cus_1',
+                    amountCents: 1000,
+                    paymentId: 'pi_repointed',
+                }),
+            ),
+        });
+        const { service, ledgerService } = build({ provider, profiles, ledgerRepo });
+
+        await service.handleWebhook('{}', 'sig');
+
+        expect(ledgerService.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'u_original',
+                organizationId: 'org_original',
+                tenantId: 'tenant_original',
+            }),
+        );
+    });
+
     it('ignores a refund with no matching purchase rather than guessing', async () => {
         const profiles = makeProfileRepository(PROFILE);
         const provider = makeProvider({

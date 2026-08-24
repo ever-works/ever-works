@@ -637,28 +637,14 @@ export class BillingService {
             return { eventId: event.id, kind: event.kind, action: 'ignored' };
         }
 
-        // Prefer the billing profile when there is one — it carries the
-        // current org/tenant scoping. Fall back to the owner recorded on the
-        // purchase itself, which is what makes a chargeback reversible.
-        const profile = await this.resolveProfile(event);
-        const owner = profile
-            ? {
-                  userId: profile.userId,
-                  organizationId: profile.organizationId ?? null,
-                  tenantId: profile.tenantId ?? null,
-              }
-            : {
-                  userId: original.userId,
-                  organizationId: original.organizationId ?? null,
-                  tenantId: original.tenantId ?? null,
-              };
-        if (!profile) {
-            this.logger.warn(
-                `Billing webhook ${event.id}: no billing profile matched — reversing against ` +
-                    `the owner recorded on purchase ${original.id}. Expected for a chargeback, ` +
-                    `which carries no customer id.`,
-            );
-        }
+        // The purchase row is the authority for ownership as well as amount.
+        // A billing profile can be re-pointed after purchase; using its current
+        // owner could debit an unrelated account for an older payment.
+        const owner = {
+            userId: original.userId,
+            organizationId: original.organizationId ?? null,
+            tenantId: original.tenantId ?? null,
+        };
 
         const chargedCents = original.costCentsRef ?? 0;
         const refundedCents = event.amountCents ?? chargedCents;
