@@ -69,9 +69,9 @@ export class UserSubscription {
     providerSubscriptionId?: string | null;
 
     /**
-     * Total seats the provider subscription is billed for — the plan's
-     * included allowance PLUS any additional seats bought (billing spec
-     * §3.6 / FR-26). Reconciled from the subscription's items on every
+     * Additional seats the provider subscription bills for, beyond the
+     * plan's included allowance (billing spec §3.6 / FR-26). Reconciled from
+     * the subscription's per-seat items on every
      * `subscription.*` delivery, so it is the provider's truth rather than
      * a local guess.
      *

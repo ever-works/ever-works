@@ -331,8 +331,12 @@ export interface BillingSubscriptionSnapshot {
  */
 export interface SeatQuantityRequest {
     readonly subscriptionId: string;
-    /** Catalog `lookup_key` of the per-seat price for this plan + interval. */
-    readonly seatLookupKey: string;
+    /**
+     * Catalog `lookup_key`s for both intervals. The provider selects the one
+     * matching the subscription's actual base-price interval; local row dates
+     * cannot reliably identify a renewed monthly subscription.
+     */
+    readonly seatLookupKeys: Readonly<Record<'monthly' | 'annual', string>>;
     /** Existing seat item, when the subscription already has one. */
     readonly seatItemId?: string | null;
     readonly quantity: number;

@@ -2103,7 +2103,10 @@ describe('StripeBillingProvider — seats (billing spec §3.6)', () => {
         process.env.STRIPE_SECRET_KEY = 'sk_test_x';
     });
 
-    const withSeatPrice = (seatItem: Record<string, unknown> | null) => {
+    const withSeatPrice = (
+        seatItem: Record<string, unknown> | null,
+        planLookupKey = 'ever_works_cloud_pro_monthly',
+    ) => {
         const subscription = {
             id: 'sub_plan',
             customer: 'cus_1',
@@ -2112,7 +2115,7 @@ describe('StripeBillingProvider — seats (billing spec §3.6)', () => {
             canceled_at: null,
             items: {
                 data: [
-                    { id: 'si_plan', price: { lookup_key: 'ever_works_cloud_pro_monthly' } },
+                    { id: 'si_plan', price: { lookup_key: planLookupKey } },
                     ...(seatItem ? [seatItem] : []),
                 ],
             },
@@ -2153,7 +2156,10 @@ describe('StripeBillingProvider — seats (billing spec §3.6)', () => {
         const withItem = withSeatPrice(seatItem(4));
         await withItem.provider.updateSeatQuantity({
             subscriptionId: 'sub_plan',
-            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatLookupKeys: {
+                monthly: 'ever_works_cloud_pro_seat_monthly',
+                annual: 'ever_works_cloud_pro_seat_annual',
+            },
             seatItemId: 'si_seat',
             quantity: 7,
         });
@@ -2164,7 +2170,10 @@ describe('StripeBillingProvider — seats (billing spec §3.6)', () => {
         const removing = withSeatPrice(seatItem(4));
         await removing.provider.updateSeatQuantity({
             subscriptionId: 'sub_plan',
-            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatLookupKeys: {
+                monthly: 'ever_works_cloud_pro_seat_monthly',
+                annual: 'ever_works_cloud_pro_seat_annual',
+            },
             seatItemId: 'si_seat',
             quantity: 0,
         });
@@ -2175,7 +2184,10 @@ describe('StripeBillingProvider — seats (billing spec §3.6)', () => {
         const { provider, client } = withSeatPrice(null);
         await provider.updateSeatQuantity({
             subscriptionId: 'sub_plan',
-            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatLookupKeys: {
+                monthly: 'ever_works_cloud_pro_seat_monthly',
+                annual: 'ever_works_cloud_pro_seat_annual',
+            },
             seatItemId: null,
             quantity: 3,
         });
@@ -2191,13 +2203,34 @@ describe('StripeBillingProvider — seats (billing spec §3.6)', () => {
         });
     });
 
+    it('creates an annual seat item when the provider subscription is annual', async () => {
+        const { provider, client } = withSeatPrice(null, 'ever_works_cloud_pro_annual');
+        await provider.updateSeatQuantity({
+            subscriptionId: 'sub_plan',
+            seatLookupKeys: {
+                monthly: 'ever_works_cloud_pro_seat_monthly',
+                annual: 'ever_works_cloud_pro_seat_annual',
+            },
+            seatItemId: null,
+            quantity: 3,
+        });
+        expect(client.prices.list).toHaveBeenCalledWith({
+            lookup_keys: ['ever_works_cloud_pro_seat_annual'],
+            active: true,
+            limit: 1,
+        });
+    });
+
     it('refuses rather than inventing a seat price the account does not have', async () => {
         const { provider, client } = withSeatPrice(null);
         client.prices.list.mockResolvedValue({ data: [] });
         await expect(
             provider.updateSeatQuantity({
                 subscriptionId: 'sub_plan',
-                seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+                seatLookupKeys: {
+                    monthly: 'ever_works_cloud_pro_seat_monthly',
+                    annual: 'ever_works_cloud_pro_seat_annual',
+                },
                 seatItemId: null,
                 quantity: 3,
             }),
@@ -2209,7 +2242,10 @@ describe('StripeBillingProvider — seats (billing spec §3.6)', () => {
         const { provider, client } = withSeatPrice(null);
         await provider.updateSeatQuantity({
             subscriptionId: 'sub_plan',
-            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatLookupKeys: {
+                monthly: 'ever_works_cloud_pro_seat_monthly',
+                annual: 'ever_works_cloud_pro_seat_annual',
+            },
             seatItemId: null,
             quantity: 0,
         });

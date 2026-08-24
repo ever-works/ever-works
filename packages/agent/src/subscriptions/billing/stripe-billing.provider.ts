@@ -770,10 +770,31 @@ export class StripeBillingProvider extends BillingProvider {
             return this.retrieveSubscriptionSnapshot(request.subscriptionId);
         }
 
-        const seatPriceId = await this.resolvePriceId(request.seatLookupKey);
+        const subscription = await stripe.subscriptions.retrieve(request.subscriptionId);
+        const basePrice = subscription.items.data.find(
+            (item) => !item.price.lookup_key?.includes('_seat_'),
+        )?.price;
+        const lookupKey = basePrice?.lookup_key ?? '';
+        const interval = lookupKey.endsWith('_annual')
+            ? 'annual'
+            : lookupKey.endsWith('_monthly')
+              ? 'monthly'
+              : basePrice?.recurring?.interval === 'year'
+                ? 'annual'
+                : basePrice?.recurring?.interval === 'month'
+                  ? 'monthly'
+                  : null;
+        if (!interval) {
+            throw new BillingProviderError(
+                'Cannot identify the subscription billing interval from its base price.',
+                'seat-interval-unknown',
+            );
+        }
+        const seatLookupKey = request.seatLookupKeys[interval];
+        const seatPriceId = await this.resolvePriceId(seatLookupKey);
         if (!seatPriceId) {
             throw new BillingProviderError(
-                `Seat price "${request.seatLookupKey}" is not available in this Stripe account. ` +
+                `Seat price "${seatLookupKey}" is not available in this Stripe account. ` +
                     'Run scripts/stripe-sync-catalog.mjs to publish the catalog.',
                 'seat-price-missing',
             );

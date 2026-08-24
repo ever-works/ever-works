@@ -3,6 +3,7 @@ import {
     Body,
     ConflictException,
     Controller,
+    ForbiddenException,
     Get,
     HttpCode,
     HttpStatus,
@@ -33,7 +34,8 @@ import { UpdateSeatsDto } from './dto/seats.dto';
  *                             the extras from the stored plan row.
  *
  * Both resolve the billing owner from the AUTHENTICATED user, so a member
- * cannot read or change somebody else's seat count by guessing an id.
+ * cannot access another tenant by guessing an id. Reads are tenant-visible;
+ * only the billing owner may change the provider subscription.
  */
 @ApiTags('Billing')
 @ApiBearerAuth('JWT-auth')
@@ -79,6 +81,11 @@ export class SeatsController {
     ): Promise<{ status: string } & SeatsView> {
         try {
             const owner = await this.seatsService.resolveBillingOwner(auth.userId);
+            if (owner !== auth.userId) {
+                throw new ForbiddenException(
+                    'Only the billing owner can change the subscription seat quantity',
+                );
+            }
             const seats = await this.seatsService.setSeats(owner, body.seats);
             return { status: 'success', ...seats };
         } catch (error) {
@@ -90,16 +97,16 @@ export class SeatsController {
 /** Stable-named domain errors → HTTP statuses (never an unmapped 500). */
 function mapSeatsError(error: unknown): unknown {
     if (error instanceof BillingProviderNotConfiguredError) {
-        return new ServiceUnavailableException(error.message);
+        return new ServiceUnavailableException((error as Error).message);
     }
     if (error instanceof SeatsBelowUsageError) {
-        return new BadRequestException(error.message);
+        return new BadRequestException((error as Error).message);
     }
     if (error instanceof SeatsNotPurchasableError) {
-        return new ConflictException(error.message);
+        return new ConflictException((error as Error).message);
     }
     if (error instanceof BillingProviderError) {
-        return new ConflictException(error.message);
+        return new ConflictException((error as Error).message);
     }
     return error;
 }

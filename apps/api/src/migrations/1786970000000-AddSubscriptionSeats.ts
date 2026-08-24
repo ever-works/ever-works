@@ -9,9 +9,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * the customer bought, so nothing could enforce them and the Billing page had
  * nothing to show. Two columns fix that:
  *
- *  - `seats`                — total seats the provider subscription bills for
- *                             (plan allowance + extras), reconciled from the
- *                             subscription's items on every `subscription.*`
+ *  - `seats`                — additional seats the provider subscription bills
+ *                             for beyond the plan allowance, reconciled from
+ *                             its per-seat items on every `subscription.*`
  *                             delivery. NULL = unknown/unbounded, which every
  *                             reader treats as "fall back to the plan's
  *                             `seatsIncluded`", never as zero.

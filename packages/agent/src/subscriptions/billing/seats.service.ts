@@ -9,7 +9,7 @@ import { SubscriptionStatus } from '@src/entities/user-subscription.entity';
 import type { SubscriptionPlanCode } from '@src/entities/types';
 import { config } from '@src/config';
 import { BillingProvider, BillingProviderNotConfiguredError } from './billing.provider';
-import { billableSeats, resolveSkuForPlanRow, type CatalogInterval } from './stripe-catalog';
+import { billableSeats, resolveSkuForPlanRow } from './stripe-catalog';
 
 /**
  * A seat-consuming write was refused because the owner's plan has no seat
@@ -209,19 +209,27 @@ export class SeatsService {
             throw new SeatsBelowUsageError(requested, used);
         }
 
-        const sku = resolveSkuForPlanRow({
+        const monthlySku = resolveSkuForPlanRow({
             code: plan.code,
             hosting: plan.hosting,
-            interval: this.intervalOf(subscription),
+            interval: 'monthly',
         });
-        if (!sku?.seatLookupKey) {
+        const annualSku = resolveSkuForPlanRow({
+            code: plan.code,
+            hosting: plan.hosting,
+            interval: 'annual',
+        });
+        if (!monthlySku?.seatLookupKey || !annualSku?.seatLookupKey) {
             throw new SeatsNotPurchasableError('This plan sells no additional seats');
         }
 
-        const extras = billableSeats(sku.plan, requested);
+        const extras = billableSeats(monthlySku.plan, requested);
         const snapshot = await this.billingProvider.updateSeatQuantity({
             subscriptionId: subscription.providerSubscriptionId,
-            seatLookupKey: sku.seatLookupKey,
+            seatLookupKeys: {
+                monthly: monthlySku.seatLookupKey,
+                annual: annualSku.seatLookupKey,
+            },
             seatItemId: subscription.providerSeatItemId ?? null,
             quantity: extras,
         });
@@ -265,24 +273,6 @@ export class SeatsService {
         if (!plan?.seatMonthlyPrice) return null;
         const dollars = Number(plan.seatMonthlyPrice);
         return Number.isFinite(dollars) ? Math.round(dollars * 100) : null;
-    }
-
-    /**
-     * Which catalog interval this subscription is on. The row does not store
-     * it, so it is inferred from the period length: anything longer than ~6
-     * weeks is an annual term. Only used to pick the matching per-seat price,
-     * and both intervals price a seat the same per month, so a wrong guess
-     * cannot mis-bill — it would only fail to resolve a key.
-     */
-    private intervalOf(subscription: {
-        createdAt?: Date | null;
-        currentPeriodEnd?: Date | null;
-    }): CatalogInterval {
-        const start = subscription.createdAt?.getTime();
-        const end = subscription.currentPeriodEnd?.getTime();
-        if (!start || !end || end <= start) return 'monthly';
-        const days = (end - start) / (24 * 60 * 60 * 1000);
-        return days > 45 ? 'annual' : 'monthly';
     }
 }
 

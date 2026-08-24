@@ -47,6 +47,7 @@ jest.mock('../auth', () => ({
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     ServiceUnavailableException,
 } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
@@ -91,11 +92,22 @@ describe('SeatsController', () => {
         expect(result).toMatchObject({ status: 'success', allowance: 15, used: 5 });
     });
 
-    it('POST sets the TOTAL for the resolved owner', async () => {
+    it('POST refuses a tenant member who resolves to a different billing owner', async () => {
         const service = makeService();
         const controller = new SeatsController(service);
 
-        await controller.setSeats(auth, { seats: 20 });
+        await expect(controller.setSeats(auth, { seats: 20 })).rejects.toBeInstanceOf(
+            ForbiddenException,
+        );
+
+        expect(service.setSeats).not.toHaveBeenCalled();
+    });
+
+    it('POST sets the TOTAL for the authenticated billing owner', async () => {
+        const service = makeService();
+        const controller = new SeatsController(service);
+
+        await controller.setSeats({ userId: 'owner-1' } as AuthenticatedUser, { seats: 20 });
 
         expect(service.setSeats).toHaveBeenCalledWith('owner-1', 20);
     });
@@ -110,9 +122,9 @@ describe('SeatsController', () => {
         for (const [error, expected] of cases) {
             const service = makeService({ setSeats: jest.fn().mockRejectedValue(error) });
             const controller = new SeatsController(service);
-            await expect(controller.setSeats(auth, { seats: 12 })).rejects.toBeInstanceOf(
-                expected as any,
-            );
+            await expect(
+                controller.setSeats({ userId: 'owner-1' } as AuthenticatedUser, { seats: 12 }),
+            ).rejects.toBeInstanceOf(expected as any);
         }
     });
 

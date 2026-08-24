@@ -282,7 +282,10 @@ describe('SeatsService.setSeats', () => {
         // 15 wanted − 10 included = 5 extras. The client's number never reaches the provider raw.
         expect(h.billingProvider.updateSeatQuantity).toHaveBeenCalledWith({
             subscriptionId: 'sub_stripe',
-            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatLookupKeys: {
+                monthly: 'ever_works_cloud_pro_seat_monthly',
+                annual: 'ever_works_cloud_pro_seat_annual',
+            },
             seatItemId: null,
             quantity: 5,
         });
