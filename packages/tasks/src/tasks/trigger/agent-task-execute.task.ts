@@ -391,6 +391,13 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 // (`TaskTransitionService.dispatchAgentRun`, the drain, or
                 // assign-task); re-admitting here could only refuse work
                 // already in flight and strand it with no run row.
+                // A non-null field means the Task carries an explicit
+                // ownership stamp. Select that stamp as one unit: null
+                // organizationId is meaningful personal scope and must not
+                // be filled from an Organization-scoped Agent. Legacy Tasks
+                // with both columns null inherit the persisted Agent stamp.
+                const runOwnership =
+                    taskRow.tenantId != null || taskRow.organizationId != null ? taskRow : agent;
                 run = await runs.createQueued({
                     agentId: agent.id,
                     userId: agent.userId,
@@ -399,6 +406,11 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     // Wave 4 M1 — workId denorm at creation (owner-scoped
                     // taskRow resolved above).
                     workId: taskRow.workId ?? null,
+                    // Trigger workers have no request ALS. Prefer the
+                    // authoritative persisted Task stamp and fall back to the
+                    // persisted Agent stamp only for legacy unstamped Tasks.
+                    tenantId: runOwnership.tenantId ?? null,
+                    organizationId: runOwnership.organizationId ?? null,
                 });
                 // Kanban run cockpit — on-the-fly creation (dispatcher row was
                 // never found), mirror it exactly like the fan-out path does.

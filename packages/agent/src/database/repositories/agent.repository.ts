@@ -83,16 +83,19 @@ export class AgentRepository {
     }
 
     /**
-     * Uniqueness check used by `AgentService.create`. Honors scope —
-     * a tenant-scoped CEO and a Mission-scoped CEO are distinct rows
-     * (matches `uq_agents_user_scope_slug`).
+     * Uniqueness check used by `AgentService.create`. This intentionally
+     * follows the durable database key, which is global to the user + Agent
+     * scope and does not include Tenant/Organization columns. Catalog and
+     * id lookups remain ownership-scoped; this probe may only drive a generic
+     * conflict/rename decision and must never expose or mutate the found row
+     * without a separate scoped lookup.
      */
     async findByUserIdAndSlug(
         userId: string,
         scope: AgentScope,
         slug: string,
         opts: { missionId?: string | null; ideaId?: string | null; workId?: string | null } = {},
-        ownershipScope?: OwnershipScope,
+        _ownershipScope?: OwnershipScope,
     ): Promise<Agent | null> {
         const common: FindOptionsWhere<Agent> = {
             scope,
@@ -101,14 +104,7 @@ export class AgentRepository {
             ideaId: opts.ideaId ?? IsNull(),
             workId: opts.workId ?? IsNull(),
         };
-        return this.repository.findOne({
-            where: ownershipScope
-                ? ownershipWhere<Agent>(userId, ownershipScope).map((branch) => ({
-                      ...branch,
-                      ...common,
-                  }))
-                : { userId, ...common },
-        });
+        return this.repository.findOne({ where: { userId, ...common } });
     }
 
     async findByUserIdScoped(
