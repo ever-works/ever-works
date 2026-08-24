@@ -2,7 +2,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import git from 'isomorphic-git';
-import * as http from 'isomorphic-git/http/node';
+import { Agent as HttpAgent } from 'node:http';
+import { Agent as HttpsAgent } from 'node:https';
+import * as nodeHttp from 'isomorphic-git/http/node';
 import type {
 	IGitOperations,
 	GitAuth,
@@ -13,6 +15,39 @@ import type {
 	GitFileChange,
 	GitFileStatus
 } from '../contracts/capabilities/git-provider.interface.js';
+
+/**
+ * Node >= 19 ships `http(s).globalAgent` with `timeout: 5000` - a SOCKET-IDLE deadline, not a
+ * total-request budget. `isomorphic-git/http/node` never passes an `agent`, so every git-over-HTTP
+ * request inherits it and `simple-get` rejects with the literal string `Request timed out` after ~5s.
+ *
+ * That string matches none of the entries in the push retry list below, so the whole operation fails
+ * on the first attempt. Worse, the abort is CLIENT-side: on 2026-08-23 a generation pushed 8 files that
+ * GitHub accepted (commits 4100128f + d006ac78) and then failed 9s later recording 0 items, leaving the
+ * data repo and the platform database silently divergent.
+ *
+ * isomorphic-git is pure JavaScript (inflate / SHA-1 / packfile indexing run on the main thread), so a
+ * busy event loop or a receive-pack that thinks for >5s trips the timer. Supplying our own agent with a
+ * realistic ceiling removes the trap. Keep this FINITE - 0 would let a genuinely dead socket hang.
+ */
+const GIT_HTTP_TIMEOUT_MS = Number(process.env.GIT_HTTP_TIMEOUT_MS ?? 300_000);
+
+const gitHttpAgent = new HttpAgent({ keepAlive: true, timeout: GIT_HTTP_TIMEOUT_MS });
+const gitHttpsAgent = new HttpsAgent({ keepAlive: true, timeout: GIT_HTTP_TIMEOUT_MS });
+
+/**
+ * Drop-in replacement for the raw `isomorphic-git/http/node` client that injects the agents above.
+ * Exported so tests can exercise it directly against a deliberately slow server.
+ */
+export const http = {
+	request: (request: Parameters<typeof nodeHttp.request>[0]) =>
+		nodeHttp.request({
+			...request,
+			agent:
+				(request as { agent?: unknown }).agent ??
+				(String(request.url).startsWith('https:') ? gitHttpsAgent : gitHttpAgent)
+		} as Parameters<typeof nodeHttp.request>[0])
+};
 
 const DEFAULT_BRANCHES = ['main', 'master'] as const;
 
@@ -186,7 +221,10 @@ export class GitOperations implements IGitOperations {
 					errorMessage.includes('cannot lock ref') ||
 					errorMessage.includes('failed to lock') ||
 					errorMessage.includes('ETIMEDOUT') ||
-					errorMessage.includes('ECONNRESET');
+					errorMessage.includes('ECONNRESET') ||
+					// Defence in depth for the agent-timeout trap documented above: simple-get rejects with the
+					// lower-case literal 'Request timed out', which none of the codes above match.
+					errorMessage.toLowerCase().includes('timed out');
 
 				if (!isRetryable || attempt === maxRetries) {
 					throw error;
