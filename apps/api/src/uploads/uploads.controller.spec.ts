@@ -27,7 +27,13 @@ jest.mock('@ever-works/agent/database', () => ({
     },
 }));
 
-import { BadRequestException, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    HttpStatus,
+    Logger,
+    NotFoundException,
+    NotImplementedException,
+} from '@nestjs/common';
 import { SELF_DECLARED_DEPS_METADATA } from '@nestjs/common/constants';
 import { promises as fs } from 'node:fs';
 import { resolve } from 'node:path';
@@ -181,6 +187,7 @@ describe('UploadsController', () => {
             organization?: object | null;
             member?: object | null;
             tenant?: object | null;
+            apiKey?: boolean;
         }) {
             const uploads = {
                 saveImage: jest.fn().mockResolvedValue(fileResult),
@@ -253,6 +260,13 @@ describe('UploadsController', () => {
                             : options.tenant,
                     ),
             };
+            const apiKeys = {
+                validateKey: jest
+                    .fn()
+                    .mockResolvedValue(
+                        options.apiKey ? { id: 'key-1', userId: bearerUserId } : null,
+                    ),
+            };
             const scopedController = new (UploadsController as any)(
                 uploads,
                 anonymousAuth,
@@ -264,10 +278,14 @@ describe('UploadsController', () => {
                 organizations,
                 members,
                 tenants,
+                apiKeys,
             ) as UploadsController;
             const req = {
-                headers:
-                    options.bearer || options.authRejects ? { authorization: 'Bearer token' } : {},
+                headers: options.apiKey
+                    ? { 'x-api-key': 'ew_live_test-key' }
+                    : options.bearer || options.authRejects
+                      ? { authorization: 'Bearer token' }
+                      : {},
             } as never;
             return {
                 controller: scopedController,
@@ -279,6 +297,7 @@ describe('UploadsController', () => {
                 organizations,
                 members,
                 tenants,
+                apiKeys,
                 req,
             };
         }
@@ -355,6 +374,18 @@ describe('UploadsController', () => {
                 bearerUserId,
             );
             expect(ctx.uploads.getBackend).toHaveBeenCalledTimes(1);
+        });
+
+        it('honors an x-api-key caller instead of minting an anonymous upload owner', async () => {
+            const ctx = publicController({ activeScope: everScope, apiKey: true });
+
+            await ctx.controller.uploadAnonymous(mkFile({}), ctx.req, undefined);
+
+            expect(ctx.apiKeys.validateKey).toHaveBeenCalledWith('ew_live_test-key');
+            expect(ctx.anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
+            expect(ctx.uploads.saveImage).toHaveBeenCalledWith(bearerUserId, expect.anything(), {
+                ownershipScope: everScope,
+            });
         });
 
         it('resolves a headerless bearer to bare personal scope and never reads the persisted Organization pointer', async () => {
@@ -516,6 +547,20 @@ describe('UploadsController', () => {
             });
             expect(ctx.anonymousAuth.createAnonymousUser).toHaveBeenCalledTimes(1);
             expect(ctx.uploads.getBackend).toHaveBeenCalledTimes(1);
+        });
+
+        it('returns 501 for an unsupported backend without minting an anonymous user', async () => {
+            const ctx = publicController({ activeScope: everScope });
+            ctx.uploads.getBackend.mockResolvedValue({});
+
+            await expect(
+                ctx.controller.presign(
+                    { filename: 'direct.png', mimeType: 'image/png', size: 100 },
+                    ctx.req,
+                ),
+            ).rejects.toBeInstanceOf(NotImplementedException);
+
+            expect(ctx.anonymousAuth.createAnonymousUser).not.toHaveBeenCalled();
         });
 
         it('derives an explicit personal scope for a valid bearer', async () => {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { UserUpload } from '../../entities/user-upload.entity';
 import { ownershipWhereWith, type OwnershipScope } from '../ownership-scope';
 
@@ -57,10 +57,11 @@ export class UserUploadRepository {
             where:
                 userId === null
                     ? {
-                          userId: null,
+                          userId: IsNull(),
                           sha256: normalizedInput.sha256,
-                          tenantId: scope.tenantId,
-                          organizationId: scope.organizationId,
+                          tenantId: scope.tenantId === null ? IsNull() : scope.tenantId,
+                          organizationId:
+                              scope.organizationId === null ? IsNull() : scope.organizationId,
                       }
                     : ownershipWhereWith<UserUpload>(userId, scope, {
                           sha256: normalizedInput.sha256,
