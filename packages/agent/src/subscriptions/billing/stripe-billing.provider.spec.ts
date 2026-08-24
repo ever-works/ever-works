@@ -1611,7 +1611,24 @@ describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
         expect(snapshot.planCode).toBeNull();
     });
 
-    it('never echoes the provider message when a session cannot be read', async () => {
+    it('classifies Stripe resource_missing without echoing the requested session id', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest.fn().mockRejectedValue({
+            type: 'StripeInvalidRequestError',
+            code: 'resource_missing',
+            statusCode: 404,
+            message: 'No such checkout.session: cs_secret; req_123',
+        });
+        const { provider } = build(client);
+
+        await expect(provider.retrieveCheckoutSession('cs_missing')).rejects.toMatchObject({
+            name: 'BillingProviderError',
+            message: 'Checkout session not found',
+            code: 'checkout-session-not-found',
+        });
+    });
+
+    it('never echoes the provider message when a non-missing session read fails', async () => {
         const client = fakeClient();
         client.checkout.sessions.retrieve = jest
             .fn()

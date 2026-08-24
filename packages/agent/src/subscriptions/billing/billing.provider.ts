@@ -39,6 +39,10 @@ export class BillingProviderNotConfiguredError extends Error {
     }
 }
 
+export const BILLING_PROVIDER_ERROR_CODES = {
+    CHECKOUT_SESSION_NOT_FOUND: 'checkout-session-not-found',
+} as const;
+
 /** A provider call failed for a reason the caller may surface as 4xx. */
 export class BillingProviderError extends Error {
     constructor(

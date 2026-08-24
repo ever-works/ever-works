@@ -8,6 +8,7 @@ import Stripe from 'stripe';
 import { config } from '@src/config';
 import type { BillingSubscriptionStatus } from '@src/entities/billing-profile.entity';
 import {
+    BILLING_PROVIDER_ERROR_CODES,
     BillingProvider,
     BillingProviderError,
     BillingProviderNotConfiguredError,
@@ -513,8 +514,14 @@ export class StripeBillingProvider extends BillingProvider {
             session = await stripe.checkout.sessions.retrieve(sessionId, {
                 expand: ['subscription'],
             });
-        } catch {
+        } catch (error) {
             // Never echo the provider message — it can quote request params.
+            if (isStripeResourceMissing(error)) {
+                throw new BillingProviderError(
+                    'Checkout session not found',
+                    BILLING_PROVIDER_ERROR_CODES.CHECKOUT_SESSION_NOT_FOUND,
+                );
+            }
             throw new BillingProviderError('Checkout session could not be read');
         }
 
@@ -1341,6 +1348,22 @@ function defaultStripeClient(secretKey: string): Stripe {
 
 function nonEmpty(value: string | undefined | null): boolean {
     return typeof value === 'string' && value.trim().length > 0;
+}
+
+/** Stripe's stable missing-resource shape; no provider message or requested id escapes. */
+function isStripeResourceMissing(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const candidate = error as {
+        code?: unknown;
+        statusCode?: unknown;
+        raw?: { code?: unknown; statusCode?: unknown };
+    };
+    return (
+        candidate.code === 'resource_missing' ||
+        candidate.raw?.code === 'resource_missing' ||
+        candidate.statusCode === 404 ||
+        candidate.raw?.statusCode === 404
+    );
 }
 
 /** Stripe expandable fields are `string | Object | null`. */

@@ -14,9 +14,12 @@ import {
 import { SubscriptionService } from '../subscription.service';
 import { PlanCreditGrantService } from '../credits/plan-credit-grant.service';
 import {
+    BILLING_PROVIDER_ERROR_CODES,
     BillingProvider,
+    BillingProviderError,
     BillingProviderNotConfiguredError,
     type BillingWebhookEvent,
+    type CheckoutSessionSnapshot,
 } from './billing.provider';
 import {
     billableSeats,
@@ -388,7 +391,18 @@ export class PlanSubscriptionService {
             throw new BillingProviderNotConfiguredError();
         }
 
-        const snapshot = await this.billingProvider.retrieveCheckoutSession(sessionId);
+        let snapshot: CheckoutSessionSnapshot;
+        try {
+            snapshot = await this.billingProvider.retrieveCheckoutSession(sessionId);
+        } catch (error) {
+            if (
+                error instanceof BillingProviderError &&
+                error.code === BILLING_PROVIDER_ERROR_CODES.CHECKOUT_SESSION_NOT_FOUND
+            ) {
+                throw new CheckoutSessionNotFoundError();
+            }
+            throw error;
+        }
         if (!snapshot.userId || snapshot.userId !== userId) {
             throw new CheckoutSessionNotFoundError();
         }
