@@ -771,6 +771,11 @@ describe('StripeBillingProvider — event normalization', () => {
             // start + first item (this fixture sets no period start).
             currentPeriodStart: null,
             subscriptionItemId: 'si_1',
+            // Billing spec §3.6 — seats read off the items. This fixture's
+            // item carries no per-seat price, so there are no extras and no
+            // seat item: `null`, deliberately NOT 0 (see subscriptionSeatInfo).
+            seats: null,
+            seatItemId: null,
         });
     });
 
@@ -879,6 +884,8 @@ describe('StripeBillingProvider — subscription mutations + portal (B07/B08)', 
             canceledAt: null,
             currentPeriodStart: null,
             subscriptionItemId: null,
+            seats: null,
+            seatItemId: null,
         });
     });
 
@@ -1843,6 +1850,9 @@ describe('StripeBillingProvider — pay-as-you-go (billing spec §3.5)', () => {
             canceledAt: null,
             currentPeriodStart: new Date(1_787_000_000 * 1000),
             subscriptionItemId: 'si_payg',
+            // The usage subscription has one metered item and no seat item.
+            seats: null,
+            seatItemId: null,
         });
     });
 
@@ -2085,5 +2095,125 @@ describe('StripeBillingProvider — pay-as-you-go (billing spec §3.5)', () => {
                 expect.objectContaining({ subscriptionId: null, subscriptionKind: null }),
             );
         });
+    });
+});
+
+describe('StripeBillingProvider — seats (billing spec §3.6)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    });
+
+    const withSeatPrice = (seatItem: Record<string, unknown> | null) => {
+        const subscription = {
+            id: 'sub_plan',
+            customer: 'cus_1',
+            status: 'active',
+            cancel_at_period_end: false,
+            canceled_at: null,
+            items: {
+                data: [
+                    { id: 'si_plan', price: { lookup_key: 'ever_works_cloud_pro_monthly' } },
+                    ...(seatItem ? [seatItem] : []),
+                ],
+            },
+        };
+        const client = fakeClient({
+            prices: { list: jest.fn().mockResolvedValue({ data: [{ id: 'price_seat' }] }) },
+            subscriptions: { retrieve: jest.fn().mockResolvedValue(subscription) },
+            subscriptionItems: {
+                create: jest.fn().mockResolvedValue({ id: 'si_seat' }),
+                update: jest.fn().mockResolvedValue({ id: 'si_seat' }),
+                del: jest.fn().mockResolvedValue({ id: 'si_seat', deleted: true }),
+            },
+        });
+        return build(client);
+    };
+
+    const seatItem = (quantity: number) => ({
+        id: 'si_seat',
+        quantity,
+        price: { lookup_key: 'ever_works_cloud_pro_seat_monthly' },
+    });
+
+    it('reads seats off the item whose price lookup_key carries the _seat_ infix', async () => {
+        const { provider } = withSeatPrice(seatItem(4));
+        const snapshot = await provider.retrieveSubscriptionSnapshot('sub_plan');
+        expect(snapshot.seats).toBe(4);
+        expect(snapshot.seatItemId).toBe('si_seat');
+    });
+
+    it('reports NO seat item as null, not 0 — 0 would read as "no seats allowed"', async () => {
+        const { provider } = withSeatPrice(null);
+        const snapshot = await provider.retrieveSubscriptionSnapshot('sub_plan');
+        expect(snapshot.seats).toBeNull();
+        expect(snapshot.seatItemId).toBeNull();
+    });
+
+    it('updates an existing seat item, and DELETES it at quantity 0', async () => {
+        const withItem = withSeatPrice(seatItem(4));
+        await withItem.provider.updateSeatQuantity({
+            subscriptionId: 'sub_plan',
+            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatItemId: 'si_seat',
+            quantity: 7,
+        });
+        expect(withItem.client.subscriptionItems.update).toHaveBeenCalledWith('si_seat', {
+            quantity: 7,
+        });
+
+        const removing = withSeatPrice(seatItem(4));
+        await removing.provider.updateSeatQuantity({
+            subscriptionId: 'sub_plan',
+            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatItemId: 'si_seat',
+            quantity: 0,
+        });
+        expect(removing.client.subscriptionItems.del).toHaveBeenCalledWith('si_seat');
+    });
+
+    it('creates the seat item from the CATALOG price when there is none yet', async () => {
+        const { provider, client } = withSeatPrice(null);
+        await provider.updateSeatQuantity({
+            subscriptionId: 'sub_plan',
+            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatItemId: null,
+            quantity: 3,
+        });
+        expect(client.prices.list).toHaveBeenCalledWith({
+            lookup_keys: ['ever_works_cloud_pro_seat_monthly'],
+            active: true,
+            limit: 1,
+        });
+        expect(client.subscriptionItems.create).toHaveBeenCalledWith({
+            subscription: 'sub_plan',
+            price: 'price_seat',
+            quantity: 3,
+        });
+    });
+
+    it('refuses rather than inventing a seat price the account does not have', async () => {
+        const { provider, client } = withSeatPrice(null);
+        client.prices.list.mockResolvedValue({ data: [] });
+        await expect(
+            provider.updateSeatQuantity({
+                subscriptionId: 'sub_plan',
+                seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+                seatItemId: null,
+                quantity: 3,
+            }),
+        ).rejects.toMatchObject({ name: 'BillingProviderError', code: 'seat-price-missing' });
+        expect(client.subscriptionItems.create).not.toHaveBeenCalled();
+    });
+
+    it('adding nothing when there is no seat item is a no-op, not a create', async () => {
+        const { provider, client } = withSeatPrice(null);
+        await provider.updateSeatQuantity({
+            subscriptionId: 'sub_plan',
+            seatLookupKey: 'ever_works_cloud_pro_seat_monthly',
+            seatItemId: null,
+            quantity: 0,
+        });
+        expect(client.subscriptionItems.create).not.toHaveBeenCalled();
+        expect(client.prices.list).not.toHaveBeenCalled();
     });
 });

@@ -1,4 +1,11 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import {
+    BadRequestException,
+    ForbiddenException,
+    Inject,
+    Injectable,
+    Logger,
+    Optional,
+} from '@nestjs/common';
 import {
     OrganizationInvitationService,
     type IssuedOrganizationInvitation,
@@ -10,6 +17,12 @@ import {
     UserRepository,
 } from '@ever-works/agent/database';
 import type { OrganizationInvitation, OrganizationMember } from '@ever-works/agent/entities';
+// Token + interface only. Importing `SeatsService` itself would pull the whole
+// `@ever-works/agent/subscriptions` barrel — and through it NotificationsModule
+// → AuthModule — into this module's load graph, which crashes the invitation
+// specs at import time (TDZ on `AuthProvider`). `seat-guard` is a zero-import
+// leaf declaring exactly the two methods this path needs.
+import { SEAT_GUARD, type SeatGuard } from '@ever-works/agent/agents';
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
 import { MailService } from '../mail/mail.service';
 import { config } from '../config/constants';
@@ -72,7 +85,33 @@ export class OrganizationInvitationFlowService {
         private readonly tenantBootstrap: TenantBootstrapService,
         private readonly membership: OrganizationMembershipService,
         private readonly mail: MailService,
+        /**
+         * Seats (billing spec §3.6 / FR-28). `@Optional()` so the hand-rolled
+         * unit tests (which never wire billing) keep constructing this
+         * service, and so an install without the billing stack still invites
+         * people. `SeatsService` is itself a no-op when subscriptions are off.
+         */
+        @Optional()
+        @Inject(SEAT_GUARD)
+        private readonly seats?: SeatGuard,
     ) {}
+
+    /**
+     * Refuse a seat-consuming admission BEFORE anything is written (billing
+     * spec FR-28), charged to the Tenant owner rather than the inviter.
+     *
+     * Checked at INVITE time as well as at accept: telling somebody "no seats
+     * left" while they are inviting is far better than mailing a token that
+     * dies on redemption, and the accept-side check is what stops a pre-issued
+     * invitation from smuggling a seat in later.
+     */
+    private async assertSeatForTenant(tenantId: string): Promise<void> {
+        if (!this.seats) return;
+        const tenant = await this.tenants.findById(tenantId).catch(() => null);
+        const owner = tenant?.ownerUserId;
+        if (!owner) return;
+        await this.seats.assertSeatAvailable(owner);
+    }
 
     /**
      * Issue an invitation on behalf of an existing member.
@@ -95,6 +134,8 @@ export class OrganizationInvitationFlowService {
             // so there is nothing coherent to invite someone into.
             throw new BadRequestException('organization_has_no_tenant');
         }
+
+        await this.assertSeatForTenant(organization.tenantId);
 
         const normalized = OrganizationInvitationService.normaliseEmail(email);
 
@@ -198,6 +239,12 @@ export class OrganizationInvitationFlowService {
         if (!organization) {
             throw new BadRequestException('organization_not_found');
         }
+
+        // Seats (billing spec FR-28): an invitation issued while a seat was
+        // free must not smuggle one in after the allowance filled up. Checked
+        // BEFORE the claim so a refusal leaves the token redeemable once the
+        // owner buys a seat, rather than burning it.
+        await this.assertSeatForTenant(invitation.tenantId);
 
         // 🛑 The CLAIM comes first, and it is what authorizes the grant.
         //

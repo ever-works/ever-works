@@ -92,6 +92,21 @@ export class UserSubscriptionRepository {
         return this.repository.save(record);
     }
 
+    /**
+     * Persist the seats the provider subscription bills for (billing spec
+     * FR-26). Written from the provider snapshot on webhooks and after a
+     * seat purchase — never inferred locally.
+     */
+    async updateSeats(
+        id: string,
+        data: { seats: number | null; providerSeatItemId: string | null },
+    ): Promise<void> {
+        await this.repository.update(id, {
+            seats: data.seats,
+            providerSeatItemId: data.providerSeatItemId,
+        });
+    }
+
     async cancel(id: string): Promise<void> {
         await this.repository.update(id, { status: SubscriptionStatus.CANCELED });
     }

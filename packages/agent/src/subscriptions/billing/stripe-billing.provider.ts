@@ -31,6 +31,7 @@ import {
     type PaymentMethodSummary,
     type PlanCheckoutRequest,
     type PlanCheckoutSession,
+    type SeatQuantityRequest,
     type SubscriptionMutationRequest,
 } from './billing.provider';
 
@@ -741,6 +742,50 @@ export class StripeBillingProvider extends BillingProvider {
         return toSubscriptionSnapshot(subscription);
     }
 
+    /**
+     * Set the additional-seat quantity (billing spec FR-29).
+     *
+     * Three cases, and the difference matters: an EXISTING seat item is
+     * updated (or deleted at quantity 0), a MISSING one is created from the
+     * catalog seat price, and a subscription whose account has no synced seat
+     * price is refused rather than silently selling seats for free — the
+     * per-seat amount lives only in the catalog, so there is nothing safe to
+     * fall back to (same rule as `buildPlanLineItems`).
+     */
+    async updateSeatQuantity(request: SeatQuantityRequest): Promise<BillingSubscriptionSnapshot> {
+        const stripe = this.requireClient();
+        const quantity = Math.max(0, Math.floor(request.quantity));
+
+        if (request.seatItemId) {
+            if (quantity === 0) {
+                await stripe.subscriptionItems.del(request.seatItemId);
+            } else {
+                await stripe.subscriptionItems.update(request.seatItemId, { quantity });
+            }
+            return this.retrieveSubscriptionSnapshot(request.subscriptionId);
+        }
+
+        if (quantity === 0) {
+            // Nothing to add and nothing to remove.
+            return this.retrieveSubscriptionSnapshot(request.subscriptionId);
+        }
+
+        const seatPriceId = await this.resolvePriceId(request.seatLookupKey);
+        if (!seatPriceId) {
+            throw new BillingProviderError(
+                `Seat price "${request.seatLookupKey}" is not available in this Stripe account. ` +
+                    'Run scripts/stripe-sync-catalog.mjs to publish the catalog.',
+                'seat-price-missing',
+            );
+        }
+        await stripe.subscriptionItems.create({
+            subscription: request.subscriptionId,
+            price: seatPriceId,
+            quantity,
+        });
+        return this.retrieveSubscriptionSnapshot(request.subscriptionId);
+    }
+
     async retrieveSubscriptionSnapshot(
         subscriptionId: string,
     ): Promise<BillingSubscriptionSnapshot> {
@@ -1379,7 +1424,35 @@ function subscriptionPeriodStart(subscription: Stripe.Subscription): Date | null
     return typeof legacy === 'number' ? toUnixDate(legacy) : null;
 }
 
+/**
+ * Seats the subscription bills for, read off its ITEMS (billing spec FR-26).
+ *
+ * A seat item is identified by its price's `lookup_key` carrying the `_seat_`
+ * infix — the same convention the catalog emits
+ * (`ever_works_<hosting>_<tier>_seat_<interval>`). Reading the key rather
+ * than a hard-coded price id is what keeps this working after a repricing,
+ * which moves the key onto a NEW price.
+ *
+ * `null` when there is no seat item at all: that is "no extras bought", and
+ * the caller resolves the plan's own `seatsIncluded` instead — reporting 0
+ * would read as "no seats allowed" and lock every paying customer out.
+ */
+function subscriptionSeatInfo(subscription: Stripe.Subscription): {
+    extraSeats: number | null;
+    seatItemId: string | null;
+} {
+    const items = subscription.items?.data ?? [];
+    for (const item of items) {
+        const lookupKey = (item.price as Stripe.Price | undefined)?.lookup_key ?? null;
+        if (typeof lookupKey === 'string' && lookupKey.includes('_seat_')) {
+            return { extraSeats: item.quantity ?? 0, seatItemId: item.id };
+        }
+    }
+    return { extraSeats: null, seatItemId: null };
+}
+
 function toSubscriptionSnapshot(subscription: Stripe.Subscription): BillingSubscriptionSnapshot {
+    const seatInfo = subscriptionSeatInfo(subscription);
     return {
         subscriptionId: subscription.id,
         status: SUBSCRIPTION_STATUS_MAP[subscription.status] ?? 'none',
@@ -1388,6 +1461,10 @@ function toSubscriptionSnapshot(subscription: Stripe.Subscription): BillingSubsc
         canceledAt: toUnixDate(subscription.canceled_at),
         currentPeriodStart: subscriptionPeriodStart(subscription),
         subscriptionItemId: subscription.items?.data?.[0]?.id ?? null,
+        // EXTRA seats only — the plan's included allowance is ours, not the
+        // provider's, so the total is composed by `SeatsService`.
+        seats: seatInfo.extraSeats,
+        seatItemId: seatInfo.seatItemId,
     };
 }
 

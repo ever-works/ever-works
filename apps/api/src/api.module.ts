@@ -2,6 +2,7 @@ import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { FacadeExceptionFilter } from './common/filters/facade-exception.filter';
 import { InsufficientCreditsExceptionFilter } from './common/filters/insufficient-credits.filter';
+import { SeatLimitExceptionFilter } from './common/filters/seat-limit.filter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
@@ -361,6 +362,15 @@ import { DatabaseModule } from '@ever-works/agent/database';
         {
             provide: APP_FILTER,
             useClass: InsufficientCreditsExceptionFilter,
+        },
+        // Same treatment for a full seat allowance (`SeatLimitExceededError`,
+        // thrown by SeatsService when inviting a member or creating an agent
+        // would exceed included + purchased seats): 402, not a 500, because
+        // the caller resolves it by buying a seat or freeing one. See
+        // seat-limit.filter.ts (billing spec §3.6).
+        {
+            provide: APP_FILTER,
+            useClass: SeatLimitExceptionFilter,
         },
     ],
     controllers: [APIController],

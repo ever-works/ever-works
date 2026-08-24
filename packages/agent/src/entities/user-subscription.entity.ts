@@ -68,6 +68,30 @@ export class UserSubscription {
     @Column({ type: 'varchar', length: 128, nullable: true })
     providerSubscriptionId?: string | null;
 
+    /**
+     * Total seats the provider subscription is billed for — the plan's
+     * included allowance PLUS any additional seats bought (billing spec
+     * §3.6 / FR-26). Reconciled from the subscription's items on every
+     * `subscription.*` delivery, so it is the provider's truth rather than
+     * a local guess.
+     *
+     * NULL means "unknown / not applicable": a manually-granted row, a
+     * plan with unbounded seats, or a subscription created before this
+     * column existed. Readers treat NULL as "fall back to the plan's
+     * `seatsIncluded`", never as zero.
+     */
+    @Column({ type: 'int', nullable: true })
+    seats?: number | null;
+
+    /**
+     * The provider subscription ITEM carrying the per-additional-seat
+     * price, when any. NULL until the first extra seat is bought — that is
+     * what tells the seat-quantity update whether to create the item or
+     * update it.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    providerSeatItemId?: string | null;
+
     @TimestampColumn()
     currentPeriodEnd?: Date | null;
 
