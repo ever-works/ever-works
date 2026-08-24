@@ -263,7 +263,12 @@ export class AgentEscalationRepository {
             .andWhere('userId = :userId', { userId })
             .andWhere('taskId = :taskId', { taskId })
             .andWhere('status = :open', { open: 'open' });
-        if (ownership) query.andWhere(ownership.clause, ownership.parameters);
+        if (ownership) {
+            const clause = scope.organizationId
+                ? `(${ownership.clause} OR (tenantId IS NULL AND organizationId IS NULL))`
+                : ownership.clause;
+            query.andWhere(clause, ownership.parameters);
+        }
         const result = await query.execute();
         return (result.affected ?? 0) > 0;
     }
