@@ -62,11 +62,7 @@ describe('canonical Organization workspace proxy', () => {
         expect(intlMock).not.toHaveBeenCalled();
     });
 
-    // Was: asserted the rewrite was re-pointed at the request authority. That
-    // absolutising is the defect that took production down twice (500, then
-    // ERR_TOO_MANY_REDIRECTS); the intent — the rewrite must stay INTERNAL — is
-    // now satisfied by emitting a path, which Next cannot treat as external.
-    it('keeps next-intl rewrites internal when the runtime request host differs', async () => {
+    it('leaves next-intl rewrite normalization to the Next runtime', async () => {
         intlMock.mockResolvedValueOnce(
             new Response(null, {
                 status: 200,
@@ -87,13 +83,12 @@ describe('canonical Organization workspace proxy', () => {
 
         const response = await proxy(runtimeRequest);
 
-        expect(response.headers.get('x-middleware-rewrite')).toBe('/en/missions?status=active');
+        expect(response.headers.get('x-middleware-rewrite')).toBe(
+            'http://localhost:3000/en/missions?status=active',
+        );
     });
 
-    // Was: asserted the runtime origin (http://$HOSTNAME:$PORT). Measured on the
-    // running prod pod, that origin STILL lost Next's internal comparison and
-    // produced a 307 loop (#2227). A path wins it unconditionally.
-    it('keeps a reverse-proxy locale rewrite internal', async () => {
+    it('does not replace a reverse-proxy locale rewrite authority', async () => {
         vi.stubEnv('HOSTNAME', 'ever-works-web-pod');
         vi.stubEnv('PORT', '3000');
         intlMock.mockResolvedValueOnce(
@@ -112,7 +107,7 @@ describe('canonical Organization workspace proxy', () => {
 
         const response = await proxy(ingressRequest);
 
-        expect(response.headers.get('x-middleware-rewrite')).toBe('/en/login');
+        expect(response.headers.get('x-middleware-rewrite')).toBe('http://localhost:3000/en/login');
     });
 
     it('does not align an internal rewrite to a non-allowlisted Host header', async () => {
@@ -128,10 +123,9 @@ describe('canonical Organization workspace proxy', () => {
 
         const response = await proxy(hostileRequest);
 
-        // Security intent unchanged and strengthened: a hostile Host header must
-        // not steer the rewrite. It no longer CAN — the emitted value carries no
-        // authority at all.
-        expect(response.headers.get('x-middleware-rewrite')).toBe('/en/login');
+        // A hostile Host header cannot steer the rewrite because application
+        // code no longer reconstructs its authority.
+        expect(response.headers.get('x-middleware-rewrite')).toBe('http://localhost:3000/en/login');
     });
 
     it('ignores an untrusted forwarded authority and falls back to the allowlisted Host', async () => {
@@ -151,9 +145,9 @@ describe('canonical Organization workspace proxy', () => {
 
         const response = await proxy(requestWithHostFallback);
 
-        // Same intent: an untrusted forwarded authority must not steer the
-        // rewrite. It cannot — the emitted value is a path with no authority.
-        expect(response.headers.get('x-middleware-rewrite')).toBe('/en/login');
+        // Application code must not use an untrusted forwarded authority to
+        // reconstruct framework-owned rewrite metadata.
+        expect(response.headers.get('x-middleware-rewrite')).toBe('http://localhost:3000/en/login');
     });
 
     it.each(['/settings/dashboard', '/org/dashboard'])(
