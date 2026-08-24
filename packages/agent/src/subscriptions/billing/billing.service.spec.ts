@@ -1185,15 +1185,13 @@ describe('BillingService — pay-as-you-go wiring (billing spec §3.5)', () => {
         const plans = { applyWebhook: jest.fn() } as any;
         const payg = makePayg();
         const provider = makeProvider({
-            verifyAndParseWebhook: jest
-                .fn()
-                .mockResolvedValue(
-                    event({
-                        kind: 'payg.updated',
-                        customerId: 'cus_1',
-                        subscriptionId: 'sub_payg',
-                    }),
-                ),
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'payg.updated',
+                    customerId: 'cus_1',
+                    subscriptionId: 'sub_payg',
+                }),
+            ),
         });
         const { service } = build({ provider, plans, payg });
 
@@ -1206,15 +1204,13 @@ describe('BillingService — pay-as-you-go wiring (billing spec §3.5)', () => {
 
     it('acknowledges payg.updated as ignored when PAYG is not wired (never a 500 → provider retry storm)', async () => {
         const provider = makeProvider({
-            verifyAndParseWebhook: jest
-                .fn()
-                .mockResolvedValue(
-                    event({
-                        kind: 'payg.updated',
-                        customerId: 'cus_1',
-                        subscriptionId: 'sub_payg',
-                    }),
-                ),
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'payg.updated',
+                    customerId: 'cus_1',
+                    subscriptionId: 'sub_payg',
+                }),
+            ),
         });
         const { service } = build({ provider });
         await expect(service.handleWebhook('{}', 'sig')).resolves.toMatchObject({
@@ -1245,15 +1241,13 @@ describe('BillingService — pay-as-you-go wiring (billing spec §3.5)', () => {
         });
 
         const paygProvider = makeProvider({
-            verifyAndParseWebhook: jest
-                .fn()
-                .mockResolvedValue(
-                    event({
-                        kind: 'invoice.updated',
-                        customerId: 'cus_1',
-                        invoice: invoiceSnapshot('payg'),
-                    }),
-                ),
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'invoice.updated',
+                    customerId: 'cus_1',
+                    invoice: invoiceSnapshot('payg'),
+                }),
+            ),
         });
         const a = build({ provider: paygProvider, profiles, payg });
         await expect(a.service.handleWebhook('{}', 'sig')).resolves.toMatchObject({
@@ -1266,15 +1260,13 @@ describe('BillingService — pay-as-you-go wiring (billing spec §3.5)', () => {
 
         payg.applyInvoice.mockClear();
         const planProvider = makeProvider({
-            verifyAndParseWebhook: jest
-                .fn()
-                .mockResolvedValue(
-                    event({
-                        kind: 'invoice.updated',
-                        customerId: 'cus_1',
-                        invoice: invoiceSnapshot('plan'),
-                    }),
-                ),
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'invoice.updated',
+                    customerId: 'cus_1',
+                    invoice: invoiceSnapshot('plan'),
+                }),
+            ),
         });
         const b = build({ provider: planProvider, profiles, payg });
         await b.service.handleWebhook('{}', 'sig');

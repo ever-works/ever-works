@@ -1744,6 +1744,9 @@ describe('Stripe Tax — every session that CHARGES asks for tax', () => {
         const params = client.checkout.sessions.create.mock.calls[0][0];
         expect(params.mode).toBe('setup');
         expect(Boolean(params.currency) || Boolean(params.payment_method_types?.length)).toBe(true);
+    });
+});
+
 describe('StripeBillingProvider — pay-as-you-go (billing spec §3.5)', () => {
     beforeEach(() => {
         process.env.STRIPE_SECRET_KEY = 'sk_test_x';
@@ -1821,6 +1824,8 @@ describe('StripeBillingProvider — pay-as-you-go (billing spec §3.5)', () => {
                 collection_method: 'charge_automatically',
                 default_payment_method: 'pm_1',
                 billing_thresholds: { amount_gte: 5000, reset_billing_cycle_anchor: false },
+                // Stripe Tax, same posture as every charging Checkout session.
+                automatic_tax: { enabled: true },
                 metadata: {
                     [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.paygSubscription,
                     [STRIPE_METADATA_KEYS.userId]: 'u1',

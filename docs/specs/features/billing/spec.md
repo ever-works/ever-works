@@ -22,28 +22,29 @@ Ever Works sells **three things** on one shared Stripe account ("Ever Tech", `ac
 1. **A plan** — Free / Pro / Enterprise (cloud) or Community / Pro / Enterprise Edition (self-hosted). Flat, recurring (monthly/annual) or a one-off perpetual licence on self-hosted Pro.
 2. **Seats** — employees **or** agents, interchangeable. Each paid plan includes 10; additional seats are a per-unit recurring price ($5 Pro / $10 Enterprise per seat per month).
 3. **Credits** — the unit of platform-billed AI usage. **1 credit = 1 cent** of platform-billed usage. Credits come from four places, all landing in one append-only ledger:
-   - the **daily free allowance** (50/day, every plan, non-accumulating),
-   - the **monthly plan allowance** (3,000 Pro / 25,000 Enterprise, expiring at the end of each allowance month),
-   - **prepaid packs** ($10/1,000 · $50/5,500 · $200/25,000, never expire) — bought at checkout or by threshold auto-recharge,
-   - **pay-as-you-go (PAYG)** — when the prepaid balance is exhausted and the owner has opted in, the remainder is **metered to Stripe and invoiced monthly in arrears** at graduated per-credit rates, under a user-set monthly cap.
+    - the **daily free allowance** (50/day, every plan; one grant per user per UTC day),
+    - the **monthly plan allowance** (3,000 Pro / 25,000 Enterprise, expiring at the end of each allowance month),
+    - **prepaid packs** ($10/1,000 · $50/5,500 · $200/25,000, never expire) — bought at checkout or by threshold auto-recharge,
+    - **pay-as-you-go (PAYG)** — when the prepaid balance is exhausted and the owner has opted in, the remainder is **metered to Stripe and invoiced monthly in arrears** at graduated per-credit rates, under a user-set monthly cap.
 
 Runs on the customer's **own model keys** (BYOK/BYOS) spend no credits on any plan.
 
 This spec closes the five gaps found in the 2026-08-23 audit:
 
-| Gap | What was wrong | What this spec does |
-| --- | --- | --- |
-| 1 | Paid subscribers received **zero** credits (no monthly grant writer; daily grant was free-plan-only in code while catalog/marketing said universal) | §3.2 monthly allowance grants + expiry; §3.1 universal daily grant |
-| 2 | `CREDITS_MARGIN_PERCENT=0` → packs sold at or below provider list cost | §3.4 margin becomes a catalog value (35 %) with documented economics |
-| 3 | Seats billed to Stripe but neither persisted nor enforced; ledger per user | §3.6 seats persisted, exposed, enforceable, adjustable; org wallets explicitly deferred (§7) |
-| 4 | Docs drift (pack prices, plan names, removed Stripe APIs), ToS promises in-arrears invoicing the code could not do, PRD missing | this spec + `docs/features/credits-and-billing.md` + `docs/advanced/subscription-billing.md` rewritten; §3.5 makes in-arrears invoicing real |
-| 5 | "Pay-as-you-go from your credits balance" on plan cards while no PAYG existed | §3.5 real PAYG; plan-card wording changed to "Usage is billed from your credits balance" |
+| Gap | What was wrong                                                                                                                                      | What this spec does                                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Paid subscribers received **zero** credits (no monthly grant writer; daily grant was free-plan-only in code while catalog/marketing said universal) | §3.2 monthly allowance grants + expiry; §3.1 universal daily grant                                                                           |
+| 2   | `CREDITS_MARGIN_PERCENT=0` → packs sold at or below provider list cost                                                                              | §3.4 margin becomes a catalog value (35 %) with documented economics                                                                         |
+| 3   | Seats billed to Stripe but neither persisted nor enforced; ledger per user                                                                          | §3.6 seats persisted, exposed, enforceable, adjustable; org wallets explicitly deferred (§7)                                                 |
+| 4   | Docs drift (pack prices, plan names, removed Stripe APIs), ToS promises in-arrears invoicing the code could not do, PRD missing                     | this spec + `docs/features/credits-and-billing.md` + `docs/advanced/subscription-billing.md` rewritten; §3.5 makes in-arrears invoicing real |
+| 5   | "Pay-as-you-go from your credits balance" on plan cards while no PAYG existed                                                                       | §3.5 real PAYG; plan-card wording changed to "Usage is billed from your credits balance"                                                     |
 
 ## 2. User Scenarios
 
 ### 2.1 Credits — allowances
 
-- **Given** I am on any plan, **when** the daily sweep runs (00:05 UTC) or I dispatch my first run of the day, **then** my balance is topped up **to** 50 credits if it is below 50 (never above; a balance ≥ 50 receives nothing).
+- **Given** I am on any plan, **when** the daily sweep runs (00:05 UTC) or I dispatch my first run of the day, **then** I receive that plan's daily allowance (50) exactly once for that UTC day.
+    - The grant carries **no balance ceiling** (decided in #2203): a ceiling had to be measured against the whole ledger sum — purchases included — so it silently denied the advertised daily credits to every paid tier and to any free user who had bought a pack. The `daily:{userId}:{date}` key is the only invariant that matters. Accepted consequence: an idle free account accrues without bound (see §6).
 - **Given** I subscribe to Pro, **when** the checkout completes (webhook or return route), **then** 3,000 credits are granted immediately with an expiry at the end of my first allowance month, and a fresh 3,000 are granted at the start of every following allowance month while the subscription is active.
 - **Given** I have 900 unused allowance credits when the allowance month ends, **when** the sweep runs, **then** a `−900 expiry` row is written and my balance drops by 900; purchased credits are untouched.
 - **Given** I have allowance credits, daily credits and purchased credits, **when** a run is settled, **then** the debit is taken from the **soonest-expiring** credits first (allowance → daily/purchased in creation order), so I never lose purchased credits to expiry while allowance credits sat unused.
@@ -89,7 +90,7 @@ This spec closes the five gaps found in the 2026-08-23 audit:
 ### 3.1 Daily free allowance (universal)
 
 - **FR-1** The daily sweep MUST apply the `daily-free-credits` entitlement to **every** plan code; the platform fallback (`CREDITS_DAILY_FREE`, default 50) applies to any plan without a row. The free/standard/premium rows are seeded at 50.
-- **FR-2** The grant MUST stay non-accumulating: `maxBalanceAfter = level`, idempotency `daily:{userId}:{date}`.
+- **FR-2** The grant MUST be exactly-once per user per UTC day (`daily:{userId}:{date}`) and MUST NOT apply a balance ceiling — a ceiling measured against the ledger sum denies the allowance to anyone holding purchased credits.
 - **FR-3** The dispatch gate MUST lazily grant today's daily allowance before evaluating the balance, so a deployment whose cron has not run today never parks a user who is owed free credits.
 
 ### 3.2 Monthly plan allowance + expiry
@@ -158,6 +159,14 @@ This spec closes the five gaps found in the 2026-08-23 audit:
 
 ## 6. Open questions (owner)
 
+- **Bounding daily-allowance accrual — now possible, deliberately not done here.** The daily grant is
+  unbounded (FR-2), so an idle free account accrues 50/day forever (~$182 of platform AI per year).
+  #2203 correctly noted that "capping accrual needs lot tracking and expiry, not a ceiling — and this
+  repo has no code that can remove a granted credit". §3.2 of this spec **added exactly that** (buckets
+    - `expiry` rows), so the clean fix is now one line: give `daily-free` grants an `expiresAt` (e.g. end
+      of the following UTC day), which bounds accrual at ~2 days of allowance without ever touching
+      purchased credits. It is left OFF because how generous the free tier is, is a product decision, not a
+      refactor — say the word and it is a one-value change plus a spec/doc line.
 - Confirm 35 % margin and the PAYG tier rates (single JSON edit to change).
 - Confirm cap defaults (10,000 default / 100,000 max).
 - Live-mode catalog sync and prod env wiring (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYMENTS_ENABLED`, `SUBSCRIPTIONS_ENABLED`) are operator actions — see the runbook.

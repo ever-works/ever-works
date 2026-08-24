@@ -32,7 +32,7 @@
 - [ ] `BillingService`: overview `payg`, webhook routing (`payg.updated`, PAYG invoices → status)
 - [ ] `RunCostSettlementService`: overflow to PAYG, lazy daily grant in precheck, headroom admission
 - [x] Config: enforcement default-on-when-configured, `PAYG_MAX_MONTHLY_CAP_CREDITS` (Stripe Tax needs no flag — unconditional since #2203)
-- [ ] Trigger task `credits-meter-flush` (*/5) + RPC allow-list
+- [ ] Trigger task `credits-meter-flush` (\*/5) + RPC allow-list
 - [ ] API: `payg.controller.ts` (GET/PUT) + DTO + module wiring + specs
 - [ ] Web: `billing.shared.ts` (types, `canConfigurePayg`, `estimatePaygCents`), server action, `BillingSettings` PAYG card, Usage tile, en.json keys, plan-card label fix
 - [ ] Notifications: `notifyPaygCapThreshold`, `notifyPaygPastDue`
