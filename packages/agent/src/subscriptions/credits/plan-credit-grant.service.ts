@@ -211,14 +211,7 @@ export class PlanCreditGrantService {
             return 'already-granted';
         }
 
-        const alreadyGranted = await this.creditLedgerService.sumByRefTypeInWindow(
-            subscription.userId,
-            PLAN_GRANT_REF_TYPE,
-            period.start,
-            period.end,
-        );
-        const amountCredits = Math.trunc(monthlyCredits) - alreadyGranted;
-        if (amountCredits <= 0) return 'already-granted';
+        const amountCredits = Math.trunc(monthlyCredits);
 
         const entry = await this.creditLedgerService.record({
             userId: subscription.userId,
@@ -233,9 +226,14 @@ export class PlanCreditGrantService {
                 .slice(0, 10)})`,
             idempotencyKey,
             expiresAt: period.end,
+            maxRefTypeAmountInWindow: {
+                from: period.start,
+                to: period.end,
+                maxAmountCredits: amountCredits,
+            },
             now,
         });
-        return entry ? 'granted' : 'not-eligible';
+        return entry ? 'granted' : 'already-granted';
     }
 }
 

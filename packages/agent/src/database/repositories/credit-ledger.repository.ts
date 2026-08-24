@@ -49,6 +49,18 @@ export interface RecordAtomicOptions {
      */
     maxBalanceAfter?: number | null;
     /**
+     * Clamp a positive write so movements with one `refType` inside the
+     * half-open window never exceed this total. The sum is read only after
+     * the per-user lock is held, so differently-keyed plan-change grants
+     * cannot both size themselves from the same stale total.
+     */
+    maxRefTypeAmountInWindow?: {
+        refType: string;
+        from: Date;
+        to: Date;
+        maxAmountCredits: number;
+    } | null;
+    /**
      * Clock for bucket expiry decisions inside the transaction (tests);
      * defaults to `new Date()`.
      */
@@ -124,6 +136,11 @@ export class CreditLedgerRepository {
             return await this.repository.manager.transaction(async (manager) => {
                 const repo = manager.getRepository(CreditLedgerEntry);
 
+                // Lock before ANY consistent read. Besides serializing writes,
+                // this ensures MySQL/MariaDB REPEATABLE READ establishes its
+                // snapshot only after an earlier writer has committed.
+                await this.lockUserRow(manager, write.userId);
+
                 if (write.idempotencyKey) {
                     const existing = await repo.findOne({
                         where: { idempotencyKey: write.idempotencyKey },
@@ -132,8 +149,6 @@ export class CreditLedgerRepository {
                         return { status: 'idempotent' as const, entry: existing };
                     }
                 }
-
-                await this.lockUserRow(manager, write.userId);
 
                 // Expire on touch: any bucket whose expiry has passed is
                 // closed BEFORE the balance is read, so a debit can never
@@ -144,17 +159,30 @@ export class CreditLedgerRepository {
                 const balance = await this.sumBalance(manager, write.userId);
 
                 let amount = write.amountCredits;
+                const refWindowCeiling = options.maxRefTypeAmountInWindow;
+                if (refWindowCeiling) {
+                    const amountInWindow = await this.sumByRefTypeInWindowWithRepository(
+                        repo,
+                        write.userId,
+                        refWindowCeiling.refType,
+                        refWindowCeiling.from,
+                        refWindowCeiling.to,
+                    );
+                    const headroom = refWindowCeiling.maxAmountCredits - amountInWindow;
+                    if (amount > headroom) {
+                        amount = headroom;
+                    }
+                }
                 if (options.maxBalanceAfter !== null && options.maxBalanceAfter !== undefined) {
                     const headroom = options.maxBalanceAfter - balance;
                     if (amount > headroom) {
                         amount = headroom;
                     }
-                    // A positive grant fully clamped away (balance already
-                    // at/above the ceiling) writes nothing — a ceiling must
-                    // never turn a grant into a debit.
-                    if (write.amountCredits > 0 && amount <= 0) {
-                        return { status: 'skipped' as const, balance };
-                    }
+                }
+                // A positive grant fully clamped away writes nothing — a
+                // ceiling must never turn a grant into a debit.
+                if (write.amountCredits > 0 && amount <= 0) {
+                    return { status: 'skipped' as const, balance };
                 }
 
                 const balanceAfter = balance + amount;
@@ -461,7 +489,7 @@ export class CreditLedgerRepository {
     /**
      * Sum of movements of ONE `refType` inside a half-open `[from, to)`
      * window. Used by the monthly plan grant to top UP to the best
-     * allowance the user has held this calendar month, so a mid-cycle
+     * allowance the user has held this allowance period, so a mid-cycle
      * upgrade adds only the difference and a downgrade removes nothing.
      *
      * No unary minus here on purpose - see the long note on
@@ -474,7 +502,17 @@ export class CreditLedgerRepository {
         from: Date,
         to: Date,
     ): Promise<number> {
-        const row = await this.repository
+        return this.sumByRefTypeInWindowWithRepository(this.repository, userId, refType, from, to);
+    }
+
+    private async sumByRefTypeInWindowWithRepository(
+        repository: Repository<CreditLedgerEntry>,
+        userId: string,
+        refType: string,
+        from: Date,
+        to: Date,
+    ): Promise<number> {
+        const row = await repository
             .createQueryBuilder('e')
             .select('COALESCE(SUM(e.amountCredits), 0)', 'total')
             .where('e.userId = :userId', { userId })
