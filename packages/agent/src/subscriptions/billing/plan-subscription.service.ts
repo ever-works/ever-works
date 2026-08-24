@@ -9,6 +9,7 @@ import { SubscriptionPlanCode } from '@src/entities/types';
 import {
     SubscriptionBillingProvider,
     SubscriptionStatus,
+    type UserSubscription,
 } from '@src/entities/user-subscription.entity';
 import { SubscriptionService } from '../subscription.service';
 import { PlanCreditGrantService } from '../credits/plan-credit-grant.service';
@@ -145,6 +146,10 @@ export type PlanWebhookAction =
     | 'subscription-reconciled'
     | 'ignored'
     | 'unattributed';
+
+export interface PlanPaymentReversalResult {
+    action: 'plan-revoked' | 'licence-refunded' | 'reversed-idempotent' | 'ignored';
+}
 
 /**
  * Paid-plan purchase (audit B24).
@@ -483,6 +488,64 @@ export class PlanSubscriptionService {
     }
 
     /**
+     * Reconcile a signature-verified full refund or dispute after the credit
+     * purchase path has proved the payment is not a credit pack. Correlation
+     * is exact: perpetual licences use their durable payment row; recurring
+     * plans use Stripe's Invoice Payment -> Subscription mapping.
+     */
+    async applyPaymentReversal(event: BillingWebhookEvent): Promise<PlanPaymentReversalResult> {
+        if (!event.paymentId || !event.reversal?.fullyReversed) {
+            return { action: 'ignored' };
+        }
+
+        const provider = this.billingProvider.getProviderId();
+        const licence = await this.licencePurchaseRepository.findByProviderPayment(
+            provider,
+            event.paymentId,
+        );
+        if (licence) {
+            const changed = await this.licencePurchaseRepository.markRefunded(licence.id);
+            return { action: changed ? 'licence-refunded' : 'reversed-idempotent' };
+        }
+
+        const providerSubscriptionId = await this.billingProvider.findPlanSubscriptionIdForPayment(
+            event.paymentId,
+        );
+        if (!providerSubscriptionId) {
+            const pendingLicence = await this.billingProvider.findPerpetualLicenceForPayment(
+                event.paymentId,
+            );
+            if (pendingLicence) {
+                throw new Error(
+                    `Plan payment reversal ${event.id} is ours but its licence purchase is not on file yet`,
+                );
+            }
+            return { action: 'ignored' };
+        }
+
+        const subscription =
+            await this.userSubscriptionRepository.findByProviderSubscriptionId(
+                providerSubscriptionId,
+            );
+        if (!subscription) {
+            throw new Error(
+                `Plan payment reversal ${event.id} is ours but its subscription is not on file yet`,
+            );
+        }
+
+        // Cancel first so the daily sweep cannot select this row for another
+        // allowance grant while the clawback is being appended.
+        await this.cancelSubscriptionRow(subscription);
+        if (this.planCreditGrantService) {
+            await this.planCreditGrantService.reverseCurrentAllowance(
+                subscription,
+                `${provider}:evt:${event.id}`,
+            );
+        }
+        return { action: 'plan-revoked' };
+    }
+
+    /**
      * Put a user on a paid plan. Idempotent: re-running for the same
      * plan rewrites the same row and re-asserts the same default plan, so
      * a webhook replay (or a webhook racing the return route) moves
@@ -649,10 +712,15 @@ export class PlanSubscriptionService {
             );
             return false;
         }
+        await this.cancelSubscriptionRow(subscription);
+        return Boolean(subscription);
+    }
+
+    private async cancelSubscriptionRow(subscription: UserSubscription): Promise<void> {
         await this.userSubscriptionRepository.cancel(subscription.id);
 
         if (this.subscriptionService.isEnabled()) {
-            const user = await this.userRepository.findById(userId);
+            const user = await this.userRepository.findById(subscription.userId);
             if (user) {
                 // Free plans are exactly what `changePlanSelfService`
                 // permits (sign-up default / downgrade / cancel).
@@ -662,7 +730,6 @@ export class PlanSubscriptionService {
                 );
             }
         }
-        return Boolean(subscription);
     }
 
     // ── Resolution helpers ───────────────────────────────────────────

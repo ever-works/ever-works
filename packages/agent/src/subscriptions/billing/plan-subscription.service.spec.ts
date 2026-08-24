@@ -79,6 +79,8 @@ function makeProvider(overrides: Record<string, unknown> = {}) {
             customerId: 'cus_1',
         }),
         retrieveCheckoutSession: jest.fn(),
+        findPlanSubscriptionIdForPayment: jest.fn().mockResolvedValue(null),
+        findPerpetualLicenceForPayment: jest.fn().mockResolvedValue(null),
         ...overrides,
     } as any;
 }
@@ -141,6 +143,8 @@ function makeLicencePurchaseRepository(overrides: Record<string, unknown> = {}) 
         countByUserAndPlan: jest.fn().mockResolvedValue(0),
         listActivePlanCodes: jest.fn().mockResolvedValue([]),
         recordPurchase: jest.fn().mockResolvedValue({ id: 'licence-1', status: 'active' }),
+        findByProviderPayment: jest.fn().mockResolvedValue(null),
+        markRefunded: jest.fn().mockResolvedValue(false),
         ...overrides,
     } as any;
 }
@@ -1122,5 +1126,157 @@ describe('applyWebhook — activation and revocation', () => {
         // …but the privileged grant is not attempted on a deploy that
         // has subscriptions switched off (it would throw by contract).
         expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
+    });
+
+    it('does not revoke entitlement for a partial refund', async () => {
+        const { service, provider, subscriptionRepository, licencePurchaseRepository } = build();
+
+        await expect(
+            service.applyPaymentReversal(
+                event({
+                    kind: 'credits.refunded',
+                    paymentId: 'pi_partial',
+                    reversal: { reason: 'refund', fullyReversed: false },
+                }),
+            ),
+        ).resolves.toEqual({ action: 'ignored' });
+        expect(licencePurchaseRepository.findByProviderPayment).not.toHaveBeenCalled();
+        expect(provider.findPlanSubscriptionIdForPayment).not.toHaveBeenCalled();
+        expect(subscriptionRepository.cancel).not.toHaveBeenCalled();
+    });
+
+    it('revokes a durable perpetual licence on a full refund', async () => {
+        const licencePurchaseRepository = makeLicencePurchaseRepository({
+            findByProviderPayment: jest.fn().mockResolvedValue({
+                id: 'licence-1',
+                userId: 'u1',
+                status: 'active',
+            }),
+            markRefunded: jest.fn().mockResolvedValue(true),
+        });
+        const { service, provider, subscriptionRepository } = build({
+            licencePurchaseRepository,
+        });
+
+        await expect(
+            service.applyPaymentReversal(
+                event({
+                    id: 'evt_licence_refund',
+                    kind: 'credits.refunded',
+                    paymentId: 'pi_licence_1',
+                    reversal: { reason: 'refund', fullyReversed: true },
+                }),
+            ),
+        ).resolves.toEqual({ action: 'licence-refunded' });
+        expect(licencePurchaseRepository.markRefunded).toHaveBeenCalledWith('licence-1');
+        expect(provider.findPlanSubscriptionIdForPayment).not.toHaveBeenCalled();
+        expect(subscriptionRepository.cancel).not.toHaveBeenCalled();
+    });
+
+    it('revokes the exact recurring plan and its current allowance on a dispute', async () => {
+        const subscription = {
+            id: 'sub-row-1',
+            userId: 'u1',
+            createdAt: new Date('2026-08-23T10:00:00Z'),
+            plan: STANDARD_PLAN,
+        };
+        const provider = makeProvider({
+            findPlanSubscriptionIdForPayment: jest.fn().mockResolvedValue('sub_provider_1'),
+        });
+        const subscriptionRepository = makeSubscriptionRepository({
+            findByProviderSubscriptionId: jest.fn().mockResolvedValue(subscription),
+        });
+        const planCreditGrantService = {
+            reverseCurrentAllowance: jest.fn().mockResolvedValue('reversed'),
+        };
+        const { service, subscriptionService } = build({
+            provider,
+            subscriptionRepository,
+            planCreditGrantService,
+        });
+
+        await expect(
+            service.applyPaymentReversal(
+                event({
+                    id: 'evt_dispute',
+                    kind: 'credits.refunded',
+                    customerId: null,
+                    referenceId: null,
+                    paymentId: 'pi_plan_1',
+                    reversal: { reason: 'dispute', fullyReversed: true },
+                }),
+            ),
+        ).resolves.toEqual({ action: 'plan-revoked' });
+        expect(subscriptionRepository.cancel).toHaveBeenCalledWith('sub-row-1');
+        expect(planCreditGrantService.reverseCurrentAllowance).toHaveBeenCalledWith(
+            subscription,
+            'stripe:evt:evt_dispute',
+        );
+        expect(subscriptionService.changePlanSelfService).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'u1' }),
+            'free',
+        );
+    });
+
+    it('is idempotent when a perpetual licence refund event is replayed', async () => {
+        const licencePurchaseRepository = makeLicencePurchaseRepository({
+            findByProviderPayment: jest.fn().mockResolvedValue({
+                id: 'licence-1',
+                userId: 'u1',
+                status: 'refunded',
+            }),
+            markRefunded: jest.fn().mockResolvedValue(false),
+        });
+        const { service } = build({ licencePurchaseRepository });
+
+        await expect(
+            service.applyPaymentReversal(
+                event({
+                    id: 'evt_licence_refund',
+                    kind: 'credits.refunded',
+                    paymentId: 'pi_licence_1',
+                    reversal: { reason: 'refund', fullyReversed: true },
+                }),
+            ),
+        ).resolves.toEqual({ action: 'reversed-idempotent' });
+    });
+
+    it('fails retryably when Stripe identifies our recurring plan but activation has not persisted yet', async () => {
+        const provider = makeProvider({
+            findPlanSubscriptionIdForPayment: jest.fn().mockResolvedValue('sub_provider_1'),
+        });
+        const { service } = build({ provider });
+
+        await expect(
+            service.applyPaymentReversal(
+                event({
+                    id: 'evt_early_refund',
+                    kind: 'credits.refunded',
+                    paymentId: 'pi_plan_early',
+                    reversal: { reason: 'refund', fullyReversed: true },
+                }),
+            ),
+        ).rejects.toThrow('not on file yet');
+    });
+
+    it('fails retryably when a perpetual licence reversal races its activation event', async () => {
+        const provider = makeProvider({
+            findPerpetualLicenceForPayment: jest.fn().mockResolvedValue({
+                userId: 'u1',
+                planCode: 'selfhosted_pro',
+            }),
+        });
+        const { service } = build({ provider });
+
+        await expect(
+            service.applyPaymentReversal(
+                event({
+                    id: 'evt_early_licence_refund',
+                    kind: 'credits.refunded',
+                    paymentId: 'pi_licence_early',
+                    reversal: { reason: 'refund', fullyReversed: true },
+                }),
+            ),
+        ).rejects.toThrow('not on file yet');
     });
 });

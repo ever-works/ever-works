@@ -56,6 +56,10 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
         },
         paymentIntents: {
             create: jest.fn().mockResolvedValue({ id: 'pi_1', status: 'succeeded' }),
+            retrieve: jest.fn().mockResolvedValue({ id: 'pi_1', metadata: {} }),
+        },
+        invoicePayments: {
+            list: jest.fn().mockResolvedValue({ data: [] }),
         },
         tax: {
             calculations: {
@@ -654,7 +658,7 @@ describe('StripeBillingProvider — event normalization', () => {
         );
     });
 
-    it('normalizes a refund and a dispute to credits.refunded', async () => {
+    it('normalizes a refund and a dispute with an explicit entitlement-reversal posture', async () => {
         const refund = await parse({
             id: 'evt_6',
             type: 'charge.refunded',
@@ -662,6 +666,7 @@ describe('StripeBillingProvider — event normalization', () => {
                 object: {
                     customer: 'cus_1',
                     amount_refunded: 2500,
+                    refunded: false,
                     currency: 'usd',
                     payment_intent: 'pi_1',
                 },
@@ -672,6 +677,7 @@ describe('StripeBillingProvider — event normalization', () => {
                 kind: 'credits.refunded',
                 amountCents: 2500,
                 paymentId: 'pi_1',
+                reversal: { reason: 'refund', fullyReversed: false },
             }),
         );
 
@@ -681,8 +687,89 @@ describe('StripeBillingProvider — event normalization', () => {
             data: { object: { amount: 5000, currency: 'usd', payment_intent: 'pi_2' } },
         });
         expect(dispute).toEqual(
-            expect.objectContaining({ kind: 'credits.refunded', amountCents: 5000 }),
+            expect.objectContaining({
+                kind: 'credits.refunded',
+                amountCents: 5000,
+                reversal: { reason: 'dispute', fullyReversed: true },
+            }),
         );
+    });
+
+    it('maps a recurring plan payment intent back to our exact subscription through Invoice Payments', async () => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        const client = fakeClient();
+        client.invoicePayments.list.mockResolvedValue({
+            data: [
+                {
+                    invoice: {
+                        parent: {
+                            type: 'subscription_details',
+                            subscription_details: {
+                                subscription: 'sub_plan_1',
+                                metadata: {
+                                    [STRIPE_METADATA_KEYS.kind]:
+                                        STRIPE_PURCHASE_KINDS.planSubscription,
+                                },
+                            },
+                        },
+                    },
+                },
+            ],
+        });
+        const { provider } = build(client);
+
+        await expect(provider.findPlanSubscriptionIdForPayment('pi_plan_1')).resolves.toBe(
+            'sub_plan_1',
+        );
+        expect(client.invoicePayments.list).toHaveBeenCalledWith({
+            payment: { type: 'payment_intent', payment_intent: 'pi_plan_1' },
+            status: 'paid',
+            limit: 1,
+            expand: ['data.invoice'],
+        });
+    });
+
+    it('does not map an invoice payment whose subscription metadata is not ours', async () => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        const client = fakeClient();
+        client.invoicePayments.list.mockResolvedValue({
+            data: [
+                {
+                    invoice: {
+                        parent: {
+                            type: 'subscription_details',
+                            subscription_details: {
+                                subscription: 'sub_foreign',
+                                metadata: {},
+                            },
+                        },
+                    },
+                },
+            ],
+        });
+        const { provider } = build(client);
+
+        await expect(provider.findPlanSubscriptionIdForPayment('pi_foreign')).resolves.toBeNull();
+    });
+
+    it('recognizes a perpetual licence from PaymentIntent metadata copied to its charge', async () => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        const client = fakeClient();
+        client.paymentIntents.retrieve.mockResolvedValue({
+            id: 'pi_licence',
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                [STRIPE_METADATA_KEYS.licence]: STRIPE_PERPETUAL_LICENCE,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.planCode]: 'selfhosted_pro',
+            },
+        });
+        const { provider } = build(client);
+
+        await expect(provider.findPerpetualLicenceForPayment('pi_licence')).resolves.toEqual({
+            userId: 'u1',
+            planCode: 'selfhosted_pro',
+        });
     });
 
     it('normalizes an invoice event into a vendor-neutral snapshot', async () => {
