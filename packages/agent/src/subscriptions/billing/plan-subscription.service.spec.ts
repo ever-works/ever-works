@@ -5,7 +5,12 @@ import {
     PlanSubscriptionService,
     UnknownSubscriptionPlanError,
 } from './plan-subscription.service';
-import { BillingProviderNotConfiguredError, type BillingWebhookEvent } from './billing.provider';
+import {
+    BILLING_PROVIDER_ERROR_CODES,
+    BillingProviderError,
+    BillingProviderNotConfiguredError,
+    type BillingWebhookEvent,
+} from './billing.provider';
 import { SubscriptionStatus } from '@src/entities/user-subscription.entity';
 
 /**
@@ -668,6 +673,25 @@ describe('syncCheckoutReturn — a session id is not an authorization', () => {
         });
 
         await expect(service.syncCheckoutReturn('u1', 'cs_plan_1')).rejects.toBeInstanceOf(
+            CheckoutSessionNotFoundError,
+        );
+    });
+
+    it('answers a provider-confirmed missing session exactly like a foreign session', async () => {
+        const { service } = build({
+            provider: makeProvider({
+                retrieveCheckoutSession: jest
+                    .fn()
+                    .mockRejectedValue(
+                        new BillingProviderError(
+                            'Checkout session not found',
+                            BILLING_PROVIDER_ERROR_CODES.CHECKOUT_SESSION_NOT_FOUND,
+                        ),
+                    ),
+            }),
+        });
+
+        await expect(service.syncCheckoutReturn('u1', 'cs_missing')).rejects.toBeInstanceOf(
             CheckoutSessionNotFoundError,
         );
     });
