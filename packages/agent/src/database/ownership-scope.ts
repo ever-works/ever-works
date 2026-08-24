@@ -101,6 +101,19 @@ export function ownershipScopeOf(row: OwnershipScopedRow): OwnershipScope {
 }
 
 /**
+ * Scope to use when following an already-validated relationship pointer.
+ *
+ * A null/null stamp means the source row predates ownership stamping; turning
+ * that stamp into a query scope would mean "legacy targets only" and hide the
+ * same owner's current-tenant target. Scoped source rows remain exact and
+ * therefore keep cross-Organization relationships fail-closed.
+ */
+export function ownershipRelationScopeOf(row: OwnershipScopedRow): OwnershipScope | undefined {
+    const scope = ownershipScopeOf(row);
+    return scope.tenantId === null && scope.organizationId === null ? undefined : scope;
+}
+
+/**
  * QueryBuilder equivalent of {@link ownershipWhere}. The parameter prefix
  * keeps the primitive safe to compose more than once in a single query.
  */

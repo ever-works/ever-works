@@ -46,6 +46,7 @@ import { WorkKnowledgeUploadRepository } from '../database/repositories/work-kno
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import {
+    ownershipRelationScopeOf,
     ownershipScopeMatches,
     ownershipScopeOf,
     ownershipStamp,
@@ -321,7 +322,7 @@ export class TasksService {
         const taskScope = ownershipScopeOf(task);
         if (actorType === 'agent' && this.agents) {
             const agent = await this.agents
-                .findByIdAndUser(actorId, userId, taskScope)
+                .findByIdAndUser(actorId, userId, ownershipRelationScopeOf(task))
                 .catch(() => null);
             if (!agent) {
                 throw new BadRequestException('Task actor is not reachable in this Task scope.');

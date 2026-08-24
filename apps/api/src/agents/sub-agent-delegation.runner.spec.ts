@@ -172,6 +172,27 @@ describe('SubAgentDelegationRunnerService', () => {
         );
     });
 
+    it('lets a legacy parent reach its same-owner current-tenant child Agent and parent Task', async () => {
+        const legacyScope = { tenantId: null, organizationId: null };
+        agents.findById.mockResolvedValue({ id: PARENT_AGENT, userId: OWNER, ...legacyScope });
+        agents.findByIdAndUser.mockImplementation(
+            async (id: string, _userId: string, scope: unknown) =>
+                scope === undefined ? { id, userId: OWNER, ...EVER_SCOPE } : null,
+        );
+        tasks.getOne.mockImplementation(async (_userId: string, id: string, scope: unknown) =>
+            scope === undefined ? { id, userId: OWNER, ...EVER_SCOPE } : null,
+        );
+        tasks.create.mockResolvedValue({ id: 'task-child', userId: OWNER, ...legacyScope });
+
+        await expect(
+            runner.run(request({ childAgentId: CHILD_AGENT, parentTaskId: 'task-parent' })),
+        ).resolves.toMatchObject({ status: 'completed' });
+
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(CHILD_AGENT, OWNER, undefined);
+        expect(tasks.getOne).toHaveBeenCalledWith(OWNER, 'task-parent', undefined);
+        expect(tasks.create).toHaveBeenCalledWith(OWNER, expect.any(Object), legacyScope);
+    });
+
     describe("inputs reach the child's brief", () => {
         // The child Task description IS the delegation's only channel into
         // the child's prompt. When `inputs` was left out of it, every

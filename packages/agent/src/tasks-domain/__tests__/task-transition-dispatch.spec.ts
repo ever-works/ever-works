@@ -170,6 +170,30 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         expect(dispatcher.enqueue).not.toHaveBeenCalled();
     });
 
+    it('dispatches a legacy Task to its same-owner current-tenant Agent', async () => {
+        const svc = makeSvc();
+        const task = makeTask({ tenantId: null, organizationId: null });
+        agents.findByIdAndUser.mockImplementationOnce(
+            async (id: string, userId: string, scope: unknown) =>
+                scope === undefined
+                    ? {
+                          id,
+                          userId,
+                          tenantId: '11111111-1111-4111-8111-111111111111',
+                          organizationId: '22222222-2222-4222-8222-222222222222',
+                      }
+                    : null,
+        );
+
+        await expect(svc.dispatchAgentRun(task, 'agent-ever')).resolves.toMatchObject({
+            dispatched: true,
+            runId: 'r1',
+        });
+
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith('agent-ever', 'u1', undefined);
+        expect(dispatcher.enqueue).toHaveBeenCalled();
+    });
+
     it('pre-creates a queued AgentRun row before enqueuing the Trigger.dev run', async () => {
         const svc = makeSvc();
         const task = makeTask({ status: TaskStatus.TODO });

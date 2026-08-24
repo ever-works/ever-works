@@ -30,6 +30,7 @@ import { AGENT_RUN_CANCELLER, type AgentRunCanceller } from '../agents/agent-run
 import { TasksService } from '../tasks-domain/tasks.service';
 import { TaskTransitionService } from '../tasks-domain/task-transition.service';
 import {
+    ownershipRelationScopeOf,
     ownershipScopeOf,
     ownershipWhereWith,
     type OwnershipScope,
@@ -215,7 +216,7 @@ export class GoalOrchestratorService {
             goal.assignedAgentId = await this.resolveAssignedAgentId(
                 userId,
                 input.assignedAgentId,
-                ownershipScopeOf(goal),
+                ownershipRelationScopeOf(goal),
             );
         }
 
@@ -1039,7 +1040,7 @@ export class GoalOrchestratorService {
      */
     private async resolveCandidates(goal: Goal): Promise<GoalRoutingCandidate[]> {
         if (goal.assignedAgentId) {
-            const goalScope = ownershipScopeOf(goal);
+            const goalScope = ownershipRelationScopeOf(goal);
             const agent = this.agents
                 ? await this.agents
                       .findByIdAndUser(goal.assignedAgentId, goal.userId, goalScope)
@@ -1063,7 +1064,7 @@ export class GoalOrchestratorService {
         const out = new Map<string, GoalRoutingCandidate>();
         for (const task of tasks) {
             if (!task.agentId || out.has(task.agentId)) continue;
-            const goalScope = ownershipScopeOf(goal);
+            const goalScope = ownershipRelationScopeOf(goal);
             const agent = this.agents
                 ? await this.agents
                       .findByIdAndUser(task.agentId, goal.userId, goalScope)

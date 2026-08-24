@@ -18,7 +18,7 @@ import {
 } from '../database/repositories/task-side.repositories';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRepository } from '../database/repositories/agent.repository';
-import { ownershipScopeOf } from '../database/ownership-scope';
+import { ownershipRelationScopeOf } from '../database/ownership-scope';
 import {
     AGENT_TASK_EXECUTE_DISPATCHER,
     JOB_RUNTIME_NOT_CONFIGURED_REASON,
@@ -373,7 +373,7 @@ export class TaskTransitionService {
             return { runId: null, dispatched: false, parked: false, error: 'no-dispatcher' };
         }
         const agent = await this.agents
-            ?.findByIdAndUser(agentId, task.userId, ownershipScopeOf(task))
+            ?.findByIdAndUser(agentId, task.userId, ownershipRelationScopeOf(task))
             .catch(() => null);
         if (!agent) {
             return {

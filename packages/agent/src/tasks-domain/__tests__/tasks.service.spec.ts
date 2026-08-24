@@ -309,6 +309,27 @@ describe('TasksService authorization guardrails', () => {
         expect(repos.reviewers.add).toHaveBeenCalledTimes(1);
     });
 
+    it('lets a legacy Task accept its same-owner current-tenant Agent actor', async () => {
+        const legacy = makeTask({ tenantId: null, organizationId: null, userId: taskOwnerId });
+        const { service, repos } = makeService();
+        repos.tasks.findByIdAndUser.mockResolvedValueOnce(legacy);
+        repos.agents.findByIdAndUser.mockImplementationOnce(
+            async (id: string, userId: string, scope: unknown) =>
+                scope === undefined ? { id, userId, ...everScope } : null,
+        );
+
+        await expect(
+            service.addAssignee(taskOwnerId, legacy.id, 'agent', 'agent-ever'),
+        ).resolves.toBeDefined();
+
+        expect(repos.agents.findByIdAndUser).toHaveBeenCalledWith(
+            'agent-ever',
+            taskOwnerId,
+            undefined,
+        );
+        expect(repos.assignees.add).toHaveBeenCalled();
+    });
+
     it('scopes the includeRun batch lookup instead of trusting a Task latestRunId pointer', async () => {
         const knownRunId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
         const task = makeTask({ latestRunId: knownRunId, ...everScope });

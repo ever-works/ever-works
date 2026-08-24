@@ -326,27 +326,28 @@ describe('GoalOrchestratorService — limits', () => {
         });
     });
 
-    it('validates a pin against the persisted legacy Goal scope, not the broader request scope', async () => {
-        const personalRequestScope = { tenantId: everScope.tenantId, organizationId: null };
+    it('lets a legacy Goal pin a same-owner current-tenant Agent without manufacturing a null scope query', async () => {
         const { service, agents, goals } = build({
             goal: { tenantId: null, organizationId: null },
         });
-        agents.findByIdAndUser.mockResolvedValueOnce(null as never);
+        agents.findByIdAndUser.mockImplementationOnce(
+            async (id: string, _userId?: string, scope?: typeof everScope) =>
+                scope === undefined ? ({ id, userId: 'u1', ...everScope } as never) : null,
+        );
 
         await expect(
-            service.updateLimits(
-                'u1',
-                'g1',
-                { assignedAgentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' },
-                personalRequestScope,
-            ),
-        ).rejects.toBeInstanceOf(NotFoundException);
+            service.updateLimits('u1', 'g1', {
+                assignedAgentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+            }),
+        ).resolves.toMatchObject({
+            assignedAgentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        });
         expect(agents.findByIdAndUser).toHaveBeenCalledWith(
             'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
             'u1',
-            { tenantId: null, organizationId: null },
+            undefined,
         );
-        expect(goals.save).not.toHaveBeenCalled();
+        expect(goals.save).toHaveBeenCalled();
     });
 
     it('persists every limit field and logs the change', async () => {
@@ -705,10 +706,28 @@ describe('GoalOrchestratorService — advance', () => {
 
         await service.advance('u1', 'g1');
 
-        expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', {
-            tenantId: null,
-            organizationId: null,
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', undefined);
+        expect(transitions.dispatchAgentRun).toHaveBeenCalled();
+    });
+
+    it('routes a legacy Goal to its same-owner current-tenant pinned Agent', async () => {
+        const assignedAgentId = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+        const { service, agents, transitions } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId,
+                tenantId: null,
+                organizationId: null,
+            },
         });
+        agents.findByIdAndUser.mockImplementationOnce(
+            async (id: string, _userId?: string, scope?: typeof everScope) =>
+                scope === undefined ? ({ id, userId: 'u1', ...everScope } as never) : null,
+        );
+
+        await service.advance('u1', 'g1');
+
+        expect(agents.findByIdAndUser).toHaveBeenCalledWith(assignedAgentId, 'u1', undefined);
         expect(transitions.dispatchAgentRun).toHaveBeenCalled();
     });
 
