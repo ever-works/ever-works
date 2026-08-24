@@ -103,6 +103,23 @@ describe('CreditLedgerRepository.recordAtomic', () => {
         expect(entryRepo.save).not.toHaveBeenCalled();
     });
 
+    it('locks before the idempotency read so ref-window sums cannot inherit a stale mysql snapshot', async () => {
+        const { repository, entryRepo, userRepo } = makeHarness({ driver: 'mysql' });
+        entryRepo.findOne.mockResolvedValue({
+            id: 'existing',
+            idempotencyKey: 'grant:plan:user-1:2026-08-23:standard',
+        });
+
+        await repository.recordAtomic({
+            ...BASE_WRITE,
+            idempotencyKey: 'grant:plan:user-1:2026-08-23:standard',
+        });
+
+        expect(userRepo.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+            entryRepo.findOne.mock.invocationCallOrder[0],
+        );
+    });
+
     it('resolves a concurrent-duplicate unique violation to the surviving row', async () => {
         const { repository, manager, topLevelRepository } = makeHarness();
         const survivor = { id: 'survivor', idempotencyKey: 'run:run-9' };
@@ -168,6 +185,72 @@ describe('CreditLedgerRepository.recordAtomic', () => {
         );
 
         expect(result).toEqual({ status: 'skipped', balance: 80 });
+        expect(entryRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('sizes a plan grant from the ref-window total while holding the user lock', async () => {
+        const { repository, entryRepo, userRepo } = makeHarness({
+            balance: 3000,
+            driver: 'postgres',
+        });
+        const windowTotal = makeQb(0);
+        windowTotal.getRawOne.mockResolvedValue({ total: 3000 });
+        entryRepo.createQueryBuilder
+            .mockReturnValueOnce(makeQb(3000))
+            .mockReturnValueOnce(windowTotal);
+
+        const result = await repository.recordAtomic(
+            {
+                ...BASE_WRITE,
+                amountCredits: 25000,
+                refType: 'plan-allowance',
+                idempotencyKey: 'grant:plan:user-1:2026-08-23:premium',
+            },
+            {
+                maxRefTypeAmountInWindow: {
+                    refType: 'plan-allowance',
+                    from: new Date('2026-08-23T10:00:00.000Z'),
+                    to: new Date('2026-09-23T10:00:00.000Z'),
+                    maxAmountCredits: 25000,
+                },
+            },
+        );
+
+        expect(result.status).toBe('created');
+        expect(entryRepo.save).toHaveBeenCalledWith(
+            expect.objectContaining({ amountCredits: 22000, balanceAfter: 25000 }),
+        );
+        expect(userRepo.findOne.mock.invocationCallOrder[0]).toBeLessThan(
+            entryRepo.createQueryBuilder.mock.invocationCallOrder[0],
+        );
+    });
+
+    it('skips a differently-keyed plan grant once the ref-window target is covered', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 25000 });
+        const windowTotal = makeQb(0);
+        windowTotal.getRawOne.mockResolvedValue({ total: 25000 });
+        entryRepo.createQueryBuilder
+            .mockReturnValueOnce(makeQb(25000))
+            .mockReturnValueOnce(windowTotal);
+
+        const result = await repository.recordAtomic(
+            {
+                ...BASE_WRITE,
+                amountCredits: 25000,
+                refType: 'plan-allowance',
+                idempotencyKey: 'grant:plan:user-1:2026-08-23:premium',
+            },
+            {
+                maxRefTypeAmountInWindow: {
+                    refType: 'plan-allowance',
+                    from: new Date('2026-08-23T10:00:00.000Z'),
+                    to: new Date('2026-09-23T10:00:00.000Z'),
+                    maxAmountCredits: 25000,
+                },
+            },
+        );
+
+        expect(result).toEqual({ status: 'skipped', balance: 25000 });
         expect(entryRepo.save).not.toHaveBeenCalled();
     });
 

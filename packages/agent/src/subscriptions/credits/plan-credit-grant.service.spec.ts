@@ -125,7 +125,7 @@ describe('PlanCreditGrantService.grantCurrentAllowance', () => {
         expect(creditLedgerService.record).not.toHaveBeenCalled();
     });
 
-    it('grants only the upgrade delta already owed in the same allowance period', async () => {
+    it('delegates upgrade-delta sizing to the atomic ref-window ceiling', async () => {
         const { service, creditLedgerService, userSubscriptionRepository } = makeHarness();
         userSubscriptionRepository.findActiveByUser.mockResolvedValue(
             proSubscription({
@@ -137,14 +137,20 @@ describe('PlanCreditGrantService.grantCurrentAllowance', () => {
                 },
             }),
         );
-        creditLedgerService.sumByRefTypeInWindow.mockResolvedValue(3000);
-
         await expect(service.grantCurrentAllowance('user-1', utc(2026, 9, 10))).resolves.toBe(
             'granted',
         );
         expect(creditLedgerService.record).toHaveBeenCalledWith(
-            expect.objectContaining({ amountCredits: 22000 }),
+            expect.objectContaining({
+                amountCredits: 25000,
+                maxRefTypeAmountInWindow: {
+                    from: utc(2026, 8, 23, 10),
+                    to: utc(2026, 9, 23, 10),
+                    maxAmountCredits: 25000,
+                },
+            }),
         );
+        expect(creditLedgerService.sumByRefTypeInWindow).not.toHaveBeenCalled();
     });
 
     it('writes a grant bucket for the current allowance month with the month end as expiry', async () => {
@@ -177,6 +183,25 @@ describe('PlanCreditGrantService.grantCurrentAllowance', () => {
             'already-granted',
         );
         expect(creditLedgerService.record).not.toHaveBeenCalled();
+    });
+
+    it('reports already-granted when the atomic window ceiling is covered by another plan key', async () => {
+        const { service, creditLedgerService, userSubscriptionRepository } = makeHarness();
+        userSubscriptionRepository.findActiveByUser.mockResolvedValue(
+            proSubscription({
+                plan: {
+                    code: 'premium',
+                    displayName: 'Enterprise',
+                    hosting: 'cloud',
+                    monthlyCredits: 25000,
+                },
+            }),
+        );
+        creditLedgerService.record.mockResolvedValue(null);
+
+        await expect(service.grantCurrentAllowance('user-1', utc(2026, 9, 10))).resolves.toBe(
+            'already-granted',
+        );
     });
 
     it('uses a new key once the allowance month rolls', async () => {
