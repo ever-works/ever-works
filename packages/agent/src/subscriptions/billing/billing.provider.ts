@@ -268,6 +268,17 @@ export interface BillingInvoiceSnapshot {
     readonly number: string | null;
     /** Raw provider status, already normalized to our closed set. */
     readonly status: 'draft' | 'open' | 'paid' | 'void' | 'uncollectible' | 'refunded';
+    /**
+     * The provider subscription that generated this invoice, when any, and
+     * which of OUR subscription kinds it is (read from the metadata WE
+     * stamped on the subscription). `null` kind = not ours / one-off.
+     * Lets the pay-as-you-go lifecycle react to its own invoices without
+     * ever touching the plan tier (billing spec FR-21).
+     */
+    readonly subscriptionId?: string | null;
+    readonly subscriptionKind?: 'plan' | 'payg' | null;
+    /** True when the delivery was a payment failure (dunning has started). */
+    readonly paymentFailed?: boolean;
     readonly periodStart: Date | null;
     readonly periodEnd: Date | null;
     readonly subtotalCents: number;
@@ -296,7 +307,47 @@ export interface BillingSubscriptionSnapshot {
     readonly currentPeriodEnd: Date | null;
     /** When the subscription actually ended. */
     readonly canceledAt: Date | null;
+    /** Start of the current period (pay-as-you-go cycles are computed over [start, end)). */
+    readonly currentPeriodStart?: Date | null;
+    /** The first (metered) subscription item, for pay-as-you-go subscriptions. */
+    readonly subscriptionItemId?: string | null;
 }
+
+// ── Pay-as-you-go (billing spec §3.5) ─────────────────────────────────
+
+/**
+ * Create the provider's usage-only subscription for pay-as-you-go. No
+ * flat fee: the single item is the catalog's metered price, so the
+ * provider rates whatever the meter receives and invoices it in arrears
+ * (and mid-cycle once accrued usage reaches `invoiceThresholdCents`).
+ */
+export interface MeteredSubscriptionRequest {
+    readonly userId: string;
+    readonly customerId: string;
+    /** Stored default payment method the arrears invoices are charged to. */
+    readonly paymentMethodRef: string;
+    /** Catalog `lookup_key` of the metered price (`ever_works_payg_credits_monthly`). */
+    readonly lookupKey: string;
+    /** `billing_thresholds.amount_gte` — invoice mid-cycle at this accrued amount. */
+    readonly invoiceThresholdCents: number;
+    /** `{userId}:payg` — echoed back on the signed provider events. */
+    readonly referenceId: string;
+}
+
+/** One usage report to the provider's meter. `value` is whole credits. */
+export interface MeterEventRequest {
+    readonly eventName: string;
+    readonly customerId: string;
+    readonly value: number;
+    /** Idempotency identifier (`run:{runId}`); Stripe de-duplicates within a rolling 24h. */
+    readonly identifier: string;
+    readonly timestamp: Date;
+}
+
+export type MeterEventOutcome =
+    | { readonly status: 'accepted' }
+    /** Provider refused; `terminal` = do not retry (e.g. outside the backdating window). */
+    | { readonly status: 'failed'; readonly failureCode: string; readonly terminal: boolean };
 
 /** Cancel/resume input. The id is server-resolved, never client-supplied. */
 export interface SubscriptionMutationRequest {
@@ -355,6 +406,12 @@ export type BillingWebhookEventKind =
     | 'subscription.updated'
     /** A stored payment method was detached from the customer. */
     | 'payment_method.removed'
+    /**
+     * The pay-as-you-go (usage-only) subscription's lifecycle moved —
+     * created, period rolled, dunning, cancelled. Carries the full
+     * snapshot. NEVER touches the plan tier; handled by `PaygService`.
+     */
+    | 'payg.updated'
     /** Recognized envelope, no action for us. */
     | 'ignored';
 
@@ -539,6 +596,39 @@ export abstract class BillingProvider {
     async createBillingPortalSession(
         _request: BillingPortalRequest,
     ): Promise<BillingPortalSession> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    // ── Pay-as-you-go (billing spec §3.5) ─────────────────────────────
+
+    /** Create the usage-only subscription that the meter bills against. */
+    async createMeteredSubscription(
+        _request: MeteredSubscriptionRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Cancel a usage-only subscription IMMEDIATELY, invoicing accrued usage
+     * now. Unlike a plan (where the owner paid for the period and
+     * at-period-end is the only right answer), nothing is prepaid here:
+     * overflow must stop at once and what was consumed is billed at once.
+     */
+    async cancelMeteredSubscriptionNow(
+        _request: SubscriptionMutationRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Read one subscription back (reconcile after create / on demand). */
+    async retrieveSubscriptionSnapshot(
+        _subscriptionId: string,
+    ): Promise<BillingSubscriptionSnapshot> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Report usage to the provider's meter. Never throws for a provider refusal — returns it. */
+    async reportMeterEvent(_request: MeterEventRequest): Promise<MeterEventOutcome> {
         throw new BillingProviderNotConfiguredError();
     }
 

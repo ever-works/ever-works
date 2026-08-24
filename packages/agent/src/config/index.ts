@@ -588,15 +588,6 @@ export const config = {
             getWebhookSecret() {
                 return process.env.STRIPE_WEBHOOK_SECRET;
             },
-            /**
-             * Billing spec FR-22 — `automatic_tax.enabled` on hosted
-             * checkout and on the PAYG subscription. Targeted flag for
-             * un-provisioned external state: Stripe Tax must be activated
-             * on the (shared) account first, or Stripe rejects the session.
-             */
-            isAutomaticTaxEnabled() {
-                return process.env.STRIPE_AUTOMATIC_TAX === 'true';
-            },
         },
         // Pay-as-you-go (billing spec §3.5).
         payg: {

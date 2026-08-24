@@ -204,6 +204,10 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'CheckoutSessionNotFoundError',
                     // Payment methods (audit B10/B25)
                     'PaymentMethodService',
+                    'PaygService',
+                    'PaygPaymentMethodRequiredError',
+                    'PaygCapOutOfRangeError',
+                    'PAYG_MIN_MONTHLY_CAP_CREDITS',
                     'PlanCreditGrantService',
                     'PaymentMethodNotFoundError',
                     'LastPaymentMethodError',

@@ -9,6 +9,7 @@ import {
     ArrowRight,
     CreditCard,
     FileText,
+    Gauge,
     RefreshCw,
     ShieldCheck,
     Wallet,
@@ -28,6 +29,7 @@ import {
     startCreditCheckoutAction,
     startPlanCheckoutAction,
     updateAutoRechargeAction,
+    updatePaygAction,
 } from '@/app/actions/dashboard/billing';
 import {
     CREDIT_LEDGER_KINDS,
@@ -47,7 +49,10 @@ import {
     canBuyCredits,
     canCancelSubscription,
     canConfigureAutoRecharge,
+    canConfigurePayg,
     canUpgradePlan,
+    estimatePaygCents,
+    formatCentsPerCredit,
     canResumeSubscription,
     formatCardExpiry,
     formatPaymentMethod,
@@ -60,6 +65,7 @@ import {
     type BillingOverview,
     type InvoiceListPage,
     type PlanCheckoutReturnResponse,
+    type PaygState,
     type SubscriptionState,
 } from '@/lib/api/billing.shared';
 
@@ -225,6 +231,50 @@ export function BillingSettings({
         overview?.autoRecharge.packId ?? packs[0]?.id ?? '',
     );
     const [autoRechargeSaving, setAutoRechargeSaving] = useState(false);
+
+    // ── Pay-as-you-go (billing spec §3.5) ─────────────────────────────
+    // Same gates as auto-recharge (payments on + provider wired + a card
+    // on file); the server snapshot is the source of truth and a
+    // successful mutation swaps in what the API just confirmed.
+    const paygUiEnabled = canConfigurePayg(overview, paymentsEnabled);
+    const [payg, setPayg] = useState<PaygState | null>(overview?.payg ?? null);
+    const [paygOn, setPaygOn] = useState(overview?.payg?.enabled ?? false);
+    const [paygCap, setPaygCap] = useState(
+        overview?.payg ? String(overview.payg.monthlyCapCredits) : '',
+    );
+    const [paygSaving, setPaygSaving] = useState(false);
+    const paygCapNumber = Number(paygCap);
+    const paygCapEstimateCents =
+        payg && Number.isFinite(paygCapNumber) && paygCapNumber > 0
+            ? estimatePaygCents(paygCapNumber, payg.tiers)
+            : null;
+    const paygPeriodEndLabel = formatPeriodDate(payg?.periodEnd ?? null);
+
+    const handleSavePayg = useCallback(async () => {
+        setPaygSaving(true);
+        try {
+            const cap = Number(paygCap);
+            const result = await updatePaygAction(
+                paygOn
+                    ? {
+                          enabled: true,
+                          monthlyCapCredits:
+                              Number.isFinite(cap) && cap > 0 ? Math.round(cap) : undefined,
+                      }
+                    : { enabled: false },
+            );
+            if (result.success && result.payg) {
+                setPayg(result.payg);
+                setPaygOn(result.payg.enabled);
+                setPaygCap(String(result.payg.monthlyCapCredits));
+                toast.success(t('payg.saved'));
+            } else {
+                toast.error(result.error ?? t('payg.saveError'));
+            }
+        } finally {
+            setPaygSaving(false);
+        }
+    }, [paygCap, paygOn, t]);
 
     const invoices = initialInvoices?.invoices ?? [];
     const paymentMethodLabel = formatPaymentMethod(overview?.paymentMethod ?? null);
@@ -968,6 +1018,148 @@ export function BillingSettings({
                     )}
                 </SectionCard>
             </div>
+
+            {/* ── Pay-as-you-go (billing spec §3.5) ─────────────────────── */}
+            <SectionCard icon={Gauge} title={t('payg.title')} testId="billing-payg">
+                {!paygUiEnabled || !payg ? (
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {buyEnabled ? t('payg.needsPaymentMethod') : t('payg.comingSoon')}
+                    </p>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark">
+                                <input
+                                    type="checkbox"
+                                    checked={paygOn}
+                                    data-testid="billing-payg-toggle"
+                                    onChange={(e) => setPaygOn(e.target.checked)}
+                                    className="rounded border-border dark:border-border-dark"
+                                />
+                                {t('payg.toggle')}
+                            </label>
+                            <span
+                                className={cn(
+                                    'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+                                    payg.pastDue
+                                        ? STATUS_TONE_CLASSES.negative
+                                        : payg.enabled
+                                          ? STATUS_TONE_CLASSES.positive
+                                          : STATUS_TONE_CLASSES.neutral,
+                                )}
+                                data-testid="billing-payg-status"
+                            >
+                                {payg.pastDue
+                                    ? t('payg.statusPastDue')
+                                    : payg.enabled
+                                      ? t('payg.statusOn')
+                                      : t('payg.statusOff')}
+                            </span>
+                        </div>
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('payg.description')}
+                        </p>
+                        {payg.pastDue ? (
+                            <div
+                                className="flex items-start gap-2 rounded-lg border border-danger/40 bg-danger/5 p-3 text-xs text-text dark:text-text-dark"
+                                data-testid="billing-payg-past-due"
+                            >
+                                <AlertTriangle className="w-4 h-4 shrink-0 text-danger" />
+                                <span>{t('payg.pastDue')}</span>
+                            </div>
+                        ) : null}
+                        {payg.enabled ? (
+                            <p
+                                className="text-xs text-text dark:text-text-dark"
+                                data-testid="billing-payg-cycle"
+                            >
+                                {t('payg.thisCycle', {
+                                    used: payg.cycleUsedCredits.toLocaleString('en-US'),
+                                    cap: payg.monthlyCapCredits.toLocaleString('en-US'),
+                                    estimate: formatCreditsAsDollars(payg.cycleEstimateCents),
+                                })}
+                                {paygPeriodEndLabel
+                                    ? ` · ${t('payg.cycleEnds', { date: paygPeriodEndLabel })}`
+                                    : null}
+                            </p>
+                        ) : null}
+                        <div className="flex flex-wrap items-end gap-3">
+                            <label className="flex flex-col gap-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('payg.capLabel')}
+                                <input
+                                    type="number"
+                                    min={payg.minMonthlyCapCredits}
+                                    max={payg.maxMonthlyCapCredits}
+                                    step="100"
+                                    inputMode="numeric"
+                                    value={paygCap}
+                                    disabled={!paygOn}
+                                    data-testid="billing-payg-cap"
+                                    onChange={(e) => setPaygCap(e.target.value)}
+                                    className="w-40 rounded-md border border-border dark:border-border-dark bg-transparent px-3 py-1.5 text-xs text-text dark:text-text-dark disabled:opacity-50"
+                                />
+                            </label>
+                            {paygCapEstimateCents !== null ? (
+                                <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    ≈ {formatCreditsAsDollars(paygCapEstimateCents)} / cycle at the
+                                    cap
+                                </span>
+                            ) : null}
+                        </div>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('payg.capHint')}{' '}
+                            {t('payg.capRange', {
+                                min: payg.minMonthlyCapCredits.toLocaleString('en-US'),
+                                max: payg.maxMonthlyCapCredits.toLocaleString('en-US'),
+                            })}
+                        </p>
+                        <div>
+                            <p className="text-xs font-medium text-text dark:text-text-dark">
+                                {t('payg.tiersTitle')}
+                            </p>
+                            <ul
+                                className="mt-1 space-y-0.5 text-xs text-text-muted dark:text-text-muted-dark"
+                                data-testid="billing-payg-tiers"
+                            >
+                                {payg.tiers.map((tier, index) => {
+                                    const from =
+                                        index === 0 ? 1 : (payg.tiers[index - 1].upTo ?? 0) + 1;
+                                    return (
+                                        <li key={`${tier.upTo ?? 'inf'}-${tier.centsPerCredit}`}>
+                                            {tier.upTo === null
+                                                ? t('payg.tierRowOpen', {
+                                                      from: from.toLocaleString('en-US'),
+                                                  })
+                                                : t('payg.tierRow', {
+                                                      from: from.toLocaleString('en-US'),
+                                                      to: tier.upTo.toLocaleString('en-US'),
+                                                  })}
+                                            {' — '}
+                                            {t('payg.perCredit', {
+                                                rate: formatCentsPerCredit(tier.centsPerCredit),
+                                            })}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                            <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('payg.invoiceThreshold', {
+                                    amount: formatCreditsAsDollars(payg.invoiceThresholdCents),
+                                })}
+                            </p>
+                        </div>
+                        <Button
+                            variant="secondary"
+                            className="text-xs"
+                            disabled={paygSaving}
+                            data-testid="billing-payg-save"
+                            onClick={() => void handleSavePayg()}
+                        >
+                            {t('payg.save')}
+                        </Button>
+                    </div>
+                )}
+            </SectionCard>
 
             {/* ── Invoice history (PRD §3.5) — fed by the webhook mirror ── */}
             <SectionCard icon={FileText} title={t('invoices.title')} testId="billing-invoices">

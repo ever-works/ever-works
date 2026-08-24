@@ -103,6 +103,33 @@ export const EMPTY_SUBSCRIPTION_STATE: SubscriptionState = {
     manageable: false,
 };
 
+/** One graduated pay-as-you-go tier (billing spec §3.5). `upTo: null` = open-ended. */
+export interface PaygTier {
+    upTo: number | null;
+    /** Cents per credit as a decimal string (Stripe `unit_amount_decimal`). */
+    centsPerCredit: string;
+}
+
+/** `GET /api/billing/payg` / `overview.payg` — pay-as-you-go state (billing spec §3.5). */
+export interface PaygState {
+    /** The provider is configured, so the feature can be turned on at all. */
+    available: boolean;
+    enabled: boolean;
+    subscriptionStatus: SubscriptionLifecycleStatus;
+    /** Arrears invoice failed — overflow suspended until it is paid. */
+    pastDue: boolean;
+    monthlyCapCredits: number;
+    defaultMonthlyCapCredits: number;
+    maxMonthlyCapCredits: number;
+    minMonthlyCapCredits: number;
+    cycleUsedCredits: number;
+    cycleEstimateCents: number;
+    periodStart: string | null;
+    periodEnd: string | null;
+    tiers: PaygTier[];
+    invoiceThresholdCents: number;
+}
+
 export interface BillingOverview {
     status: string;
     /** False ⇒ render the coming-soon state instead of live controls. */
@@ -119,7 +146,12 @@ export interface BillingOverview {
      * than the page crashing on an undefined read.
      */
     subscription?: SubscriptionState;
+    /** Pay-as-you-go (billing spec §3.5). Optional on the wire for older API builds. */
+    payg?: PaygState | null;
 }
+
+/** `PUT /api/billing/payg` response: the success envelope spread over the state. */
+export type PaygMutationResponse = { status: string } & PaygState;
 
 export interface SubscriptionMutationResponse {
     status: string;
@@ -277,6 +309,50 @@ export function canConfigureAutoRecharge(
     paymentsEnabled: boolean,
 ): boolean {
     return canBuyCredits(overview, paymentsEnabled) && Boolean(overview?.paymentMethod);
+}
+
+/**
+ * Pay-as-you-go (billing spec §3.5) is offerable under the same two gates
+ * as buying credits plus a payment method on file (the arrears invoices
+ * charge it). Same single-testable-place rule as {@link canBuyCredits}.
+ */
+export function canConfigurePayg(
+    overview: BillingOverview | null,
+    paymentsEnabled: boolean,
+): boolean {
+    return (
+        canBuyCredits(overview, paymentsEnabled) &&
+        Boolean(overview?.payg?.available) &&
+        Boolean(overview?.paymentMethod)
+    );
+}
+
+/**
+ * What Stripe bills for `credits` in one cycle under graduated tiers, in cents
+ * (same arithmetic as the API's `estimatePaygCents`). Used for the live
+ * estimate while the owner types a cap.
+ */
+export function estimatePaygCents(credits: number, tiers: readonly PaygTier[]): number {
+    if (!Number.isFinite(credits) || credits <= 0) return 0;
+    let remaining = Math.floor(credits);
+    let previousUpTo = 0;
+    let total = 0;
+    for (const tier of tiers) {
+        if (remaining <= 0) break;
+        const span = tier.upTo === null ? remaining : Math.max(0, tier.upTo - previousUpTo);
+        const inTier = Math.min(remaining, span);
+        total += inTier * Number(tier.centsPerCredit);
+        remaining -= inTier;
+        if (tier.upTo !== null) previousUpTo = tier.upTo;
+    }
+    return Math.round(total);
+}
+
+/** `1.00¢`, `0.91¢` — a tier rate for display. */
+export function formatCentsPerCredit(centsPerCredit: string): string {
+    const value = Number(centsPerCredit);
+    if (!Number.isFinite(value)) return `${centsPerCredit}¢`;
+    return `${value.toFixed(2)}¢`;
 }
 
 /**

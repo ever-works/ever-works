@@ -20,6 +20,7 @@ import {
 } from './billing.provider';
 import { CREDIT_PACKS, findCreditPack, type CreditPack } from './credit-packs';
 import { PlanSubscriptionService } from './plan-subscription.service';
+import { PaygService, type PaygStateView } from './payg.service';
 
 /** Correlation refType stamped on every purchase/refund ledger movement. */
 export const BILLING_PAYMENT_REF_TYPE = 'billing-payment';
@@ -104,6 +105,8 @@ export interface BillingOverview {
     };
     /** Real lifecycle state — the status chip is no longer assumed active. */
     subscription: SubscriptionStateView;
+    /** Pay-as-you-go state (billing spec §3.5); `null` when the collaborator is not wired. */
+    payg: PaygStateView | null;
 }
 
 export interface WebhookOutcome {
@@ -125,6 +128,8 @@ export interface WebhookOutcome {
         | 'subscription-activated'
         | 'subscription-canceled'
         | 'subscription-reconciled'
+        // Pay-as-you-go usage subscription lifecycle (billing spec §3.5).
+        | 'payg-reconciled'
         | 'ignored'
         | 'unattributed';
     creditsDelta?: number;
@@ -171,6 +176,12 @@ export class BillingService {
          */
         @Optional()
         private readonly planSubscriptionService?: PlanSubscriptionService,
+        /**
+         * Pay-as-you-go (billing spec §3.5). Appended LAST + `@Optional()`
+         * for the same arity reason as the plan collaborator.
+         */
+        @Optional()
+        private readonly paygService?: PaygService,
     ) {}
 
     /** Server-side pack table — the only source of prices. */
@@ -237,9 +248,19 @@ export class BillingService {
 
     /** One round-trip snapshot for the Billing page (PRD §5.2). */
     async getOverview(userId: string): Promise<BillingOverview> {
-        const [profile, balanceCredits] = await Promise.all([
+        const [profile, balanceCredits, payg] = await Promise.all([
             this.billingProfileRepository.findByUserId(userId),
             this.creditLedgerService.getBalance(userId),
+            this.paygService
+                ? this.paygService.getState(userId).catch((error: unknown) => {
+                      this.logger.warn(
+                          `Billing overview: pay-as-you-go state unavailable for ${userId}: ${
+                              error instanceof Error ? error.message : String(error)
+                          }`,
+                      );
+                      return null;
+                  })
+                : Promise.resolve(null),
         ]);
 
         return {
@@ -263,6 +284,7 @@ export class BillingService {
                 failureCount: profile?.autoRechargeFailureCount ?? 0,
             },
             subscription: this.toSubscriptionState(profile),
+            payg,
         };
     }
 
@@ -469,6 +491,8 @@ export class BillingService {
             case 'subscription.canceled':
             case 'subscription.updated':
                 return this.applySubscription(event);
+            case 'payg.updated':
+                return this.applyPayg(event);
             case 'ignored':
             default:
                 return { eventId: event.id, kind: event.kind, action: 'ignored' };
@@ -514,6 +538,23 @@ export class BillingService {
             return this.unattributed(event);
         }
         return { eventId: event.id, kind: event.kind, action: 'subscription-reconciled' };
+    }
+
+    /**
+     * The pay-as-you-go usage subscription's lifecycle (billing spec §3.5)
+     * — delegated whole to `PaygService`, which owns those columns. Never
+     * reaches `PlanSubscriptionService`: the usage subscription carries no
+     * plan code and must never move a tier.
+     */
+    private async applyPayg(event: BillingWebhookEvent): Promise<WebhookOutcome> {
+        if (!this.paygService) {
+            this.logger.warn(
+                `Billing webhook ${event.id}: pay-as-you-go event received but PAYG is not wired — acknowledged`,
+            );
+            return { eventId: event.id, kind: event.kind, action: 'ignored' };
+        }
+        const action = await this.paygService.applyWebhook(event);
+        return { eventId: event.id, kind: event.kind, action };
     }
 
     private async applyPurchase(event: BillingWebhookEvent): Promise<WebhookOutcome> {
@@ -649,6 +690,20 @@ export class BillingService {
             })),
             issuedAt: snapshot.issuedAt,
         });
+        // A pay-as-you-go invoice also drives the usage subscription's
+        // suspend/resume (billing spec FR-21). Best-effort: a failure here
+        // must not un-mirror the invoice or 500 the delivery.
+        if (snapshot.subscriptionKind === 'payg' && this.paygService) {
+            try {
+                await this.paygService.applyInvoice(profile, snapshot);
+            } catch (error) {
+                this.logger.warn(
+                    `Billing webhook ${event.id}: pay-as-you-go invoice handling failed (ignored): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
         return { eventId: event.id, kind: event.kind, action: 'invoice-mirrored' };
     }
 

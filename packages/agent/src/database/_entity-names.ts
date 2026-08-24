@@ -73,6 +73,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ConversationMessage',
     // Credits ledger (pricing Wave 9 M1)
     'CreditLedgerEntry',
+    // Pay-as-you-go meter events (billing spec §3.5) — the platform-side
+    // mirror of every credit reported to the provider's usage meter
+    'CreditMeterEvent',
     'EmailConversation',
     'EmailMessage',
     // Environments (Settings → Environments) — named, reusable runtime

@@ -8,6 +8,9 @@ import {
     canBuyCredits,
     canCancelSubscription,
     canConfigureAutoRecharge,
+    canConfigurePayg,
+    estimatePaygCents,
+    formatCentsPerCredit,
     canResumeSubscription,
     canUpgradePlan,
     formatCardExpiry,
@@ -21,6 +24,7 @@ import {
     canManagePaymentMethods,
     canRemovePaymentMethod,
     type BillingOverview,
+    type PaygState,
     type SubscriptionState,
     type PaymentMethodRow,
 } from './billing.shared';
@@ -350,5 +354,93 @@ describe('formatters accept a payment-method row (no provider reference needed)'
 
     it('formats the expiry', () => {
         expect(formatCardExpiry(method({ expMonth: 9, expYear: 2030 }))).toBe('09 / 2030');
+    });
+});
+
+// ── Pay-as-you-go (billing spec §3.5) ──────────────────────────────────
+
+function paygState(partial: Partial<PaygState> = {}): PaygState {
+    return {
+        available: true,
+        enabled: false,
+        subscriptionStatus: 'none',
+        pastDue: false,
+        monthlyCapCredits: 10000,
+        defaultMonthlyCapCredits: 10000,
+        maxMonthlyCapCredits: 100000,
+        minMonthlyCapCredits: 500,
+        cycleUsedCredits: 0,
+        cycleEstimateCents: 0,
+        periodStart: null,
+        periodEnd: null,
+        tiers: [
+            { upTo: 5000, centsPerCredit: '1' },
+            { upTo: 25000, centsPerCredit: '0.91' },
+            { upTo: null, centsPerCredit: '0.8' },
+        ],
+        invoiceThresholdCents: 5000,
+        ...partial,
+    };
+}
+
+describe('canConfigurePayg — buy gates + a card on file + the feature being available', () => {
+    const card = { brand: 'visa', last4: '4242', expMonth: 4, expYear: 2031 };
+
+    it('offers pay-as-you-go only when payments are on, the provider is wired, PAYG is available and a card exists', () => {
+        const ready = overview({
+            providerConfigured: true,
+            paymentMethod: card,
+            payg: paygState(),
+        });
+        expect(canConfigurePayg(ready, true)).toBe(true);
+        expect(canConfigurePayg(ready, false)).toBe(false);
+        expect(
+            canConfigurePayg(
+                overview({ providerConfigured: false, paymentMethod: card, payg: paygState() }),
+                true,
+            ),
+        ).toBe(false);
+        expect(
+            canConfigurePayg(
+                overview({ providerConfigured: true, paymentMethod: null, payg: paygState() }),
+                true,
+            ),
+        ).toBe(false);
+        expect(
+            canConfigurePayg(
+                overview({
+                    providerConfigured: true,
+                    paymentMethod: card,
+                    payg: paygState({ available: false }),
+                }),
+                true,
+            ),
+        ).toBe(false);
+        expect(
+            canConfigurePayg(overview({ providerConfigured: true, paymentMethod: card }), true),
+        ).toBe(false);
+        expect(canConfigurePayg(null, true)).toBe(false);
+    });
+});
+
+describe('estimatePaygCents — graduated arithmetic shared with the API', () => {
+    const tiers = paygState().tiers;
+
+    it('bills each span at its own rate and rounds once at the end', () => {
+        expect(estimatePaygCents(0, tiers)).toBe(0);
+        expect(estimatePaygCents(-3, tiers)).toBe(0);
+        expect(estimatePaygCents(5000, tiers)).toBe(5000);
+        expect(estimatePaygCents(6000, tiers)).toBe(5000 + 910);
+        expect(estimatePaygCents(30000, tiers)).toBe(5000 + 18200 + 4000);
+        // Fractional credits are floored — the ledger only ever holds integers.
+        expect(estimatePaygCents(10.9, tiers)).toBe(11 - 1); // 10 credits × 1¢
+    });
+});
+
+describe('formatCentsPerCredit — display rate', () => {
+    it('renders two decimals with the cent sign', () => {
+        expect(formatCentsPerCredit('1')).toBe('1.00¢');
+        expect(formatCentsPerCredit('0.91')).toBe('0.91¢');
+        expect(formatCentsPerCredit('0.8')).toBe('0.80¢');
     });
 });

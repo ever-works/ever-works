@@ -308,6 +308,91 @@ export class NotificationService {
         });
     }
 
+    /**
+     * Billing spec FR-20 — pay-as-you-go usage reached 80% / 100% of the
+     * owner's monthly cap. At 100% new runs are parked until the cap is
+     * raised, a pack is bought, or the cycle rolls. One notification per
+     * threshold per cycle (the caller latches on the billing profile).
+     */
+    async notifyPaygCapThreshold(args: {
+        userId: string;
+        percent: 80 | 100;
+        usedCredits: number;
+        capCredits: number;
+        periodEnd: Date | null;
+    }): Promise<void> {
+        const used = Math.max(0, Math.trunc(args.usedCredits));
+        const cap = Math.max(0, Math.trunc(args.capCredits));
+        const resets = args.periodEnd
+            ? ` The cycle resets on ${args.periodEnd.toISOString().slice(0, 10)}.`
+            : '';
+        const reached = args.percent >= 100;
+        const title = reached ? 'Pay-as-you-go cap reached' : 'Pay-as-you-go at 80% of cap';
+        const message = reached
+            ? `Your pay-as-you-go usage reached your monthly cap (${used} of ${cap} credits). New runs ` +
+              `that need credits are paused until you raise the cap, buy a credit pack, or the cycle ` +
+              `resets.${resets}`
+            : `Your pay-as-you-go usage is at ${used} of ${cap} credits this cycle (80%). Raise the cap ` +
+              `in Billing if you want to keep going past it.${resets}`;
+        await this.create({
+            userId: args.userId,
+            type: reached ? NotificationType.WARNING : NotificationType.INFO,
+            category: NotificationCategory.AI_CREDITS,
+            title,
+            message,
+            actionUrl: '/settings/billing',
+            actionLabel: 'Manage pay-as-you-go',
+            isPersistent: reached,
+            metadata: { percent: args.percent, usedCredits: used, capCredits: cap },
+            deduplicationKey: `payg_cap_${args.percent}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: `payg_cap_${args.percent}`,
+            title,
+            message,
+            actionUrl: '/settings/billing',
+            actionLabel: 'Manage pay-as-you-go',
+            urgent: reached,
+        });
+    }
+
+    /**
+     * Billing spec FR-21 — a pay-as-you-go invoice could not be collected.
+     * Overflow is suspended until it is paid (the portal link recovers it).
+     */
+    async notifyPaygPastDue(args: { userId: string; amountCents: number | null }): Promise<void> {
+        const amount =
+            typeof args.amountCents === 'number'
+                ? ` ($${(args.amountCents / 100).toFixed(2)})`
+                : '';
+        const message =
+            `We could not collect your latest pay-as-you-go invoice${amount}. Pay-as-you-go is paused ` +
+            `until it is settled; prepaid credits keep working. Update your card or retry the payment ` +
+            `from Billing.`;
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.ERROR,
+            category: NotificationCategory.AI_CREDITS,
+            title: 'Pay-as-you-go payment failed',
+            message,
+            actionUrl: '/settings/billing',
+            actionLabel: 'Fix payment',
+            isPersistent: true,
+            metadata: { amountCents: args.amountCents },
+            deduplicationKey: 'payg_past_due',
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'payg_past_due',
+            title: 'Pay-as-you-go payment failed',
+            message,
+            actionUrl: '/settings/billing',
+            actionLabel: 'Fix payment',
+            urgent: true,
+        });
+    }
+
     async notifyAiProviderError(
         userId: string,
         provider: string,

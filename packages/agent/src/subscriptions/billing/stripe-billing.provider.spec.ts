@@ -767,6 +767,10 @@ describe('StripeBillingProvider — event normalization', () => {
             cancelAtPeriodEnd: true,
             currentPeriodEnd: new Date(1_790_000_000 * 1000),
             canceledAt: null,
+            // Billing spec §3.5 — the snapshot also carries the period
+            // start + first item (this fixture sets no period start).
+            currentPeriodStart: null,
+            subscriptionItemId: 'si_1',
         });
     });
 
@@ -873,6 +877,8 @@ describe('StripeBillingProvider — subscription mutations + portal (B07/B08)', 
             cancelAtPeriodEnd: true,
             currentPeriodEnd: new Date(1_790_000_000 * 1000),
             canceledAt: null,
+            currentPeriodStart: null,
+            subscriptionItemId: null,
         });
     });
 
@@ -1738,5 +1744,340 @@ describe('Stripe Tax — every session that CHARGES asks for tax', () => {
         const params = client.checkout.sessions.create.mock.calls[0][0];
         expect(params.mode).toBe('setup');
         expect(Boolean(params.currency) || Boolean(params.payment_method_types?.length)).toBe(true);
+describe('StripeBillingProvider — pay-as-you-go (billing spec §3.5)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        process.env.STRIPE_WEBHOOK_SECRET = 'whsec_x';
+    });
+
+    const subscriptionObject = {
+        id: 'sub_payg',
+        customer: 'cus_1',
+        status: 'active',
+        cancel_at_period_end: false,
+        canceled_at: null,
+        currency: 'usd',
+        metadata: {
+            [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.paygSubscription,
+            [STRIPE_METADATA_KEYS.userId]: 'u1',
+            [STRIPE_METADATA_KEYS.referenceId]: 'u1:payg',
+        },
+        items: {
+            data: [
+                {
+                    id: 'si_payg',
+                    current_period_start: 1_787_000_000,
+                    current_period_end: 1_789_600_000,
+                },
+            ],
+        },
+    };
+
+    function withPayg(overrides: Record<string, unknown> = {}) {
+        const client = fakeClient({
+            prices: {
+                list: jest.fn().mockResolvedValue({ data: [{ id: 'price_payg' }] }),
+            },
+            subscriptions: {
+                create: jest.fn().mockResolvedValue(subscriptionObject),
+                cancel: jest.fn().mockResolvedValue({
+                    ...subscriptionObject,
+                    status: 'canceled',
+                    canceled_at: 1_788_000_000,
+                }),
+                retrieve: jest.fn().mockResolvedValue(subscriptionObject),
+            },
+            billing: {
+                meterEvents: { create: jest.fn().mockResolvedValue({ identifier: 'run:r1' }) },
+            },
+            ...overrides,
+        });
+        return build(client);
+    }
+
+    const request = {
+        userId: 'u1',
+        customerId: 'cus_1',
+        paymentMethodRef: 'pm_1',
+        lookupKey: 'ever_works_payg_credits_monthly',
+        invoiceThresholdCents: 5000,
+        referenceId: 'u1:payg',
+    };
+
+    it('creates the usage subscription from the CATALOG price (never inline), with thresholds, card and our metadata', async () => {
+        const { provider, client } = withPayg();
+
+        const snapshot = await provider.createMeteredSubscription(request);
+
+        expect(client.prices.list).toHaveBeenCalledWith({
+            lookup_keys: ['ever_works_payg_credits_monthly'],
+            active: true,
+            limit: 1,
+        });
+        expect(client.subscriptions.create).toHaveBeenCalledWith(
+            {
+                customer: 'cus_1',
+                items: [{ price: 'price_payg' }],
+                collection_method: 'charge_automatically',
+                default_payment_method: 'pm_1',
+                billing_thresholds: { amount_gte: 5000, reset_billing_cycle_anchor: false },
+                metadata: {
+                    [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.paygSubscription,
+                    [STRIPE_METADATA_KEYS.userId]: 'u1',
+                    [STRIPE_METADATA_KEYS.referenceId]: 'u1:payg',
+                },
+            },
+            { idempotencyKey: 'payg-enable:u1:cus_1' },
+        );
+        expect(snapshot).toEqual({
+            subscriptionId: 'sub_payg',
+            status: 'active',
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: new Date(1_789_600_000 * 1000),
+            canceledAt: null,
+            currentPeriodStart: new Date(1_787_000_000 * 1000),
+            subscriptionItemId: 'si_payg',
+        });
+    });
+
+    // Same posture as every charging Checkout session (STRIPE_TAX_SESSION_FIELDS):
+    // the account has Stripe Tax active with live registrations, so an arrears
+    // invoice that shipped without a tax line would be VAT out of margin.
+    it('always asks for automatic tax on the usage subscription, and never the Checkout-only tax params', async () => {
+        const { provider, client } = withPayg();
+        await provider.createMeteredSubscription(request);
+        const params = client.subscriptions.create.mock.calls[0][0];
+        expect(params.automatic_tax).toEqual({ enabled: true });
+        // `customer_update` / `tax_id_collection` are Checkout-only — Stripe
+        // rejects them on subscriptions.create.
+        expect(params.customer_update).toBeUndefined();
+        expect(params.tax_id_collection).toBeUndefined();
+    });
+
+    it('refuses to create the usage subscription when the catalog price is not in this account (no inline fallback)', async () => {
+        const { provider, client } = withPayg({
+            prices: { list: jest.fn().mockResolvedValue({ data: [] }) },
+        });
+        await expect(provider.createMeteredSubscription(request)).rejects.toMatchObject({
+            name: 'BillingProviderError',
+            code: 'payg-price-missing',
+        });
+        expect(client.subscriptions.create).not.toHaveBeenCalled();
+    });
+
+    it('cancels the usage subscription IMMEDIATELY and invoices accrued usage now', async () => {
+        const { provider, client } = withPayg();
+        const snapshot = await provider.cancelMeteredSubscriptionNow({
+            subscriptionId: 'sub_payg',
+        });
+        expect(client.subscriptions.cancel).toHaveBeenCalledWith('sub_payg', {
+            invoice_now: true,
+            prorate: false,
+        });
+        expect(snapshot.status).toBe('canceled');
+        expect(snapshot.canceledAt).toEqual(new Date(1_788_000_000 * 1000));
+    });
+
+    it('reports a meter event with the identifier as BOTH payload identifier and request idempotency key', async () => {
+        const { provider, client } = withPayg();
+        const when = new Date('2026-09-10T12:00:00.000Z');
+
+        const outcome = await provider.reportMeterEvent({
+            eventName: 'ever_works_credits',
+            customerId: 'cus_1',
+            value: 380,
+            identifier: 'run:r1',
+            timestamp: when,
+        });
+
+        expect(outcome).toEqual({ status: 'accepted' });
+        expect(client.billing.meterEvents.create).toHaveBeenCalledWith(
+            {
+                event_name: 'ever_works_credits',
+                identifier: 'run:r1',
+                timestamp: Math.floor(when.getTime() / 1000),
+                payload: { stripe_customer_id: 'cus_1', value: '380' },
+            },
+            { idempotencyKey: 'run:r1' },
+        );
+    });
+
+    it('returns (never throws) a provider refusal, flagging a timestamp-window refusal as terminal', async () => {
+        const { provider, client } = withPayg();
+        client.billing.meterEvents.create
+            .mockRejectedValueOnce(Object.assign(new Error('Rate limited'), { code: 'rate_limit' }))
+            .mockRejectedValueOnce(
+                Object.assign(new Error('The timestamp must be within the past 35 days'), {
+                    code: 'invalid_request_error',
+                }),
+            );
+        const req = {
+            eventName: 'ever_works_credits',
+            customerId: 'cus_1',
+            value: 1,
+            identifier: 'run:r2',
+            timestamp: new Date(),
+        };
+        await expect(provider.reportMeterEvent(req)).resolves.toEqual({
+            status: 'failed',
+            failureCode: 'rate_limit',
+            terminal: false,
+        });
+        await expect(provider.reportMeterEvent(req)).resolves.toMatchObject({
+            status: 'failed',
+            terminal: true,
+        });
+    });
+
+    it('fails closed on every pay-as-you-go call without a secret key', async () => {
+        delete process.env.STRIPE_SECRET_KEY;
+        const { provider, factory } = build();
+        await expect(provider.retrieveSubscriptionSnapshot('sub_payg')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        await expect(
+            provider.reportMeterEvent({
+                eventName: 'x',
+                customerId: 'cus_1',
+                value: 1,
+                identifier: 'run:r3',
+                timestamp: new Date(),
+            }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        expect(factory).not.toHaveBeenCalled();
+    });
+
+    describe('normalization', () => {
+        function parse(raw: any) {
+            const client = fakeClient({
+                webhooks: { constructEvent: jest.fn().mockReturnValue(raw) },
+            });
+            const { provider } = build(client);
+            return provider.verifyAndParseWebhook('{}', 'sig');
+        }
+
+        it('routes the usage subscription to payg.updated — never to a plan-tier kind', async () => {
+            const normalized = await parse({
+                id: 'evt_p1',
+                type: 'customer.subscription.updated',
+                data: { object: { ...subscriptionObject, status: 'past_due' } },
+            });
+            expect(normalized.kind).toBe('payg.updated');
+            expect(normalized.subscriptionId).toBe('sub_payg');
+            expect(normalized.customerId).toBe('cus_1');
+            expect(normalized.referenceId).toBe('u1:payg');
+            expect(normalized.subscription).toEqual(
+                expect.objectContaining({
+                    status: 'past_due',
+                    currentPeriodStart: new Date(1_787_000_000 * 1000),
+                    subscriptionItemId: 'si_payg',
+                }),
+            );
+            expect(normalized.planCode).toBeUndefined();
+        });
+
+        it('a deleted usage subscription is terminal regardless of the object status', async () => {
+            const normalized = await parse({
+                id: 'evt_p2',
+                type: 'customer.subscription.deleted',
+                data: { object: subscriptionObject },
+            });
+            expect(normalized.kind).toBe('payg.updated');
+            expect(normalized.subscription?.status).toBe('canceled');
+        });
+
+        it('tags a pay-as-you-go invoice with its subscription kind and flags payment failures', async () => {
+            const invoice = {
+                id: 'in_1',
+                customer: 'cus_1',
+                status: 'open',
+                total: 380,
+                subtotal: 380,
+                amount_paid: 0,
+                currency: 'usd',
+                lines: { data: [] },
+                parent: {
+                    type: 'subscription_details',
+                    subscription_details: {
+                        subscription: 'sub_payg',
+                        metadata: {
+                            [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.paygSubscription,
+                        },
+                    },
+                },
+            };
+            const failed = await parse({
+                id: 'evt_i1',
+                type: 'invoice.payment_failed',
+                data: { object: invoice },
+            });
+            expect(failed.kind).toBe('invoice.updated');
+            expect(failed.invoice).toEqual(
+                expect.objectContaining({
+                    subscriptionId: 'sub_payg',
+                    subscriptionKind: 'payg',
+                    paymentFailed: true,
+                }),
+            );
+            const paid = await parse({
+                id: 'evt_i2',
+                type: 'invoice.paid',
+                data: { object: { ...invoice, status: 'paid', amount_paid: 380 } },
+            });
+            expect(paid.invoice).toEqual(
+                expect.objectContaining({
+                    subscriptionKind: 'payg',
+                    paymentFailed: false,
+                    status: 'paid',
+                }),
+            );
+        });
+
+        it('tags a plan invoice as plan and a one-off as null (legacy top-level fields still read)', async () => {
+            const legacy = await parse({
+                id: 'evt_i3',
+                type: 'invoice.paid',
+                data: {
+                    object: {
+                        id: 'in_2',
+                        customer: 'cus_1',
+                        status: 'paid',
+                        total: 2500,
+                        subtotal: 2500,
+                        amount_paid: 2500,
+                        currency: 'usd',
+                        lines: { data: [] },
+                        subscription: 'sub_plan',
+                        subscription_details: {
+                            metadata: {
+                                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                            },
+                        },
+                    },
+                },
+            });
+            expect(legacy.invoice).toEqual(
+                expect.objectContaining({ subscriptionId: 'sub_plan', subscriptionKind: 'plan' }),
+            );
+            const oneOff = await parse({
+                id: 'evt_i4',
+                type: 'invoice.paid',
+                data: {
+                    object: {
+                        id: 'in_3',
+                        customer: 'cus_1',
+                        status: 'paid',
+                        total: 1000,
+                        subtotal: 1000,
+                        amount_paid: 1000,
+                        currency: 'usd',
+                        lines: { data: [] },
+                    },
+                },
+            });
+            expect(oneOff.invoice).toEqual(
+                expect.objectContaining({ subscriptionId: null, subscriptionKind: null }),
+            );
+        });
     });
 });

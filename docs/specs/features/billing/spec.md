@@ -121,7 +121,7 @@ This spec closes the five gaps found in the 2026-08-23 audit:
 - **FR-19** `cycleUsed` MUST be computed locally from `credit_meter_events` in `[paygPeriodStart, paygPeriodEnd)`; the dispatch gate MUST admit when `balance > 0 || (payg active && cycleUsed < cap)`.
 - **FR-20** Notifications MUST fire at 80 % and 100 % of the cap (once per cycle each).
 - **FR-21** Webhooks: `customer.subscription.*` with kind `payg-subscription` → `payg.updated` (status/period reconcile, never touches the plan tier); `invoice.payment_failed` whose subscription is the PAYG one → `paygStatus=past_due` + notification; `invoice.paid` on it → `paygStatus=active`; all invoices keep being mirrored.
-- **FR-22** Checkout sessions and the PAYG subscription MUST set `automatic_tax.enabled=true` when `STRIPE_AUTOMATIC_TAX=true` (Stripe Tax must be activated on the shared account first — un-provisioned external state, hence the flag) and `tax_id_collection.enabled=true` on hosted checkout regardless; customers created by the platform set `tax.validate_location=immediately` only when automatic tax is on.
+- **FR-22** Every provider session that CHARGES (credit pack, plan, licence) and the PAYG subscription MUST carry Stripe Tax. On hosted checkout that means `automatic_tax` + `customer_update: {address:'auto', name:'auto'}` + `tax_id_collection`; on the PAYG subscription only `automatic_tax` (the other two are Checkout-only and Stripe rejects them). `mode: 'setup'` sessions MUST NOT ask for tax — saving a card charges nothing. No env flag: the shared account has Stripe Tax active with live registrations.
 - **FR-23** A Trigger.dev task `credits-meter-flush` (every 5 min) MUST resend `pending|failed` meter events (< 35 days old) and a daily task MUST run expiries, daily grants and plan grants (extend `credits-daily-grant`).
 - **FR-24** The Billing page MUST show a PAYG card: toggle, cap input, this-cycle credits + estimated amount (computed from the catalog tiers), status chip (on/off/past due), next invoice date, explanatory copy with the tier table; the Usage page MUST show "Pay-as-you-go this cycle" in the tiles.
 - **FR-25** The legacy per-run `billingMode=usage` path (`UsageLedgerService`, `PAY_PER_USE_PRICE_USD`, `recordUsageCharge`) is **deprecated** by this spec, left in place (removal needs owner confirmation — tracked in Jira), and documented as dead.
@@ -160,7 +160,7 @@ This spec closes the five gaps found in the 2026-08-23 audit:
 
 - Confirm 35 % margin and the PAYG tier rates (single JSON edit to change).
 - Confirm cap defaults (10,000 default / 100,000 max).
-- Live-mode catalog sync and prod env wiring (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYMENTS_ENABLED`, `SUBSCRIPTIONS_ENABLED`, `STRIPE_AUTOMATIC_TAX`) are operator actions — see the runbook.
+- Live-mode catalog sync and prod env wiring (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYMENTS_ENABLED`, `SUBSCRIPTIONS_ENABLED`) are operator actions — see the runbook.
 
 ## 7. Follow-ups (ticketed)
 

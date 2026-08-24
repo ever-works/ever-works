@@ -11,10 +11,21 @@
  * purpose — you cannot reach live by forgetting an argument.
  *
  * This is the Ever Works twin of ever-co/ever-website's scripts/stripe-sync-catalog.mjs, and it
- * writes into the SAME shared Stripe account. It differs in three ways, all additive:
+ * writes into the SAME shared Stripe account. It differs in four ways, all additive:
  *   1. it syncs ONE product family (Ever Works) rather than a list of them;
  *   2. it also emits per-additional-seat prices (`…_seat_monthly` / `…_seat_annual`);
- *   3. it also emits one-time credit-pack prices (`ever_works_credits_<n>`).
+ *   3. it also emits one-time credit-pack prices (`ever_works_credits_<n>`);
+ *   4. it also emits the pay-as-you-go Billing Meter + ONE metered, graduated price
+ *      (`ever_works_payg_credits_monthly`) — billing spec docs/specs/features/billing/spec.md §3.5.
+ *
+ * ## Pay-as-you-go objects
+ * The meter is matched on `event_name` among ACTIVE meters and never deleted (Stripe only allows
+ * deactivation, and a meter with history must stay). The metered price is matched on `lookup_key`
+ * like every other price; a tier change supersedes it (new price + transfer_lookup_key + archive
+ * old), exactly like an amount change on a flat price.
+ *
+ * NN #22 note: this script deliberately mirrors the account-wide sync (raw fetch + a pinned
+ * Stripe-Version) so the two stay byte-comparable; the runtime provider uses the official SDK.
  *
  * ## Idempotency
  * Products are matched on metadata `ever_sku` (a stable per-SKU id); prices on `lookup_key`.
@@ -82,6 +93,7 @@ async function stripe(method, path, body) {
 			Authorization: `Bearer ${KEY}`,
 			'Content-Type': 'application/x-www-form-urlencoded',
 			// Kept in step with the account-wide sync script so both see the same API shape.
+			// (Billing Meters + metered prices are GA since 2024-04 — well inside this version.)
 			'Stripe-Version': '2025-02-24.acacia'
 		},
 		body: body ? encodeForm(body).join('&') : undefined
@@ -145,6 +157,39 @@ function priceMatches(existing, amountCents, interval) {
 	if (existing.unit_amount !== amountCents) return false;
 	if (existing.currency !== CURRENCY) return false;
 	return (existing.recurring?.interval ?? null) === recurringInterval(interval);
+}
+
+/* ----------------------------------------------------------- pay-as-you-go */
+
+const PAYG = catalog.payg ?? null;
+const paygSkuId = () => `ever_${PRODUCT}_payg_credits`;
+
+/** Stripe tier shape for the metered price: `up_to` is a number or the string "inf". */
+function paygTiersParam() {
+	return PAYG.tiers.map((tier) => ({
+		up_to: tier.upTo === null ? 'inf' : tier.upTo,
+		unit_amount_decimal: String(tier.centsPerCredit)
+	}));
+}
+
+/**
+ * True when an existing metered price still matches the catalog tiers + meter. Stripe returns
+ * `unit_amount_decimal` as a string and `up_to` as a number or null (for inf), so compare
+ * normalized shapes rather than raw objects. `tiers` is only returned when expanded.
+ */
+function paygPriceMatches(existing, meterId) {
+	if (existing.currency !== CURRENCY) return false;
+	if (existing.recurring?.interval !== 'month') return false;
+	if (existing.recurring?.usage_type !== 'metered') return false;
+	if ((existing.recurring?.meter ?? null) !== meterId) return false;
+	if (existing.billing_scheme !== 'tiered' || existing.tiers_mode !== 'graduated') return false;
+	const got = (existing.tiers ?? []).map((t) => [t.up_to ?? null, Number(t.unit_amount_decimal)]);
+	const want = PAYG.tiers.map((t) => [t.upTo, Number(t.centsPerCredit)]);
+	return JSON.stringify(got) === JSON.stringify(want);
+}
+
+function describePaygTiers() {
+	return PAYG.tiers.map((t) => `${t.upTo === null ? '∞' : t.upTo}@${t.centsPerCredit}¢`).join(' / ');
 }
 
 /**
@@ -267,7 +312,8 @@ async function main() {
 	}
 
 	const existingProducts = await listAll('/products?active=true');
-	const existingPrices = await listAll('/prices?active=true');
+	// `tiers` is not returned by default; expand it so the metered price can be compared.
+	const existingPrices = await listAll('/prices?active=true&expand[]=data.tiers');
 
 	const productBySku = new Map();
 	for (const p of existingProducts) {
@@ -369,6 +415,11 @@ async function main() {
 		}
 	}
 
+	// ---------------------------------------------------------- pay-as-you-go
+	if (PAYG) {
+		await syncPayg({ productBySku, priceByLookup, drift });
+	}
+
 	if (VERIFY) {
 		if (drift.length === 0) {
 			console.log(`Stripe matches the catalog — ${intents.length} price(s) verified, 0 drift.\n`);
@@ -387,6 +438,133 @@ async function main() {
 				: `${changes.length} change(s)${DRY_RUN ? ' would be applied.' : ' applied.'}`
 		}\n`
 	);
+}
+
+/**
+ * Pay-as-you-go: ONE Billing Meter + ONE metered, graduated monthly price.
+ *
+ * Meter: matched on `event_name` among active meters; created when missing; never deleted. A meter's
+ * aggregation/mapping cannot change after creation, so drift there is reported, not fixed.
+ * Price: matched on `lookup_key`; a tier/meter mismatch supersedes the price like a flat-price
+ * amount change (new price, transfer_lookup_key, archive old). Existing pay-as-you-go subscriptions
+ * stay on the price they were created with — Stripe's behaviour, and what you want.
+ */
+async function syncPayg({ productBySku, priceByLookup, drift }) {
+	const lookupKey = PAYG.lookupKey;
+	if (!lookupKey.startsWith(KEY_PREFIX)) {
+		throw new Error(`Refusing to run: payg lookup key "${lookupKey}" is outside "${KEY_PREFIX}"`);
+	}
+
+	// --- meter
+	const meters = await listAll('/billing/meters?status=active');
+	let meter = meters.find((m) => m.event_name === PAYG.meterEventName) ?? null;
+	if (!meter) {
+		if (VERIFY) {
+			drift.push(`missing billing meter "${PAYG.meterEventName}"`);
+		} else {
+			note('create', `meter ${PAYG.meterEventName}`, `sum(value) by stripe_customer_id`);
+			if (DRY_RUN) {
+				meter = { id: `dry_run_meter_${PAYG.meterEventName}`, event_name: PAYG.meterEventName };
+			} else {
+				meter = await stripe('POST', '/billing/meters', {
+					display_name: PAYG.meterDisplayName,
+					event_name: PAYG.meterEventName,
+					default_aggregation: { formula: 'sum' },
+					customer_mapping: { event_payload_key: 'stripe_customer_id', type: 'by_id' },
+					value_settings: { event_payload_key: 'value' }
+				});
+			}
+		}
+	} else {
+		const aggregation = meter.default_aggregation?.formula;
+		if (aggregation && aggregation !== 'sum') {
+			drift.push(`billing meter "${PAYG.meterEventName}" aggregates with ${aggregation}, catalog needs sum`);
+		}
+	}
+	if (!meter) return; // verify mode, missing meter — the price check below would be meaningless.
+
+	// --- product
+	const sku = paygSkuId();
+	const productMeta = {
+		ever_product: PRODUCT,
+		ever_sku: sku,
+		ever_site: catalog.site,
+		ever_unit: 'credits',
+		ever_billing: 'metered',
+		ever_meter_event: PAYG.meterEventName
+	};
+	let product = productBySku.get(sku);
+	if (!product) {
+		if (VERIFY) {
+			drift.push(`missing product ${sku} (${PAYG.productName})`);
+			return;
+		}
+		note('create', `product ${PAYG.productName}`);
+		product = DRY_RUN
+			? { id: `dry_run_${sku}`, name: PAYG.productName, metadata: productMeta }
+			: await stripe('POST', '/products', { name: PAYG.productName, metadata: productMeta });
+		productBySku.set(sku, product);
+	} else if (product.name !== PAYG.productName) {
+		if (VERIFY) {
+			drift.push(`product ${sku} named "${product.name}", catalog says "${PAYG.productName}"`);
+		} else {
+			note('rename', `product ${product.name}`, `-> ${PAYG.productName}`);
+			if (!DRY_RUN) {
+				await stripe('POST', `/products/${product.id}`, { name: PAYG.productName, metadata: productMeta });
+			}
+		}
+	}
+
+	// --- metered price
+	const existing = priceByLookup.get(lookupKey);
+	if (existing && paygPriceMatches(existing, meter.id)) return;
+
+	if (VERIFY) {
+		drift.push(
+			existing
+				? `price ${lookupKey} tiers/meter differ from the catalog (${describePaygTiers()}, meter ${meter.id})`
+				: `missing price ${lookupKey} (metered, graduated: ${describePaygTiers()})`
+		);
+		return;
+	}
+
+	const body = {
+		product: product.id,
+		currency: CURRENCY,
+		lookup_key: lookupKey,
+		billing_scheme: 'tiered',
+		tiers_mode: 'graduated',
+		recurring: { interval: 'month', usage_type: 'metered', meter: meter.id },
+		metadata: {
+			ever_product: PRODUCT,
+			ever_sku: sku,
+			ever_unit: 'credits',
+			ever_billing: 'metered',
+			ever_meter_event: PAYG.meterEventName,
+			ever_tiers: describePaygTiers()
+		}
+	};
+	// Stripe wants tiers as an indexed array: tiers[0][up_to]=…; encodeForm handles nested objects
+	// but not arrays, so spell the indices out.
+	paygTiersParam().forEach((tier, i) => {
+		body[`tiers[${i}][up_to]`] = tier.up_to;
+		body[`tiers[${i}][unit_amount_decimal]`] = tier.unit_amount_decimal;
+	});
+
+	if (existing) {
+		note('replace', `price ${lookupKey}`, `-> metered graduated ${describePaygTiers()}`);
+		if (!DRY_RUN) {
+			const created = await stripe('POST', '/prices', { ...body, transfer_lookup_key: 'true' });
+			await stripe('POST', `/prices/${existing.id}`, { active: 'false' });
+			priceByLookup.set(lookupKey, created);
+		}
+		return;
+	}
+	note('create', `price ${lookupKey}`, `metered graduated ${describePaygTiers()} on meter ${meter.id}`);
+	if (!DRY_RUN) {
+		const created = await stripe('POST', '/prices', body);
+		priceByLookup.set(lookupKey, created);
+	}
 }
 
 main().catch((err) => {
