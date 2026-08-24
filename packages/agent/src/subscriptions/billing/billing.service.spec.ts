@@ -515,6 +515,54 @@ describe('BillingService — webhook: refunds', () => {
         expect(outcome.creditsDelta).toBe(0);
     });
 
+    // 🛑 A CHARGEBACK, not a refund. Stripe's `Dispute` object has no
+    // `customer` field — only `charge` and `payment_intent` — so
+    // `charge.dispute.created` reaches the service with `customerId: null`
+    // and `referenceId: null`, which are the only two inputs
+    // `resolveProfile` has. Before the fix it resolved to no profile and the
+    // reversal was skipped as "unattributed": the customer kept the credits
+    // AND got the money back. The purchase row carries the owner, so the
+    // reversal must still land — against that owner.
+    it('reverses a chargeback that carries no customer id, using the purchase row owner', async () => {
+        const profiles = makeProfileRepository(null); // no profile resolvable — as on a dispute
+        const ledgerRepo = makeLedgerRepository({
+            findLatestByRef: jest.fn().mockResolvedValue({
+                id: 'cle_1',
+                userId: 'u_disputed',
+                organizationId: 'org_9',
+                tenantId: 't_9',
+                amountCredits: 25000,
+                costCentsRef: 20000,
+            }),
+        });
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    id: 'evt_dispute',
+                    kind: 'credits.refunded',
+                    customerId: null,
+                    referenceId: null,
+                    amountCents: 20000,
+                    paymentId: 'pi_disputed',
+                }),
+            ),
+        });
+        const { service, ledgerService } = build({ provider, profiles, ledgerRepo });
+
+        const outcome = await service.handleWebhook('{}', 'sig');
+
+        expect(outcome.action).toBe('reversed');
+        expect(ledgerService.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'u_disputed',
+                organizationId: 'org_9',
+                tenantId: 't_9',
+                kind: CreditLedgerKind.ADJUSTMENT,
+                amountCredits: -25000,
+                allowNegativeBalance: true,
+            }),
+        );
+    });
     it('ignores a refund with no matching purchase rather than guessing', async () => {
         const profiles = makeProfileRepository(PROFILE);
         const provider = makeProvider({
