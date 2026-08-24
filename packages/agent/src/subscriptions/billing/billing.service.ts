@@ -119,6 +119,8 @@ export interface WebhookOutcome {
         | 'credited-idempotent'
         | 'reversed'
         | 'reversed-idempotent'
+        | 'plan-revoked'
+        | 'licence-refunded'
         | 'invoice-mirrored'
         | 'payment-method-updated'
         | 'payment-method-removed'
@@ -621,6 +623,10 @@ export class BillingService {
             description: 'Refund / chargeback reversal',
         });
         if (result.status === 'missing-purchase') {
+            if (this.planSubscriptionService) {
+                const reversal = await this.planSubscriptionService.applyPaymentReversal(event);
+                return { eventId: event.id, kind: event.kind, action: reversal.action };
+            }
             this.logger.warn(
                 `Billing webhook ${event.id}: refund has no matching purchase — ignored`,
             );

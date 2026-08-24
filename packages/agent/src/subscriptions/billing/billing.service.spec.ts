@@ -642,6 +642,34 @@ describe('BillingService — webhook: refunds', () => {
         expect(ledgerService.record).not.toHaveBeenCalled();
     });
 
+    it('delegates a non-credit payment reversal to the plan reconciler', async () => {
+        const plans = {
+            applyPaymentReversal: jest.fn().mockResolvedValue({ action: 'plan-revoked' }),
+        };
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    id: 'evt_plan_refund',
+                    kind: 'credits.refunded',
+                    customerId: null,
+                    paymentId: 'pi_plan_1',
+                    amountCents: 2900,
+                    reversal: { reason: 'refund', fullyReversed: true },
+                }),
+            ),
+        });
+        const { service } = build({ provider, plans });
+
+        await expect(service.handleWebhook('{}', 'sig')).resolves.toEqual({
+            eventId: 'evt_plan_refund',
+            kind: 'credits.refunded',
+            action: 'plan-revoked',
+        });
+        expect(plans.applyPaymentReversal).toHaveBeenCalledWith(
+            expect.objectContaining({ paymentId: 'pi_plan_1' }),
+        );
+    });
+
     it('delegates cumulative refund accounting to the atomic ledger path', async () => {
         const ledgerRepo = makeLedgerRepository({
             recordCumulativeRefundAtomic: jest.fn().mockResolvedValue({

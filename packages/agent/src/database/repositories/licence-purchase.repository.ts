@@ -38,6 +38,22 @@ export class LicencePurchaseRepository {
         return this.repository.count({ where: { userId, planCode } });
     }
 
+    findByProviderPayment(
+        provider: string,
+        providerPaymentId: string,
+    ): Promise<LicencePurchase | null> {
+        return this.repository.findOne({ where: { provider, providerPaymentId } });
+    }
+
+    /** Compare-and-set transition: true only for the first successful reversal. */
+    async markRefunded(id: string, refundedAt: Date = new Date()): Promise<boolean> {
+        const result = await this.repository.update(
+            { id, status: LicencePurchaseStatus.ACTIVE },
+            { status: LicencePurchaseStatus.REFUNDED, refundedAt },
+        );
+        return (result.affected ?? 0) > 0;
+    }
+
     /**
      * Provider-event idempotency: webhook replay and return-route sync both
      * carry the same payment id and converge on the same row. A previously

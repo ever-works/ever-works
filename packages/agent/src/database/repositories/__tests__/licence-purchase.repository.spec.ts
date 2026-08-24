@@ -14,6 +14,7 @@ function build() {
         findOne: jest.fn(),
         find: jest.fn(),
         count: jest.fn(),
+        update: jest.fn(),
         create: jest.fn((value) => value),
         save: jest.fn(),
     } as any;
@@ -47,5 +48,31 @@ describe('LicencePurchaseRepository', () => {
         repository.save.mockRejectedValue(failure);
 
         await expect(service.recordPurchase(write)).rejects.toBe(failure);
+    });
+
+    it('finds a purchase by its provider payment correlation', async () => {
+        const { service, repository } = build();
+        const purchase = { id: 'licence-1', ...write, status: 'active' };
+        repository.findOne.mockResolvedValue(purchase);
+
+        await expect(service.findByProviderPayment('stripe', 'pi_1')).resolves.toBe(purchase);
+        expect(repository.findOne).toHaveBeenCalledWith({
+            where: { provider: 'stripe', providerPaymentId: 'pi_1' },
+        });
+    });
+
+    it('marks an active purchase refunded once and reports replay as idempotent', async () => {
+        const { service, repository } = build();
+        const now = new Date('2026-08-24T20:00:00Z');
+        repository.update
+            .mockResolvedValueOnce({ affected: 1 })
+            .mockResolvedValueOnce({ affected: 0 });
+
+        await expect(service.markRefunded('licence-1', now)).resolves.toBe(true);
+        await expect(service.markRefunded('licence-1', now)).resolves.toBe(false);
+        expect(repository.update).toHaveBeenCalledWith(
+            { id: 'licence-1', status: 'active' },
+            { status: 'refunded', refundedAt: now },
+        );
     });
 });

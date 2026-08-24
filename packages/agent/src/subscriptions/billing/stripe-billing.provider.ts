@@ -550,6 +550,50 @@ export class StripeBillingProvider extends BillingProvider {
     }
 
     /**
+     * Stripe does not copy Subscription metadata onto the invoice's
+     * PaymentIntent/Charge. Invoice Payments are the provider-owned mapping
+     * from that PaymentIntent back to its Invoice; the Invoice carries an
+     * immutable snapshot of the originating Subscription metadata.
+     */
+    async findPlanSubscriptionIdForPayment(paymentId: string): Promise<string | null> {
+        const stripe = this.requireClient();
+        const payments = await stripe.invoicePayments.list({
+            payment: { type: 'payment_intent', payment_intent: paymentId },
+            status: 'paid',
+            limit: 1,
+            expand: ['data.invoice'],
+        });
+        const invoice = payments.data[0]?.invoice;
+        if (!invoice || typeof invoice === 'string' || !('parent' in invoice)) return null;
+        const parent = invoice.parent;
+        const details =
+            parent?.type === 'subscription_details' ? parent.subscription_details : null;
+        if (
+            details?.metadata?.[STRIPE_METADATA_KEYS.kind] !==
+            STRIPE_PURCHASE_KINDS.planSubscription
+        ) {
+            return null;
+        }
+        return asId(details.subscription);
+    }
+
+    async findPerpetualLicenceForPayment(
+        paymentId: string,
+    ): Promise<{ userId: string; planCode: string } | null> {
+        const intent = await this.requireClient().paymentIntents.retrieve(paymentId);
+        const metadata = intent.metadata ?? {};
+        if (
+            metadata[STRIPE_METADATA_KEYS.kind] !== STRIPE_PURCHASE_KINDS.planSubscription ||
+            metadata[STRIPE_METADATA_KEYS.licence] !== STRIPE_PERPETUAL_LICENCE
+        ) {
+            return null;
+        }
+        const userId = metadata[STRIPE_METADATA_KEYS.userId];
+        const planCode = metadata[STRIPE_METADATA_KEYS.planCode];
+        return userId && planCode ? { userId, planCode } : null;
+    }
+
+    /**
      * Tax-inclusive off-session credit-pack charge.
      *
      * Checkout uses `automatic_tax`, but PaymentIntents use Stripe Tax's custom
@@ -1002,6 +1046,7 @@ export class StripeBillingProvider extends BillingProvider {
                     amountCents: charge.amount_refunded ?? null,
                     currency: charge.currency ?? null,
                     paymentId: asId(charge.payment_intent),
+                    reversal: { reason: 'refund', fullyReversed: charge.refunded === true },
                 };
             }
 
@@ -1013,6 +1058,7 @@ export class StripeBillingProvider extends BillingProvider {
                     amountCents: dispute.amount ?? null,
                     currency: dispute.currency ?? null,
                     paymentId: asId(dispute.payment_intent),
+                    reversal: { reason: 'dispute', fullyReversed: true },
                 };
             }
 

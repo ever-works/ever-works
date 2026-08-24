@@ -224,6 +224,60 @@ describe('PlanCreditGrantService.grantCurrentAllowance', () => {
     });
 });
 
+describe('PlanCreditGrantService.reverseCurrentAllowance', () => {
+    it('claws back the current allowance and permits a negative balance after spend', async () => {
+        const { service, creditLedgerService } = makeHarness();
+        creditLedgerService.sumByRefTypeInWindow.mockResolvedValue(3000);
+        const subscription = proSubscription();
+        const now = utc(2026, 9, 10);
+
+        await expect(
+            service.reverseCurrentAllowance(subscription as any, 'stripe:evt:evt_refund', now),
+        ).resolves.toBe('reversed');
+        expect(creditLedgerService.record).toHaveBeenCalledWith({
+            userId: 'user-1',
+            organizationId: 'org-1',
+            tenantId: null,
+            kind: CreditLedgerKind.ADJUSTMENT,
+            amountCredits: -3000,
+            refType: PLAN_GRANT_REF_TYPE,
+            refId: 'sub-1',
+            description: 'Plan allowance reversed after payment reversal',
+            idempotencyKey: 'revoke:plan:stripe:evt:evt_refund',
+            allowNegativeBalance: true,
+            now,
+        });
+    });
+
+    it('is idempotent on a replayed provider event', async () => {
+        const { service, creditLedgerService } = makeHarness();
+        creditLedgerService.hasEntry.mockResolvedValue(true);
+
+        await expect(
+            service.reverseCurrentAllowance(
+                proSubscription() as any,
+                'stripe:evt:evt_refund',
+                utc(2026, 9, 10),
+            ),
+        ).resolves.toBe('already-reversed');
+        expect(creditLedgerService.sumByRefTypeInWindow).not.toHaveBeenCalled();
+        expect(creditLedgerService.record).not.toHaveBeenCalled();
+    });
+
+    it('does not invent a debit when no allowance was granted in this period', async () => {
+        const { service, creditLedgerService } = makeHarness();
+
+        await expect(
+            service.reverseCurrentAllowance(
+                proSubscription() as any,
+                'stripe:evt:evt_refund',
+                utc(2026, 9, 10),
+            ),
+        ).resolves.toBe('nothing-to-reverse');
+        expect(creditLedgerService.record).not.toHaveBeenCalled();
+    });
+});
+
 describe('PlanCreditGrantService.dispatchPlanGrants', () => {
     it('walks active subscriptions in batches and tallies outcomes; one failure does not stop the pass', async () => {
         const { service, creditLedgerService, userSubscriptionRepository } = makeHarness();
