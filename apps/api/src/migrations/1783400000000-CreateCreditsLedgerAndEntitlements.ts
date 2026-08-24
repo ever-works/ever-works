@@ -177,15 +177,19 @@ export class CreateCreditsLedgerAndEntitlements1783400000000 implements Migratio
                 .createQueryBuilder()
                 .select('pe.id', 'id')
                 .from('plan_entitlements', 'pe')
-                // 🛑 DOUBLE-QUOTED on purpose. This builder has no entity metadata
-                // (raw `.from('plan_entitlements', 'pe')`), so TypeORM emits the
-                // reference verbatim — verified against the Postgres driver:
-                // `pe.planId = :planId` comes out unquoted, Postgres folds it to
-                // `pe.planid`, and the migration dies with 42703 on every Postgres
-                // environment. The sqlite suite cannot catch it: sqlite matches
-                // unquoted identifiers case-insensitively, so CI stays green while
-                // a fresh Postgres boot fails. Same fix as the 1786950000000 /
-                // 1786960000000 seeds.
+                // Identifiers are double-quoted explicitly so this query does not
+                // depend on TypeORM resolving the raw table name to an entity.
+                //
+                // It normally does: the runtime DataSource registers every entity
+                // (`database.config.ts` → `entities: ENTITIES`) alongside the
+                // migrations glob, so `.from('plan_entitlements', 'pe')` matches
+                // `PlanEntitlement` BY TABLE NAME and the emitted SQL is fully
+                // quoted — which is why this seed has always worked on Postgres.
+                // Quoting here only removes the dependency on that lookup; it is
+                // what makes the query correct for a table with NO entity, where
+                // TypeORM would emit `pe.planId` verbatim and Postgres would fold
+                // it to `pe.planid` (sqlite, which CI runs on, matches unquoted
+                // identifiers case-insensitively and would not catch it).
                 .where('pe."planId" = :planId AND pe."key" = :key', {
                     planId: seed.planId,
                     key: seed.key,

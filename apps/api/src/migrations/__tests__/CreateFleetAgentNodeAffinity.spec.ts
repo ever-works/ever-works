@@ -1,5 +1,5 @@
 import { DataSource, Table } from 'typeorm';
-import { CreateFleetAgentNodeAffinity1787508800000 } from '../1787508800000-create-fleet-agent-node-affinity';
+import { CreateFleetAgentNodeAffinity1787508800000 } from '../1787508800000-CreateFleetAgentNodeAffinity';
 
 describe('CreateFleetAgentNodeAffinity1787508800000', () => {
     let dataSource: DataSource;
