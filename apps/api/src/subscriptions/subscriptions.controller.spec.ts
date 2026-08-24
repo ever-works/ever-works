@@ -26,7 +26,11 @@ jest.mock('../auth', () => ({
 
 import { BadRequestException } from '@nestjs/common';
 import { SubscriptionsController } from './subscriptions.controller';
-import type { EntitlementsService, SubscriptionService } from '@ever-works/agent/subscriptions';
+import type {
+    EntitlementsService,
+    PlanSubscriptionService,
+    SubscriptionService,
+} from '@ever-works/agent/subscriptions';
 import type { AuthService } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
@@ -43,6 +47,9 @@ describe('SubscriptionsController', () => {
     >;
     let authService: jest.Mocked<Pick<AuthService, 'getUser'>>;
     let entitlementsService: jest.Mocked<Pick<EntitlementsService, 'getNumber'>>;
+    let planSubscriptionService: jest.Mocked<
+        Pick<PlanSubscriptionService, 'listOwnedLicenceCodes'>
+    >;
     let controller: SubscriptionsController;
 
     const auth: AuthenticatedUser = {
@@ -74,10 +81,14 @@ describe('SubscriptionsController', () => {
         entitlementsService = {
             getNumber: jest.fn().mockResolvedValue(0),
         } as any;
+        planSubscriptionService = {
+            listOwnedLicenceCodes: jest.fn().mockResolvedValue([]),
+        } as any;
         controller = new SubscriptionsController(
             subscriptionService as unknown as SubscriptionService,
             authService as unknown as AuthService,
             entitlementsService as unknown as EntitlementsService,
+            planSubscriptionService as unknown as PlanSubscriptionService,
         );
     });
 
@@ -245,6 +256,32 @@ describe('SubscriptionsController', () => {
             expect(result.licences[0].lifetimePrice).toBe('99');
             // A licence never becomes "your current plan" on this deployment.
             expect(result.licences[0].isCurrent).toBe(false);
+            expect(result.licences[0].owned).toBe(false);
+        });
+
+        it('marks a durable self-hosted licence as owned for this user', async () => {
+            subscriptionService.summarizePlan.mockResolvedValue({
+                enabled: true,
+                plan: { code: 'free', displayName: 'Free' },
+                allowances: [],
+            } as any);
+            subscriptionService.listPlans.mockResolvedValue(seededPlans);
+            subscriptionService.listSelfHostedPlans.mockResolvedValue([
+                {
+                    code: 'selfhosted_pro',
+                    displayName: 'Pro Edition',
+                    hosting: 'selfhosted',
+                    monthlyPrice: '49',
+                    lifetimePrice: '99',
+                    currency: 'usd',
+                },
+            ] as any[]);
+            planSubscriptionService.listOwnedLicenceCodes.mockResolvedValue(['selfhosted_pro']);
+
+            const result = await controller.listPlans(auth);
+
+            expect(planSubscriptionService.listOwnedLicenceCodes).toHaveBeenCalledWith('user-1');
+            expect(result.licences[0].owned).toBe(true);
         });
 
         it('falls back to free as the current plan when subscriptions are disabled', async () => {

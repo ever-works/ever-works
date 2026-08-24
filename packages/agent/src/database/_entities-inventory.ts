@@ -136,6 +136,7 @@ import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import { BillingProfile } from '../entities/billing-profile.entity';
 import { Invoice } from '../entities/invoice.entity';
+import { LicencePurchase } from '../entities/licence-purchase.entity';
 import { CreditMeterEvent } from '../entities/credit-meter-event.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
@@ -339,6 +340,7 @@ export const ENTITIES = [
     // written exclusively by the signature-verified webhook.
     BillingProfile,
     Invoice,
+    LicencePurchase,
     CreditMeterEvent,
     // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
     // headless) with hashed credentials + heartbeat status.
