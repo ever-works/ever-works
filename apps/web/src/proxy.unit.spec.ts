@@ -18,6 +18,26 @@ function request(path: string, selector = 'attacker-supplied'): NextRequest {
     });
 }
 
+/**
+ * 🛑 NOTE ON SCOPE: the locale-rewrite assertions in this file CANNOT catch the
+ * /login locale-rewrite defect class, and must not be relied on for it.
+ *
+ * They mock `next-intl/middleware` and assert the header string `proxy()`
+ * returns. The failure occurs after `proxy()` returns, inside Next's middleware
+ * adapter — mocked away here. They are also shaped so the bug cannot appear:
+ * the requests use `127.0.0.1`/`localhost`, which `ALLOWED_REDIRECT_URLS`
+ * permits BY DEFAULT (`'localhost,127.0.0.1'`, see src/lib/constants.ts), so the
+ * reconstructed public authority equals the internal one and the origin mismatch
+ * that IS the defect never arises.
+ *
+ * These stayed green through all five states of an ~8.5 h production outage on
+ * 2026-08-24. The real guard is the "Guard: /login renders behind a foreign
+ * authority" step in .github/workflows/ci.yml, which crosses the adapter
+ * boundary with a FOREIGN authority and `X-Forwarded-Proto: https`.
+ *
+ * Kept because they pin a genuine narrower property — `proxy()` must not mangle
+ * the rewrite header nor invent a redirect. Retained per the no-removal rule.
+ */
 describe('canonical Organization workspace proxy', () => {
     beforeEach(() => {
         vi.clearAllMocks();
