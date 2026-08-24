@@ -609,6 +609,10 @@ describe('PaygService webhooks', () => {
         expect(h.notificationService.notifyPaygPastDue).toHaveBeenCalledWith({
             userId: 'u1',
             amountCents: 380,
+            // Cycle end rides along so the dedup key re-arms next period —
+            // a persistent row under a fixed key would announce dunning once
+            // per account, ever.
+            periodEnd: PERIOD_END,
         });
 
         await h.service.applyInvoice(h.stored(), invoice({ status: 'paid', amountPaidCents: 380 }));

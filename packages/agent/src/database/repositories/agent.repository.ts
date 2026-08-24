@@ -545,4 +545,24 @@ export class AgentRepository {
             } as FindOptionsWhere<Agent>,
         });
     }
+    /**
+     * Active agents in one Tenant — the "agents" half of the seat count
+     * (billing spec §3.6 / FR-27). A seat is an employee OR an agent, so
+     * this is counted tenant-wide rather than per creator: an agent built
+     * by a team member is platform capacity just like one the owner built.
+     *
+     * ARCHIVED agents do not hold a seat — archiving is how you free one.
+     */
+    async countActiveForTenant(tenantId: string): Promise<number> {
+        return this.repository.count({
+            where: { tenantId, status: Not(AgentStatus.ARCHIVED) },
+        });
+    }
+
+    /** Same count for an account that has no Tenant yet (a solo owner). */
+    async countActiveForUser(userId: string): Promise<number> {
+        return this.repository.count({
+            where: { userId, status: Not(AgentStatus.ARCHIVED) },
+        });
+    }
 }
