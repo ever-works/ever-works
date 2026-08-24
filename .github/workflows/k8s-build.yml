@@ -5,7 +5,24 @@ on:
     branches: [develop, stage, main, master]
 concurrency:
   group: k8s-build-${{ github.ref }}
-  cancel-in-progress: true
+  # 🛑 Every ref that can trigger this workflow is deploy-bearing and QUEUES.
+  #
+  # This workflow is the ONLY one that publishes the tags the clusters pull
+  # (`:dev`/`:stage`/`:prod` + `:sha-<sha>`); `docker-build-publish-*.yml`
+  # pushes `:latest`, which no Deployment tracks. So a cancelled run here is
+  # not lost CI signal — it is a fix that never reaches an environment.
+  #
+  # Measured 2026-08-24: a successful k8s-build on `main` takes 215-243 min,
+  # while the cascade cadence that morning was 21-54 min. With
+  # `cancel-in-progress: true`, FOUR consecutive production image builds were
+  # killed by the next cascade and prod sat on a 7-hour-old image carrying a
+  # defect that made the credit ledger unable to write at all. The build can
+  # never win that race: it is not a slow build, it is an unwinnable one.
+  #
+  # Queueing costs a little runner time and bounds the wait at one build.
+  # Cancelling makes the wait unbounded. Same shape as #2210 for the stage
+  # E2E gate.
+  cancel-in-progress: false
 permissions:
   contents: read
   packages: write

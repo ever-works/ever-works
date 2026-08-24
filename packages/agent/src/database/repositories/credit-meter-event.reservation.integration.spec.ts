@@ -1,9 +1,6 @@
 import { DataSource, Repository } from 'typeorm';
 import { BillingProfile } from '@src/entities/billing-profile.entity';
-import {
-    CreditMeterEvent,
-    CreditMeterEventStatus,
-} from '@src/entities/credit-meter-event.entity';
+import { CreditMeterEvent, CreditMeterEventStatus } from '@src/entities/credit-meter-event.entity';
 import { CreditMeterEventRepository } from './credit-meter-event.repository';
 
 describe('CreditMeterEventRepository — cap reservation (integration)', () => {
