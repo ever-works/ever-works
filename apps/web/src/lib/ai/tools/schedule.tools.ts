@@ -30,7 +30,25 @@ export const setSchedule = tool({
         const result = await updateWorkSchedule(workId, {
             enable,
             cadence: cadenceMap[cadence ?? 'weekly'],
-            billingMode: WorkScheduleBillingMode.USAGE,
+            // 🛑 SUBSCRIPTION, matching the entity default
+            // (work-schedule.entity.ts:48). This used to hardcode USAGE, so
+            // EVERY schedule the assistant created was silently pay-per-use —
+            // a billing mode the user never chose and is never shown.
+            //
+            // That is not cosmetic. `billingMode === USAGE` currently skips two
+            // entitlement gates: SubscriptionService.requiresUsageBilling
+            // returns false for it (so a cadence the plan does not allow is
+            // permitted), and WorkScheduleService.validateRunEntitlement returns
+            // true immediately (so the plan's active-schedule cap is not
+            // applied). Both are justified in-code by "assuming they can pay" —
+            // but BillingProvider.recordUsageCharge is a no-op on every
+            // provider, so nobody ever pays. Asking the assistant to set up a
+            // schedule therefore granted unmetered capacity.
+            //
+            // This restores the default only. The bypass itself is still open
+            // and is tracked separately; flipping it would pause existing
+            // usage-mode schedules, which needs an owner decision.
+            billingMode: WorkScheduleBillingMode.SUBSCRIPTION,
             maxFailureBeforePause: 3,
         });
         return { success: result.success, message: result.message, error: result.error };
