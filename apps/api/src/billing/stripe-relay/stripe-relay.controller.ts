@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Public } from '../../auth/decorators/public.decorator';
+import { Public } from '@src/auth/decorators/public.decorator';
 import {
     StripeRelayNotConfiguredError,
     StripeRelayService,

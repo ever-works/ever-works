@@ -146,8 +146,7 @@ export class StripeRelayService {
         // BEFORE signing so the secret never leaves the process for an unsafe
         // target. Local dev/test may legitimately point a Work at http://localhost.
         const env = process.env.NODE_ENV;
-        const isLocalEnv =
-            env === 'development' || env === 'test' || env === undefined || env === '';
+        const isLocalEnv = env === 'development' || env === 'test';
         if (!isLocalEnv && !isSafeWebhookUrl(url)) {
             this.logger.warn(
                 `relay: forward blocked by SSRF guard for work ${workId} (host resolves to a private / loopback / link-local / metadata target)`,
@@ -193,10 +192,6 @@ export class StripeRelayService {
                 `relay: work ${workId} rejected event ${eventId} as belonging to another directory`,
             );
             return { status: 'unroutable', eventId, reason: 'work_mismatch' };
-        }
-        if (response.status === 503) {
-            // Site is up but platform sync was never injected — needs a redeploy.
-            return { status: 'unroutable', eventId, reason: 'site_not_provisioned' };
         }
         if (response.status === 401) {
             // Stale/rotated secret. Retry: a re-sync may fix it within Stripe's

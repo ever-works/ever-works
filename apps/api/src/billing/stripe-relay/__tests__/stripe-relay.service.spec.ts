@@ -128,6 +128,21 @@ describe('StripeRelayService', () => {
             expect(outcome).toMatchObject({ status: 'unroutable', reason: 'ssrf_blocked' });
             expect(global.fetch).not.toHaveBeenCalled();
         });
+
+        it('fails closed when NODE_ENV is missing rather than treating it as local', async () => {
+            delete process.env.NODE_ENV;
+            (isSafeWebhookUrl as jest.Mock).mockReturnValue(false);
+            (constructStripeEvent as jest.Mock).mockReturnValue(
+                event('evt_missing_env', { metadata: { work_id: WORK_ID } }),
+            );
+            const { service } = makeService();
+
+            expect(await service.handle('{}', 'sig')).toMatchObject({
+                status: 'unroutable',
+                reason: 'ssrf_blocked',
+            });
+            expect(global.fetch).not.toHaveBeenCalled();
+        });
     });
 
     describe('routing', () => {
@@ -224,7 +239,7 @@ describe('StripeRelayService', () => {
             [502, 'retry'],
             [401, 'retry'], // stale secret — a re-sync may fix it inside the window
             [409, 'unroutable'], // our routing bug; retrying repeats it
-            [503, 'unroutable'], // site up, sync never injected — needs a redeploy
+            [503, 'retry'], // can come from ingress/site outage; status alone is not a trusted permanent signal
             [400, 'unroutable'], // malformed body is not fixable by retrying
             [200, 'forwarded'],
         ])('site answers %i -> %s', async (siteStatus, expected) => {
