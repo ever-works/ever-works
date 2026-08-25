@@ -180,6 +180,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'UsageLedgerService',
                     'BillingProvider',
                     'BillingProviderError',
+                    'BILLING_PROVIDER_ERROR_CODES',
                     'BillingProviderNotConfiguredError',
                     'ManualBillingProvider',
                     // The money path (billing PRD B5)
@@ -191,6 +192,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'defaultAutoRechargePack',
                     'estimatePaygCents',
                     'StripeBillingProvider',
+                    'constructStripeEvent',
                     'STRIPE_METADATA_KEYS',
                     'STRIPE_PERPETUAL_LICENCE',
                     'STRIPE_PURCHASE_KINDS',
