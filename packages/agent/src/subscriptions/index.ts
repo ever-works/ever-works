@@ -10,6 +10,9 @@ export * from './billing/credits-pricing';
 export { estimatePaygCents, getPaygCatalog, paygLookupKey } from './billing/stripe-catalog';
 export type { CatalogPayg, CatalogPaygTier } from './billing/stripe-catalog';
 export * from './billing/stripe-billing.provider';
+// Signature verification against an arbitrary secret — the shared Stripe
+// webhook RELAY has its own signing secret, separate from the platform receiver.
+export * from './billing/stripe-webhook-verify';
 export * from './billing/billing.service';
 export * from './billing/auto-recharge.service';
 // Paid-plan purchase: checkout, return-route sync, activation (audit B24)
