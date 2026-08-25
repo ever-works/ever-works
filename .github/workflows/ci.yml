@@ -182,10 +182,6 @@ jobs:
         if: steps.scope.outputs.code == 'true'
         run: pnpm build --filter=!./apps/docs
 
-      - name: run test on all packages
-        if: steps.scope.outputs.code == 'true'
-        run: pnpm test
-
       # --- Regression guard: the /login locale-rewrite defect class -----------
       #
       # On 2026-08-24 `app.ever.works/login` was down ~8.5 h. FIVE fixes were
@@ -355,6 +351,10 @@ jobs:
           pkill -f "next start -p $BITE_PORT" 2>/dev/null || true
 
           exit $rc
+
+      - name: run test on all packages
+        if: steps.scope.outputs.code == 'true'
+        run: pnpm test
 
       - name: Build Internal CLI
         if: steps.scope.outputs.code == 'true'
