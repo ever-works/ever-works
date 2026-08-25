@@ -50,11 +50,13 @@ function makeService(overrides?: {
     decryptThrows?: boolean;
 }) {
     const workRepository = {
-        findById: jest.fn().mockResolvedValue(
-            overrides && 'work' in overrides
-                ? overrides.work
-                : { id: WORK_ID, website: SITE, platformSyncSecretEncrypted: 'enc' },
-        ),
+        findById: jest
+            .fn()
+            .mockResolvedValue(
+                overrides && 'work' in overrides
+                    ? overrides.work
+                    : { id: WORK_ID, website: SITE, platformSyncSecretEncrypted: 'enc' },
+            ),
     };
     const secretService = {
         decryptForWork: jest.fn(() => {
@@ -62,10 +64,7 @@ function makeService(overrides?: {
             return overrides && 'secret' in overrides ? overrides.secret : SECRET;
         }),
     };
-    const service = new StripeRelayService(
-        workRepository as never,
-        secretService as never,
-    );
+    const service = new StripeRelayService(workRepository as never, secretService as never);
     return { service, workRepository, secretService };
 }
 
@@ -151,7 +150,9 @@ describe('StripeRelayService', () => {
             // over `${ts}:${sha256(body)}:${workId}` with the per-Work secret.
             const ts = init.headers['x-platform-ts'];
             const expected = createHmac('sha256', SECRET)
-                .update(`${ts}:${createHash('sha256').update(raw, 'utf8').digest('hex')}:${WORK_ID}`)
+                .update(
+                    `${ts}:${createHash('sha256').update(raw, 'utf8').digest('hex')}:${WORK_ID}`,
+                )
                 .digest('hex');
             expect(init.headers.Authorization).toBe(`Bearer ${expected}`);
         });
@@ -233,7 +234,9 @@ describe('StripeRelayService', () => {
         });
 
         it('retries a network failure rather than dropping a paid event', async () => {
-            (global.fetch as jest.Mock).mockRejectedValue(new Error('connect ECONNREFUSED 10.0.0.1'));
+            (global.fetch as jest.Mock).mockRejectedValue(
+                new Error('connect ECONNREFUSED 10.0.0.1'),
+            );
             const { service } = makeService();
             expect(await service.handle('{}', 'sig')).toMatchObject({
                 status: 'retry',
