@@ -23,11 +23,19 @@ async function summaryBlock(): Promise<string> {
 function exerciseSummary(block: string, failingUrls: string) {
 	const shellLiteral = failingUrls.replace(/'/g, `'"'"'`);
 	const bash = process.platform === 'win32' ? 'C:\\Program Files\\Git\\bin\\bash.exe' : 'bash';
-	const cleanEnv = { ...process.env };
-	delete cleanEnv.BASH_ENV;
+	// The self-hosted runners may inject Bash startup hooks through either
+	// BASH_ENV or ENV. Give this contract only the OS variables it needs so a
+	// runner profile cannot change the shell semantics under test.
+	const cleanEnv = Object.fromEntries(
+		['PATH', 'HOME', 'SYSTEMROOT', 'COMSPEC', 'PATHEXT', 'TMPDIR', 'TMP', 'TEMP']
+			.map((key) => [key, process.env[key]])
+			.filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+	);
 	return spawnSync(
 		bash,
 		[
+			'--noprofile',
+			'--norc',
 			'-euo',
 			'pipefail',
 			'-c',
