@@ -23,6 +23,8 @@ async function summaryBlock(): Promise<string> {
 function exerciseSummary(block: string, failingUrls: string) {
 	const shellLiteral = failingUrls.replace(/'/g, `'"'"'`);
 	const bash = process.platform === 'win32' ? 'C:\\Program Files\\Git\\bin\\bash.exe' : 'bash';
+	const cleanEnv = { ...process.env };
+	delete cleanEnv.BASH_ENV;
 	return spawnSync(
 		bash,
 		[
@@ -33,7 +35,7 @@ function exerciseSummary(block: string, failingUrls: string) {
 		],
 		{
 			encoding: 'utf8',
-			env: process.env
+			env: cleanEnv
 		}
 	);
 }
