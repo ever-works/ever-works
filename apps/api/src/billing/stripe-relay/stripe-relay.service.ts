@@ -233,8 +233,14 @@ export function extractWorkId(event: { data?: { object?: unknown } }): string | 
     const direct = read((obj as { metadata?: unknown }).metadata);
     if (direct) return direct;
 
-    // invoice.* — `subscription_details.metadata` carries the subscription's
-    // metadata, and line items carry their own copy.
+    // Stripe v18 invoice.* — the subscription's metadata is nested below
+    // `parent.subscription_details`; older event shapes used the top level.
+    const parentDetails = read(
+        (obj as { parent?: { subscription_details?: { metadata?: unknown } } }).parent
+            ?.subscription_details?.metadata,
+    );
+    if (parentDetails) return parentDetails;
+
     const details = read(
         (obj as { subscription_details?: { metadata?: unknown } }).subscription_details?.metadata,
     );

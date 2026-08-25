@@ -286,6 +286,18 @@ describe('extractWorkId', () => {
         ).toBe('w2');
     });
 
+    it('reads Stripe v18 invoice parent.subscription_details metadata', () => {
+        expect(
+            extractWorkId({
+                data: {
+                    object: {
+                        parent: { subscription_details: { metadata: { work_id: 'w-v18' } } },
+                    },
+                },
+            }),
+        ).toBe('w-v18');
+    });
+
     it('falls back to a line item', () => {
         expect(
             extractWorkId({
