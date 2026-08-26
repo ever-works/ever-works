@@ -172,7 +172,7 @@ describe('StripeRelayService', () => {
             expect(init.headers.Authorization).toBe(`Bearer ${expected}`);
         });
 
-        it('routes a legacy managed k8s Work through its canonical slug host when website is null', async () => {
+        it('routes a legacy managed k8s Work by slug when website is null', async () => {
             delete process.env.EVER_WORKS_DOMAIN;
             const raw = JSON.stringify(event('evt_legacy', { metadata: { work_id: WORK_ID } }));
             (constructStripeEvent as jest.Mock).mockReturnValue(JSON.parse(raw));
@@ -195,7 +195,7 @@ describe('StripeRelayService', () => {
             );
         });
 
-        it('prefers an allocated managed subdomain and respects the configured root domain', async () => {
+        it('prefers a managed subdomain and respects the configured root domain', async () => {
             process.env.EVER_WORKS_DOMAIN = 'preview.ever.works';
             (constructStripeEvent as jest.Mock).mockReturnValue(
                 event('evt_managed', { metadata: { work_id: WORK_ID } }),
