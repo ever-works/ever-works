@@ -145,7 +145,7 @@ export class WebsiteGeneratorService {
         throwIfGenerationCancelled(options.signal);
 
         // Push template to target repo
-        const targetCloneUrl = this.gitFacade.getCloneUrl(
+        const targetCloneUrl = await this.gitFacade.getCloneUrl(
             work.gitProvider,
             websiteRepository.owner,
             websiteRepository.name,
