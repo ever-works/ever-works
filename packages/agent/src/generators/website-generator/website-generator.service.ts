@@ -150,6 +150,7 @@ export class WebsiteGeneratorService {
             websiteRepository.owner,
             websiteRepository.name,
         );
+        throwIfGenerationCancelled(options.signal);
 
         // Remove origin and add new one pointing to target
         await this.gitFacade.replaceRemote(work.gitProvider, templateDir, 'origin', targetCloneUrl);
