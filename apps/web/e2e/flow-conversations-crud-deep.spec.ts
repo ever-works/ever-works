@@ -201,20 +201,17 @@ test.describe('Conversations CRUD deep — create-body validation (DTO caps + wh
 });
 
 test.describe('Conversations CRUD deep — PATCH body validation', () => {
-    test('PATCH requires title: {} → 400; over-length → 400; valid → 204', async ({ request }) => {
+    test('PATCH accepts an empty no-op; over-length → 400; valid → 204', async ({ request }) => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
         const conv = await createConversation(request, token, { title: 'original' });
 
-        // UpdateConversationDto.title has NO @IsOptional → an empty PATCH body is a 400.
+        // Both update fields are optional so an empty PATCH is a valid no-op.
         const missing = await request.patch(`${API_BASE}/api/conversations/${conv.id}`, {
             headers: authedHeaders(token),
             data: {},
         });
-        expect(missing.status(), 'PATCH {} → 400 (title required)').toBe(400);
-        expect(messageText(await missing.json()), 'title must be a string').toContain(
-            'title must be a string',
-        );
+        expect(missing.status(), 'PATCH {} → 204 (no-op)').toBe(204);
 
         // Over-length rename trips the @MaxLength(200) cap.
         const tooLong = await request.patch(`${API_BASE}/api/conversations/${conv.id}`, {
@@ -223,14 +220,14 @@ test.describe('Conversations CRUD deep — PATCH body validation', () => {
         });
         expect(tooLong.status(), 'PATCH 201-char title → 400').toBe(400);
 
-        // Both failed PATCHes left the original title intact (no partial write).
+        // The empty no-op and failed over-length PATCH left the title intact.
         const stillOriginal = await request.get(`${API_BASE}/api/conversations/${conv.id}`, {
             headers: authedHeaders(token),
         });
         expect(stillOriginal.status()).toBe(200);
         expect(
             ((await stillOriginal.json()) as ConversationRow).title,
-            'failed PATCHes did not mutate the title',
+            'empty/failed PATCHes did not mutate the title',
         ).toBe('original');
 
         // A within-cap rename succeeds with 204 No Content and persists.
@@ -319,25 +316,23 @@ test.describe('Conversations CRUD deep — ParseUUIDPipe on :id routes', () => {
         expect(append.status(), 'append bad-uuid → 400').toBe(400);
     });
 
-    test('PATCH validates the body before the id pipe: bad body wins, valid body surfaces the uuid 400', async ({
+    test('PATCH validates the id before either an empty or populated optional body', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
 
-        // PATCH bad-uuid + EMPTY body → the body DTO validation fires first, so the
-        // response is the title error, NOT the uuid error (pins NestJS pipe ordering).
+        // An empty body is valid, so the malformed id is the failing boundary.
         const badBody = await request.patch(`${API_BASE}/api/conversations/${MALFORMED_ID}`, {
             headers: authedHeaders(token),
             data: {},
         });
         expect(badBody.status(), 'PATCH bad-uuid + bad-body → 400').toBe(400);
-        expect(messageText(await badBody.json()), 'body error wins over the uuid pipe').toContain(
-            'title must be a string',
+        expect(messageText(await badBody.json()), 'uuid pipe surfaces for an empty body').toContain(
+            'uuid is expected',
         );
 
-        // PATCH bad-uuid + VALID body → now the param pipe is the only failing gate
-        // → the uuid-expected error surfaces.
+        // A populated valid body reaches the same id boundary.
         const validBody = await request.patch(`${API_BASE}/api/conversations/${MALFORMED_ID}`, {
             headers: authedHeaders(token),
             data: { title: 'valid title' },
