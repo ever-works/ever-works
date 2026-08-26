@@ -94,7 +94,7 @@ try {
 		-Certificate $certificate `
 		-HashAlgorithm SHA256
 	if ($signature.Status -ne "Valid") {
-		throw "ephemeral test signature did not become Valid: $($signature.Status)"
+		throw "ephemeral test signature did not become Valid: $($signature.Status) - $($signature.StatusMessage)"
 	}
 	Write-Host "Signed copied test-only helper fixture"
 	$certificateSha256 = $certificate.GetCertHashString(
