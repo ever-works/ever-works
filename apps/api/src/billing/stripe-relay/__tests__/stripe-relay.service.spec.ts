@@ -172,6 +172,76 @@ describe('StripeRelayService', () => {
             expect(init.headers.Authorization).toBe(`Bearer ${expected}`);
         });
 
+        it('routes a legacy managed k8s Work by slug when website is null', async () => {
+            delete process.env.EVER_WORKS_DOMAIN;
+            const raw = JSON.stringify(event('evt_legacy', { metadata: { work_id: WORK_ID } }));
+            (constructStripeEvent as jest.Mock).mockReturnValue(JSON.parse(raw));
+            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            const { service } = makeService({
+                work: {
+                    id: WORK_ID,
+                    slug: 'awesome-rust-ai-libraries',
+                    deployProvider: 'k8s',
+                    website: null,
+                    managedSubdomain: null,
+                    platformSyncSecretEncrypted: 'enc',
+                },
+            });
+
+            expect(await service.handle(raw, 'sig')).toMatchObject({ status: 'forwarded' });
+            expect(global.fetch).toHaveBeenCalledWith(
+                'https://awesome-rust-ai-libraries.ever.works/api/stripe/platform-webhook',
+                expect.objectContaining({ body: raw }),
+            );
+        });
+
+        it('prefers a managed subdomain and respects the configured root domain', async () => {
+            process.env.EVER_WORKS_DOMAIN = 'preview.ever.works';
+            (constructStripeEvent as jest.Mock).mockReturnValue(
+                event('evt_managed', { metadata: { work_id: WORK_ID } }),
+            );
+            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            const { service } = makeService({
+                work: {
+                    id: WORK_ID,
+                    slug: 'legacy-slug',
+                    deployProvider: 'k8s',
+                    website: null,
+                    managedSubdomain: 'Allocated-Name',
+                    platformSyncSecretEncrypted: 'enc',
+                },
+            });
+
+            expect(await service.handle('{}', 'sig')).toMatchObject({ status: 'forwarded' });
+            expect(global.fetch).toHaveBeenCalledWith(
+                'https://allocated-name.preview.ever.works/api/stripe/platform-webhook',
+                expect.any(Object),
+            );
+        });
+
+        it('ignores a stale Vercel placeholder for a managed k8s Work', async () => {
+            (constructStripeEvent as jest.Mock).mockReturnValue(
+                event('evt_placeholder', { metadata: { work_id: WORK_ID } }),
+            );
+            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            const { service } = makeService({
+                work: {
+                    id: WORK_ID,
+                    slug: 'awesome-rust-tools-and-frameworks',
+                    deployProvider: 'k8s',
+                    website: 'https://awesome-rust-tools-and-frameworks-w.vercel.app',
+                    managedSubdomain: null,
+                    platformSyncSecretEncrypted: 'enc',
+                },
+            });
+
+            expect(await service.handle('{}', 'sig')).toMatchObject({ status: 'forwarded' });
+            expect(global.fetch).toHaveBeenCalledWith(
+                'https://awesome-rust-tools-and-frameworks.ever.works/api/stripe/platform-webhook',
+                expect.any(Object),
+            );
+        });
+
         it('binds the signature to the work id, so it cannot be replayed elsewhere', async () => {
             const raw = JSON.stringify(event('evt_3', { metadata: { work_id: WORK_ID } }));
             (constructStripeEvent as jest.Mock).mockReturnValue(JSON.parse(raw));
