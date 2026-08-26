@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, parse, relative } from 'node:path';
@@ -16,6 +16,11 @@ const git = (cwd: string, ...args: string[]): string =>
 	execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }).trim();
 
 const SHA = 'a'.repeat(40);
+
+// Hosted Windows runners may expose TEMP through a reparse alias. Valid-root
+// cases must use its canonical path; dedicated tests below create aliases explicitly.
+const canonicalTemporaryDirectory = realpathSync(tmpdir());
+const temporaryRoot = (prefix: string): string => mkdtempSync(join(canonicalTemporaryDirectory, prefix));
 
 const fleetBindingKey = (taskId: string, repositoryId = 'ever/repository'): string =>
 	`fleet-${createHash('sha256').update(repositoryId).update('\0').update(taskId).digest('hex').slice(0, 32)}`;
@@ -37,7 +42,7 @@ describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { ti
 	});
 
 	beforeAll(() => {
-		ownedRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-task-workspace-'));
+		ownedRoot = temporaryRoot('ew-fleet-task-workspace-');
 		seedDir = join(ownedRoot, 'seed');
 		originDir = join(ownedRoot, 'origin.git');
 		workspaceRoot = join(ownedRoot, 'fleet-root');
@@ -160,7 +165,7 @@ describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { ti
 });
 
 describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
-	const rootPath = mkdtempSync(join(tmpdir(), 'ew-fleet-workspace-validation-'));
+	const rootPath = temporaryRoot('ew-fleet-workspace-validation-');
 	const valid = {
 		repositoryId: 'ever/repository',
 		repoUrl: 'https://github.com/ever/repository.git',
@@ -226,7 +231,7 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 	});
 
 	it('rejects an in-root junction created by a provider during provisioning', async () => {
-		const ownedRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-provider-alias-'));
+		const ownedRoot = temporaryRoot('ew-fleet-provider-alias-');
 		let targetPath = '';
 		try {
 			const plugin: FleetWorkspacePlugin = {
@@ -260,7 +265,7 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 	});
 
 	it('preserves an unowned directory at the deterministic path instead of letting self-heal delete it', async () => {
-		const ownedRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-collision-'));
+		const ownedRoot = temporaryRoot('ew-fleet-collision-');
 		try {
 			const repositoryKey = createHash('sha256')
 				.update(valid.repositoryId)
@@ -287,8 +292,8 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 	});
 
 	it('refuses a repository-cache junction that redirects writes outside the configured root', async () => {
-		const guardedRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-root-guard-'));
-		const foreignRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-foreign-'));
+		const guardedRoot = temporaryRoot('ew-fleet-root-guard-');
+		const foreignRoot = temporaryRoot('ew-fleet-foreign-');
 		try {
 			await fs.symlink(
 				foreignRoot,
@@ -310,8 +315,8 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 	it.runIf(process.platform === 'win32')(
 		'refuses a configured root junction before creating cache children or invoking Git',
 		async () => {
-			const parent = mkdtempSync(join(tmpdir(), 'ew-fleet-root-link-parent-'));
-			const foreignRoot = mkdtempSync(join(tmpdir(), 'ew-fleet-root-link-target-'));
+			const parent = temporaryRoot('ew-fleet-root-link-parent-');
+			const foreignRoot = temporaryRoot('ew-fleet-root-link-target-');
 			const linkedRoot = join(parent, 'fleet-root');
 			try {
 				await fs.symlink(foreignRoot, linkedRoot, 'junction');
