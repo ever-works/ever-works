@@ -93,7 +93,7 @@ interface ConvListBody {
 async function createConversation(
     request: APIRequestContext,
     token: string,
-    body: { title?: string; providerId?: string } = {},
+    body: { title?: string; providerId?: string; model?: string } = {},
     expectStatus = 201,
 ): Promise<ConvSummary> {
     const res = await request.post(CONV_URL, {
