@@ -148,7 +148,7 @@ jobs:
         run: pnpm --filter "ever-works-node^..." build
 
       - name: Test trusted adapter and model factory
-        run: pnpm --filter ever-works-node test -- src/core/windows-job-launcher src/core/model-execution
+        run: pnpm --filter ever-works-node exec vitest run src/core/windows-job-launcher src/core/model-execution
 
       - name: Type-check trusted adapter and model factory
         run: pnpm --filter ever-works-node type-check
@@ -171,7 +171,7 @@ jobs:
           if (-not $valid) { throw 'signed test manifest failed its schema' }
 
       - name: Test signed helper trust and broker-death cleanup
-        run: pnpm --filter ever-works-node test -- src/core/windows-job-launcher/windows-job-helper-trust.windows.spec.ts
+        run: pnpm --filter ever-works-node exec vitest run src/core/windows-job-launcher/windows-job-helper-trust.windows.spec.ts
 
       - name: Remove ephemeral test certificate and helper
         if: always()

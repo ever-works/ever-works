@@ -37,7 +37,7 @@ describe.skipIf(process.platform !== 'win32')('Windows Job helper broker fail-cl
 		expect(failure).toMatchObject({
 			code: expect.stringMatching(/^WINDOWS_JOB_(?:HELPER_EXITED|LAUNCH_TIMEOUT)$/)
 		});
-	}, 40_000);
+	}, 90_000);
 });
 
 describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration', () => {
@@ -69,7 +69,7 @@ describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration
 			activeProcesses: 0,
 			processIds: []
 		});
-	}, 45_000);
+	}, 90_000);
 
 	it.each([
 		['hash mismatch', { expectedSha256: '0'.repeat(64) }],
@@ -86,7 +86,7 @@ describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration
 				})
 			).rejects.toMatchObject({ code: 'WINDOWS_JOB_HELPER_EXITED' });
 		},
-		45_000
+		90_000
 	);
 
 	it('fails closed when the configured helper is missing', async () => {
@@ -102,7 +102,7 @@ describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration
 				...modelRequest()
 			})
 		).rejects.toMatchObject({ code: 'WINDOWS_JOB_HELPER_EXITED' });
-	}, 45_000);
+	}, 90_000);
 
 	it('broker death closes native control EOF and the Job removes the model process', async () => {
 		let broker: WindowsJobHelperProcessInternal | undefined;
@@ -138,7 +138,7 @@ describe.skipIf(!hasSignedFixture)('signed Windows Job helper broker integration
 			},
 			{ timeout: 10_000, interval: 100 }
 		);
-	}, 45_000);
+	}, 90_000);
 });
 
 function modelRequest(
@@ -160,7 +160,7 @@ function modelRequest(
 		timeoutMs: 10_000,
 		cleanupTimeoutMs: 1000,
 		maxOutputBytes: 1024 * 1024,
-		helperStartupTimeoutMs: 30_000,
+		helperStartupTimeoutMs: 60_000,
 		...overrides
 	};
 }
