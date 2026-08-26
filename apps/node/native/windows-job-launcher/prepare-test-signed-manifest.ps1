@@ -21,18 +21,11 @@ if ($Cleanup) {
 			if (Test-Path -LiteralPath $signingStorePath) {
 				Remove-Item -LiteralPath $signingStorePath -Force
 			}
-			$trustedStorePath = "Cert:\CurrentUser\TrustedPeople\$thumbprint"
+			$trustedStorePath = "Cert:\LocalMachine\Root\$thumbprint"
 			if (Test-Path -LiteralPath $trustedStorePath) {
-				& $certutilPath -user -silent -delstore TrustedPeople $thumbprint *> $null
+				& $certutilPath -silent -delstore Root $thumbprint *> $null
 				if ($LASTEXITCODE -ne 0) {
 					throw "certutil could not remove the ephemeral test certificate"
-				}
-			}
-			$publisherStorePath = "Cert:\CurrentUser\TrustedPublisher\$thumbprint"
-			if (Test-Path -LiteralPath $publisherStorePath) {
-				& $certutilPath -user -silent -delstore TrustedPublisher $thumbprint *> $null
-				if ($LASTEXITCODE -ne 0) {
-					throw "certutil could not remove the ephemeral test publisher certificate"
 				}
 			}
 		}
@@ -76,18 +69,15 @@ try {
 		[Security.Cryptography.X509Certificates.X509ContentType]::Cert
 	)
 	[IO.File]::WriteAllBytes($certificatePath, $publicCertificateBytes)
-	# Trust only this end-entity signer. Adding a self-signed leaf to Root opens
-	# an interactive CA-trust prompt on hosted runners and overstates its role.
-	Write-Host "Adding public-only ephemeral certificate with noninteractive certutil"
-	& $certutilPath -user -f -addstore TrustedPeople $certificatePath | Out-Null
+	# Hosted Windows Server disables peer trust for Authenticode, so this
+	# self-signed test certificate must be a root. The hosted runner is
+	# disposable and the always() cleanup removes it after this job.
+	Write-Host "Adding public-only ephemeral certificate to the disposable runner trust root"
+	& $certutilPath -f -addstore Root $certificatePath | Out-Null
 	if ($LASTEXITCODE -ne 0) {
-		throw "certutil could not add the ephemeral public certificate to CurrentUser TrustedPeople"
+		throw "certutil could not add the ephemeral public certificate to LocalMachine Root"
 	}
-	& $certutilPath -user -f -addstore TrustedPublisher $certificatePath | Out-Null
-	if ($LASTEXITCODE -ne 0) {
-		throw "certutil could not add the ephemeral public certificate to CurrentUser TrustedPublisher"
-	}
-	Write-Host "Trusted the ephemeral end-entity signer and publisher for this test runner only"
+	Write-Host "Trusted the ephemeral certificate for this disposable test runner only"
 	Write-Host "Signing copied test-only helper fixture"
 	$signature = Set-AuthenticodeSignature `
 		-LiteralPath $fixtureArtifactPath `
