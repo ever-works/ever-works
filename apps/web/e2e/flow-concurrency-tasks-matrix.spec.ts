@@ -67,7 +67,7 @@
  *       peer stays client-level (<500).
  *
  *   ISOLATION / GATES  cross-user transition + assignee-add against another user's
- *     Task → 404 (no existence leak); an unowned-agent assignee → 400 "not reachable"
+ *     Task → 404 (no existence leak); an out-of-scope actor → one generic 400
  *     (never 5xx). The approver gate blocks `→done` (409) until force overrides it,
  *     and under a force burst the CAS still elects exactly one winner.
  *
@@ -84,7 +84,7 @@
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
-import { createTaskViaAPI, transitionTaskViaAPI } from './helpers/agents-tasks';
+import { createAgentViaAPI, createTaskViaAPI, transitionTaskViaAPI } from './helpers/agents-tasks';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TASKS = `${API_BASE}/api/tasks`;
@@ -99,8 +99,7 @@ function H(token: string): Record<string, string> {
     return { ...authedHeaders(token), 'content-type': 'application/json' };
 }
 
-/** A synthetic user-actor id (assigneeId column is a uuid; a random one is a valid
- *  "user" actor — the service only existence-checks agent-type actors). */
+/** A well-formed unknown UUID for negative-path and missing-resource probes. */
 function actorUuid(): string {
     const hex = () => Math.floor(Math.random() * 16).toString(16);
     const s = Array.from({ length: 12 }, hex).join('');
@@ -333,7 +332,7 @@ test.describe('Tasks — parallel duplicate roster adds → exactly one 201 + th
         const task = await createTaskViaAPI(request, u.access_token, {
             title: `Assignee CAS ${stamp()}`,
         });
-        const assigneeId = actorUuid();
+        const assigneeId = u.user.id;
         const BURST = 5;
 
         const results = await Promise.all(
@@ -390,7 +389,7 @@ test.describe('Tasks — parallel duplicate roster adds → exactly one 201 + th
         const task = await createTaskViaAPI(request, u.access_token, {
             title: `Reviewer CAS ${stamp()}`,
         });
-        const reviewerId = actorUuid();
+        const reviewerId = u.user.id;
         const BURST = 4;
 
         const results = await Promise.all(
@@ -417,7 +416,7 @@ test.describe('Tasks — parallel duplicate roster adds → exactly one 201 + th
         const task = await createTaskViaAPI(request, u.access_token, {
             title: `Approver CAS ${stamp()}`,
         });
-        const approverId = actorUuid();
+        const approverId = u.user.id;
         const BURST = 4;
 
         const results = await Promise.all(
@@ -498,7 +497,7 @@ test.describe('Tasks — parallel duplicate roster adds → exactly one 201 + th
         expect((await loser.json()).message).toMatch(/already has a relation/i);
     });
 
-    test('DISTINCT assignees added in parallel → ALL 201 with distinct row ids (no false conflict)', async ({
+    test('DISTINCT scoped agent assignees added in parallel → ALL 201 with distinct row ids (no false conflict)', async ({
         request,
     }) => {
         test.setTimeout(90_000);
@@ -506,13 +505,21 @@ test.describe('Tasks — parallel duplicate roster adds → exactly one 201 + th
         const task = await createTaskViaAPI(request, u.access_token, {
             title: `Fanout ${stamp()}`,
         });
-        const ids = [actorUuid(), actorUuid(), actorUuid(), actorUuid()];
+        const agents = await Promise.all(
+            Array.from({ length: 4 }, (_, i) =>
+                createAgentViaAPI(request, u.access_token, {
+                    name: `Fanout Agent ${i} ${stamp()}`,
+                    scope: 'tenant',
+                }),
+            ),
+        );
+        const ids = agents.map((agent) => agent.id);
 
         const results = await Promise.all(
             ids.map((assigneeId) =>
                 request.post(`${TASKS}/${task.id}/assignees`, {
                     headers: H(u.access_token),
-                    data: { assigneeType: 'user', assigneeId },
+                    data: { assigneeType: 'agent', assigneeId },
                     timeout: T,
                 }),
             ),
@@ -771,7 +778,7 @@ test.describe('Tasks — delete races resolve to a gone row (no double-remove, n
         });
         const add = await request.post(`${TASKS}/${task.id}/assignees`, {
             headers: H(u.access_token),
-            data: { assigneeType: 'user', assigneeId: actorUuid() },
+            data: { assigneeType: 'user', assigneeId: u.user.id },
         });
         expect(add.status()).toBe(201);
         const rowId = (await add.json()).id;
@@ -886,7 +893,7 @@ test.describe('Tasks — gate/force interplay, isolation, and bad-input robustne
         // Configure a PENDING approver so requireAllApprovers gates →done.
         const addApprover = await request.post(`${TASKS}/${task.id}/approvers`, {
             headers: H(u.access_token),
-            data: { approverType: 'user', approverId: actorUuid() },
+            data: { approverType: 'user', approverId: u.user.id },
         });
         expect(addApprover.status()).toBe(201);
         await walkTo(request, u.access_token, task.id, ['todo', 'in_progress']);
@@ -988,7 +995,7 @@ test.describe('Tasks — gate/force interplay, isolation, and bad-input robustne
         const task = await createTaskViaAPI(request, u.access_token, {
             title: `Bad Actor ${stamp()}`,
         });
-        const userAssignee = actorUuid();
+        const userAssignee = u.user.id;
 
         const [good, bad] = await Promise.all([
             request.post(`${TASKS}/${task.id}/assignees`, {
@@ -1003,9 +1010,9 @@ test.describe('Tasks — gate/force interplay, isolation, and bad-input robustne
             }),
         ]);
         expect(good.status(), 'the valid user assignee lands').toBe(201);
-        // An agent that doesn't belong to the user is a clean 400 — never a 5xx.
+        // An agent outside the Task scope is a clean, non-enumerating 400.
         expect(bad.status(), 'the unowned agent is rejected 400').toBe(400);
-        expect((await bad.json()).message).toMatch(/not reachable for this user/i);
+        expect((await bad.json()).message).toBe('Task actor is not reachable in this Task scope.');
     });
 
     test('concurrent invalid transition inputs never 5xx: garbage targets → 400 validation; a missing task → 404; the row is untouched', async ({

@@ -23,7 +23,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *      the `auth.userId !== :userId` short-circuit fired with NO stored file
  *      (pure path-segment mismatch → 404 "Not found"), a canonical-shape
  *      filename with an out-of-allow-list extension (<hex64>.exe → 400
- *      InvalidFilename), and a too-short hash (63 chars → 400 InvalidFilename).
+ *      InvalidFilename), and a too-short hash (63 chars → opaque 404).
  *   4. The ANONYMOUS upload routes' VALIDATION (rejects, not the happy mint
  *      sec-pin already owns): image-only allow-list, magic-byte mismatch,
  *      empty/missing file on `/anonymous`, the broader allow-list + reject on
@@ -526,7 +526,7 @@ test.describe('FLOW: uploads authz — serve-route filename + ownership edges', 
         expect(body.message).toBe('Invalid filename');
     });
 
-    test('a too-short hash (63 hex chars) with a valid extension → 400 InvalidFilename', async ({
+    test('a too-short hash (63 hex chars) with a valid extension → opaque 404', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -534,8 +534,8 @@ test.describe('FLOW: uploads authz — serve-route filename + ownership edges', 
             `${API_BASE}/api/uploads/${user.user.id}/${'a'.repeat(63)}.png`,
             { headers: authedHeaders(user.access_token) },
         );
-        expect(res.status()).toBe(400);
-        expect((await res.json()).code).toBe('InvalidFilename');
+        expect(res.status()).toBe(404);
+        expect(await res.json()).toEqual({ status: 'error', message: 'Not found' });
     });
 });
 

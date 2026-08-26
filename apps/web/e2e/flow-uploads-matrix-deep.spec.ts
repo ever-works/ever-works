@@ -595,7 +595,7 @@ test.describe('FLOW: uploads matrix (deep) — serve-side MIME hardening + size 
         expect(filedBody.mimeType).toBe('image/png');
     });
 
-    test('serve a valid-shape but never-stored filename (owner) -> 404 "Upload not found"; malformed filename -> 400 InvalidFilename', async ({
+    test('serve a never-stored canonical filename as 404; malformed shape is the same opaque 404', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -616,8 +616,8 @@ test.describe('FLOW: uploads matrix (deep) — serve-side MIME hardening + size 
             `${API_BASE}/api/uploads/${owner.user.id}/not-a-valid-name.txt`,
             { headers: authedHeaders(owner.access_token) },
         );
-        expect(bad.status(), 'malformed filename -> 400').toBe(400);
+        expect(bad.status(), 'malformed filename -> opaque 404').toBe(404);
         const badBody = (await bad.json()) as Record<string, unknown>;
-        expect(badBody.code).toBe('InvalidFilename');
+        expect(badBody).toEqual({ status: 'error', message: 'Not found' });
     });
 });

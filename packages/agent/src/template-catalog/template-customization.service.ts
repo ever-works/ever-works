@@ -552,7 +552,11 @@ export class TemplateCustomizationService {
             'Custom template repository',
         );
 
-        const cloneUrl = this.gitFacade.getCloneUrl(GIT_PROVIDER_ID, created.owner, created.name);
+        const cloneUrl = await this.gitFacade.getCloneUrl(
+            GIT_PROVIDER_ID,
+            created.owner,
+            created.name,
+        );
         await this.gitFacade.replaceRemote(GIT_PROVIDER_ID, baseDir, 'origin', cloneUrl);
         await this.gitFacade.push({ dir: baseDir, force: true }, gitOptions);
 
@@ -646,7 +650,7 @@ export class TemplateCustomizationService {
             committer,
         );
 
-        const targetRepoUrl = this.gitFacade.getCloneUrl(
+        const targetRepoUrl = await this.gitFacade.getCloneUrl(
             GIT_PROVIDER_ID,
             template.repositoryOwner,
             template.repositoryName,

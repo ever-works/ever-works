@@ -410,7 +410,11 @@ export class BranchSyncService {
             }
 
             // Update remote to point to target repo
-            const targetRepoUrl = this.gitFacade.getCloneUrl(providerId, targetOwner, targetRepo);
+            const targetRepoUrl = await this.gitFacade.getCloneUrl(
+                providerId,
+                targetOwner,
+                targetRepo,
+            );
             await this.gitFacade.replaceRemote(providerId, tempDir, 'origin', targetRepoUrl);
 
             // Push to target. `ref`/`remoteRef` are explicit on purpose:

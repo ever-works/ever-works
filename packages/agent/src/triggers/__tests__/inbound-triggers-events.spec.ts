@@ -288,6 +288,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
                     title: 'Push on acme/widgets',
                     description: 'By ada — Pushed 3 commits',
                 }),
+                { tenantId: null, organizationId: null },
             );
             const row = repo._rows.get(trigger.id) as InboundTrigger;
             expect(row.fireCount).toBe(1);
@@ -422,6 +423,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
                     title: 'From template: github.push',
                     description: 'Templated body',
                 }),
+                { tenantId: null, organizationId: null },
             );
         });
 
@@ -444,6 +446,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             expect(tasks.create).toHaveBeenCalledWith(
                 'user-1',
                 expect.objectContaining({ title: 'Own title' }),
+                { tenantId: null, organizationId: null },
             );
         });
     });
@@ -466,6 +469,7 @@ describe('InboundTriggersService — event-sourced triggers', () => {
             expect(tasks.create).toHaveBeenCalledWith(
                 'user-1',
                 expect.objectContaining({ labels: [TRIGGER_TEST_LABEL] }),
+                { tenantId: null, organizationId: null },
             );
             const row = repo._rows.get(trigger.id) as InboundTrigger;
             expect(row.fireCount).toBe(0);

@@ -258,7 +258,7 @@ test.describe('sec-pin: agent run scoping (Wave M #133) + attachment uploadId va
         );
         expect(res.status()).toBe(404);
         const body = (await res.json()) as ErrorBody;
-        expect(body.message).toBe(`Agent ${a.agent.id} not found.`);
+        expect(body.message).toBe('AgentRun not found.');
 
         // The victim's history is provably untouched: same total, same row,
         // same terminal status (a cancel would have flipped/echoed state).
