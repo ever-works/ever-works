@@ -102,7 +102,8 @@ export class StripeRelayService {
             this.logger.warn(`relay: event ${event.id} names unknown work ${workId}`);
             return { status: 'unroutable', eventId: event.id, reason: 'unknown_work' };
         }
-        if (!work.website) {
+        const website = resolveDirectoryWebsite(work);
+        if (!website) {
             this.logger.warn(`relay: work ${workId} has no deployed website`);
             return { status: 'unroutable', eventId: event.id, reason: 'not_deployed' };
         }
@@ -122,7 +123,7 @@ export class StripeRelayService {
             return { status: 'unroutable', eventId: event.id, reason: 'not_provisioned' };
         }
 
-        return this.forward(work.id, work.website, secret, rawBody, event.id);
+        return this.forward(work.id, website, secret, rawBody, event.id);
     }
 
     /**
@@ -140,8 +141,8 @@ export class StripeRelayService {
         const url = `${stripTrailingSlash(website)}/api/stripe/platform-webhook`;
 
         // Security (SSRF + signed-bearer leak) — identical reasoning to
-        // DirectoryWebsiteClient: `work.website` is attacker-influenceable (a
-        // tenant's verified custom domain is promoted into it), and the request
+        // DirectoryWebsiteClient: the resolved website is attacker-influenceable
+        // (a tenant's verified custom domain may be promoted into it), and the request
         // below carries an HMAC Bearer header bound to the per-Work secret. Refuse
         // BEFORE signing so the secret never leaves the process for an unsafe
         // target. Local dev/test may legitimately point a Work at http://localhost.
@@ -210,6 +211,43 @@ export class StripeRelayService {
         this.logger.log(`relay: event ${eventId} -> work ${workId} (site ${response.status})`);
         return { status: 'forwarded', eventId, workId, siteStatus: response.status };
     }
+}
+
+/**
+ * Resolve the directory's public base URL without requiring a data migration.
+ *
+ * Older managed k8s Works predate `managedSubdomain` and several have a null
+ * `website` even though their canonical `${slug}.ever.works` deployment is
+ * live. The deploy pipeline deliberately preserves that legacy derivation;
+ * the relay must use the same address or it will classify paid events as
+ * permanently unroutable. Explicit website URLs still win, and unmanaged
+ * providers never get a guessed destination.
+ */
+function resolveDirectoryWebsite(work: {
+    website?: string | null;
+    deployProvider?: string | null;
+    managedSubdomain?: string | null;
+    slug?: string | null;
+}): string | null {
+    const explicit = work.website?.trim();
+    if (explicit) return explicit;
+
+    if (work.deployProvider !== 'k8s' && work.deployProvider !== 'ever-works') {
+        return null;
+    }
+
+    const isDnsLabel = (value: string) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(value);
+    const subdomainCandidates = [work.managedSubdomain, work.slug]
+        .map((value) => value?.trim().toLowerCase() ?? '')
+        .filter((value) => isDnsLabel(value));
+    const subdomain = subdomainCandidates[0];
+    if (!subdomain) return null;
+
+    const rootDomain = process.env.EVER_WORKS_DOMAIN?.trim().toLowerCase() || 'ever.works';
+    if (!rootDomain.split('.').every((label) => isDnsLabel(label))) {
+        return null;
+    }
+    return `https://${subdomain}.${rootDomain}`;
 }
 
 /**
