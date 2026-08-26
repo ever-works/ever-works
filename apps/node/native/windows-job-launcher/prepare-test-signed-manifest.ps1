@@ -72,7 +72,7 @@ try {
 	# Trust only this end-entity signer. Adding a self-signed leaf to Root opens
 	# an interactive CA-trust prompt on hosted runners and overstates its role.
 	Write-Host "Adding public-only ephemeral certificate with noninteractive certutil"
-	& $certutilPath -user -f -silent -addstore TrustedPeople $certificatePath | Out-Null
+	& $certutilPath -user -f -addstore TrustedPeople $certificatePath | Out-Null
 	if ($LASTEXITCODE -ne 0) {
 		throw "certutil could not add the ephemeral public certificate to CurrentUser TrustedPeople"
 	}
