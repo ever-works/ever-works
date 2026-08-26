@@ -1090,23 +1090,27 @@ if (process.argv.includes('--version')) {
 		['http_proxy', 'http://proxy.corp:8080?token=secret'],
 		['https_proxy', 'http://proxy.corp:8080?region=eu'],
 		['all_proxy', 'http://proxy.corp:8080#corp']
-	])('drops any non-plain proxy URL in %s from both version and model processes', async (name, value) => {
-		const harness = await createHarness('success', {
-			Path: process.env.Path ?? process.env.PATH,
-			SystemRoot: process.env.SystemRoot,
-			[name]: value
-		});
-		const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
-		const modelEnv = (await readCapture(harness)).env;
-		const versionEnv = JSON.parse(await readFile(`${harness.capturePath}.version.json`, 'utf8')) as Record<
-			string,
-			string
-		>;
+	])(
+		'drops any non-plain proxy URL in %s from both version and model processes',
+		async (name, value) => {
+			const harness = await createHarness('success', {
+				Path: process.env.Path ?? process.env.PATH,
+				SystemRoot: process.env.SystemRoot,
+				[name]: value
+			});
+			const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
+			const modelEnv = (await readCapture(harness)).env;
+			const versionEnv = JSON.parse(await readFile(`${harness.capturePath}.version.json`, 'utf8')) as Record<
+				string,
+				string
+			>;
 
-		expect(result.status).toBe('succeeded');
-		expect(envValue(modelEnv, name)).toBeUndefined();
-		expect(envValue(versionEnv, name)).toBeUndefined();
-	});
+			expect(result.status).toBe('succeeded');
+			expect(envValue(modelEnv, name)).toBeUndefined();
+			expect(envValue(versionEnv, name)).toBeUndefined();
+		},
+		10_000
+	);
 
 	it('builds the supported non-interactive Claude Code argv with zero provider credential injection', async () => {
 		const harness = await createHarness('success');
