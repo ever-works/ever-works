@@ -251,7 +251,15 @@ function Get-TrustedAuthenticodeIdentity {
 		$null -eq $signature.SignerCertificate -or
 		$signature.SignerCertificate.Subject -cne $ExpectedPublisherSubject
 	) {
-		throw "$Name does not have a Valid Authenticode signature from the pinned publisher"
+		$observedPublisher = if ($null -eq $signature.SignerCertificate) {
+			"<none>"
+		} else {
+			[string]$signature.SignerCertificate.Subject
+		}
+		throw (
+			"$Name does not have a Valid Authenticode signature from the pinned publisher " +
+			"(status=$($signature.Status); publisher=$observedPublisher)"
+		)
 	}
 	return [ordered]@{
 		sha256 = Get-Sha256 $LiteralPath
