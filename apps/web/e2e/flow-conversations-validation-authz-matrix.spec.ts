@@ -544,24 +544,25 @@ test.describe('append › pipeline ordering and create whitelist', () => {
         expect(msg, 'the uuid-pipe error is NOT what surfaced').not.toContain('uuid is expected');
     });
 
-    test('conversation create rejects entity columns absent from the DTO (model, metadata)', async ({
+    test('conversation create accepts a model pin but rejects server-owned metadata', async ({
         request,
     }) => {
         const { access_token } = await registerUserViaAPI(request);
 
-        // `model` and `metadata` are real (nullable) columns on the Conversation
-        // entity but are NOT part of CreateConversationDto — they are message-/
-        // server-owned and must not be client-settable at create time.
-        for (const field of ['model', 'metadata'] as const) {
-            const res = await request.post(`${API_BASE}/api/conversations`, {
-                headers: authedHeaders(access_token),
-                data: { title: 'x', [field]: field === 'metadata' ? { a: 1 } : 'gpt-4' },
-            });
-            expect(res.status(), `create with ${field} → 400 (forbidNonWhitelisted)`).toBe(400);
-            const json = (await res.json()) as Record<string, unknown>;
-            expect(errText(json), `names the forbidden ${field} property`).toContain(
-                `property ${field} should not exist`,
-            );
-        }
+        const accepted = await request.post(`${API_BASE}/api/conversations`, {
+            headers: authedHeaders(access_token),
+            data: { title: 'x', model: 'gpt-4' },
+        });
+        expect(accepted.status(), 'model is a whitelisted create-time pin').toBe(201);
+        expect(((await accepted.json()) as Record<string, unknown>).model).toBe('gpt-4');
+
+        const rejected = await request.post(`${API_BASE}/api/conversations`, {
+            headers: authedHeaders(access_token),
+            data: { title: 'x', metadata: { a: 1 } },
+        });
+        expect(rejected.status(), 'metadata remains server-owned').toBe(400);
+        expect(errText((await rejected.json()) as Record<string, unknown>)).toContain(
+            'property metadata should not exist',
+        );
     });
 });
