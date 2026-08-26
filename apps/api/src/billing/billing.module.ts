@@ -8,6 +8,7 @@ import { PlanCheckoutController } from './plan-checkout.controller';
 import { PaymentMethodController } from './payment-method.controller';
 import { PaygController } from './payg.controller';
 import { SeatsController } from './seats.controller';
+import { StripeRelayModule } from './stripe-relay/stripe-relay.module';
 
 /**
  * The money path (billing PRD B5) — thin API module over the agent-side
@@ -32,7 +33,15 @@ import { SeatsController } from './seats.controller';
  * read-only payment-method summary on `GET /api/billing/overview`.
  */
 @Module({
-    imports: [AuthModule, AgentSubscriptionsModule, OrganizationsModule],
+    imports: [
+        AuthModule,
+        AgentSubscriptionsModule,
+        OrganizationsModule,
+        // The SHARED Stripe webhook relay (relay phase 3) — one Stripe endpoint
+        // that routes each event to the directory that owns it. Ships dark
+        // behind STRIPE_RELAY_ENABLED; additive beside the receiver above.
+        StripeRelayModule,
+    ],
     controllers: [
         BillingController,
         CreditsCheckoutController,

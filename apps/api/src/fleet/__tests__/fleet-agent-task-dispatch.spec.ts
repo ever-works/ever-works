@@ -98,8 +98,8 @@ describe('fleet agent-task dispatch (AUDIT A46/A24 producer wiring)', () => {
                     Promise.resolve({
                         id,
                         userId,
-                        tenantId: scope.tenantId,
-                        organizationId: scope.organizationId,
+                        tenantId: scope?.tenantId ?? null,
+                        organizationId: scope?.organizationId ?? null,
                     }),
                 ),
             } as never,
