@@ -160,7 +160,7 @@ function modelRequest(
 		timeoutMs: 10_000,
 		cleanupTimeoutMs: 1000,
 		maxOutputBytes: 1024 * 1024,
-		helperStartupTimeoutMs: 60_000,
+		helperStartupTimeoutMs: 30_000,
 		...overrides
 	};
 }
