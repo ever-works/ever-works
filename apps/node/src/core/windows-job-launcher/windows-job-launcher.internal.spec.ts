@@ -59,6 +59,35 @@ describe('internal Windows Job launcher adapter', () => {
 		});
 	});
 
+	it('allows configured broker startup headroom beyond thirty seconds while remaining bounded', async () => {
+		vi.useFakeTimers();
+		try {
+			const fake = new FakeHelper();
+			const launching = launchWindowsJobInternal(
+				{
+					helperPath: String.raw`C:\trusted\native\windows-job-launcher.exe`,
+					helperTrust: helperTrust(),
+					...request(),
+					helperStartupTimeoutMs: 60_000
+				},
+				{ platform: 'win32', spawnTrustedHelper: () => fake, outputHighWaterMark: 16 * 1024 }
+			);
+			const observed = launching.then(
+				(run) => ({ run, error: undefined }),
+				(error: unknown) => ({ run: undefined, error })
+			);
+
+			await vi.advanceTimersByTimeAsync(30_001);
+			fake.send(launched(5151));
+
+			const outcome = await observed;
+			expect(outcome.error).toBeUndefined();
+			expect(outcome.run).toMatchObject({ rootPid: 5151 });
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('fails closed before production broker startup when a trust pin is missing', async () => {
 		const spawnTrustedHelper = vi.fn();
 		await expect(

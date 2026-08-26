@@ -359,7 +359,7 @@ export async function launchWindowsJobInternal(
 
 	const launchTimer = setTimeout(
 		() => fail('WINDOWS_JOB_LAUNCH_TIMEOUT'),
-		Math.min(request.helperStartupTimeoutMs ?? request.cleanupTimeoutMs, 30_000)
+		Math.min(request.helperStartupTimeoutMs ?? request.cleanupTimeoutMs, 60_000)
 	);
 	void launched.finally(() => clearTimeout(launchTimer)).catch(() => undefined);
 
