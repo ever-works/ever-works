@@ -219,6 +219,29 @@ describe('StripeRelayService', () => {
             );
         });
 
+        it('ignores a stale Vercel placeholder for a managed k8s Work', async () => {
+            (constructStripeEvent as jest.Mock).mockReturnValue(
+                event('evt_placeholder', { metadata: { work_id: WORK_ID } }),
+            );
+            (global.fetch as jest.Mock).mockResolvedValue({ status: 200 });
+            const { service } = makeService({
+                work: {
+                    id: WORK_ID,
+                    slug: 'awesome-rust-tools-and-frameworks',
+                    deployProvider: 'k8s',
+                    website: 'https://awesome-rust-tools-and-frameworks-w.vercel.app',
+                    managedSubdomain: null,
+                    platformSyncSecretEncrypted: 'enc',
+                },
+            });
+
+            expect(await service.handle('{}', 'sig')).toMatchObject({ status: 'forwarded' });
+            expect(global.fetch).toHaveBeenCalledWith(
+                'https://awesome-rust-tools-and-frameworks.ever.works/api/stripe/platform-webhook',
+                expect.any(Object),
+            );
+        });
+
         it('binds the signature to the work id, so it cannot be replayed elsewhere', async () => {
             const raw = JSON.stringify(event('evt_3', { metadata: { work_id: WORK_ID } }));
             (constructStripeEvent as jest.Mock).mockReturnValue(JSON.parse(raw));

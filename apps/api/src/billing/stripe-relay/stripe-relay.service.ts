@@ -218,10 +218,11 @@ export class StripeRelayService {
  *
  * Older managed k8s Works predate `managedSubdomain` and several have a null
  * `website` even though their canonical `${slug}.ever.works` deployment is
- * live. The deploy pipeline deliberately preserves that legacy derivation;
- * the relay must use the same address or it will classify paid events as
- * permanently unroutable. Explicit website URLs still win, and unmanaged
- * providers never get a guessed destination.
+ * live. The deploy pipeline deliberately preserves that legacy derivation and
+ * ignores stale `*.vercel.app` placeholders for managed k8s Works; the relay
+ * must do the same or it will classify paid events as permanently unroutable.
+ * Real explicit website URLs still win, and unmanaged providers never get a
+ * guessed destination.
  */
 function resolveDirectoryWebsite(work: {
     website?: string | null;
@@ -229,10 +230,21 @@ function resolveDirectoryWebsite(work: {
     managedSubdomain?: string | null;
     slug?: string | null;
 }): string | null {
+    const isManagedProvider = work.deployProvider === 'k8s' || work.deployProvider === 'ever-works';
     const explicit = work.website?.trim();
-    if (explicit) return explicit;
+    if (explicit) {
+        let isVercelPlaceholder = false;
+        try {
+            const parsed = new URL(explicit.includes('://') ? explicit : `https://${explicit}`);
+            isVercelPlaceholder = parsed.hostname.toLowerCase().endsWith('.vercel.app');
+        } catch {
+            // Preserve the existing explicit-target behavior; the forwarder's
+            // SSRF/URL checks remain the authority for malformed values.
+        }
+        if (!isManagedProvider || !isVercelPlaceholder) return explicit;
+    }
 
-    if (work.deployProvider !== 'k8s' && work.deployProvider !== 'ever-works') {
+    if (!isManagedProvider) {
         return null;
     }
 
