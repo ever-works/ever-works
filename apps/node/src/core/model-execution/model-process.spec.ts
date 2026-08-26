@@ -586,7 +586,11 @@ describe('executeModelProcess — real process boundary', () => {
 			expect(spawnPurposes).toEqual(['version-probe']);
 			await expect(access(harness.capturePath)).rejects.toThrow();
 		},
-		5_000
+		// The never-settling branch deliberately consumes the 2.5 s production
+		// termination-safety deadline. Leave enough runner headroom for the two
+		// real subprocesses and temp-directory cleanup while keeping the test
+		// itself bounded.
+		10_000
 	);
 
 	it.runIf(process.platform === 'win32')(
@@ -1715,12 +1719,18 @@ describe('executeModelProcess — request refusal', () => {
 	it('makes the absolute deadline win when a contained model closes after its budget', async () => {
 		const harness = await createHarness('success');
 		let monotonicTime = 0;
+		let containmentCount = 0;
 		const baseCreateContainment = harness.io.createModelProcessContainment!;
 		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
 			...harness.io,
 			monotonicNow: () => monotonicTime,
 			createModelProcessContainment: async (spawnFn) => {
 				const containment = await baseCreateContainment(spawnFn);
+				containmentCount += 1;
+				// The first containment owns the version probe. Advance the fake
+				// deadline only for the credentialed model process this test names;
+				// attaching to both made the outcome depend on probe close ordering.
+				if (containmentCount === 1) return containment;
 				return {
 					...containment,
 					spawn: (async (...args: Parameters<TestContainment['spawn']>) => {
@@ -1736,6 +1746,7 @@ describe('executeModelProcess — request refusal', () => {
 
 		expect(result.status).toBe('timed-out');
 		expect(result.summary).toMatch(/wall-clock/i);
+		expect(containmentCount).toBe(2);
 	});
 
 	it('makes the absolute deadline win when containment close consumes the remaining budget', async () => {
