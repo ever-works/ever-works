@@ -350,10 +350,17 @@ test.describe('Task assignees — deep integration', () => {
         expect(emptyId.status()).toBe(400);
         expect((await emptyId.json()).message).toContain('id is required');
 
-        // Either actor type outside the Task scope gets the same generic 400.
+        // A real persisted actor from another tenant/organization is not
+        // reachable from the owner's Task scope. Keep this distinct from the
+        // missing-actor probes below: both must fail closed, but they exercise
+        // different repository outcomes.
+        const foreign = await registerUserViaAPI(request);
+        const foreignAgent = await createAgentViaAPI(request, foreign.access_token, {
+            name: 'Foreign validation agent',
+        });
         const unreachableAgent = await postAssignee(request, token, task.id, {
             assigneeType: 'agent',
-            assigneeId: C_UUID,
+            assigneeId: foreignAgent.id,
         });
         expect(unreachableAgent.status()).toBe(400);
         expect((await unreachableAgent.json()).message).toBe(
@@ -361,12 +368,23 @@ test.describe('Task assignees — deep integration', () => {
         );
         const unreachableUser = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: C_UUID,
+            assigneeId: foreign.user.id,
         });
         expect(unreachableUser.status()).toBe(400);
         expect((await unreachableUser.json()).message).toBe(
             'Task actor is not reachable in this Task scope.',
         );
+
+        for (const assigneeType of ['agent', 'user'] as const) {
+            const missingActor = await postAssignee(request, token, task.id, {
+                assigneeType,
+                assigneeId: C_UUID,
+            });
+            expect(missingActor.status()).toBe(400);
+            expect((await missingActor.json()).message).toBe(
+                'Task actor is not reachable in this Task scope.',
+            );
+        }
 
         // Malformed task uuid → 400 ParseUUIDPipe.
         const badTaskUuid = await postAssignee(request, token, MALFORMED_UUID, {
@@ -388,7 +406,7 @@ test.describe('Task assignees — deep integration', () => {
 
         // A stranger cannot see — let alone assign on — my task: scoped-resolve
         // reads as 404 (not 403). The owner's task is untouched.
-        const stranger: RegisteredUser = await registerUserViaAPI(request);
+        const stranger: RegisteredUser = foreign;
         const strangerAssign = await postAssignee(request, stranger.access_token, task.id, {
             assigneeType: 'user',
             assigneeId: stranger.user.id,

@@ -413,13 +413,27 @@ test.describe('Task approver gate — requireAllApprovers on → done (API)', ()
         // class-validator returns `message` as a string[]; coerce before matching.
         expect(String((await badType.json()).message)).toMatch(/one of the following values/i);
 
-        // (b) Agent approver outside the persisted Task scope → generic 400.
+        // (b) A real persisted Agent from another tenant/organization is
+        // outside the Task scope → generic 400. A separate missing-actor
+        // probe keeps the not-found repository outcome covered too.
+        const bob = await registerUserViaAPI(request);
+        const foreignAgent = await createAgentViaAPI(request, bob.access_token, {
+            name: `Foreign Approver Bot ${stamp}`,
+        });
         const unownedAgent = await rawAddApprover(request, token, task.id, {
             approverType: 'agent',
-            approverId: '00000000-0000-0000-0000-000000000000',
+            approverId: foreignAgent.id,
         });
         expect(unownedAgent.status()).toBe(400);
         expect((await unownedAgent.json()).message).toBe(
+            'Task actor is not reachable in this Task scope.',
+        );
+        const missingAgent = await rawAddApprover(request, token, task.id, {
+            approverType: 'agent',
+            approverId: '00000000-0000-0000-0000-000000000000',
+        });
+        expect(missingAgent.status()).toBe(400);
+        expect((await missingAgent.json()).message).toBe(
             'Task actor is not reachable in this Task scope.',
         );
 
@@ -451,7 +465,6 @@ test.describe('Task approver gate — requireAllApprovers on → done (API)', ()
 
         // (f) Cross-user isolation — a stranger adding an approver to my task
         // gets a 404 (no existence leak), not a 403.
-        const bob = await registerUserViaAPI(request);
         const stranger = await rawAddApprover(request, bob.access_token, task.id, {
             approverType: 'user',
             approverId: bob.user.id,
