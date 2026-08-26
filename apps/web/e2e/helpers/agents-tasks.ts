@@ -1,6 +1,12 @@
 import { type APIRequestContext, expect } from '@playwright/test';
 import { API_BASE, authedHeaders } from './api';
 
+function scopedHeaders(token: string, scopeSlug?: string) {
+    return scopeSlug
+        ? { ...authedHeaders(token), 'x-scope-slug': scopeSlug }
+        : authedHeaders(token);
+}
+
 /**
  * Agents + Tasks helpers.
  *
@@ -51,9 +57,10 @@ export async function createAgentViaAPI(
     request: APIRequestContext,
     token: string,
     body: { name: string; scope?: string; missionId?: string; ideaId?: string; workId?: string },
+    scopeSlug?: string,
 ): Promise<Agent> {
     const res = await request.post(`${API_BASE}/api/agents`, {
-        headers: authedHeaders(token),
+        headers: scopedHeaders(token, scopeSlug),
         data: { scope: 'tenant', ...body },
     });
     expect(res.status(), `createAgent body=${await res.text().catch(() => '')}`).toBe(201);
@@ -72,9 +79,10 @@ export async function createTaskViaAPI(
         missionId?: string;
         ideaId?: string;
     },
+    scopeSlug?: string,
 ): Promise<Task> {
     const res = await request.post(`${API_BASE}/api/tasks`, {
-        headers: authedHeaders(token),
+        headers: scopedHeaders(token, scopeSlug),
         data: body,
     });
     expect(res.status(), `createTask body=${await res.text().catch(() => '')}`).toBe(201);
@@ -87,9 +95,10 @@ export async function addTaskAssignee(
     token: string,
     taskId: string,
     assignee: { assigneeType: 'agent' | 'user'; assigneeId: string },
+    scopeSlug?: string,
 ): Promise<{ id: string; taskId: string; assigneeType: string; assigneeId: string }> {
     const res = await request.post(`${API_BASE}/api/tasks/${taskId}/assignees`, {
-        headers: authedHeaders(token),
+        headers: scopedHeaders(token, scopeSlug),
         data: assignee,
     });
     expect(res.status(), `addAssignee body=${await res.text().catch(() => '')}`).toBe(201);
@@ -102,9 +111,10 @@ export async function transitionTaskViaAPI(
     taskId: string,
     to: string,
     force = false,
+    scopeSlug?: string,
 ): Promise<Task> {
     const res = await request.post(`${API_BASE}/api/tasks/${taskId}/transition`, {
-        headers: authedHeaders(token),
+        headers: scopedHeaders(token, scopeSlug),
         data: { to, force },
     });
     expect(res.status(), `transition body=${await res.text().catch(() => '')}`).toBeLessThan(300);
@@ -122,9 +132,10 @@ export async function assignTaskToAgent(
     token: string,
     agentId: string,
     taskId: string,
+    scopeSlug?: string,
 ): Promise<{ runId?: string } | null> {
     const res = await request.post(`${API_BASE}/api/agents/${agentId}/assign-task`, {
-        headers: authedHeaders(token),
+        headers: scopedHeaders(token, scopeSlug),
         data: { taskId },
     });
     if (res.ok()) return res.json();
@@ -135,9 +146,10 @@ export async function listAgentRuns(
     request: APIRequestContext,
     token: string,
     agentId: string,
+    scopeSlug?: string,
 ): Promise<AgentRun[]> {
     const res = await request.get(`${API_BASE}/api/agents/${agentId}/runs`, {
-        headers: authedHeaders(token),
+        headers: scopedHeaders(token, scopeSlug),
     });
     expect(res.status()).toBe(200);
     const body = await res.json();

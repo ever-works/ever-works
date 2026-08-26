@@ -26,10 +26,9 @@
  *     inside the cradle-to-grave journey.
  * The NEW, un-pinned angles here: the Trigger.dev-independence contrast
  * (cancel 200 while assign/run-now 500), CAS terminal-row INTEGRITY proved via
- * the getRun detail before/after, guard-ORDERING (agent-gate 404 vs run 404
- * carry different messages), the 'manual' (run-now) trigger-kind cancel, the
- * same-user CROSS-AGENT-path asymmetry (cancel is not agentId-scoped whereas
- * getRun is), cancel ISOLATION across sibling runs + sibling agents, the events
+ * the getRun detail before/after, non-enumerating 404s across ownership
+ * mismatches, the 'manual' (run-now) trigger-kind cancel, same-user
+ * CROSS-AGENT-path rejection, cancel ISOLATION across sibling runs + sibling agents, the events
  * feed staying inert on a no-op cancel, and the exact 2-key response envelope.
  *
  * PROBED LIVE (http://127.0.0.1:3100, sqlite in-memory, NO LLM key, NO
@@ -43,12 +42,12 @@
  *     { cancelled:false, previousStatus:'failed' } — deterministic, never 500;
  *     the row STAYS 'failed' (getRun detail unchanged: status/errorMessage/
  *     finishedAt/durationMs identical), and re-cancel repeats verbatim.
- *   - cross-user cancel (real ids) → 404 { message:"Agent <id> not found.", … }.
- *   - real agent + unknown runId → 404 { message:"AgentRun <id> not found.", … }.
- *   - unknown agentId + real runId → 404 "Agent <id> not found." (gate first).
+ *   - cross-user cancel (real ids) → 404 { message:"AgentRun not found.", … }.
+ *   - real agent + unknown runId → the same non-enumerating 404 body.
+ *   - unknown agentId + real runId → the same non-enumerating 404 body.
  *   - malformed run/agent id → 400 "Validation failed (uuid is expected)".
- *   - same-user cross-agent path (A's run under agent B) → 200 no-op (cancel is
- *     userId-scoped, not agentId-scoped) — while GET :B/runs/:runIdOfA → 404.
+ *   - same-user cross-agent path (A's run under agent B) → 404; cancel and GET
+ *     enforce the same agentId/run relation.
  *   - anonymous cancel → 401 { message:"Unauthorized", statusCode:401 }.
  *
  * Isolation: every test registers a FRESH owner via registerUserViaAPI() with a
@@ -352,25 +351,24 @@ test.describe('agent-run cancellation — guard ordering + id validation matrix'
         expect((await badAgent.json()).message).toBe('Validation failed (uuid is expected)');
     });
 
-    test('the agent-ownership gate fires BEFORE the run lookup — the two 404s carry DIFFERENT messages', async ({
+    test('agent and run ownership mismatches share one non-enumerating 404 body', async ({
         request,
     }) => {
         const s = await seedAgentWithTaskRun(request, 'GuardOrder');
 
-        // Unknown AGENT + a real run id → the gate answers "Agent … not found."
+        // Unknown agent + a real run id must not reveal which identifier missed.
         const unknownAgent = await cancel(request, s.token, UNKNOWN_AGENT_UUID, s.run.id);
         expect(unknownAgent.status).toBe(404);
         const uaBody = unknownAgent.body as unknown as ErrorBody;
-        expect(uaBody.message).toBe(`Agent ${UNKNOWN_AGENT_UUID} not found.`);
+        expect(uaBody.message).toBe('AgentRun not found.');
 
-        // Real agent + unknown RUN id → the gate passes; the run lookup answers.
+        // Real agent + unknown run id returns the same body.
         const unknownRun = await cancel(request, s.token, s.agentId, UNKNOWN_RUN_UUID);
         expect(unknownRun.status).toBe(404);
         const urBody = unknownRun.body as unknown as ErrorBody;
-        expect(urBody.message).toBe(`AgentRun ${UNKNOWN_RUN_UUID} not found.`);
+        expect(urBody.message).toBe('AgentRun not found.');
 
-        // The distinct messages prove the ordering (agent gate → run CAS).
-        expect(uaBody.message).not.toBe(urBody.message);
+        expect(uaBody).toEqual(urBody);
     });
 
     test('unknown runId under the OWNER agent returns the AgentRun-scoped 404 body', async ({
@@ -383,7 +381,7 @@ test.describe('agent-run cancellation — guard ordering + id validation matrix'
         expect(res.status()).toBe(404);
         const body = (await res.json()) as ErrorBody;
         expect(body).toEqual({
-            message: `AgentRun ${UNKNOWN_RUN_UUID} not found.`,
+            message: 'AgentRun not found.',
             error: 'Not Found',
             statusCode: 404,
         });
@@ -407,18 +405,18 @@ test.describe('agent-run cancellation — guard ordering + id validation matrix'
 
 // ───────────────────────────────────────────────────────────────────────────
 test.describe('agent-run cancellation — cross-user vs cross-agent scoping', () => {
-    test('a stranger holding BOTH real ids still 404s at the agent gate and cannot mutate the run', async ({
+    test('a stranger holding BOTH real ids receives a non-enumerating 404 and cannot mutate the run', async ({
         request,
     }) => {
         const s = await seedAgentWithTaskRun(request, 'CrossUser');
         const intruder = await registerUserViaAPI(request);
 
-        // Cancel with the victim's real agent + run ids → agent-gate 404.
+        // Cancel with the victim's real agent + run ids → generic run 404.
         const res = await request.post(`${AGENTS}/${s.agentId}/runs/${s.run.id}/cancel`, {
             headers: authedHeaders(intruder.access_token),
         });
         expect(res.status()).toBe(404);
-        expect((await res.json()).message).toBe(`Agent ${s.agentId} not found.`);
+        expect((await res.json()).message).toBe('AgentRun not found.');
 
         // The intruder cannot even read the run detail (same 404 gate).
         const peek = await request.get(`${AGENTS}/${s.agentId}/runs/${s.run.id}`, {
@@ -432,13 +430,11 @@ test.describe('agent-run cancellation — cross-user vs cross-agent scoping', ()
         expect(after.id).toBe(s.run.id);
     });
 
-    test('cancel is userId-scoped, NOT agentId-scoped: an owner may cancel their run through a DIFFERENT owned agent path', async ({
+    test('cancel is agentId-scoped: an owner cannot cancel a run through a different owned agent path', async ({
         request,
     }) => {
-        // NOVEL: agentRuns.cancel(runId, userId) is not keyed on the path agentId,
-        // so run-of-A cancelled via agent-B's path succeeds (as a no-op) — unlike
-        // GET :id/runs/:runId which enforces run.agentId === id. Both agents are
-        // owned by the SAME user, so no cross-user boundary is crossed.
+        // Both agents are owned by the same user, but run.agentId must still
+        // match the path agent before cancellation reaches the repository.
         const s = await seedAgentWithTaskRun(request, 'CrossAgent');
         const agentB = await createAgentViaAPI(request, s.token, {
             name: `CrossAgentB ${stamp()}`,
@@ -450,19 +446,12 @@ test.describe('agent-run cancellation — cross-user vs cross-agent scoping', ()
         });
         expect(detailUnderB.status()).toBe(404);
 
-        // cancel is NOT agentId-scoped → observed 200 no-op. Tolerate a future
-        // hardening to 404; assert the exact shape in whichever branch is live.
+        // Cancel is intentionally agent-scoped too.
         const viaB = await request.post(`${AGENTS}/${agentB.id}/runs/${s.run.id}/cancel`, {
             headers: authedHeaders(s.token),
         });
-        expect([200, 404]).toContain(viaB.status());
-        if (viaB.status() === 200) {
-            const body = (await viaB.json()) as CancelBody;
-            expect(body.cancelled).toBe(false);
-            expect(body.previousStatus).toBe(s.run.status);
-        } else {
-            expect((await viaB.json()).message).toContain('not found');
-        }
+        expect(viaB.status()).toBe(404);
+        expect((await viaB.json()).message).toBe('AgentRun not found.');
 
         // Either way the run is unchanged and still lives under agent A.
         const underA = await getRun(request, s.token, s.agentId, s.run.id);
@@ -471,16 +460,14 @@ test.describe('agent-run cancellation — cross-user vs cross-agent scoping', ()
         expect((await listRunsPage(request, s.token, agentB.id)).meta.total).toBe(0);
     });
 
-    test('an unknown (well-formed) agentId with a real run id resolves at the agent gate, not the run lookup', async ({
+    test('an unknown (well-formed) agentId with a real run id returns the shared non-enumerating body', async ({
         request,
     }) => {
         const s = await seedAgentWithTaskRun(request, 'PhantomAgent');
         const res = await cancel(request, s.token, UNKNOWN_AGENT_UUID, s.run.id);
         expect(res.status).toBe(404);
         const body = res.body as unknown as ErrorBody;
-        // Names the AGENT (gate), never the run — no cross-agent existence leak.
-        expect(body.message).toBe(`Agent ${UNKNOWN_AGENT_UUID} not found.`);
-        expect(String(body.message)).not.toContain('AgentRun');
+        expect(body.message).toBe('AgentRun not found.');
     });
 });
 

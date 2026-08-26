@@ -180,11 +180,33 @@ describe('InboundTriggersService', () => {
                     createdById: 'user-1',
                     description: expect.stringContaining('ada@example.com'),
                 }),
+                { tenantId: null, organizationId: null },
             );
             expect(tasks.addAssignee).toHaveBeenCalledWith('user-1', 'task-1', 'agent', 'agent-1');
             const row = repo._rows.get(trigger.id) as InboundTrigger;
             expect(row.fireCount).toBe(1);
             expect(row.lastFiredAt).toBeInstanceOf(Date);
+        });
+
+        it('propagates the persisted trigger tenant and organization scope to the spawned Task', async () => {
+            const { service, repo, tasks } = makeService();
+            const { trigger, secret } = await service.create(ORG_SCOPE, { name: 'Scoped hook' });
+            const row = repo._rows.get(trigger.id) as InboundTrigger;
+            row.tenantId = 'tenant-1';
+
+            const body = '{}';
+            const ts = nowSeconds();
+            await service.fire(trigger.id, {
+                rawBody: body,
+                signatureHeader: sign(secret, ts, body),
+                timestampHeader: ts,
+                contentType: 'application/json',
+            });
+
+            expect(tasks.create).toHaveBeenCalledWith('user-1', expect.any(Object), {
+                tenantId: 'tenant-1',
+                organizationId: 'org-1',
+            });
         });
 
         it('accepts a sha256=-prefixed signature and defaults the task title template', async () => {
@@ -202,6 +224,7 @@ describe('InboundTriggersService', () => {
             expect(tasks.create).toHaveBeenCalledWith(
                 'user-1',
                 expect.objectContaining({ title: 'Trigger: Plain hook' }),
+                { tenantId: null, organizationId: null },
             );
         });
 

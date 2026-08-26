@@ -44,8 +44,8 @@
  *       is an escape hatch (→200 without force); zero approvers pass vacuously.
  *   POST   /api/tasks/:id/assignees { assigneeType:'user'|'agent', assigneeId }
  *     → 201 { taskId, assigneeType, assigneeId, id, createdAt, … }
- *     - agent-type must be an OWNED agent (foreign/unknown → 400); user-type
- *       id is NOT validated; duplicate → 409; DELETE is BY ROW id (the add
+ *     - every actor must be reachable in the persisted Task scope; foreign or
+ *       unknown user/agent ids share one generic 400; duplicate → 409; DELETE is BY ROW id (the add
  *       response `id`, not the actor id) → { deleted:true }, re-delete → 404.
  *   POST   /api/tasks/:id/reviewers { reviewerType, reviewerId }
  *     → 201 { …, reviewState:'pending', reviewedAt:null }
@@ -102,7 +102,6 @@ async function createTask(
     request: APIRequestContext,
     ctx: OwnerCtx,
     body: Record<string, unknown>,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
     const res = await request.post(`${API_BASE}/api/tasks`, { headers: ctx.headers, data: body });
     expect(res.status(), `createTask body=${await res.text().catch(() => '')}`).toBe(201);
@@ -421,7 +420,7 @@ test.describe('Task full lifecycle — reviewers + assignee sub-resource lifecyc
         expect(readd.assigneeId).toBe(ctx.userId);
     });
 
-    test('agent assignee must be an OWNED agent (foreign → 400); user-type ids are not validated', async ({
+    test('agent and user assignees must both be reachable in the persisted Task scope', async ({
         request,
     }) => {
         const ctx = await boot(request);
@@ -434,13 +433,15 @@ test.describe('Task full lifecycle — reviewers + assignee sub-resource lifecyc
         });
         expect(foreignAgent.status()).toBe(400);
 
-        // A user-type assignee id is taken as-is (no users-table lookup in this graph).
+        // The same non-enumerating rejection applies to an unknown user id.
         const anyUser = await request.post(`${tasksBase()}/${task.id}/assignees`, {
             headers: ctx.headers,
             data: { assigneeType: 'user', assigneeId: UNKNOWN_UUID },
         });
-        expect(anyUser.status()).toBe(201);
-        expect((await anyUser.json()).assigneeId).toBe(UNKNOWN_UUID);
+        expect(anyUser.status()).toBe(400);
+        expect((await anyUser.json()).message).toBe(
+            'Task actor is not reachable in this Task scope.',
+        );
     });
 });
 

@@ -498,7 +498,7 @@ test.describe('Agent create DTO — field validation matrix', () => {
         expect(perms.canEditSkills).toBe(false);
     });
 
-    test('targets: array of typed entries — non-array, bad type, missing type, and bad id all 400; a wildcard entry round-trips', async ({
+    test('targets: invalid shapes 400; wildcard round-trips; a well-formed but unreachable work id 404s', async ({
         request,
     }) => {
         const token = await freshToken(request);
@@ -541,12 +541,15 @@ test.describe('Agent create DTO — field validation matrix', () => {
         });
         expect(wildcard.targets).toEqual([{ type: 'wildcard' }]);
 
-        // A well-formed uuid id passes DTO validation (existence is not checked here).
-        const withId = await createOk(request, token, {
+        // DTO validation passes, then the ownership check rejects a target that
+        // is not reachable in this caller's scope.
+        const withId = await rawCreate(request, token, {
+            scope: 'tenant',
             name: `Tgt WithId ${stamp()}`,
             targets: [{ type: 'work', id: SOME_UUID }],
         });
-        expect(Array.isArray(withId.targets)).toBe(true);
+        expect(withId.status()).toBe(404);
+        expect(messageText(await withId.json())).toBe(`Work ${SOME_UUID} not found.`);
     });
 
     test('avatar cluster: avatarMode enum, avatarIcon <=64, avatarImageUploadId IsUUID', async ({

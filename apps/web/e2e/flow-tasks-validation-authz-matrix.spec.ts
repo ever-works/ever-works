@@ -72,7 +72,7 @@ import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from '.
  *       missing/bad type → 400 ["<x>Type must be one of the following values: user, agent"]
  *       missing id       → 400 ["<x>Id must be a string", …]
  *       id 129 chars     → 400 ["<x>Id must be shorter than or equal to 128 characters"]
- *       agent-type + unknown agent id → 400 "Agent … is not reachable for this user — cannot assign."
+ *       agent-type + unknown agent id → 400 "Task actor is not reachable in this Task scope."
  *       user-type happy  → 201;  duplicate → 409;  cross-user task → 404;  no auth → 401
  *     DELETE assignees/:assigneeId — unknown → 404; malformed → 400
  *
@@ -639,7 +639,7 @@ test.describe('POST assignees/reviewers/approvers — actor DTO symmetric matrix
             assigneeId: UNKNOWN_UUID,
         });
         expect(res.status()).toBe(400);
-        expect(errText(await res.json())).toContain('is not reachable for this user');
+        expect(errText(await res.json())).toBe('Task actor is not reachable in this Task scope.');
     });
 
     test('user-type assignee happy path → 201, exact duplicate → 409 conflict', async ({
