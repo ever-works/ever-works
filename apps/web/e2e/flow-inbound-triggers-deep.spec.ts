@@ -180,8 +180,13 @@ test.describe('Inbound Triggers — the PUBLIC HMAC fire endpoint', () => {
         expect(typeof result.taskSlug).toBe('string');
 
         // The spawned Task is real: it shows up in the owner's task list with the templated title.
-        const tasks = await request.get(`${API_BASE}/api/tasks?limit=100`, {
-            headers: authedHeaders(user.access_token),
+        const tasks = await request.get(`${API_BASE}/api/tasks?limit=100&includeHidden=true`, {
+            headers: {
+                ...authedHeaders(user.access_token),
+                // The unprefixed trigger-management route creates the
+                // trigger in personal scope; query the spawned Task there.
+                'x-scope-slug': '@personal',
+            },
         });
         expect(tasks.status()).toBe(200);
         const rows = (await tasks.json()).data as Array<{ id: string; title: string }>;

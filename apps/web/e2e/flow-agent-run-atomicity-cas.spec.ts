@@ -42,11 +42,10 @@ import { createAgentViaAPI, createTaskViaAPI } from './helpers/agents-tasks';
  *     { cancelled:false, previousStatus:'failed' } — the CAS `WHERE status IN
  *     (queued,running)` matches nothing, so ZERO columns mutate (finishedAt /
  *     durationMs / errorMessage all stay put). Idempotent under repeat + burst.
- *   • Cancel scoping ASYMMETRY (a genuine, pinned quirk): cancel resolves the
- *     run by (runId, userId) only — so a same-user cancel routed through a
- *     DIFFERENT agent's :id still reaches the run and 200s, whereas GET
- *     /:id/runs/:runId is agent-scoped and 404s on the same cross-agent id.
- *   • Cancel errors: unknown runId → 404 "AgentRun <id> not found."; malformed
+ *   • Cancel and run-read are both agent-scoped: the path agent must match the
+ *     run even for two agents owned by the same user. Cross-agent and
+ *     cross-user probes share one non-enumerating 404 body.
+ *   • Cancel errors: unknown runId → 404 "AgentRun not found."; malformed
  *     runId/agentId → 400 (ParseUUIDPipe); anonymous → 401; cross-USER (agent
  *     gate) → 404 with the victim's row provably untouched.
  *
@@ -348,7 +347,7 @@ test.describe('Cancel CAS — a terminal AgentRun is an immutable no-op', () => 
         });
         expect(unknown.status()).toBe(404);
         expect(await unknown.json()).toEqual({
-            message: `AgentRun ${UNKNOWN_UUID} not found.`,
+            message: 'AgentRun not found.',
             error: 'Not Found',
             statusCode: 404,
         });
@@ -701,10 +700,10 @@ test.describe('Reconciled-run detail shape', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Run scoping asymmetry: cancel is user-scoped, run-read is agent-scoped.
+// Run scoping symmetry: cancel and run-read are both agent-scoped.
 // ─────────────────────────────────────────────────────────────────────────────
-test.describe('Run scoping asymmetry — cancel is user-scoped, run-read is agent-scoped', () => {
-    test("same user, cross-agent: getRun 404s (agent-scoped) but cancel 200-no-ops (user-scoped); the run's own agent is untouched", async ({
+test.describe('Run scoping symmetry — cancel and run-read are agent-scoped', () => {
+    test("same user, cross-agent: getRun and cancel both 404 without mutating the run's own agent", async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -726,12 +725,10 @@ test.describe('Run scoping asymmetry — cancel is user-scoped, run-read is agen
         });
         expect(crossRead.status(), 'cross-agent run READ is agent-scoped 404').toBe(404);
 
-        // cancel resolves the run by (runId, userId) ONLY — the :id agent is not
-        // matched — so the same cross-agent cancel REACHES the run and 200-no-ops.
+        // Cancel enforces the same run.agentId === :id relation as read.
         const crossCancel = await cancel(request, u.access_token, other.id, run.id);
-        expect(crossCancel.status, 'cross-agent (same-user) cancel is user-scoped 200').toBe(200);
-        expect(crossCancel.body.cancelled).toBe(false);
-        expect(crossCancel.body.previousStatus).toBe('failed');
+        expect(crossCancel.status, 'cross-agent (same-user) cancel is agent-scoped 404').toBe(404);
+        expect(crossCancel.body).toMatchObject({ message: 'AgentRun not found.', statusCode: 404 });
 
         // The run is still readable + terminal under its OWN agent, untouched.
         const readBack = await getRunDetail(request, u.access_token, owner.id, run.id);
@@ -756,13 +753,13 @@ test.describe('Run scoping asymmetry — cancel is user-scoped, run-read is agen
             await getRunDetail(request, owner.access_token, agent.id, run.id),
         );
 
-        // The intruder holds BOTH real ids but the service.getOne agent gate fires
-        // first → 404 "Agent <id> not found." (no existence leak).
+        // The intruder holds BOTH real ids but receives the same non-enumerating
+        // run-scoped 404 as every other ownership mismatch.
         const res = await request.post(`${AGENTS}/${agent.id}/runs/${run.id}/cancel`, {
             headers: authedHeaders(intruder.access_token),
         });
         expect(res.status()).toBe(404);
-        expect((await res.json()).message).toBe(`Agent ${agent.id} not found.`);
+        expect((await res.json()).message).toBe('AgentRun not found.');
 
         // Cross-user run READ is likewise a 404 (never an empty 200).
         const read = await request.get(`${AGENTS}/${agent.id}/runs/${run.id}`, {

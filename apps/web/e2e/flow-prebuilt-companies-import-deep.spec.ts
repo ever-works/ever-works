@@ -552,7 +552,10 @@ test.describe('Prebuilt Companies — materialized org structure', () => {
         test.skip(report.created.agents === 0, 'template created no agents in this run');
 
         const agentsRes = await request.get(`${API_BASE}/api/agents`, {
-            headers: authedHeaders(token),
+            headers: {
+                ...authedHeaders(token),
+                'x-scope-slug': report.organization.slug,
+            },
         });
         expect(agentsRes.status()).toBe(200);
         const agents = (await agentsRes.json()).data as Array<{

@@ -679,9 +679,9 @@ test.describe('Goals — /goals/new create form (UI)', () => {
         await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible({
             timeout: 30_000,
         });
-        // Fresh draft: the metric value + comparator we entered are shown. The
-        // `/goals/[id]` detail is another first-hit compile, so give the target
-        // value line a generous window (the default expect timeout is only 5s).
+        // Fresh draft: the metric value + comparator we entered are shown under
+        // the Progress tab. The detail page defaults to Definition of Done.
+        await page.getByRole('tab', { name: 'Progress log' }).click();
         await expect(page.getByText('2,500 usd').first()).toBeVisible({ timeout: 30_000 });
 
         // And it now appears back in the catalog.

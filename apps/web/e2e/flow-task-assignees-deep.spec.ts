@@ -26,12 +26,10 @@ import {
  *   POST /api/tasks/:id/assignees { assigneeType:'user'|'agent', assigneeId }
  *     → 201 { id, taskId, assigneeType, assigneeId, tenantId, organizationId,
  *             createdAt }
- *     - user-type: assigneeId is NOT validated against the users table — ANY
- *       uuid (incl. one that is not a real user) is accepted with 201. Only
- *       the task ownership is enforced (`getOne(userId, taskId)`).
- *     - agent-type: assigneeId IS validated — the agent must be reachable for
- *       the caller (`agents.findByIdAndUser`). Unknown/unreachable agent →
- *       400 "Agent <id> is not reachable for this user — cannot assign."
+ *     - both actor types are validated against the persisted Task scope. A
+ *       user must be active in the same Tenant (or own a personal Task), and
+ *       an agent must be reachable in that exact scope. Any mismatch returns
+ *       the same non-enumerating 400 response.
  *     - empty assigneeId → 400 "<type> id is required."
  *     - assigneeType not 'user'|'agent' → 400 "Invalid actor type: <value>"
  *       (controller guard `assertActorType`, runs before the service).
@@ -79,11 +77,10 @@ import {
  * (the shared in-memory DB / per-user `T-n` slug counter must stay clean for
  * sibling specs). Assertions tolerate pre-existing rows (toContain / >=) and
  * never assert exact global counts. UUID literals below are deliberately NOT
- * real users — exercising the "user-type is not validated" contract.
+ * real actors and exercise the scope-validation rejection path.
  */
 
 const A_UUID = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
-const B_UUID = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
 const C_UUID = 'cccccccc-cccc-4ccc-cccc-cccccccccccc';
 const MALFORMED_UUID = 'not-a-uuid';
 
@@ -142,20 +139,20 @@ test.describe('Task assignees — deep integration', () => {
         // First add → clean 201, full row shape echoed back.
         const first = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: user.user.id,
         });
         expect(first.status(), `first add body=${await first.text()}`).toBe(201);
         const firstRow = await first.json();
         expect(firstRow.id).toBeTruthy();
         expect(firstRow.taskId).toBe(task.id);
         expect(firstRow.assigneeType).toBe('user');
-        expect(firstRow.assigneeId).toBe(A_UUID);
+        expect(firstRow.assigneeId).toBe(user.user.id);
 
-        // Duplicate of the LIVE (taskId,user,A_UUID) triple → 409 (uq index;
+        // Duplicate of the live owner-user triple → 409 (uq index;
         // the repo save()s with no pre-check). Never assert it is a 4xx.
         const dup = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: user.user.id,
         });
         expect(dup.status(), `dup body=${await dup.text()}`).toBe(409);
 
@@ -168,29 +165,29 @@ test.describe('Task assignees — deep integration', () => {
         // removal yields a brand-new 201 with a fresh id.
         const reAdd = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: user.user.id,
         });
         expect(reAdd.status(), `re-add body=${await reAdd.text()}`).toBe(201);
         const reRow = await reAdd.json();
-        expect(reRow.assigneeId).toBe(A_UUID);
+        expect(reRow.assigneeId).toBe(user.user.id);
         expect(reRow.id).not.toBe(firstRow.id);
 
         // And the recovered row is itself live again → a second duplicate 409s.
         const dup2 = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: user.user.id,
         });
         expect(dup2.status()).toBe(409);
     });
 
-    test('polymorphic assignee key: same uuid as both user and agent are distinct rows', async ({
+    test('validated user and agent actors have independent live rows and uniqueness', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
         const task = await createTaskViaAPI(request, token, { title: 'polymorphic key' });
 
-        // A real, reachable agent — its id is what we reuse across both types.
+        // A real, reachable agent shares the Task scope with the active owner.
         const agent = await createAgentViaAPI(request, token, {
             name: `Poly Agent ${Date.now().toString(36)}`,
             scope: 'tenant',
@@ -205,17 +202,16 @@ test.describe('Task assignees — deep integration', () => {
         const agentRow = await asAgent.json();
         expect(agentRow.assigneeType).toBe('agent');
 
-        // Add the SAME id as a USER assignee. uq is on the (task,type,id) triple,
-        // so a different type is a different row — and user-type isn't validated,
-        // so the id need not be a real user. → 201, distinct row id.
+        // Add the active owner as a USER assignee. Both actor kinds are now
+        // validated before insert and produce distinct join rows.
         const asUser = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: agent.id,
+            assigneeId: user.user.id,
         });
         expect(asUser.status(), `user add=${await asUser.text()}`).toBe(201);
         const userRow = await asUser.json();
         expect(userRow.assigneeType).toBe('user');
-        expect(userRow.assigneeId).toBe(agent.id);
+        expect(userRow.assigneeId).toBe(user.user.id);
         expect(userRow.id).not.toBe(agentRow.id);
 
         // Each (type,id) pair is independently unique: re-adding the agent-type
@@ -227,12 +223,12 @@ test.describe('Task assignees — deep integration', () => {
         expect(dupAgent.status()).toBe(409);
         const dupUser = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: agent.id,
+            assigneeId: user.user.id,
         });
         expect(dupUser.status()).toBe(409);
 
-        // Removing ONLY the agent-type row frees just that pair: agent-type can
-        // be re-added (201) while the user-type duplicate still 409s.
+        // Removing ONLY the agent row frees just that pair: the agent can be
+        // re-added while the independent owner-user row remains live.
         const delAgent = await deleteAssignee(request, token, task.id, agentRow.id);
         expect(delAgent.status()).toBe(200);
         const reAddAgent = await postAssignee(request, token, task.id, {
@@ -242,7 +238,7 @@ test.describe('Task assignees — deep integration', () => {
         expect(reAddAgent.status(), `re-add agent=${await reAddAgent.text()}`).toBe(201);
         const stillDupUser = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: agent.id,
+            assigneeId: user.user.id,
         });
         expect(stillDupUser.status()).toBe(409);
     });
@@ -264,14 +260,10 @@ test.describe('Task assignees — deep integration', () => {
             scope: 'tenant',
         });
 
-        // Build a heterogeneous crew: 2 distinct users + 2 distinct agents.
+        // Build a heterogeneous crew: the active owner + 2 distinct agents.
         const u1 = await addTaskAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
-        });
-        const u2 = await addTaskAssignee(request, token, task.id, {
-            assigneeType: 'user',
-            assigneeId: B_UUID,
+            assigneeId: user.user.id,
         });
         const ag1 = await addTaskAssignee(request, token, task.id, {
             assigneeType: 'agent',
@@ -281,13 +273,12 @@ test.describe('Task assignees — deep integration', () => {
             assigneeType: 'agent',
             assigneeId: agent2.id,
         });
-        const created = [u1.id, u2.id, ag1.id, ag2.id];
-        expect(new Set(created).size, 'all four rows have distinct ids').toBe(4);
+        const created = [u1.id, ag1.id, ag2.id];
+        expect(new Set(created).size, 'all three rows have distinct ids').toBe(3);
 
-        // All four are independently live: each duplicate 409s.
+        // All three are independently live: each duplicate 409s.
         for (const a of [
-            { assigneeType: 'user' as const, assigneeId: A_UUID },
-            { assigneeType: 'user' as const, assigneeId: B_UUID },
+            { assigneeType: 'user' as const, assigneeId: user.user.id },
             { assigneeType: 'agent' as const, assigneeId: agent1.id },
             { assigneeType: 'agent' as const, assigneeId: agent2.id },
         ]) {
@@ -302,8 +293,7 @@ test.describe('Task assignees — deep integration', () => {
             const addedIds = afterAdds
                 .filter((r) => r.actionType === 'task_assignee_added')
                 .map((r) => r.details?.assigneeId);
-            expect(addedIds).toContain(A_UUID);
-            expect(addedIds).toContain(B_UUID);
+            expect(addedIds).toContain(user.user.id);
             expect(addedIds).toContain(agent1.id);
             expect(addedIds).toContain(agent2.id);
         } else {
@@ -314,7 +304,7 @@ test.describe('Task assignees — deep integration', () => {
         }
 
         // Remove one agent from the crew → frees just that pair (re-addable),
-        // the other three remain live (still 409 on duplicate).
+        // the other two remain live (still 409 on duplicate).
         const delAg1 = await deleteAssignee(request, token, task.id, ag1.id);
         expect(delAg1.status()).toBe(200);
         const reAg1 = await postAssignee(request, token, task.id, {
@@ -324,9 +314,9 @@ test.describe('Task assignees — deep integration', () => {
         expect(reAg1.status(), `re-add freed agent1=${await reAg1.text()}`).toBe(201);
         const stillLiveUserA = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: user.user.id,
         });
-        expect(stillLiveUserA.status(), 'untouched user A still live').toBe(409);
+        expect(stillLiveUserA.status(), 'untouched owner-user row still live').toBe(409);
 
         // And the remove is audited too.
         const afterRemove = await taskActivity(request, token, task.id);
@@ -360,13 +350,23 @@ test.describe('Task assignees — deep integration', () => {
         expect(emptyId.status()).toBe(400);
         expect((await emptyId.json()).message).toContain('id is required');
 
-        // Agent-type assignee that is not reachable for this user → 400.
+        // Either actor type outside the Task scope gets the same generic 400.
         const unreachableAgent = await postAssignee(request, token, task.id, {
             assigneeType: 'agent',
             assigneeId: C_UUID,
         });
         expect(unreachableAgent.status()).toBe(400);
-        expect((await unreachableAgent.json()).message).toContain('not reachable');
+        expect((await unreachableAgent.json()).message).toBe(
+            'Task actor is not reachable in this Task scope.',
+        );
+        const unreachableUser = await postAssignee(request, token, task.id, {
+            assigneeType: 'user',
+            assigneeId: C_UUID,
+        });
+        expect(unreachableUser.status()).toBe(400);
+        expect((await unreachableUser.json()).message).toBe(
+            'Task actor is not reachable in this Task scope.',
+        );
 
         // Malformed task uuid → 400 ParseUUIDPipe.
         const badTaskUuid = await postAssignee(request, token, MALFORMED_UUID, {
@@ -395,11 +395,11 @@ test.describe('Task assignees — deep integration', () => {
         });
         expect(strangerAssign.status()).toBe(404);
 
-        // After every rejected attempt the task still has NO live A_UUID row, so
-        // a fresh add succeeds (none of the 4xx/401/404 above leaked a row).
+        // After every rejected attempt the task still has no owner-assignee row,
+        // so a valid add succeeds (none of the failures leaked a row).
         const cleanAdd = await postAssignee(request, token, task.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: owner.user.id,
         });
         expect(cleanAdd.status(), `clean add after matrix=${await cleanAdd.text()}`).toBe(201);
     });
@@ -415,7 +415,7 @@ test.describe('Task assignees — deep integration', () => {
         // Assignee row attached to task A.
         const rowA = await addTaskAssignee(request, token, taskA.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: owner.user.id,
         });
 
         // Removing an UNKNOWN id (never existed) under task A removes nothing →
@@ -423,13 +423,13 @@ test.describe('Task assignees — deep integration', () => {
         // (taskId,id) key; 0 rows affected → NotFound, NOT an idempotent 200).
         const ghost = await deleteAssignee(request, token, taskA.id, C_UUID);
         expect(ghost.status(), `ghost delete=${await ghost.text()}`).toBe(404);
-        // A_UUID is still live on task A → duplicate add 409s (ghost delete
+        // The owner actor is still live on task A → duplicate add 409s (ghost delete
         // touched nothing).
         const stillLive = await postAssignee(request, token, taskA.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: owner.user.id,
         });
-        expect(stillLive.status(), 'A still live after ghost delete').toBe(409);
+        expect(stillLive.status(), 'owner still live after ghost delete').toBe(409);
 
         // The :id is BOTH an ownership gate AND part of the delete key
         // (removeForTask deletes the (taskId,id) pair — IDOR hardening). So
@@ -439,15 +439,16 @@ test.describe('Task assignees — deep integration', () => {
         expect(crossTaskDelete.status(), `cross-task delete=${await crossTaskDelete.text()}`).toBe(
             404,
         );
-        // Proof the cross-task delete did NOT touch A's row: A_UUID is still
+        // Proof the cross-task delete did NOT touch A's row: the owner is still
         // live on task A, so a duplicate add still 409s.
         const stillLiveAfterCross = await postAssignee(request, token, taskA.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: owner.user.id,
         });
-        expect(stillLiveAfterCross.status(), 'A still live after cross-task delete attempt').toBe(
-            409,
-        );
+        expect(
+            stillLiveAfterCross.status(),
+            'owner still live after cross-task delete attempt',
+        ).toBe(409);
 
         // A correct remove (right task + right id) succeeds → 200 { deleted:true }.
         const goodDelete = await deleteAssignee(request, token, taskA.id, rowA.id);
@@ -456,7 +457,7 @@ test.describe('Task assignees — deep integration', () => {
         // After a successful remove the same (type,id) re-adds cleanly → 201.
         const reAddA = await postAssignee(request, token, taskA.id, {
             assigneeType: 'user',
-            assigneeId: A_UUID,
+            assigneeId: owner.user.id,
         });
         expect(reAddA.status(), `re-add after delete=${await reAddA.text()}`).toBe(201);
 
@@ -474,7 +475,7 @@ test.describe('Task assignees — deep integration', () => {
         // row to task A first so the gate (not a missing row) is what blocks.
         const rowA2 = await addTaskAssignee(request, token, taskA.id, {
             assigneeType: 'user',
-            assigneeId: B_UUID,
+            assigneeId: owner.user.id,
         });
         const stranger = await registerUserViaAPI(request);
         const strangerRemove = await deleteAssignee(
