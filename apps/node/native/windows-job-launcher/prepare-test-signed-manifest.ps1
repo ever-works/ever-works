@@ -21,9 +21,9 @@ if ($Cleanup) {
 			if (Test-Path -LiteralPath $signingStorePath) {
 				Remove-Item -LiteralPath $signingStorePath -Force
 			}
-			$trustedStorePath = "Cert:\CurrentUser\Root\$thumbprint"
+			$trustedStorePath = "Cert:\CurrentUser\TrustedPeople\$thumbprint"
 			if (Test-Path -LiteralPath $trustedStorePath) {
-				& $certutilPath -user -silent -delstore Root $thumbprint *> $null
+				& $certutilPath -user -silent -delstore TrustedPeople $thumbprint *> $null
 				if ($LASTEXITCODE -ne 0) {
 					throw "certutil could not remove the ephemeral test certificate"
 				}
@@ -69,10 +69,12 @@ try {
 		[Security.Cryptography.X509Certificates.X509ContentType]::Cert
 	)
 	[IO.File]::WriteAllBytes($certificatePath, $publicCertificateBytes)
+	# Trust only this end-entity signer. Adding a self-signed leaf to Root opens
+	# an interactive CA-trust prompt on hosted runners and overstates its role.
 	Write-Host "Adding public-only ephemeral certificate with noninteractive certutil"
-	& $certutilPath -user -f -silent -addstore Root $certificatePath | Out-Null
+	& $certutilPath -user -f -silent -addstore TrustedPeople $certificatePath | Out-Null
 	if ($LASTEXITCODE -ne 0) {
-		throw "certutil could not add the ephemeral public certificate to CurrentUser Root"
+		throw "certutil could not add the ephemeral public certificate to CurrentUser TrustedPeople"
 	}
 	Write-Host "Trusted ephemeral certificate for this test runner only"
 	Write-Host "Signing copied test-only helper fixture"
