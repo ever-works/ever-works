@@ -17,10 +17,13 @@ const git = (cwd: string, ...args: string[]): string =>
 
 const SHA = 'a'.repeat(40);
 
-// Hosted Windows runners may expose TEMP through a reparse alias. Valid-root
-// cases must use its canonical path; dedicated tests below create aliases explicitly.
-const canonicalTemporaryDirectory = realpathSync(tmpdir());
-const temporaryRoot = (prefix: string): string => realpathSync(mkdtempSync(join(canonicalTemporaryDirectory, prefix)));
+// Hosted Windows runners may expose the generic TEMP path through a reparse
+// alias. Prefer their job-scoped physical temp root; dedicated tests below
+// still create and reject aliases explicitly.
+const testTemporaryDirectory = process.env.RUNNER_TEMP ?? tmpdir();
+const canonicalTemporaryDirectory = realpathSync.native(testTemporaryDirectory);
+const temporaryRoot = (prefix: string): string =>
+	realpathSync.native(mkdtempSync(join(canonicalTemporaryDirectory, prefix)));
 
 const fleetBindingKey = (taskId: string, repositoryId = 'ever/repository'): string =>
 	`fleet-${createHash('sha256').update(repositoryId).update('\0').update(taskId).digest('hex').slice(0, 32)}`;
