@@ -23,7 +23,7 @@ if ($Cleanup) {
 			}
 			$trustedStorePath = "Cert:\CurrentUser\Root\$thumbprint"
 			if (Test-Path -LiteralPath $trustedStorePath) {
-				& $certutilPath -user -delstore Root $thumbprint *> $null
+				& $certutilPath -user -silent -delstore Root $thumbprint *> $null
 				if ($LASTEXITCODE -ne 0) {
 					throw "certutil could not remove the ephemeral test certificate"
 				}
@@ -70,7 +70,7 @@ try {
 	)
 	[IO.File]::WriteAllBytes($certificatePath, $publicCertificateBytes)
 	Write-Host "Adding public-only ephemeral certificate with noninteractive certutil"
-	& $certutilPath -user -f -addstore Root $certificatePath | Out-Null
+	& $certutilPath -user -f -silent -addstore Root $certificatePath | Out-Null
 	if ($LASTEXITCODE -ne 0) {
 		throw "certutil could not add the ephemeral public certificate to CurrentUser Root"
 	}
