@@ -28,6 +28,13 @@ if ($Cleanup) {
 					throw "certutil could not remove the ephemeral test certificate"
 				}
 			}
+			$publisherStorePath = "Cert:\CurrentUser\TrustedPublisher\$thumbprint"
+			if (Test-Path -LiteralPath $publisherStorePath) {
+				& $certutilPath -user -silent -delstore TrustedPublisher $thumbprint *> $null
+				if ($LASTEXITCODE -ne 0) {
+					throw "certutil could not remove the ephemeral test publisher certificate"
+				}
+			}
 		}
 	}
 	if (Test-Path -LiteralPath $fixtureDirectory) {
@@ -76,14 +83,18 @@ try {
 	if ($LASTEXITCODE -ne 0) {
 		throw "certutil could not add the ephemeral public certificate to CurrentUser TrustedPeople"
 	}
-	Write-Host "Trusted ephemeral certificate for this test runner only"
+	& $certutilPath -user -f -addstore TrustedPublisher $certificatePath | Out-Null
+	if ($LASTEXITCODE -ne 0) {
+		throw "certutil could not add the ephemeral public certificate to CurrentUser TrustedPublisher"
+	}
+	Write-Host "Trusted the ephemeral end-entity signer and publisher for this test runner only"
 	Write-Host "Signing copied test-only helper fixture"
 	$signature = Set-AuthenticodeSignature `
 		-LiteralPath $fixtureArtifactPath `
 		-Certificate $certificate `
 		-HashAlgorithm SHA256
 	if ($signature.Status -ne "Valid") {
-		throw "ephemeral test signature did not become Valid"
+		throw "ephemeral test signature did not become Valid: $($signature.Status)"
 	}
 	Write-Host "Signed copied test-only helper fixture"
 	$certificateSha256 = $certificate.GetCertHashString(
