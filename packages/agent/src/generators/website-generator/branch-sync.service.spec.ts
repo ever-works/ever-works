@@ -85,7 +85,7 @@ describe('BranchSyncService', () => {
         it('clones the template branch, pushes to target, and cleans up the temp dir', async () => {
             gitFacade.cloneBranch.mockResolvedValue('/tmp/work-dir');
             gitFacade.getCloneUrl.mockReturnValue(
-                'https://github.com/target-owner/target-repo.git',
+                Promise.resolve('https://github.com/target-owner/target-repo.git'),
             );
             gitFacade.replaceRemote.mockResolvedValue(undefined);
             gitFacade.push.mockResolvedValue(undefined);

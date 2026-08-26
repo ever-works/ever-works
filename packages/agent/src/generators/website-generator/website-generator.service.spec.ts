@@ -115,6 +115,44 @@ describe('WebsiteGeneratorService', () => {
             gitFacade.updateRepository.mock.invocationCallOrder[0],
         );
     });
+
+    it('does not replace the remote when duplication is cancelled while resolving the clone URL', async () => {
+        const gitFacade = createGitFacadeMock();
+        const branchSyncService = createBranchSyncMock();
+        const templateResolver = createTemplateResolverMock();
+        const service = new WebsiteGeneratorService(gitFacade, branchSyncService, templateResolver);
+        const work = createWork();
+        const user = createUser();
+        const controller = new AbortController();
+        let resolveCloneUrl!: (url: string) => void;
+        let cloneUrlRequested!: () => void;
+        const cloneUrlRequest = new Promise<void>((resolve) => {
+            cloneUrlRequested = resolve;
+        });
+
+        gitFacade.getCloneUrl.mockImplementation(
+            () =>
+                new Promise<string>((resolve) => {
+                    cloneUrlRequested();
+                    resolveCloneUrl = resolve;
+                }) as unknown as string,
+        );
+
+        const initialization = service.initialize(
+            work,
+            user,
+            WebsiteRepositoryCreationMethod.DUPLICATE,
+            { signal: controller.signal },
+        );
+
+        await cloneUrlRequest;
+        controller.abort();
+        resolveCloneUrl('https://github.com/acme/test-work-web.git');
+
+        await expect(initialization).rejects.toMatchObject({ name: 'AbortError' });
+        expect(gitFacade.replaceRemote).not.toHaveBeenCalled();
+        expect(gitFacade.push).not.toHaveBeenCalled();
+    });
 });
 
 describe('WebsiteUpdateService', () => {

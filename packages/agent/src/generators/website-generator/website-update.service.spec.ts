@@ -103,6 +103,9 @@ describe('WebsiteUpdateService', () => {
             gitFacade.repositoryExists.mockResolvedValue(true);
             gitFacade.getLatestCommit.mockResolvedValue({ sha: 'abc123' });
             gitFacade.cloneOrPull.mockResolvedValue('/tmp/dup');
+            gitFacade.getCloneUrl.mockReturnValue(
+                Promise.resolve('https://example.test/owner/repo.git'),
+            );
             branchSyncService.syncFromTemplate.mockResolvedValue({
                 totalBranches: 3,
                 synced: 3,
@@ -132,7 +135,7 @@ describe('WebsiteUpdateService', () => {
                 'github',
                 '/tmp/dup',
                 'origin',
-                expect.any(String),
+                'https://example.test/owner/repo.git',
             );
             expect(gitFacade.push).toHaveBeenCalledWith(
                 { dir: '/tmp/dup', force: true },

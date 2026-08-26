@@ -278,7 +278,7 @@ export class WebsiteUpdateService {
         );
 
         // Get the target repository URL
-        const targetRepoUrl = this.gitFacade.getCloneUrl(
+        const targetRepoUrl = await this.gitFacade.getCloneUrl(
             work.gitProvider,
             websiteOwner,
             websiteRepo,
