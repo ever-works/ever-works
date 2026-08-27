@@ -31,7 +31,7 @@
 		"fileSetSha256": "6022fdc2c8064e6bcea4671d66d05cd8fa8ffeb2044739d97431062219f7da3b"
 	},
 	"publishers": {
-		"git": "CN=Johannes Schindelin, O=Johannes Schindelin, S=Nordrhein-Westfalen, C=DE",
+		"git": "CN=Johannes Schindelin, O=Johannes Schindelin, L=Bruehl, C=DE",
 		"microsoft": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
 	},
 	"attestationBoundary": "external-authenticated-runner-attestation-required"

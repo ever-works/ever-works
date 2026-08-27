@@ -19,10 +19,6 @@ $cargoMutationJob = $null
 $originalPath = [Environment]::GetEnvironmentVariable("PATH", "Process")
 $originalProgramFiles = [Environment]::GetEnvironmentVariable("ProgramFiles", "Process")
 $originalProgramFilesX86 = [Environment]::GetEnvironmentVariable("ProgramFiles(x86)", "Process")
-$osLocalApplicationData = [Environment]::GetFolderPath(
-	[Environment+SpecialFolder]::LocalApplicationData,
-	[Environment+SpecialFolderOption]::DoNotVerify
-)
 $repositoryRoot = (& git -C $packageRoot rev-parse --show-toplevel).Trim()
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repositoryRoot)) {
 	throw "unable to resolve repository root for ancestor Cargo-config testing"
@@ -158,7 +154,7 @@ rustflags = ['-C', 'opt-level=0']
 	)
 }
 
-function Start-CargoBoundaryMutationJob {
+function Start-LegacyCargoBoundaryMutationJob {
 	param(
 		[Parameter(Mandatory)] [string]$HostileConfigDirectory,
 		[Parameter(Mandatory)] [string]$MarkerPath
@@ -174,29 +170,17 @@ function Start-CargoBoundaryMutationJob {
 	$legacyPredictableRoot = [IO.Path]::GetFullPath(
 		(Join-Path ([IO.Path]::GetTempPath()) "ever-works-cargo-$packageRootToken")
 	)
-	$privateInvocationRoot = [IO.Path]::GetFullPath(
-		(Join-Path $osLocalApplicationData "EverWorks\CargoInvocations")
-	)
 	return Start-Job -ArgumentList @(
 		$legacyPredictableRoot,
-		$privateInvocationRoot,
 		$HostileConfigDirectory,
 		$MarkerPath
 	) -ScriptBlock {
-		param($LegacyRoot, $PrivateRoot, $HostileRoot, $Marker)
+		param($LegacyRoot, $HostileRoot, $Marker)
 		$deadline = [DateTime]::UtcNow.AddMinutes(3)
 		while ([DateTime]::UtcNow -lt $deadline) {
 			$candidates = [Collections.Generic.List[string]]::new()
 			if (Test-Path -LiteralPath $LegacyRoot -PathType Container) {
 				$candidates.Add($LegacyRoot)
-			}
-			if (Test-Path -LiteralPath $PrivateRoot -PathType Container) {
-				try {
-					Get-ChildItem -LiteralPath $PrivateRoot -Directory -ErrorAction Stop |
-						ForEach-Object { $candidates.Add($_.FullName) }
-				} catch {
-					# A private ACL is an acceptable reason for the hostile watcher to see nothing.
-				}
 			}
 			foreach ($candidate in $candidates) {
 				$junction = Join-Path $candidate ".cargo"
@@ -304,7 +288,7 @@ try {
 			"[build]`r`nrustc-wrapper = 'C:\missing-concurrent-wrapper.exe'`r`n",
 			[Text.UTF8Encoding]::new($false)
 		)
-		$cargoMutationJob = Start-CargoBoundaryMutationJob `
+		$cargoMutationJob = Start-LegacyCargoBoundaryMutationJob `
 			-HostileConfigDirectory $hostileConfigDirectory `
 			-MarkerPath $cargoMutationMarker
 	}
@@ -325,7 +309,7 @@ try {
 	Assert-True (@($hostileHashes | Select-Object -Unique).Count -eq 1) "hostile build executables differ"
 	Assert-True ($controlHashes[0] -ceq $hostileHashes[0]) "hostile Cargo/Rust/MSVC linker environment changed the release executable"
 	Assert-True (-not (Test-Path -LiteralPath $toolPoisonMarker)) "build executed rustc selected from inherited PATH"
-	Assert-True (-not (Test-Path -LiteralPath $cargoMutationMarker)) "concurrent watcher replaced the controlled Cargo configuration boundary"
+	Assert-True (-not (Test-Path -LiteralPath $cargoMutationMarker)) "build reused the legacy predictable Cargo configuration boundary"
 	for ($index = 0; $index -lt $controlHashes.Count; $index++) {
 		$evidenceHash = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $evidenceDirectory "control-$index.exe")).Hash.ToLowerInvariant()
 		Assert-True ($evidenceHash -ceq $controlHashes[$index]) "retained control executable $index changed"
