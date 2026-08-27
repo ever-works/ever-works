@@ -236,6 +236,10 @@ Notes:
 
 - We recommend deploying to Kubernetes (k8s) for production workloads. See the `.deploy/` folder for our deployment configurations.
 
+## ☁️ One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/ever-works/)
+
 ## 💌 Contact Us
 
 - [Ever.co Website Contact Us page](https://ever.co/contacts)
