@@ -37,7 +37,7 @@
 		"prepare:husky": "husky install .husky",
 		"prepare": "husky",
 		"lint": "turbo run lint",
-		"test": "turbo run test",
+		"test": "turbo run test --continue",
 		"type-check": "turbo run type-check",
 		"clean": "turbo run clean",
 		"format": "prettier --write \"**/*.{ts,tsx,jsx,json,css,md}\" --log-level warn",
