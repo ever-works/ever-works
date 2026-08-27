@@ -63,8 +63,8 @@ import { createAgentViaAPI, createTaskViaAPI } from './helpers/agents-tasks';
  *               :id / :id/runs cross-user → 404 "Agent <id> not found." (uuid
  *               pipe → non-uuid 400).
  *   Assignees   POST /api/tasks/:id/assignees {assigneeType:'agent'|'user',
- *               assigneeId} on YOUR task but a FOREIGN agent child → 400 "Agent
- *               <id> is not reachable for this user — cannot assign." (== the body
+ *               assigneeId} on YOUR task but a FOREIGN agent child → 400 "Task
+ *               actor is not reachable in this Task scope." (== the body
  *               for a never-existed agent: child-existence non-disclosure).
  *   AssignTask  POST /api/agents/:id/assign-task {taskId} on YOUR agent but a
  *               FOREIGN task child → 404 "Task <id> not found.".
@@ -504,7 +504,7 @@ test.describe('IDOR — guessable ids, sub-resource-requires-parent, cross-user 
         const bobAgent = await createAgentViaAPI(request, bob.token, { name: `Bob Ag ${sfx}` });
 
         // (a) Alice adds BOB's agent as an assignee to her OWN task → 400
-        //     "not reachable for this user". The body for a FOREIGN agent must
+        //     with the generic Task-scope response. The body for a FOREIGN agent must
         //     equal the body for a NEVER-EXISTED agent (child non-disclosure).
         const foreignAgentAssign = await request.post(
             `${API_BASE}/api/tasks/${aliceTask.id}/assignees`,

@@ -61,6 +61,13 @@ const TASK_SLUG_RE = /^T-\d+$/;
 const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
 const AGENTS = `${API_BASE}/api/agents`;
 
+function triggerScopeHeaders(token: string) {
+    // createTriggerViaAPI intentionally uses the unprefixed management route,
+    // which creates this fixture in personal scope. List under that same
+    // explicit scope rather than the user's separately remembered org scope.
+    return { ...authedHeaders(token), 'x-scope-slug': '@personal' };
+}
+
 function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -522,8 +529,8 @@ test.describe('Trigger fire counters + spawned-Task lifecycle', () => {
         );
 
         // The owner's task list holds exactly the three spawned Tasks (fresh user).
-        const list = await request.get(`${API_BASE}/api/tasks?limit=200`, {
-            headers: authedHeaders(token),
+        const list = await request.get(`${API_BASE}/api/tasks?limit=200&includeHidden=true`, {
+            headers: triggerScopeHeaders(token),
         });
         expect(list.status()).toBe(200);
         const ids = ((await list.json()).data as { id: string }[]).map((t) => t.id);
@@ -573,8 +580,8 @@ test.describe('Trigger fire counters + spawned-Task lifecycle', () => {
         // A fire against a paused trigger is a 409 with NO spawned Task.
         const paused = await fireTrigger(request, trigger.id, secret, '{"e":1}');
         expect(paused.status()).toBe(409);
-        const emptyList = await request.get(`${API_BASE}/api/tasks?limit=200`, {
-            headers: authedHeaders(token),
+        const emptyList = await request.get(`${API_BASE}/api/tasks?limit=200&includeHidden=true`, {
+            headers: triggerScopeHeaders(token),
         });
         expect((await emptyList.json()).data.length).toBe(0);
 
@@ -587,8 +594,8 @@ test.describe('Trigger fire counters + spawned-Task lifecycle', () => {
             ).status(),
         ).toBe(200);
         const { taskId } = await fireAndSpawn(request, trigger.id, secret, '{"e":2}');
-        const afterList = await request.get(`${API_BASE}/api/tasks?limit=200`, {
-            headers: authedHeaders(token),
+        const afterList = await request.get(`${API_BASE}/api/tasks?limit=200&includeHidden=true`, {
+            headers: triggerScopeHeaders(token),
         });
         const ids = ((await afterList.json()).data as { id: string }[]).map((t) => t.id);
         expect(ids).toContain(taskId);

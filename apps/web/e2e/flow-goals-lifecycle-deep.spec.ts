@@ -131,10 +131,11 @@ test.describe('Goals — create & read', () => {
         expect(body.outcome).toBeNull();
         expect(typeof body.createdAt).toBe('string');
         expect(typeof body.updatedAt).toBe('string');
-        // Pure projection — internal ownership/scope columns are NOT on the wire.
+        // The internal user id stays private. Nullable tenant/organization scope
+        // is explicit on the DTO so callers can distinguish a personal Goal.
         expect(body.userId).toBeUndefined();
-        expect(body.tenantId).toBeUndefined();
-        expect(body.organizationId).toBeUndefined();
+        expect(body.tenantId).toBeNull();
+        expect(body.organizationId).toBeNull();
     });
 
     test('create normalizes input: trims title, blanks description → null, keeps params, allows 0/negative/float targets', async ({

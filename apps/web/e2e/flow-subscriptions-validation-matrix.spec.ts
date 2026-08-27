@@ -279,7 +279,7 @@ test.describe('Subscriptions plan — POST happy path, self-serve gate, transiti
             const gated = body.plan.allowedCadences.filter((c: { allowed: boolean }) => !c.allowed);
             for (const c of gated) {
                 expect(c.payPerUse).toBe(true);
-                expect(String(c.reason)).toContain('Upgrade to Premium');
+                expect(String(c.reason)).toContain('Upgrade to Enterprise');
             }
         } else {
             expect(/billing|self-assigned/i.test(JSON.stringify(body.message))).toBe(true);

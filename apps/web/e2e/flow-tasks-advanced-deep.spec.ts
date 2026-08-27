@@ -41,7 +41,7 @@ import { createAgentViaAPI, createTaskViaAPI, transitionTaskViaAPI } from './hel
  *         "reviewerType must be one of the following values: user, agent"
  *         (the @IsIn pipe fires before the controller's assertActorType).
  *       · reviewerType:'agent' + unknown/unowned id → 400
- *         "Agent <id> is not reachable for this user — cannot assign."
+ *         "Task actor is not reachable in this Task scope."
  *       · missing reviewerId → 400 (@IsString/@MaxLength).
  *       · DUPLICATE (same taskId+type+id) → 500 (unique index).
  *       · cross-user (stranger on my task) → 404 "Task <id> not found."
@@ -212,7 +212,9 @@ test.describe('Task reviewers — add lifecycle (API)', () => {
             reviewerId: NIL_UUID,
         });
         expect(unownedAgent.status()).toBe(400);
-        expect((await unownedAgent.json()).message).toMatch(/not reachable for this user/i);
+        expect((await unownedAgent.json()).message).toBe(
+            'Task actor is not reachable in this Task scope.',
+        );
 
         // (c) Missing reviewerId → 400 (DTO @IsString/@MaxLength).
         const missingId = await addReviewer(request, token, task.id, { reviewerType: 'user' });

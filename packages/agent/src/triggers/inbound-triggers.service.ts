@@ -561,14 +561,21 @@ export class InboundTriggersService {
                     '```',
                 ].join('\n'),
         );
-        const task = await this.tasks.create(row.userId, {
-            title,
-            description,
-            labels: [TRIGGER_TEST_LABEL],
-            hiddenFromBoard: !row.showOnBoard,
-            createdByType: 'user',
-            createdById: row.userId,
-        });
+        const task = await this.tasks.create(
+            row.userId,
+            {
+                title,
+                description,
+                labels: [TRIGGER_TEST_LABEL],
+                hiddenFromBoard: !row.showOnBoard,
+                createdByType: 'user',
+                createdById: row.userId,
+            },
+            {
+                tenantId: row.tenantId ?? null,
+                organizationId: row.organizationId ?? null,
+            },
+        );
         await this.tryAssignAgent(row, task.id);
         // Rehearsals appear in the fire log (that is where the owner looks
         // to see what happened) but never dedupe against anything and never
@@ -638,16 +645,23 @@ export class InboundTriggersService {
 
         let task: { id: string; slug: string; title: string };
         try {
-            task = await this.tasks.create(row.userId, {
-                title,
-                description,
-                workId: ctx.workId ?? null,
-                // Automated work stays off the human board unless the
-                // trigger's owner opted it in.
-                hiddenFromBoard: !row.showOnBoard,
-                createdByType: 'user',
-                createdById: row.userId,
-            });
+            task = await this.tasks.create(
+                row.userId,
+                {
+                    title,
+                    description,
+                    workId: ctx.workId ?? null,
+                    // Automated work stays off the human board unless the
+                    // trigger's owner opted it in.
+                    hiddenFromBoard: !row.showOnBoard,
+                    createdByType: 'user',
+                    createdById: row.userId,
+                },
+                {
+                    tenantId: row.tenantId ?? null,
+                    organizationId: row.organizationId ?? null,
+                },
+            );
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             await this.closeFire(ctx.fire, 'failed', { reason: message });
