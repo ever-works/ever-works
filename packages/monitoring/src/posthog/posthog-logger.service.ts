@@ -1,5 +1,5 @@
 import { ConsoleLogger, LoggerService } from '@nestjs/common';
-import { getPostHogClient } from './posthog.config';
+import { getPostHogClient, isCaptureEnabled } from './posthog.config';
 import { getSentryInstance } from '../sentry/sentry.config';
 
 /**
@@ -54,6 +54,37 @@ const redactSecrets = (value: string | undefined): string | undefined => {
 };
 
 type LogLevel = 'log' | 'warn' | 'error' | 'debug' | 'verbose';
+
+/**
+ * Which log levels are forwarded to PostHog Logs as `$log` events.
+ *
+ * Log volume scales with TRAFFIC, not with anything analytical, so forwarding
+ * every level burned ~17k events/day against a 1M/month allowance (measured
+ * 2026-08-31). Default to the two levels anyone actually alerts on; the
+ * console still receives every level, so `kubectl logs` is unaffected.
+ *
+ * `POSTHOG_LOG_LEVELS` accepts a comma-separated list (`warn,error`), the
+ * special value `all` to restore the previous forward-everything behaviour,
+ * or `none` to forward nothing.
+ */
+const DEFAULT_FORWARDED_LOG_LEVELS: readonly LogLevel[] = ['warn', 'error'];
+
+const shouldForwardLevel = (level: LogLevel): boolean => {
+    if (!isCaptureEnabled()) return false;
+
+    const raw = (process.env.POSTHOG_LOG_LEVELS ?? '').trim();
+    if (raw === '') return DEFAULT_FORWARDED_LOG_LEVELS.includes(level);
+
+    const normalized = raw.toLowerCase();
+    if (normalized === 'all' || normalized === '*') return true;
+    if (normalized === 'none' || normalized === 'off') return false;
+
+    return normalized
+        .split(',')
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .includes(level);
+};
 
 /**
  * NestJS `LoggerService` that forwards every log emit to PostHog Logs as a
@@ -151,9 +182,12 @@ export class PostHogLoggerService implements LoggerService {
             console.error('[PostHogLoggerService] fallback logger threw', level, message);
         }
 
-        // 2) Forward to PostHog Logs as a `$log` event. Swallow any error.
+        // 2) Forward to PostHog Logs as a `$log` event, if this level is
+        //    forwarded at all (see shouldForwardLevel). Swallow any error.
+        //    Step 1 above already wrote to stdout unconditionally, so a
+        //    suppressed level is still fully visible in `kubectl logs`.
         try {
-            const client = getPostHogClient();
+            const client = shouldForwardLevel(level) ? getPostHogClient() : null;
             if (client) {
                 const properties: Record<string, unknown> = {
                     level,
