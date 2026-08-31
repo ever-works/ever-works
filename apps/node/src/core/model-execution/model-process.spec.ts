@@ -586,7 +586,11 @@ describe('executeModelProcess — real process boundary', () => {
 			expect(spawnPurposes).toEqual(['version-probe']);
 			await expect(access(harness.capturePath)).rejects.toThrow();
 		},
-		5_000
+		// The never-settling branch deliberately consumes the 2.5 s production
+		// termination-safety deadline. Leave enough runner headroom for the two
+		// real subprocesses and temp-directory cleanup while keeping the test
+		// itself bounded.
+		10_000
 	);
 
 	it.runIf(process.platform === 'win32')(
@@ -1086,23 +1090,27 @@ if (process.argv.includes('--version')) {
 		['http_proxy', 'http://proxy.corp:8080?token=secret'],
 		['https_proxy', 'http://proxy.corp:8080?region=eu'],
 		['all_proxy', 'http://proxy.corp:8080#corp']
-	])('drops any non-plain proxy URL in %s from both version and model processes', async (name, value) => {
-		const harness = await createHarness('success', {
-			Path: process.env.Path ?? process.env.PATH,
-			SystemRoot: process.env.SystemRoot,
-			[name]: value
-		});
-		const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
-		const modelEnv = (await readCapture(harness)).env;
-		const versionEnv = JSON.parse(await readFile(`${harness.capturePath}.version.json`, 'utf8')) as Record<
-			string,
-			string
-		>;
+	])(
+		'drops any non-plain proxy URL in %s from both version and model processes',
+		async (name, value) => {
+			const harness = await createHarness('success', {
+				Path: process.env.Path ?? process.env.PATH,
+				SystemRoot: process.env.SystemRoot,
+				[name]: value
+			});
+			const result = await executeModelProcess(request('codex', harness.workspacePath), harness.io);
+			const modelEnv = (await readCapture(harness)).env;
+			const versionEnv = JSON.parse(await readFile(`${harness.capturePath}.version.json`, 'utf8')) as Record<
+				string,
+				string
+			>;
 
-		expect(result.status).toBe('succeeded');
-		expect(envValue(modelEnv, name)).toBeUndefined();
-		expect(envValue(versionEnv, name)).toBeUndefined();
-	});
+			expect(result.status).toBe('succeeded');
+			expect(envValue(modelEnv, name)).toBeUndefined();
+			expect(envValue(versionEnv, name)).toBeUndefined();
+		},
+		10_000
+	);
 
 	it('builds the supported non-interactive Claude Code argv with zero provider credential injection', async () => {
 		const harness = await createHarness('success');
@@ -1715,12 +1723,18 @@ describe('executeModelProcess — request refusal', () => {
 	it('makes the absolute deadline win when a contained model closes after its budget', async () => {
 		const harness = await createHarness('success');
 		let monotonicTime = 0;
+		let containmentCount = 0;
 		const baseCreateContainment = harness.io.createModelProcessContainment!;
 		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
 			...harness.io,
 			monotonicNow: () => monotonicTime,
 			createModelProcessContainment: async (spawnFn) => {
 				const containment = await baseCreateContainment(spawnFn);
+				containmentCount += 1;
+				// The first containment owns the version probe. Advance the fake
+				// deadline only for the credentialed model process this test names;
+				// attaching to both made the outcome depend on probe close ordering.
+				if (containmentCount === 1) return containment;
 				return {
 					...containment,
 					spawn: (async (...args: Parameters<TestContainment['spawn']>) => {
@@ -1736,6 +1750,7 @@ describe('executeModelProcess — request refusal', () => {
 
 		expect(result.status).toBe('timed-out');
 		expect(result.summary).toMatch(/wall-clock/i);
+		expect(containmentCount).toBe(2);
 	});
 
 	it('makes the absolute deadline win when containment close consumes the remaining budget', async () => {
