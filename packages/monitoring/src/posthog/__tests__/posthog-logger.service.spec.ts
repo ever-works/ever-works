@@ -79,6 +79,11 @@ describe('PostHogLoggerService', () => {
 
     describe('with an initialized PostHog client', () => {
         beforeEach(() => {
+            // These cases exercise SERIALIZATION, distinctId and metadata — not
+            // which levels are forwarded — so opt every level back in. The
+            // production default is warn+error (see the "$log level gating"
+            // block); `process.env` is restored by the outer afterEach.
+            process.env.POSTHOG_LOG_LEVELS = 'all';
             initPostHog({ apiKey: 'phc_test' });
             captureMock.mockReset();
         });
@@ -166,5 +171,98 @@ describe('PostHogLoggerService', () => {
             svc.log('ping');
             expect(captureMock.mock.calls[0][0].properties.env).toBe('production');
         });
+    });
+});
+
+/**
+ * Regression tests for the 2026-08-31 PostHog quota incident.
+ *
+ * The logger forwarded EVERY NestJS log emit to PostHog as a `$log` event
+ * (~17k/day, distinct_id=system) against a 1M/month allowance. Log volume is
+ * driven by traffic, not by anything analytical, so the default is now
+ * warn+error only — while the CONSOLE keeps receiving every level, so
+ * `kubectl logs` is unchanged.
+ */
+describe('PostHogLoggerService — $log level gating', () => {
+    let envBackup: NodeJS.ProcessEnv;
+
+    beforeEach(async () => {
+        envBackup = { ...process.env };
+        delete process.env.POSTHOG_LOG_LEVELS;
+        delete process.env.POSTHOG_CAPTURE_ENABLED;
+        await shutdownPostHog();
+        captureMock.mockReset();
+        initPostHog({ apiKey: 'phc_test' });
+    });
+
+    afterEach(() => {
+        process.env = envBackup;
+    });
+
+    it.each(['log', 'debug', 'verbose'])(
+        'does NOT forward %s() to PostHog by default',
+        (method) => {
+            const svc = new PostHogLoggerService('Ctx');
+            (svc as any)[method]('chatty');
+            expect(captureMock).not.toHaveBeenCalled();
+        },
+    );
+
+    it.each(['warn', 'error'])('DOES forward %s() to PostHog by default', (method) => {
+        const svc = new PostHogLoggerService('Ctx');
+        (svc as any)[method]('something is wrong');
+        expect(captureMock).toHaveBeenCalledTimes(1);
+        expect(captureMock.mock.calls[0][0].properties.level).toBe(method);
+    });
+
+    it('still writes suppressed levels to the console (kubectl logs is unchanged)', () => {
+        const svc = new PostHogLoggerService('Ctx');
+        const spy = jest.spyOn((svc as any).fallbackLogger, 'log').mockImplementation(() => {});
+        svc.log('still on stdout');
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(captureMock).not.toHaveBeenCalled();
+        spy.mockRestore();
+    });
+
+    it('honours an explicit POSTHOG_LOG_LEVELS allowlist', () => {
+        process.env.POSTHOG_LOG_LEVELS = 'error';
+        const svc = new PostHogLoggerService('Ctx');
+        svc.warn('warned');
+        expect(captureMock).not.toHaveBeenCalled();
+        svc.error('failed');
+        expect(captureMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('forwards every level when POSTHOG_LOG_LEVELS=all', () => {
+        process.env.POSTHOG_LOG_LEVELS = 'all';
+        const svc = new PostHogLoggerService('Ctx');
+        svc.log('a');
+        svc.debug('b');
+        svc.verbose('c');
+        expect(captureMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('forwards nothing when POSTHOG_LOG_LEVELS is set to none', () => {
+        process.env.POSTHOG_LOG_LEVELS = 'none';
+        const svc = new PostHogLoggerService('Ctx');
+        svc.error('even errors are suppressed');
+        expect(captureMock).not.toHaveBeenCalled();
+    });
+
+    it('forwards nothing when POSTHOG_CAPTURE_ENABLED=false', () => {
+        process.env.POSTHOG_CAPTURE_ENABLED = 'false';
+        const svc = new PostHogLoggerService('Ctx');
+        svc.error('boom');
+        expect(captureMock).not.toHaveBeenCalled();
+    });
+
+    it('still forwards Error instances to Sentry even when $log is suppressed', () => {
+        process.env.POSTHOG_LOG_LEVELS = 'none';
+        captureExceptionMock.mockReset();
+        const err = new Error('explode');
+        const svc = new PostHogLoggerService('Ctx');
+        svc.error(err);
+        expect(captureMock).not.toHaveBeenCalled();
+        expect(captureExceptionMock).toHaveBeenCalledWith(err);
     });
 });
