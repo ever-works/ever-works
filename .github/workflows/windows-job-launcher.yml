@@ -19,7 +19,10 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: windows-latest
+    # This build attests exact OS tool identities. `windows-latest` migrated to
+    # Windows Server 2025 / VS 2026 and is therefore outside that pinned trust
+    # boundary; keep the runner image explicit just like the toolchain policy.
+    runs-on: windows-2022
     timeout-minutes: 30
 
     steps:
@@ -145,7 +148,7 @@ jobs:
         run: pnpm --filter "ever-works-node^..." build
 
       - name: Test trusted adapter and model factory
-        run: pnpm --filter ever-works-node test -- src/core/windows-job-launcher src/core/model-execution
+        run: pnpm --filter ever-works-node exec vitest run src/core/windows-job-launcher src/core/model-execution
 
       - name: Type-check trusted adapter and model factory
         run: pnpm --filter ever-works-node type-check
@@ -168,7 +171,7 @@ jobs:
           if (-not $valid) { throw 'signed test manifest failed its schema' }
 
       - name: Test signed helper trust and broker-death cleanup
-        run: pnpm --filter ever-works-node test -- src/core/windows-job-launcher/windows-job-helper-trust.windows.spec.ts
+        run: pnpm --filter ever-works-node exec vitest run src/core/windows-job-launcher/windows-job-helper-trust.windows.spec.ts
 
       - name: Remove ephemeral test certificate and helper
         if: always()

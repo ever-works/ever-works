@@ -24,6 +24,7 @@ import {
     identifyUser,
     setUserProperties,
     shutdownPostHog,
+    isCaptureEnabled,
 } from '../posthog.config';
 
 const PostHogCtor = PostHogMockCtor as unknown as jest.Mock;
@@ -141,5 +142,67 @@ describe('posthog.config', () => {
             expect(shutdownMock).toHaveBeenCalledTimes(1);
             expect(getPostHogClient()).toBeNull();
         });
+    });
+});
+
+/**
+ * Regression tests for the 2026-08-31 PostHog quota incident.
+ *
+ * Before this switch existed the ONLY way to stop capture was to unset
+ * POSTHOG_API_KEY, which also killed feature flags. `dev` and `stage` share a
+ * PostHog project with `prod`, so their traffic billed against the same
+ * 1M/month allowance with no way to opt out short of breaking the client.
+ */
+describe('posthog.config — capture kill switch', () => {
+    let envBackup: NodeJS.ProcessEnv;
+
+    beforeEach(async () => {
+        envBackup = { ...process.env };
+        delete process.env.POSTHOG_CAPTURE_ENABLED;
+        await shutdownPostHog();
+        captureMock.mockReset();
+        identifyMock.mockReset();
+        initPostHog({ apiKey: 'phc_test' });
+    });
+
+    afterEach(() => {
+        process.env = envBackup;
+    });
+
+    it('is enabled when POSTHOG_CAPTURE_ENABLED is unset (no behaviour change)', () => {
+        expect(isCaptureEnabled()).toBe(true);
+        trackEvent('u', 'evt');
+        expect(captureMock).toHaveBeenCalledTimes(1);
+    });
+
+    it.each(['false', 'FALSE', '0', 'no', 'off', ' false '])(
+        'is disabled for POSTHOG_CAPTURE_ENABLED=%p',
+        (value) => {
+            process.env.POSTHOG_CAPTURE_ENABLED = value;
+            expect(isCaptureEnabled()).toBe(false);
+        },
+    );
+
+    it.each(['true', '1', 'yes', 'on', ''])(
+        'stays enabled for POSTHOG_CAPTURE_ENABLED=%p',
+        (value) => {
+            process.env.POSTHOG_CAPTURE_ENABLED = value;
+            expect(isCaptureEnabled()).toBe(true);
+        },
+    );
+
+    it('suppresses trackEvent, identifyUser and setUserProperties when disabled', () => {
+        process.env.POSTHOG_CAPTURE_ENABLED = 'false';
+        trackEvent('u', 'evt');
+        identifyUser('u', { a: 1 });
+        setUserProperties('u', { b: 2 });
+        expect(captureMock).not.toHaveBeenCalled();
+        expect(identifyMock).not.toHaveBeenCalled();
+    });
+
+    it('leaves the client constructed so feature flags keep working', () => {
+        process.env.POSTHOG_CAPTURE_ENABLED = 'false';
+        trackEvent('u', 'evt');
+        expect(getPostHogClient()).not.toBeNull();
     });
 });

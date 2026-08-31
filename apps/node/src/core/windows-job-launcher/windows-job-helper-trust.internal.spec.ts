@@ -158,6 +158,9 @@ describe('trusted Windows Job helper broker', () => {
 			'SignerCertificate.Subject',
 			'SignerCertificate.GetCertHashString',
 			'EnvironmentVariables.Clear',
+			'Read-Exact',
+			'broker-launch-frame-too-large',
+			'BaseStream.Flush()',
 			'CopyToAsync',
 			'Kill()',
 			'WaitForExit'

@@ -301,7 +301,7 @@ test.describe('GET /api/works/:id/runs-summary', () => {
 });
 
 test.describe('run steering — steer / interrupt / resume', () => {
-    test('steer: empty message is a DTO 400, whitespace-only is a 409, oversized is rejected', async ({
+    test('steer: empty/oversized messages are DTO 400s; an unknown run stays a 404', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -315,11 +315,11 @@ test.describe('run steering — steer / interrupt / resume', () => {
         expect(empty.status()).toBe(400);
         expect(errText(await empty.json())).toContain('message');
 
-        // Whitespace passes the DTO; the service's own trim guard rejects
-        // it — and does so BEFORE the run lookup, so this is 409 not 404.
+        // Whitespace passes the DTO, but the controller scopes the run before
+        // invoking the service. An unknown run therefore remains a 404 and
+        // does not expose the service's trim guard ordering.
         const whitespace = await post(request, u.access_token, path, { message: '   ' });
-        expect(whitespace.status()).toBe(409);
-        expect(errText(await whitespace.json())).toContain('steering message is required');
+        expect(whitespace.status()).toBe(404);
 
         const oversized = await post(request, u.access_token, path, {
             message: 'a'.repeat(16_385),

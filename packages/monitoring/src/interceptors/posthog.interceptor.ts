@@ -3,6 +3,56 @@ import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { trackEvent } from '../posthog/posthog.config';
 
+/**
+ * Route prefixes that are MACHINE traffic, never product usage. Every one of
+ * these is polled around the clock by infrastructure, so recording them as
+ * analytics both bills per event and drowns the real signal.
+ *
+ * Measured on 2026-08-31 (PostHog project 144390): these paths accounted for
+ * ~99% of ~110k events/day while genuine product events ran at 0-13/day.
+ *   - `/api/health*`   — k8s liveness + readiness probes on every replica.
+ *   - `/api/version`   — synthetic monitoring. `vmprobe-ever-works-{dev,stage,
+ *     prod}` scrape it every 60s and VMAgent runs 3 replicas that each scrape
+ *     independently: 5 URLs x 3 replicas = 15 hits/min. The events arrived
+ *     with user agent `Blackbox Exporter/0.25.0` (43,188 in 2 days).
+ *   - `/api/info`      — ops metadata, probed the same way.
+ *   - `/internal/*`    — machine-to-machine calls. `/internal/trigger/remote/
+ *     call` alone produced 33,180 events in 2 days (user agent `node`).
+ *   - `/.well-known/*` — agent/protocol discovery, fetched by clients not users.
+ *   - `/metrics`       — Prometheus scrape endpoint.
+ *
+ * Matching is EXACT-or-followed-by-`/` so a real product route that merely
+ * shares a prefix (`/api/versions-of-my-doc`, `/api/healthcheck-foo`) is still
+ * tracked. Extend at runtime with `POSTHOG_ANALYTICS_EXCLUDE_PATHS` (a
+ * comma-separated prefix list) rather than editing this array for a one-off.
+ */
+const DEFAULT_EXCLUDED_PATH_PREFIXES: readonly string[] = [
+    '/api/health',
+    '/api/version',
+    '/api/info',
+    '/internal',
+    '/.well-known',
+    '/metrics',
+];
+
+/**
+ * Opt-in restore of the per-endpoint `api_<method>_<path>` companion event.
+ *
+ * It used to fire on EVERY request alongside `api_request`, which was exact
+ * 1:1 duplication: over 3 days `api_request` = 129,426 against 129,205 summed
+ * per-endpoint events. Nothing analytical is lost by defaulting it off —
+ * `api_request` already carries the same value in its `endpoint` property, and
+ * keeping one event name avoids unbounded event-name cardinality in PostHog.
+ */
+const trackPerEndpointEvents = (): boolean =>
+    /^(true|1|yes|on)$/i.test((process.env.POSTHOG_TRACK_PER_ENDPOINT_EVENTS ?? '').trim());
+
+const extraExcludedPrefixes = (): string[] =>
+    (process.env.POSTHOG_ANALYTICS_EXCLUDE_PATHS ?? '')
+        .split(',')
+        .map((p) => p.trim())
+        .filter(Boolean);
+
 @Injectable()
 export class PostHogInterceptor implements NestInterceptor {
     intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -15,14 +65,12 @@ export class PostHogInterceptor implements NestInterceptor {
         // ?api_key=) that must not be persisted in third-party analytics.
         const endpointPath = this.getEndpointPath(originalUrl);
 
-        // Do NOT record analytics for health-check / probe endpoints. k8s liveness +
-        // readiness probes (plus uptime monitors / load balancers) hit these every few
-        // seconds on every replica, around the clock. Each probe would otherwise emit an
-        // `api_request` event plus a per-endpoint `api_get_api_health` event — pure
-        // machine noise that bills per event and tells us nothing about real product
-        // usage. Covers `/api/health`, `/api/health/live`, `/api/health/ready`
-        // (see APIController + HealthController).
-        if (this.isHealthProbePath(endpointPath)) {
+        // Do NOT record analytics for infrastructure traffic — health probes,
+        // synthetic monitoring, internal machine-to-machine calls. These run around
+        // the clock on every replica and bill per event while telling us nothing
+        // about real product usage. See DEFAULT_EXCLUDED_PATH_PREFIXES for the list
+        // and the measurements behind it.
+        if (this.isExcludedPath(endpointPath)) {
             return next.handle();
         }
 
@@ -51,17 +99,23 @@ export class PostHogInterceptor implements NestInterceptor {
                     },
                 );
 
-                // Track specific endpoint usage
-                trackEvent(
-                    user?.id || 'anonymous',
-                    `api_${method.toLowerCase()}_${this.getEndpointName(endpointPath)}`,
-                    {
-                        endpoint: endpointPath,
-                        statusCode,
-                        duration,
-                        timestamp: new Date().toISOString(),
-                    },
-                );
+                // Track specific endpoint usage. OFF by default: this duplicated
+                // `api_request` 1:1 and doubled the event bill for no added signal
+                // (the endpoint is already a property above). Re-enable with
+                // POSTHOG_TRACK_PER_ENDPOINT_EVENTS=true if a dashboard needs
+                // per-endpoint event NAMES rather than a breakdown by property.
+                if (trackPerEndpointEvents()) {
+                    trackEvent(
+                        user?.id || 'anonymous',
+                        `api_${method.toLowerCase()}_${this.getEndpointName(endpointPath)}`,
+                        {
+                            endpoint: endpointPath,
+                            statusCode,
+                            duration,
+                            timestamp: new Date().toISOString(),
+                        },
+                    );
+                }
             }),
         );
     }
@@ -73,14 +127,18 @@ export class PostHogInterceptor implements NestInterceptor {
         return url.split('?')[0].split('#')[0];
     }
 
-    // Health-check / probe endpoints we never want in analytics. Matches the base
-    // `/api/health` liveness route plus the `/api/health/live` + `/api/health/ready`
-    // probes underneath it. Kept narrow (exact match or `/api/health/` prefix) so an
-    // unrelated future route like `/api/healthcheck-foo` would NOT be silently dropped.
-    private isHealthProbePath(path: string): boolean {
+    // Infrastructure endpoints we never want in analytics: health probes, synthetic
+    // monitoring, internal machine calls, protocol discovery, metrics. Kept narrow —
+    // a prefix matches only on an EXACT hit or when followed by `/` — so an unrelated
+    // route like `/api/healthcheck-foo` or `/api/versions-of-my-doc` is NOT silently
+    // dropped. Operators can add prefixes via POSTHOG_ANALYTICS_EXCLUDE_PATHS without
+    // a code change.
+    private isExcludedPath(path: string): boolean {
         if (!path) return false;
         const normalized = path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
-        return normalized === '/api/health' || normalized.startsWith('/api/health/');
+        return [...DEFAULT_EXCLUDED_PATH_PREFIXES, ...extraExcludedPrefixes()].some(
+            (prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`),
+        );
     }
 
     private getEndpointName(url: string): string {

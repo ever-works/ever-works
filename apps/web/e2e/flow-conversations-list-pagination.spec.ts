@@ -93,7 +93,7 @@ interface ConvListBody {
 async function createConversation(
     request: APIRequestContext,
     token: string,
-    body: { title?: string; providerId?: string } = {},
+    body: { title?: string; providerId?: string; model?: string } = {},
     expectStatus = 201,
 ): Promise<ConvSummary> {
     const res = await request.post(CONV_URL, {
@@ -219,28 +219,24 @@ test.describe('Conversations list — shape & projection', () => {
         expect(row!.updatedAt).toMatch(ISO_RE);
     });
 
-    test('a titleless conversation lists with title:null / providerId:null; model is always null (create rejects it)', async ({
+    test('a titleless conversation lists with null defaults; a create-time model pin is projected', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
         const token = user.access_token;
-        // `model` is NOT whitelisted on CreateConversationDto → forbidNonWhitelisted 400.
         await createConversation(request, token, { title: 't', providerId: 'p' }, 201);
-        const rejected = await request.post(CONV_URL, {
-            headers: { ...authedHeaders(token), 'content-type': 'application/json' },
-            data: { title: 't2', model: 'gpt-4' },
+        const modelled = await createConversation(request, token, {
+            title: 't2',
+            model: 'gpt-4',
         });
-        expect(rejected.status(), 'model is not an accepted create field').toBe(400);
 
         const conv = await createConversation(request, token, {}); // empty body allowed
         const body = await listConversations(request, token);
         const row = body.conversations.find((c) => c.id === conv.id)!;
         expect(row.title).toBeNull();
         expect(row.providerId).toBeNull();
-        expect(
-            row.model,
-            'model can never be set via the public create path → always null',
-        ).toBeNull();
+        expect(row.model).toBeNull();
+        expect(body.conversations.find((c) => c.id === modelled.id)!.model).toBe('gpt-4');
     });
 });
 

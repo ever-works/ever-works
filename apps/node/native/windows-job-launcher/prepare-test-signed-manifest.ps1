@@ -21,9 +21,9 @@ if ($Cleanup) {
 			if (Test-Path -LiteralPath $signingStorePath) {
 				Remove-Item -LiteralPath $signingStorePath -Force
 			}
-			$trustedStorePath = "Cert:\CurrentUser\Root\$thumbprint"
+			$trustedStorePath = "Cert:\LocalMachine\Root\$thumbprint"
 			if (Test-Path -LiteralPath $trustedStorePath) {
-				& $certutilPath -user -delstore Root $thumbprint *> $null
+				& $certutilPath -silent -delstore Root $thumbprint *> $null
 				if ($LASTEXITCODE -ne 0) {
 					throw "certutil could not remove the ephemeral test certificate"
 				}
@@ -69,19 +69,22 @@ try {
 		[Security.Cryptography.X509Certificates.X509ContentType]::Cert
 	)
 	[IO.File]::WriteAllBytes($certificatePath, $publicCertificateBytes)
-	Write-Host "Adding public-only ephemeral certificate with noninteractive certutil"
-	& $certutilPath -user -f -addstore Root $certificatePath | Out-Null
+	# Hosted Windows Server disables peer trust for Authenticode, so this
+	# self-signed test certificate must be a root. The hosted runner is
+	# disposable and the always() cleanup removes it after this job.
+	Write-Host "Adding public-only ephemeral certificate to the disposable runner trust root"
+	& $certutilPath -f -addstore Root $certificatePath | Out-Null
 	if ($LASTEXITCODE -ne 0) {
-		throw "certutil could not add the ephemeral public certificate to CurrentUser Root"
+		throw "certutil could not add the ephemeral public certificate to LocalMachine Root"
 	}
-	Write-Host "Trusted ephemeral certificate for this test runner only"
+	Write-Host "Trusted the ephemeral certificate for this disposable test runner only"
 	Write-Host "Signing copied test-only helper fixture"
 	$signature = Set-AuthenticodeSignature `
 		-LiteralPath $fixtureArtifactPath `
 		-Certificate $certificate `
 		-HashAlgorithm SHA256
 	if ($signature.Status -ne "Valid") {
-		throw "ephemeral test signature did not become Valid"
+		throw "ephemeral test signature did not become Valid: $($signature.Status) - $($signature.StatusMessage)"
 	}
 	Write-Host "Signed copied test-only helper fixture"
 	$certificateSha256 = $certificate.GetCertHashString(

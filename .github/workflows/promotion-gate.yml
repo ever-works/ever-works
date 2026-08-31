@@ -53,11 +53,50 @@ jobs:
 
           echo "Promoting commit: $HEAD_SHA"
 
-          RUN=$(gh api "repos/$REPO/actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=1" \
-                  --jq '.workflow_runs[0] // empty' 2>/dev/null || echo "")
+          # 🛑 DO NOT reintroduce `gh` here. This job runs on a SELF-HOSTED ARC
+          # runner (vars.RUNNER_LINUX_X64_4) whose image is built from the minimal
+          # ghcr.io/actions/actions-runner and does NOT ship the gh CLI — only
+          # curl/jq/node. `gh` is preinstalled on ubuntu-latest, which is why this
+          # never showed up in review.
+          #
+          # The old lookup was:
+          #     RUN=$(gh api "..." --jq '...' 2>/dev/null || echo "")
+          # so `gh: command not found` was swallowed by 2>/dev/null, `|| echo ""`
+          # produced an empty RUN, and the gate reported "No E2E run found" on
+          # EVERY promotion — including one where the E2E had already completed
+          # RED (run 32950358018, 2026-08-27). The gate could then only be
+          # satisfied by the override label, so the protection added after the
+          # 2026-08-09 signup outage was silently doing nothing.
+          #
+          # Rule this encodes: a FAILED lookup and a MISSING run must never render
+          # identically. One is a broken gate, the other is a real answer.
+          api() { # $1 = path under /repos/{owner}/{repo}
+            curl -sS -w '\n%{http_code}' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$REPO/$1"
+          }
 
-          if [ -z "$RUN" ]; then
-            echo "::error::No E2E run found for $HEAD_SHA."
+          RAW=$(api "actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=1")
+          CURL_RC=$?
+          CODE=$(printf '%s' "$RAW" | tail -n1)
+          BODY=$(printf '%s' "$RAW" | sed '$d')
+
+          if [ "$CURL_RC" -ne 0 ] || [ "$CODE" != "200" ]; then
+            echo "::error::E2E LOOKUP FAILED (curl rc=$CURL_RC, http=$CODE) — this is a BROKEN GATE, not a verdict."
+            echo "The gate could not ask GitHub whether an E2E run exists, so it knows nothing"
+            echo "about $HEAD_SHA either way. Do not read this as 'no run'."
+            echo "Response head: $(printf '%s' "$BODY" | head -c 300)"
+            [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present — allowing despite a BROKEN LOOKUP."; exit 0; }
+            exit 1
+          fi
+
+          TOTAL=$(printf '%s' "$BODY" | jq -r '.total_count // 0')
+          RUN=$(printf '%s' "$BODY" | jq -c '.workflow_runs[0] // empty')
+
+          if [ "$TOTAL" = "0" ] || [ -z "$RUN" ]; then
+            echo "::error::No E2E run found for $HEAD_SHA (lookup succeeded, http 200, total_count=$TOTAL)."
             echo "The suite runs on push to stage. If it has not started yet, wait for it."
             echo "Promoting a commit whose E2E result is unknown is what shipped the"
             echo "2026-08-09 signup outage."
@@ -65,16 +104,38 @@ jobs:
             exit 1
           fi
 
-          STATUS=$(echo "$RUN"     | jq -r '.status')
-          CONCLUSION=$(echo "$RUN" | jq -r '.conclusion // ""')
-          RUN_ID=$(echo "$RUN"     | jq -r '.id')
-          URL=$(echo "$RUN"        | jq -r '.html_url')
+          STATUS=$(printf '%s' "$RUN"     | jq -r '.status')
+          CONCLUSION=$(printf '%s' "$RUN" | jq -r '.conclusion // ""')
+          RUN_ID=$(printf '%s' "$RUN"     | jq -r '.id')
+          URL=$(printf '%s' "$RUN"        | jq -r '.html_url')
 
           echo "E2E run $RUN_ID: $STATUS/$CONCLUSION"
           echo "$URL"
 
+          # Shard breakdown, printed for EVERY outcome. GitHub reports the parent
+          # run as `queued` for a long time while shards are already finishing, so
+          # "still queued" on its own is not actionable — the counts show whether
+          # it is genuinely stuck or nearly done.
+          shard_breakdown() {
+            local raw code body
+            raw=$(api "actions/runs/$RUN_ID/jobs?per_page=100")
+            code=$(printf '%s' "$raw" | tail -n1)
+            body=$(printf '%s' "$raw" | sed '$d')
+            if [ "$code" != "200" ]; then
+              echo "  (shard breakdown unavailable: http $code)"
+              return
+            fi
+            printf '%s' "$body" | jq -r '
+              "  status:    " + ([.jobs[] | .status] | group_by(.) | map("\(.[0])=\(length)") | join("  ")),
+              "  concluded: " + ([.jobs[] | select(.conclusion != null) | .conclusion] | group_by(.) | map("\(.[0])=\(length)") | join("  "))'
+            printf '%s' "$body" | jq -r '.jobs[] | select(.conclusion=="failure") | "  failing shard: \(.name)"'
+          }
+
           if [ "$STATUS" != "completed" ]; then
             echo "::error::E2E for $HEAD_SHA is still $STATUS. Wait for it to finish."
+            echo "::group::Shard progress for run $RUN_ID"
+            shard_breakdown
+            echo "::endgroup::"
             [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present — allowing."; exit 0; }
             exit 1
           fi
@@ -88,8 +149,7 @@ jobs:
           # rather than reflexive — a maintainer should be able to tell a
           # pre-existing failure from a new one without opening 33 shard logs.
           echo "::group::Failing specs in E2E run $RUN_ID"
-          gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
-            --jq '.jobs[] | select(.conclusion=="failure") | .name' 2>/dev/null | sed 's/^/  shard: /' || true
+          shard_breakdown
           echo "::endgroup::"
 
           echo "::error::E2E concluded '$CONCLUSION' for $HEAD_SHA — see $URL"

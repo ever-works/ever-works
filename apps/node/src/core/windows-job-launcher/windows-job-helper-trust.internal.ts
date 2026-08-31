@@ -152,6 +152,18 @@ function Get-StreamSha256 {
     }
 }
 
+function Read-Exact {
+    param([IO.Stream] $Stream, [int] $Length)
+    $buffer = [byte[]]::new($Length)
+    $offset = 0
+    while ($offset -lt $Length) {
+        $read = $Stream.Read($buffer, $offset, $Length - $offset)
+        if ($read -le 0) { throw 'broker-input-ended' }
+        $offset += $read
+    }
+    return ,$buffer
+}
+
 function Assert-Authenticode {
     param([string] $Path, [object] $Policy)
     $command = Get-Command -Name Get-AuthenticodeSignature -CommandType Cmdlet -ErrorAction SilentlyContinue
@@ -280,9 +292,18 @@ try {
 
     $parentInput = [Console]::OpenStandardInput()
     $parentOutput = [Console]::OpenStandardOutput()
-    $inputCopy = $parentInput.CopyToAsync($helper.StandardInput.BaseStream)
     $outputCopy = $helper.StandardOutput.BaseStream.CopyToAsync($parentOutput)
     $errorCopy = $helper.StandardError.BaseStream.CopyToAsync([IO.Stream]::Null)
+    $launchHeader = [byte[]] (Read-Exact $parentInput 12)
+    $launchPayloadLength = [BitConverter]::ToUInt32($launchHeader, 8)
+    if ($launchPayloadLength -gt 1048576) { throw 'broker-launch-frame-too-large' }
+    $launchPayload = [byte[]] (Read-Exact $parentInput ([int] $launchPayloadLength))
+    $helper.StandardInput.BaseStream.Write($launchHeader, 0, $launchHeader.Length)
+    if ($launchPayload.Length -gt 0) {
+        $helper.StandardInput.BaseStream.Write($launchPayload, 0, $launchPayload.Length)
+    }
+    $helper.StandardInput.BaseStream.Flush()
+    $inputCopy = $parentInput.CopyToAsync($helper.StandardInput.BaseStream)
     $inputClosed = $false
     while (-not $helper.HasExited) {
         if ($inputCopy.IsFaulted -or $outputCopy.IsFaulted -or $errorCopy.IsFaulted) {
