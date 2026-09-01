@@ -331,8 +331,35 @@ describe('WorkRepository', () => {
             );
             expect(fns.andWhere).toHaveBeenCalledWith(
                 'deploymentStartedAt = :deploymentStartedAt',
-                { deploymentStartedAt: startedAt },
+                { deploymentStartedAt: startedAt.getTime() },
             );
+        });
+
+        // REGRESSION (2026-09-01): `deploymentStartedAt` is a Postgres `bigint` holding epoch
+        // millis (see `TimestampColumn` in entities/_types.ts). TypeORM applies that column
+        // transformer to entity writes and object-form conditions, but NOT to raw
+        // `andWhere('col = :p', { p })` parameters. Passing the raw `Date` therefore reaches the
+        // driver as an ISO string and Postgres rejects the whole UPDATE with
+        // `invalid input syntax for type bigint: "2026-08-23T18:47:45.019+00:00"`, so every
+        // health-probed deploy failed reconciliation and no work ever reached READY.
+        it('passes deploymentStartedAt as epoch millis so the bigint column accepts it', async () => {
+            const { chain, fns } = buildChain('execute', { affected: 1 });
+            repository.createQueryBuilder.mockReturnValueOnce(chain as never);
+            const startedAt = new Date('2026-08-22T08:00:00.000Z');
+
+            await service.markDeploymentReadyIfCurrent('w1', {
+                deploymentState: 'TIMEOUT',
+                deploymentStartedAt: startedAt,
+                lastDeployCorrelationId: 'corr-1',
+            });
+
+            const call = fns.andWhere.mock.calls.find(
+                ([sql]: [string]) => sql === 'deploymentStartedAt = :deploymentStartedAt',
+            );
+            expect(call).toBeDefined();
+            const value = call![1].deploymentStartedAt;
+            expect(typeof value).toBe('number');
+            expect(value).toBe(startedAt.getTime());
         });
 
         it('returns false when a newer deployment changed the guarded fields', async () => {
