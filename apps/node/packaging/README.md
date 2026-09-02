@@ -23,6 +23,10 @@ ever-works-node enroll --api-url https://api.ever.works --token <token>
 
 Install the service afterwards.
 
+The scripts below live in this directory of the source tree **and** inside
+the published npm package: after `npm install -g ever-works-node` they are
+under `$(npm root -g)/ever-works-node/packaging/`.
+
 ---
 
 ## Linux — systemd
@@ -52,8 +56,16 @@ restart.
 From an **elevated** PowerShell session:
 
 ```powershell
+# from the published package …
+& "$(npm root -g)\ever-works-node\packaging\windows\install-service.ps1" -Work
+# … or from a source checkout
 .\apps\node\packaging\windows\install-service.ps1 -Work
 ```
+
+`-ClaudePath` / `-CodexPath` pin the model CLIs for the service (the service
+account's `PATH` often lacks the per-user npm directory) and `-WorkspaceRoot`
+sets the absolute directory the per-Task worktrees live under; each becomes
+the matching `start` flag.
 
 The script prefers a real Windows service via [NSSM](https://nssm.cc).
 This matters: Node.js cannot answer Service Control Manager messages, so

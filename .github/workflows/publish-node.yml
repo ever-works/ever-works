@@ -1,0 +1,168 @@
+name: Publish Node
+
+# Builds the headless fleet node (`apps/node`) into a single-file bundle and
+# publishes it to npm as the PUBLIC package `ever-works-node`, so a machine
+# joins the fleet with `npm install -g ever-works-node` instead of a
+# monorepo checkout. See `apps/node/build.js` for what the bundle contains.
+#
+# Triggers:
+#   - a `node-v*` tag (e.g. `node-v0.2.0`) publishes that version;
+#   - manual dispatch with `publish: true` publishes the version in
+#     `apps/node/package.json` (optionally bumped first); the default
+#     manual run is a dry run that only stages + smoke-tests the bundle.
+
+on:
+  push:
+    tags:
+      - 'node-v*'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish to npm (public). Off = dry run: build, smoke-test, npm publish --dry-run'
+        required: true
+        type: boolean
+        default: false
+      do_version_bump:
+        description: 'Bump package.json + src/version.ts before publishing'
+        required: false
+        type: boolean
+        default: false
+      version_bump:
+        description: 'Version bump type'
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Configure Registry
+        uses: ./.github/actions/configure-registry
+        with:
+          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
+          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
+          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bump version if requested
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.do_version_bump == 'true'
+        working-directory: apps/node
+        run: |
+          npm version ${{ github.event.inputs.version_bump }} --no-git-tag-version
+          node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const file = 'src/version.ts';
+          fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/NODE_APP_VERSION = '[^']+'/, \"NODE_APP_VERSION = '\" + pkg.version + \"'\"));
+          console.log('bumped to', pkg.version);
+          "
+
+      - name: Verify the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/node-v')
+        working-directory: apps/node
+        run: |
+          tag="${GITHUB_REF#refs/tags/node-v}"
+          pkg="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$pkg" ]; then
+            echo "tag node-v$tag does not match apps/node/package.json version $pkg" >&2
+            exit 1
+          fi
+
+      - name: Build the node and its workspace dependencies
+        run: npx turbo build --filter=ever-works-node...
+
+      - name: Run the node test suite
+        working-directory: apps/node
+        run: npx vitest run
+
+      - name: Stage the publishable bundle
+        working-directory: apps/node
+        run: pnpm build:bundle
+
+      - name: Smoke-test the bundle
+        working-directory: apps/node/dist-bundle
+        run: |
+          node cli.js --version
+          node cli.js capabilities
+          # An un-enrolled node must report exit code 3 (the documented "not enrolled").
+          set +e
+          EVER_WORKS_NODE_CONFIG="$(mktemp -d)/node-config.json" node cli.js status
+          code=$?
+          set -e
+          if [ "$code" != "3" ]; then echo "expected exit 3 for an un-enrolled node, got $code" >&2; exit 1; fi
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ever-works-node-bundle
+          path: apps/node/dist-bundle/
+
+  publish:
+    needs: build
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download bundle artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ever-works-node-bundle
+          path: dist-bundle/
+
+      - name: Configure npm
+        run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> ~/.npmrc
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish (dry run)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish != 'true'
+        working-directory: dist-bundle
+        run: npm publish --access public --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to npm (public)
+        if: startsWith(github.ref, 'refs/tags/node-v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish == 'true')
+        working-directory: dist-bundle
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

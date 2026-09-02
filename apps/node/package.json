@@ -1,6 +1,6 @@
 {
 	"name": "ever-works-node",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Ever Works Node - headless execution node (CLI + long-running service): fleet enrollment, heartbeat and capability reporting",
 	"author": {
 		"name": "Ever Co. LTD",
@@ -29,6 +29,7 @@
 	],
 	"scripts": {
 		"build": "tsc --noEmit && tsc -p tsconfig.build.json",
+		"build:bundle": "node build.js",
 		"type-check": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
@@ -43,6 +44,7 @@
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.11",
+		"esbuild": "^0.25.12",
 		"typescript": "^5.9.3",
 		"vitest": "^4.1.0"
 	}

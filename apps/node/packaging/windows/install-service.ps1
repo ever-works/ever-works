@@ -33,14 +33,35 @@
 .PARAMETER UseScheduledTask
     Skip the NSSM lookup and register a scheduled task.
 
+.PARAMETER ClaudePath
+    Pin the Claude Code executable the node may run for model-cli agent
+    tasks (adds --claude-path). Use it when the service account's PATH
+    does not resolve `claude`, e.g.
+    C:\Users\<user>\AppData\Roaming\npm\claude.cmd. A pin that does not
+    resolve DISABLES that CLI rather than falling back to PATH.
+
+.PARAMETER CodexPath
+    Pin the Codex executable (adds --codex-path). Same rules as -ClaudePath.
+
+.PARAMETER WorkspaceRoot
+    Absolute directory the node keeps its per-Task worktrees under (adds
+    --workspace-root). Default: EVER_WORKS_NODE_WORKSPACE_ROOT, then
+    ~\.ever-works\fleet-workspaces of the account the service runs as.
+
 .EXAMPLE
     .\install-service.ps1 -Work
+
+.EXAMPLE
+    .\install-service.ps1 -Work -ClaudePath "$env:APPDATA\npm\claude.cmd" -WorkspaceRoot D:\fleet-workspaces
 #>
 [CmdletBinding()]
 param(
     [string] $Name = 'EverWorksNode',
     [switch] $Work,
-    [switch] $UseScheduledTask
+    [switch] $UseScheduledTask,
+    [string] $ClaudePath,
+    [string] $CodexPath,
+    [string] $WorkspaceRoot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,6 +84,17 @@ if ($null -eq $cli) {
 
 $arguments = @('start')
 if ($Work) { $arguments += '--work' }
+# Pins are quoted as one argument each: the usual locations (Program
+# Files, user profiles) contain spaces, and both NSSM and the Task
+# Scheduler hand the argument line to the process as a single string.
+if ($ClaudePath) { $arguments += @('--claude-path', "`"$ClaudePath`"") }
+if ($CodexPath) { $arguments += @('--codex-path', "`"$CodexPath`"") }
+if ($WorkspaceRoot) {
+    if (-not [System.IO.Path]::IsPathRooted($WorkspaceRoot)) {
+        throw "-WorkspaceRoot must be an absolute directory (got '$WorkspaceRoot')."
+    }
+    $arguments += @('--workspace-root', "`"$WorkspaceRoot`"")
+}
 $argumentLine = $arguments -join ' '
 
 $stateDir = Join-Path $env:ProgramData 'ever-works-node'

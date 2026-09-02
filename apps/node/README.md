@@ -8,11 +8,40 @@ This app also **owns the shared node core** (`src/core/`) — enrollment, heartb
 detection and config persistence are written once here and imported by `apps/desktop-node`, so the
 headless and desktop shells can never drift apart (PRD §3.3).
 
+## Install
+
+The node ships on npm as the public package **`ever-works-node`** — one command per machine, no
+monorepo checkout:
+
+```bash
+npm install -g ever-works-node     # Node.js >= 22
+ever-works-node --version
+ever-works-node capabilities       # what this machine would advertise, before enrolling
+```
+
+The published package is a single bundled `cli.js` (see `build.js`); the only runtime dependency is
+the optional `@napi-rs/keyring` native addon for the OS keychain — where its prebuilt binary is
+unavailable the install still works, with the credential in the owner-locked config file instead.
+
+The unattended-run scripts ship inside the package. After a global install the Windows installer is
+at:
+
+```powershell
+& "$(npm root -g)\ever-works-node\packaging\windows\install-service.ps1" -Work
+```
+
+(Windows: [NSSM](https://nssm.cc) is optional — with it the script registers a real Windows service,
+without it a boot-time Scheduled Task. The systemd unit for Linux is under `packaging/systemd/`.)
+
+**From source** instead — in the monorepo, `pnpm build:node` builds the node and its workspace
+dependencies into `apps/node/dist/`, and `cd apps/node && npm link` puts `ever-works-node` on `PATH`
+pointing at that checkout.
+
 ## Commands
 
 ```bash
 ever-works-node enroll --api-url <url> --token <one-time-token> [--name <label>] [-i <seconds>]
-ever-works-node start [-i <seconds>] [--work] [--concurrency <count>]
+ever-works-node start [-i <seconds>] [--work] [--concurrency <count>] [--claude-path <file>] [--codex-path <file>] [--workspace-root <dir>]
 ever-works-node pause [--local-only]
 ever-works-node resume [--local-only]
 ever-works-node unenroll [--local-only]
@@ -27,7 +56,10 @@ ever-works-node capabilities
   exponential backoff on failure, refreshing capability tags on every beat, until SIGINT/SIGTERM.
   With **`--work`** it also runs the worker host: lease → execute → report against
   `POST /api/fleet/jobs/*`. This is opt-in on purpose — enrolling a machine and letting it run the
-  owner's commands are two different consents.
+  owner's commands are two different consents. `--claude-path` / `--codex-path` pin the model CLIs
+  for this process and `--workspace-root <dir>` sets the **absolute** directory the per-Task
+  worktrees of agent tasks live under (default `EVER_WORKS_NODE_WORKSPACE_ROOT`, then
+  `~/.ever-works/fleet-workspaces`); a relative path is a usage error.
 - **`pause` / `resume`** drain and undrain this machine. Pausing stops leasing **immediately** and
   lets in-flight jobs finish and report — it is not a kill. It tells the platform
   (`POST /api/fleet/pause`, so the scheduler stops offering work) _and_ records the intent locally,
@@ -132,9 +164,14 @@ engine than the one an operator chose is how a check passes for the wrong reason
 ## Commands (development)
 
 ```bash
-pnpm --filter ever-works-node build   # tsc type-check + CommonJS emit to dist/
-pnpm --filter ever-works-node test    # vitest unit tests (no network, no disk, no real timers)
+pnpm --filter ever-works-node build         # tsc type-check + CommonJS emit to dist/
+pnpm --filter ever-works-node test          # vitest unit tests (no network, no disk, no real timers)
+pnpm --filter ever-works-node build:bundle  # stage the publishable npm package under dist-bundle/
 ```
+
+`build:bundle` (`build.js`) inlines the `workspace:*` packages with esbuild into one `cli.js`,
+writes the public manifest beside it and copies `packaging/`. The workspace package itself stays
+`private`; `.github/workflows/publish-node.yml` publishes `dist-bundle/` on a `node-v<version>` tag.
 
 ## Notes
 
@@ -198,5 +235,6 @@ dropped, which would leave it to expire and retry forever on the same incapable 
 - Workspace **provisioning** on the node: today `acceptance-checks` requires the workspace to
   already exist on this machine (it refuses a path it cannot resolve), so the end-to-end cloud
   path still wants a checkout step.
-- **Publishing to npm.** The package is still `private`, and the packaging scripts therefore refuse
-  to install a service unless `ever-works-node` is already on `PATH`.
+- **Signing and auto-update.** The npm package is published unsigned (no provenance attestation yet)
+  and a node does not update itself — `npm install -g ever-works-node@latest` plus a service restart
+  is the upgrade path.

@@ -757,6 +757,9 @@ importers:
       '@types/node':
         specifier: ^22.19.11
         version: 22.19.11
+      esbuild:
+        specifier: '>=0.28.1'
+        version: 0.28.1
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -34178,7 +34181,7 @@ snapshots:
   binary-version-check@6.1.0:
     dependencies:
       binary-version: 7.1.0
-      semver: 7.8.1
+      semver: 7.8.5
       semver-truncate: 3.0.0
 
   binary-version@7.1.0:
@@ -41764,7 +41767,7 @@ snapshots:
       ky: 1.14.3
       registry-auth-token: 5.1.1
       registry-url: 6.0.1
-      semver: 7.8.1
+      semver: 7.8.5
 
   package-json@8.1.1:
     dependencies:
@@ -45925,7 +45928,7 @@ snapshots:
       is-yarn-global: 0.4.1
       latest-version: 7.0.0
       pupa: 3.3.0
-      semver: 7.8.1
+      semver: 7.8.5
       semver-diff: 4.0.0
       xdg-basedir: 5.1.0
 
