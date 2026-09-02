@@ -164,7 +164,7 @@ describe('fleet barrel', () => {
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(60);
+		expect(Object.keys(fleet)).toHaveLength(79);
 	});
 
 	it.each([
