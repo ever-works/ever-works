@@ -64,12 +64,10 @@ describe('TaskWorkspaceService.finalizeRemotePush', () => {
         tasks = { updateById: jest.fn().mockResolvedValue(undefined), findById: jest.fn() };
         runs = { updateTelemetry: jest.fn().mockResolvedValue(undefined) };
         gitFacade = {
-            getRepository: jest
-                .fn()
-                .mockResolvedValue({
-                    defaultBranch: 'main',
-                    cloneUrl: 'https://github.com/acme/site-data.git',
-                }),
+            getRepository: jest.fn().mockResolvedValue({
+                defaultBranch: 'main',
+                cloneUrl: 'https://github.com/acme/site-data.git',
+            }),
             createPullRequest: jest
                 .fn()
                 .mockResolvedValue({ number: 7, url: 'https://github.com/acme/site-data/pull/7' }),
@@ -158,7 +156,10 @@ describe('TaskWorkspaceService.finalizeRemotePush', () => {
             /no branch/,
         );
         await expect(
-            build().finalizeRemotePush({ ...input(), task: makeTask({ workId: null } as Partial<Task>) }),
+            build().finalizeRemotePush({
+                ...input(),
+                task: makeTask({ workId: null } as Partial<Task>),
+            }),
         ).rejects.toThrow(/lost its Work/);
     });
 });

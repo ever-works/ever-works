@@ -110,14 +110,12 @@ describe('FleetAgentTaskReconcilerService', () => {
             updateTelemetry: jest.fn().mockResolvedValue(undefined),
         };
         tasks = {
-            findById: jest
-                .fn()
-                .mockResolvedValue({
-                    id: TASK,
-                    workId: 'work-1',
-                    title: 'Fix the thing',
-                    organizationId: null,
-                }),
+            findById: jest.fn().mockResolvedValue({
+                id: TASK,
+                workId: 'work-1',
+                title: 'Fix the thing',
+                organizationId: null,
+            }),
         };
         agents = {
             findById: jest
@@ -129,13 +127,11 @@ describe('FleetAgentTaskReconcilerService', () => {
             recordTerminal: jest.fn().mockResolvedValue(true),
         };
         taskWorkspace = {
-            finalizeRemotePush: jest
-                .fn()
-                .mockResolvedValue({
-                    outcome: 'pr-opened',
-                    prNumber: 42,
-                    prUrl: 'https://github.com/acme/repo/pull/42',
-                }),
+            finalizeRemotePush: jest.fn().mockResolvedValue({
+                outcome: 'pr-opened',
+                prNumber: 42,
+                prUrl: 'https://github.com/acme/repo/pull/42',
+            }),
         };
         taskChat = { post: jest.fn().mockResolvedValue({}) };
         dispatchGate = { drainForWork: jest.fn().mockResolvedValue({ dispatched: false }) };
