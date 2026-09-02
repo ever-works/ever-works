@@ -50,6 +50,7 @@ import {
 import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetRunRouterService } from '../fleet/fleet-run-router.service';
 import { createFleetAwareAgentTaskExecuteDispatcher } from '../fleet/fleet-agent-task.dispatcher';
+import { FleetAgentTaskPlannerService } from '../fleet/fleet-agent-task-planner.service';
 import { FleetTaskScopeResolverService } from '../fleet/fleet-task-scope.resolver';
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
@@ -96,19 +97,30 @@ import { TaskChatController } from './task-chat.controller';
         // module does not import — the same split
         // `SubAgentDelegationDepthResolverService` already uses.
         FleetTaskScopeResolverService,
+        // Agent execution v2 — builds the model-CLI job for a fleet-bound
+        // run. Provided HERE (not in FleetApiModule) for the same reason
+        // the scope resolver is: it needs the Task / Agent / workspace
+        // services this module already has.
+        FleetAgentTaskPlannerService,
         {
             provide: AGENT_TASK_EXECUTE_DISPATCHER,
             useFactory: (
                 fleetRouter: FleetRunRouterService,
                 scopeResolver: FleetTaskScopeResolverService,
                 notifications: NotificationService,
+                planner: FleetAgentTaskPlannerService,
             ) =>
                 createFleetAwareAgentTaskExecuteDispatcher(
                     agentTaskExecuteTriggerAdapter,
                     fleetRouter,
-                    { scopeResolver, notifications },
+                    { scopeResolver, notifications, planner },
                 ),
-            inject: [FleetRunRouterService, FleetTaskScopeResolverService, NotificationService],
+            inject: [
+                FleetRunRouterService,
+                FleetTaskScopeResolverService,
+                NotificationService,
+                FleetAgentTaskPlannerService,
+            ],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
         // Judgment layers G5 + G9 — the two runner seams the agents module

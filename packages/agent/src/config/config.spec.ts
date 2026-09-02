@@ -343,6 +343,79 @@ describe('agent/config', () => {
                 expect(config.fleetNode.getAgentTaskEnvPassthrough()).toEqual(['ONLY_THIS']);
             });
         });
+
+        describe('agent execution v2 (model CLIs on the node)', () => {
+            beforeEach(() => {
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_MODE;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_MODEL;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_EFFORT;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS;
+            });
+
+            it('defaults to the legacy command mode so existing installs are untouched', () => {
+                expect(config.fleetNode.getAgentExecutionMode()).toBe('command');
+                expect(config.fleetNode.getAgentExecutionProvider()).toBe('claude-code');
+                expect(config.fleetNode.getAgentExecutionModel()).toBeUndefined();
+                expect(config.fleetNode.getAgentExecutionEffort()).toBeUndefined();
+                expect(config.fleetNode.getAgentExecutionPermissionMode()).toBe('acceptEdits');
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(1200);
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBeUndefined();
+                expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(false);
+            });
+
+            it('reads the vocabulary values and ignores typos', () => {
+                process.env.FLEET_NODE_AGENT_EXECUTION_MODE = ' model-cli ';
+                process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'codex';
+                process.env.FLEET_NODE_AGENT_EXECUTION_EFFORT = 'xhigh';
+                process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE = 'plan';
+                expect(config.fleetNode.getAgentExecutionMode()).toBe('model-cli');
+                expect(config.fleetNode.getAgentExecutionProvider()).toBe('codex');
+                expect(config.fleetNode.getAgentExecutionEffort()).toBe('xhigh');
+                expect(config.fleetNode.getAgentExecutionPermissionMode()).toBe('plan');
+
+                process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'shell';
+                process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'gemini';
+                process.env.FLEET_NODE_AGENT_EXECUTION_EFFORT = 'ludicrous';
+                process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE = 'bypassPermissions';
+                expect(config.fleetNode.getAgentExecutionMode()).toBe('command');
+                expect(config.fleetNode.getAgentExecutionProvider()).toBe('claude-code');
+                expect(config.fleetNode.getAgentExecutionEffort()).toBeUndefined();
+                expect(config.fleetNode.getAgentExecutionPermissionMode()).toBe('acceptEdits');
+            });
+
+            it('accepts an opaque model id and refuses anything a shell could interpret', () => {
+                process.env.FLEET_NODE_AGENT_EXECUTION_MODEL = 'claude-opus-5';
+                expect(config.fleetNode.getAgentExecutionModel()).toBe('claude-opus-5');
+                process.env.FLEET_NODE_AGENT_EXECUTION_MODEL = 'opus; rm -rf /';
+                expect(config.fleetNode.getAgentExecutionModel()).toBeUndefined();
+            });
+
+            it('clamps the timeout into the node-supported range', () => {
+                process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS = '10';
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(60);
+                process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS = '99999';
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(1800);
+                process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS = '900';
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(900);
+                process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS = 'soon';
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(1200);
+            });
+
+            it('parses the budget and the skip-permissions switch', () => {
+                process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '12.5';
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBe(12.5);
+                process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '-3';
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBeUndefined();
+                process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS = 'true';
+                expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(true);
+                process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS = 'yes';
+                expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(false);
+            });
+        });
     });
 
     describe('config.database', () => {

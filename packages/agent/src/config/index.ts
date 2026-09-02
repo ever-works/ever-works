@@ -1,5 +1,20 @@
 import {
+    DEFAULT_FLEET_AGENT_EXECUTION_MODE,
+    DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE,
+    DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER,
     FLEET_AGENT_CREDENTIAL_ENV_NAMES,
+    FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC,
+    FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
+    FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
+    FLEET_AGENT_EXECUTION_MODEL_PATTERN,
+    isFleetAgentExecutionEffort,
+    isFleetAgentExecutionMode,
+    isFleetAgentExecutionPermissionMode,
+    isFleetAgentExecutionProvider,
+    type FleetAgentExecutionEffort,
+    type FleetAgentExecutionMode,
+    type FleetAgentExecutionPermissionMode,
+    type FleetAgentExecutionProvider,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
@@ -270,6 +285,87 @@ export const config = {
                 .split(',')
                 .map((name) => name.trim())
                 .filter((name) => name.length > 0);
+        },
+
+        // ── Agent execution v2 — model CLIs on the node ─────────────
+        //
+        // Instance-level DEFAULTS for how a fleet node executes an
+        // `agent-task`. A tenant overrides them through the
+        // `job-runtime-node` plugin's settings (same keys, resolved per
+        // user by the planner); these getters are the floor that applies
+        // when no tenant setting is present.
+
+        /**
+         * `command` (legacy template, the default) or `model-cli` (the
+         * platform assembles the agent's instructions and the node runs
+         * a local Claude Code / Codex on them). Unknown values fall back
+         * to the default so a typo can never silently switch modes.
+         */
+        getAgentExecutionMode(): FleetAgentExecutionMode {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_MODE || '').trim();
+            return isFleetAgentExecutionMode(raw) ? raw : DEFAULT_FLEET_AGENT_EXECUTION_MODE;
+        },
+        /** Which local CLI the node drives in `model-cli` mode. */
+        getAgentExecutionProvider(): FleetAgentExecutionProvider {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER || '').trim();
+            return isFleetAgentExecutionProvider(raw)
+                ? raw
+                : DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER;
+        },
+        /**
+         * Model id handed to the CLI (`--model`). Unset = the CLI's own
+         * default. Refused (→ undefined) unless it is an opaque
+         * identifier, because it ends up on a command line.
+         */
+        getAgentExecutionModel(): string | undefined {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_MODEL || '').trim();
+            return raw && FLEET_AGENT_EXECUTION_MODEL_PATTERN.test(raw) ? raw : undefined;
+        },
+        /** Claude Code `--effort`. Unset = the CLI's default. */
+        getAgentExecutionEffort(): FleetAgentExecutionEffort | undefined {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_EFFORT || '').trim();
+            return isFleetAgentExecutionEffort(raw) ? raw : undefined;
+        },
+        /** What the CLI may do without asking. Default `acceptEdits`. */
+        getAgentExecutionPermissionMode(): FleetAgentExecutionPermissionMode {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE || '').trim();
+            return isFleetAgentExecutionPermissionMode(raw)
+                ? raw
+                : DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE;
+        },
+        /**
+         * Wall-clock budget for one model run, clamped into the node's
+         * supported range. Default 20 minutes.
+         */
+        getAgentExecutionTimeoutSeconds(): number {
+            const raw = parseInt(process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS || '', 10);
+            if (!Number.isFinite(raw) || raw <= 0) {
+                return FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC;
+            }
+            return Math.min(
+                Math.max(raw, FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC),
+                FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
+            );
+        },
+        /**
+         * Per-run dollar cap handed to the CLI. Unset/nonsense = no cap
+         * (the CLI's own limits and the platform budgets still apply).
+         */
+        getAgentExecutionMaxBudgetUsd(): number | undefined {
+            const raw = parseFloat(process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD || '');
+            return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+        },
+        /**
+         * Whether runs may bypass the CLI's permission prompts entirely
+         * (`--dangerously-skip-permissions`). Default OFF; an unattended
+         * node usually needs it, which is exactly why it is an explicit
+         * operator decision recorded on every job.
+         */
+        isAgentExecutionSkipPermissionsEnabled(): boolean {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS || '')
+                .trim()
+                .toLowerCase();
+            return raw === 'true' || raw === '1';
         },
     },
 

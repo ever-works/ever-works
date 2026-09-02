@@ -146,12 +146,41 @@ pnpm --filter ever-works-node test    # vitest unit tests (no network, no disk, 
 
 ## What a node can and cannot run
 
-The worker host resolves an executor by `job.kind`. Today exactly one kind is registered:
+The worker host resolves an executor by `job.kind`:
 
-| Kind                | Status                                                                                                                                                                                                                                                                 |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `acceptance-checks` | **Working end to end.** Runs a Task's dispatch-frozen acceptance checks in a workspace directory on this machine and reports each exit code, with verdict rules identical to the platform's `TaskGateRunnerService`.                                                   |
-| `browser-check`     | **Working end to end, on a node that resolved a browser.** Drives the machine's real browser against a URL in a throwaway profile and reports what it rendered (DOM bytes, `<title>`, an optional `expectText`). Registered only when the `browser` tag is advertised. |
+| Kind                | Status                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `acceptance-checks` | **Working end to end.** Runs a Task's dispatch-frozen acceptance checks in a workspace directory on this machine and reports each exit code, with verdict rules identical to the platform's `TaskGateRunnerService`.                                                                                                                                                                         |
+| `agent-task`        | **Working end to end.** The general kind. In the platform's `command` mode it runs the operator's command template; in `model-cli` mode it provisions an isolated worktree of the Task's repository, runs a **local Claude Code / Codex** on the instructions the platform assembled, grades the acceptance checks, then commits and pushes the task branch. See "Agent execution v2" below. |
+| `browser-check`     | **Working end to end, on a node that resolved a browser.** Drives the machine's real browser against a URL in a throwaway profile and reports what it rendered (DOM bytes, `<title>`, an optional `expectText`). Registered only when the `browser` tag is advertised.                                                                                                                       |
+
+## Agent execution v2 — model CLIs on this machine
+
+A node advertises `claude-code` and/or `codex` when it resolved the executable at startup:
+
+1. `EVER_WORKS_NODE_CLAUDE_PATH` / `EVER_WORKS_NODE_CODEX_PATH` (or `start --claude-path` /
+   `--codex-path`) pin an executable. A pin that does not resolve **disables** that CLI rather than
+   falling back to PATH — a run must never succeed on a binary the operator did not choose.
+2. Otherwise the first `claude` / `codex` on PATH (on Windows, the `.cmd` / `.exe` form).
+
+A `model-cli` job is only offered to nodes advertising the CLI it needs. On such a job the node:
+
+- provisions the Task worktree (bare cache + `git worktree`, per-Task binding, root-confined);
+- writes the platform's instructions to a scratch file and runs the CLI **through the same command
+  runner every check uses** — env scrub, timeout, cancellation, whole-tree kill — with the
+  instructions on stdin (`claude -p --output-format json …` / `codex exec --json … -`) and the CLI's
+  structured output captured to a scratch file. Nothing free-form ever reaches argv;
+- runs the acceptance checks in the worktree;
+- `git add -A && git commit && git push HEAD:refs/heads/<task-branch>` via the node's own Git
+  credential helper (token-free, like the fetch);
+- reports one `FleetAgentTaskResult`: model summary / cost / turns / session id, check verdicts,
+  gate status, branch + head SHA + changed-file count, and a one-sentence `failureReason` when any
+  required part did not pass.
+
+The CLI runs with the machine's own login (`~/.claude`, `~/.codex`) or the credential names the
+platform granted (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `CODEX_ACCESS_TOKEN`,
+`OPENAI_API_KEY` — one per family, subscription-backed first). Scratch files live under the OS temp
+dir (`ever-works-node/agent-tasks/<job id>`) and are removed after every run.
 
 `browser-check` runs headless by default (`--headless=new --dump-dom`), which is what makes its
 verdict a real observation rather than "the process did not crash". `headed: true` opens a visible

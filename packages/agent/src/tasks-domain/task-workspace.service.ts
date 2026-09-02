@@ -1,5 +1,6 @@
 import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type {
+    FleetTaskWorkspaceSpec,
     GateStatus,
     MergeMethod,
     MergePolicySource,
@@ -231,6 +232,63 @@ export class TaskWorkspaceService {
             baseSha: handle.baseSha,
             reused: handle.reused,
             provider: 'workspace',
+        };
+    }
+
+    /**
+     * Agent execution v2 — describe the Task's repository workspace for
+     * a FLEET NODE to provision itself.
+     *
+     * Same repository / base-ref / branch resolution as
+     * {@link provisionForRun}, but nothing is checked out here: the node
+     * clones and cuts the branch on its own disk, with its own Git
+     * credential helper, so the spec is deliberately TOKEN-FREE (the
+     * clone URL is re-parsed and any embedded credential refused). The
+     * branch identity IS persisted on the Task exactly as the cloud
+     * path does, so a re-run — on a node or in the cloud — reuses it.
+     *
+     * Returns null when the Task has no Work or the Work has no
+     * resolvable repository; the caller decides whether that is fatal
+     * (a model run needs a repository to work in).
+     */
+    async describeFleetWorkspace(input: {
+        task: Task;
+        userId: string;
+    }): Promise<FleetTaskWorkspaceSpec | null> {
+        const { task, userId } = input;
+        if (!task.workId) return null;
+        const work = await this.works.findById(task.workId);
+        if (!work) return null;
+        if (!this.gitFacade) {
+            throw new Error(
+                `Task ${task.id} needs its repository described for a fleet node but no git facade is available in this runtime.`,
+            );
+        }
+
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+        if (!owner || !repo) return null;
+        const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
+        const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
+        const baseRef =
+            (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
+            repository.defaultBranch;
+        const branch = task.branchRef || taskBranchName({ id: task.id, slug: task.slug });
+
+        // Persist the durable identity on the Task BEFORE the job leaves,
+        // so the reconciler and every later run agree on the branch.
+        if (!task.branchRef || !task.branchState) {
+            await this.tasks.updateById(task.id, {
+                branchRef: branch,
+                ...(task.branchState ? {} : { branchState: 'created' }),
+            });
+        }
+
+        return {
+            repositoryId: `${owner}/${repo}`,
+            repoUrl: tokenFreeCloneUrl(repository.cloneUrl),
+            baseRef,
+            branch,
         };
     }
 
@@ -927,4 +985,35 @@ export class TaskWorkspaceService {
             );
         }
     }
+}
+
+/**
+ * Agent execution v2 — a clone URL safe to put on the fleet job wire.
+ *
+ * Provider clone URLs are normally credential-free, but this is the one
+ * place a token could leak onto a node's disk and into its Git config,
+ * so the URL is re-parsed and REFUSED (not stripped) when it carries
+ * one: a stripped URL would be a silent policy the caller never saw.
+ */
+export function tokenFreeCloneUrl(cloneUrl: string): string {
+    const value = typeof cloneUrl === 'string' ? cloneUrl.trim() : '';
+    if (!value) {
+        throw new Error('Repository has no clone URL');
+    }
+    // scp-like SSH syntax (`git@host:owner/repo.git`) carries no secret.
+    if (/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+$/.test(value)) {
+        return value;
+    }
+    let parsed: URL;
+    try {
+        parsed = new URL(value);
+    } catch {
+        throw new Error('Repository clone URL is not a valid URL');
+    }
+    if (parsed.password || (parsed.protocol === 'https:' && parsed.username)) {
+        throw new Error(
+            'Repository clone URL carries a credential and cannot be sent to a fleet node',
+        );
+    }
+    return value;
 }

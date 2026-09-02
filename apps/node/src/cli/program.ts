@@ -1,6 +1,7 @@
 import { Command, CommanderError } from 'commander';
 import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
+import { resolveModelCliPaths } from '../core/model-cli-probe';
 import { FleetClientError } from '../core/fleet-client';
 import {
 	createNodeRuntime,
@@ -84,6 +85,11 @@ export interface CliDeps {
 	 * only the concurrency ceiling is enforced.
 	 */
 	resourceProbe?: ResourceProbe;
+	/**
+	 * Executable-file probe for the `--claude-path` / `--codex-path` pins.
+	 * Optional: a shell without it trusts the operator's path as given.
+	 */
+	fileExists?: (path: string) => boolean;
 }
 
 /**
@@ -238,6 +244,10 @@ export interface StartCommandOptions {
 	concurrency?: string;
 	maxCpu?: string;
 	maxMemory?: string;
+	/** Agent execution v2 — pin the Claude Code executable for this process. */
+	claudePath?: string;
+	/** Agent execution v2 — pin the Codex executable for this process. */
+	codexPath?: string;
 }
 
 export async function runStart(deps: CliDeps, options: StartCommandOptions): Promise<void> {
@@ -260,10 +270,34 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		...(config.limits ?? {}),
 		...(limitOverrides ?? {})
 	});
+	// Agent execution v2 — which model CLIs this process may spawn. The
+	// flags re-run the probe with the operator's pins; a pin that does not
+	// resolve DISABLES that CLI rather than falling back to PATH.
+	const modelCli =
+		options.claudePath || options.codexPath
+			? resolveModelCliPaths(
+					{
+						env: {},
+						platform: deps.platform,
+						fileExists: deps.fileExists ?? (() => true),
+						lookupAllOnPath: () => []
+					},
+					{
+						'claude-code': options.claudePath ?? deps.io.environment.modelCli?.['claude-code'] ?? null,
+						codex: options.codexPath ?? deps.io.environment.modelCli?.codex ?? null
+					}
+				)
+			: { paths: deps.io.environment.modelCli ?? {}, notes: deps.io.environment.modelCliNotes ?? [] };
+	if (workerEnabled) {
+		for (const note of modelCli.notes) {
+			deps.io.logger.info(`Model CLI — ${note}`);
+		}
+	}
 	const { loop, worker } = createNodeRuntime(config, deps.io, {
 		workerEnabled,
 		startPaused,
 		limits: effectiveLimits,
+		modelCli: modelCli.paths,
 		persistUnsafe: async (unsafe) =>
 			saveConfig(
 				deps.fs,
@@ -592,6 +626,14 @@ export function buildProgram(deps: CliDeps): Command {
 		)
 		.option('--max-cpu <percent>', 'Override the stored CPU admission ceiling, in percent')
 		.option('--max-memory <mb>', 'Override the stored memory admission ceiling, in MB')
+		.option(
+			'--claude-path <file>',
+			'Claude Code executable used for model-cli agent tasks (default: EVER_WORKS_NODE_CLAUDE_PATH, then PATH)'
+		)
+		.option(
+			'--codex-path <file>',
+			'Codex executable used for model-cli agent tasks (default: EVER_WORKS_NODE_CODEX_PATH, then PATH)'
+		)
 		.action(async (options: StartCommandOptions) => {
 			await runStart(deps, options);
 		});

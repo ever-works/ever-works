@@ -15,6 +15,7 @@ import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
+import type { ModelCliPaths } from './executors/model-cli';
 import { defaultFleetTaskWorkspaceRoot, FleetTaskWorkspaceProvisioner } from './workspaces/fleet-task-workspace';
 import type { Logger } from './logger';
 import {
@@ -250,7 +251,17 @@ export interface CreateNodeRuntimeOptions {
 	/** Persistent bare-cache/worktree root for repository-backed agent Tasks. */
 	agentTaskWorkspaceRoot?: string;
 	/** Test/embedding seam; ordinary runtimes use the local-workspace provider. */
-	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'>;
+	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'> &
+		Partial<Pick<FleetTaskWorkspaceProvisioner, 'finalize'>>;
+	/**
+	 * Agent execution v2 — the model CLIs the `agent-task` executor may
+	 * spawn. Defaults to what `io.environment.modelCli` resolved at
+	 * startup; an explicit value (the `--claude-path` / `--codex-path`
+	 * flags) overrides it for this process only.
+	 */
+	modelCli?: ModelCliPaths;
+	/** Scratch root for the model step's instructions / output files. */
+	agentTaskScratchRoot?: string;
 	/** Persist a fail-closed worker quarantine into the node config. */
 	persistUnsafe?: (state: { since: string; reason: string }) => Promise<void> | void;
 	/** Durable write-ahead crash guard; acquired before the first job lease. */
@@ -342,12 +353,27 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// score a gate; with it a Task's run can actually EXECUTE here when
 		// the owner's resolved job runtime is the fleet. Same seam, same
 		// protocol, same credential — exactly as the header above promised.
+		// Agent execution v2 — the model CLIs resolved at startup (or pinned
+		// by the operator for this process). Absent on a machine without
+		// either CLI: a job that asks for model execution then fails naming
+		// the missing CLI rather than pretending to have run it.
+		const modelCli = options.modelCli ?? io.environment.modelCli ?? {};
 		worker.register('agent-task', (job, signal) =>
 			runAgentTaskJob(
 				job,
 				{
 					provisionWorkspace: (taskId, spec, provisionSignal) =>
 						workspaceProvisioner.provision(taskId, spec, provisionSignal),
+					...(workspaceProvisioner.finalize
+						? {
+								finalizeWorkspace: (taskId, descriptor, opts, finalizeSignal) =>
+									workspaceProvisioner.finalize!(taskId, descriptor, opts, finalizeSignal)
+							}
+						: {}),
+					modelCli,
+					...(options.agentTaskScratchRoot !== undefined
+						? { scratchRoot: options.agentTaskScratchRoot }
+						: {}),
 					...(options.agentTaskWorkspacePath !== undefined
 						? { defaultWorkspacePath: options.agentTaskWorkspacePath }
 						: {})

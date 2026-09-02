@@ -25,8 +25,21 @@ export class FleetTaskWorkspaceError extends Error {
 	}
 }
 
-/** Narrow structural seam used by focused tests and alternative local providers. */
-export type FleetWorkspacePlugin = Pick<IWorkspacePlugin, 'provision'>;
+/**
+ * Narrow structural seam used by focused tests and alternative local
+ * providers. `finalize` is optional so every existing provision-only
+ * double keeps compiling; a node whose provider lacks it cannot commit
+ * (and says so in the job result) rather than failing to construct.
+ */
+export type FleetWorkspacePlugin = Pick<IWorkspacePlugin, 'provision'> & Partial<Pick<IWorkspacePlugin, 'finalize'>>;
+
+/** What {@link FleetTaskWorkspaceProvisioner.finalize} reports back to the executor. */
+export interface FleetTaskWorkspaceFinalizeResult {
+	pushed: boolean;
+	headSha: string | null;
+	empty: boolean;
+	changedFiles?: number;
+}
 
 export interface FleetTaskWorkspaceProvisionerOptions {
 	/** Persistent cache/worktree root owned by the node service account. */
@@ -178,6 +191,90 @@ export class FleetTaskWorkspaceProvisioner {
 			headSha,
 			reused: handle.reused
 		};
+	}
+
+	/**
+	 * Commit whatever the model left in the task worktree and push the
+	 * task branch (agent execution v2).
+	 *
+	 * Delegates to the local-workspace provider's own `finalize` — the
+	 * same `git add -A` / commit / `push HEAD:refs/heads/<branch>` the
+	 * cloud worker runs — so a node-pushed branch is indistinguishable
+	 * from a cloud-pushed one. The push is token-free: the node's own Git
+	 * credential helper authenticates, exactly as the fetch did.
+	 *
+	 * The descriptor is re-validated against the configured root before
+	 * any Git command runs, so a job cannot point this at a directory the
+	 * provisioner did not create.
+	 */
+	async finalize(
+		taskId: string,
+		descriptor: FleetTaskWorkspaceDescriptor,
+		opts: { commitMessage: string; push: boolean },
+		signal?: AbortSignal
+	): Promise<FleetTaskWorkspaceFinalizeResult> {
+		if (!this.plugin.finalize) {
+			throw new FleetTaskWorkspaceError(
+				'git-failed',
+				'Workspace provider cannot finalize (no commit/push support)'
+			);
+		}
+		throwIfCancelled(signal);
+		const normalizedTaskId = validateTaskId(taskId);
+		const repositoryId = typeof descriptor?.repositoryId === 'string' ? descriptor.repositoryId.trim() : '';
+		if (!IDENTITY_PATTERN.test(repositoryId)) {
+			throw new FleetTaskWorkspaceError('invalid-spec', 'Fleet workspace repository identity is invalid');
+		}
+		const branch = validateBranchRef(descriptor.branch, 'branch');
+		if (!SHA_PATTERN.test(descriptor.baseSha)) {
+			throw new FleetTaskWorkspaceError('invalid-spec', 'Fleet workspace base commit is invalid');
+		}
+		const commitMessage = typeof opts.commitMessage === 'string' ? opts.commitMessage.trim() : '';
+		if (!commitMessage || /[\0\r]/.test(commitMessage) || commitMessage.length > 1000) {
+			throw new FleetTaskWorkspaceError('invalid-spec', 'Commit message is missing or invalid');
+		}
+
+		let canonicalRoot: string;
+		let canonicalPath: string;
+		try {
+			[canonicalRoot, canonicalPath] = await Promise.all([
+				fs.realpath(this.rootPath),
+				fs.realpath(descriptor.path)
+			]);
+		} catch {
+			throw new FleetTaskWorkspaceError('path-collision', 'Task workspace no longer resolves to a directory');
+		}
+		if (!isStrictDescendant(canonicalRoot, canonicalPath)) {
+			throw new FleetTaskWorkspaceError('path-collision', 'Task workspace escapes the configured root');
+		}
+		throwIfCancelled(signal);
+
+		const bindingKey = taskBindingKey(normalizedTaskId, repositoryId);
+		try {
+			const result = await this.plugin.finalize(
+				{
+					path: canonicalPath,
+					baseSha: descriptor.baseSha,
+					reused: descriptor.reused,
+					branch,
+					bindingKey
+				},
+				{ commitMessage, push: opts.push }
+			);
+			return {
+				pushed: result.pushed,
+				headSha: result.headSha,
+				empty: result.empty,
+				...(result.changedFiles === undefined ? {} : { changedFiles: result.changedFiles })
+			};
+		} catch (error) {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+			if (signal?.aborted) throw cancelledError();
+			throw new FleetTaskWorkspaceError(
+				'git-failed',
+				`Commit or push failed for branch '${branch}': ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
 	}
 }
 
