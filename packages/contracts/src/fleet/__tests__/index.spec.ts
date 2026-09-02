@@ -86,6 +86,29 @@ const NODE_EXPORTS = [
 	'FLEET_MIN_NODE_OFFLINE_AFTER_MS'
 ] as const;
 
+/** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
+const AGENT_EXECUTION_EXPORTS = [
+	'FLEET_AGENT_EXECUTION_PROVIDERS',
+	'DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER',
+	'isFleetAgentExecutionProvider',
+	'FLEET_AGENT_EXECUTION_MODES',
+	'DEFAULT_FLEET_AGENT_EXECUTION_MODE',
+	'isFleetAgentExecutionMode',
+	'FLEET_AGENT_EXECUTION_EFFORTS',
+	'isFleetAgentExecutionEffort',
+	'FLEET_AGENT_EXECUTION_PERMISSION_MODES',
+	'DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE',
+	'isFleetAgentExecutionPermissionMode',
+	'FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES',
+	'FLEET_AGENT_EXECUTION_MAX_BUDGET_USD',
+	'FLEET_AGENT_EXECUTION_MODEL_PATTERN',
+	'FleetAgentExecutionError',
+	'normalizeFleetAgentModelExecution'
+] as const;
+
 const RUNNER_STATUS_EXPORTS = [
 	'FLEET_RUNNER_STATUS_REFRESH_SEC',
 	'FLEET_RUNNER_STATUS_MIN_REFRESH_SEC',
@@ -97,6 +120,7 @@ const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
 	...JOB_EXPORTS,
+	...AGENT_EXECUTION_EXPORTS,
 	...NODE_EXPORTS,
 	...RUNNER_STATUS_EXPORTS
 ];
@@ -115,7 +139,12 @@ const FUNCTION_EXPORTS = [
 	'nodeSatisfiesCapabilities',
 	'isNodeBusy',
 	'isFleetEnrollableNodeKind',
-	'summarizeRunnerStatus'
+	'summarizeRunnerStatus',
+	'isFleetAgentExecutionProvider',
+	'isFleetAgentExecutionMode',
+	'isFleetAgentExecutionEffort',
+	'isFleetAgentExecutionPermissionMode',
+	'normalizeFleetAgentModelExecution'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -130,7 +159,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 60 runtime symbols', () => {
+	it('exposes exactly these 79 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
