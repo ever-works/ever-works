@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, parse, relative } from 'node:path';
@@ -419,5 +419,73 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 		await expect(pending).rejects.toMatchObject({ code: 'cancelled' });
 		expect(receivedSignal).toBe(controller.signal);
 		expect(observedAbort).toBe(true);
+	});
+});
+
+describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent execution v2 review follow-up)', () => {
+	it('forwards the abort signal to the provider and maps an abort into a cancelled error', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
+		const worktree = join(root, 'repositories', 'r', 'worktrees', 'w');
+		mkdirSync(worktree, { recursive: true });
+		const controller = new AbortController();
+		const finalize = vi.fn(async (_handle: unknown, opts: { signal?: AbortSignal }) => {
+			expect(opts.signal).toBe(controller.signal);
+			controller.abort(new Error('lease lost'));
+			const error = new Error('lease lost');
+			error.name = 'AbortError';
+			throw error;
+		});
+		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		const descriptor = {
+			path: worktree,
+			repositoryId: 'ever/repository',
+			baseRef: 'main',
+			branch: 'task/cancel',
+			baseSha: SHA,
+			headSha: SHA,
+			reused: false
+		};
+		try {
+			await expect(
+				provisioner.finalize(
+					'task-0001',
+					descriptor,
+					{ commitMessage: 'agent: x', push: true },
+					controller.signal
+				)
+			).rejects.toMatchObject({ code: 'cancelled' });
+			expect(finalize).toHaveBeenCalledTimes(1);
+			expect(finalize.mock.calls[0][1]).toMatchObject({ commitMessage: 'agent: x', push: true });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('reports a provider without commit support instead of pretending to push', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
+		try {
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: root,
+				plugin: { provision: vi.fn() } as unknown as FleetWorkspacePlugin
+			});
+			await expect(
+				provisioner.finalize(
+					'task-0001',
+					{
+						path: root,
+						repositoryId: 'ever/repository',
+						baseRef: 'main',
+						branch: 'b',
+						baseSha: SHA,
+						headSha: SHA,
+						reused: false
+					},
+					{ commitMessage: 'x', push: false }
+				)
+			).rejects.toMatchObject({ code: 'git-failed' });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });

@@ -508,3 +508,21 @@ describe('gc', () => {
 		}
 	});
 });
+
+describe('finalize — cancellation (agent execution v2 review follow-up)', () => {
+	it('refuses an already-aborted finalize before any Git call, leaving the tree uncommitted', async () => {
+		const handle = await plugin.provision(spec('task-cancel-1', 'task/cancel-1'));
+		writeFileSync(join(handle.path, 'cancel.txt'), 'never committed\n');
+		const controller = new AbortController();
+		controller.abort(new Error('lease lost'));
+
+		await expect(
+			plugin.finalize(handle, { commitMessage: 'agent: cancelled', push: true, signal: controller.signal })
+		).rejects.toMatchObject({ name: 'AbortError' });
+
+		// Nothing was staged, committed or pushed.
+		expect(git(handle.path, 'status', '--porcelain')).toContain('cancel.txt');
+		expect(git(handle.path, 'rev-parse', 'HEAD')).toBe(handle.baseSha);
+		expect(() => git(originDir, 'rev-parse', '--verify', 'refs/heads/task/cancel-1')).toThrow();
+	});
+});

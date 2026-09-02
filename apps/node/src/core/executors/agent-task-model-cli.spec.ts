@@ -1,6 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FleetJobView, FleetTaskWorkspaceDescriptor } from '@ever-works/contracts';
-import { AgentTaskPayloadError, runAgentTaskJob, type AgentTaskIo, type AgentTaskScratchFs } from './agent-task';
+import { mkdtempSync, promises as realFs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+	AgentTaskPayloadError,
+	defaultScratchFs,
+	runAgentTaskJob,
+	type AgentTaskIo,
+	type AgentTaskScratchFs
+} from './agent-task';
 
 /**
  * `agent-task` with an `execution` block — agent execution v2.
@@ -65,7 +74,7 @@ function scratchFs(modelOutput: string | null): AgentTaskScratchFs & { files: Ma
 	return {
 		files,
 		removed,
-		mkdir: async () => undefined,
+		createScratchDir: async (root, prefix) => join(root, `${prefix}-scratch`),
 		writeFile: async (path, content) => {
 			files.set(path, content);
 		},
@@ -158,6 +167,7 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		expect(written?.[1]).toBe('# Task\nFix the thing.');
 		expect(fs.removed).toHaveLength(1);
 		expect(fs.removed[0]).toContain('job-77');
+		expect(fs.removed[0]).toContain('-scratch');
 
 		expect(io.finalizeWorkspace).toHaveBeenCalledWith(
 			't1',
@@ -315,5 +325,33 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		});
 		await expect(runAgentTaskJob(job(payload), io, controller.signal)).rejects.toThrowError(/lease lost/);
 		expect(io.finalizeWorkspace).not.toHaveBeenCalled();
+	});
+});
+
+describe('defaultScratchFs — scratch directories cannot be pre-planted (review follow-up)', () => {
+	it('creates a unique directory under the root even when the predictable name is a symlink elsewhere', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-scratch-root-'));
+		const elsewhere = mkdtempSync(join(tmpdir(), 'ew-scratch-elsewhere-'));
+		// An attacker pre-creates a link at the predictable path.
+		await realFs.symlink(elsewhere, join(root, 'job-77'), process.platform === 'win32' ? 'junction' : 'dir');
+
+		const created = await defaultScratchFs.createScratchDir(root, 'job-77');
+		try {
+			// The created directory is unique (never the planted name) and a
+			// real directory under the root, not the link's target.
+			expect(created).not.toBe(join(root, 'job-77'));
+			expect(created.startsWith(root)).toBe(true);
+			const stat = await realFs.lstat(created);
+			expect(stat.isDirectory()).toBe(true);
+			expect(stat.isSymbolicLink()).toBe(false);
+			await defaultScratchFs.writeFile(join(created, 'instructions.md'), 'secret');
+			expect(await realFs.readdir(elsewhere)).toEqual([]);
+			expect(await defaultScratchFs.readFile(join(created, 'instructions.md'))).toBe('secret');
+			expect(await defaultScratchFs.readFile(join(created, 'missing.json'))).toBeNull();
+		} finally {
+			await defaultScratchFs.remove(created);
+			await realFs.rm(root, { recursive: true, force: true });
+			await realFs.rm(elsewhere, { recursive: true, force: true });
+		}
 	});
 });

@@ -96,3 +96,29 @@ describe('resolveModelCliPaths', () => {
 		expect(out.paths).toEqual({ 'claude-code': null, codex: '/usr/bin/codex' });
 	});
 });
+
+describe('resolveModelCliPaths — pinned paths are held to the launchability rule (review follow-up)', () => {
+	it('on Windows disables a pin that is not a .cmd/.exe/.bat, even when the file exists', () => {
+		const out = resolveModelCliPaths(
+			io({ platform: 'win32', files: ['C:\npm\claude'], hits: { claude: ['C:\npm\claude.cmd'] } }),
+			{ 'claude-code': 'C:\npm\claude' }
+		);
+		expect(out.paths['claude-code']).toBeNull();
+		expect(out.notes[0]).toContain('not a launchable Windows executable');
+	});
+
+	it('on Windows accepts a .cmd / .exe pin', () => {
+		const out = resolveModelCliPaths(io({ platform: 'win32', files: ['C:\tools\claude.exe'] }), {
+			'claude-code': 'C:\tools\claude.exe'
+		});
+		expect(out.paths['claude-code']).toBe('C:\tools\claude.exe');
+	});
+
+	it('disables a pin the file probe rejects (a directory, a missing file)', () => {
+		const out = resolveModelCliPaths(io({ platform: 'linux', fileExists: () => false }), {
+			codex: '/opt/codex'
+		});
+		expect(out.paths.codex).toBeNull();
+		expect(out.notes[1]).toContain('not an executable file');
+	});
+});

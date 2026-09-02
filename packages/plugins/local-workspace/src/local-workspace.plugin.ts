@@ -388,13 +388,18 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 
 	async finalize(
 		handle: WorkspaceHandle,
-		opts: { commitMessage: string; push: boolean; auth?: WorkspaceProvisionSpec['auth'] }
+		opts: { commitMessage: string; push: boolean; auth?: WorkspaceProvisionSpec['auth']; signal?: AbortSignal }
 	): Promise<WorkspaceFinalizeResult> {
-		await this.ensureGit();
+		// Cancellation rides every Git call below: a caller aborted mid-way
+		// (a fleet node whose lease was lost) must not end up with a branch
+		// pushed after it stopped. An already-aborted signal never spawns.
+		const signal = opts.signal;
+		throwIfFinalizeAborted(signal);
+		await this.ensureGit(signal);
 		const dir = handle.path;
-		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed');
+		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed', signal);
 
-		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed');
+		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed', signal);
 		const dirty = status.stdout.trim().length > 0;
 		if (dirty) {
 			await this.gitOrThrow(
@@ -409,11 +414,12 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 				],
 				dir,
 				opts.auth,
-				'git commit failed'
+				'git commit failed',
+				signal
 			);
 		}
 
-		const head = await this.git(['rev-parse', 'HEAD'], dir, opts.auth);
+		const head = await this.git(['rev-parse', 'HEAD'], dir, opts.auth, signal);
 		const headSha = head.code === 0 ? head.stdout.trim() : null;
 
 		// Empty run: no new commit AND the branch has nothing beyond the
@@ -426,18 +432,19 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// cut from. Best-effort: a failed diff omits the field entirely
 		// (the caller then leaves the run's counter untouched rather
 		// than stamping a wrong 0) and never fails the finalize.
-		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth);
+		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth, signal);
 
 		let pushed = false;
 		if (opts.push) {
 			const repoUrl = (
-				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing')
+				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing', signal)
 			).stdout.trim();
 			await this.gitOrThrow(
 				['push', this.authedUrl(repoUrl, opts.auth), `HEAD:refs/heads/${handle.branch}`],
 				dir,
 				opts.auth,
-				'git push failed'
+				'git push failed',
+				signal
 			);
 			pushed = true;
 		}
@@ -459,10 +466,11 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	private async countChangedFiles(
 		dir: string,
 		baseSha: string,
-		auth?: WorkspaceProvisionSpec['auth']
+		auth?: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
 	): Promise<number | null> {
 		try {
-			const diff = await this.git(['diff', '--name-only', `${baseSha}..HEAD`], dir, auth);
+			const diff = await this.git(['diff', '--name-only', `${baseSha}..HEAD`], dir, auth, signal);
 			if (diff.code !== 0) return null;
 			const files = diff.stdout
 				.split('\n')
@@ -1382,3 +1390,12 @@ async function existsNoFollow(path: string): Promise<boolean> {
 }
 
 export default LocalWorkspacePlugin;
+
+/** Refuse to start a finalize the caller has already abandoned. */
+function throwIfFinalizeAborted(signal?: AbortSignal): void {
+	if (!signal?.aborted) return;
+	const reason = signal.reason;
+	const error = new Error(reason instanceof Error ? reason.message : 'Workspace finalize was cancelled');
+	error.name = 'AbortError';
+	throw error;
+}

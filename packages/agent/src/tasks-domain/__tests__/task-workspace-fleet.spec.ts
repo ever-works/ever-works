@@ -1,4 +1,12 @@
+import type { Task } from '../../entities/task.entity';
 import { TaskWorkspaceService, tokenFreeCloneUrl } from '../task-workspace.service';
+
+/** Constructor slots, so the doubles are typed against the real contracts. */
+type ServiceArgs = ConstructorParameters<typeof TaskWorkspaceService>;
+type WorkDouble = Pick<
+    Awaited<ReturnType<ServiceArgs[0]['findById']>> & object,
+    'id' | 'gitProvider' | 'taskIsolationBaseBranch' | 'getRepoOwner' | 'getDataRepo'
+>;
 
 /**
  * Agent execution v2 — describing a Task's repository for a FLEET NODE.
@@ -9,7 +17,7 @@ import { TaskWorkspaceService, tokenFreeCloneUrl } from '../task-workspace.servi
  * the Task exactly as the cloud path persists it.
  */
 
-function makeWork(over: Record<string, unknown> = {}) {
+function makeWork(over: Partial<WorkDouble> = {}): WorkDouble {
     return {
         id: 'work-1',
         gitProvider: 'github',
@@ -20,7 +28,7 @@ function makeWork(over: Record<string, unknown> = {}) {
     };
 }
 
-function makeTask(over: Record<string, unknown> = {}) {
+function makeTask(over: Partial<Task> = {}): Task {
     return {
         id: 'task-1',
         slug: 'TSK-9',
@@ -29,7 +37,7 @@ function makeTask(over: Record<string, unknown> = {}) {
         branchRef: null,
         branchState: null,
         ...over,
-    } as any;
+    } as unknown as Task;
 }
 
 describe('TaskWorkspaceService.describeFleetWorkspace', () => {
@@ -39,11 +47,11 @@ describe('TaskWorkspaceService.describeFleetWorkspace', () => {
 
     const build = (opts: { withGitFacade?: boolean } = {}) =>
         new TaskWorkspaceService(
-            works as any,
-            tasks as any,
-            {} as any,
-            {} as any,
-            (opts.withGitFacade === false ? undefined : gitFacade) as any,
+            works as unknown as ServiceArgs[0],
+            tasks as unknown as ServiceArgs[1],
+            {} as unknown as ServiceArgs[2],
+            {} as unknown as ServiceArgs[3],
+            (opts.withGitFacade === false ? undefined : gitFacade) as unknown as ServiceArgs[4],
         );
 
     beforeEach(() => {
@@ -80,7 +88,10 @@ describe('TaskWorkspaceService.describeFleetWorkspace', () => {
     it('honours the Work base branch and reuses an existing task branch verbatim', async () => {
         works.findById.mockResolvedValue(makeWork({ taskIsolationBaseBranch: ' develop ' }));
         const spec = await build().describeFleetWorkspace({
-            task: makeTask({ branchRef: 'task/task-1-old-slug', branchState: 'pushed' }),
+            task: makeTask({
+                branchRef: 'task/task-1-old-slug',
+                branchState: 'pushed',
+            } as Partial<Task>),
             userId: 'user-1',
         });
         expect(spec?.baseRef).toBe('develop');
@@ -91,7 +102,7 @@ describe('TaskWorkspaceService.describeFleetWorkspace', () => {
     it('is null for a Task without a Work, or a Work without a repository', async () => {
         expect(
             await build().describeFleetWorkspace({
-                task: makeTask({ workId: null }),
+                task: makeTask({ workId: null } as Partial<Task>),
                 userId: 'user-1',
             }),
         ).toBeNull();

@@ -4,6 +4,7 @@ import {
     DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER,
     FLEET_AGENT_CREDENTIAL_ENV_NAMES,
     FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC,
+    FLEET_AGENT_EXECUTION_MAX_BUDGET_USD,
     FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
     FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
     FLEET_AGENT_EXECUTION_MODEL_PATTERN,
@@ -353,7 +354,11 @@ export const config = {
          */
         getAgentExecutionMaxBudgetUsd(): number | undefined {
             const raw = parseFloat(process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD || '');
-            return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+            // Same ceiling the wire contract enforces (`normalizeFleetAgentModelExecution`):
+            // a value the node would refuse must never be planned in the first place.
+            return Number.isFinite(raw) && raw > 0 && raw <= FLEET_AGENT_EXECUTION_MAX_BUDGET_USD
+                ? raw
+                : undefined;
         },
         /**
          * Whether runs may bypass the CLI's permission prompts entirely

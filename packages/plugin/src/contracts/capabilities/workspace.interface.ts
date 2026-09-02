@@ -115,10 +115,16 @@ export interface IWorkspacePlugin extends IPlugin {
 	/** Fetch-first provision: clone/fetch, cut or reuse the branch. */
 	provision(spec: WorkspaceProvisionSpec): Promise<WorkspaceHandle>;
 
-	/** Commit everything + optionally push the branch. */
+	/**
+	 * Commit everything + optionally push the branch.
+	 *
+	 * `signal` (optional) aborts the Git operations in flight — a caller
+	 * that was cancelled mid-finalize must not have the branch pushed
+	 * behind its back. Providers that predate the field ignore it.
+	 */
 	finalize(
 		handle: WorkspaceHandle,
-		opts: { commitMessage: string; push: boolean; auth?: WorkspaceProvisionSpec['auth'] }
+		opts: { commitMessage: string; push: boolean; auth?: WorkspaceProvisionSpec['auth']; signal?: AbortSignal }
 	): Promise<WorkspaceFinalizeResult>;
 
 	/**

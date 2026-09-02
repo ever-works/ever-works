@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process';
-import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
+import { accessSync, constants as fsConstants, existsSync, statSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -126,14 +126,18 @@ export function defaultConfigPath(): string {
 	});
 }
 
-/** True when the path is an existing file this process may execute. */
+/**
+ * True when the path is an existing REGULAR FILE this process may execute.
+ * A directory (or a socket, a device) is never an executable, even though
+ * it may exist and — on POSIX — carry the execute bit.
+ */
 export function isExecutableFile(filePath: string): boolean {
 	try {
-		if (!existsSync(filePath)) {
+		if (!existsSync(filePath) || !statSync(filePath).isFile()) {
 			return false;
 		}
 		if (process.platform === 'win32') {
-			// Windows has no execute bit; existence is the whole test.
+			// Windows has no execute bit; a regular file is the whole test.
 			return true;
 		}
 		accessSync(filePath, fsConstants.X_OK);

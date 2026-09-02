@@ -16,6 +16,7 @@ import {
     type AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
 import {
+    FLEET_AGENT_EXECUTION_MAX_BUDGET_USD,
     FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES,
     FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
     FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
@@ -179,9 +180,17 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
             );
         }
+        // Same ceiling the wire contract enforces — a budget the node would
+        // refuse must never be planned. Refused, not clamped: a silently
+        // lowered cap is a decision the operator never saw.
         const overlayBudget = Number(read('agentExecutionMaxBudgetUsd'));
-        if (Number.isFinite(overlayBudget) && overlayBudget > 0)
+        if (
+            Number.isFinite(overlayBudget) &&
+            overlayBudget > 0 &&
+            overlayBudget <= FLEET_AGENT_EXECUTION_MAX_BUDGET_USD
+        ) {
             settings.maxBudgetUsd = overlayBudget;
+        }
         const skip = read('agentExecutionSkipPermissions');
         if (typeof skip === 'boolean') settings.skipPermissions = skip;
         return settings;
@@ -326,6 +335,15 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         ].join('\n\n');
 
         const tail = `# TASK\n${userMessage}\n\n${fleetSections}`;
+        // The Task brief and the workspace facts are never truncated; when
+        // they alone do not fit, the run cannot be planned honestly — fail
+        // HERE (recorded on the run row) rather than enqueue a job the node
+        // would refuse during execution validation.
+        if (byteLength(tail) > FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES) {
+            throw new FleetAgentTaskPlanError(
+                `Task ${task.slug ?? task.id} is too large for fleet model instructions (${byteLength(tail)} bytes of task/workspace content; limit ${FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES})`,
+            );
+        }
         const budget = FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES - byteLength(tail) - 2;
         const system = budget > 0 ? truncateToBytes(systemMessage, budget) : '';
         if (system.length < systemMessage.length) {

@@ -259,7 +259,10 @@ export class FleetTaskWorkspaceProvisioner {
 					branch,
 					bindingKey
 				},
-				{ commitMessage, push: opts.push }
+				// The signal rides into every Git call the provider makes, so a
+				// lease lost mid-push cannot leave the branch pushed behind the
+				// cancelled run's back.
+				{ commitMessage, push: opts.push, ...(signal ? { signal } : {}) }
 			);
 			return {
 				pushed: result.pushed,

@@ -45,7 +45,7 @@ tenant alike.
 
 ## Verification
 
-```
+```sh
 cd packages/contracts && npx vitest run src/fleet/__tests__      # incl. fleet-agent-execution.spec (vocab, normalizer)
 cd packages/plugins/job-runtime-node && npx vitest run            # schema still valid
 cd packages/agent && npx jest src/config/config.spec.ts           # new getters

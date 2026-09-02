@@ -293,7 +293,15 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 			deps.io.logger.info(`Model CLI — ${note}`);
 		}
 	}
-	const { loop, worker } = createNodeRuntime(config, deps.io, {
+	// The SAME resolution feeds both the executor and the capability tags:
+	// a pin that adds a CLI advertises it, a pin that disables one withdraws
+	// it — otherwise the node could run jobs it does not advertise, or be
+	// offered jobs it cannot run.
+	const io: NodeIo = {
+		...deps.io,
+		environment: { ...deps.io.environment, modelCli: modelCli.paths, modelCliNotes: modelCli.notes }
+	};
+	const { loop, worker } = createNodeRuntime(config, io, {
 		workerEnabled,
 		startPaused,
 		limits: effectiveLimits,

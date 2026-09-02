@@ -20,7 +20,7 @@ import type { ModelCliPaths } from './executors/model-cli';
 export interface ModelCliProbeIo {
 	env: Readonly<Record<string, string | undefined>>;
 	platform: NodeJS.Platform | string;
-	/** True when the path is an existing file this process may execute. */
+	/** True when the path is an existing REGULAR FILE this process may execute (never a directory). */
 	fileExists(path: string): boolean;
 	/** Every PATH hit for a bare command, first match first; `[]` when none. */
 	lookupAllOnPath?(command: string): string[];
@@ -56,12 +56,24 @@ export function resolveModelCliPaths(
 	for (const provider of Object.keys(MODEL_CLI_COMMANDS) as Array<keyof typeof MODEL_CLI_COMMANDS>) {
 		const pinned = (overrides[provider] ?? io.env[MODEL_CLI_ENV_OVERRIDES[provider]] ?? '').trim();
 		if (pinned) {
-			if (io.fileExists(pinned)) {
+			// A pin is held to the SAME launchability rule as a PATH hit: it
+			// must be a regular executable file, and on Windows a form
+			// `cmd.exe` can actually start (`.cmd` / `.exe` / `.bat`, never
+			// the extension-less npm shim or a directory). Otherwise the node
+			// would advertise a CLI every job on it then fails to spawn.
+			if (!io.fileExists(pinned)) {
+				paths[provider] = null;
+				notes.push(
+					`${provider}: disabled — pinned path does not exist or is not an executable file: ${pinned}`
+				);
+			} else if (io.platform === 'win32' && !WINDOWS_LAUNCHABLE.test(pinned)) {
+				paths[provider] = null;
+				notes.push(
+					`${provider}: disabled — pinned path is not a launchable Windows executable (.cmd/.exe/.bat): ${pinned}`
+				);
+			} else {
 				paths[provider] = pinned;
 				notes.push(`${provider}: ${pinned} (pinned)`);
-			} else {
-				paths[provider] = null;
-				notes.push(`${provider}: disabled — pinned path does not exist or is not executable: ${pinned}`);
 			}
 			continue;
 		}

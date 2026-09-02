@@ -93,7 +93,14 @@ export function defaultAgentTaskCommitMessage(taskId: string): string {
 
 /** Filesystem seam for the model step's scratch files. */
 export interface AgentTaskScratchFs {
-	mkdir(path: string): Promise<void>;
+	/**
+	 * Create a fresh, private, UNIQUE directory under `root` for one job
+	 * and return its path. The production implementation uses `mkdtemp`
+	 * beneath a `0700` root: a predictable path could be pre-created as a
+	 * symlink by anything sharing the temp dir, and the instructions
+	 * would then be written wherever it pointed.
+	 */
+	createScratchDir(root: string, prefix: string): Promise<string>;
 	writeFile(path: string, content: string): Promise<void>;
 	/** Null when the file does not exist. */
 	readFile(path: string): Promise<string | null>;
@@ -279,12 +286,11 @@ async function runModelStep(
 		);
 	}
 	const scratchFs = io.scratchFs ?? defaultScratchFs;
-	const scratchDir = join(io.scratchRoot ?? defaultScratchRoot(), scratchDirName(jobId));
+	const scratchDir = await scratchFs.createScratchDir(io.scratchRoot ?? defaultScratchRoot(), scratchDirName(jobId));
 	const scratch = {
 		instructionsPath: join(scratchDir, 'instructions.md'),
 		resultPath: join(scratchDir, 'model-output.json')
 	};
-	await scratchFs.mkdir(scratchDir);
 	try {
 		await scratchFs.writeFile(scratch.instructionsPath, execution.instructions);
 		let command: string;
@@ -460,7 +466,7 @@ function defaultDirectoryExists(path: string): boolean {
 	}
 }
 
-/** Per-job scratch directory name — the job id is a uuid, but never trust the wire. */
+/** Per-job scratch directory PREFIX — the job id is a uuid, but never trust the wire. */
 function scratchDirName(jobId: string): string {
 	const safe = jobId.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 80);
 	return safe || 'job';
@@ -471,9 +477,18 @@ export function defaultScratchRoot(): string {
 	return join(tmpdir(), 'ever-works-node', 'agent-tasks');
 }
 
-const defaultScratchFs: AgentTaskScratchFs = {
-	mkdir: (path) => fs.mkdir(path, { recursive: true }).then(() => undefined),
-	writeFile: (path, content) => fs.writeFile(path, content, { encoding: 'utf8' }),
+/**
+ * Production scratch filesystem. `createScratchDir` is `mkdtemp` under a
+ * `0700` root: atomic and unique, so nothing sharing the temp dir can
+ * pre-plant a symlink at the path the node is about to write to.
+ * Exported for the regression test that proves exactly that.
+ */
+export const defaultScratchFs: AgentTaskScratchFs = {
+	createScratchDir: async (root, prefix) => {
+		await fs.mkdir(root, { recursive: true, mode: 0o700 });
+		return fs.mkdtemp(join(root, `${prefix}-`));
+	},
+	writeFile: (path, content) => fs.writeFile(path, content, { encoding: 'utf8', mode: 0o600 }),
 	readFile: async (path) => {
 		try {
 			return await fs.readFile(path, { encoding: 'utf8' });

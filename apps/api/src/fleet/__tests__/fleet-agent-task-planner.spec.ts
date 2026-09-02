@@ -299,3 +299,61 @@ describe('FleetAgentTaskPlannerService', () => {
         await expect(build().plan(payload)).rejects.toThrow(/Agent agent-1 was not found/);
     });
 });
+
+describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow-ups)', () => {
+    const originalEnv = process.env;
+    let tasks: { findById: jest.Mock };
+    let agents: { findByIdAndUser: jest.Mock };
+    let works: { findById: jest.Mock };
+    let taskWorkspace: { describeFleetWorkspace: jest.Mock };
+    let pluginSettings: { getResolvedSettings: jest.Mock };
+
+    const build = () =>
+        new FleetAgentTaskPlannerService(
+            tasks as never,
+            agents as never,
+            works as never,
+            taskWorkspace as never,
+            undefined,
+            undefined,
+            pluginSettings as never,
+        );
+
+    beforeEach(() => {
+        process.env = { ...originalEnv, FLEET_NODE_AGENT_EXECUTION_MODE: 'model-cli' };
+        delete process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD;
+        tasks = { findById: jest.fn().mockResolvedValue(task()) };
+        agents = { findByIdAndUser: jest.fn().mockResolvedValue(agent()) };
+        works = { findById: jest.fn().mockResolvedValue({ id: 'work-1', checkDefaults: [] }) };
+        taskWorkspace = { describeFleetWorkspace: jest.fn().mockResolvedValue(workspace) };
+        pluginSettings = { getResolvedSettings: jest.fn().mockResolvedValue({}) };
+    });
+
+    afterAll(() => {
+        process.env = originalEnv;
+    });
+
+    it('ignores a tenant budget above the wire-contract ceiling instead of planning a job the node refuses', async () => {
+        pluginSettings.getResolvedSettings.mockResolvedValue({
+            agentExecutionMaxBudgetUsd: { value: 10_000, source: 'user' },
+        });
+        const settings = await build().resolveSettings(USER);
+        expect(settings.maxBudgetUsd).toBeUndefined();
+        pluginSettings.getResolvedSettings.mockResolvedValue({
+            agentExecutionMaxBudgetUsd: { value: 500, source: 'user' },
+        });
+        expect((await build().resolveSettings(USER)).maxBudgetUsd).toBe(500);
+    });
+
+    it('is a PLAN ERROR when the Task brief alone exceeds the instructions limit', async () => {
+        tasks.findById.mockResolvedValue(
+            task({
+                description: 'x'.repeat(FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES),
+            } as never),
+        );
+        await expect(build().plan(payload)).rejects.toBeInstanceOf(FleetAgentTaskPlanError);
+        await expect(build().plan(payload)).rejects.toThrow(
+            /too large for fleet model instructions/,
+        );
+    });
+});

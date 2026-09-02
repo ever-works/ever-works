@@ -410,6 +410,12 @@ describe('agent/config', () => {
                 expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBe(12.5);
                 process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '-3';
                 expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBeUndefined();
+                // Above the wire-contract ceiling → refused here rather than
+                // planned and then rejected by the node.
+                process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '501';
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBeUndefined();
+                process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '500';
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBe(500);
                 process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS = 'true';
                 expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(true);
                 process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS = 'yes';
