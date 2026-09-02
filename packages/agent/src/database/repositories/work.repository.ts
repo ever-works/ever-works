@@ -385,8 +385,13 @@ export class WorkRepository {
         if (expected.deploymentStartedAt == null) {
             query.andWhere('deploymentStartedAt IS NULL');
         } else {
+            // `deploymentStartedAt` is a `bigint` column of epoch millis (`TimestampColumn`).
+            // TypeORM runs that column's transformer for entity writes and object-form
+            // conditions, but NOT for raw `andWhere(sql, params)` parameters — the value goes
+            // straight to the driver, which serialises a `Date` as an ISO string and makes
+            // Postgres reject the UPDATE (`invalid input syntax for type bigint`). Convert here.
             query.andWhere('deploymentStartedAt = :deploymentStartedAt', {
-                deploymentStartedAt: expected.deploymentStartedAt,
+                deploymentStartedAt: expected.deploymentStartedAt.getTime(),
             });
         }
 
