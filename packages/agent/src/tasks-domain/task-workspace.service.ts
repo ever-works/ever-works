@@ -7,6 +7,7 @@ import type {
     MergeRefusalCode,
 } from '@ever-works/contracts';
 import { TaskStatus, type Task } from '../entities/task.entity';
+import type { Work } from '../entities/work.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -439,9 +440,135 @@ export class TaskWorkspaceService {
             return { outcome: 'conflict', conflictPaths: simulation.conflictPaths };
         }
 
-        if (!input.agentCanOpenPullRequests) {
+        return this.openPullRequestForBranch({
+            task,
+            work,
+            userId,
+            agentId: input.agentId,
+            agentCanOpenPullRequests: input.agentCanOpenPullRequests,
+            owner,
+            repo,
+            gitOptions,
+            baseRef,
+            branch: workspace.branch,
+            gate: input.gate,
+            gateStatus: input.gateStatus ?? null,
+        });
+    }
+
+    /**
+     * Agent execution v2 (slice B) — the finalize path for a branch that
+     * was committed and pushed SOMEWHERE ELSE: a fleet node ran the
+     * agent, pushed `branch` with its own credential, and reported the
+     * head SHA. Nothing is checked out here, so there is no merge
+     * simulation (the pull request itself is the conflict signal); what
+     * remains is exactly what a cloud run does after its push — record
+     * the branch on the Task, open the pull request (or hand it to a
+     * human), transition to review, and let the merge-policy matrix
+     * decide — through the SAME helper, so a node-pushed branch and a
+     * cloud-pushed one are indistinguishable downstream.
+     *
+     * Idempotent on the PR: a Task that already carries a `prNumber` is
+     * left alone (the node may report twice, the reconciler may re-run).
+     */
+    async finalizeRemotePush(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        agentCanOpenPullRequests: boolean;
+        branch: string;
+        headSha?: string | null;
+        baseSha?: string | null;
+        changedFiles?: number;
+        runId?: string;
+        gate?: { checksPassed: number };
+        gateStatus?: GateStatus | null;
+    }): Promise<TaskWorkspaceFinalizeOutcome> {
+        const { task, userId } = input;
+        if (!this.gitFacade) {
+            throw new Error(`Task ${task.id} remote finalize requires the git facade.`);
+        }
+        if (!task.workId) {
+            throw new Error(`Task ${task.id} lost its Work before finalize.`);
+        }
+        const work = await this.works.findById(task.workId);
+        if (!work) {
+            throw new Error(`Task ${task.id} lost its Work before finalize.`);
+        }
+        const branch = typeof input.branch === 'string' ? input.branch.trim() : '';
+        if (!branch) {
+            throw new Error(
+                `Task ${task.id} remote finalize has no branch to open a pull request from.`,
+            );
+        }
+
+        await this.stampChangedFiles(input.runId, input.changedFiles);
+        await this.tasks.updateById(task.id, {
+            branchRef: branch,
+            branchState: 'pushed',
+            ...(input.baseSha ? { baseSha: input.baseSha } : {}),
+        });
+
+        if (task.prNumber && task.prUrl) {
             this.logger.log(
-                `Task ${task.id} branch ${workspace.branch} pushed; agent lacks canOpenPullRequests — leaving PR to a human.`,
+                `Task ${task.id} already has PR #${task.prNumber}; remote push of ${branch} recorded without opening another.`,
+            );
+            await this.tasks.updateById(task.id, { branchState: 'pr-open' });
+            return { outcome: 'pr-opened', prNumber: task.prNumber, prUrl: task.prUrl };
+        }
+
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+        const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
+        const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
+        const baseRef =
+            (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
+            repository.defaultBranch;
+
+        return this.openPullRequestForBranch({
+            task,
+            work,
+            userId,
+            agentId: input.agentId,
+            agentCanOpenPullRequests: input.agentCanOpenPullRequests,
+            owner,
+            repo,
+            gitOptions,
+            baseRef,
+            branch,
+            gate: input.gate,
+            gateStatus: input.gateStatus ?? null,
+        });
+    }
+
+    /**
+     * The shared tail of every finalize: hand the branch to a human or
+     * open the pull request, move the Task to review, then ask the
+     * merge-policy matrix. Extracted (unchanged in behaviour) so the
+     * cloud path and the fleet path cannot drift on what "reviewable"
+     * means.
+     */
+    private async openPullRequestForBranch(args: {
+        task: Task;
+        work: Work;
+        userId: string;
+        agentId: string;
+        agentCanOpenPullRequests: boolean;
+        owner: string;
+        repo: string;
+        gitOptions: { userId: string; providerId: string; workId: string };
+        baseRef: string;
+        branch: string;
+        gate?: { checksPassed: number };
+        gateStatus: GateStatus | null;
+    }): Promise<TaskWorkspaceFinalizeOutcome> {
+        const { task, work, userId, owner, repo, gitOptions, baseRef, branch } = args;
+        if (!this.gitFacade) {
+            throw new Error(`Task ${task.id} pull-request finalize requires the git facade.`);
+        }
+        if (!args.agentCanOpenPullRequests) {
+            this.logger.log(
+                `Task ${task.id} branch ${branch} pushed; agent lacks canOpenPullRequests — leaving PR to a human.`,
             );
             // Run-driven lifecycle (plan 04 M7): the run COMPLETED WITH
             // CHANGES — they are committed and pushed on the Task branch —
@@ -459,15 +586,15 @@ export class TaskWorkspaceService {
             return { outcome: 'pushed-no-pr' };
         }
 
-        const gateNote = input.gate
-            ? `\n\nQuality gate: all ${input.gate.checksPassed} acceptance checks green.`
+        const gateNote = args.gate
+            ? `\n\nQuality gate: all ${args.gate.checksPassed} acceptance checks green.`
             : '';
         const pr = await this.gitFacade.createPullRequest(
             {
                 owner,
                 repo,
                 title: `Task ${task.slug}: ${task.title ?? 'agent run output'}`,
-                head: workspace.branch,
+                head: branch,
                 base: baseRef,
                 body: `Automated changes for Task \`${task.slug}\` (agent run). Review before merging — merge policy is governed by the Work's merge-policy settings.${gateNote}`,
             },
@@ -481,7 +608,7 @@ export class TaskWorkspaceService {
         await this.transitionTask(task, TaskStatus.IN_REVIEW);
         this.logger.log(
             `Task ${task.id} opened PR #${pr.number} (${pr.url})` +
-                `${await this.describeMergePolicy(input.agentId, work.id)}.`,
+                `${await this.describeMergePolicy(args.agentId, work.id)}.`,
         );
 
         // Merge-policy matrix (Wave 3, D4) — the agent-merge path. The PR
@@ -493,13 +620,13 @@ export class TaskWorkspaceService {
             task,
             work,
             userId,
-            agentId: input.agentId,
+            agentId: args.agentId,
             owner,
             repo,
             gitOptions,
             prNumber: pr.number,
             baseRef,
-            gateStatus: input.gateStatus ?? null,
+            gateStatus: args.gateStatus,
         });
 
         return {

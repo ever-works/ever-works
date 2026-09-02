@@ -170,6 +170,41 @@ export class FleetJobRepository {
      * `userId` is supplied (the inline reclaim on the lease path) and
      * global when it is not (the cron sweep).
      */
+    /**
+     * Agent execution v2 (slice B) — fail a job NO node has claimed yet.
+     * Pinned to `queued`, so a claim that lands first wins and the caller
+     * falls through to the active-cancel path.
+     */
+    async cancelQueued(id: string, error: string, completedAt: Date): Promise<boolean> {
+        const updated = await this.repository.update(
+            { id, status: 'queued' },
+            {
+                status: 'failed',
+                error,
+                completedAt,
+                cancelRequestedAt: completedAt,
+                leaseExpiresAt: null,
+                queuedReason: null,
+            },
+        );
+        return (updated.affected ?? 0) === 1;
+    }
+
+    /**
+     * Agent execution v2 (slice B) — flag an ACTIVE job for cancellation.
+     * The node holding it is never contacted directly (outbound-only
+     * transport); `FleetJobService.heartbeatJob` refuses its next beat
+     * instead. Pinned to the active statuses and to rows not yet flagged,
+     * so a repeated request is a no-op rather than a fresh timestamp.
+     */
+    async requestCancel(id: string, at: Date): Promise<boolean> {
+        const updated = await this.repository.update(
+            { id, status: In([...FLEET_JOB_ACTIVE_STATUSES]), cancelRequestedAt: IsNull() },
+            { cancelRequestedAt: at },
+        );
+        return (updated.affected ?? 0) === 1;
+    }
+
     async findExpiredLeases(cutoff: Date, limit: number, userId?: string): Promise<FleetJob[]> {
         return this.repository.find({
             where: {

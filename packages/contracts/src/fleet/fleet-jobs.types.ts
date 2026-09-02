@@ -215,6 +215,13 @@ export interface FleetJobView {
 	 * still satisfies this type on a newer client.
 	 */
 	queuedReason?: string | null;
+	/**
+	 * ISO timestamp of an operator cancel request on an ACTIVE job. The
+	 * node learns of it through its next job heartbeat being refused
+	 * (the same "lease lost" path a dead server produces), aborts, and
+	 * reports; the row then settles `failed`. Null / absent otherwise.
+	 */
+	cancelRequestedAt?: string | null;
 }
 
 /** Owner-safe view of one active-Organization Agent-to-node binding. */

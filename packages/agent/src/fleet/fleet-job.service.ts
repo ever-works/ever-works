@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { isUUID } from 'class-validator';
 import type {
     FleetJobKind,
@@ -18,6 +19,7 @@ import {
     nodeSatisfiesCapabilities,
 } from '@ever-works/contracts';
 import { FleetJob } from '../entities/fleet-job.entity';
+import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '../events/fleet-job.events';
 import { FleetJobRepository } from './fleet-job.repository';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { verifyNodeSecret } from './fleet-node-credential';
@@ -66,6 +68,23 @@ export interface ReclaimSummary {
     failed: number;
 }
 
+/** Error text a job settles with when an operator cancels it before any node claimed it. */
+export const FLEET_JOB_CANCELLED_ERROR = 'Cancelled by the operator before a node claimed it';
+
+/** What `cancel` did (or could not do) — see {@link FleetJobService.cancel}. */
+export interface CancelFleetJobOutcome {
+    /** True when the request changed the job's course (dropped, or flagged for the node). */
+    cancelled: boolean;
+    state: /** Queued row failed outright; nothing ever ran. */
+        | 'queued-dropped'
+        /** A node holds it; flagged, and its next job heartbeat will be refused. */
+        | 'cancel-requested'
+        /** Already `done` / `failed` — nothing to cancel. */
+        | 'terminal'
+        /** No such job (an id from another runtime, or a stale stamp). */
+        | 'not-found';
+}
+
 /**
  * Fleet job runtime (Desktop PRD §6.2 / M4) — the lease protocol.
  *
@@ -101,6 +120,12 @@ export class FleetJobService {
         private readonly jobs: FleetJobRepository,
         private readonly nodes: FleetNodeRepository,
         private readonly affinities: FleetAgentNodeAffinityRepository,
+        // Agent execution v2 (slice B) — lifecycle events for the API-side
+        // reconciler. Appended LAST and @Optional() per the positional-
+        // arity rule, so every existing spec that builds this service
+        // positionally keeps compiling; absent, the lease protocol is
+        // byte-for-byte what it was (no consumer, no event).
+        @Optional() private readonly events?: EventEmitter2,
     ) {}
 
     /**
@@ -233,19 +258,120 @@ export class FleetJobService {
                 // Another node won the race. Not an error — just skip it.
                 continue;
             }
-            leased.push(
-                toJobView({
-                    ...candidate,
-                    nodeId: node.id,
-                    status: 'leased',
-                    leaseExpiresAt,
-                    attempts,
-                    queuedReason: null,
-                } as FleetJob),
+            const view = toJobView({
+                ...candidate,
+                nodeId: node.id,
+                status: 'leased',
+                leaseExpiresAt,
+                attempts,
+                queuedReason: null,
+            } as FleetJob);
+            leased.push(view);
+            this.emit(
+                FleetJobLeasedEvent.EVENT_NAME,
+                new FleetJobLeasedEvent(view, node.id, node.userId),
             );
         }
 
         return leased;
+    }
+
+    /**
+     * Agent execution v2 (slice B) — cancel a job from the platform side.
+     *
+     * Two honest answers, because a node may already hold the job:
+     *
+     *   - **queued** — nothing ran; the row settles `failed` with
+     *     {@link FLEET_JOB_CANCELLED_ERROR} and a completion event fires
+     *     (source `cancelled`) so anything waiting on the job learns it
+     *     will never run;
+     *   - **leased / running** — the node is mid-job and cannot be
+     *     reached (transport is outbound-only). The request is recorded
+     *     as `cancelRequestedAt`; the node's next job heartbeat is REFUSED
+     *     — the same "lease lost" signal a dead server produces, which the
+     *     node already aborts on — and its report then settles the row.
+     *
+     * Never throws for an unknown id: the caller (the composite run
+     * canceller) uses `not-found` to fall through to the next runtime.
+     */
+    async cancel(jobId: string): Promise<CancelFleetJobOutcome> {
+        if (typeof jobId !== 'string' || !isUUID(jobId)) {
+            return { cancelled: false, state: 'not-found' };
+        }
+        const job = await this.jobs.findById(jobId);
+        if (!job) {
+            return { cancelled: false, state: 'not-found' };
+        }
+        if (job.status === 'done' || job.status === 'failed') {
+            return { cancelled: false, state: 'terminal' };
+        }
+        const now = new Date();
+        if (job.status === 'queued') {
+            const dropped = await this.jobs.cancelQueued(job.id, FLEET_JOB_CANCELLED_ERROR, now);
+            if (!dropped) {
+                // Lost the race to a node's claim — fall through to the
+                // active path on a fresh read rather than reporting a
+                // cancel that did not happen.
+                const fresh = await this.jobs.findById(job.id);
+                if (!fresh || fresh.status === 'done' || fresh.status === 'failed') {
+                    return { cancelled: false, state: 'terminal' };
+                }
+                return this.requestCancelOnActive(fresh, now);
+            }
+            const view = toJobView({
+                ...job,
+                status: 'failed',
+                error: FLEET_JOB_CANCELLED_ERROR,
+                completedAt: now,
+                leaseExpiresAt: null,
+                cancelRequestedAt: now,
+            } as FleetJob);
+            this.emit(
+                FleetJobCompletedEvent.EVENT_NAME,
+                new FleetJobCompletedEvent(
+                    view,
+                    job.userId,
+                    'cancelled',
+                    null,
+                    null,
+                    FLEET_JOB_CANCELLED_ERROR,
+                ),
+            );
+            return { cancelled: true, state: 'queued-dropped' };
+        }
+        return this.requestCancelOnActive(job, now);
+    }
+
+    private async requestCancelOnActive(job: FleetJob, now: Date): Promise<CancelFleetJobOutcome> {
+        if (job.cancelRequestedAt) {
+            // Already flagged — idempotent, and still "cancelled" from the
+            // operator's point of view.
+            return { cancelled: true, state: 'cancel-requested' };
+        }
+        const flagged = await this.jobs.requestCancel(job.id, now);
+        if (!flagged) {
+            const fresh = await this.jobs.findById(job.id);
+            if (fresh?.cancelRequestedAt) return { cancelled: true, state: 'cancel-requested' };
+            return { cancelled: false, state: 'terminal' };
+        }
+        this.logger.log(
+            `Fleet job ${job.id} flagged for cancellation; node ${job.nodeId} aborts on its next heartbeat`,
+        );
+        return { cancelled: true, state: 'cancel-requested' };
+    }
+
+    /** Best-effort event emission — a listener failure must never fail the lease protocol. */
+    private emit(name: string, event: FleetJobLeasedEvent | FleetJobCompletedEvent): void {
+        if (!this.events) return;
+        try {
+            this.events.emit(name, event);
+        } catch (error) {
+            this.logger.warn(
+                `fleet event ${name} for job ${event.job.id} failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /**
@@ -268,6 +394,15 @@ export class FleetJobService {
         const job = await this.jobs.findById(jobId);
         if (!job || job.nodeId !== node.id) return null;
         if (job.status !== 'leased' && job.status !== 'running') return null;
+        // Agent execution v2 (slice B) — an operator cancel is delivered
+        // as a REFUSED heartbeat: the node reads it as "lease lost" and
+        // aborts the job, exactly as it would for a dead server. Its
+        // report is still accepted below (`completeJob` does not check
+        // the flag), so the row settles with the node's own verdict.
+        if (job.cancelRequestedAt) {
+            this.logger.log(`Fleet job ${job.id}: heartbeat refused — cancellation requested`);
+            return null;
+        }
 
         const ttlSec = clampLeaseTtlSec(leaseTtlSec);
         const leaseExpiresAt = new Date(Date.now() + ttlSec * 1000);
@@ -317,7 +452,7 @@ export class FleetJobService {
         });
         if (!applied) return null;
 
-        return toJobView({
+        const view = toJobView({
             ...job,
             status,
             result,
@@ -325,6 +460,11 @@ export class FleetJobService {
             completedAt,
             leaseExpiresAt: null,
         } as FleetJob);
+        this.emit(
+            FleetJobCompletedEvent.EVENT_NAME,
+            new FleetJobCompletedEvent(view, job.userId, 'node-report', node.id, result, error),
+        );
+        return view;
     }
 
     /**
@@ -348,13 +488,30 @@ export class FleetJobService {
                     leaseExpiresAt: job.leaseExpiresAt,
                 };
                 if ((job.attempts ?? 0) >= (job.maxAttempts ?? 1)) {
-                    const failed = await this.jobs.failExhausted(
-                        job.id,
-                        observed,
-                        `Lease expired ${job.attempts} time(s) without a result; attempt budget exhausted`,
-                        now,
-                    );
-                    if (failed) summary.failed += 1;
+                    const error = `Lease expired ${job.attempts} time(s) without a result; attempt budget exhausted`;
+                    const failed = await this.jobs.failExhausted(job.id, observed, error, now);
+                    if (failed) {
+                        summary.failed += 1;
+                        // The run behind this job would otherwise wait on
+                        // a verdict that is never coming.
+                        this.emit(
+                            FleetJobCompletedEvent.EVENT_NAME,
+                            new FleetJobCompletedEvent(
+                                toJobView({
+                                    ...job,
+                                    status: 'failed',
+                                    error,
+                                    completedAt: now,
+                                    leaseExpiresAt: null,
+                                } as FleetJob),
+                                job.userId,
+                                'lease-exhausted',
+                                job.nodeId ?? null,
+                                null,
+                                error,
+                            ),
+                        );
+                    }
                     continue;
                 }
                 const requeued = await this.jobs.reclaim(job.id, observed);
@@ -507,6 +664,7 @@ export function toJobView(job: FleetJob): FleetJobView {
         startedAt: job.startedAt ? toIso(job.startedAt) : null,
         completedAt: job.completedAt ? toIso(job.completedAt) : null,
         queuedReason: job.queuedReason ?? null,
+        cancelRequestedAt: job.cancelRequestedAt ? toIso(job.cancelRequestedAt) : null,
     };
 }
 
