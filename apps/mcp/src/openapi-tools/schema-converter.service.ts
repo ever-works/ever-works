@@ -158,7 +158,13 @@ export class SchemaConverterService {
 	}
 
 	private convertArray(schema: JsonSchema): z.ZodArray<z.ZodTypeAny> {
-		const items = schema.items ? this.convertType(schema.items) : z.any();
+		// Why `convertToZod` and not `convertType`: only the former honours
+		// `nullable`, and a list whose ELEMENTS may be null is ordinary here
+		// (`relatedIds: [id, null]` on a partially resolved batch). Going
+		// through `convertType` produced `z.array(z.string())`, which rejects
+		// exactly the payload the endpoint documents. `required: true` because
+		// an element is present-or-null, never absent.
+		const items = schema.items ? this.convertToZod(schema.items, true) : z.any();
 		let array = z.array(items);
 		// Why: the API refuses an over-long batch with a 400; carrying the
 		// bound into the tool schema lets the client refuse it before the

@@ -79,6 +79,38 @@ describe('SchemaConverterService', () => {
 				expect(result.safeParse({ workId: '550e8400-e29b-41d4-a716-446655440000' }).success).toBe(true);
 				expect(result.safeParse({ workId: 'not-a-uuid' }).success).toBe(false);
 			});
+
+			// Review follow-up: array ELEMENTS carried their own `nullable`
+			// nowhere, because `convertArray` went through `convertType`,
+			// which never reads it. The list below is the shape the API
+			// documents for a partially resolved batch.
+			it('accepts null members of a nullable-item array', () => {
+				const schema: JsonSchema = { type: 'array', items: { type: 'string', nullable: true } };
+				const zodType = converter.convertToZod(schema, true);
+				expect(zodType.safeParse(['a', null, 'b']).success).toBe(true);
+				expect(zodType.safeParse([null]).success).toBe(true);
+				expect(zodType.safeParse(['a', 1]).success).toBe(false);
+			});
+
+			it('still rejects null members when the item schema is not nullable', () => {
+				const schema: JsonSchema = { type: 'array', items: { type: 'string' } };
+				const zodType = converter.convertToZod(schema, true);
+				expect(zodType.safeParse(['a', 'b']).success).toBe(true);
+				expect(zodType.safeParse(['a', null]).success).toBe(false);
+			});
+
+			it('keeps the item bounds while honouring nullable items', () => {
+				const schema: JsonSchema = {
+					type: 'array',
+					items: { type: 'string', nullable: true },
+					minItems: 1,
+					maxItems: 2
+				};
+				const zodType = converter.convertToZod(schema, true);
+				expect(zodType.safeParse([null]).success).toBe(true);
+				expect(zodType.safeParse([]).success).toBe(false);
+				expect(zodType.safeParse([null, 'a', 'b']).success).toBe(false);
+			});
 		});
 
 		it('converts integer type', () => {
