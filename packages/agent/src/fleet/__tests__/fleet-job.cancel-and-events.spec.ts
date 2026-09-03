@@ -180,6 +180,39 @@ describe('FleetJobService — cancel + lifecycle events', () => {
         expect(event.error).toMatch(/attempt budget exhausted/);
     });
 
+    // A cancelled job must never go back in the pool. `reclaim()` resets
+    // status/nodeId/leaseExpiresAt but leaves `cancelRequestedAt` set, and
+    // `claim()` CASed on `{ id, status: 'queued' }` only — so a cancelled job
+    // whose node aborted on the refused heartbeat WITHOUT calling complete()
+    // was requeued still flagged, re-leased to a fresh node, and started
+    // re-executing the cancelled Task for real until the attempt budget ran
+    // out. It is settled instead, well inside the attempt budget.
+    it('settles a cancelled job instead of requeuing it when its lease lapses', async () => {
+        await leaseIt();
+        await service.cancel(job.id);
+        emitter.emit.mockClear();
+
+        // Attempts deliberately BELOW maxAttempts: without the cancel check
+        // this row takes the requeue branch, not the exhausted one.
+        job.attempts = 0;
+        job.leaseExpiresAt = new Date(Date.now() - 60_000);
+        jobs.findExpiredLeases.mockResolvedValue([job]);
+
+        const summary = await service.reclaimExpired(USER);
+
+        expect(summary.requeued).toBe(0);
+        expect(summary.failed).toBe(1);
+        expect(jobs.reclaim).not.toHaveBeenCalled();
+
+        const [name, event] = emitter.emit.mock.calls[0];
+        expect(name).toBe(FleetJobCompletedEvent.EVENT_NAME);
+        // `cancelled` routes the reconciler to its board-mirror branch —
+        // nothing was produced that anyone should act on.
+        expect(event.source).toBe('cancelled');
+        expect(event.succeeded).toBe(false);
+        expect(event.error).toMatch(/stopped reporting/);
+    });
+
     it('never fails the lease protocol when a listener throws', async () => {
         emitter.emit.mockImplementation(() => {
             throw new Error('listener exploded');

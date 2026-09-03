@@ -365,6 +365,60 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
     });
 
+    // Cancellation reaches a node as a REFUSED HEARTBEAT, and
+    // `FleetJobService.completeJob` deliberately does not check the flag —
+    // the row settles with the node's own verdict. So a node that finished
+    // and pushed before its next heartbeat reports SUCCESS, and the event
+    // arrives as an ordinary `node-report`, not the synthetic `cancelled`
+    // one. Before the guard, that fell through to the full success path and
+    // opened a real pull request for a Task the user had cancelled.
+    //
+    // `markCompleted` was never the problem: it CASes against NON_TERMINAL
+    // and no-ops on the cancelled row. The pull request, the chat message
+    // and the inbox notice are not CAS-guarded and cannot be undone.
+    it('opens no pull request when the AgentRun is already cancelled', async () => {
+        runs.findById.mockResolvedValue({
+            id: RUN,
+            userId: USER,
+            agentId: AGENT,
+            workId: 'work-1',
+            status: 'cancelled',
+        });
+
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job(),
+                USER,
+                'node-report',
+                NODE,
+                successResult as unknown as Record<string, unknown>,
+            ),
+        );
+
+        expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+        expect(runs.markCompleted).not.toHaveBeenCalled();
+        expect(inbox.notice).not.toHaveBeenCalled();
+        expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
+    });
+
+    it('opens no pull request when the job carries cancelRequestedAt', async () => {
+        // The run row may not have flipped yet — the flag on the job is an
+        // independent signal that a cancel is in flight.
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job({ cancelRequestedAt: new Date().toISOString() }),
+                USER,
+                'node-report',
+                NODE,
+                successResult as unknown as Record<string, unknown>,
+            ),
+        );
+
+        expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+        expect(runs.markCompleted).not.toHaveBeenCalled();
+        expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
+    });
+
     it('ignores a run that belongs to another owner, and non-agent jobs', async () => {
         runs.findById.mockResolvedValue({ id: RUN, userId: 'someone-else' });
         await build().onCompleted(
