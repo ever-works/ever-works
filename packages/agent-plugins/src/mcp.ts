@@ -555,6 +555,101 @@ export function validateMcpConfig(value: unknown, options: ParseMcpConfigOptions
 	return { componentValid: true, componentAbsent: false, specVersion, servers, findings };
 }
 
+/**
+ * Enforces the *filesystem* half of containment for one server entry —
+ * spec 4.1 boundary 4: "If an MCP server `command` or `cwd` fails
+ * containment, the client MUST treat that server entry as invalid."
+ *
+ * Parsing alone cannot do this. `validateServerEntry` checks the shapes the
+ * specification defines — a `command` is a bare token or begins `./`, a
+ * `cwd` takes one of three forms — but §4.1(4) additionally requires a
+ * plugin-relative path to "remain within the filesystem-resolved plugin
+ * root after resolution", and only a caller holding the root can decide
+ * that. Symlinks are exactly why: `./bin/server` is lexically innocent and
+ * may still point anywhere.
+ *
+ * Two deliberate non-checks:
+ *
+ *  - A **bare** `command` is resolved through the platform's executable
+ *    search (spec 7.2.1), not against the package, so it has no containment
+ *    to fail.
+ *  - `args` elements and `env` values are never checked. Spec 4.1(5) is
+ *    explicit: they "are opaque strings. Clients MUST NOT interpret them as
+ *    package paths for the purpose of enforcing this section." Treating an
+ *    argument that merely looks like a path as one would reject conformant
+ *    packages.
+ *
+ * A `${PLUGIN_DATA}`-rooted `cwd` is contained against the data directory
+ * rather than the package root, so it is only checked when `pluginData` is
+ * supplied — the launcher knows that path, the loader does not.
+ */
+export async function checkServerContainment(
+	pluginRoot: string,
+	entry: McpServerEntry,
+	options?: { readonly pluginData?: string }
+): Promise<Finding[]> {
+	if (entry.transport !== 'stdio') {
+		return [];
+	}
+	const config = entry.config as McpStdioServer;
+	const at = `/mcpServers/${entry.name}`;
+	const findings: Finding[] = [];
+
+	if (config.command.startsWith('./')) {
+		const resolved = await resolveWithinRoot(pluginRoot, config.command.slice(2));
+		if (!resolved.ok) {
+			findings.push(
+				finding(
+					'mcp.server-command-invalid',
+					'error',
+					'mcp-server',
+					`MCP server "${entry.name}" has a "command" that resolves outside the plugin root; the server is skipped`,
+					{ subject: entry.name, at }
+				)
+			);
+		}
+	}
+
+	if (config.cwd !== undefined && entry.cwdAnchor !== undefined) {
+		const anchor = entry.cwdAnchor;
+		const relative =
+			anchor === 'plugin-relative'
+				? config.cwd.slice(2)
+				: config.cwd.replace(/^\$\{PLUGIN_(?:ROOT|DATA)\}\/?/u, '');
+		if (anchor === 'plugin-data') {
+			if (options?.pluginData !== undefined) {
+				const resolved = await resolveWithinRoot(options.pluginData, relative);
+				if (!resolved.ok) {
+					findings.push(
+						finding(
+							'mcp.server-cwd-invalid',
+							'error',
+							'mcp-server',
+							`MCP server "${entry.name}" has a "cwd" that resolves outside the plugin data directory; the server is skipped`,
+							{ subject: entry.name, at }
+						)
+					);
+				}
+			}
+		} else {
+			const resolved = await resolveWithinRoot(pluginRoot, relative);
+			if (!resolved.ok) {
+				findings.push(
+					finding(
+						'mcp.server-cwd-invalid',
+						'error',
+						'mcp-server',
+						`MCP server "${entry.name}" has a "cwd" that resolves outside the plugin root; the server is skipped`,
+						{ subject: entry.name, at }
+					)
+				);
+			}
+		}
+	}
+
+	return findings;
+}
+
 /** Parses `mcp.json` text. Invalid JSON disables MCP for the package (spec 7.2.2 rule 2). */
 export function parseMcpConfig(text: string, options: ParseMcpConfigOptions): McpConfigResult {
 	let parsed: unknown;
@@ -625,5 +720,31 @@ export async function loadMcpConfig(pluginRoot: string, options: ParseMcpConfigO
 		]);
 	}
 
-	return parseMcpConfig(text, options);
+	const parsed = parseMcpConfig(text, options);
+	if (!parsed.componentValid || parsed.servers.length === 0) {
+		return parsed;
+	}
+
+	// Spec 4.1 boundary 4 — now that the root is in hand, enforce the
+	// filesystem half of containment for `command` and root-anchored `cwd`.
+	// A server that escapes is dropped, and only that server: the others and
+	// every other component type keep loading.
+	const containmentFindings: Finding[] = [];
+	const containedServers: McpServerEntry[] = [];
+	for (const entry of parsed.servers) {
+		const problems = await checkServerContainment(pluginRoot, entry);
+		if (problems.length === 0) {
+			containedServers.push(entry);
+			continue;
+		}
+		containmentFindings.push(...problems);
+	}
+
+	return {
+		componentValid: true,
+		componentAbsent: false,
+		...(parsed.specVersion === undefined ? {} : { specVersion: parsed.specVersion }),
+		servers: containedServers,
+		findings: [...parsed.findings, ...containmentFindings]
+	};
 }

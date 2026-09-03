@@ -55,6 +55,7 @@ export {
 } from './skills';
 
 export {
+	checkServerContainment,
 	isLoopbackHost,
 	isToolNamespaceSafeServerName,
 	loadMcpConfig,

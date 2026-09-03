@@ -3,7 +3,7 @@ import { join, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { fixture, scratchDir, tryMakeSymlink } from './fixtures';
 import { discoverSkills } from '../skills';
-import { loadMcpConfig } from '../mcp';
+import { checkServerContainment, loadMcpConfig, type McpServerEntry } from '../mcp';
 import { isPluginRelative, isWithinResolved, packageRelative, resolveRealPath, resolveWithinRoot } from '../paths';
 
 describe('paths — plugin-relative form (spec 4.1(4))', () => {
@@ -171,6 +171,146 @@ describe('paths — symlink escapes (spec 4.1, failure boundaries)', () => {
 		const result = await loadMcpConfig(root, { manifestSpecVersion: '1.0.0' });
 		expect(result.componentValid).toBe(false);
 		expect(result.findings.every((f) => f.scope === 'mcp-component')).toBe(true);
+	});
+});
+
+describe('paths — MCP server containment (spec 4.1 boundary 4)', () => {
+	const mcpDoc = (servers: Record<string, unknown>): string =>
+		JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json', mcpServers: servers });
+
+	it('accepts a plugin-relative command and cwd that stay inside the root', async () => {
+		const root = await scratchDir();
+		await mkdir(join(root, 'bin'), { recursive: true });
+		await writeFile(join(root, 'bin', 'server'), '#!/bin/sh', 'utf8');
+		await mkdir(join(root, 'data'), { recursive: true });
+		await writeFile(
+			join(root, 'mcp.json'),
+			mcpDoc({ ok: { type: 'stdio', command: './bin/server', cwd: './data' } }),
+			'utf8'
+		);
+		const result = await loadMcpConfig(root, { manifestSpecVersion: '1.0.0' });
+		expect(result.servers.map((s) => s.name)).toEqual(['ok']);
+		expect(result.findings).toEqual([]);
+	});
+
+	it('accepts a command whose file does not exist yet', async () => {
+		// A package may build its binary on first run. Containment must be
+		// decidable without the file being there, and must not reject it.
+		const root = await scratchDir();
+		await writeFile(
+			join(root, 'mcp.json'),
+			mcpDoc({ later: { type: 'stdio', command: './bin/not-built-yet' } }),
+			'utf8'
+		);
+		const result = await loadMcpConfig(root, { manifestSpecVersion: '1.0.0' });
+		expect(result.servers.map((s) => s.name)).toEqual(['later']);
+	});
+
+	it('never containment-checks args or env values (spec 4.1(5))', async () => {
+		// "Configuration values not defined as paths, including command
+		// arguments and environment variable values, are opaque strings.
+		// Clients MUST NOT interpret them as package paths." An argument that
+		// merely looks like an escaping path must not sink the server.
+		const root = await scratchDir();
+		await writeFile(
+			join(root, 'mcp.json'),
+			mcpDoc({
+				opaque: {
+					type: 'stdio',
+					command: 'node',
+					args: ['../../../etc/passwd', '/absolute/elsewhere', '../..'],
+					env: { SOME_PATH: '../../../etc/shadow' }
+				}
+			}),
+			'utf8'
+		);
+		const result = await loadMcpConfig(root, { manifestSpecVersion: '1.0.0' });
+		expect(result.servers.map((s) => s.name)).toEqual(['opaque']);
+		expect(result.findings).toEqual([]);
+	});
+
+	it('does not containment-check a bare command, which the platform resolves', async () => {
+		const root = await scratchDir();
+		const entry: McpServerEntry = { name: 's', config: { type: 'stdio', command: 'node' }, transport: 'stdio' };
+		expect(await checkServerContainment(root, entry)).toEqual([]);
+	});
+
+	it('returns no findings for a remote server, which has no package paths', async () => {
+		const root = await scratchDir();
+		const entry: McpServerEntry = {
+			name: 's',
+			config: { type: 'streamable-http', url: 'https://x.example.com/mcp' },
+			transport: 'streamable-http'
+		};
+		expect(await checkServerContainment(root, entry)).toEqual([]);
+	});
+
+	it('drops a server whose plugin-relative command escapes via a symlink', async (ctx) => {
+		const outside = await scratchDir();
+		await writeFile(join(outside, 'evil'), '#!/bin/sh', 'utf8');
+		const root = await scratchDir();
+		await mkdir(join(root, 'bin'), { recursive: true });
+		const made = await tryMakeSymlink(join(outside, 'evil'), join(root, 'bin', 'server'), 'file');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		await writeFile(
+			join(root, 'mcp.json'),
+			mcpDoc({
+				escaping: { type: 'stdio', command: './bin/server' },
+				fine: { type: 'streamable-http', url: 'https://x.example.com/mcp' }
+			}),
+			'utf8'
+		);
+		const result = await loadMcpConfig(root, { manifestSpecVersion: '1.0.0' });
+		// Boundary 4 is per SERVER: the other entry and the component survive.
+		expect(result.componentValid).toBe(true);
+		expect(result.servers.map((s) => s.name)).toEqual(['fine']);
+		expect(result.findings.map((f) => f.code)).toEqual(['mcp.server-command-invalid']);
+		expect(result.findings[0]?.subject).toBe('escaping');
+	});
+
+	it('drops a server whose cwd escapes via a symlink', async (ctx) => {
+		const outside = await scratchDir();
+		await mkdir(join(outside, 'elsewhere'), { recursive: true });
+		const root = await scratchDir();
+		const made = await tryMakeSymlink(join(outside, 'elsewhere'), join(root, 'data'), 'dir');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		await writeFile(
+			join(root, 'mcp.json'),
+			mcpDoc({ escaping: { type: 'stdio', command: 'node', cwd: './data' } }),
+			'utf8'
+		);
+		const result = await loadMcpConfig(root, { manifestSpecVersion: '1.0.0' });
+		expect(result.servers).toEqual([]);
+		expect(result.findings.map((f) => f.code)).toEqual(['mcp.server-cwd-invalid']);
+	});
+
+	it('checks a PLUGIN_DATA-rooted cwd only when the data directory is known', async (ctx) => {
+		// The loader does not know PLUGIN_DATA — the launcher does — so the
+		// check is deferred rather than guessed at.
+		const outside = await scratchDir();
+		await mkdir(join(outside, 'elsewhere'), { recursive: true });
+		const root = await scratchDir();
+		const data = await scratchDir();
+		const made = await tryMakeSymlink(join(outside, 'elsewhere'), join(data, 'sub'), 'dir');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		const entry: McpServerEntry = {
+			name: 's',
+			config: { type: 'stdio', command: 'node', cwd: '${PLUGIN_DATA}/sub' },
+			transport: 'stdio',
+			cwdAnchor: 'plugin-data'
+		};
+		expect(await checkServerContainment(root, entry)).toEqual([]);
+		const withData = await checkServerContainment(root, entry, { pluginData: data });
+		expect(withData.map((f) => f.code)).toEqual(['mcp.server-cwd-invalid']);
 	});
 });
 
