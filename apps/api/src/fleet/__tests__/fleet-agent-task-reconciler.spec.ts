@@ -738,10 +738,7 @@ describe('FleetAgentTaskReconcilerService', () => {
             mountDir: null,
         };
         const questionResult = { ...successResult, question };
-        const completed = (
-            result: Record<string, unknown>,
-            jobOver: Partial<FleetJobView> = {},
-        ) =>
+        const completed = (result: Record<string, unknown>, jobOver: Partial<FleetJobView> = {}) =>
             build().onCompleted(
                 new FleetJobCompletedEvent(job(jobOver), USER, 'node-report', NODE, result),
             );

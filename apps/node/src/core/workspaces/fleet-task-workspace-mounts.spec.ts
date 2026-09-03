@@ -165,7 +165,7 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 
 	it('keeps the owner-question directory out of the MOUNT repository too, upgrading a slice-C exclude exactly once', async () => {
 		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
-		const descriptor = await provisioner.provision('task-m9', spec('task/mounts-9'));
+		const descriptor = await provisioner.provision('task-m13', spec('task/mounts-13'));
 		const mount = descriptor.mounts![0]!;
 		const readExclude = async (repoPath: string): Promise<string[]> => {
 			const commonDir = git(repoPath, 'rev-parse', '--path-format=absolute', '--git-common-dir');
@@ -196,8 +196,8 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 			join(mountCommonDir, 'info', 'exclude'),
 			`# ever-works fleet: mounted repositories of multi-repo Task workspaces\n/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/\n`
 		);
-		await provisioner.provision('task-m9', spec('task/mounts-9'));
-		await provisioner.provision('task-m9', spec('task/mounts-9'));
+		await provisioner.provision('task-m13', spec('task/mounts-13'));
+		await provisioner.provision('task-m13', spec('task/mounts-13'));
 		const upgraded = await readExclude(mount.path);
 		expect(countRule(upgraded, `/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`)).toBe(1);
 		expect(countRule(upgraded, '/.ever-works/')).toBe(1);

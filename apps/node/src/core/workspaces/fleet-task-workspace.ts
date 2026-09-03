@@ -1070,7 +1070,10 @@ async function ensureFleetExcluded(repoPath: string, signal?: AbortSignal): Prom
 		} catch (error) {
 			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
 			if (signal?.aborted) throw cancelledError();
-			throw new FleetTaskWorkspaceError('git-failed', `Task workspace exclude rule for '${probe}' did not take effect`);
+			throw new FleetTaskWorkspaceError(
+				'git-failed',
+				`Task workspace exclude rule for '${probe}' did not take effect`
+			);
 		}
 	}
 }
