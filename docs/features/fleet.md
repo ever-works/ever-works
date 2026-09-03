@@ -90,8 +90,10 @@ Routing preferences (**Settings → Fleet → Execution routing**) decide what h
 ### Tasks that span several repositories
 
 A Task keeps one primary Work and branch. When the run agent has **repository attachments** (Agent →
-Capabilities → Repositories, backed by the repository registry), a fleet run checks those repositories
-out next to the primary worktree, at `.mounts/<name>` inside it, each on the same Task branch name. The
+Capabilities → Repositories, backed by the repository registry), or the Task itself lists extra
+repositories (**Also work in** on the new-task form and the task page — registry connections, a Task
+entry wins over an agent attachment for the same repository or directory), a fleet run checks those
+repositories out next to the primary worktree, at `.mounts/<name>` inside it, each on the same Task branch name. The
 model is told exactly where each repository is; it edits them in place. When the run finishes the node
 commits and pushes every repository that changed, the platform opens **one pull request per
 repository** (each one linked to the primary's), records the extra ones on the Task ("Also in" on the

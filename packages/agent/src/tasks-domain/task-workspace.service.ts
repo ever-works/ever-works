@@ -14,6 +14,8 @@ import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
+import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
+import type { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
@@ -23,6 +25,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { resolveTaskIsolation, taskBranchName } from './task-isolation';
 import {
+    mapAttachmentEdgesToRepos,
     resolveAttachedReposForAgent,
     toAdvisoryRepoSpecs,
     type AdvisoryAttachedRepoSpec,
@@ -134,6 +137,9 @@ export class TaskWorkspaceService {
         // the positional-spec arity rule; absent (or failing) resolves
         // to "no extra repos", never a failed provision.
         @Optional() private readonly agentRepoAttachments?: AgentRepoAttachmentRepository,
+        // Multi-repo Task workspaces (slice C, PR C2) — the Task's own extra
+        // repositories by registry connection. Appended LAST + @Optional.
+        @Optional() private readonly repoConnections?: RepoConnectionRepository,
     ) {}
 
     /**
@@ -307,6 +313,7 @@ export class TaskWorkspaceService {
 
         const repositoryId = `${owner}/${repo}`;
         const mounts = await this.resolveFleetMounts({
+            task,
             agentId: input.agentId,
             userId,
             workId: work.id,
@@ -336,19 +343,23 @@ export class TaskWorkspaceService {
      * log line — attaching it is harmless redundancy, not an error.
      */
     private async resolveFleetMounts(input: {
+        task: Task;
         agentId: string | undefined;
         userId: string;
         workId: string;
         primaryRepositoryId: string;
         branch: string;
     }): Promise<FleetTaskWorkspaceMountSpec[]> {
-        if (!input.agentId || !this.agentRepoAttachments) return [];
-        const attached = await resolveAttachedReposForAgent(
-            this.agentRepoAttachments,
-            input.agentId,
-            input.userId,
-        );
-        if (attached.length === 0) return [];
+        const extras = Array.isArray(input.task.extraRepos) ? input.task.extraRepos : [];
+        const attached =
+            input.agentId && this.agentRepoAttachments
+                ? await resolveAttachedReposForAgent(
+                      this.agentRepoAttachments,
+                      input.agentId,
+                      input.userId,
+                  )
+                : [];
+        if (attached.length === 0 && extras.length === 0) return [];
         if (!this.gitFacade) {
             throw new Error(
                 `Agent ${input.agentId} has attached repositories but no git facade is available to describe them for a fleet node.`,
@@ -389,6 +400,70 @@ export class TaskWorkspaceService {
         }
         // The contracts normalizer is the same gate the node applies; failing
         // HERE names the attachment while the plan is still on the platform.
+        // Task-level extra repositories (PR C2) come AFTER the agent's
+        // attachments and win over them on the same repository or mount
+        // directory: the Task is the narrower scope.
+        for (const extra of extras) {
+            if (!this.repoConnections) {
+                throw new Error(
+                    `Task ${input.task.id} lists extra repositories but the repository registry is not available to describe them.`,
+                );
+            }
+            const connection = await this.repoConnections.findByIdAndUser(
+                extra.repoConnectionId,
+                input.userId,
+            );
+            if (!connection) {
+                throw new Error(
+                    `Task ${input.task.id} lists repository connection ${extra.repoConnectionId}, which no longer exists.`,
+                );
+            }
+            const [resolved] = mapAttachmentEdgesToRepos([
+                { repoConnection: connection } as unknown as AgentRepoAttachment,
+            ]);
+            if (!resolved) {
+                throw new Error(
+                    `Task ${input.task.id} lists repository connection ${connection.name}, which is disabled.`,
+                );
+            }
+            const identity = repositoryIdFromCloneUrl(resolved.url);
+            if (!identity) {
+                throw new Error(
+                    `Repository connection ${connection.name} (${resolved.url}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
+                );
+            }
+            if (identity.toLowerCase() === input.primaryRepositoryId.toLowerCase()) {
+                this.logger.log(
+                    `Task ${input.task.id}: extra repository ${identity} is the primary repository; not mounted twice.`,
+                );
+                continue;
+            }
+            let baseRef = resolved.branch?.trim() || '';
+            if (!baseRef) {
+                const [mountOwner, mountName] = identity.split('/') as [string, string];
+                const remote = await this.gitFacade!.getRepository(mountOwner, mountName, {
+                    userId: input.userId,
+                    providerId: resolved.provider,
+                    workId: input.workId,
+                });
+                baseRef = remote.defaultBranch;
+            }
+            const mountDir = extra.mountDir?.trim() || resolved.mountDir;
+            const replaced = mounts.filter(
+                (candidate) =>
+                    candidate.repositoryId.toLowerCase() !== identity.toLowerCase() &&
+                    candidate.mountDir.toLowerCase() !== mountDir.toLowerCase(),
+            );
+            mounts.length = 0;
+            mounts.push(...replaced, {
+                repositoryId: identity,
+                repoUrl: tokenFreeCloneUrl(resolved.url),
+                baseRef,
+                branch: input.branch,
+                mountDir,
+                writable: extra.writable !== false,
+            });
+        }
         return normalizeFleetTaskWorkspaceMounts(mounts, input.primaryRepositoryId);
     }
 

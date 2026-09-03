@@ -65,10 +65,26 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
   their PR link (or "pushed" / "failed" state). Keys `dashboard.tasksPage.branch.linkedPullRequests`,
   `linkedPrPushed`, `linkedPrFailed` in all locales.
 
+## PR C2 — Task-level extra repositories
+
+- `Task.extraRepos: TaskExtraRepo[] | null` (`{ repoConnectionId, mountDir?, writable? }`, contracts
+  `packages/contracts/src/tasks/task-extra-repos.types.ts`, `TASK_MAX_EXTRA_REPOS = 8`) + migration
+  `1787900000000-AddTaskExtraRepos`. `TasksService.normalizeExtraRepos` validates on create and update:
+  every connection must belong to the caller and be enabled, mount directories single safe names and
+  unique, at most 8. The API DTOs carry `TaskExtraRepoDto` (`@ever-works/agent/dto`), so the MCP
+  `create_task` / `update_task` tools expose it too.
+- `describeFleetWorkspace` merges the Task's extras AFTER the agent's attachments; a Task entry wins over
+  an attachment on the same repository or mount directory. Missing or disabled connections fail the plan
+  naming them.
+- Web: `TaskExtraReposPicker` ("Also work in": a checkbox per enabled registry connection with the
+  `.mounts/<dir>` it will get) on the new-task form and the task page (saved through `updateTaskAction`).
+  `listRepoConnections` server action. Keys under `dashboard.tasksPage.extraRepos`, `newDialog.extraRepos*`,
+  `detail.extraRepos*` in all locales.
+
 ## Deliberate limits
 
-- Mounts come from AGENT attachments only. Task-level extra repositories (`extraRepos`) and the form
-  picker are PR C2.
+- Extra repositories are registry CONNECTIONS. Pointing a Task at another Work's repository directly
+  (a `repo` Work from slice D) is a follow-up once D merges.
 - Read-only mounts are supported end to end in the contract and the node (never committed), but nothing
   creates one yet (attachments are always writable).
 - Acceptance checks still run in the primary worktree only.

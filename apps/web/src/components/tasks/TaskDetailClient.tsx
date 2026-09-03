@@ -35,6 +35,8 @@ import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 import { TaskDeleteButton } from './TaskDeleteButton';
 import { WorkSelect } from './WorkSelect';
 import { AgentSelect } from './AgentSelect';
+import { TaskExtraReposPicker } from './TaskExtraReposPicker';
+import type { TaskExtraRepo } from '@ever-works/contracts';
 import { MissionSelect } from './MissionSelect';
 import { IdeaSelect } from './IdeaSelect';
 // Skills feature — invocation slugs. Task chat is the surface whose
@@ -239,6 +241,31 @@ export function TaskDetailClient({
                     setConflictKey((prev) => prev + 1);
                 } catch (err) {
                     setDescError(err instanceof Error ? err.message : t('saveDescriptionError'));
+                }
+            })();
+        });
+    };
+    // Multi-repo: repositories the Task spans besides its Work's (slice C, PR C2).
+    const [extraRepos, setExtraRepos] = useState<TaskExtraRepo[]>(task.extraRepos ?? []);
+    const [extraReposError, setExtraReposError] = useState<string | null>(null);
+    const [pendingExtraRepos, startExtraRepos] = useTransition();
+    const handleExtraReposChange = (next: TaskExtraRepo[]) => {
+        const previous = extraRepos;
+        setExtraRepos(next);
+        setExtraReposError(null);
+        startExtraRepos(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, {
+                        extraRepos: next.length > 0 ? next : null,
+                    });
+                    setExtraRepos(updated.extraRepos ?? []);
+                    router.refresh();
+                } catch (err) {
+                    setExtraRepos(previous);
+                    setExtraReposError(
+                        err instanceof Error ? err.message : t('extraReposUpdateError'),
+                    );
                 }
             })();
         });
@@ -720,6 +747,24 @@ export function TaskDetailClient({
                                     testId="task-detail-agent"
                                 />
                             </AssignmentRow>
+                            <DetailRow label={t('extraRepos')}>
+                                <div className="space-y-1">
+                                    <TaskExtraReposPicker
+                                        value={extraRepos}
+                                        onChange={handleExtraReposChange}
+                                        disabled={pendingExtraRepos}
+                                        testId="task-detail-extra-repos"
+                                    />
+                                    {extraReposError && (
+                                        <p
+                                            className="text-xs text-danger"
+                                            data-testid="task-detail-extra-repos-error"
+                                        >
+                                            {extraReposError}
+                                        </p>
+                                    )}
+                                </div>
+                            </DetailRow>
                             <DetailRow label={t('created')}>
                                 <span className="text-xs text-text-secondary">
                                     {formatDate(task.createdAt)}

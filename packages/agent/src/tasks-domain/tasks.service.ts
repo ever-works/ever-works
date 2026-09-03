@@ -9,7 +9,11 @@ import {
 import type { TaskIsolationMode } from './task-isolation';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { GateStatus, TaskAcceptanceCheck, TaskExtraRepo } from '@ever-works/contracts';
+import {
+    FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN,
+    TASK_MAX_EXTRA_REPOS,
+} from '@ever-works/contracts';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
 import type { TaskApprover } from '../entities/task-approver.entity';
 import { Mission } from '../entities/mission.entity';
@@ -44,6 +48,7 @@ import type { AgentRunStatus } from '../entities/agent-run.entity';
 import { TaskNotificationService } from './task-notification.service';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import {
     ownershipRelationScopeOf,
@@ -78,6 +83,8 @@ export interface CreateTaskInput {
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     /** Quality gates: `null` = inherit the Work's budget (clamped 1..5 at resolve). */
     maxGateAttempts?: number | null;
+    /** Multi-repo (slice C, PR C2): extra repositories by registry connection. `null` = none. */
+    extraRepos?: TaskExtraRepo[] | null;
     /**
      * Judgment layer G9 — sub-agent delegation depth.
      *
@@ -116,6 +123,8 @@ export interface UpdateTaskInput {
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     /** Quality gates: `null` reverts to inheriting the Work's budget. */
     maxGateAttempts?: number | null;
+    /** Multi-repo (slice C, PR C2): extra repositories by registry connection. `null` = none. */
+    extraRepos?: TaskExtraRepo[] | null;
     /**
      * Schedule mode "Scheduled": run once at this instant (must be in the
      * future). `null` clears the schedule — the same effect as
@@ -300,6 +309,11 @@ export class TasksService {
         @Optional() private readonly users?: UserRepository,
         @Optional() private readonly organizationMembers?: OrganizationMemberRepository,
         @Optional() private readonly tenants?: TenantRepository,
+        // Multi-repo Task workspaces (slice C, PR C2) — ownership check of
+        // `extraRepos` connections. Appended LAST + @Optional per the
+        // positional-spec arity rule; absent means extra repositories are
+        // refused (never silently accepted unchecked).
+        @Optional() private readonly repoConnections?: RepoConnectionRepository,
     ) {}
 
     /**
@@ -571,6 +585,89 @@ export class TasksService {
         };
     }
 
+    /**
+     * Multi-repo Task workspaces (slice C, PR C2) — validate and normalize
+     * the Task's extra repositories. Every connection must belong to the
+     * caller and be enabled; mount directories must be single safe names
+     * and unique (case-insensitively, Windows and macOS collide); at most
+     * TASK_MAX_EXTRA_REPOS entries. `null` / `[]` mean "none".
+     */
+    private async normalizeExtraRepos(
+        userId: string,
+        raw: TaskExtraRepo[] | null | undefined,
+    ): Promise<TaskExtraRepo[] | null> {
+        if (raw === undefined || raw === null || raw.length === 0) return null;
+        if (!Array.isArray(raw)) throw new BadRequestException('extraRepos must be an array.');
+        if (raw.length > TASK_MAX_EXTRA_REPOS) {
+            throw new BadRequestException(
+                `A Task can span at most ${TASK_MAX_EXTRA_REPOS} extra repositories (got ${raw.length}).`,
+            );
+        }
+        if (!this.repoConnections) {
+            throw new BadRequestException(
+                'Extra repositories are not available: the repository registry is not configured.',
+            );
+        }
+        const seenConnections = new Set<string>();
+        const seenDirs = new Set<string>();
+        const normalized: TaskExtraRepo[] = [];
+        for (const entry of raw) {
+            const repoConnectionId =
+                typeof entry?.repoConnectionId === 'string' ? entry.repoConnectionId.trim() : '';
+            if (!repoConnectionId) {
+                throw new BadRequestException('extraRepos entries need a repoConnectionId.');
+            }
+            if (seenConnections.has(repoConnectionId)) {
+                throw new BadRequestException(
+                    `Repository connection ${repoConnectionId} is listed twice in extraRepos.`,
+                );
+            }
+            seenConnections.add(repoConnectionId);
+            const connection = await this.repoConnections.findByIdAndUser(repoConnectionId, userId);
+            if (!connection) {
+                throw new BadRequestException(
+                    `Repository connection ${repoConnectionId} not found.`,
+                );
+            }
+            if (!connection.enabled) {
+                throw new BadRequestException(
+                    `Repository connection ${connection.name} is disabled and cannot be added to a Task.`,
+                );
+            }
+            const mountDirRaw =
+                typeof entry.mountDir === 'string'
+                    ? entry.mountDir.trim()
+                    : (entry.mountDir ?? null);
+            const mountDir = mountDirRaw ? mountDirRaw : null;
+            if (mountDir !== null) {
+                if (
+                    !FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN.test(mountDir) ||
+                    ['.git', '.mounts', 'node_modules'].includes(mountDir.toLowerCase())
+                ) {
+                    throw new BadRequestException(
+                        `extraRepos mountDir '${mountDir}' must be a single directory name (letters, digits, '.', '_' or '-'; not '.git', '.mounts' or 'node_modules').`,
+                    );
+                }
+                const key = mountDir.toLowerCase();
+                if (seenDirs.has(key)) {
+                    throw new BadRequestException(
+                        `extraRepos mountDir '${mountDir}' is used twice.`,
+                    );
+                }
+                seenDirs.add(key);
+            }
+            if (entry.writable !== undefined && typeof entry.writable !== 'boolean') {
+                throw new BadRequestException('extraRepos writable must be a boolean.');
+            }
+            normalized.push({
+                repoConnectionId,
+                ...(mountDir !== null ? { mountDir } : {}),
+                ...(entry.writable === undefined ? {} : { writable: entry.writable }),
+            });
+        }
+        return normalized;
+    }
+
     async create(
         userId: string,
         input: CreateTaskInput,
@@ -665,6 +762,7 @@ export class TasksService {
             requireAllApprovers: input.requireAllApprovers ?? true,
             acceptanceChecks: input.acceptanceChecks ?? null,
             maxGateAttempts: input.maxGateAttempts ?? null,
+            extraRepos: await this.normalizeExtraRepos(userId, input.extraRepos),
             delegationDepth: input.delegationDepth ?? null,
             scheduledAt: input.scheduledAt ?? null,
             scheduleClaimedAt: null,
@@ -702,6 +800,9 @@ export class TasksService {
         if (input.isolationMode !== undefined) patch.isolationMode = input.isolationMode;
         if (input.acceptanceChecks !== undefined) patch.acceptanceChecks = input.acceptanceChecks;
         if (input.maxGateAttempts !== undefined) patch.maxGateAttempts = input.maxGateAttempts;
+        if (input.extraRepos !== undefined) {
+            patch.extraRepos = await this.normalizeExtraRepos(userId, input.extraRepos);
+        }
         if (input.requireAllApprovers !== undefined)
             patch.requireAllApprovers = input.requireAllApprovers;
         // Schedule mode "Scheduled" via the generic PATCH. Same rules as
