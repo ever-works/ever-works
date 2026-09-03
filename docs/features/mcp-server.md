@@ -116,7 +116,7 @@ The MCP server exposes 123 tools organized by domain. Each tool's parameters and
 
 ### Human-in-the-loop gates are not tools
 
-The API cannot tell an MCP caller holding the owner's key from the owner. A tool that answered a gate would therefore let an Agent bound to this server approve its own proposal, resolve its own escalation or sign off its own definition of done. So the answering verbs are deliberately not exposed: `POST /api/inbox/{id}/reply`, `POST /api/tasks/{id}/escalations/{escalationId}/resolve`, `POST /api/me/goals/{id}/dod/approve`, and the `force` flag of `transition_task` (the approver-gate override). Asking stays: an agent can propose criteria, post to a Task's chat, list escalations and read the Inbox; a person answers in the app. For the same reason, never bind this server to an Agent with the owner's API key or JWT — that hands the Agent the owner's identity.
+The API cannot tell an MCP caller holding the owner's key from the owner. A tool that answered a gate would therefore let an Agent bound to this server approve its own proposal, resolve its own escalation or sign off its own definition of done. So the answering verbs are deliberately not exposed: `POST /api/inbox/{id}/reply`, `POST /api/tasks/{id}/escalations/{escalationId}/resolve`, `POST /api/me/goals/{id}/dod/approve`, the `force` flag of `transition_task` (the approver-gate override), and the `requireAllApprovers` field of `create_task` / `update_task` (the approver policy: with it `false` the `→ done` approver check never runs, so a machine caller could pre-disarm a Task or switch its gate off before moving it — a machine-created Task keeps the API default and a person changes the policy in the app). Asking stays: an agent can propose criteria, post to a Task's chat, list escalations and read the Inbox; a person answers in the app. For the same reason, never bind this server to an Agent with the owner's API key or JWT — that hands the Agent the owner's identity.
 
 ### Works (12 tools)
 
@@ -198,9 +198,9 @@ Tasks are units of work an Agent executes (on the cloud runtime or on one of the
 | Tool                      | Description                                                          |
 | ------------------------- | -------------------------------------------------------------------- |
 | `list_tasks`              | List my Tasks (filter by status, priority, scope, label, search)     |
-| `create_task`             | Create a Task                                                        |
+| `create_task`             | Create a Task (no `requireAllApprovers`; see the gates note above)   |
 | `get_task`                | Get one Task                                                         |
-| `update_task`             | Update Task fields (partial)                                         |
+| `update_task`             | Update Task fields (partial; no `requireAllApprovers`)               |
 | `delete_task`             | Delete a Task                                                        |
 | `list_task_subtasks`      | Subtasks of a Task                                                   |
 | `get_task_activity`       | Activity rows (created / updated / transitioned / dispatched)        |
@@ -308,7 +308,7 @@ The tool's description, parameters, and validation are derived automatically fro
 - **Response sanitization** — sensitive fields (passwords, API keys, tokens, secrets) are automatically stripped from all API responses before being returned to the AI client
 - **API key authentication** — all requests are authenticated with your Ever Works API key
 - **Whitelist filtering** — only explicitly allowed endpoints are exposed as tools
-- **Human gates stay human** — the routes that answer an approval, resolve an escalation, approve a definition of done or force a Task past its approvers are not tools, so an Agent bound to this server cannot approve its own work; never bind the server to an Agent with the owner's credentials
+- **Human gates stay human** — the routes that answer an approval, resolve an escalation, approve a definition of done, force a Task past its approvers or switch its approver policy off (`requireAllApprovers`) are not tools, so an Agent bound to this server cannot approve its own work; never bind the server to an Agent with the owner's credentials
 - **Scope selection, not widening** — `EVER_WORKS_SCOPE_SLUG` is forwarded as `x-scope-slug` and the API authorises the caller against it the same way it does for the web client
 - **Request timeout** — API calls time out after 2 minutes
 

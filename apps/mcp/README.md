@@ -161,7 +161,7 @@ The authoritative list is `src/openapi-tools/whitelist.ts`; the tables below cov
 
 ### Human-in-the-loop gates are not tools
 
-The API cannot tell an MCP caller holding the owner's key from the owner. A tool that answered a gate would therefore let an Agent bound to this server approve its own proposal, resolve its own escalation or sign off its own definition of done. So the answering verbs are deliberately not exposed: `POST /api/inbox/{id}/reply`, `POST /api/tasks/{id}/escalations/{escalationId}/resolve`, `POST /api/me/goals/{id}/dod/approve`, and the `force` flag of `transition_task` (the approver-gate override). Asking stays: an agent can propose criteria, post to a Task's chat, list escalations and read the Inbox; a person answers in the app. For the same reason, never bind this server to an Agent with the owner's API key or JWT — that hands the Agent the owner's identity.
+The API cannot tell an MCP caller holding the owner's key from the owner. A tool that answered a gate would therefore let an Agent bound to this server approve its own proposal, resolve its own escalation or sign off its own definition of done. So the answering verbs are deliberately not exposed: `POST /api/inbox/{id}/reply`, `POST /api/tasks/{id}/escalations/{escalationId}/resolve`, `POST /api/me/goals/{id}/dod/approve`, the `force` flag of `transition_task` (the approver-gate override), and the `requireAllApprovers` field of `create_task` / `update_task` (the approver policy: with it `false` the `→ done` approver check never runs, so a machine caller could pre-disarm a Task or switch its gate off before moving it — a machine-created Task keeps the API default and a person changes the policy in the app). Asking stays: an agent can propose criteria, post to a Task's chat, list escalations and read the Inbox; a person answers in the app. For the same reason, never bind this server to an Agent with the owner's API key or JWT — that hands the Agent the owner's identity.
 
 ### Tasks (23)
 
@@ -170,9 +170,9 @@ Tasks are units of work an Agent executes (on the cloud runtime or on one of the
 | Tool                      | Description                                                          |
 | ------------------------- | -------------------------------------------------------------------- |
 | `list_tasks`              | List my Tasks (filter by status, priority, scope, label, search)     |
-| `create_task`             | Create a Task                                                        |
+| `create_task`             | Create a Task (no `requireAllApprovers`; see the gates note above)   |
 | `get_task`                | Get one Task                                                         |
-| `update_task`             | Update Task fields (partial)                                         |
+| `update_task`             | Update Task fields (partial; no `requireAllApprovers`)               |
 | `delete_task`             | Delete a Task                                                        |
 | `list_task_subtasks`      | Subtasks of a Task                                                   |
 | `get_task_activity`       | Activity rows (created / updated / transitioned / dispatched)        |
