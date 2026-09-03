@@ -1,16 +1,22 @@
 import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type {
+    FleetTaskWorkspaceMountSpec,
     FleetTaskWorkspaceSpec,
     GateStatus,
     MergeMethod,
     MergePolicySource,
     MergeRefusalCode,
 } from '@ever-works/contracts';
-import { TaskStatus, type Task } from '../entities/task.entity';
+import { normalizeFleetTaskWorkspaceMounts } from '@ever-works/contracts';
+import { TaskStatus, type Task, type TaskLinkedPullRequest } from '../entities/task.entity';
+import type { Work } from '../entities/work.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
+import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
+import type { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
+import type { RepoConnectionProvider } from '../entities/repo-connection.entity';
 import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
@@ -20,6 +26,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { resolveTaskIsolation, taskBranchName } from './task-isolation';
 import {
+    mapAttachmentEdgesToRepos,
     resolveAttachedReposForAgent,
     toAdvisoryRepoSpecs,
     type AdvisoryAttachedRepoSpec,
@@ -65,6 +72,18 @@ export interface TaskWorkspaceFinalizeOutcome {
     conflictPaths?: string[];
     /** Present only on the `pr-opened` path (Wave 3, D4). */
     merge?: TaskAgentMergeOutcome;
+}
+
+/**
+ * Multi-repo Task workspaces (self-build slice C): the outcome of opening
+ * the pull request for ONE mounted repository a fleet run pushed.
+ */
+export interface TaskMountPushOutcome {
+    repositoryId: string;
+    outcome: 'pr-opened' | 'pushed-no-pr' | 'failed';
+    prNumber?: number;
+    prUrl?: string;
+    error?: string;
 }
 
 /**
@@ -119,6 +138,9 @@ export class TaskWorkspaceService {
         // the positional-spec arity rule; absent (or failing) resolves
         // to "no extra repos", never a failed provision.
         @Optional() private readonly agentRepoAttachments?: AgentRepoAttachmentRepository,
+        // Multi-repo Task workspaces (slice C, PR C2) — the Task's own extra
+        // repositories by registry connection. Appended LAST + @Optional.
+        @Optional() private readonly repoConnections?: RepoConnectionRepository,
     ) {}
 
     /**
@@ -254,6 +276,12 @@ export class TaskWorkspaceService {
     async describeFleetWorkspace(input: {
         task: Task;
         userId: string;
+        /**
+         * The run agent. Its enabled repository attachments become the
+         * workspace MOUNTS (multi-repo Task workspaces, self-build slice C);
+         * absent means a single-repository workspace.
+         */
+        agentId?: string;
     }): Promise<FleetTaskWorkspaceSpec | null> {
         const { task, userId } = input;
         if (!task.workId) return null;
@@ -284,12 +312,441 @@ export class TaskWorkspaceService {
             });
         }
 
+        const repositoryId = `${owner}/${repo}`;
+        const mounts = await this.resolveFleetMounts({
+            task,
+            agentId: input.agentId,
+            userId,
+            workId: work.id,
+            primaryRepositoryId: repositoryId,
+            branch,
+        });
         return {
-            repositoryId: `${owner}/${repo}`,
+            repositoryId,
             repoUrl: tokenFreeCloneUrl(repository.cloneUrl),
             baseRef,
             branch,
+            ...(mounts.length > 0 ? { mounts } : {}),
         };
+    }
+
+    /**
+     * Multi-repo Task workspaces (self-build slice C) — the run agent's
+     * enabled repository attachments as fleet mount specs, on the SAME Task
+     * branch as the primary.
+     *
+     * Refuses rather than coerces, like the rest of the fleet planning: an
+     * attachment that cannot be described (a URL that is not `owner/repo`,
+     * a repository whose default branch cannot be read) fails the plan
+     * naming it, because a run that silently lacks one of its repositories
+     * would produce a pull request the operator never asked for. The one
+     * silent case is the primary repository itself, which is skipped with a
+     * log line — attaching it is harmless redundancy, not an error.
+     */
+    private async resolveFleetMounts(input: {
+        task: Task;
+        agentId: string | undefined;
+        userId: string;
+        workId: string;
+        primaryRepositoryId: string;
+        branch: string;
+    }): Promise<FleetTaskWorkspaceMountSpec[]> {
+        const extras = Array.isArray(input.task.extraRepos) ? input.task.extraRepos : [];
+        const attached =
+            input.agentId && this.agentRepoAttachments
+                ? await resolveAttachedReposForAgent(
+                      this.agentRepoAttachments,
+                      input.agentId,
+                      input.userId,
+                  )
+                : [];
+        if (attached.length === 0 && extras.length === 0) return [];
+        if (!this.gitFacade) {
+            throw new Error(
+                extras.length > 0
+                    ? `Task ${input.task.id} lists extra repositories but no git facade is available to describe them for a fleet node.`
+                    : `Agent ${input.agentId} has attached repositories but no git facade is available to describe them for a fleet node.`,
+            );
+        }
+        const mounts: FleetTaskWorkspaceMountSpec[] = [];
+        for (const repo of attached) {
+            const identity = repositoryIdFromCloneUrl(repo.url);
+            if (!identity) {
+                // Never the raw URL: this refusal lands on the AgentRun, the
+                // Task page and the API log, and a registry URL may carry
+                // userinfo (`tokenFreeCloneUrl` would refuse it — but only
+                // AFTER this check).
+                throw new Error(
+                    `Attached repository ${repo.repoConnectionId} (${credentialFreeUrlForMessages(repo.url)}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
+                );
+            }
+            if (identity.toLowerCase() === input.primaryRepositoryId.toLowerCase()) {
+                this.logger.log(
+                    `Attached repository ${identity} is the Task's primary repository; not mounted twice.`,
+                );
+                continue;
+            }
+            let baseRef = repo.branch?.trim() || '';
+            if (!baseRef) {
+                const [mountOwner, mountName] = identity.split('/') as [string, string];
+                const remote = await this.gitFacade.getRepository(mountOwner, mountName, {
+                    userId: input.userId,
+                    providerId: repo.provider,
+                    workId: input.workId,
+                });
+                baseRef = remote.defaultBranch;
+            }
+            mounts.push({
+                repositoryId: identity,
+                repoUrl: tokenFreeCloneUrl(repo.url),
+                baseRef,
+                branch: input.branch,
+                mountDir: repo.mountDir,
+                writable: true,
+            });
+        }
+        // The contracts normalizer is the same gate the node applies; failing
+        // HERE names the attachment while the plan is still on the platform.
+        // Task-level extra repositories (PR C2) come AFTER the agent's
+        // attachments and win over them on the same repository or mount
+        // directory: the Task is the narrower scope. Two Task extras that
+        // collide are refused naming both — only an agent ATTACHMENT yields
+        // to a Task extra; a Task extra silently dropped in favour of another
+        // would be a run the operator never asked for.
+        const extraMounts: FleetTaskWorkspaceMountSpec[] = [];
+        const extraSources = new Map<string, string>();
+        for (const extra of extras) {
+            if (!this.repoConnections) {
+                throw new Error(
+                    `Task ${input.task.id} lists extra repositories but the repository registry is not available to describe them.`,
+                );
+            }
+            const connection = await this.repoConnections.findByIdAndUser(
+                extra.repoConnectionId,
+                input.userId,
+            );
+            if (!connection) {
+                throw new Error(
+                    `Task ${input.task.id} lists repository connection ${extra.repoConnectionId}, which no longer exists.`,
+                );
+            }
+            const [resolved] = mapAttachmentEdgesToRepos([
+                { repoConnection: connection } as unknown as AgentRepoAttachment,
+            ]);
+            if (!resolved) {
+                throw new Error(
+                    `Task ${input.task.id} lists repository connection ${connection.name}, which is disabled.`,
+                );
+            }
+            const identity = repositoryIdFromCloneUrl(resolved.url);
+            if (!identity) {
+                // Same rule as the attachments above: the raw registry URL may
+                // carry userinfo and this message reaches the run and the logs.
+                throw new Error(
+                    `Repository connection ${connection.name} (${credentialFreeUrlForMessages(resolved.url)}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
+                );
+            }
+            if (identity.toLowerCase() === input.primaryRepositoryId.toLowerCase()) {
+                this.logger.log(
+                    `Task ${input.task.id}: extra repository ${identity} is the primary repository; not mounted twice.`,
+                );
+                continue;
+            }
+            let baseRef = resolved.branch?.trim() || '';
+            if (!baseRef) {
+                const [mountOwner, mountName] = identity.split('/') as [string, string];
+                const remote = await this.gitFacade!.getRepository(mountOwner, mountName, {
+                    userId: input.userId,
+                    providerId: resolved.provider,
+                    workId: input.workId,
+                });
+                baseRef = remote.defaultBranch;
+            }
+            const mountDir = extra.mountDir?.trim() || resolved.mountDir;
+            const colliding = extraMounts.find(
+                (candidate) =>
+                    candidate.repositoryId.toLowerCase() === identity.toLowerCase() ||
+                    candidate.mountDir.toLowerCase() === mountDir.toLowerCase(),
+            );
+            if (colliding) {
+                const other = extraSources.get(colliding.repositoryId.toLowerCase());
+                throw new Error(
+                    `Task ${input.task.id}: extra repository connection ${connection.name} (${identity} at .mounts/${mountDir}) collides with ${other} (${colliding.repositoryId} at .mounts/${colliding.mountDir}); give one of them a distinct mountDir or remove it.`,
+                );
+            }
+            extraSources.set(identity.toLowerCase(), connection.name);
+            extraMounts.push({
+                repositoryId: identity,
+                repoUrl: tokenFreeCloneUrl(resolved.url),
+                baseRef,
+                branch: input.branch,
+                mountDir,
+                writable: extra.writable !== false,
+            });
+        }
+        const keptAttachments = mounts.filter(
+            (candidate) =>
+                !extraMounts.some(
+                    (extra) =>
+                        extra.repositoryId.toLowerCase() === candidate.repositoryId.toLowerCase() ||
+                        extra.mountDir.toLowerCase() === candidate.mountDir.toLowerCase(),
+                ),
+        );
+        return normalizeFleetTaskWorkspaceMounts(
+            [...keptAttachments, ...extraMounts],
+            input.primaryRepositoryId,
+        );
+    }
+
+    /**
+     * Provider of a Task extra repository (PR C2) by repository identity. An
+     * extra is not an agent attachment, so its OWN connection decides: a
+     * generic `git` connection has no pull requests, and a GitHub extra on a
+     * Work of another provider must not inherit that provider. Best-effort by
+     * contract — an unreadable registry resolves to null and the caller falls
+     * back to the Work's provider as before.
+     */
+    private async extraRepoProvider(
+        task: Task,
+        repositoryId: string,
+        userId: string,
+    ): Promise<RepoConnectionProvider | null> {
+        if (!this.repoConnections || !Array.isArray(task.extraRepos)) return null;
+        for (const extra of task.extraRepos) {
+            const connection = await this.repoConnections
+                .findByIdAndUser(extra.repoConnectionId, userId)
+                .catch(() => null);
+            if (!connection || typeof connection.url !== 'string') continue;
+            if (
+                repositoryIdFromCloneUrl(connection.url)?.toLowerCase() ===
+                repositoryId.toLowerCase()
+            ) {
+                return connection.provider;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Multi-repo Task workspaces (self-build slice C) — a fleet run pushed
+     * a branch in one of the Task's MOUNTED repositories; open its pull
+     * request and record it on the Task next to the primary.
+     *
+     * Never throws for a provider failure: the branch is already pushed,
+     * and the other repositories (and the primary) must still get their
+     * turn. The failure is recorded on the Task's entry instead, with the
+     * branch kept, so a human can open the pull request by hand.
+     */
+    async finalizeMountPush(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        agentCanOpenPullRequests: boolean;
+        repositoryId: string;
+        branch: string;
+        baseRef?: string | null;
+        headSha?: string | null;
+        /** The primary pull request, for the cross-link in the body. */
+        primaryPrUrl?: string | null;
+        summary?: string | null;
+    }): Promise<TaskMountPushOutcome> {
+        const { task, userId, repositoryId } = input;
+        const branch = input.branch.trim();
+        const [owner, repo] = repositoryId.split('/') as [string, string | undefined];
+        if (!owner || !repo || repositoryId.split('/').length !== 2) {
+            return this.recordMountFailure(
+                task,
+                input,
+                `repository identity '${repositoryId}' is not <owner>/<repository>`,
+            );
+        }
+
+        // Idempotent on the pull request, exactly like the primary path: the
+        // Task branch name is stable, so a re-run pushes MORE commits onto the
+        // branch behind an already-open pull request. Asking the provider for
+        // another one fails (`A pull request already exists for <branch>`),
+        // and that failure would REPLACE the recorded link with a `failed`
+        // entry — on every re-run of a multi-repo Task. Re-record the open one.
+        const alreadyOpen = await this.findOpenLinkedPullRequest(task, repositoryId, branch);
+        if (alreadyOpen) {
+            await this.recordLinkedPullRequest(task, {
+                repositoryId,
+                branch,
+                baseRef: input.baseRef?.trim() || alreadyOpen.baseRef,
+                headSha: input.headSha ?? alreadyOpen.headSha,
+                prNumber: alreadyOpen.prNumber,
+                prUrl: alreadyOpen.prUrl,
+                state: 'pr-open',
+                error: null,
+            });
+            this.logger.log(
+                `Task ${task.id}: mount ${repositoryId} already has PR #${alreadyOpen.prNumber}; push of ${branch} recorded without opening another.`,
+            );
+            return {
+                repositoryId,
+                outcome: 'pr-opened',
+                prNumber: alreadyOpen.prNumber,
+                prUrl: alreadyOpen.prUrl,
+            };
+        }
+        if (!this.gitFacade) {
+            return this.recordMountFailure(
+                task,
+                input,
+                'no git facade is available to open the pull request',
+            );
+        }
+        const attached = this.agentRepoAttachments
+            ? await resolveAttachedReposForAgent(
+                  this.agentRepoAttachments,
+                  input.agentId,
+                  userId,
+              ).catch(() => [])
+            : [];
+        const attachment = attached.find(
+            (candidate) =>
+                repositoryIdFromCloneUrl(candidate.url)?.toLowerCase() ===
+                repositoryId.toLowerCase(),
+        );
+        const work = task.workId ? await this.works.findById(task.workId) : null;
+        // Attachment first, then the Task's own extra repositories (PR C2),
+        // then the Work's provider — the same precedence the plan used.
+        const providerId =
+            attachment?.provider ??
+            (await this.extraRepoProvider(task, repositoryId, userId)) ??
+            work?.gitProvider ??
+            'github';
+        const gitOptions = { userId, providerId, workId: task.workId ?? '' };
+
+        if (!input.agentCanOpenPullRequests || providerId === 'git') {
+            await this.recordLinkedPullRequest(task, {
+                repositoryId,
+                branch,
+                baseRef: input.baseRef ?? null,
+                headSha: input.headSha ?? null,
+                prNumber: null,
+                prUrl: null,
+                state: 'pushed',
+                error: null,
+            });
+            this.logger.log(
+                `Task ${task.id}: mount ${repositoryId} branch ${branch} pushed; ${
+                    providerId === 'git'
+                        ? 'a generic git remote has no pull requests'
+                        : 'agent lacks canOpenPullRequests'
+                } — leaving the pull request to a human.`,
+            );
+            return { repositoryId, outcome: 'pushed-no-pr' };
+        }
+
+        try {
+            let baseRef = input.baseRef?.trim() || '';
+            if (!baseRef) {
+                baseRef = (await this.gitFacade.getRepository(owner, repo, gitOptions))
+                    .defaultBranch;
+            }
+            const primaryNote = input.primaryPrUrl ? ` Part of ${input.primaryPrUrl}.` : '';
+            const summaryNote = input.summary ? `\n\n${input.summary}` : '';
+            const pr = await this.gitFacade.createPullRequest(
+                {
+                    owner,
+                    repo,
+                    title: `Task ${task.slug}: ${task.title ?? 'agent run output'} (${repositoryId})`,
+                    head: branch,
+                    base: baseRef,
+                    body: `Automated changes for Task \`${task.slug}\` (agent run) in \`${repositoryId}\`, one of the repositories the Task spans.${primaryNote} Review before merging — merge policy is governed by the Work's merge-policy settings.${summaryNote}`,
+                },
+                gitOptions,
+            );
+            await this.recordLinkedPullRequest(task, {
+                repositoryId,
+                branch,
+                baseRef,
+                headSha: input.headSha ?? null,
+                prNumber: pr.number,
+                prUrl: pr.url,
+                state: 'pr-open',
+                error: null,
+            });
+            this.logger.log(
+                `Task ${task.id}: mount ${repositoryId} opened PR #${pr.number} (${pr.url}).`,
+            );
+            return { repositoryId, outcome: 'pr-opened', prNumber: pr.number, prUrl: pr.url };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return this.recordMountFailure(task, input, message);
+        }
+    }
+
+    private async recordMountFailure(
+        task: Task,
+        input: {
+            repositoryId: string;
+            branch: string;
+            baseRef?: string | null;
+            headSha?: string | null;
+        },
+        error: string,
+    ): Promise<TaskMountPushOutcome> {
+        await this.recordLinkedPullRequest(task, {
+            repositoryId: input.repositoryId,
+            branch: input.branch.trim(),
+            baseRef: input.baseRef ?? null,
+            headSha: input.headSha ?? null,
+            prNumber: null,
+            prUrl: null,
+            state: 'failed',
+            error,
+        });
+        this.logger.warn(
+            `Task ${task.id}: mount ${input.repositoryId} branch ${input.branch} pushed but its pull request was not opened: ${error}`,
+        );
+        return { repositoryId: input.repositoryId, outcome: 'failed', error };
+    }
+
+    /**
+     * The Task's recorded, still-open pull request for `repositoryId` from
+     * exactly this branch — the one a re-run's push just updated. A `failed`
+     * or `pushed` entry, or an entry from another branch, is NOT a match: the
+     * pull request must then be (re)opened.
+     */
+    private async findOpenLinkedPullRequest(
+        task: Task,
+        repositoryId: string,
+        branch: string,
+    ): Promise<(TaskLinkedPullRequest & { prNumber: number; prUrl: string }) | null> {
+        const fresh = (await this.tasks.findById(task.id)) ?? task;
+        const entries = Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : [];
+        for (const entry of entries) {
+            if (
+                entry.repositoryId.toLowerCase() === repositoryId.toLowerCase() &&
+                entry.branch === branch &&
+                entry.state === 'pr-open' &&
+                typeof entry.prNumber === 'number' &&
+                typeof entry.prUrl === 'string' &&
+                entry.prUrl.length > 0
+            ) {
+                return { ...entry, prNumber: entry.prNumber, prUrl: entry.prUrl };
+            }
+        }
+        return null;
+    }
+
+    /** Upsert by repository, so a re-run updates the entry instead of duplicating it. */
+    private async recordLinkedPullRequest(
+        task: Task,
+        entry: Omit<TaskLinkedPullRequest, 'updatedAt'>,
+    ): Promise<void> {
+        const fresh = (await this.tasks.findById(task.id)) ?? task;
+        const existing = Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : [];
+        const key = entry.repositoryId.toLowerCase();
+        const next: TaskLinkedPullRequest = { ...entry, updatedAt: new Date().toISOString() };
+        const merged = [
+            ...existing.filter((candidate) => candidate.repositoryId.toLowerCase() !== key),
+            next,
+        ];
+        await this.tasks.updateById(task.id, { linkedPullRequests: merged });
+        task.linkedPullRequests = merged;
     }
 
     /**
@@ -439,9 +896,182 @@ export class TaskWorkspaceService {
             return { outcome: 'conflict', conflictPaths: simulation.conflictPaths };
         }
 
-        if (!input.agentCanOpenPullRequests) {
+        return this.openPullRequestForBranch({
+            task,
+            work,
+            userId,
+            agentId: input.agentId,
+            agentCanOpenPullRequests: input.agentCanOpenPullRequests,
+            owner,
+            repo,
+            gitOptions,
+            baseRef,
+            branch: workspace.branch,
+            gate: input.gate,
+            gateStatus: input.gateStatus ?? null,
+        });
+    }
+
+    /**
+     * Agent execution v2 (slice B) — the finalize path for a branch that
+     * was committed and pushed SOMEWHERE ELSE: a fleet node ran the
+     * agent, pushed `branch` with its own credential, and reported the
+     * head SHA. Nothing is checked out here, so there is no merge
+     * simulation (the pull request itself is the conflict signal); what
+     * remains is exactly what a cloud run does after its push — record
+     * the branch on the Task, open the pull request (or hand it to a
+     * human), transition to review, and let the merge-policy matrix
+     * decide — through the SAME helper, so a node-pushed branch and a
+     * cloud-pushed one are indistinguishable downstream.
+     *
+     * Idempotent on the PR: a Task that already carries a `prNumber` is
+     * left alone (the node may report twice, the reconciler may re-run).
+     */
+    async finalizeRemotePush(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        agentCanOpenPullRequests: boolean;
+        branch: string;
+        headSha?: string | null;
+        baseSha?: string | null;
+        changedFiles?: number;
+        runId?: string;
+        gate?: { checksPassed: number };
+        gateStatus?: GateStatus | null;
+    }): Promise<TaskWorkspaceFinalizeOutcome> {
+        const { task, userId } = input;
+        if (!this.gitFacade) {
+            throw new Error(`Task ${task.id} remote finalize requires the git facade.`);
+        }
+        if (!task.workId) {
+            throw new Error(`Task ${task.id} lost its Work before finalize.`);
+        }
+        const work = await this.works.findById(task.workId);
+        if (!work) {
+            throw new Error(`Task ${task.id} lost its Work before finalize.`);
+        }
+        const branch = typeof input.branch === 'string' ? input.branch.trim() : '';
+        if (!branch) {
+            throw new Error(
+                `Task ${task.id} remote finalize has no branch to open a pull request from.`,
+            );
+        }
+
+        await this.recordRemotePush({
+            task,
+            branch,
+            runId: input.runId,
+            headSha: input.headSha ?? null,
+            baseSha: input.baseSha ?? null,
+            ...(typeof input.changedFiles === 'number' ? { changedFiles: input.changedFiles } : {}),
+        });
+
+        if (task.prNumber && task.prUrl) {
+            // `recordRemotePush` already kept the branch at `pr-open` for a
+            // Task that carries a pull request (review Q-R1-01).
             this.logger.log(
-                `Task ${task.id} branch ${workspace.branch} pushed; agent lacks canOpenPullRequests — leaving PR to a human.`,
+                `Task ${task.id} already has PR #${task.prNumber}; remote push of ${branch} recorded without opening another.`,
+            );
+            return { outcome: 'pr-opened', prNumber: task.prNumber, prUrl: task.prUrl };
+        }
+
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+        const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
+        const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
+        const baseRef =
+            (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
+            repository.defaultBranch;
+
+        return this.openPullRequestForBranch({
+            task,
+            work,
+            userId,
+            agentId: input.agentId,
+            agentCanOpenPullRequests: input.agentCanOpenPullRequests,
+            owner,
+            repo,
+            gitOptions,
+            baseRef,
+            branch,
+            gate: input.gate,
+            gateStatus: input.gateStatus ?? null,
+        });
+    }
+
+    /**
+     * Self-build slice Q — record a branch a fleet run pushed WITHOUT
+     * opening a pull request or moving the Task: the run is parked on an
+     * owner question, so the work is partial by definition and nobody
+     * should be asked to review it yet.
+     *
+     * Exactly the bookkeeping half of {@link finalizeRemotePush} —
+     * `branchRef` / `branchState` / `baseSha` on the Task plus the
+     * changed-files stamp on the run — and none of its tail:
+     * `openPullRequestForBranch` transitions the Task to `in_review` even
+     * on the pushed-no-pr path, which is precisely the signal a paused
+     * run must not send. `describeFleetWorkspace` reads `task.branchRef`
+     * back, so the run the owner's answer starts re-provisions THIS
+     * branch, with these commits, from the remote. `headSha` is accepted
+     * for call-site symmetry with `finalizeRemotePush` and, like there,
+     * not persisted on the Task (the remote owns the branch head).
+     *
+     * A Task that already carries a pull request stays `pr-open` (review
+     * Q-R1-01): a question asked in a LATER run of such a Task — the
+     * reviewer-rejection → resume loop — must not downgrade the row to
+     * `pushed` with `prNumber` / `prUrl` still set, which drops the PR
+     * link from the branch chip while the Inbox item still advertises it.
+     */
+    async recordRemotePush(input: {
+        task: Task;
+        branch: string;
+        runId?: string;
+        headSha?: string | null;
+        baseSha?: string | null;
+        changedFiles?: number;
+    }): Promise<void> {
+        const { task } = input;
+        const branch = typeof input.branch === 'string' ? input.branch.trim() : '';
+        if (!branch) {
+            throw new Error(`Task ${task.id} remote push cannot be recorded without a branch.`);
+        }
+        await this.stampChangedFiles(input.runId, input.changedFiles);
+        await this.tasks.updateById(task.id, {
+            branchRef: branch,
+            branchState: task.prNumber && task.prUrl ? 'pr-open' : 'pushed',
+            ...(input.baseSha ? { baseSha: input.baseSha } : {}),
+        });
+    }
+
+    /**
+     * The shared tail of every finalize: hand the branch to a human or
+     * open the pull request, move the Task to review, then ask the
+     * merge-policy matrix. Extracted (unchanged in behaviour) so the
+     * cloud path and the fleet path cannot drift on what "reviewable"
+     * means.
+     */
+    private async openPullRequestForBranch(args: {
+        task: Task;
+        work: Work;
+        userId: string;
+        agentId: string;
+        agentCanOpenPullRequests: boolean;
+        owner: string;
+        repo: string;
+        gitOptions: { userId: string; providerId: string; workId: string };
+        baseRef: string;
+        branch: string;
+        gate?: { checksPassed: number };
+        gateStatus: GateStatus | null;
+    }): Promise<TaskWorkspaceFinalizeOutcome> {
+        const { task, work, userId, owner, repo, gitOptions, baseRef, branch } = args;
+        if (!this.gitFacade) {
+            throw new Error(`Task ${task.id} pull-request finalize requires the git facade.`);
+        }
+        if (!args.agentCanOpenPullRequests) {
+            this.logger.log(
+                `Task ${task.id} branch ${branch} pushed; agent lacks canOpenPullRequests — leaving PR to a human.`,
             );
             // Run-driven lifecycle (plan 04 M7): the run COMPLETED WITH
             // CHANGES — they are committed and pushed on the Task branch —
@@ -459,15 +1089,15 @@ export class TaskWorkspaceService {
             return { outcome: 'pushed-no-pr' };
         }
 
-        const gateNote = input.gate
-            ? `\n\nQuality gate: all ${input.gate.checksPassed} acceptance checks green.`
+        const gateNote = args.gate
+            ? `\n\nQuality gate: all ${args.gate.checksPassed} acceptance checks green.`
             : '';
         const pr = await this.gitFacade.createPullRequest(
             {
                 owner,
                 repo,
                 title: `Task ${task.slug}: ${task.title ?? 'agent run output'}`,
-                head: workspace.branch,
+                head: branch,
                 base: baseRef,
                 body: `Automated changes for Task \`${task.slug}\` (agent run). Review before merging — merge policy is governed by the Work's merge-policy settings.${gateNote}`,
             },
@@ -481,7 +1111,7 @@ export class TaskWorkspaceService {
         await this.transitionTask(task, TaskStatus.IN_REVIEW);
         this.logger.log(
             `Task ${task.id} opened PR #${pr.number} (${pr.url})` +
-                `${await this.describeMergePolicy(input.agentId, work.id)}.`,
+                `${await this.describeMergePolicy(args.agentId, work.id)}.`,
         );
 
         // Merge-policy matrix (Wave 3, D4) — the agent-merge path. The PR
@@ -493,13 +1123,13 @@ export class TaskWorkspaceService {
             task,
             work,
             userId,
-            agentId: input.agentId,
+            agentId: args.agentId,
             owner,
             repo,
             gitOptions,
             prNumber: pr.number,
             baseRef,
-            gateStatus: input.gateStatus ?? null,
+            gateStatus: args.gateStatus,
         });
 
         return {
@@ -1016,4 +1646,60 @@ export function tokenFreeCloneUrl(cloneUrl: string): string {
         );
     }
     return value;
+}
+
+/**
+ * A clone URL safe to put in an ERROR MESSAGE. Registry connection URLs
+ * are only checked for shape, so `https://user:token@host/…` is storable;
+ * `tokenFreeCloneUrl` refuses such a URL, but a refusal raised BEFORE it
+ * (an unparseable `owner/repository`) must not echo the raw value into the
+ * run failure reason, the Task page and the API log. Userinfo is dropped
+ * (the scp-like user part included), and anything that does not parse to a
+ * host degrades to a placeholder rather than the input.
+ */
+export function credentialFreeUrlForMessages(cloneUrl: string): string {
+    const value = typeof cloneUrl === 'string' ? cloneUrl.trim() : '';
+    if (!value) return '<no URL>';
+    if (/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+$/.test(value)) {
+        return value.replace(/^[A-Za-z0-9._-]+@/, '');
+    }
+    try {
+        const parsed = new URL(value);
+        if (!parsed.host) return '<unparseable URL>';
+        parsed.username = '';
+        parsed.password = '';
+        return parsed.toString();
+    } catch {
+        return '<unparseable URL>';
+    }
+}
+
+/**
+ * `owner/repository` from an HTTPS or SSH clone URL (GitHub / GitLab /
+ * Bitbucket style paths), or null when the URL does not name exactly one
+ * owner and one repository. Case is preserved: the identity is used
+ * verbatim in clone URLs and pull-request calls.
+ */
+export function repositoryIdFromCloneUrl(cloneUrl: string): string | null {
+    const value = cloneUrl.trim();
+    let path = '';
+    const scpLike = /^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+:(.+)$/.exec(value);
+    if (scpLike && !/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) {
+        path = scpLike[1];
+    } else {
+        try {
+            path = new URL(value).pathname;
+        } catch {
+            return null;
+        }
+    }
+    const segments = path
+        .replace(/\.git$/i, '')
+        .split('/')
+        .filter((segment) => segment.length > 0);
+    if (segments.length !== 2) return null;
+    const [owner, repo] = segments;
+    const safe = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+    if (!safe.test(owner) || !safe.test(repo) || owner === '..' || repo === '..') return null;
+    return `${owner}/${repo}`;
 }

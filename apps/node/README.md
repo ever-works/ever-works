@@ -234,6 +234,17 @@ headed job that asks for `expectText` is **refused** rather than quietly downgra
 A leased job of any other kind is completed as a **failure naming the kind** — never silently
 dropped, which would leave it to expire and retry forever on the same incapable node.
 
+### Multi-repo Task workspaces
+
+A job's workspace spec may carry `mounts`: additional repositories checked out on the same Task branch.
+Each mount is its own binding under the workspace root (same pool, reuse and ownership proof as the
+primary) and is linked into the primary worktree at `.mounts/<dir>` — a directory junction on Windows,
+a symlink elsewhere — with `/.mounts/` written to the repository's shared `info/exclude`, so the
+primary's Git never sees it. After the model step the node commits and pushes every writable mount
+(one verdict each, reported as `mountGit`) and then the primary. A mount that cannot be provisioned
+fails the job naming it; a mount whose push fails is reported on its own entry while the others still
+complete.
+
 ## Follow-ups
 
 - Further job kinds behind the same executor seam: full agent execution, `pty-local`

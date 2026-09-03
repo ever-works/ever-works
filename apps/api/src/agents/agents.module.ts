@@ -77,7 +77,8 @@ import {
 import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/ingest';
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
-import { FleetModule, FleetService } from '@ever-works/agent/fleet';
+import { FleetJobService, FleetModule, FleetService } from '@ever-works/agent/fleet';
+import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import {
     PolicyModule,
@@ -210,8 +211,17 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         { provide: AGENT_HEARTBEAT_TRIGGER, useValue: agentHeartbeatTriggerAdapter },
         {
             provide: AGENT_RUN_CANCELLER,
-            inject: [TriggerService],
-            useFactory: createAgentRunCancellerAdapter,
+            // Agent execution v2 (slice B) — a run's remote id is a fleet
+            // job id when the fleet executed it; the composite adapter
+            // tries the fleet for uuid-shaped ids and falls through to
+            // Trigger.dev otherwise. `FleetModule` (imported above) exports
+            // FleetJobService.
+            inject: [TriggerService, FleetJobService],
+            useFactory: (trigger: TriggerService, fleetJobs: FleetJobService) =>
+                createFleetAwareAgentRunCanceller(
+                    createAgentRunCancellerAdapter(trigger),
+                    fleetJobs,
+                ),
         },
         {
             provide: AGENT_RUN_CHAT_BACK_POSTER,

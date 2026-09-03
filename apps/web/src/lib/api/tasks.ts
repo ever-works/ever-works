@@ -3,6 +3,7 @@ import type {
     DecisionConflictReportDto,
     GateStatus,
     TaskAcceptanceCheck,
+    TaskExtraRepo,
 } from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
@@ -145,6 +146,18 @@ export type RunBatchItemResult =
     | { taskId: string; ok: true; run: RunTaskResult }
     | { taskId: string; ok: false; error: { code: string; message: string } };
 
+export interface TaskLinkedPullRequest {
+    repositoryId: string;
+    branch: string;
+    baseRef: string | null;
+    headSha: string | null;
+    prNumber: number | null;
+    prUrl: string | null;
+    state: 'pushed' | 'pr-open' | 'failed';
+    error?: string | null;
+    updatedAt: string;
+}
+
 export interface Task {
     id: string;
     userId: string;
@@ -201,6 +214,14 @@ export interface Task {
     baseSha: string | null;
     prNumber: number | null;
     prUrl: string | null;
+    /**
+     * Multi-repo Task workspaces: the non-primary repositories a fleet run
+     * pushed for this Task, one entry per repository (the primary stays in
+     * `branchRef` / `prNumber` / `prUrl`). Absent or null = single repository.
+     */
+    linkedPullRequests?: TaskLinkedPullRequest[] | null;
+    /** Multi-repo: repositories this Task spans besides its Work's (registry connections). */
+    extraRepos?: TaskExtraRepo[] | null;
     conflictPaths: string[] | null;
     // PR insights (kanban M5) — cached PR/CI verdict, refreshed by the
     // `task-pr-status-sync` cron. All null until the Task opens a PR.
@@ -297,6 +318,12 @@ export const tasksAPI = {
         isolationMode?: TaskIsolationMode | null;
         acceptanceChecks?: TaskAcceptanceCheck[] | null;
         maxGateAttempts?: number | null;
+        /**
+         * Multi-repo: extra repositories by registry connection. Declared
+         * here, not only on the server action, so a future refactor that
+         * maps the DTO field by field cannot drop it without a type error.
+         */
+        extraRepos?: TaskExtraRepo[] | null;
     }) {
         return serverMutation<Task>({
             endpoint: '/tasks',
@@ -324,6 +351,7 @@ export const tasksAPI = {
                 | 'missionId'
                 | 'ideaId'
                 | 'agentId'
+                | 'extraRepos'
             >
         >,
     ) {

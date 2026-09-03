@@ -389,7 +389,7 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         kind: 'create',
         body: true,
         bodyHint:
-            'title (required), description, priority, dueDate, labels, missionId, ideaId, workId, parentTaskId.',
+            'title (required), description, priority, dueDate, labels, missionId, ideaId, workId, parentTaskId, extraRepos (array of { repoConnectionId, mountDir?, writable? } — repository-registry connection ids; extra repositories mounted next to the Work’s repository when the task runs on a fleet node).',
     },
     {
         toolName: 'update_task',
@@ -399,7 +399,8 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         kind: 'update',
         params: [id('Task id')],
         body: true,
-        bodyHint: 'Any of: title, description, priority, dueDate, status, labels.',
+        bodyHint:
+            'Any of: title, description, priority, dueDate, status, labels, extraRepos (array of { repoConnectionId, mountDir?, writable? } — repository-registry connection ids; null clears).',
     },
     {
         toolName: 'delete_task',

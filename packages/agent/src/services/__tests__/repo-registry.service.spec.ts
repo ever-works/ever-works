@@ -534,6 +534,7 @@ describe('provisioning resolver', () => {
                 branch: 'develop',
                 mountDir: 'api',
                 envFiles: [{ path: '.env', content: 'A=1' }],
+                provider: 'github',
             },
         ]);
     });

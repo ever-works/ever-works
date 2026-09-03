@@ -730,12 +730,30 @@ export class AgentRunRepository {
     }
 
     async markCompleted(runId: string, summary: string | null): Promise<void> {
+        await this.tryMarkCompleted(runId, summary);
+    }
+
+    /**
+     * `markCompleted` that REPORTS whether this call won the terminal CAS
+     * (self-build slice Q).
+     *
+     * The fleet reconciler parks a run that asked the owner a question
+     * (`completed` + `awaitingInput`) and then files the Inbox question;
+     * it must do neither for a completion it did not win — a replayed
+     * completion event, or a second node report for the same job — or the
+     * owner gets a duplicate question for a run that `resume()` may
+     * already have un-parked. `markCompleted` keeps its `void` contract
+     * (pinned by its spec, ignored by every other caller) and delegates
+     * here; the two are the same write.
+     */
+    async tryMarkCompleted(runId: string, summary: string | null): Promise<boolean> {
         const ok = await this.casTerminal(runId, NON_TERMINAL, { status: 'completed', summary });
         if (!ok) await this.warnTerminalNoOp(runId, 'markCompleted');
         // Wave 9 M2 — settle metered cost → credits debit on the winning
         // terminal write only; a CAS loser's re-settle would be a
         // harmless idempotent no-op but is skipped to avoid double work.
         if (ok) await this.settleRunCost(runId);
+        return ok;
     }
 
     async markFailed(runId: string, errorMessage: string): Promise<void> {

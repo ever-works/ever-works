@@ -136,6 +136,17 @@ export class FleetJob {
     @Column({ type: 'varchar', length: 64, nullable: true })
     queuedReason?: string | null;
 
+    /**
+     * Operator cancel request on an ACTIVE job (agent execution v2 /
+     * slice B). A queued job is failed outright instead; a leased or
+     * running one cannot be — a node already holds it — so the request
+     * is recorded here and the node's next job heartbeat is REFUSED,
+     * which is the exact signal ("lease lost") it already aborts on.
+     * The node then reports and the row settles `failed`.
+     */
+    @PortableDateColumn({ nullable: true })
+    cancelRequestedAt?: Date | null;
+
     /** First transition into `running` (the node acknowledged the claim). */
     @PortableDateColumn({ nullable: true })
     startedAt?: Date | null;
