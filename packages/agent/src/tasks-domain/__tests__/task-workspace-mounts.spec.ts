@@ -1,5 +1,9 @@
 import type { Task } from '../../entities/task.entity';
-import { TaskWorkspaceService, repositoryIdFromCloneUrl } from '../task-workspace.service';
+import {
+    TaskWorkspaceService,
+    credentialFreeUrlForMessages,
+    repositoryIdFromCloneUrl,
+} from '../task-workspace.service';
 
 /** Constructor slots, so the doubles are typed against the real contracts. */
 type ServiceArgs = ConstructorParameters<typeof TaskWorkspaceService>;
@@ -92,6 +96,31 @@ describe('repositoryIdFromCloneUrl', () => {
         ['free text', 'not a url'],
     ])('rejects %s', (_label, url) => {
         expect(repositoryIdFromCloneUrl(url)).toBeNull();
+    });
+});
+
+describe('credentialFreeUrlForMessages', () => {
+    it.each([
+        [
+            'https://x-access-token:ghp_secret@github.com/group/sub/repo.git',
+            'https://github.com/group/sub/repo.git',
+        ],
+        [
+            'https://ghp_secret@github.com/group/sub/repo.git',
+            'https://github.com/group/sub/repo.git',
+        ],
+        ['ssh://git:pw@gitlab.com/group/sub/project.git', 'ssh://gitlab.com/group/sub/project.git'],
+        ['ghp_secret@github.com:group/sub/repo.git', 'github.com:group/sub/repo.git'],
+        [
+            'https://github.com/ever-works/ever-works.git',
+            'https://github.com/ever-works/ever-works.git',
+        ],
+        ['x-access-token:ghp_secret@github.com:group/repo', '<unparseable URL>'],
+        ['not a url', '<unparseable URL>'],
+        ['', '<no URL>'],
+    ])('never echoes userinfo: %s', (url, expected) => {
+        expect(credentialFreeUrlForMessages(url)).toBe(expected);
+        expect(credentialFreeUrlForMessages(url)).not.toContain('ghp_secret');
     });
 });
 
@@ -218,6 +247,29 @@ describe('TaskWorkspaceService.describeFleetWorkspace — mounts', () => {
                 agentId: 'agent-1',
             }),
         ).rejects.toThrow(/conn-1 .*cannot be mounted/);
+    });
+
+    it('does not echo a credential-bearing URL into the refusal (it lands on the run and in the logs)', async () => {
+        attachments.listEnabledForAgentWithRepos.mockResolvedValue([
+            attachment({
+                url: 'https://x-access-token:ghp_secret@git.example.com/deep/nested/path.git',
+                name: 'weird',
+            }),
+        ]);
+        let message = '';
+        try {
+            await build().describeFleetWorkspace({
+                task: makeTask(),
+                userId: 'user-1',
+                agentId: 'agent-1',
+            });
+        } catch (error) {
+            message = error instanceof Error ? error.message : String(error);
+        }
+        expect(message).toMatch(/conn-1 .*cannot be mounted/);
+        expect(message).toContain('https://git.example.com/deep/nested/path.git');
+        expect(message).not.toContain('ghp_secret');
+        expect(message).not.toContain('x-access-token');
     });
 
     it('refuses two attachments that would share a mount directory', async () => {
@@ -375,6 +427,86 @@ describe('TaskWorkspaceService.finalizeMountPush', () => {
             ['ever-works/workspace', 'pr-open'],
             ['ever-works/directory-web-template', 'pr-open'],
         ]);
+    });
+
+    it('re-records an already-open pull request on a re-run instead of asking the provider for another', async () => {
+        // Second fleet run of the same Task: the branch behind PR #42 was
+        // just updated. The provider would answer 422 "already exists" and
+        // the failure would have REPLACED the link with a `failed` entry.
+        tasks.findById.mockResolvedValue(
+            makeTask({
+                linkedPullRequests: [
+                    {
+                        repositoryId: 'Ever-Works/Directory-Web-Template',
+                        branch: 'task/tsk-9-task1',
+                        baseRef: 'develop',
+                        headSha: 'a'.repeat(40),
+                        prNumber: 42,
+                        prUrl: 'https://github.com/ever-works/directory-web-template/pull/42',
+                        state: 'pr-open',
+                        error: null,
+                        updatedAt: '2026-09-01T00:00:00.000Z',
+                    },
+                ],
+            }),
+        );
+        gitFacade.createPullRequest.mockRejectedValue(
+            new Error('422: A pull request already exists'),
+        );
+
+        const outcome = await build().finalizeMountPush({ ...base(), headSha: 'f'.repeat(40) });
+
+        expect(outcome).toEqual({
+            repositoryId: 'ever-works/directory-web-template',
+            outcome: 'pr-opened',
+            prNumber: 42,
+            prUrl: 'https://github.com/ever-works/directory-web-template/pull/42',
+        });
+        expect(gitFacade.createPullRequest).not.toHaveBeenCalled();
+        expect(tasks.updateById).toHaveBeenCalledWith('task-1', {
+            linkedPullRequests: [
+                expect.objectContaining({
+                    repositoryId: 'ever-works/directory-web-template',
+                    state: 'pr-open',
+                    prNumber: 42,
+                    prUrl: 'https://github.com/ever-works/directory-web-template/pull/42',
+                    headSha: 'f'.repeat(40),
+                    error: null,
+                }),
+            ],
+        });
+    });
+
+    it('still opens a pull request when the recorded one is for another branch, failed, or only pushed', async () => {
+        for (const prior of [
+            {
+                branch: 'task/tsk-9-old',
+                state: 'pr-open' as const,
+                prNumber: 41,
+                prUrl: 'https://x/pull/41',
+            },
+            { branch: 'task/tsk-9-task1', state: 'failed' as const, prNumber: null, prUrl: null },
+            { branch: 'task/tsk-9-task1', state: 'pushed' as const, prNumber: null, prUrl: null },
+        ]) {
+            gitFacade.createPullRequest.mockClear();
+            tasks.findById.mockResolvedValue(
+                makeTask({
+                    linkedPullRequests: [
+                        {
+                            repositoryId: 'ever-works/directory-web-template',
+                            baseRef: 'develop',
+                            headSha: null,
+                            error: null,
+                            updatedAt: '2026-09-01T00:00:00.000Z',
+                            ...prior,
+                        },
+                    ],
+                }),
+            );
+            const outcome = await build().finalizeMountPush(base());
+            expect(outcome).toMatchObject({ outcome: 'pr-opened', prNumber: 42 });
+            expect(gitFacade.createPullRequest).toHaveBeenCalledTimes(1);
+        }
     });
 
     it('records the pushed branch without a pull request when the agent may not open one', async () => {

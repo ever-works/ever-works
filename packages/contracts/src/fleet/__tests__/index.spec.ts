@@ -121,7 +121,8 @@ const WORKSPACE_EXPORTS = [
 	'FLEET_TASK_WORKSPACE_MAX_MOUNTS',
 	'FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN',
 	'FleetTaskWorkspaceMountError',
-	'normalizeFleetTaskWorkspaceMounts'
+	'normalizeFleetTaskWorkspaceMounts',
+	'isReservedMountDir'
 ] as const;
 
 const ALL_EXPORTS = [
@@ -155,7 +156,8 @@ const FUNCTION_EXPORTS = [
 	'isFleetAgentExecutionPermissionMode',
 	'normalizeFleetAgentModelExecution',
 	'FleetTaskWorkspaceMountError',
-	'normalizeFleetTaskWorkspaceMounts'
+	'normalizeFleetTaskWorkspaceMounts',
+	'isReservedMountDir'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -170,12 +172,12 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 83 runtime symbols', () => {
+	it('exposes exactly these 84 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(83);
+		expect(Object.keys(fleet)).toHaveLength(84);
 	});
 
 	it.each([

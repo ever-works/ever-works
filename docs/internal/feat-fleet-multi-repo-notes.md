@@ -19,21 +19,32 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
 - `FleetAgentTaskGitResult.repositoryId? / mountDir?` and `FleetAgentTaskResult.mountGit?` — one git
   verdict per writable mount.
 - `normalizeFleetTaskWorkspaceMounts(raw, primaryRepositoryId)` — refuse-never-coerce: at most
-  `FLEET_TASK_WORKSPACE_MAX_MOUNTS` (8), `mountDir` a single safe name (no leading dot, never `.git`,
-  `.mounts`, `node_modules`, ≤ 64 chars), unique case-insensitively, never the primary repository, remote
-  token-free URLs only.
+  `FLEET_TASK_WORKSPACE_MAX_MOUNTS` (8), `mountDir` a single safe name (no leading or trailing dot — Windows
+  strips trailing dots, so `api.` and `api` would be one directory — never `.git`, `.mounts`,
+  `node_modules` or a Windows device name such as `NUL` / `COM1`, ≤ 64 chars), unique case-insensitively,
+  never the primary repository, remote token-free URLs only. `isReservedMountDir(name)` is the ONE
+  reserved-name rule, shared with the API DTO and the Task extra-repositories validation.
 
 ### Node (`apps/node`)
 
 - `FleetTaskWorkspaceProvisioner.provision` provisions each mount as its OWN binding under the fleet
   root (same pool / reuse / ownership proof as the primary), then links it into the primary worktree
   at `.mounts/<mountDir>` — a directory **junction** on Windows (no privilege needed), a directory
-  symlink elsewhere — and appends `/.mounts/` to the repository's shared `info/exclude`, so the
-  primary's `git status`, `git add -A` and diffs never see the mounts. An existing link to the same
-  target is kept; a real directory at the link path is a `path-collision`.
+  symlink elsewhere — and writes `/.mounts/` to the repository's shared `info/exclude` (temporary file +
+  rename, then verified with `git check-ignore`, because another worktree's finalize may be reading the
+  file), so the primary's `git status`, `git add -A` and diffs never see the mounts. An existing link to
+  the same target is kept; a real directory at the link path is a `path-collision` naming the path.
+- `.mounts` is untrusted between runs (the model runs in the reused primary as the node's account):
+  before anything is written through it the provisioner proves it is a plain directory directly under
+  the primary — a link, junction or file there is a `path-collision` — and on EVERY provision (a run
+  without mounts included) drops the links of mounts the current spec no longer names, so a repository
+  the operator removed does not stay reachable. Real directories under `.mounts/` are never removed.
+- A reused READ-ONLY mount is reset to its base commit (`git reset --hard` + `git clean -fd`) on
+  provision, so what a model left in it never leaks into the next run or into the first push after
+  `writable` flips.
 - `finalizeMounts` commits and pushes every WRITABLE mount (`git add -A` / commit / push through the
   local-workspace plugin, exactly like the primary) and returns one verdict per mount; a failure is
-  recorded on its entry and never stops the others. Cancellation propagates.
+  recorded on its entry and never stops the others. Cancellation propagates, unprefixed.
 - The `agent-task` executor finalizes mounts FIRST, the primary LAST (so the primary PR can link the
   others), and carries `mountGit` in the result. A failed mount fails the run naming the mount.
 
@@ -45,8 +56,14 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
   connection's mount path or name. Refuses an attachment it cannot describe; skips the primary itself.
 - `TaskWorkspaceService.finalizeMountPush(...)` opens the pull request for a pushed mount (title
   suffixed with the repository, body cross-linked to the primary PR and carrying the run summary) and
-  upserts `Task.linkedPullRequests` by repository. Provider failures are recorded (`state: 'failed'`),
-  never thrown. Agents without `canOpenPullRequests`, and generic `git` connections, record `pushed`.
+  upserts `Task.linkedPullRequests` by repository. Idempotent like the primary path: a re-run whose push
+  updated the branch behind an already-open pull request re-records that pull request instead of asking
+  the provider for another (which would fail and replace the link with a `failed` entry). Provider
+  failures are recorded (`state: 'failed'`), never thrown. Agents without `canOpenPullRequests`, and
+  generic `git` connections, record `pushed`.
+- Plan-time refusals never echo a registry URL verbatim (`credentialFreeUrlForMessages`): a connection
+  URL is only shape-checked at the registry, so it may carry userinfo, and the refusal lands on the
+  AgentRun, the Task page and the API log.
 - `Task.linkedPullRequests` (simple-json, nullable) + migration `1787800000000-AddTaskLinkedPullRequests`.
 - `ResolvedAgentRepo.provider` (from the connection) so the fleet path knows which provider to use.
 
@@ -58,12 +75,20 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
 - Reconciler: after the primary, one `finalizeMountPush` per pushed mount; the task-chat message lists
   every repository's outcome; ONE Inbox notice lists every pull request to review. A failed run's
   pushed mount branches are recorded on the Task (no PR) so they are not orphaned.
+- The node's `mountGit` is untrusted: the reconciler acts only on verdicts whose repository is a
+  WRITABLE mount of the job's planned `workspace.mounts` (same normalizer as the node), on the planned
+  Task branch, with a well-formed head; repository, branch and base come from the plan, never from the
+  report. Anything else is logged, mentioned as ignored in the chat note, and never becomes a pull
+  request or a `linkedPullRequests` entry. A throw while recording a mount pull request is caught like
+  the primary's, so the run always reaches `markCompleted`.
 
 ### Web
 
 - `Task.linkedPullRequests` on the web type; the Task branch section lists the linked repositories with
   their PR link (or "pushed" / "failed" state). Keys `dashboard.tasksPage.branch.linkedPullRequests`,
   `linkedPrPushed`, `linkedPrFailed` in all locales.
+- The agent settings Repositories card says what attaching a repository now means for fleet runs
+  (`dashboard.settings.repositories.agentCard.fleetHint`, all locales).
 
 ## PR C2 — Task-level extra repositories
 

@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
@@ -120,6 +120,12 @@ export class FleetTaskWorkspaceProvisioner {
 		const spec = validateWorkspaceSpec(rawSpec);
 		const primary = await this.provisionOne(normalizedTaskId, spec, signal);
 		const mountSpecs = spec.mounts ?? [];
+		throwIfCancelled(signal);
+		// The primary worktree persists across runs, so `.mounts/` is
+		// reconciled on EVERY provision — a run without mounts included: a
+		// link left behind by an earlier spec would otherwise keep a repository
+		// the operator has since removed reachable (and editable) by the model.
+		const mountsDir = await reconcileMountsDir(primary.path, mountSpecs);
 		if (mountSpecs.length === 0) return primary;
 
 		// Multi-repo Task workspaces (self-build slice C). Every mount is an
@@ -144,6 +150,13 @@ export class FleetTaskWorkspaceProvisioner {
 			let provisioned: FleetTaskWorkspaceDescriptor;
 			try {
 				provisioned = await this.provisionOne(normalizedTaskId, mountSpec, signal);
+				// A read-only mount is a pristine reference by contract. The
+				// binding is reused in place without a reset, so whatever a
+				// model left in it would survive into the next run — and be
+				// committed by the first run after `writable` flips to true.
+				if (!mount.writable && provisioned.reused) {
+					await resetReadOnlyMount(provisioned.path, signal);
+				}
 			} catch (error) {
 				if (error instanceof FleetTaskWorkspaceError && error.code !== 'cancelled') {
 					throw new FleetTaskWorkspaceError(
@@ -153,7 +166,7 @@ export class FleetTaskWorkspaceProvisioner {
 				}
 				throw error;
 			}
-			const linkPath = await linkMountIntoPrimary(primary.path, mount.mountDir, provisioned.path);
+			const linkPath = await linkMountIntoPrimary(mountsDir, mount.mountDir, provisioned.path);
 			mounts.push({ ...provisioned, mountDir: mount.mountDir, linkPath, writable: mount.writable });
 		}
 		throwIfCancelled(signal);
@@ -790,19 +803,131 @@ function runGitOutput(args: string[], workspacePath: string, signal?: AbortSigna
 }
 
 /**
- * Link one provisioned mount into the primary worktree at
- * `<primary>/.mounts/<mountDir>`. A directory junction on Windows (no
- * privilege needed) and a directory symlink elsewhere. An existing link to
- * the same target is kept; a link elsewhere is replaced; a real directory
- * or file at that path is a collision and is never touched.
+ * Prove `<primary>/.mounts` is a plain directory directly under the primary
+ * worktree — creating it when the spec has mounts — and drop every link in
+ * it that the current spec no longer names.
+ *
+ * The primary worktree is reused across runs and the model runs in it as
+ * the node service account, so `.mounts` is untrusted input on the next
+ * provision: left as a symlink or junction to another Task's worktree (or
+ * anywhere the account can write), every `lstat` / `unlink` / `symlink` on
+ * `.mounts/<dir>` would resolve THROUGH it — a write-through-link by the
+ * privileged provisioner, exactly what the cache-root checks refuse for
+ * every other path. A link or file at `.mounts` is therefore a
+ * `path-collision` when mounts are needed (and left alone when none are,
+ * since nothing would be written through it). Real directories and files
+ * inside `.mounts/` are never touched: they surface as collisions naming
+ * the path so an operator can clean them.
  */
-async function linkMountIntoPrimary(primaryPath: string, mountDir: string, targetPath: string): Promise<string> {
+async function reconcileMountsDir(
+	primaryPath: string,
+	mountSpecs: readonly FleetTaskWorkspaceMountSpec[]
+): Promise<string> {
 	const mountsDir = resolve(primaryPath, FLEET_TASK_WORKSPACE_MOUNTS_DIR);
+	let stats: Awaited<ReturnType<typeof fs.lstat>> | null = null;
+	try {
+		stats = await fs.lstat(mountsDir);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+			throw new FleetTaskWorkspaceError('path-collision', `'${mountsDir}' could not be inspected safely`);
+		}
+	}
+	if (stats && (stats.isSymbolicLink() || !stats.isDirectory())) {
+		if (mountSpecs.length === 0) return mountsDir;
+		throw new FleetTaskWorkspaceError(
+			'path-collision',
+			`'${FLEET_TASK_WORKSPACE_MOUNTS_DIR}' in the task workspace (${mountsDir}) is a link or file and was preserved`
+		);
+	}
+	if (!stats) {
+		if (mountSpecs.length === 0) return mountsDir;
+		await fs.mkdir(mountsDir);
+	}
+	// `mkdir` cannot race a link into place unnoticed: re-read without
+	// following, then require the canonical path to be exactly the plain
+	// child of the (already canonical) primary.
+	const created = await fs.lstat(mountsDir);
+	if (created.isSymbolicLink() || !created.isDirectory()) {
+		throw new FleetTaskWorkspaceError(
+			'path-collision',
+			`'${FLEET_TASK_WORKSPACE_MOUNTS_DIR}' in the task workspace (${mountsDir}) is a link or file and was preserved`
+		);
+	}
+	let canonicalPrimary: string;
+	let canonicalMounts: string;
+	try {
+		[canonicalPrimary, canonicalMounts] = await Promise.all([fs.realpath(primaryPath), fs.realpath(mountsDir)]);
+	} catch {
+		throw new FleetTaskWorkspaceError('path-collision', `'${mountsDir}' did not resolve to a directory`);
+	}
+	if (
+		!isStrictDescendant(canonicalPrimary, canonicalMounts) ||
+		!samePath(canonicalMounts, resolve(canonicalPrimary, FLEET_TASK_WORKSPACE_MOUNTS_DIR))
+	) {
+		throw new FleetTaskWorkspaceError(
+			'path-collision',
+			`'${mountsDir}' resolves through a link or reparse-point alias and was preserved`
+		);
+	}
+	// Case-insensitive like the contracts normalizer: Windows and macOS
+	// would otherwise keep `Template` next to `template`.
+	const wanted = new Set(mountSpecs.map((mount) => mount.mountDir.toLowerCase()));
+	for (const name of await fs.readdir(mountsDir)) {
+		if (wanted.has(name.toLowerCase())) continue;
+		const entryPath = join(mountsDir, name);
+		if (!(await fs.lstat(entryPath)).isSymbolicLink()) continue;
+		await removeMountLink(entryPath);
+	}
+	return mountsDir;
+}
+
+/**
+ * Remove a mount link WITHOUT touching its target. `unlink` handles
+ * symlinks everywhere and junctions on current Node; `rmdir` is the
+ * documented fallback for a directory reparse point, and removes only the
+ * reparse point itself. The caller has already proven the path is a link.
+ */
+async function removeMountLink(linkPath: string): Promise<void> {
+	try {
+		await fs.unlink(linkPath);
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code !== 'EPERM' && code !== 'EISDIR') throw error;
+		await fs.rmdir(linkPath);
+	}
+}
+
+/**
+ * Put a reused READ-ONLY mount back to exactly its checked-out commit:
+ * tracked edits reverted, untracked files removed (ignored files — caches,
+ * dependencies — are kept, they are not content). Both commands run inside
+ * the mount's own canonical worktree, never through the primary's link.
+ */
+async function resetReadOnlyMount(mountPath: string, signal?: AbortSignal): Promise<void> {
+	try {
+		await runGitOutput(['reset', '--hard', '--quiet', 'HEAD'], mountPath, signal);
+		await runGitOutput(['clean', '-fdq'], mountPath, signal);
+	} catch (error) {
+		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+		if (signal?.aborted) throw cancelledError();
+		throw new FleetTaskWorkspaceError('git-failed', 'Read-only mount could not be reset to its base commit');
+	}
+}
+
+/**
+ * Link one provisioned mount into the primary worktree at
+ * `<mountsDir>/<mountDir>` (`mountsDir` is the `.mounts` directory
+ * {@link reconcileMountsDir} has already proven plain). A directory
+ * junction on Windows (no privilege needed) and a directory symlink
+ * elsewhere. An existing link to the same target is kept; a link elsewhere
+ * is replaced; a real directory or file at that path is a collision and is
+ * never touched — the message names it so an operator can clean it.
+ */
+async function linkMountIntoPrimary(mountsDir: string, mountDir: string, targetPath: string): Promise<string> {
 	const linkPath = resolve(mountsDir, mountDir);
 	if (!isStrictDescendant(mountsDir, linkPath) || dirname(linkPath) !== mountsDir) {
 		throw new FleetTaskWorkspaceError('invalid-spec', `Mount directory '${mountDir}' escapes the mounts directory`);
 	}
-	await fs.mkdir(mountsDir, { recursive: true });
 	let existing: Awaited<ReturnType<typeof fs.lstat>> | null = null;
 	try {
 		existing = await fs.lstat(linkPath);
@@ -813,7 +938,7 @@ async function linkMountIntoPrimary(primaryPath: string, mountDir: string, targe
 		if (!existing.isSymbolicLink()) {
 			throw new FleetTaskWorkspaceError(
 				'path-collision',
-				`Mount path '${mountDir}' already exists in the task workspace and is not a mount link`
+				`Mount path '${mountDir}' already exists in the task workspace (${linkPath}) and is not a mount link; remove it to provision this Task again`
 			);
 		}
 		let current: string | null = null;
@@ -823,7 +948,7 @@ async function linkMountIntoPrimary(primaryPath: string, mountDir: string, targe
 			current = null;
 		}
 		if (current && samePath(current, targetPath)) return linkPath;
-		await fs.unlink(linkPath);
+		await removeMountLink(linkPath);
 	}
 	await fs.symlink(targetPath, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
 	return linkPath;
@@ -835,6 +960,15 @@ async function linkMountIntoPrimary(primaryPath: string, mountDir: string, targe
  * repository's `info/exclude` (shared by all worktrees of the pool) rather
  * than a tracked `.gitignore`, so nothing about the fleet layout is ever
  * committed to the owner's repository.
+ *
+ * The file is shared by every worktree of the pool, and another Task's
+ * finalize (`git add -A`) may be reading it at this very moment: a torn
+ * rule would let that finalize commit `.mounts` — a symlink entry on POSIX,
+ * an embedded-repository gitlink on Windows — silently, into the owner's
+ * pushed branch. The merged content is therefore written to a sibling
+ * temporary file and renamed over the exclude file (atomic on both
+ * platforms), and the rule is verified through Git itself before the mount
+ * layout is considered ready.
  */
 async function ensureMountsExcluded(primaryPath: string, signal?: AbortSignal): Promise<void> {
 	let commonDir: string;
@@ -853,12 +987,33 @@ async function ensureMountsExcluded(primaryPath: string, signal?: AbortSignal): 
 	} catch {
 		current = '';
 	}
-	if (current.split(/\r?\n/).some((line) => line.trim() === rule)) return;
-	await fs.mkdir(dirname(excludePath), { recursive: true });
-	const separator = current.length === 0 || current.endsWith('\n') ? '' : '\n';
-	await fs.appendFile(
-		excludePath,
-		`${separator}# ever-works fleet: mounted repositories of multi-repo Task workspaces\n${rule}\n`,
-		'utf8'
-	);
+	if (!current.split(/\r?\n/).some((line) => line.trim() === rule)) {
+		await fs.mkdir(dirname(excludePath), { recursive: true });
+		const separator = current.length === 0 || current.endsWith('\n') ? '' : '\n';
+		const merged = `${current}${separator}# ever-works fleet: mounted repositories of multi-repo Task workspaces\n${rule}\n`;
+		const temporaryPath = `${excludePath}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`;
+		try {
+			await fs.writeFile(temporaryPath, merged, 'utf8');
+			await fs.rename(temporaryPath, excludePath);
+		} catch (error) {
+			await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+			throw new FleetTaskWorkspaceError(
+				'git-failed',
+				`Task workspace exclude rule could not be written: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+	throwIfCancelled(signal);
+	// `check-ignore -q` exits 0 only when the path IS ignored; anything else
+	// (rule not effective, Git error) surfaces as a thrown call.
+	try {
+		await runGitOutput(['check-ignore', '-q', FLEET_TASK_WORKSPACE_MOUNTS_DIR], primaryPath, signal);
+	} catch (error) {
+		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+		if (signal?.aborted) throw cancelledError();
+		throw new FleetTaskWorkspaceError(
+			'git-failed',
+			`Task workspace exclude rule for '${FLEET_TASK_WORKSPACE_MOUNTS_DIR}' did not take effect`
+		);
+	}
 }

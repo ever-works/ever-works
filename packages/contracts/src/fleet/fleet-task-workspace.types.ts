@@ -60,13 +60,33 @@ export const FLEET_TASK_WORKSPACE_MAX_MOUNTS = 8;
 /**
  * Shape of a mount directory name: one segment, 1–64 characters, no path
  * separators, no leading dot (so `.git`, `.mounts` and hidden entries can
- * never be named).
+ * never be named) and no trailing dot — Windows strips trailing dots, so
+ * `api.` and `api` would be the SAME directory on the node's primary
+ * platform and two mounts could silently collapse into one link.
  */
-export const FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+export const FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9_-])?$/;
 
 const MOUNT_REPOSITORY_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,255}$/;
 const MOUNT_BRANCH_PATTERN = /^[^\s\0~^:?*[\\]{1,200}$/;
 const MOUNT_RESERVED_DIRS = new Set(['.', '..', '.git', '.mounts', 'node_modules']);
+/**
+ * Windows device names (`CON`, `NUL`, `COM1`…, with or without an extension)
+ * cannot be created as directories; the file system reports EINVAL/ENOENT
+ * from the symlink call instead of anything naming the field.
+ */
+const WINDOWS_DEVICE_NAME_PATTERN = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$/i;
+
+/**
+ * True when `name` can never be a mount directory even though it may match
+ * {@link FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN}: the Git / fleet layout
+ * entries (`.git`, `.mounts`), `node_modules`, and Windows reserved device
+ * names. ONE definition, shared by the fleet normalizer, the API DTO and the
+ * Task extra-repositories validation so the three gates cannot drift.
+ */
+export function isReservedMountDir(name: string): boolean {
+	const value = typeof name === 'string' ? name.trim().toLowerCase() : '';
+	return value.length === 0 || MOUNT_RESERVED_DIRS.has(value) || WINDOWS_DEVICE_NAME_PATTERN.test(value);
+}
 
 export class FleetTaskWorkspaceMountError extends Error {
 	constructor(message: string) {
@@ -125,9 +145,9 @@ export function normalizeFleetTaskWorkspaceMounts(
 			}
 		}
 		const mountDir = requireString(mount.mountDir, `${at}.mountDir`);
-		if (!FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN.test(mountDir) || MOUNT_RESERVED_DIRS.has(mountDir.toLowerCase())) {
+		if (!FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN.test(mountDir) || isReservedMountDir(mountDir)) {
 			throw new FleetTaskWorkspaceMountError(
-				`${at}.mountDir must be a single directory name (letters, digits, '.', '_' or '-'; not '.git', '.mounts' or 'node_modules')`
+				`${at}.mountDir must be a single directory name (letters, digits, '.', '_' or '-'; no trailing dot; not '.git', '.mounts', 'node_modules' or a Windows device name)`
 			);
 		}
 		// Windows and macOS file systems are case-insensitive: two mounts

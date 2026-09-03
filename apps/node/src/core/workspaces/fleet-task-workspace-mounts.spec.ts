@@ -1,10 +1,24 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, realpathSync, writeFileSync, promises as fs } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync, promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import type { WorkspaceProvisionSpec } from '@ever-works/plugin';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { FLEET_TASK_WORKSPACE_MOUNTS_DIR, FleetTaskWorkspaceProvisioner } from './fleet-task-workspace';
+import {
+	FLEET_TASK_WORKSPACE_MOUNTS_DIR,
+	FleetTaskWorkspaceProvisioner,
+	type FleetWorkspacePlugin
+} from './fleet-task-workspace';
+
+/** Remove a link the way the provisioner does: never its target. */
+const removeLink = async (linkPath: string): Promise<void> => {
+	try {
+		await fs.unlink(linkPath);
+	} catch {
+		await fs.rmdir(linkPath);
+	}
+};
 
 /**
  * Multi-repo Task workspaces (self-build slice C) against real Git.
@@ -223,7 +237,256 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 		mkdirSync(join(primaryOnly.path, FLEET_TASK_WORKSPACE_MOUNTS_DIR, 'template'), { recursive: true });
 
 		await expect(provisioner.provision('task-m8', spec('task/mounts-8'))).rejects.toMatchObject({
+			code: 'path-collision',
+			message: expect.stringContaining('remove it to provision this Task again')
+		});
+	});
+
+	it('never writes through a `.mounts` that is a link or a file, and leaves the link target alone', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const primaryOnly = await provisioner.provision('task-m9', { ...spec('task/mounts-9'), mounts: [] });
+		const mountsDir = join(primaryOnly.path, FLEET_TASK_WORKSPACE_MOUNTS_DIR);
+		// What a model (or anything else sharing the service account) could
+		// leave behind between two runs: `.mounts` pointing at a sibling
+		// directory. A junction on Windows needs no privilege at all.
+		const sibling = join(ownedRoot, 'sibling-of-m9');
+		mkdirSync(sibling, { recursive: true });
+		await fs.symlink(sibling, mountsDir, process.platform === 'win32' ? 'junction' : 'dir');
+
+		await expect(provisioner.provision('task-m9', spec('task/mounts-9'))).rejects.toMatchObject({
+			code: 'path-collision',
+			message: expect.stringContaining('is a link or file and was preserved')
+		});
+		// Nothing was created or unlinked inside the sibling, the link itself is intact...
+		expect(await fs.readdir(sibling)).toEqual([]);
+		expect((await fs.lstat(mountsDir)).isSymbolicLink()).toBe(true);
+		// ...and a workspace WITHOUT mounts is not blocked by it (nothing is written through it).
+		await expect(provisioner.provision('task-m9', { ...spec('task/mounts-9'), mounts: [] })).resolves.toMatchObject(
+			{
+				path: primaryOnly.path
+			}
+		);
+
+		await removeLink(mountsDir);
+		writeFileSync(mountsDir, 'not a directory\n');
+		await expect(provisioner.provision('task-m9', spec('task/mounts-9'))).rejects.toMatchObject({
 			code: 'path-collision'
 		});
+		expect((await fs.readFile(mountsDir, 'utf8')).trim()).toBe('not a directory');
+	});
+
+	it('drops the links of mounts the current spec no longer names, keeping their worktrees', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const first = await provisioner.provision('task-m10', spec('task/mounts-10'));
+		const mountsDir = join(first.path, FLEET_TASK_WORKSPACE_MOUNTS_DIR);
+		const worktree = first.mounts![0]!.path;
+
+		// The same repository under a new directory name: one link, not two.
+		const renamed = await provisioner.provision('task-m10', {
+			...spec('task/mounts-10'),
+			mounts: [{ ...spec('task/mounts-10').mounts[0]!, mountDir: 'tpl' }]
+		});
+		expect(renamed.mounts![0]!.path).toBe(worktree);
+		expect(await fs.readdir(mountsDir)).toEqual(['tpl']);
+
+		// The repository removed from the Task: the link goes, the worktree
+		// (the plugin's binding, reused when the repository comes back) stays.
+		const none = await provisioner.provision('task-m10', { ...spec('task/mounts-10'), mounts: [] });
+		expect(none.mounts).toBeUndefined();
+		expect(await fs.readdir(mountsDir)).toEqual([]);
+		expect((await fs.stat(worktree)).isDirectory()).toBe(true);
+
+		// A real directory left under `.mounts/` is never removed — only links are.
+		mkdirSync(join(mountsDir, 'kept-by-hand'));
+		await provisioner.provision('task-m10', { ...spec('task/mounts-10'), mounts: [] });
+		expect(await fs.readdir(mountsDir)).toEqual(['kept-by-hand']);
+	});
+
+	it('resets a reused read-only mount to its base commit (a writable one keeps its edits)', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const readOnly = await provisioner.provision('task-m11', spec('task/mounts-11', false));
+		const link = readOnly.mounts![0]!.linkPath;
+		writeFileSync(join(link, 'junk.txt'), 'left by the model\n');
+		writeFileSync(join(link, 'TEMPLATE.md'), 'edited by the model\n');
+		expect(git(readOnly.mounts![0]!.path, 'status', '--porcelain')).not.toBe('');
+
+		const again = await provisioner.provision('task-m11', spec('task/mounts-11', false));
+		expect(again.mounts![0]!.reused).toBe(true);
+		expect(git(again.mounts![0]!.path, 'status', '--porcelain')).toBe('');
+		expect(existsSync(join(link, 'junk.txt'))).toBe(false);
+		expect((await fs.readFile(join(link, 'TEMPLATE.md'), 'utf8')).trim()).toBe('TEMPLATE.md');
+		// The writable counterpart is the idempotency case above: `scratch.txt` survives.
+	});
+
+	it('writes the exclude rule atomically: concurrent provisions of one pool leave exactly one rule', async () => {
+		// A fresh root, so the rule does not exist yet when both provisions race.
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: join(ownedRoot, 'fleet-root-concurrent') });
+		const [first, second] = await Promise.all([
+			provisioner.provision('task-m12a', spec('task/mounts-12a')),
+			provisioner.provision('task-m12b', spec('task/mounts-12b'))
+		]);
+		const commonDir = git(first.path, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+		expect(git(second.path, 'rev-parse', '--path-format=absolute', '--git-common-dir')).toBe(commonDir);
+		const rule = `/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`;
+		const exclude = await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8');
+		expect(exclude.split(/\r?\n/).filter((line) => line.trim() === rule)).toHaveLength(1);
+		// No temporary file is left next to it.
+		expect((await fs.readdir(join(commonDir, 'info'))).filter((name) => name.startsWith('exclude.'))).toEqual([]);
+		expect(git(first.path, 'status', '--porcelain')).toBe('');
+	});
+});
+
+/**
+ * Cancellation mid-mount. The Git work is faked so the abort can be raised
+ * from inside a specific mount step; what must hold is that a cancellation
+ * is NOT re-labelled as that mount's failure (`mount '<dir>' (...)`) — the
+ * executor and the platform key on the `cancelled` code — and that
+ * `finalizeMounts` stops at it instead of recording an `error` entry and
+ * moving on to the next repository.
+ */
+describe('FleetTaskWorkspaceProvisioner — mounts and cancellation (faked Git)', () => {
+	const SHA = 'a'.repeat(40);
+	const primaryUrl = 'https://fleet-cancel.invalid/ever/platform.git';
+	const mountSpecs = [
+		{
+			repositoryId: 'ever/template',
+			repoUrl: 'https://fleet-cancel.invalid/ever/template.git',
+			baseRef: 'main',
+			branch: 'task/cancel',
+			mountDir: 'template',
+			writable: true
+		},
+		{
+			repositoryId: 'ever/docs',
+			repoUrl: 'https://fleet-cancel.invalid/ever/docs.git',
+			baseRef: 'main',
+			branch: 'task/cancel',
+			mountDir: 'docs',
+			writable: true
+		}
+	];
+	const workspaceSpec = {
+		repositoryId: 'ever/platform',
+		repoUrl: primaryUrl,
+		baseRef: 'main',
+		branch: 'task/cancel',
+		mounts: mountSpecs
+	};
+
+	const abortError = (): Error => {
+		const error = new Error('git was interrupted');
+		error.name = 'AbortError';
+		return error;
+	};
+
+	const fakePlugin = (hooks: {
+		onProvision?: (received: WorkspaceProvisionSpec, path: string) => void;
+		onFinalize?: (path: string) => void;
+	}): FleetWorkspacePlugin => ({
+		provision: async (received) => {
+			const path = join(String(received.settings?.baseDir), 'worktrees', received.bindingKey);
+			await fs.mkdir(path, { recursive: true });
+			hooks.onProvision?.(received, path);
+			return { path, baseSha: SHA, reused: false, branch: received.branch, bindingKey: received.bindingKey };
+		},
+		finalize: async (handle) => {
+			hooks.onFinalize?.(handle.path);
+			return { pushed: true, headSha: SHA, empty: false, changedFiles: 1 };
+		}
+	});
+
+	it('propagates a cancellation raised while a mount is provisioned, unprefixed, with nothing linked', async () => {
+		const root = temporaryRoot('ew-fleet-mounts-cancel-');
+		try {
+			const controller = new AbortController();
+			let primaryPath = '';
+			const provisioned: string[] = [];
+			const plugin = fakePlugin({
+				onProvision: (received, path) => {
+					provisioned.push(received.repositoryId ?? '');
+					if (received.repositoryId === 'ever/platform') {
+						primaryPath = path;
+						return;
+					}
+					// The lease is lost while the FIRST mount is being fetched.
+					controller.abort();
+					throw abortError();
+				}
+			});
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: root,
+				plugin,
+				inspectHead: async () => SHA
+			});
+
+			await expect(provisioner.provision('task-cancel', workspaceSpec, controller.signal)).rejects.toMatchObject({
+				code: 'cancelled',
+				message: expect.not.stringMatching(/^mount '/)
+			});
+			expect(provisioned).toEqual(['ever/platform', 'ever/template']);
+			// `.mounts` was prepared but no link was written into it (and the
+			// exclude step, which would have needed real Git, was never reached).
+			expect(await fs.readdir(join(primaryPath, FLEET_TASK_WORKSPACE_MOUNTS_DIR))).toEqual([]);
+		} finally {
+			await fs.rm(root, { recursive: true, force: true, maxRetries: 3 });
+		}
+	});
+
+	it('stops finalizing mounts at a cancellation instead of recording it as a mount failure', async () => {
+		const root = temporaryRoot('ew-fleet-mounts-cancel-finalize-');
+		try {
+			const controller = new AbortController();
+			const finalized: string[] = [];
+			const plugin = fakePlugin({
+				onFinalize: (path) => {
+					finalized.push(path);
+					controller.abort();
+					throw abortError();
+				}
+			});
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: root,
+				plugin,
+				inspectHead: async () => SHA
+			});
+			const worktree = (name: string) => join(root, 'repositories', 'pool', 'worktrees', name);
+			for (const name of ['primary', 'template', 'docs']) {
+				await fs.mkdir(worktree(name), { recursive: true });
+			}
+			const descriptor = {
+				path: worktree('primary'),
+				repositoryId: 'ever/platform',
+				baseRef: 'main',
+				branch: 'task/cancel',
+				baseSha: SHA,
+				headSha: SHA,
+				reused: false,
+				mounts: mountSpecs.map((mount) => ({
+					path: worktree(mount.mountDir),
+					linkPath: join(worktree('primary'), FLEET_TASK_WORKSPACE_MOUNTS_DIR, mount.mountDir),
+					repositoryId: mount.repositoryId,
+					baseRef: mount.baseRef,
+					branch: mount.branch,
+					baseSha: SHA,
+					headSha: SHA,
+					reused: false,
+					mountDir: mount.mountDir,
+					writable: true
+				}))
+			};
+
+			await expect(
+				provisioner.finalizeMounts(
+					'task-cancel',
+					descriptor,
+					{ commitMessage: 'Task cancel: mounts', push: true },
+					controller.signal
+				)
+			).rejects.toMatchObject({ code: 'cancelled' });
+			// The first mount was attempted; the second never was.
+			expect(finalized).toEqual([await fs.realpath(worktree('template'))]);
+		} finally {
+			await fs.rm(root, { recursive: true, force: true, maxRetries: 3 });
+		}
 	});
 });
