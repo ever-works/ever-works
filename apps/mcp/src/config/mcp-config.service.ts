@@ -32,10 +32,23 @@ export class McpConfigService {
 	 * (local dev). See EVER_WORKS_OPENAPI_SPEC_PATH.
 	 */
 	readonly specPath: string | null;
+	/**
+	 * Slug of the Organization every upstream call runs under, forwarded as
+	 * the `x-scope-slug` header the API already honours for the web client.
+	 * Null = personal scope. Why it exists: the API selects an Organization
+	 * only from a `:slug` route param or that header, and every whitelisted
+	 * path is unprefixed, so without this the Organization-scoped tools
+	 * (Fleet node affinity) can never succeed and every list shows personal
+	 * rows only. The API still authorises the caller against the slug
+	 * (`ScopeOwnershipGuard` / `SessionScopeGuard`), so this selects a scope
+	 * — it cannot widen one. See EVER_WORKS_SCOPE_SLUG.
+	 */
+	readonly scopeSlug: string | null;
 
 	constructor() {
 		this.authMode = parseAuthMode(process.env.EVER_WORKS_MCP_AUTH_MODE);
 		this.specPath = process.env.EVER_WORKS_OPENAPI_SPEC_PATH?.trim() || null;
+		this.scopeSlug = parseScopeSlug(process.env.EVER_WORKS_SCOPE_SLUG);
 
 		// H-21: the shared API key is OPTIONAL in `per-user-jwt` mode. In any
 		// mode that may accept it (`shared-key`, `shared-key-jwt`, `hybrid`)
@@ -79,6 +92,38 @@ export class McpConfigService {
 	requiresJwt(): boolean {
 		return this.authMode === 'shared-key-jwt' || this.authMode === 'per-user-jwt';
 	}
+}
+
+/**
+ * The API's `@personal` sentinel: the same header value the web client sends
+ * to pin a request to the personal scope. Accepted so an operator can state
+ * the default explicitly.
+ */
+const PERSONAL_SCOPE_SENTINEL = '@personal';
+/**
+ * Shape of every allocated slug (`UsernameAllocatorService.normalize` emits
+ * lower-case `[a-z0-9]` runs joined by single dashes). Anything else cannot
+ * resolve upstream, and refusing it at boot keeps a mistyped value from
+ * silently degrading every tool to a 404.
+ */
+const SCOPE_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const SCOPE_SLUG_MAX_LENGTH = 128;
+
+function parseScopeSlug(raw: string | undefined): string | null {
+	const value = raw?.trim() ?? '';
+	if (value.length === 0) {
+		return null;
+	}
+	if (value === PERSONAL_SCOPE_SENTINEL) {
+		return value;
+	}
+	if (value.length > SCOPE_SLUG_MAX_LENGTH || !SCOPE_SLUG_PATTERN.test(value)) {
+		throw new Error(
+			'EVER_WORKS_SCOPE_SLUG must be an Organization slug (lower-case letters, digits and single dashes, ' +
+				`at most ${SCOPE_SLUG_MAX_LENGTH} characters) or "${PERSONAL_SCOPE_SENTINEL}".`
+		);
+	}
+	return value;
 }
 
 function parseAuthMode(raw: string | undefined): McpAuthMode {
