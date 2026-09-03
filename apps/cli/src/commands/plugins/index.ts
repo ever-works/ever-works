@@ -15,6 +15,10 @@ import {
 import type { UserPluginResponse, SettingScopeApi } from '@ever-works/plugin/api';
 // EW-693 / T36 — dynamic distribution subcommands (catalog/install/uninstall/install-status).
 import { buildDynamicSubcommands } from './dynamic.command';
+// Agent Plugins standard interop — inspect packages in the open
+// cross-vendor format. Nested under `plugins` because they ARE plugins to a
+// user, just data packages rather than native code plugins.
+import { buildAgentPluginsCommand } from './agent-plugins.command';
 
 export const pluginsCommand = new Command('plugins')
     .description('Manage plugins')
@@ -411,3 +415,5 @@ function formatCategory(category: string): string {
 for (const sub of buildDynamicSubcommands()) {
     pluginsCommand.addCommand(sub);
 }
+
+pluginsCommand.addCommand(buildAgentPluginsCommand());
