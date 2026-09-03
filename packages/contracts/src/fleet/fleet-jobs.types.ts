@@ -600,6 +600,14 @@ export interface FleetAgentTaskModelResult {
 
 /** What the node did with the working tree after the model ran. */
 export interface FleetAgentTaskGitResult {
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): which repository this
+	 * verdict is about. Absent on the primary (`result.git`), set on every
+	 * entry of `result.mountGit`.
+	 */
+	repositoryId?: string;
+	/** The mount directory the repository was linked at (`.mounts/<dir>`); mounts only. */
+	mountDir?: string;
 	branch: string;
 	baseSha: string;
 	headSha: string | null;
@@ -638,6 +646,12 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	gateStatus?: 'green' | 'red' | 'none' | null;
 	/** Present when the node attempted a commit / push. */
 	git?: FleetAgentTaskGitResult | null;
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): one verdict per
+	 * WRITABLE mount the node attempted to commit / push, in spec order.
+	 * Read-only mounts never appear here.
+	 */
+	mountGit?: FleetAgentTaskGitResult[] | null;
 	/** Why `status` is `failed`, in one sentence, for the run report. */
 	failureReason?: string | null;
 }
