@@ -95,12 +95,20 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
 - `Task.extraRepos: TaskExtraRepo[] | null` (`{ repoConnectionId, mountDir?, writable? }`, contracts
   `packages/contracts/src/tasks/task-extra-repos.types.ts`, `TASK_MAX_EXTRA_REPOS = 8`) + migration
   `1787900000000-AddTaskExtraRepos`. `TasksService.normalizeExtraRepos` validates on create and update:
-  every connection must belong to the caller and be enabled, mount directories single safe names and
-  unique, at most 8. The API DTOs carry `TaskExtraRepoDto` (`@ever-works/agent/dto`), so the MCP
-  `create_task` / `update_task` tools expose it too.
+  every connection must belong to the Task OWNER (the identity the plan resolves connections under; an
+  org member editing another member's Task is refused at edit time with a message saying so) and be
+  enabled and describe an `owner/repository` URL; the EFFECTIVE mount directory (explicit `mountDir`,
+  else the connection's mount path or name) must pass the fleet gate (`isReservedMountDir` included)
+  and be unique case-insensitively; two connections may not point at the same repository; at most 8.
+  The API DTOs carry `TaskExtraRepoDto` (`@ever-works/agent/dto`); the field is exposed to the web chat
+  tools `create_task` / `update_task` (body hint) and in the Swagger document — the MCP server whitelist
+  (`apps/mcp/src/openapi-tools/whitelist.ts`) does not include `/api/tasks`, so no MCP tool carries it.
 - `describeFleetWorkspace` merges the Task's extras AFTER the agent's attachments; a Task entry wins over
-  an attachment on the same repository or mount directory. Missing or disabled connections fail the plan
-  naming them.
+  an AGENT ATTACHMENT on the same repository or mount directory, while two Task extras that collide fail
+  the plan naming both. Missing, disabled or unparseable connections fail the plan naming them (URL
+  credential-free). `finalizeMountPush` resolves the provider of an extra from its own connection
+  (attachment → Task extra → Work provider), so a generic `git` extra records `pushed` instead of a
+  failed pull request.
 - Web: `TaskExtraReposPicker` ("Also work in": a checkbox per enabled registry connection with the
   `.mounts/<dir>` it will get) on the new-task form and the task page (saved through `updateTaskAction`).
   `listRepoConnections` server action. Keys under `dashboard.tasksPage.extraRepos`, `newDialog.extraRepos*`,
@@ -110,8 +118,8 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
 
 - Extra repositories are registry CONNECTIONS. Pointing a Task at another Work's repository directly
   (a `repo` Work from slice D) is a follow-up once D merges.
-- Read-only mounts are supported end to end in the contract and the node (never committed), but nothing
-  creates one yet (attachments are always writable).
+- Read-only mounts: the API creates one via `extraRepos[].writable = false` (PR C2); the "Also work in"
+  picker does not expose `writable` or a custom `mountDir` yet — agent attachments are always writable.
 - Acceptance checks still run in the primary worktree only.
 - The primary PR body is not edited after the mount PRs exist; the cross-link is on each mount PR
   ("Part of <primary PR>") and in the task chat / Inbox.
