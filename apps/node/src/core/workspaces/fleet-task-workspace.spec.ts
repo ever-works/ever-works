@@ -7,6 +7,7 @@ import { join, parse, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+	FLEET_TASK_WORKSPACE_EXCLUDE_RULES,
 	FleetTaskWorkspaceError,
 	FleetTaskWorkspaceProvisioner,
 	type FleetWorkspacePlugin
@@ -133,6 +134,48 @@ describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { ti
 		expect(healed.reused).toBe(false);
 		expect(existsSync(join(healed.path, 'stale.txt'))).toBe(false);
 		expect(git(healed.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/fleet-new');
+	});
+
+	it('keeps the owner-question directory out of the single-repository worktree (self-build slice Q)', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const descriptor = await provisioner.provision('task-0006', workspace('task/fleet-0006'));
+		mkdirSync(join(descriptor.path, '.ever-works'), { recursive: true });
+		writeFileSync(join(descriptor.path, '.ever-works', 'QUESTION.md'), '# Which database?\n');
+
+		// Git never sees the file: not untracked, not stageable by `add -A`.
+		expect(git(descriptor.path, 'status', '--porcelain')).toBe('');
+		git(descriptor.path, 'add', '-A');
+		expect(git(descriptor.path, 'diff', '--cached', '--name-only')).toBe('');
+
+		// A file written from a package directory — a model that `cd`-ed into
+		// one and wrote the path relative to its cwd — is just as invisible:
+		// the unanchored rule (review SR-5) matches at any depth.
+		mkdirSync(join(descriptor.path, 'packages', 'api', '.ever-works'), { recursive: true });
+		writeFileSync(join(descriptor.path, 'packages', 'api', '.ever-works', 'QUESTION.md'), '# Nested?\n');
+		expect(git(descriptor.path, 'status', '--porcelain')).toBe('');
+		git(descriptor.path, 'add', '-A');
+		expect(git(descriptor.path, 'diff', '--cached', '--name-only')).toBe('');
+
+		// Every fleet rule lives in the repository's shared exclude file...
+		const commonDir = git(descriptor.path, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+		const excludeLines = (await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8'))
+			.split(/\r?\n/)
+			.map((line) => line.trim());
+		expect(excludeLines).toContain('/.mounts/');
+		expect(excludeLines).toContain('/.ever-works/');
+		expect(excludeLines).toContain('.ever-works/');
+		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
+			expect(excludeLines.filter((line) => line === rule)).toHaveLength(1);
+		}
+
+		// ...and a second provision of the same task adds nothing twice.
+		await provisioner.provision('task-0006', workspace('task/fleet-0006'));
+		const again = (await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8'))
+			.split(/\r?\n/)
+			.map((line) => line.trim());
+		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
+			expect(again.filter((line) => line === rule)).toHaveLength(1);
+		}
 	});
 
 	it.runIf(process.platform === 'win32')(

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { FleetJobView, FleetTaskWorkspaceDescriptor } from '@ever-works/contracts';
 import { join } from 'node:path';
 import { runAgentTaskJob, type AgentTaskIo, type AgentTaskScratchFs } from './agent-task';
+import { ownerQuestionPath, type AgentTaskQuestionFs } from './agent-task-question';
 
 /**
  * Multi-repo Task workspaces (self-build slice C) at the executor seam.
@@ -97,6 +98,31 @@ function scratchFs(): AgentTaskScratchFs {
 	};
 }
 
+/**
+ * In-memory owner-question filesystem (self-build slice Q). Every read and
+ * removal is logged to `log` so a test can interleave it with the finalize
+ * `order`; the default double logs to its own list so the existing
+ * `['mounts', 'primary']` assertions stay exact.
+ */
+function questionFs(seed: Record<string, string> = {}, log: string[] = []) {
+	const files = new Map<string, string>(Object.entries(seed));
+	const fs: AgentTaskQuestionFs & { files: Map<string, string> } = {
+		files,
+		readHead: async (path, maxBytes) => {
+			log.push(`read:${path}`);
+			const content = files.get(path);
+			if (content === undefined) return null;
+			return Buffer.from(content, 'utf8').subarray(0, maxBytes).toString('utf8');
+		},
+		remove: async (path) => {
+			log.push(`remove:${path}`);
+			files.delete(path);
+		},
+		removeDirIfEmpty: async () => undefined
+	};
+	return fs;
+}
+
 function spawnOk() {
 	return ((command: string) => {
 		const handlers = new Map<string, (arg?: unknown) => void>();
@@ -172,6 +198,7 @@ function io(over: Partial<AgentTaskIo> = {}): AgentTaskIo & { order: string[] } 
 		modelCli: { 'claude-code': CLAUDE, codex: null },
 		scratchRoot: SCRATCH,
 		scratchFs: scratchFs(),
+		questionFs: questionFs(),
 		...over
 	} as AgentTaskIo & { order: string[] };
 }
@@ -267,5 +294,68 @@ describe('runAgentTaskJob — multi-repo mounts', () => {
 		expect(deps.finalizeWorkspace).not.toHaveBeenCalled();
 		expect('mountGit' in outcome).toBe(false);
 		expect('git' in outcome).toBe(false);
+	});
+});
+
+describe('runAgentTaskJob — owner question across mounts (self-build slice Q)', () => {
+	const PRIMARY_QUESTION = ownerQuestionPath(primary.path);
+	const TEMPLATE_QUESTION = ownerQuestionPath(withMounts.mounts![0]!.path);
+	const READ_ONLY_PATH = withMounts.mounts![1]!.path;
+
+	it('discards, then scans the primary and each writable mount — never the read-only one — before any finalizer', async () => {
+		const deps = io();
+		// Log into the same `order` the finalizers write to, so the relative
+		// position of every question step is pinned, not just its presence.
+		deps.questionFs = questionFs({}, deps.order);
+
+		const outcome = await runAgentTaskJob(job(payload), deps);
+
+		expect(outcome.status).toBe('succeeded');
+		expect('question' in outcome).toBe(false);
+		expect(deps.order).toEqual([
+			// Pre-model discard: primary, then the writable mount.
+			`remove:${PRIMARY_QUESTION}`,
+			`remove:${TEMPLATE_QUESTION}`,
+			// Post-model collect, in the same order (absent → no removal).
+			`read:${PRIMARY_QUESTION}`,
+			`read:${TEMPLATE_QUESTION}`,
+			// Only THEN the Git work.
+			'mounts',
+			'primary'
+		]);
+		expect(deps.order.some((entry) => entry.includes(READ_ONLY_PATH))).toBe(false);
+	});
+
+	it('reports a question found only in a writable mount, naming the mount, and removes it before the mount push', async () => {
+		const deps = io();
+		deps.questionFs = questionFs(
+			{ [TEMPLATE_QUESTION]: '# Rename the template component too?\n\nThe platform side is done.' },
+			deps.order
+		);
+		// The file appears AFTER the discard: the double seeds it up front, so
+		// the pre-model discard would wipe it. Re-seed it when the model runs.
+		const spawn = deps.spawnFn as unknown as (command: string, options: unknown) => unknown;
+		deps.spawnFn = ((command: string, options: unknown) => {
+			if (command.includes(CLAUDE)) {
+				(deps.questionFs as ReturnType<typeof questionFs>).files.set(
+					TEMPLATE_QUESTION,
+					'# Rename the template component too?\n\nThe platform side is done.'
+				);
+			}
+			return spawn(command, options);
+		}) as never;
+
+		const outcome = await runAgentTaskJob(job(payload), deps);
+
+		expect(outcome.question).toEqual({
+			text: 'Rename the template component too?',
+			context: 'The platform side is done.',
+			truncated: false,
+			mountDir: 'template'
+		});
+		expect(outcome.status).toBe('succeeded');
+		expect(outcome.mountGit?.[0]).toMatchObject({ mountDir: 'template', pushed: true });
+		expect((deps.questionFs as ReturnType<typeof questionFs>).files.size).toBe(0);
+		expect(deps.order.indexOf(`remove:${TEMPLATE_QUESTION}`, 2)).toBeLessThan(deps.order.indexOf('mounts'));
 	});
 });

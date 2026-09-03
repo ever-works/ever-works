@@ -1,15 +1,18 @@
+import type { InboxItemSourceMeta } from '@ever-works/contracts';
+
 /**
  * Inbox (operator message center) — the producer port.
  *
  * Same posture as `tasks-domain/run-steering-port.ts` and
  * `agents/agent-run-post-processor.ts`: the interface + token live in a
- * LEAF file with zero runtime imports, the consumers
- * (`AgentEscalationService`, `AgentApprovalsService`,
- * `NotificationService`) inject it `@Optional()`, and the api-side
- * `@Global()` InboxModule binds it to `InboxService`. That keeps the
- * file-import direction one-way (inbox → agents/approvals for the
- * reply routing, never back) even though the runtime call goes the
- * other way, so no barrel can form a cycle.
+ * LEAF file with zero runtime imports (the contracts import above is
+ * type-only), the consumers (`AgentEscalationService`,
+ * `AgentApprovalsService`, `NotificationService`, the api-side fleet
+ * reconciler) inject it `@Optional()`, and the api-side `@Global()`
+ * InboxModule binds it to `InboxService`. That keeps the file-import
+ * direction one-way (inbox → agents/approvals for the reply routing,
+ * never back) even though the runtime call goes the other way, so no
+ * barrel can form a cycle.
  *
  * When the token is unbound — unit tests, the worker's RPC context,
  * installs without the api layer — every producer keeps today's
@@ -67,6 +70,28 @@ export interface InboxNoticeInput {
     notify?: boolean;
 }
 
+/**
+ * Self-build slice Q — a question a FLEET run asked the Task owner
+ * (written to `.ever-works/QUESTION.md` on the node, reported in the
+ * job result, consumed by the api-side reconciler).
+ */
+export interface InboxQuestionRaisedInput {
+    userId: string;
+    /**
+     * The PARKED run. MUST already be terminal (`markCompleted`) and
+     * flagged `awaitingInput` when this is called — see the reconciler's
+     * ordering: a question filed while the run row is still `running`
+     * lets a fast reply route to `RunSteeringService.steer`, which
+     * appends the answer to `pendingInput` nobody on a node ever reads.
+     */
+    agentRunId: string;
+    agentId?: string | null;
+    question: string;
+    context?: string | null;
+    /** Fleet provenance (node, branch, Task title, PR, mount), rendered as chips. */
+    sourceMeta?: InboxItemSourceMeta | null;
+}
+
 export interface InboxProducer {
     /** Mirror a freshly-recorded escalation as an inbox item. */
     escalationRaised(input: InboxEscalationRaisedInput): Promise<void>;
@@ -74,6 +99,14 @@ export interface InboxProducer {
     proposalPending(input: InboxProposalPendingInput): Promise<void>;
     /** File a plain system notice. */
     notice(userId: string, input: InboxNoticeInput): Promise<void>;
+    /**
+     * Self-build slice Q: file a question a FLEET run asked and park that
+     * run — the fleet twin of `askHuman`. Task / Work / organization links
+     * are derived from the run row, never from the caller (the result the
+     * node reported is untrusted data). Idempotent per run: a second call
+     * while an open question exists for `agentRunId` files nothing.
+     */
+    questionRaised(input: InboxQuestionRaisedInput): Promise<void>;
 }
 
 export const INBOX_PRODUCER = 'INBOX_PRODUCER' as const;

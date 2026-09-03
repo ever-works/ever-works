@@ -7,6 +7,7 @@ import type {
 	FleetAgentTaskGitResult,
 	FleetAgentTaskModelResult,
 	FleetAgentTaskPayload,
+	FleetAgentTaskQuestion,
 	FleetAgentTaskResult,
 	FleetAgentTaskStep,
 	FleetJobView,
@@ -26,6 +27,12 @@ import {
 	type NodeCheckResult,
 	type WireCheck
 } from './acceptance-checks';
+import {
+	collectOwnerQuestion,
+	defaultQuestionFs,
+	discardOwnerQuestion,
+	type AgentTaskQuestionFs
+} from './agent-task-question';
 import {
 	buildModelCliCommand,
 	buildModelCliStep,
@@ -64,6 +71,17 @@ import {
  * (`runNodeCommandStep`), so the env scrub, the timeout policy, the
  * cancellation path and the verdict rules cannot drift between them —
  * or between this kind and `acceptance-checks`.
+ *
+ * **Owner question (self-build slice Q)** — a model that needs a decision
+ * only the Task owner can make writes `.ever-works/QUESTION.md` in the
+ * worktree and stops. After the model step (before the checks, before
+ * any Git command) the node reads and REMOVES that file and reports it
+ * as `result.question`; a stale file from an earlier attempt is
+ * discarded before the model runs so only this run's words count. A
+ * question is not a failure and never makes the job `failed` on its
+ * own: the node still reports the model, check and git verdicts
+ * honestly, and the platform decides what a paused run means. See
+ * `agent-task-question.ts`.
  *
  * ## Failure posture
  *
@@ -157,6 +175,11 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	/** Root for per-job scratch files (instructions / CLI output). */
 	scratchRoot?: string;
 	scratchFs?: AgentTaskScratchFs;
+	/**
+	 * Self-build slice Q: reads / removes the owner-question file in the
+	 * worktree (and in writable mounts). Defaults to `node:fs`.
+	 */
+	questionFs?: AgentTaskQuestionFs;
 	platform?: NodeJS.Platform;
 }
 
@@ -199,6 +222,24 @@ export async function runAgentTaskJob(
 	const workspaceResolution = await resolveAgentTaskWorkspace(taskId, payload, io, signal);
 	throwIfAgentTaskAborted(signal);
 
+	const questionFs = io.questionFs ?? defaultQuestionFs;
+	const questionMounts = (workspaceResolution.descriptor?.mounts ?? []).map((mount) => ({
+		mountDir: mount.mountDir,
+		path: mount.path,
+		writable: mount.writable
+	}));
+	if (execution) {
+		// The worktree is reused in place across runs (no clean, no
+		// re-clone): a question file left by an aborted attempt, or by the
+		// previous run whose question the owner already answered, must never
+		// become a phantom question — nor context the model reads.
+		await discardOwnerQuestion(workspaceResolution.path, questionFs, signal);
+		for (const mount of questionMounts) {
+			if (mount.writable) await discardOwnerQuestion(mount.path, questionFs, signal);
+		}
+		throwIfAgentTaskAborted(signal);
+	}
+
 	const failures: string[] = [];
 	let model: FleetAgentTaskModelResult | null = null;
 	if (execution) {
@@ -207,6 +248,20 @@ export async function runAgentTaskJob(
 		if (model.status !== 'succeeded') {
 			failures.push(describeModelFailure(model));
 		}
+	}
+
+	// Self-build slice Q: read the owner question BEFORE the checks and
+	// BEFORE finalize, so `git add -A` can never stage the file. A question
+	// NEVER pushes to `failures` — the platform decides what a paused run
+	// means, and the model / check / git verdicts below stay honest.
+	let question: FleetAgentTaskQuestion | null = null;
+	if (execution) {
+		question = await collectOwnerQuestion(
+			{ primaryPath: workspaceResolution.path, mounts: questionMounts },
+			questionFs,
+			signal
+		);
+		throwIfAgentTaskAborted(signal);
 	}
 
 	const stepResults: NodeCheckResult[] = [];
@@ -268,6 +323,9 @@ export async function runAgentTaskJob(
 		gateStatus,
 		...(git ? { git } : {}),
 		...(mountGit && mountGit.length > 0 ? { mountGit } : {}),
+		// Conditional key: a run without a question reports exactly what it
+		// always did (`question: null` would be a wire change for nothing).
+		...(question ? { question } : {}),
 		...(failures.length > 0 ? { failureReason: failures.join('; ') } : {})
 	};
 }

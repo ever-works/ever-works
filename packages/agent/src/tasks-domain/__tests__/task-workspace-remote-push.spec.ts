@@ -149,6 +149,13 @@ describe('TaskWorkspaceService.finalizeRemotePush', () => {
             prNumber: 5,
             prUrl: 'https://github.com/acme/site-data/pull/5',
         });
+        // One write, and it keeps the branch at `pr-open` — never a
+        // `pushed` downgrade followed by a repair (review Q-R1-01).
+        expect(tasks.updateById).toHaveBeenCalledTimes(1);
+        expect(tasks.updateById).toHaveBeenCalledWith(
+            'task-1',
+            expect.objectContaining({ branchRef: 'task/tsk-9-task1', branchState: 'pr-open' }),
+        );
     });
 
     it('refuses without a branch or a Work', async () => {
@@ -161,5 +168,66 @@ describe('TaskWorkspaceService.finalizeRemotePush', () => {
                 task: makeTask({ workId: null } as Partial<Task>),
             }),
         ).rejects.toThrow(/lost its Work/);
+    });
+
+    describe('recordRemotePush (self-build slice Q — a run parked on an owner question)', () => {
+        it('records the branch as pushed and stamps changed files without opening a PR or transitioning the Task', async () => {
+            await build().recordRemotePush({
+                task: makeTask(),
+                branch: 'task/tsk-9-task1',
+                runId: 'run-1',
+                headSha: 'b'.repeat(40),
+                baseSha: 'a'.repeat(40),
+                changedFiles: 3,
+            });
+            expect(runs.updateTelemetry).toHaveBeenCalledWith('run-1', { changedFilesCount: 3 });
+            expect(tasks.updateById).toHaveBeenCalledTimes(1);
+            expect(tasks.updateById).toHaveBeenCalledWith('task-1', {
+                branchRef: 'task/tsk-9-task1',
+                branchState: 'pushed',
+                baseSha: 'a'.repeat(40),
+            });
+            // No pull request, no Work lookup, no `in_review` transition:
+            // partial work waits for the owner's answer, not for a review.
+            expect(gitFacade.getRepository).not.toHaveBeenCalled();
+            expect(gitFacade.createPullRequest).not.toHaveBeenCalled();
+            expect(transitions.transition).not.toHaveBeenCalled();
+        });
+
+        it('keeps pr-open when the Task already has a pull request (review Q-R1-01)', async () => {
+            // A question asked in a LATER run of a Task whose earlier run
+            // opened the PR: the row must not fall back to `pushed` with
+            // prNumber / prUrl still set (the branch chip would lose the
+            // PR link while the Inbox item still advertises it).
+            await build().recordRemotePush({
+                task: makeTask({ prNumber: 5, prUrl: 'https://github.com/acme/site-data/pull/5' }),
+                branch: 'task/tsk-9-task1',
+                baseSha: 'a'.repeat(40),
+            });
+            expect(tasks.updateById).toHaveBeenCalledTimes(1);
+            expect(tasks.updateById).toHaveBeenCalledWith('task-1', {
+                branchRef: 'task/tsk-9-task1',
+                branchState: 'pr-open',
+                baseSha: 'a'.repeat(40),
+            });
+            expect(gitFacade.createPullRequest).not.toHaveBeenCalled();
+            expect(transitions.transition).not.toHaveBeenCalled();
+        });
+
+        it('trims the branch and skips the telemetry stamp without a run id', async () => {
+            await build().recordRemotePush({ task: makeTask(), branch: '  task/tsk-9-task1 ' });
+            expect(runs.updateTelemetry).not.toHaveBeenCalled();
+            expect(tasks.updateById).toHaveBeenCalledWith('task-1', {
+                branchRef: 'task/tsk-9-task1',
+                branchState: 'pushed',
+            });
+        });
+
+        it('refuses without a branch, like finalizeRemotePush', async () => {
+            await expect(
+                build().recordRemotePush({ task: makeTask(), branch: '   ' }),
+            ).rejects.toThrow(/without a branch/);
+            expect(tasks.updateById).not.toHaveBeenCalled();
+        });
     });
 });
