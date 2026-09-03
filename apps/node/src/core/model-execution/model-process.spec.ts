@@ -440,6 +440,40 @@ function closedProcess(stdoutText: string): ChildProcess {
 	return child;
 }
 
+/**
+ * A child that has already finished on its own. Unlike closedProcess, its stdio
+ * and 'close' arrive on macrotasks: the executor attaches its listeners only
+ * after `await containment.spawn(...)` settles, so a microtask-timed close would
+ * fire before anyone listens and the run would hang. `exitCode` is set before
+ * 'close' exactly as Node does, which is what lets the test containment prove
+ * termination without a taskkill. `beforeClose` runs right before 'close' so a
+ * test can move the fake monotonic clock to where a slow child would have left it.
+ */
+function exitedProcess(stdoutText: string, beforeClose?: () => void): ChildProcess {
+	const stdout = new PassThrough();
+	const stderr = new PassThrough();
+	const child = Object.assign(new EventEmitter(), {
+		stdout,
+		stderr,
+		stdin: new PassThrough(),
+		exitCode: null as number | null,
+		signalCode: null as NodeJS.Signals | null,
+		kill: () => true
+	});
+	setImmediate(() => {
+		stdout.end(stdoutText);
+		stderr.end();
+		// A second turn lets the captured stdout drain before 'close' is observed,
+		// mirroring a real child whose stdio closes before its 'close' event.
+		setImmediate(() => {
+			beforeClose?.();
+			child.exitCode = 0;
+			child.emit('close', 0, null);
+		});
+	});
+	return child as unknown as ChildProcess;
+}
+
 function envValue(env: Record<string, string>, name: string): string | undefined {
 	const key = Object.keys(env).find((candidate) => candidate.toUpperCase() === name.toUpperCase());
 	return key ? env[key] : undefined;
@@ -976,26 +1010,51 @@ if (process.argv.includes('--version')) {
 	});
 
 	it('charges a slow version probe against the single execution deadline', async () => {
-		const harness = await createHarness('slow-deadline');
-		const result = await executeModelProcess(
-			request('codex', harness.workspacePath, { timeoutMs: 400 }),
-			harness.io
-		);
+		const harness = await createHarness('success');
+		let monotonicTime = 0;
+		const spawnPurposes: string[] = [];
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 8_000 }), {
+			...harness.io,
+			monotonicNow: () => monotonicTime,
+			beforeSpawn: (purpose) => spawnPurposes.push(purpose),
+			// The probe answers inside its own 10 s ceiling yet has eaten the whole
+			// shared budget by the time it closes. Moving the fake clock instead of
+			// sleeping keeps the real budget timer, which the executor arms from the
+			// fake remaining budget, out of any race with a real child under load.
+			spawnFn: (() =>
+				exitedProcess('codex-cli 0.146.0\n', () => {
+					monotonicTime = 8_001;
+				})) as typeof spawn
+		});
 
-		expect(['timed-out', 'termination-failed']).toContain(result.status);
+		expect(result.status).toBe('timed-out');
+		expect(result.summary).toMatch(/wall-clock/i);
+		expect(spawnPurposes).toEqual(['version-probe']);
 	});
 
 	it('charges asynchronous preparation against the single execution deadline', async () => {
-		const harness = await createHarness('slow-model-deadline');
-		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 400 }), {
+		const harness = await createHarness('success');
+		let monotonicTime = 0;
+		const spawnPurposes: string[] = [];
+		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 8_000 }), {
 			...harness.io,
+			monotonicNow: () => monotonicTime,
+			beforeSpawn: (purpose) => spawnPurposes.push(purpose),
 			directoryExists: async () => {
-				await new Promise((resolve) => setTimeout(resolve, 200));
+				monotonicTime = 4_000;
 				return true;
-			}
+			},
+			// Alone, neither the 4 s preparation nor the 4.001 s probe exhausts the
+			// 8 s budget; only their sum does, which is what one deadline means.
+			spawnFn: (() =>
+				exitedProcess('codex-cli 0.146.0\n', () => {
+					monotonicTime += 4_001;
+				})) as typeof spawn
 		});
 
-		expect(['timed-out', 'termination-failed']).toContain(result.status);
+		expect(result.status).toBe('timed-out');
+		expect(result.summary).toMatch(/wall-clock/i);
+		expect(spawnPurposes).toEqual(['version-probe']);
 	});
 
 	it.each(['claude-code', 'codex'] as const)(
@@ -1724,26 +1783,33 @@ describe('executeModelProcess — request refusal', () => {
 		const harness = await createHarness('success');
 		let monotonicTime = 0;
 		let containmentCount = 0;
+		let modelCloseCalls = 0;
 		const baseCreateContainment = harness.io.createModelProcessContainment!;
 		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
 			...harness.io,
 			monotonicNow: () => monotonicTime,
+			// Only the credentialed model child moves the fake deadline; the version
+			// probe closes inside the budget so the outcome cannot depend on probe
+			// close ordering. Both are finished fakes because the executor arms a
+			// real budget timer from the fake remaining budget: a real child that
+			// starts slowly under runner load loses that race and the containment
+			// is asked to prove termination of a still-running tree instead.
+			spawnFn: ((...args: Parameters<typeof spawn>) =>
+				(args[1] ?? []).includes('--version')
+					? exitedProcess('codex-cli 0.146.0\n')
+					: exitedProcess(`${JSON.stringify({ type: 'turn.completed' })}\n`, () => {
+							monotonicTime = 1_001;
+						})) as typeof spawn,
 			createModelProcessContainment: async (spawnFn) => {
 				const containment = await baseCreateContainment(spawnFn);
 				containmentCount += 1;
-				// The first containment owns the version probe. Advance the fake
-				// deadline only for the credentialed model process this test names;
-				// attaching to both made the outcome depend on probe close ordering.
 				if (containmentCount === 1) return containment;
 				return {
 					...containment,
-					spawn: (async (...args: Parameters<TestContainment['spawn']>) => {
-						const child = await containment.spawn(...args);
-						child.once('close', () => {
-							monotonicTime = 1_001;
-						});
-						return child;
-					}) as TestContainment['spawn']
+					close: async () => {
+						modelCloseCalls += 1;
+						return containment.close();
+					}
 				};
 			}
 		});
@@ -1751,6 +1817,7 @@ describe('executeModelProcess — request refusal', () => {
 		expect(result.status).toBe('timed-out');
 		expect(result.summary).toMatch(/wall-clock/i);
 		expect(containmentCount).toBe(2);
+		expect(modelCloseCalls).toBe(1);
 	});
 
 	it('makes the absolute deadline win when containment close consumes the remaining budget', async () => {
@@ -1973,10 +2040,15 @@ describe('executeModelProcess — request refusal', () => {
 		const harness = await createHarness('success');
 		const baseCreateContainment = harness.io.createModelProcessContainment!;
 		let containmentCount = 0;
+		let rejectedLauncherCloseCalls = 0;
 		let monotonicTime = 0;
 		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
 			...harness.io,
 			monotonicNow: () => monotonicTime,
+			// A finished fake probe cannot be outrun by the real budget timer the
+			// executor arms from the fake remaining budget, so the only deadline
+			// event left is the one this test stages in the launcher.
+			spawnFn: (() => exitedProcess('codex-cli 0.146.0\n')) as typeof spawn,
 			createModelProcessContainment: async (spawnFn) => {
 				const containment = await baseCreateContainment(spawnFn);
 				containmentCount += 1;
@@ -1986,6 +2058,10 @@ describe('executeModelProcess — request refusal', () => {
 					spawn: async () => {
 						monotonicTime = 1_001;
 						throw new Error('trusted broker stopped after deadline');
+					},
+					close: async () => {
+						rejectedLauncherCloseCalls += 1;
+						return containment.close();
 					}
 				};
 			}
@@ -1993,6 +2069,8 @@ describe('executeModelProcess — request refusal', () => {
 
 		expect(result.status).toBe('timed-out');
 		expect(result.summary).toMatch(/wall-clock/i);
+		expect(containmentCount).toBe(2);
+		expect(rejectedLauncherCloseCalls).toBe(1);
 	});
 
 	it('bounds a never-resolving workspace validation inside the one execution deadline', async () => {
