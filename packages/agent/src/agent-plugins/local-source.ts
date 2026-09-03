@@ -233,11 +233,30 @@ export function parsePackageDirs(value: string | undefined): string[] {
     const separators = new Set([',', ';', delimiter]);
     const parts: string[] = [];
     let current = '';
-    for (const char of value) {
+    for (let i = 0; i < value.length; i += 1) {
+        const char = value[i];
         if (separators.has(char)) {
-            parts.push(current);
-            current = '';
-            continue;
+            // A drive-letter colon belongs to the path on EVERY platform.
+            //
+            // On Windows this never fires: `delimiter` is `;` there, so `:`
+            // is not in `separators` at all. It bites on POSIX, where
+            // `delimiter` IS `:` — a container or CI host reading a value
+            // authored on Windows would otherwise turn `C:\packages` into
+            // `C` and `\packages`, and then scan two directories that do
+            // not exist instead of reporting the one that does.
+            //
+            // Deliberately requires a BACKSLASH after the colon rather than
+            // any slash: on POSIX a list like `a:/b` is two real paths, and
+            // treating that as a drive letter would silently merge them. A
+            // Windows-authored path always uses `\`, so this keeps the
+            // POSIX meaning intact.
+            const isDriveLetterColon =
+                char === ':' && /^[A-Za-z]$/.test(current) && value[i + 1] === '\\';
+            if (!isDriveLetterColon) {
+                parts.push(current);
+                current = '';
+                continue;
+            }
         }
         current += char;
     }
