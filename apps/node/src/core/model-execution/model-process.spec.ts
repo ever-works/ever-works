@@ -259,7 +259,13 @@ interface Harness {
 const roots: string[] = [];
 
 afterEach(async () => {
-	await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+	// Windows releases a force-killed child's working-directory handle a beat
+	// after taskkill reports success, and a loaded machine widens that gap into
+	// EBUSY on the temp root. Retry the removal rather than fail a test that
+	// already passed on an unrelated cleanup race.
+	await Promise.all(
+		roots.splice(0).map((root) => rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }))
+	);
 });
 
 async function createHarness(mode: string, parentEnv: NodeJS.ProcessEnv = process.env): Promise<Harness> {
