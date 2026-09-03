@@ -166,8 +166,12 @@ The **Repository** kind (`kind: repo`) turns an existing code repository — the
 platform monorepo, a template repository, a website repository — into a
 first-class Work so Tasks, Goals and fleet runs can attach to it. Pick the
 **Repository** chip on `/new` or `/works/new`, paste the repository URL
-(GitHub, GitLab or Bitbucket — `https://github.com/owner/repo`), and adjust
-the derived name, slug and description if you like.
+(GitHub only for now — `https://github.com/owner/repo`; GitLab and Bitbucket
+follow once their git-provider plugins ship), and adjust the derived name,
+slug and description if you like. Registration is verified against your own
+connected GitHub account: the repository must exist and be readable by that
+account, and a repository another account has already registered as a Work
+is refused — ask that Work's owner to add you as a member instead.
 
 What is different from every other kind:
 
