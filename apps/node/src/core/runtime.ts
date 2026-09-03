@@ -252,7 +252,7 @@ export interface CreateNodeRuntimeOptions {
 	agentTaskWorkspaceRoot?: string;
 	/** Test/embedding seam; ordinary runtimes use the local-workspace provider. */
 	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'> &
-		Partial<Pick<FleetTaskWorkspaceProvisioner, 'finalize'>>;
+		Partial<Pick<FleetTaskWorkspaceProvisioner, 'finalize' | 'finalizeMounts'>>;
 	/**
 	 * Agent execution v2 — the model CLIs the `agent-task` executor may
 	 * spawn. Defaults to what `io.environment.modelCli` resolved at
@@ -368,6 +368,12 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 						? {
 								finalizeWorkspace: (taskId, descriptor, opts, finalizeSignal) =>
 									workspaceProvisioner.finalize!(taskId, descriptor, opts, finalizeSignal)
+							}
+						: {}),
+					...(workspaceProvisioner.finalizeMounts
+						? {
+								finalizeMounts: (taskId, descriptor, opts, finalizeSignal) =>
+									workspaceProvisioner.finalizeMounts!(taskId, descriptor, opts, finalizeSignal)
 							}
 						: {}),
 					modelCli,

@@ -58,6 +58,8 @@ import { InboxController } from './inbox.controller';
                     escalationRaised: (input) => inbox().escalationRaised(input),
                     proposalPending: (input) => inbox().proposalPending(input),
                     notice: (userId, input) => inbox().notice(userId, input),
+                    // Self-build slice Q — the fleet reconciler's question path.
+                    questionRaised: (input) => inbox().questionRaised(input),
                 };
             },
         },

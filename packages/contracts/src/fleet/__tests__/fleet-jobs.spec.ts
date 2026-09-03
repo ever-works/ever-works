@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
+import { INBOX_MAX_BODY_CHARS, INBOX_MAX_TITLE_CHARS } from '../../inbox/inbox.types.js';
 import {
 	clampLeaseTtlSec,
 	clampMaxAttempts,
 	FLEET_AGENT_TASK_MAX_STEPS,
+	FLEET_AGENT_TASK_META_DIR,
+	FLEET_AGENT_TASK_QUESTION_FILE,
+	FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES,
+	FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES,
+	FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS,
 	FLEET_BROWSER_CAPABILITY,
 	FLEET_GPU_CAPABILITY,
 	FLEET_JOB_ACTIVE_STATUSES,
@@ -25,6 +31,8 @@ import {
 	isFleetJobTerminal,
 	isNodeBusy,
 	nodeSatisfiesCapabilities,
+	normalizeFleetAgentTaskQuestion,
+	parseFleetAgentTaskQuestionMarkdown,
 	type FleetJobKind,
 	type FleetJobStatus,
 	type FleetNodeLoadView
@@ -261,7 +269,13 @@ describe('numeric limits', () => {
 		['FLEET_JOB_MAX_RESULT_BYTES', FLEET_JOB_MAX_RESULT_BYTES, 262144],
 		['FLEET_JOB_MAX_ERROR_LENGTH', FLEET_JOB_MAX_ERROR_LENGTH, 4096],
 		['FLEET_JOB_MAX_REQUIRED_CAPABILITIES', FLEET_JOB_MAX_REQUIRED_CAPABILITIES, 8],
-		['FLEET_AGENT_TASK_MAX_STEPS', FLEET_AGENT_TASK_MAX_STEPS, 16]
+		['FLEET_AGENT_TASK_MAX_STEPS', FLEET_AGENT_TASK_MAX_STEPS, 16],
+		// Owner question (self-build slice Q): the node never reads more than
+		// the file cap, the question line shares the Inbox title cap, and the
+		// context cap keeps title + context inside the Inbox body cap.
+		['FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES', FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES, 65536],
+		['FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS', FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS, 300],
+		['FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES', FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES, 6144]
 	];
 
 	it.each(LIMITS)('pins %s', (_name, actual, expected) => {
@@ -293,6 +307,35 @@ describe('numeric limits', () => {
 	it('keeps the default attempt budget inside [1, ceiling]', () => {
 		expect(FLEET_JOB_DEFAULT_MAX_ATTEMPTS).toBeGreaterThanOrEqual(1);
 		expect(FLEET_JOB_DEFAULT_MAX_ATTEMPTS).toBeLessThanOrEqual(FLEET_JOB_MAX_ATTEMPTS_CEILING);
+	});
+
+	it('keeps the question caps inside the Inbox caps and far below the result cap', () => {
+		// The question line becomes the Inbox item's title verbatim, and the
+		// body is `text + blank line + context`, so both have to fit the Inbox
+		// writer caps or the reconciler would have to cut a second time. The
+		// file cap stays well under HALF the result cap: an oversize result
+		// is REJECTED by the platform, and a question run must never fail
+		// its report over the size of what it asked.
+		expect(FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS).toBe(INBOX_MAX_TITLE_CHARS);
+		expect(
+			FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES + FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS + 2
+		).toBeLessThanOrEqual(INBOX_MAX_BODY_CHARS);
+		expect(FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES).toBeLessThan(FLEET_JOB_MAX_RESULT_BYTES / 2);
+	});
+});
+
+describe('owner question file constants (self-build slice Q)', () => {
+	it('names the reserved directory and the question file inside it', () => {
+		// The node builds the OS path from these two, the planner tells the
+		// model the same relative path, and the node excludes the directory
+		// from Git — three consumers, one spelling.
+		expect(FLEET_AGENT_TASK_META_DIR).toBe('.ever-works');
+		expect(FLEET_AGENT_TASK_QUESTION_FILE).toBe('.ever-works/QUESTION.md');
+		expect(FLEET_AGENT_TASK_QUESTION_FILE.startsWith(`${FLEET_AGENT_TASK_META_DIR}/`)).toBe(true);
+	});
+
+	it('is case-exact (ext4 would not find `question.md`)', () => {
+		expect(FLEET_AGENT_TASK_QUESTION_FILE).not.toBe(FLEET_AGENT_TASK_QUESTION_FILE.toLowerCase());
 	});
 });
 
@@ -588,5 +631,218 @@ describe('isNodeBusy', () => {
 		expect(typeof isNodeBusy(undefined)).toBe('boolean');
 		expect(typeof isNodeBusy(load(0))).toBe('boolean');
 		expect(typeof isNodeBusy(load(2, 'agent-task'))).toBe('boolean');
+	});
+});
+
+/** The two characters the escape-averse tests below need, built without `\u` escapes. */
+const BOM = String.fromCharCode(0xfeff);
+const REPLACEMENT_CHAR = String.fromCharCode(0xfffd);
+/** True when the string's last UTF-16 unit is an unpaired high surrogate (a torn code point). */
+const endsWithLoneHighSurrogate = (value: string): boolean => {
+	const last = value.charCodeAt(value.length - 1);
+	return last >= 0xd800 && last <= 0xdbff;
+};
+
+describe('parseFleetAgentTaskQuestionMarkdown (self-build slice Q)', () => {
+	it('takes a `# ` heading as the question, without the marker', () => {
+		expect(parseFleetAgentTaskQuestionMarkdown('# Which database?\n\nPostgres or SQLite?')).toEqual({
+			text: 'Which database?',
+			context: 'Postgres or SQLite?',
+			truncated: false,
+			mountDir: null
+		});
+	});
+
+	it('takes a plain first line as the question', () => {
+		expect(parseFleetAgentTaskQuestionMarkdown('Which database?')).toEqual({
+			text: 'Which database?',
+			context: null,
+			truncated: false,
+			mountDir: null
+		});
+	});
+
+	it('skips a UTF-8 BOM and leading blank lines', () => {
+		const parsed = parseFleetAgentTaskQuestionMarkdown(`${BOM}\n\n   \n## Ship it?\nContext.`);
+		expect(parsed?.text).toBe('Ship it?');
+		expect(parsed?.context).toBe('Context.');
+	});
+
+	it('leaves no carriage return behind on CRLF input', () => {
+		const parsed = parseFleetAgentTaskQuestionMarkdown('# Which DB?\r\n\r\nPostgres\r\nor SQLite\r\n');
+		expect(parsed?.text).toBe('Which DB?');
+		expect(parsed?.context).toBe('Postgres\nor SQLite');
+		expect(parsed?.text).not.toContain('\r');
+		expect(parsed?.context).not.toContain('\r');
+	});
+
+	it('trims the remainder into context and reports null context when nothing is left', () => {
+		expect(parseFleetAgentTaskQuestionMarkdown('Question?\n\n\n  \n')?.context).toBeNull();
+		expect(parseFleetAgentTaskQuestionMarkdown('Question?\n\n  - a\n  - b  \n\n')?.context).toBe('- a\n  - b');
+	});
+
+	it.each([
+		['the empty string', ''],
+		['whitespace only', '   \n\t\n'],
+		['heading markers only', '#\n##\n'],
+		['a BOM only', BOM]
+	])('returns null for %s — a blank file is not a question', (_label, input) => {
+		expect(parseFleetAgentTaskQuestionMarkdown(input)).toBeNull();
+	});
+
+	it('keeps a long first line whole by moving it into the context', () => {
+		// A 400-char question line: the title is the first 300 code points,
+		// the FULL line is prepended to the context, so nothing was dropped
+		// and `truncated` is honestly false.
+		const line = Array.from({ length: 80 }, (_v, i) => `word${i}`).join(' ');
+		expect(line.length).toBeGreaterThan(300);
+		const parsed = parseFleetAgentTaskQuestionMarkdown(`${line}\nMore.`);
+		expect(parsed).not.toBeNull();
+		expect(Array.from(parsed!.text)).toHaveLength(Array.from(line).slice(0, 300).join('').trimEnd().length);
+		expect(line.startsWith(parsed!.text)).toBe(true);
+		expect(parsed!.context?.startsWith(line)).toBe(true);
+		expect(parsed!.context?.endsWith('More.')).toBe(true);
+		expect(parsed!.truncated).toBe(false);
+	});
+
+	it('cuts oversize multi-byte context on a code-point boundary and says so', () => {
+		// 'a' + 3000 three-byte characters = 9001 bytes. The 6144-byte cap
+		// lands two bytes into a character, which must be dropped whole —
+		// never decoded into a replacement character.
+		const context = `a${'中'.repeat(3000)}`;
+		const parsed = parseFleetAgentTaskQuestionMarkdown(`Q?\n\n${context}`);
+		expect(parsed?.truncated).toBe(true);
+		expect(parsed?.context).toBe(`a${'中'.repeat(2047)}`);
+		expect(parsed?.context).not.toContain(REPLACEMENT_CHAR);
+		expect(new TextEncoder().encode(parsed!.context!).length).toBeLessThanOrEqual(
+			FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES
+		);
+	});
+
+	it('never splits a surrogate pair when capping the question line', () => {
+		const parsed = parseFleetAgentTaskQuestionMarkdown('😀'.repeat(301));
+		expect(Array.from(parsed!.text)).toHaveLength(300);
+		expect(endsWithLoneHighSurrogate(parsed!.text)).toBe(false);
+		// The full line is preserved in the context, so still not truncated.
+		expect(parsed!.context).toBe('😀'.repeat(301));
+		expect(parsed!.truncated).toBe(false);
+	});
+
+	it('strips control characters and ANSI escapes, and skips a line that is nothing but control characters (review SR-3)', () => {
+		// A binary head or a terminal-coloured paste: NUL / BEL / DEL and the
+		// CSI colour codes go, a tab stays, and a line of only NULs is not
+		// the question — the real one below it is.
+		const parsed = parseFleetAgentTaskQuestionMarkdown(
+			'\x00\x01\n\x1B[31mWhich\x00 DB?\x1B[0m\r\n\x07Context\x7F\tindented.'
+		);
+		expect(parsed).toEqual({ text: 'Which DB?', context: 'Context\tindented.', truncated: false, mountDir: null });
+		expect(parseFleetAgentTaskQuestionMarkdown('\x00\n\x1B\n')).toBeNull();
+	});
+
+	it('passes the mount directory through and defaults it to null', () => {
+		expect(parseFleetAgentTaskQuestionMarkdown('Q?', 'template')?.mountDir).toBe('template');
+		expect(parseFleetAgentTaskQuestionMarkdown('Q?')?.mountDir).toBeNull();
+		expect(parseFleetAgentTaskQuestionMarkdown('Q?', null)?.mountDir).toBeNull();
+	});
+
+	it('returns null for a non-string without throwing', () => {
+		expect(parseFleetAgentTaskQuestionMarkdown(undefined as unknown as string)).toBeNull();
+		expect(parseFleetAgentTaskQuestionMarkdown(42 as unknown as string)).toBeNull();
+	});
+});
+
+describe('normalizeFleetAgentTaskQuestion (self-build slice Q)', () => {
+	it.each([
+		['null', null],
+		['undefined', undefined],
+		['a string', 'Which DB?'],
+		['an array', ['Which DB?']],
+		['a number', 7],
+		['an object without text', { context: 'x' }],
+		['a non-string text', { text: 42 }],
+		['a blank text', { text: '   ' }],
+		['a text of only newlines', { text: '\n\n' }]
+	] as Array<[string, unknown]>)('returns null for %s', (_label, value) => {
+		expect(normalizeFleetAgentTaskQuestion(value)).toBeNull();
+	});
+
+	it('keeps only the first line of a multi-line text', () => {
+		expect(normalizeFleetAgentTaskQuestion({ text: 'a\nb' })).toEqual({
+			text: 'a',
+			context: null,
+			truncated: false,
+			mountDir: null
+		});
+	});
+
+	it('trims text and context, and ignores a non-string context', () => {
+		expect(normalizeFleetAgentTaskQuestion({ text: '  Q?  ', context: '  why  ' })).toEqual({
+			text: 'Q?',
+			context: 'why',
+			truncated: false,
+			mountDir: null
+		});
+		expect(normalizeFleetAgentTaskQuestion({ text: 'Q?', context: 12 })?.context).toBeNull();
+		expect(normalizeFleetAgentTaskQuestion({ text: 'Q?', context: '   ' })?.context).toBeNull();
+	});
+
+	it('re-caps an oversize text and context and marks the cut', () => {
+		const result = normalizeFleetAgentTaskQuestion({ text: 'x'.repeat(400), context: 'y'.repeat(10_000) });
+		expect(result?.text).toHaveLength(FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS);
+		expect(result?.context).toHaveLength(FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES);
+		expect(result?.truncated).toBe(true);
+	});
+
+	it('preserves a sticky truncated flag and never invents one', () => {
+		expect(normalizeFleetAgentTaskQuestion({ text: 'Q?', truncated: true })?.truncated).toBe(true);
+		expect(normalizeFleetAgentTaskQuestion({ text: 'Q?', truncated: 'yes' })?.truncated).toBe(false);
+		expect(normalizeFleetAgentTaskQuestion({ text: 'Q?' })?.truncated).toBe(false);
+	});
+
+	it('strips C0 controls, DEL and ANSI escapes from text and context, keeping tabs (review SR-3)', () => {
+		// A NUL in `text` would make the reconciler's first Postgres write
+		// throw and leave the run `running`; ESC sequences would reach the
+		// Inbox title as-is.
+		expect(normalizeFleetAgentTaskQuestion({ text: '\x1B[1mQ\x00?\x1B[0m', context: 'a\tb\x00\x7Fc' })).toEqual({
+			text: 'Q?',
+			context: 'a\tbc',
+			truncated: false,
+			mountDir: null
+		});
+		expect(normalizeFleetAgentTaskQuestion({ text: '\x00\x00' })).toBeNull();
+		expect(normalizeFleetAgentTaskQuestion({ text: '\x00\nReal question?' })?.text).toBe('Real question?');
+	});
+
+	it('drops every key it does not declare — a smuggled id never reaches a consumer', () => {
+		const result = normalizeFleetAgentTaskQuestion({ text: 'q', userId: 'x', taskId: 'y', agentRunId: 'z' });
+		expect(Object.keys(result!).sort()).toEqual(['context', 'mountDir', 'text', 'truncated']);
+	});
+
+	it.each([
+		['a traversal', '../x'],
+		['a nested path', 'a/b'],
+		['a backslash path', 'a\\b'],
+		['a blank string', '   '],
+		['the empty string', ''],
+		['a non-string', 7],
+		['an over-long name', 'm'.repeat(65)]
+	] as Array<[string, unknown]>)('nulls a mountDir that is %s', (_label, mountDir) => {
+		expect(normalizeFleetAgentTaskQuestion({ text: 'q', mountDir })?.mountDir).toBeNull();
+	});
+
+	it('keeps a well-formed mountDir', () => {
+		expect(normalizeFleetAgentTaskQuestion({ text: 'q', mountDir: 'template-1.0_x' })?.mountDir).toBe(
+			'template-1.0_x'
+		);
+	});
+
+	it('is idempotent — normalizing its own output changes nothing', () => {
+		const once = normalizeFleetAgentTaskQuestion({
+			text: 'Which DB?',
+			context: 'Postgres or SQLite',
+			truncated: true,
+			mountDir: 'template'
+		});
+		expect(normalizeFleetAgentTaskQuestion(once)).toEqual(once);
 	});
 });

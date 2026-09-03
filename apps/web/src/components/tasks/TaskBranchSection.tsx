@@ -213,6 +213,53 @@ function BranchPanel({ task }: { task: Task }) {
                         </dd>
                     </div>
                 )}
+
+                {/* Multi-repo Task workspaces: pull requests in the OTHER repositories a fleet run pushed. */}
+                {task.linkedPullRequests && task.linkedPullRequests.length > 0 && (
+                    <div
+                        className="grid grid-cols-[5.5rem_1fr] items-start gap-3"
+                        data-testid="task-linked-prs"
+                    >
+                        <dt className="text-xs text-text-muted pt-0.5">
+                            {t('linkedPullRequests')}
+                        </dt>
+                        <dd className="min-w-0 space-y-1">
+                            {task.linkedPullRequests.map((linked) => (
+                                <div
+                                    key={linked.repositoryId}
+                                    className="flex items-center gap-2 text-xs min-w-0"
+                                    data-testid={`task-linked-pr-${linked.repositoryId}`}
+                                >
+                                    <span className="font-mono truncate text-text dark:text-text-dark">
+                                        {linked.repositoryId}
+                                    </span>
+                                    {linked.prUrl ? (
+                                        <a
+                                            href={linked.prUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-primary hover:underline shrink-0"
+                                        >
+                                            {linked.prNumber != null
+                                                ? `#${linked.prNumber}`
+                                                : t('openPr')}
+                                            <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    ) : (
+                                        <span
+                                            className={`shrink-0 ${linked.state === 'failed' ? 'text-danger' : 'text-text-muted'}`}
+                                            title={linked.error ?? undefined}
+                                        >
+                                            {linked.state === 'failed'
+                                                ? t('linkedPrFailed')
+                                                : t('linkedPrPushed')}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </dd>
+                    </div>
+                )}
             </dl>
 
             {/* Actions / overflow area */}

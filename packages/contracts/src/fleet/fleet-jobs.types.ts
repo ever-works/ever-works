@@ -1,3 +1,4 @@
+import { INBOX_MAX_TITLE_CHARS } from '../inbox/inbox.types.js';
 import type { TaskAcceptanceCheck, TaskCheckResult } from '../tasks/task-gates.types.js';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
 
@@ -600,6 +601,14 @@ export interface FleetAgentTaskModelResult {
 
 /** What the node did with the working tree after the model ran. */
 export interface FleetAgentTaskGitResult {
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): which repository this
+	 * verdict is about. Absent on the primary (`result.git`), set on every
+	 * entry of `result.mountGit`.
+	 */
+	repositoryId?: string;
+	/** The mount directory the repository was linked at (`.mounts/<dir>`); mounts only. */
+	mountDir?: string;
 	branch: string;
 	baseSha: string;
 	headSha: string | null;
@@ -609,6 +618,197 @@ export interface FleetAgentTaskGitResult {
 	changedFiles?: number;
 	/** Set when commit/push failed; the run is reported as failed. */
 	error?: string;
+}
+
+// ─── Owner question (self-build slice Q) ─────────────────────────────
+
+/**
+ * Directory, relative to a worktree root, the fleet reserves for its own
+ * out-of-band files. Kept out of every Task repository's Git view by the
+ * node (`info/exclude`, next to `/.mounts/`), so nothing written here can
+ * be staged by the finalize's `git add -A`.
+ */
+export const FLEET_AGENT_TASK_META_DIR = '.ever-works';
+
+/**
+ * The file a model writes, in the PRIMARY worktree root, when it needs a
+ * decision only the Task owner can make.
+ *
+ * WHY a file: a fleet run executes a model CLI on the owner's own machine
+ * with no platform credentials and no platform tools — the working tree
+ * is the only channel it has back to the platform. The node reads the
+ * file after the model step, removes it, and reports it as
+ * `FleetAgentTaskResult.question`; the reconciler parks the run and files
+ * an Inbox question; the owner's answer reaches the NEXT run of the same
+ * Task inside its instructions.
+ *
+ * Case-exact and matched by name: NTFS would find `question.md`, ext4
+ * would not, and a node must behave the same on both.
+ */
+export const FLEET_AGENT_TASK_QUESTION_FILE = '.ever-works/QUESTION.md';
+
+/**
+ * Caps. WHY they are mandatory rather than advisory: the platform REJECTS
+ * an oversize job result outright (`FLEET_JOB_MAX_RESULT_BYTES`, enforced
+ * with a 400 by `FleetJobService.completeJob`), and a rejected report
+ * turns a run that merely asked a question into a failed job. So the node
+ * never reads more than `MAX_FILE_BYTES` of the file, the question line is
+ * capped at the Inbox title width, the context at a budget that keeps
+ * title + context inside the Inbox body width — and every cut is
+ * deterministic and code-point safe, never a throw.
+ */
+export const FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES = 64 * 1024;
+/** The question line IS the Inbox item's title, so it shares that cap. */
+export const FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS = INBOX_MAX_TITLE_CHARS;
+/** UTF-8 bytes of context; text + blank line + context stays below `INBOX_MAX_BODY_CHARS`. */
+export const FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES = 6 * 1024;
+
+/** A question the model asked the Task owner through `FLEET_AGENT_TASK_QUESTION_FILE`. */
+export interface FleetAgentTaskQuestion {
+	/** First non-empty line (leading `#{1,6}` stripped), ≤ 300 code points; the Inbox title. */
+	text: string;
+	/**
+	 * Everything after the first line, trimmed. When the first line
+	 * exceeded the text cap the FULL first line is prepended here so the
+	 * cut never loses words — the title is a headline, the body keeps the
+	 * question. `null` when empty.
+	 */
+	context: string | null;
+	/** True only when bytes were actually dropped by a cap. */
+	truncated: boolean;
+	/**
+	 * Where the file was found: `null` = the primary worktree, otherwise
+	 * the `.mounts/<dir>` mount directory (the node scans writable mounts
+	 * as a safety net for a model that wrote the file where it was working).
+	 */
+	mountDir: string | null;
+}
+
+const QUESTION_MOUNT_DIR_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+const QUESTION_HEADING_PREFIX = /^#{1,6}\s*/;
+/** ANSI CSI sequences (`ESC [ … m` and friends) — a terminal-coloured line pasted into the file. */
+const ANSI_CSI_SEQUENCE = /\x1B\[[0-9;?]*[ -/]*[@-~]/g;
+/** C0 control characters except TAB / LF / CR, plus DEL — the class `sanitizeText` strips. */
+const C0_CONTROL_CHARACTERS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+
+/**
+ * Drop control characters a question can only have picked up by accident
+ * (a binary head, a symlink target, a terminal escape pasted into the
+ * file). WHY here, at the contract: the question line becomes the run
+ * summary, the Inbox title and the next run's instructions, and Postgres
+ * REJECTS a NUL in `text` / `varchar` — the reconciler's very first write
+ * would throw and leave the run `running`, neither parked nor failed.
+ * CSI sequences go first so their ESC does not leave `[31m` behind.
+ */
+function stripControlCharacters(value: string): string {
+	return value.replace(ANSI_CSI_SEQUENCE, '').replace(C0_CONTROL_CHARACTERS, '');
+}
+
+/**
+ * Parse the Markdown the model wrote into a question.
+ *
+ * Tolerant on the input (a leading UTF-8 BOM, CRLF or bare CR line ends,
+ * leading blank lines, a `# ` heading marker, control characters — a
+ * line that is nothing but control characters is skipped like a blank
+ * one) and strict on the output: the result has been through
+ * {@link normalizeFleetAgentTaskQuestion}, so it already satisfies every
+ * cap. `null` when the file carries no question line at all — a blank
+ * file is not a question.
+ */
+export function parseFleetAgentTaskQuestionMarkdown(
+	markdown: string,
+	mountDir?: string | null
+): FleetAgentTaskQuestion | null {
+	if (typeof markdown !== 'string') return null;
+	const lines = markdown
+		.replace(/^\uFEFF/, '')
+		.replace(/\r\n?/g, '\n')
+		.split('\n');
+	let index = -1;
+	let questionLine = '';
+	for (let i = 0; i < lines.length; i += 1) {
+		const candidate = stripControlCharacters(lines[i]).trim().replace(QUESTION_HEADING_PREFIX, '').trim();
+		if (candidate.length > 0) {
+			index = i;
+			questionLine = candidate;
+			break;
+		}
+	}
+	if (index < 0) return null;
+	const points = Array.from(questionLine);
+	const overflowed = points.length > FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS;
+	const text = overflowed
+		? points.slice(0, FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS).join('').trimEnd()
+		: questionLine;
+	const remainder = lines
+		.slice(index + 1)
+		.join('\n')
+		.trim();
+	const context = `${overflowed ? `${questionLine}\n\n` : ''}${remainder}`.trim();
+	return normalizeFleetAgentTaskQuestion({
+		text,
+		context: context.length > 0 ? context : null,
+		truncated: false,
+		...(mountDir ? { mountDir } : {})
+	});
+}
+
+/**
+ * Coerce an untrusted `question` (off the wire, out of a column) into a
+ * `FleetAgentTaskQuestion`, or `null` when nothing usable survives.
+ *
+ * COERCING, never throwing: the reconciler consumes this from a node's
+ * result, and a malformed question must not cost the run its verdict —
+ * the model, check and git outcomes in the same result are still true.
+ * Only the four declared fields come out; a smuggled `userId` / `taskId`
+ * is dropped here so no consumer can be talked into trusting it, and
+ * control characters are stripped from both strings (a NUL would make
+ * the first Postgres write of the parked-run path throw).
+ */
+export function normalizeFleetAgentTaskQuestion(raw: unknown): FleetAgentTaskQuestion | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const input = raw as Record<string, unknown>;
+	if (typeof input.text !== 'string') return null;
+	let truncated = input.truncated === true;
+
+	const firstLine = stripControlCharacters(input.text)
+		.trim()
+		.split(/\r\n?|\n/, 1)[0]
+		.trim();
+	if (firstLine.length === 0) return null;
+	const points = Array.from(firstLine);
+	let text = firstLine;
+	if (points.length > FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS) {
+		text = points.slice(0, FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS).join('').trimEnd();
+		truncated = true;
+	}
+
+	let context: string | null = null;
+	if (typeof input.context === 'string') {
+		const cut = truncateToUtf8Bytes(
+			stripControlCharacters(input.context).trim(),
+			FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES
+		);
+		truncated = truncated || cut.truncated;
+		context = cut.value.length > 0 ? cut.value : null;
+	}
+
+	const mountDir =
+		typeof input.mountDir === 'string' && QUESTION_MOUNT_DIR_PATTERN.test(input.mountDir) ? input.mountDir : null;
+
+	return { text, context, truncated, mountDir };
+}
+
+/**
+ * Cut a string to at most `maxBytes` of UTF-8 without splitting a code
+ * point: decode the byte prefix leniently and drop the replacement
+ * character a torn trailing sequence leaves behind.
+ */
+function truncateToUtf8Bytes(value: string, maxBytes: number): { value: string; truncated: boolean } {
+	const bytes = new TextEncoder().encode(value);
+	if (bytes.length <= maxBytes) return { value, truncated: false };
+	const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes.subarray(0, maxBytes));
+	return { value: decoded.replace(/\uFFFD+$/, '').trimEnd(), truncated: true };
 }
 
 /**
@@ -638,6 +838,20 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	gateStatus?: 'green' | 'red' | 'none' | null;
 	/** Present when the node attempted a commit / push. */
 	git?: FleetAgentTaskGitResult | null;
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): one verdict per
+	 * WRITABLE mount the node attempted to commit / push, in spec order.
+	 * Read-only mounts never appear here.
+	 */
+	mountGit?: FleetAgentTaskGitResult[] | null;
+	/**
+	 * Self-build slice Q: present when the model wrote
+	 * `FLEET_AGENT_TASK_QUESTION_FILE`. The run is NOT failed for it — the
+	 * reconciler parks it awaiting the owner's answer whatever `status`
+	 * says, because partial work almost always reports a red check or a
+	 * non-zero model exit and that verdict is still true.
+	 */
+	question?: FleetAgentTaskQuestion | null;
 	/** Why `status` is `failed`, in one sentence, for the run report. */
 	failureReason?: string | null;
 }
