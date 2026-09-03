@@ -6156,6 +6156,7 @@
                 "creatingButton": "Kaydediliyor…",
                 "cancelButton": "İptal",
                 "invalidUrl": "https://github.com/owner/repo gibi bir depo URL’si girin",
+                "invalidSlug": "Yalnızca küçük harf, rakam ve tire kullanın, örneğin my-repo",
                 "success": "Depo Work olarak kaydedildi",
                 "createFailed": "Depo kaydedilemedi",
                 "noteTitle": "Not:",

@@ -6555,6 +6555,7 @@
                 "creatingButton": "Registering…",
                 "cancelButton": "Cancel",
                 "invalidUrl": "Enter a repository URL like https://github.com/owner/repo",
+                "invalidSlug": "Use lowercase letters, digits and hyphens only, for example my-repo",
                 "success": "Repository registered as a Work",
                 "createFailed": "Failed to register the repository",
                 "noteTitle": "Note:",

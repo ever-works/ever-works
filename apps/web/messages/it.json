@@ -6156,10 +6156,11 @@
                 "creatingButton": "Registrazione…",
                 "cancelButton": "Annulla",
                 "invalidUrl": "Inserisci un URL di repository come https://github.com/owner/repo",
+                "invalidSlug": "Usa solo lettere minuscole, cifre e trattini, ad esempio my-repo",
                 "success": "Repository registrato come Work",
                 "createFailed": "Registrazione del repository non riuscita",
                 "noteTitle": "Nota:",
-                "noteText": "Per un Work di tipo Repository non vengono creati template del sito, repository del provider né deployment. Collega il provider Git che ospita il repository così che gli agenti possano clonarlo."
+                "noteText": "Per un Work di tipo Repository non vengono creati template del sito, repository del provider né deployment. Collega GitHub come provider Git così che gli agenti possano clonarlo."
             },
             "manual": {
                 "title": "Crea Manualmente",

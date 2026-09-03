@@ -6156,6 +6156,7 @@
                 "creatingButton": "Mendaftarkan…",
                 "cancelButton": "Batal",
                 "invalidUrl": "Masukkan URL repositori seperti https://github.com/owner/repo",
+                "invalidSlug": "Use lowercase letters, digits and hyphens only, for example my-repo",
                 "success": "Repositori terdaftar sebagai Work",
                 "createFailed": "Gagal mendaftarkan repositori",
                 "noteTitle": "Catatan:",

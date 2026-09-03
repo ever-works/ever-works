@@ -6156,6 +6156,7 @@
                 "creatingButton": "登録中…",
                 "cancelButton": "キャンセル",
                 "invalidUrl": "https://github.com/owner/repo のようなリポジトリ URL を入力してください",
+                "invalidSlug": "小文字、数字、ハイフンのみを使用してください。例: my-repo",
                 "success": "リポジトリを Work として登録しました",
                 "createFailed": "リポジトリの登録に失敗しました",
                 "noteTitle": "注意:",

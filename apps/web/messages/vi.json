@@ -6156,6 +6156,7 @@
                 "creatingButton": "Đang đăng ký…",
                 "cancelButton": "Hủy",
                 "invalidUrl": "Nhập URL kho mã như https://github.com/owner/repo",
+                "invalidSlug": "Chỉ dùng chữ thường, chữ số và dấu gạch ngang, ví dụ my-repo",
                 "success": "Đã đăng ký kho mã làm Work",
                 "createFailed": "Không thể đăng ký kho mã",
                 "noteTitle": "Lưu ý:",

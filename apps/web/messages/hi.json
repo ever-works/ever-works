@@ -6156,6 +6156,7 @@
                 "creatingButton": "रजिस्टर हो रहा है…",
                 "cancelButton": "रद्द करें",
                 "invalidUrl": "https://github.com/owner/repo जैसा रिपॉज़िटरी URL दर्ज करें",
+                "invalidSlug": "केवल लोअरकेस अक्षर, अंक और हाइफ़न का उपयोग करें, उदाहरण के लिए my-repo",
                 "success": "रिपॉज़िटरी Work के रूप में रजिस्टर हो गई",
                 "createFailed": "रिपॉज़िटरी रजिस्टर नहीं हो सकी",
                 "noteTitle": "नोट:",

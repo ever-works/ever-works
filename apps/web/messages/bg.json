@@ -6249,6 +6249,7 @@
                 "creatingButton": "Регистриране…",
                 "cancelButton": "Отказ",
                 "invalidUrl": "Въведете URL на хранилище като https://github.com/owner/repo",
+                "invalidSlug": "Само малки букви, цифри и тирета, например my-repo",
                 "success": "Хранилището е регистрирано като Работа",
                 "createFailed": "Регистрирането на хранилището не успя",
                 "noteTitle": "Забележка:",

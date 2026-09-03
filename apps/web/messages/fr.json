@@ -6249,6 +6249,7 @@
                 "creatingButton": "Enregistrement…",
                 "cancelButton": "Annuler",
                 "invalidUrl": "Saisissez une URL de dépôt comme https://github.com/owner/repo",
+                "invalidSlug": "Utilisez uniquement des minuscules, des chiffres et des tirets, par exemple my-repo",
                 "success": "Dépôt enregistré comme Work",
                 "createFailed": "Échec de l’enregistrement du dépôt",
                 "noteTitle": "Remarque :",

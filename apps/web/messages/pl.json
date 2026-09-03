@@ -6156,10 +6156,11 @@
                 "creatingButton": "Rejestrowanie…",
                 "cancelButton": "Anuluj",
                 "invalidUrl": "Podaj URL repozytorium, np. https://github.com/owner/repo",
+                "invalidSlug": "Używaj tylko małych liter, cyfr i myślników, na przykład my-repo",
                 "success": "Repozytorium zarejestrowano jako Work",
                 "createFailed": "Nie udało się zarejestrować repozytorium",
                 "noteTitle": "Uwaga:",
-                "noteText": "Dla Worka typu Repozytorium nie jest tworzony szablon strony, repozytorium dostawcy ani wdrożenie. Połącz dostawcę Git hostującego repozytorium, aby agenci mogli je sklonować."
+                "noteText": "Dla Worka typu Repozytorium nie jest tworzony szablon strony, repozytorium dostawcy ani wdrożenie. Połącz GitHub jako dostawcę Git, aby agenci mogli je sklonować."
             },
             "manual": {
                 "title": "Utwórz ręcznie",
