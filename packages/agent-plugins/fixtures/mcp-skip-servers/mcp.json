@@ -1,0 +1,110 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "good": {
+      "type": "streamable-http",
+      "url": "https://good.example.com/mcp"
+    },
+    "good-stdio": {
+      "type": "stdio",
+      "command": "./bin/server",
+      "cwd": "./data"
+    },
+    "missing-type": {
+      "url": "https://x.example.com/mcp"
+    },
+    "unknown-type": {
+      "type": "websocket",
+      "url": "wss://x.example.com/mcp"
+    },
+    "unknown-field": {
+      "type": "streamable-http",
+      "url": "https://x.example.com/mcp",
+      "retries": 3
+    },
+    "cross-variant-field": {
+      "type": "streamable-http",
+      "url": "https://x.example.com/mcp",
+      "command": "./x"
+    },
+    "stdio-with-url": {
+      "type": "stdio",
+      "command": "./bin/x",
+      "url": "https://x.example.com/mcp"
+    },
+    "not-an-object": "nope",
+    "plain-http-remote": {
+      "type": "streamable-http",
+      "url": "http://insecure.example.com/mcp"
+    },
+    "url-with-userinfo": {
+      "type": "streamable-http",
+      "url": "https://user:pass@x.example.com/mcp"
+    },
+    "url-with-fragment": {
+      "type": "streamable-http",
+      "url": "https://x.example.com/mcp#frag"
+    },
+    "url-relative": {
+      "type": "streamable-http",
+      "url": "/mcp"
+    },
+    "url-wrong-scheme": {
+      "type": "streamable-http",
+      "url": "ftp://x.example.com/mcp"
+    },
+    "duplicate-headers": {
+      "type": "streamable-http",
+      "url": "https://x.example.com/mcp",
+      "headers": {
+        "X-Tenant": "a",
+        "x-tenant": "b"
+      }
+    },
+    "bad-header-name": {
+      "type": "streamable-http",
+      "url": "https://x.example.com/mcp",
+      "headers": {
+        "Bad Header": "v"
+      }
+    },
+    "reserved-env": {
+      "type": "stdio",
+      "command": "./bin/x",
+      "env": {
+        "PLUGIN_ROOT": "/tmp/hijack"
+      }
+    },
+    "shell-command": {
+      "type": "stdio",
+      "command": "sh -c \"echo hi\""
+    },
+    "absolute-command": {
+      "type": "stdio",
+      "command": "/usr/bin/env"
+    },
+    "parent-relative-command": {
+      "type": "stdio",
+      "command": "../bin/server"
+    },
+    "bare-path-command": {
+      "type": "stdio",
+      "command": "bin/server"
+    },
+    "bad-cwd-bare": {
+      "type": "stdio",
+      "command": "./bin/x",
+      "cwd": "data"
+    },
+    "bad-cwd-parent": {
+      "type": "stdio",
+      "command": "./bin/x",
+      "cwd": "../data"
+    },
+    "bad-cwd-placeholder": {
+      "type": "stdio",
+      "command": "./bin/x",
+      "cwd": "${PLUGIN_HOME}/data"
+    }
+  }
+}

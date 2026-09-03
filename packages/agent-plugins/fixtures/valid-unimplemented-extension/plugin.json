@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "unimplemented-extension",
+  "extensions": {
+    "com.other.client": {
+      "anything": [
+        1,
+        2,
+        {
+          "nested": null
+        }
+      ],
+      "anotherThing": false
+    }
+  }
+}
