@@ -2,8 +2,10 @@ jest.mock('@src/generators/data-generator/data-generator.service', () => ({
     DataGeneratorService: class DataGeneratorService {},
 }));
 
+import { BadRequestException } from '@nestjs/common';
 import { WorkScheduleService } from '../work-schedule.service';
 import { ImportSourceTypeEnum } from '@src/dto/import-work.dto';
+import { REPOSITORY_WORK_REFUSAL } from '@src/works/repository-work-guard';
 import {
     WorkScheduleBillingMode,
     WorkScheduleCadence,
@@ -670,5 +672,50 @@ describe('WorkScheduleService', () => {
                 status: WorkScheduleStatus.PAUSED,
             }),
         );
+    });
+
+    // Self-build slice D (EW-766): the web hides the schedule page for a
+    // Repository Work, but `PUT /works/:id/schedule` and the MCP
+    // `update_schedule` tool reach this method directly. Both the enable
+    // and the pause branch upsert a row and ask WorksConfigWriter to commit
+    // `.works/works.yml` into the data repository — the wrapped code repo —
+    // so the refusal has to land before either writer is touched.
+    it('refuses to create or update a schedule for a Repository Work before any writer runs', async () => {
+        const eventEmitter = { emit: jest.fn() };
+        const repositoryWork = { ...work, kind: 'repo', name: 'Platform' };
+        ownershipService.ensureCanEdit.mockResolvedValue({ work: repositoryWork });
+        scheduleRepository.findByWorkId.mockResolvedValue(null);
+
+        const guarded = new WorkScheduleService(
+            scheduleRepository,
+            workRepository,
+            ownershipService,
+            subscriptionService,
+            usageLedgerService,
+            dataGeneratorService,
+            pluginRegistry,
+            notificationService,
+            eventEmitter as any,
+        );
+
+        const enableError = await guarded
+            .updateSchedule(work.id, { enable: true, cadence: WorkScheduleCadence.DAILY }, user)
+            .catch((error) => error);
+        expect(enableError).toBeInstanceOf(BadRequestException);
+        expect(enableError.message).toContain(REPOSITORY_WORK_REFUSAL);
+        expect(enableError.message).toContain('Work "Platform"');
+
+        // The pause branch skips `ensureWorkConfigReady`, so it must be
+        // refused by the kind guard itself, not by readiness.
+        const pauseError = await guarded
+            .updateSchedule(work.id, { enable: false }, user)
+            .catch((error) => error);
+        expect(pauseError).toBeInstanceOf(BadRequestException);
+        expect(pauseError.message).toContain(REPOSITORY_WORK_REFUSAL);
+
+        expect(scheduleRepository.upsert).not.toHaveBeenCalled();
+        expect(workRepository.update).not.toHaveBeenCalled();
+        expect(dataGeneratorService.getConfig).not.toHaveBeenCalled();
+        expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 });
