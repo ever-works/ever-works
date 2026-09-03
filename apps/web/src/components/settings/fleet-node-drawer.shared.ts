@@ -51,6 +51,13 @@ export function filterFleetJobs(
  * exactly the number that tells an operator a job is stuck. Negative
  * spans (clock skew between the two stamps) clamp to zero rather than
  * rendering as a bug.
+ *
+ * `startedAt` is the FIRST attempt's start: the API keeps it across
+ * re-leases (`FleetJobService.lease` reuses `job.startedAt`; reclaim
+ * never resets it), so a job on its second attempt reports the
+ * wall-clock age since it first ran, not since this node picked it up.
+ * That is the number an operator asking "how long has this been going
+ * on" wants; per-attempt timing would need the API to reset the stamp.
  */
 export function fleetJobDurationMs(job: FleetJobView, now: number = Date.now()): number | null {
     if (!job.startedAt) return null;
