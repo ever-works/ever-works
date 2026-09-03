@@ -1359,7 +1359,7 @@
                     "routingLabel": "Execution routing",
                     "routingAccountDefault": "Your account default.",
                     "routingPlatformDefault": "Platform default — nothing is configured for your account yet.",
-                    "routingOverrides": "{count} Work or Goal overrides take precedence for runs in their own scope.",
+                    "routingOverrides": "{count, plural, one {# Work or Goal override takes} other {# Work or Goal overrides take}} precedence for runs in their own scope.",
                     "routingUnavailable": "Execution routing could not be loaded right now.",
                     "routingChange": "Change in Settings → Fleet"
                 }
