@@ -8,6 +8,13 @@ const NON_TERMINAL: WorkflowRunStatus[] = ['queued', 'running'];
 /** Narrower source set for a dispatch rollback — see `markDispatchFailed`. */
 const QUEUED_ONLY: WorkflowRunStatus[] = ['queued'];
 
+/**
+ * `failureCode` stamped on a run reaped by the stuck-row sweep, so it is
+ * distinguishable from a graph that genuinely failed. Short machine string,
+ * never free text — the same convention as the `agent_runs` attention tokens.
+ */
+export const WORKFLOW_RUN_SWEPT_FAILURE_CODE = 'stuck-swept' as const;
+
 export interface CreateWorkflowRunInput {
     workflowId: string;
     userId: string;
@@ -203,6 +210,86 @@ export class WorkflowRunRepository {
             .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
             .execute();
         return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Rows abandoned by a worker that died without reaching a terminal write
+     * — OOM, node eviction, a `release-trigger-prod` deploy, Trigger.dev
+     * teardown, or `maxDuration` expiry. Nothing else reaps them.
+     *
+     * `workflow-run.task.ts` runs `maxAttempts: 1` (a graph walk is not
+     * safely re-runnable: `ai.ask` nodes are already paid for and delegate
+     * nodes spawn real child runs), so there is no runtime redelivery to fall
+     * back on. Without this the row reads `running` forever, `finishedAt` and
+     * `durationMs` stay NULL, and the user has no signal that the walk died.
+     *
+     * `COALESCE("startedAt", "createdAt")` covers BOTH non-terminal statuses
+     * in one predicate. `startedAt` is NULL while `queued`, and `markStarted`
+     * is the only writer of `status='running'` and sets both in one atomic
+     * UPDATE, so `running` implies `startedAt IS NOT NULL` with no torn
+     * window. Sweeping `queued` matters on its own: an enqueue that parks in
+     * `PENDING_VERSION` across an API/worker deploy skew may never execute.
+     *
+     * Bounded by `limit` on purpose — see {@link markStuckFailed}.
+     */
+    async findStuckNonTerminal(
+        cutoff: Date,
+        limit: number,
+    ): Promise<
+        Pick<WorkflowRun, 'id' | 'workflowId' | 'userId' | 'status' | 'startedAt' | 'createdAt'>[]
+    > {
+        return this.repository
+            .createQueryBuilder('run')
+            .select([
+                'run.id',
+                'run.workflowId',
+                'run.userId',
+                'run.status',
+                'run.startedAt',
+                'run.createdAt',
+            ])
+            .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .andWhere('COALESCE(run."startedAt", run."createdAt") < :cutoff', { cutoff })
+            .orderBy('COALESCE(run."startedAt", run."createdAt")', 'ASC')
+            .limit(limit)
+            .getMany();
+    }
+
+    /**
+     * Bulk `queued | running → failed` for a batch from
+     * {@link findStuckNonTerminal}.
+     *
+     * Guarded on `NON_TERMINAL` in the same statement, so a worker that
+     * reached its own terminal write between the scan and this update keeps
+     * its result — the sweep simply is not counted for that row. Returns
+     * `affected`, NOT `runIds.length`: reporting the input size would
+     * overstate the sweep every time that race is lost.
+     *
+     * `durationMs` is deliberately left NULL. It cannot be computed in a bulk
+     * statement, and NULL is the honest value for "we do not know when this
+     * died". Nothing branches on it — it is a reporting field.
+     *
+     * `failureCode` is stamped so an operator (and any future `on_failure`
+     * routing) can tell a swept run apart from a graph that genuinely failed.
+     */
+    async markStuckFailed(runIds: string[], errorMessage: string): Promise<number> {
+        // TypeORM renders `IN (:...ids)` as invalid SQL for an empty array.
+        if (runIds.length === 0) return 0;
+
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(WorkflowRun)
+            .set({
+                status: 'failed',
+                finishedAt: new Date(),
+                errorMessage,
+                failureCode: WORKFLOW_RUN_SWEPT_FAILURE_CODE,
+            })
+            .where('id IN (:...runIds)', { runIds })
+            .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .execute();
+
+        return result.affected ?? 0;
     }
 
     /**
