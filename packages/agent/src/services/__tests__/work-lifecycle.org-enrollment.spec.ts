@@ -23,6 +23,7 @@ import { WebsiteGeneratorService } from '@src/generators/website-generator/websi
 import { WebsiteUpdateService } from '@src/generators/website-generator/website-update.service';
 import { WorkOwnershipService } from '../work-ownership.service';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
+import { GitFacadeService } from '@src/facades/git.facade';
 import { TemplateCatalogService } from '@src/template-catalog/template-catalog.service';
 import { WorkWebsiteRepositoryStateService } from '../work-website-repository-state.service';
 import {
@@ -113,6 +114,9 @@ describe('WorkLifecycleService — org-KB enrollment tenant guard (EW-711 #27)',
                 { provide: WebsiteUpdateService, useValue: {} },
                 { provide: WorkOwnershipService, useValue: ownershipService },
                 { provide: DeployFacadeService, useValue: { getAvailableProviders: () => [] } },
+                // Self-build slice D (EW-766): only the Repository Work create
+                // path probes the git facade; this spec never takes it.
+                { provide: GitFacadeService, useValue: {} },
                 { provide: TemplateCatalogService, useValue: {} },
                 { provide: WorkWebsiteRepositoryStateService, useValue: {} },
                 { provide: EverWorksDeployQuotaService, useValue: {} },

@@ -2065,6 +2065,194 @@ describe('WorkGenerationService', () => {
     });
 
     // ════════════════════════════════════════════════════════════════════
+    //  Repository Work kind (self-build slice D, EW-766) — nothing is
+    //  generated INTO a user's code repository
+    // ════════════════════════════════════════════════════════════════════
+    describe('repo work kind — the pipelines refuse a Repository Work', () => {
+        // A `repo` Work's data repository is the user's own code repository.
+        // Every entry point below clones it and writes into it, so each must
+        // refuse BEFORE any history row, provider warm-up, clone or dispatch.
+        const repoWork = () =>
+            buildWork({ kind: 'repo', name: 'Platform', slug: 'platform' } as Partial<Work>);
+
+        it('generateItems: 400 before history, providers or dispatch', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService({ withDispatcher: true });
+            await expect(
+                service.generateItems(
+                    'work-1',
+                    { name: 'X', prompt: 'p' } as any,
+                    buildUser(),
+                    false,
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(generationHistoryRepository.createEntry).not.toHaveBeenCalled();
+            expect(generationDispatcher.dispatchWorkGeneration).not.toHaveBeenCalled();
+        });
+
+        it('updateItemsGenerator: 400 even on the scheduled path — no skip bookkeeping, no history', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.updateItemsGenerator({
+                    workId: 'work-1',
+                    updateDto: {} as any,
+                    user: buildUser(),
+                    awaitCompletion: false,
+                    context: { triggeredBy: 'schedule', scheduleId: 'sched-1' },
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(workScheduleService.finalizeScheduleRun).not.toHaveBeenCalled();
+            expect(generationHistoryRepository.createEntry).not.toHaveBeenCalled();
+        });
+
+        it('regenerateMarkdown: 400 without touching the README generator', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(service.regenerateMarkdown('work-1', buildUser())).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        it('updateReadme: 400 without touching the data repository', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(service.updateReadme('work-1', buildUser())).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+
+            expect(dataGenerator.updateMarkdownTemplate).not.toHaveBeenCalled();
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        // The item writers commit straight into the data repository — for a
+        // Repository Work that is `items/<slug>.md` on the code repo's
+        // default branch. Each refuses before ItemSubmissionService clones.
+        it('submitItem: 400 before the item is written or the README regenerated', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.submitItem(
+                    'work-1',
+                    { name: 'X', source_url: 'https://x.dev' } as any,
+                    buildUser(),
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(itemSubmissionService.submitItem).not.toHaveBeenCalled();
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        it('removeItem: 400 before the removal commit', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.removeItem('work-1', { item_slug: 'x' } as any, buildUser()),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(itemSubmissionService.removeItem).not.toHaveBeenCalled();
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        it('updateItemMetadata: 400 before the metadata commit', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.updateItemMetadata(
+                    'work-1',
+                    { item_slug: 'x', featured: true } as any,
+                    buildUser(),
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(itemSubmissionService.updateItem).not.toHaveBeenCalled();
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        it('extractItemDetails: 400 when scoped to a Repository Work, before any fetch', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.extractItemDetails(
+                    { source_url: 'https://example.com/tool', workId: 'work-1' } as any,
+                    buildUser(),
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(contentExtractorFacade.extractContent).not.toHaveBeenCalled();
+        });
+
+        it('bulkCaptureImages: 400 before the data repository is cloned for its items', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.bulkCaptureImages('work-1', {} as any, buildUser()),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(dataGenerator.getItems).not.toHaveBeenCalled();
+        });
+
+        it('updateDomainType: 400 without touching the row', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.updateDomainType('work-1', 'saas', buildUser()),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(workRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('updateWebsiteRepository: 400 — the kind provisions no website repository to sync into', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(service.updateWebsiteRepository('work-1', buildUser())).rejects.toThrow(
+                /provisions no website repository/,
+            );
+
+            expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
+        });
+
+        it('the awesome-repo kind is NOT a Repository Work — its pipeline keeps running', async () => {
+            // Guards against a lazy substring check: `awesome-repo` contains
+            // "repo" but its data repository is platform-generated.
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork({ kind: 'awesome-repo' } as Partial<Work>),
+            } as any);
+            generationHistoryRepository.createEntry.mockResolvedValue({
+                id: 'h-1',
+                startedAt: new Date(),
+            } as any);
+            generationDispatcher.dispatchWorkGeneration.mockResolvedValue('run-1');
+
+            const service = buildService({ withDispatcher: true });
+            const result = await service.generateItems(
+                'work-1',
+                { name: 'X', prompt: 'p' } as any,
+                buildUser(),
+                false,
+            );
+
+            expect(result.status).toBe('pending');
+            expect(generationHistoryRepository.createEntry).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    // ════════════════════════════════════════════════════════════════════
     //  generateItems (smoke + ConflictException + scope)
     // ════════════════════════════════════════════════════════════════════
     describe('generateItems', () => {

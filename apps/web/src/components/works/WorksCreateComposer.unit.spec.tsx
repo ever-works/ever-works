@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
 }));
 
+const routerPushMock = vi.fn();
 vi.mock('@/i18n/navigation', () => ({
-    useRouter: () => ({ push: vi.fn() }),
+    useRouter: () => ({ push: routerPushMock }),
     // `Button` re-exports this as its `asChild`-less link variant, so the
-    // mock has to cover it even though these tests never navigate.
+    // mock has to cover it even though most of these tests never navigate.
     Link: ({
         href,
         children,
@@ -27,11 +28,18 @@ vi.mock('sonner', () => ({
     toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const startFromPromptMock = vi.fn();
 vi.mock('@/lib/hooks/use-start-from-prompt', () => ({
-    useStartFromPrompt: () => vi.fn(),
+    useStartFromPrompt: () => startFromPromptMock,
 }));
 
 import { WorksCreateComposer } from './WorksCreateComposer';
+
+function getSubmit(container: HTMLElement): HTMLButtonElement {
+    const el = container.querySelector('button[data-testid="works-quick-add-submit"]');
+    if (!el) throw new Error('submit button not found');
+    return el as HTMLButtonElement;
+}
 
 function getTextarea(container: HTMLElement): HTMLTextAreaElement {
     const el = container.querySelector('textarea[data-testid="works-quick-add"]');
@@ -99,5 +107,54 @@ describe('WorksCreateComposer chip seeding', () => {
         clickChip(container, 'directory');
 
         expect(getTextarea(container).value).toBe('My own brief, in my own words');
+    });
+});
+
+describe('WorksCreateComposer Repository chip routing', () => {
+    function clickChip(container: HTMLElement, value: string) {
+        const chip = container.querySelector(`button[data-testid="works-quick-add-${value}"]`);
+        if (!chip) throw new Error(`chip ${value} not found`);
+        fireEvent.click(chip);
+    }
+
+    it('hands the text to the Repository form (mode=manual&kind=repo&prompt=…) and opens NO chat turn', async () => {
+        // Self-build slice D (EW-766): a Repository Work has nothing for the
+        // chat AI to generate — the composer text (a repo URL, typically)
+        // goes straight to the form on /works/new.
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<WorksCreateComposer />);
+        clickChip(container, 'repo');
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'https://github.com/ever-works/ever-works' },
+        });
+        fireEvent.click(getSubmit(container));
+
+        await waitFor(() => expect(routerPushMock).toHaveBeenCalledTimes(1));
+        expect(startFromPromptMock).not.toHaveBeenCalled();
+        const href = routerPushMock.mock.calls[0][0] as string;
+        expect(href.startsWith('/works/new?')).toBe(true);
+        const params = new URLSearchParams(href.slice(href.indexOf('?') + 1));
+        expect(params.get('mode')).toBe('manual');
+        expect(params.get('kind')).toBe('repo');
+        expect(params.get('prompt')).toBe('https://github.com/ever-works/ever-works');
+    });
+
+    it('every other chip still opens a chat turn and routes to the AI form without the prompt in the URL', async () => {
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<WorksCreateComposer />);
+        clickChip(container, 'blog');
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'Personal blog about indie game development' },
+        });
+        fireEvent.click(getSubmit(container));
+
+        await waitFor(() => expect(routerPushMock).toHaveBeenCalledTimes(1));
+        expect(startFromPromptMock).toHaveBeenCalledTimes(1);
+        const href = routerPushMock.mock.calls[0][0] as string;
+        expect(href).toContain('mode=ai');
+        expect(href).toContain('kind=blog');
+        expect(href).not.toContain('prompt=');
     });
 });

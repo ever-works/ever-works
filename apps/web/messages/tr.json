@@ -6032,6 +6032,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Depo",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -6046,6 +6047,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Mevcut bir kod deposu Work olarak — görevler, hedefler ve filo çalıştırmaları ona bağlanır. Hiçbir şey üretilmez veya dağıtılmaz.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6195,6 +6197,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Yeni Work — Depo",
+                "formSubtitle": "Mevcut bir kod deposunu Work olarak kaydedin. Hiçbir şey üretilmez veya dağıtılmaz — görevler, hedefler ve filo çalıştırmaları yalnızca o depoda çalışır.",
+                "urlLabel": "Depo URL’si",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Erişiminiz olan bir GitHub deposu. Olduğu gibi Work’ün veri deposu olur.",
+                "nameLabel": "Work Adı",
+                "slugLabel": "Work Slug’ı",
+                "slugHelp": "URL dostu tanımlayıcı. Depo adından türetilir — değiştirmek için düzenleyin.",
+                "descriptionLabel": "Açıklama",
+                "submitButton": "Depoyu Kaydet",
+                "creatingButton": "Kaydediliyor…",
+                "cancelButton": "İptal",
+                "invalidUrl": "https://github.com/owner/repo gibi bir depo URL’si girin",
+                "success": "Depo Work olarak kaydedildi",
+                "createFailed": "Depo kaydedilemedi",
+                "noteTitle": "Not:",
+                "noteText": "Depo türündeki bir Work için web sitesi şablonu, sağlayıcı deposu veya dağıtım oluşturulmaz. Ajanların klonlayabilmesi için depoyu barındıran Git sağlayıcısını bağlayın."
             },
             "manual": {
                 "title": "Manuel Oluştur",
@@ -6438,14 +6459,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Depo"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Mevcut bir kod deposu Work olarak — görevler, hedefler ve filo çalıştırmaları ona bağlanır. Hiçbir şey üretilmez veya dağıtılmaz."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7933,6 +7956,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Depo",
             "company": "Company",
             "campaign": "Kampanya",
             "default": "Work"

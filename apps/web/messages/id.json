@@ -6032,6 +6032,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Repositori",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -6046,6 +6047,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Repositori kode yang sudah ada sebagai Work — Task, Goal, dan eksekusi fleet melekat padanya. Tidak ada yang dibuat atau dideploy.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6195,6 +6197,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Work Baru — Repositori",
+                "formSubtitle": "Daftarkan repositori kode yang sudah ada sebagai Work. Tidak ada yang dibuat atau dideploy — Task, Goal, dan eksekusi fleet cukup bekerja di repositori tersebut.",
+                "urlLabel": "URL Repositori",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Repositori GitHub yang dapat Anda akses. Repositori ini menjadi repositori data Work apa adanya.",
+                "nameLabel": "Nama Work",
+                "slugLabel": "Slug Work",
+                "slugHelp": "Pengenal ramah URL. Diturunkan dari nama repositori — ubah untuk menimpanya.",
+                "descriptionLabel": "Deskripsi",
+                "submitButton": "Daftarkan Repositori",
+                "creatingButton": "Mendaftarkan…",
+                "cancelButton": "Batal",
+                "invalidUrl": "Masukkan URL repositori seperti https://github.com/owner/repo",
+                "success": "Repositori terdaftar sebagai Work",
+                "createFailed": "Gagal mendaftarkan repositori",
+                "noteTitle": "Catatan:",
+                "noteText": "Tidak ada template situs, repositori penyedia, atau deployment yang dibuat untuk Work Repositori. Hubungkan penyedia Git yang menghosting repositori agar agen dapat mengklonanya."
             },
             "manual": {
                 "title": "Buat Secara Manual",
@@ -6438,14 +6459,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Repositori"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Repositori kode yang sudah ada sebagai Work — Task, Goal, dan eksekusi fleet melekat padanya. Tidak ada yang dibuat atau dideploy."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7933,6 +7956,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Repositori",
             "company": "Company",
             "campaign": "Kampanye",
             "default": "Work"

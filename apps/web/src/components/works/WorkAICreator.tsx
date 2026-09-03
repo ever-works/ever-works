@@ -58,8 +58,9 @@ import type { GeneratorFormSchema } from '@/lib/api/types-only';
 import type { WebsiteTemplateOption } from '@/lib/api/work';
 import type { WorkBlueprintEntry } from '@/lib/api/work-templates';
 import type { WorkProposal } from '@/lib/api/work-proposals';
+import { getWorkCapabilities } from '@ever-works/contracts';
 
-type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo';
+type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo' | 'repo';
 
 interface WorkAICreatorProps {
     gitProvider?: string;
@@ -468,15 +469,21 @@ export function WorkAICreator({
                 disabled={isPending}
             />
 
-            <WorkTemplatePicker
-                customTemplates={websiteTemplates}
-                blueprints={workBlueprints}
-                workKind={initialKind}
-                value={websiteTemplateId}
-                onChange={setWebsiteTemplateId}
-                disabled={isPending}
-                helperText={t('websiteTemplateHelperText')}
-            />
+            {/* A kind with no website repository (the Repository kind) has
+                no template to pick — `/works/new` renders its own form for
+                it, this gate only keeps the picker honest if this creator is
+                ever reached with such a kind. */}
+            {getWorkCapabilities(initialKind).repos.website && (
+                <WorkTemplatePicker
+                    customTemplates={websiteTemplates}
+                    blueprints={workBlueprints}
+                    workKind={initialKind}
+                    value={websiteTemplateId}
+                    onChange={setWebsiteTemplateId}
+                    disabled={isPending}
+                    helperText={t('websiteTemplateHelperText')}
+                />
+            )}
 
             {formSchema && (
                 <CollapsibleSection

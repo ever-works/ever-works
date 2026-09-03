@@ -6102,6 +6102,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "מאגר",
                 "company": "Company"
             },
             "chipDescriptions": {
@@ -6114,6 +6115,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "מאגר קוד קיים כ-Work — משימות, יעדים והרצות צי מצטרפים אליו. שום דבר לא נוצר או נפרס.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6158,14 +6160,16 @@
                 "landing-page": "דף נחיתה",
                 "blog": "בלוג",
                 "directory": "מדריך",
-                "awesome-repo": "מאגר מצוין"
+                "awesome-repo": "מאגר מצוין",
+                "repo": "מאגר"
             },
             "kindDescriptions": {
                 "website": "אתר רב-עמוד לעסק, שירות או מותג — תוכן וקוד שנוצרו.",
                 "landing-page": "דף נחיתה ממוקד — רשימות המתנה, השקות מוצרים, הרשמות להרצאות, איסוף לידים.",
                 "blog": "בלוג עם קטגוריות, RSS, הדגשת קוד, ותוכן מוכן ל-SEO.",
                 "directory": "אתר מדריך מוקטלג עם חיפוש, מסננים, ונתוני פריטים מסודרים.",
-                "awesome-repo": "מאגר רשימה מצוינת — אינדקס markdown, קישורים מקוטלגים, ומטא-נתונים ניתנים לרענון."
+                "awesome-repo": "מאגר רשימה מצוינת — אינדקס markdown, קישורים מקוטלגים, ומטא-נתונים ניתנים לרענון.",
+                "repo": "מאגר קוד קיים כ-Work — משימות, יעדים והרצות צי מצטרפים אליו. שום דבר לא נוצר או נפרס."
             },
             "promptHints": {
                 "minLength": "הוסף תיאור (לפחות 10 תווים) כדי להתחיל.",
@@ -6286,6 +6290,25 @@
                 "organizationNameLabel": "שם ארגון",
                 "organizationNamePlaceholder": "הזן שם ארגון",
                 "websiteTemplateHelperText": "בחר את תבנית העבודה שתשמש ביצירה הראשונה של מאגר העבודה."
+            },
+            "repo": {
+                "formTitle": "Work חדש — מאגר",
+                "formSubtitle": "רשמו מאגר קוד קיים כ-Work. שום דבר לא נוצר או נפרס — משימות, יעדים והרצות צי פשוט עובדים במאגר הזה.",
+                "urlLabel": "כתובת המאגר",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "מאגר GitHub שיש לכם גישה אליו. הוא הופך כמות שהוא למאגר הנתונים של ה-Work.",
+                "nameLabel": "שם ה-Work",
+                "slugLabel": "מזהה ה-Work",
+                "slugHelp": "מזהה ידידותי לכתובת URL. נגזר משם המאגר — ערכו כדי לשנות.",
+                "descriptionLabel": "תיאור",
+                "submitButton": "רישום המאגר",
+                "creatingButton": "רושם…",
+                "cancelButton": "ביטול",
+                "invalidUrl": "הזינו כתובת מאגר כמו https://github.com/owner/repo",
+                "success": "המאגר נרשם כ-Work",
+                "createFailed": "רישום המאגר נכשל",
+                "noteTitle": "הערה:",
+                "noteText": "ל-Work מסוג מאגר לא נוצרים תבנית אתר, מאגר ספק או פריסה. חברו את ספק ה-Git שמארח את המאגר כדי שסוכנים יוכלו לשכפל אותו."
             },
             "manual": {
                 "title": "צור ידנית",
@@ -7963,6 +7986,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "מאגר",
             "company": "Company",
             "campaign": "קמפיין",
             "default": "Work"

@@ -6407,6 +6407,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Repository",
                 "company": "Company"
             },
             "chipDescriptions": {
@@ -6419,6 +6420,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "An existing code repository as a Work — Tasks, Goals and fleet runs attach to it. Nothing is generated or deployed.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6463,14 +6465,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Repository"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "An existing code repository as a Work — Tasks, Goals and fleet runs attach to it. Nothing is generated or deployed."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -6592,6 +6596,25 @@
                 "organizationNameLabel": "Organization Name",
                 "organizationNamePlaceholder": "Enter organization name",
                 "websiteTemplateHelperText": "Choose the Work template that will be used when the Work repository is first created."
+            },
+            "repo": {
+                "formTitle": "New Work — Repository",
+                "formSubtitle": "Register an existing code repository as a Work. Nothing is generated or deployed — Tasks, Goals and fleet runs simply work in that repository.",
+                "urlLabel": "Repository URL",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "A GitHub repository you can access. It becomes the Work’s data repository as-is.",
+                "nameLabel": "Work Name",
+                "slugLabel": "Work Slug",
+                "slugHelp": "URL-friendly identifier. Derived from the repository name — edit to override.",
+                "descriptionLabel": "Description",
+                "submitButton": "Register Repository",
+                "creatingButton": "Registering…",
+                "cancelButton": "Cancel",
+                "invalidUrl": "Enter a repository URL like https://github.com/owner/repo",
+                "success": "Repository registered as a Work",
+                "createFailed": "Failed to register the repository",
+                "noteTitle": "Note:",
+                "noteText": "No website template, provider repository or deployment is created for a Repository Work. Connect the git provider that hosts the repository so agents can clone it."
             },
             "manual": {
                 "title": "Create Manually",
@@ -8262,6 +8285,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Repository",
             "company": "Company",
             "campaign": "Campaign",
             "default": "Work"

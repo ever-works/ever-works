@@ -6032,6 +6032,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Репозиторій",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -6046,6 +6047,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Наявний репозиторій коду як Work — до нього прив’язуються завдання, цілі та запуски флоту. Нічого не генерується й не розгортається.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6195,6 +6197,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Новий Work — Репозиторій",
+                "formSubtitle": "Зареєструйте наявний репозиторій коду як Work. Нічого не генерується й не розгортається — завдання, цілі та запуски флоту просто працюють у цьому репозиторії.",
+                "urlLabel": "URL репозиторію",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Репозиторій GitHub, до якого у вас є доступ. Він без змін стає репозиторієм даних Work.",
+                "nameLabel": "Назва Work",
+                "slugLabel": "Slug Work",
+                "slugHelp": "Ідентифікатор для URL. Утворюється з назви репозиторію — відредагуйте, щоб змінити.",
+                "descriptionLabel": "Опис",
+                "submitButton": "Зареєструвати репозиторій",
+                "creatingButton": "Реєстрація…",
+                "cancelButton": "Скасувати",
+                "invalidUrl": "Введіть URL репозиторію на кшталт https://github.com/owner/repo",
+                "success": "Репозиторій зареєстровано як Work",
+                "createFailed": "Не вдалося зареєструвати репозиторій",
+                "noteTitle": "Примітка:",
+                "noteText": "Для Work типу «Репозиторій» не створюються шаблон сайту, репозиторій провайдера чи розгортання. Підключіть Git-провайдера, на якому розміщено репозиторій, щоб агенти могли його клонувати."
             },
             "manual": {
                 "title": "Створити вручну",
@@ -6438,14 +6459,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Репозиторій"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Наявний репозиторій коду як Work — до нього прив’язуються завдання, цілі та запуски флоту. Нічого не генерується й не розгортається."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7933,6 +7956,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Репозиторій",
             "company": "Company",
             "campaign": "Кампанія",
             "default": "Work"

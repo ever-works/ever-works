@@ -6102,6 +6102,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Хранилище",
                 "company": "Company"
             },
             "chipDescriptions": {
@@ -6114,6 +6115,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Съществуващо кодово хранилище като Работа — задачи, цели и изпълнения на флота се прикачват към него. Нищо не се генерира или разгръща.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6158,14 +6160,16 @@
                 "landing-page": "Landing страница",
                 "blog": "Блог",
                 "directory": "Директория",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Хранилище"
             },
             "kindDescriptions": {
                 "website": "Многостраничен сайт за бизнес, услуга или марка — генерирано съдържание + код.",
                 "landing-page": "Фокусирана едностранна страница — списъци с чакащи, лансиране на продукти, регистрации за уебинари, улавяне на лидове.",
                 "blog": "Блог с категории, RSS, подчертаване на код и съдържание, готово за SEO.",
                 "directory": "Подбран сайт директория с търсене, филтри и структурирани данни за елементите.",
-                "awesome-repo": "Хранилище от тип awesome-list — markdown индекс, категоризирани връзки и обновяеми метаданни."
+                "awesome-repo": "Хранилище от тип awesome-list — markdown индекс, категоризирани връзки и обновяеми метаданни.",
+                "repo": "Съществуващо кодово хранилище като Работа — задачи, цели и изпълнения на флота се прикачват към него. Нищо не се генерира или разгръща."
             },
             "promptHints": {
                 "minLength": "Добави описание (поне 10 символа), за да започнеш.",
@@ -6286,6 +6290,25 @@
                 "organizationNameLabel": "Име на организация",
                 "organizationNamePlaceholder": "Въведете име на организация",
                 "websiteTemplateHelperText": "Изберете шаблона на работата, който ще се използва при първоначалното създаване на репозитория на работата."
+            },
+            "repo": {
+                "formTitle": "Нова Работа — Хранилище",
+                "formSubtitle": "Регистрирайте съществуващо кодово хранилище като Работа. Нищо не се генерира или разгръща — задачите, целите и изпълненията на флота просто работят в това хранилище.",
+                "urlLabel": "URL на хранилището",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Хранилище в GitHub, до което имате достъп. То става хранилището с данни на Работата без промяна.",
+                "nameLabel": "Име на Работата",
+                "slugLabel": "Идентификатор на Работата",
+                "slugHelp": "Идентификатор за URL. Извлечен от името на хранилището — редактирайте, за да го промените.",
+                "descriptionLabel": "Описание",
+                "submitButton": "Регистрирай хранилището",
+                "creatingButton": "Регистриране…",
+                "cancelButton": "Отказ",
+                "invalidUrl": "Въведете URL на хранилище като https://github.com/owner/repo",
+                "success": "Хранилището е регистрирано като Работа",
+                "createFailed": "Регистрирането на хранилището не успя",
+                "noteTitle": "Забележка:",
+                "noteText": "За Работа от тип Хранилище не се създава шаблон за сайт, хранилище на доставчик или разгръщане. Свържете Git доставчика, който хоства хранилището, за да могат агентите да го клонират."
             },
             "manual": {
                 "title": "Създай ръчно",
@@ -7963,6 +7986,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Хранилище",
             "company": "Company",
             "campaign": "Кампания",
             "default": "Work"

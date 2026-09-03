@@ -6102,6 +6102,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Dépôt",
                 "company": "Company"
             },
             "chipDescriptions": {
@@ -6114,6 +6115,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Un dépôt de code existant comme Work — les tâches, les objectifs et les exécutions de la flotte s’y rattachent. Rien n’est généré ni déployé.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6158,14 +6160,16 @@
                 "landing-page": "Page de destination",
                 "blog": "Blog",
                 "directory": "Annuaire",
-                "awesome-repo": "Dépôt Awesome"
+                "awesome-repo": "Dépôt Awesome",
+                "repo": "Dépôt"
             },
             "kindDescriptions": {
                 "website": "Un site multi-pages pour une entreprise, un service ou une marque — contenu généré + code.",
                 "landing-page": "Une page unique et concentrée — listes d'attente, lancements de produits, inscriptions à des webinaires, capture de prospects.",
                 "blog": "Un blog avec des catégories, RSS, mise en évidence de code, et contenu prêt pour le SEO.",
                 "directory": "Un site d'annuaire avec recherche, filtres et données d'articles structurées.",
-                "awesome-repo": "Un dépôt de type awesome-list — index markdown, liens catégorisés et métadonnées actualisables."
+                "awesome-repo": "Un dépôt de type awesome-list — index markdown, liens catégorisés et métadonnées actualisables.",
+                "repo": "Un dépôt de code existant comme Work — les tâches, les objectifs et les exécutions de la flotte s’y rattachent. Rien n’est généré ni déployé."
             },
             "promptHints": {
                 "minLength": "Ajoutez une description (au moins 10 caractères) pour commencer.",
@@ -6286,6 +6290,25 @@
                 "organizationNameLabel": "Nom de l'organisation",
                 "organizationNamePlaceholder": "Saisir le nom de l'organisation",
                 "websiteTemplateHelperText": "Choisissez le modèle de travail qui sera utilisé lors de la première création du dépôt du travail."
+            },
+            "repo": {
+                "formTitle": "Nouveau Work — Dépôt",
+                "formSubtitle": "Enregistrez un dépôt de code existant comme Work. Rien n’est généré ni déployé : les tâches, les objectifs et les exécutions de la flotte travaillent simplement dans ce dépôt.",
+                "urlLabel": "URL du dépôt",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Un dépôt GitHub auquel vous avez accès. Il devient tel quel le dépôt de données du Work.",
+                "nameLabel": "Nom du Work",
+                "slugLabel": "Slug du Work",
+                "slugHelp": "Identifiant compatible URL. Dérivé du nom du dépôt — modifiez-le pour le remplacer.",
+                "descriptionLabel": "Description",
+                "submitButton": "Enregistrer le dépôt",
+                "creatingButton": "Enregistrement…",
+                "cancelButton": "Annuler",
+                "invalidUrl": "Saisissez une URL de dépôt comme https://github.com/owner/repo",
+                "success": "Dépôt enregistré comme Work",
+                "createFailed": "Échec de l’enregistrement du dépôt",
+                "noteTitle": "Remarque :",
+                "noteText": "Aucun modèle de site, dépôt fournisseur ni déploiement n’est créé pour un Work de type Dépôt. Connectez le fournisseur Git qui héberge le dépôt pour que les agents puissent le cloner."
             },
             "manual": {
                 "title": "Créer manuellement",
@@ -7963,6 +7986,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Dépôt",
             "company": "Company",
             "campaign": "Campagne",
             "default": "Work"
