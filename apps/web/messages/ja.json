@@ -6147,7 +6147,7 @@
                 "formSubtitle": "既存のコードリポジトリを Work として登録します。生成もデプロイも行われません — タスク、ゴール、フリート実行はそのリポジトリ内で作業するだけです。",
                 "urlLabel": "リポジトリ URL",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "アクセスできる GitHub、GitLab、Bitbucket のリポジトリ。そのまま Work のデータリポジトリになります。",
+                "urlHelp": "アクセスできる GitHub のリポジトリ。そのまま Work のデータリポジトリになります。",
                 "nameLabel": "Work 名",
                 "slugLabel": "Work スラッグ",
                 "slugHelp": "URL 用の識別子。リポジトリ名から生成されます — 変更する場合は編集してください。",

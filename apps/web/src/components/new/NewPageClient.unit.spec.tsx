@@ -274,6 +274,30 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         expect(href).not.toContain('prompt=');
     });
 
+    it('Submit with chip=repo hands the text to the Repository form (mode=manual&kind=repo&prompt=…) and opens NO chat turn', () => {
+        // Self-build slice D (EW-766): a Repository Work has nothing for the
+        // chat AI to generate, so the composer text — a repo URL, typically —
+        // goes straight to the form on the Work canvas.
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<NewPageClient initialType="repo" />);
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'https://github.com/ever-works/ever-works' },
+        });
+        fireEvent.click(getSubmit(container));
+
+        expect(startFromPromptMock).not.toHaveBeenCalled();
+        expect(routerPushMock).toHaveBeenCalledTimes(1);
+        const href = routerPushMock.mock.calls[0][0] as string;
+        expect(href.startsWith('/works/new?')).toBe(true);
+        const params = new URLSearchParams(href.slice(href.indexOf('?') + 1));
+        expect(params.get('mode')).toBe('manual');
+        expect(params.get('kind')).toBe('repo');
+        // Unlike every other Work chip, the text DOES travel in the URL: the
+        // form seeds its Repository URL field from it.
+        expect(params.get('prompt')).toBe('https://github.com/ever-works/ever-works');
+    });
+
     it('renders initialPrompt verbatim in the prompt textarea', () => {
         const prefill = `Starter Business\n\nA blank-slate Mission for cats.`;
         const { container } = render(

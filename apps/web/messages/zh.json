@@ -6147,7 +6147,7 @@
                 "formSubtitle": "将现有代码仓库注册为 Work。不生成也不部署任何内容 — 任务、目标和车队运行只是在该仓库中工作。",
                 "urlLabel": "仓库 URL",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "你有权访问的 GitHub、GitLab 或 Bitbucket 仓库。它将原样成为该 Work 的数据仓库。",
+                "urlHelp": "你有权访问的 GitHub 仓库。它将原样成为该 Work 的数据仓库。",
                 "nameLabel": "Work 名称",
                 "slugLabel": "Work 标识",
                 "slugHelp": "适用于 URL 的标识符。由仓库名称派生 — 如需覆盖请编辑。",

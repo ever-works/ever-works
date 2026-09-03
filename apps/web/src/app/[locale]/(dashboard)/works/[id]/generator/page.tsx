@@ -7,6 +7,7 @@ import { GeneratorForm } from '@/components/works/detail/generator/GeneratorForm
 import { GenerationProgress } from '@/components/works/detail/generator/GenerationProgress';
 import { GenerateStatusType } from '@/lib/api/enums';
 import { canGenerate } from '@/lib/permissions';
+import { isRepositoryWorkKind } from '@ever-works/contracts';
 import { notFound } from 'next/navigation';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,6 +35,13 @@ export default async function WorkGeneratorPage({ params, searchParams }: Params
 
     // Server-side permission check: only editors+ can access generator
     if (!canGenerate(work.userRole)) {
+        notFound();
+    }
+
+    // A Repository Work has no content pipeline — the API refuses every
+    // generator action for the kind — so the page is not served either
+    // (the tab is hidden in `WorkTabs`; this covers a typed URL).
+    if (isRepositoryWorkKind(work.kind)) {
         notFound();
     }
 

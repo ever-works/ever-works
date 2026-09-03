@@ -29,18 +29,27 @@ import { Textarea } from '@/components/ui/textarea';
  */
 
 /**
- * Mirrors `parseRepositoryWorkSource` on the API (GitHub / GitLab /
- * Bitbucket, `owner/repo` only) closely enough to derive defaults and to
- * catch an obviously wrong URL before the round-trip. The API remains the
- * authority — it re-parses and rejects anything it cannot register.
+ * Mirrors `parseRepositoryWorkSource` on the API closely enough to derive
+ * defaults and to catch an obviously wrong URL before the round-trip. The
+ * API remains the authority — it re-parses and rejects anything it cannot
+ * register.
+ *
+ * GitHub only, like the API: only the GitHub git-provider plugin exists, so
+ * a GitLab / Bitbucket URL would produce a Work no Task can clone. Flagging
+ * it here means the form says so instead of a 400 after the round-trip.
+ * Repository names may start with a dot (`.github`, `.dotfiles`); owners
+ * may not — same rule as GitHub itself.
  */
 const REPOSITORY_URL_PATTERN =
-    /^(?:https?:\/\/)?(?:www\.)?(?:github\.com|gitlab\.com|bitbucket\.org)\/([A-Za-z0-9][A-Za-z0-9._-]*)\/([A-Za-z0-9][A-Za-z0-9._-]*?)(?:\.git)?\/?$/i;
+    /^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]*?)(?:\.git)?\/?$/i;
 
 export function parseRepositoryUrl(value: string): { owner: string; repo: string } | null {
     const match = REPOSITORY_URL_PATTERN.exec(value.trim());
     if (!match) return null;
-    return { owner: match[1], repo: match[2] };
+    const [, owner, repo] = match;
+    // `.` / `..` are path components, not repository names.
+    if (!repo || repo === '.' || repo === '..') return null;
+    return { owner, repo };
 }
 
 /** Same rules as the API slug regex: lowercase letters, digits, hyphens. */

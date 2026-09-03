@@ -195,7 +195,7 @@ const PLACEHOLDERS_BY_CHIP: Record<ChipType, ReadonlyArray<string>> = {
         'e.g. "https://github.com/ever-works/ever-works — the platform monorepo"',
         'e.g. "https://github.com/ever-works/directory-web-template — the directory template"',
         'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
-        'e.g. "https://gitlab.com/my-group/my-project — any GitHub, GitLab or Bitbucket repo"',
+        'e.g. "https://github.com/my-org/.github — any GitHub repository you can access"',
     ],
     // EW-662 Phase 10 — Company placeholders telegraph that this chip
     // ends in a registered Organization (manual-completion path for v1).

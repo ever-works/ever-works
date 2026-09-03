@@ -6240,7 +6240,7 @@
                 "formSubtitle": "Registriere ein bestehendes Code-Repository als Work. Nichts wird generiert oder deployt — Tasks, Goals und Fleet-Läufe arbeiten einfach in diesem Repository.",
                 "urlLabel": "Repository-URL",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "Ein GitHub-, GitLab- oder Bitbucket-Repository, auf das du Zugriff hast. Es wird unverändert zum Daten-Repository des Works.",
+                "urlHelp": "Ein GitHub-Repository, auf das du Zugriff hast. Es wird unverändert zum Daten-Repository des Works.",
                 "nameLabel": "Work-Name",
                 "slugLabel": "Work-Slug",
                 "slugHelp": "URL-freundliche Kennung. Aus dem Repository-Namen abgeleitet — zum Überschreiben bearbeiten.",

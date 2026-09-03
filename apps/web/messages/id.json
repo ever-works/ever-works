@@ -6147,7 +6147,7 @@
                 "formSubtitle": "Daftarkan repositori kode yang sudah ada sebagai Work. Tidak ada yang dibuat atau dideploy — Task, Goal, dan eksekusi fleet cukup bekerja di repositori tersebut.",
                 "urlLabel": "URL Repositori",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "Repositori GitHub, GitLab, atau Bitbucket yang dapat Anda akses. Repositori ini menjadi repositori data Work apa adanya.",
+                "urlHelp": "Repositori GitHub yang dapat Anda akses. Repositori ini menjadi repositori data Work apa adanya.",
                 "nameLabel": "Nama Work",
                 "slugLabel": "Slug Work",
                 "slugHelp": "Pengenal ramah URL. Diturunkan dari nama repositori — ubah untuk menimpanya.",

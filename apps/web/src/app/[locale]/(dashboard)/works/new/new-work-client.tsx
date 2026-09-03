@@ -113,7 +113,7 @@ const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
         'e.g. "https://github.com/ever-works/ever-works — the platform monorepo"',
         'e.g. "https://github.com/ever-works/directory-web-template — the directory template"',
         'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
-        'e.g. "https://gitlab.com/my-group/my-project — any GitHub, GitLab or Bitbucket repo"',
+        'e.g. "https://github.com/my-org/.github — any GitHub repository you can access"',
     ],
 };
 

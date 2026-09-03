@@ -6147,7 +6147,7 @@
                 "formSubtitle": "Đăng ký một kho mã nguồn hiện có làm Work. Không có gì được tạo ra hay triển khai — Task, Goal và các lượt chạy fleet chỉ làm việc trong kho mã đó.",
                 "urlLabel": "URL kho mã",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "Một kho GitHub, GitLab hoặc Bitbucket mà bạn có quyền truy cập. Nó trở thành kho dữ liệu của Work nguyên trạng.",
+                "urlHelp": "Một kho GitHub mà bạn có quyền truy cập. Nó trở thành kho dữ liệu của Work nguyên trạng.",
                 "nameLabel": "Tên Work",
                 "slugLabel": "Slug của Work",
                 "slugHelp": "Định danh thân thiện với URL. Lấy từ tên kho mã — chỉnh sửa để ghi đè.",

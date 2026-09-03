@@ -6240,7 +6240,7 @@
                 "formSubtitle": "Registra un repositorio de código existente como Work. No se genera ni despliega nada: las tareas, los objetivos y las ejecuciones de la flota simplemente trabajan en ese repositorio.",
                 "urlLabel": "URL del repositorio",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "Un repositorio de GitHub, GitLab o Bitbucket al que tengas acceso. Se convierte tal cual en el repositorio de datos del Work.",
+                "urlHelp": "Un repositorio de GitHub al que tengas acceso. Se convierte tal cual en el repositorio de datos del Work.",
                 "nameLabel": "Nombre del Work",
                 "slugLabel": "Slug del Work",
                 "slugHelp": "Identificador apto para URL. Derivado del nombre del repositorio; edítalo para cambiarlo.",

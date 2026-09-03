@@ -6240,7 +6240,7 @@
                 "formSubtitle": "רשמו מאגר קוד קיים כ-Work. שום דבר לא נוצר או נפרס — משימות, יעדים והרצות צי פשוט עובדים במאגר הזה.",
                 "urlLabel": "כתובת המאגר",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "מאגר GitHub, GitLab או Bitbucket שיש לכם גישה אליו. הוא הופך כמות שהוא למאגר הנתונים של ה-Work.",
+                "urlHelp": "מאגר GitHub שיש לכם גישה אליו. הוא הופך כמות שהוא למאגר הנתונים של ה-Work.",
                 "nameLabel": "שם ה-Work",
                 "slugLabel": "מזהה ה-Work",
                 "slugHelp": "מזהה ידידותי לכתובת URL. נגזר משם המאגר — ערכו כדי לשנות.",

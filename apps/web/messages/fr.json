@@ -6240,7 +6240,7 @@
                 "formSubtitle": "Enregistrez un dépôt de code existant comme Work. Rien n’est généré ni déployé : les tâches, les objectifs et les exécutions de la flotte travaillent simplement dans ce dépôt.",
                 "urlLabel": "URL du dépôt",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "Un dépôt GitHub, GitLab ou Bitbucket auquel vous avez accès. Il devient tel quel le dépôt de données du Work.",
+                "urlHelp": "Un dépôt GitHub auquel vous avez accès. Il devient tel quel le dépôt de données du Work.",
                 "nameLabel": "Nom du Work",
                 "slugLabel": "Slug du Work",
                 "slugHelp": "Identifiant compatible URL. Dérivé du nom du dépôt — modifiez-le pour le remplacer.",

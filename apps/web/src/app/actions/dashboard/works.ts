@@ -261,7 +261,18 @@ export async function createWork(data: CreateWorkDto) {
         // two tiers would silently disagree again.
         const managedStorage = await resolveManagedStorageStatus(validation.data.storageProvider);
 
-        const gate = await resolveCreateWorkGitGate(providerId, managedStorage);
+        // Repository Work (self-build slice D, EW-766): the API verifies that
+        // the caller can read the repository with THEIR OWN connected
+        // account before it registers anything, so managed storage — which
+        // needs no personal connection — is no shortcut for the kind. Gate
+        // on a personal connection so the form says "connect GitHub" up
+        // front instead of relaying the API's 400 after the round-trip.
+        const gate = await resolveCreateWorkGitGate(
+            providerId,
+            validation.data.kind === 'repo'
+                ? { ...managedStorage, managedGitActive: false }
+                : managedStorage,
+        );
         if (!gate.ok) {
             return {
                 success: false,

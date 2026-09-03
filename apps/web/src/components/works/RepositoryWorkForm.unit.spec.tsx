@@ -59,21 +59,25 @@ describe('parseRepositoryUrl', () => {
         expect(parseRepositoryUrl(input)).toEqual({ owner: 'ever-works', repo: 'ever-works' });
     });
 
-    it('accepts GitLab and Bitbucket too', () => {
-        expect(parseRepositoryUrl('https://gitlab.com/group/project')).toEqual({
-            owner: 'group',
-            repo: 'project',
+    it('accepts repository names that start with a dot (`.github`) — owners still may not', () => {
+        expect(parseRepositoryUrl('https://github.com/ever-works/.github')).toEqual({
+            owner: 'ever-works',
+            repo: '.github',
         });
-        expect(parseRepositoryUrl('https://bitbucket.org/team/project')).toEqual({
-            owner: 'team',
-            repo: 'project',
-        });
+        expect(parseRepositoryUrl('https://github.com/.ever-works/repo')).toBeNull();
+        expect(parseRepositoryUrl('https://github.com/ever-works/.')).toBeNull();
+        expect(parseRepositoryUrl('https://github.com/ever-works/..')).toBeNull();
     });
 
     it.each([
         ['an empty string', ''],
         ['free text', 'make me a blog about coffee'],
         ['an unsupported host', 'https://example.com/owner/repo'],
+        // Mirrors the API: only the GitHub git-provider plugin exists, so a
+        // GitLab / Bitbucket URL is flagged in the form instead of becoming a
+        // Work no Task can clone.
+        ['a GitLab URL (no GitLab plugin yet)', 'https://gitlab.com/group/project'],
+        ['a Bitbucket URL (no Bitbucket plugin yet)', 'https://bitbucket.org/team/project'],
         ['an owner-only path', 'https://github.com/ever-works'],
         ['a deeper path', 'https://github.com/ever-works/ever-works/tree/develop'],
         ['an ssh remote', 'git@github.com:ever-works/ever-works.git'],
