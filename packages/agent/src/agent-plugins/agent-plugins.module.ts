@@ -11,6 +11,7 @@ import { AgentPluginRemoteAcquireService } from './remote-acquire.service';
 import { AgentPluginPackageRepository } from './package.repository';
 import { AgentPluginPackageBootstrapService } from './package-bootstrap.service';
 import { AgentPluginUpdateService } from './update.service';
+import { AgentPluginInstallService } from './install.service';
 import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 
 /**
@@ -58,6 +59,7 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
         AgentPluginPackageRepository,
         AgentPluginPackageBootstrapService,
         AgentPluginUpdateService,
+        AgentPluginInstallService,
         AGENT_PLUGIN_SKILL_SOURCE,
     ],
 })

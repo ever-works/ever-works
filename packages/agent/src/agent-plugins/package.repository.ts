@@ -75,4 +75,54 @@ export class AgentPluginPackageRepository {
             installError: error.slice(0, 2000),
         });
     }
+
+    /**
+     * Create or refresh the row for a package.
+     *
+     * Keyed on (userId, name) because that is the table's unique index —
+     * re-installing the same package for the same user must UPDATE rather than
+     * insert a duplicate that the index would reject anyway.
+     */
+    async upsertInstalled(input: {
+        userId: string;
+        tenantId: string | null;
+        organizationId: string | null;
+        name: string;
+        version: string | null;
+        specVersion: string;
+        source: AgentPluginPackageSource;
+        sourceRef: string;
+        installPath: string;
+        integrity: string | null;
+        manifest: Record<string, unknown>;
+        findings: AgentPluginPackage['findings'];
+        skillNames: string[];
+        mcpServerNames: string[];
+    }): Promise<AgentPluginPackage> {
+        const existing = await this.repository.findOne({
+            where: { userId: input.userId, name: input.name },
+        });
+
+        const values = {
+            ...input,
+            installState: 'installed' as AgentPluginPackageInstallState,
+            installError: null,
+            lastValidatedAt: new Date(),
+        };
+
+        if (existing) {
+            await this.repository.update(existing.id, values);
+            const updated = await this.repository.findOne({ where: { id: existing.id } });
+            if (!updated) {
+                throw new Error(`Package row ${existing.id} vanished during upsert.`);
+            }
+            return updated;
+        }
+
+        return this.repository.save(this.repository.create(values));
+    }
+
+    async deleteById(id: string): Promise<void> {
+        await this.repository.delete(id);
+    }
 }

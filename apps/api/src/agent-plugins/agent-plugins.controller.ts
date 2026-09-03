@@ -1,15 +1,32 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import {
+    BadRequestException,
+    Body,
+    Controller,
+    Delete,
+    Get,
+    HttpCode,
+    Param,
+    ParseUUIDPipe,
+    Post,
+    Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+    AgentPluginInstallService,
     AgentPluginPackageCatalogService,
+    AgentPluginUpdateService,
     loadedPackages,
     rejectedPackages,
     scanConfiguredPackages,
+    type AcquireInput,
 } from '@ever-works/agent/agent-plugins';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { ListAgentPluginPackagesQueryDto } from './dto/agent-plugin.dto';
+import {
+    InstallAgentPluginPackageDto,
+    ListAgentPluginPackagesQueryDto,
+} from './dto/agent-plugin.dto';
 
 /**
  * Read surface over installed Agent Plugins packages.
@@ -23,15 +40,19 @@ import { ListAgentPluginPackagesQueryDto } from './dto/agent-plugin.dto';
  * Authentication is global (`AuthSessionGuard` as an `APP_GUARD`), so a
  * user-scoped controller needs no `@UseGuards` of its own.
  *
- * Read-only in this phase. Installing, updating and removing packages arrive
- * with the git and npm sources; local packages are registered in place, so
- * there is nothing yet for a write route to do that editing the directory
- * does not already do.
+ * Local packages have no write routes: such a package IS the directory the
+ * operator configured, so "removing" one through the API would only
+ * disagree with the filesystem until the next scan. Only git and npm
+ * packages can be installed, re-synced and removed here.
  */
 @ApiTags('agent-plugins')
 @Controller('api/agent-plugins')
 export class AgentPluginsController {
-    constructor(private readonly catalog: AgentPluginPackageCatalogService) {}
+    constructor(
+        private readonly catalog: AgentPluginPackageCatalogService,
+        private readonly installer: AgentPluginInstallService,
+        private readonly updateService: AgentPluginUpdateService,
+    ) {}
 
     @Get()
     @ApiOperation({
@@ -128,4 +149,79 @@ export class AgentPluginsController {
         });
         return { entries, total: entries.length };
     }
+
+    @Get('updates')
+    @ApiOperation({
+        summary: 'Packages with a newer version available',
+        description:
+            'Reports only. Upgrading changes the instructions an agent follows, so it stays an explicit action rather than a side effect of rendering this page. Packages whose remote could not be reached are listed separately from packages that are up to date.',
+    })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async listUpdates(@CurrentUser() _auth: AuthenticatedUser) {
+        return this.updateService.checkForUpdates();
+    }
+
+    @Post()
+    @ApiOperation({
+        summary: 'Install a package from git or npm',
+        description:
+            'Requires an allowlist entry for the exact package name or git URL. The fetched tree is validated before it is kept — a package that fails is deleted rather than left on disk.',
+    })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async install(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: InstallAgentPluginPackageDto,
+    ) {
+        const row = await this.installer.install(toAcquireInput(body), { userId: auth.userId });
+        return { id: row.id, name: row.name, version: row.version, source: row.source };
+    }
+
+    @Post(':id/resync')
+    @ApiOperation({
+        summary: 'Re-fetch a package at its recorded coordinates',
+        description:
+            'The explicit counterpart to the update badge. Re-runs the same acquire-and-validate path as an install.',
+    })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async resync(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+        const row = await this.installer.resync(id, auth.userId);
+        return { id: row.id, name: row.name, version: row.version, source: row.source };
+    }
+
+    @Delete(':id')
+    @HttpCode(204)
+    @ApiOperation({
+        summary: 'Remove an installed package',
+        description:
+            'Deletes the registry row and then the directory. A package the caller does not own reports 404 rather than 403, so the response does not confirm that another user’s package exists.',
+    })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async remove(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
+        await this.installer.remove(id, auth.userId);
+    }
+}
+
+/**
+ * Turn the flat request body into the acquirer's discriminated input.
+ *
+ * The DTO cannot express "url required when source is git" with
+ * class-validator alone without a custom constraint, so the pairing is checked
+ * here — and rejected with a message naming the missing field, because
+ * `BadRequestException` with no detail is the least useful 400 there is.
+ */
+export function toAcquireInput(body: InstallAgentPluginPackageDto): AcquireInput {
+    if (body.source === 'git') {
+        if (!body.url) {
+            throw new BadRequestException('A git package requires "url".');
+        }
+        return { kind: 'git', url: body.url, ...(body.ref ? { ref: body.ref } : {}) };
+    }
+    if (!body.packageName) {
+        throw new BadRequestException('An npm package requires "packageName".');
+    }
+    return {
+        kind: 'npm',
+        packageName: body.packageName,
+        ...(body.version ? { version: body.version } : {}),
+    };
 }

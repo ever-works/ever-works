@@ -96,3 +96,5 @@ export {
     type PackageUpdate,
     type UpdateCheckResult,
 } from './update.service';
+
+export { AgentPluginInstallService, sourceRefFor } from './install.service';

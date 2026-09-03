@@ -91,3 +91,44 @@ export class UpdateAgentPluginAllowlistEntryDto {
     @MaxLength(2000)
     notes?: string;
 }
+
+/** Which remote source a package is installed from. */
+export const AGENT_PLUGIN_INSTALL_SOURCES = ['git', 'npm'] as const;
+
+export class InstallAgentPluginPackageDto {
+    @ApiProperty({ enum: AGENT_PLUGIN_INSTALL_SOURCES })
+    @IsIn(AGENT_PLUGIN_INSTALL_SOURCES)
+    source: (typeof AGENT_PLUGIN_INSTALL_SOURCES)[number];
+
+    @ApiPropertyOptional({
+        description: 'HTTPS clone URL. Required when source is "git".',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(2048)
+    url?: string;
+
+    @ApiPropertyOptional({
+        description: 'Branch or tag to pin. Only meaningful when source is "git".',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(256)
+    ref?: string;
+
+    @ApiPropertyOptional({
+        description: 'Package name. Required when source is "npm".',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(214)
+    packageName?: string;
+
+    @ApiPropertyOptional({
+        description: 'Version or dist-tag. Only meaningful when source is "npm".',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(256)
+    version?: string;
+}
