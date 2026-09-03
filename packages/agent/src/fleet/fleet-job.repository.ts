@@ -115,9 +115,21 @@ export class FleetJobRepository {
      * CAS-claim one queued job for a node. The row must STILL be
      * `queued` — a raced second lease matches zero rows and returns
      * false, so exactly one node ever wins a given job.
+     *
+     * `cancelRequestedAt IS NULL` is part of the same predicate, not a
+     * separate read. A cancelled job must never be leased, and the status
+     * column alone cannot express that: `reclaim()` returns a lapsed claim
+     * to `queued` without clearing the flag, so a flagged row can legally
+     * BE `queued`. `FleetJobService.reclaimExpired` now settles those
+     * instead of requeuing them, but this is the invariant itself rather
+     * than one caller remembering it — any future path that queues a
+     * flagged row is refused here.
      */
     async claim(id: string, patch: ClaimJobPatch): Promise<boolean> {
-        const result = await this.repository.update({ id, status: 'queued' }, patch);
+        const result = await this.repository.update(
+            { id, status: 'queued', cancelRequestedAt: IsNull() },
+            patch,
+        );
         return (result.affected ?? 0) === 1;
     }
 

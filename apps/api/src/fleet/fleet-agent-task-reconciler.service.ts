@@ -145,9 +145,40 @@ export class FleetAgentTaskReconcilerService {
             return;
         }
 
-        if (event.source === 'cancelled') {
-            // The operator path already flipped the run to `cancelled`
-            // (that is what triggered the job cancel); mirror the board.
+        // A cancelled run gets the board mirror and NOTHING else.
+        //
+        // Three different arrivals mean "this run was cancelled", and only
+        // the first is a synthetic event:
+        //
+        //   1. `source === 'cancelled'` — the operator cancelled a job no
+        //      node had claimed yet, so the service failed it outright.
+        //   2. `run.status === 'cancelled'` — the operator path flipped the
+        //      AgentRun first (that is what triggers the job cancel).
+        //   3. `event.job.cancelRequestedAt` — the job carries the flag but
+        //      the node got its report in first.
+        //
+        // Case 3 is the one that bit. Cancellation reaches a node as a
+        // REFUSED HEARTBEAT, and `FleetJobService.completeJob` deliberately
+        // does not check the flag ("the row settles with the node's own
+        // verdict"). So a node that had already finished and pushed before
+        // its next heartbeat reports success, `completeJob` accepts it, and
+        // the event arrives as an ordinary `node-report`.
+        //
+        // Falling through from there ran the whole success path:
+        // `finalizeRemotePush` OPENED A PULL REQUEST — and can auto-merge it
+        // — for a Task the user had explicitly cancelled, then posted a
+        // "run finished" chat message contradicting the cancellation.
+        //
+        // The terminal write itself was always safe: `markCompleted` CASes
+        // against NON_TERMINAL and no-ops on an already-cancelled row. What
+        // was never guarded is the side effects — the pull request, the chat
+        // message, the inbox notice — none of which are CAS-guarded and none
+        // of which can be undone once they have happened.
+        if (
+            event.source === 'cancelled' ||
+            run.status === 'cancelled' ||
+            event.job.cancelRequestedAt
+        ) {
             await this.bestEffort('board denorm', () =>
                 this.runDenorm.recordTerminal(ctx.taskId, ctx.runId, 'failed'),
             );

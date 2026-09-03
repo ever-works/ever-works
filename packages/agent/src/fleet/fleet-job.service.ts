@@ -71,6 +71,14 @@ export interface ReclaimSummary {
 /** Error text a job settles with when an operator cancels it before any node claimed it. */
 export const FLEET_JOB_CANCELLED_ERROR = 'Cancelled by the operator before a node claimed it';
 
+/**
+ * Settled reason for an ACTIVE job that was cancelled and whose node then
+ * died without reporting. Distinct from {@link FLEET_JOB_CANCELLED_ERROR},
+ * which only covers a job no node had claimed yet.
+ */
+export const FLEET_JOB_CANCELLED_LEASE_LAPSED_ERROR =
+    'Cancelled by the operator; the node holding it stopped reporting';
+
 /** What `cancel` did (or could not do) — see {@link FleetJobService.cancel}. */
 export interface CancelFleetJobOutcome {
     /** True when the request changed the job's course (dropped, or flagged for the node). */
@@ -487,6 +495,48 @@ export class FleetJobService {
                     nodeId: job.nodeId,
                     leaseExpiresAt: job.leaseExpiresAt,
                 };
+                // A cancelled job must never go back in the pool.
+                //
+                // `reclaim()` resets status / nodeId / leaseExpiresAt /
+                // queuedReason but leaves `cancelRequestedAt` set, and
+                // `claim()` CASes on `{ id, status: 'queued' }` only — it does
+                // not exclude a flagged row. So a job the operator cancelled,
+                // whose node then aborted on the refused heartbeat without
+                // calling `complete()` (or simply crashed), was requeued still
+                // carrying the flag and re-leased to a fresh node, which began
+                // re-executing the cancelled Task for real — CLI work, git
+                // work — until the attempt budget ran out.
+                //
+                // Settle it instead, with the same observed-lease CAS the
+                // exhausted path uses so a heartbeat landing between the scan
+                // and this write still wins. `source: 'cancelled'` routes the
+                // reconciler to its board-mirror branch, which is exactly
+                // right: nothing was produced that anyone should act on.
+                if (job.cancelRequestedAt) {
+                    const error = FLEET_JOB_CANCELLED_LEASE_LAPSED_ERROR;
+                    const settled = await this.jobs.failExhausted(job.id, observed, error, now);
+                    if (settled) {
+                        summary.failed += 1;
+                        this.emit(
+                            FleetJobCompletedEvent.EVENT_NAME,
+                            new FleetJobCompletedEvent(
+                                toJobView({
+                                    ...job,
+                                    status: 'failed',
+                                    error,
+                                    completedAt: now,
+                                    leaseExpiresAt: null,
+                                } as FleetJob),
+                                job.userId,
+                                'cancelled',
+                                job.nodeId ?? null,
+                                null,
+                                error,
+                            ),
+                        );
+                    }
+                    continue;
+                }
                 if ((job.attempts ?? 0) >= (job.maxAttempts ?? 1)) {
                     const error = `Lease expired ${job.attempts} time(s) without a result; attempt budget exhausted`;
                     const failed = await this.jobs.failExhausted(job.id, observed, error, now);
