@@ -397,6 +397,34 @@ describe('FleetAgentTaskReconcilerService', () => {
     });
 
     describe('multi-repo mounts (slice C)', () => {
+        /** The PLAN: what the planner put on the job, and the only mounts a node may report on. */
+        const plannedMount = (repositoryId: string, over: Record<string, unknown> = {}) => ({
+            repositoryId,
+            repoUrl: `https://github.com/${repositoryId}.git`,
+            baseRef: 'main',
+            branch: 'task/tsk-1-task1',
+            mountDir: repositoryId.split('/')[1],
+            writable: true,
+            ...over,
+        });
+        const mountedJob = (
+            mounts: unknown[] = [plannedMount('acme/template'), plannedMount('acme/docs')],
+        ) =>
+            job({
+                payload: {
+                    taskId: TASK,
+                    runId: RUN,
+                    agentId: AGENT,
+                    userId: USER,
+                    workspace: {
+                        repositoryId: 'acme/repo',
+                        repoUrl: 'https://github.com/acme/repo.git',
+                        baseRef: 'develop',
+                        branch: 'task/tsk-1-task1',
+                        mounts,
+                    },
+                },
+            });
         const mountedResult = {
             ...successResult,
             workspace: {
@@ -448,7 +476,7 @@ describe('FleetAgentTaskReconcilerService', () => {
         it('opens one pull request per pushed mount, cross-linked to the primary, and posts one Inbox notice', async () => {
             await build().onCompleted(
                 new FleetJobCompletedEvent(
-                    job(),
+                    mountedJob(),
                     USER,
                     'node-report',
                     NODE,
@@ -498,7 +526,7 @@ describe('FleetAgentTaskReconcilerService', () => {
             });
             await build().onCompleted(
                 new FleetJobCompletedEvent(
-                    job(),
+                    mountedJob(),
                     USER,
                     'node-report',
                     NODE,
@@ -513,6 +541,25 @@ describe('FleetAgentTaskReconcilerService', () => {
             expect(inbox.notice.mock.calls[0][1].body).toContain('Pull requests to review (1):');
         });
 
+        it('still completes the run when recording a mount pull request throws, and says so', async () => {
+            taskWorkspace.finalizeMountPush.mockRejectedValue(new Error('db down'));
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    mountedJob(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+            expect(runs.markCompleted).toHaveBeenCalledWith(RUN, 'Fixed it.');
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'completed');
+            expect(taskChat.post.mock.calls[0][1].body).toContain(
+                '`acme/template`: branch `task/tsk-1-task1` pushed, but recording it failed: db down',
+            );
+            expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
+        });
+
         it('records branches a FAILED run still pushed in mounts, without opening pull requests', async () => {
             const failed = {
                 ...mountedResult,
@@ -521,7 +568,7 @@ describe('FleetAgentTaskReconcilerService', () => {
             };
             await build().onCompleted(
                 new FleetJobCompletedEvent(
-                    job(),
+                    mountedJob(),
                     USER,
                     'node-report',
                     NODE,
@@ -541,6 +588,130 @@ describe('FleetAgentTaskReconcilerService', () => {
                     baseRef: 'main',
                 }),
             );
+        });
+
+        /**
+         * The node's word is not the plan's. Repository, branch and base come
+         * from the job payload; a verdict the plan does not cover is logged,
+         * mentioned, and never turned into a pull request or a Task entry —
+         * on the success AND the failure path.
+         */
+        describe.each([
+            ['success', mountedResult],
+            [
+                'failure',
+                {
+                    ...mountedResult,
+                    status: 'failed',
+                    failureReason: 'a required acceptance check did not pass',
+                },
+            ],
+        ])('planned-mount gate on the %s path', (_path, baseResult) => {
+            const withEntry = (entry: Record<string, unknown>) => ({
+                ...baseResult,
+                mountGit: [{ ...mountedResult.mountGit[0], ...entry }],
+            });
+
+            it('ignores a repository the plan did not mount', async () => {
+                await build().onCompleted(
+                    new FleetJobCompletedEvent(
+                        mountedJob(),
+                        USER,
+                        'node-report',
+                        NODE,
+                        withEntry({ repositoryId: 'victim/anything' }) as unknown as Record<
+                            string,
+                            unknown
+                        >,
+                    ),
+                );
+                expect(taskWorkspace.finalizeMountPush).not.toHaveBeenCalled();
+                if (baseResult.status === 'succeeded') {
+                    expect(taskChat.post.mock.calls[0][1].body).toContain(
+                        'ignored: `victim/anything` was not a planned mount of this run',
+                    );
+                }
+            });
+
+            it('ignores a verdict for a read-only mount', async () => {
+                await build().onCompleted(
+                    new FleetJobCompletedEvent(
+                        mountedJob([
+                            plannedMount('acme/template', { writable: false }),
+                            plannedMount('acme/docs'),
+                        ]),
+                        USER,
+                        'node-report',
+                        NODE,
+                        baseResult as unknown as Record<string, unknown>,
+                    ),
+                );
+                expect(taskWorkspace.finalizeMountPush).not.toHaveBeenCalled();
+            });
+
+            it('ignores a verdict from a branch other than the planned Task branch', async () => {
+                await build().onCompleted(
+                    new FleetJobCompletedEvent(
+                        mountedJob(),
+                        USER,
+                        'node-report',
+                        NODE,
+                        withEntry({ branch: 'main' }) as unknown as Record<string, unknown>,
+                    ),
+                );
+                expect(taskWorkspace.finalizeMountPush).not.toHaveBeenCalled();
+            });
+
+            it('ignores a head that is not a commit id, and every verdict when the job planned no mounts', async () => {
+                await build().onCompleted(
+                    new FleetJobCompletedEvent(
+                        mountedJob(),
+                        USER,
+                        'node-report',
+                        NODE,
+                        withEntry({ headSha: 'refs/heads/main' }) as unknown as Record<
+                            string,
+                            unknown
+                        >,
+                    ),
+                );
+                expect(taskWorkspace.finalizeMountPush).not.toHaveBeenCalled();
+
+                await build().onCompleted(
+                    new FleetJobCompletedEvent(
+                        job(),
+                        USER,
+                        'node-report',
+                        NODE,
+                        baseResult as unknown as Record<string, unknown>,
+                    ),
+                );
+                expect(taskWorkspace.finalizeMountPush).not.toHaveBeenCalled();
+            });
+
+            it('takes repository, branch and base from the plan, not from the node', async () => {
+                await build().onCompleted(
+                    new FleetJobCompletedEvent(
+                        mountedJob([plannedMount('Acme/Template', { baseRef: 'release' })]),
+                        USER,
+                        'node-report',
+                        NODE,
+                        withEntry({ repositoryId: 'acme/template' }) as unknown as Record<
+                            string,
+                            unknown
+                        >,
+                    ),
+                );
+                expect(taskWorkspace.finalizeMountPush).toHaveBeenCalledTimes(1);
+                expect(taskWorkspace.finalizeMountPush).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        repositoryId: 'Acme/Template',
+                        branch: 'task/tsk-1-task1',
+                        baseRef: 'release',
+                        headSha: 'd'.repeat(40),
+                    }),
+                );
+            });
         });
     });
 });
@@ -566,5 +737,33 @@ describe('parseAgentTaskResult', () => {
         expect(parseAgentTaskResult(null)).toBeNull();
         expect(parseAgentTaskResult({ ok: true })).toBeNull();
         expect(parseAgentTaskResult({ status: 'weird' })).toBeNull();
+    });
+
+    it('keeps well-formed mount verdicts, drops malformed ones, and never trusts a non-array', () => {
+        const verdict = {
+            repositoryId: 'acme/template',
+            mountDir: 'template',
+            branch: 'task/tsk-1-task1',
+            baseSha: 'c'.repeat(40),
+            headSha: 'd'.repeat(40),
+            empty: false,
+            pushed: true,
+        };
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mountGit: [verdict, { repositoryId: 'acme/docs' }, 'nope', null],
+            })?.mountGit,
+        ).toEqual([verdict]);
+        expect(
+            parseAgentTaskResult({ status: 'succeeded', taskId: TASK, mountGit: { verdict } })
+                ?.mountGit,
+        ).toBeNull();
+        expect(
+            parseAgentTaskResult({ status: 'succeeded', taskId: TASK, mountGit: 'template' })
+                ?.mountGit,
+        ).toBeNull();
+        expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })?.mountGit).toBeNull();
     });
 });

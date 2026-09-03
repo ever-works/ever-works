@@ -15,11 +15,15 @@ import {
     type TaskMountPushOutcome,
 } from '@ever-works/agent/tasks-domain';
 import { redactSecrets } from '@ever-works/agent/utils';
-import type {
-    FleetAgentTaskResult,
-    FleetJobView,
-    GateStatus,
-    TaskCheckResult,
+import {
+    normalizeFleetTaskWorkspaceMounts,
+    type FleetAgentTaskGitResult,
+    type FleetAgentTaskPayload,
+    type FleetAgentTaskResult,
+    type FleetJobView,
+    type FleetTaskWorkspaceMountSpec,
+    type GateStatus,
+    type TaskCheckResult,
 } from '@ever-works/contracts';
 
 /** What an `agent-task` job correlates to on the platform side. */
@@ -32,6 +36,12 @@ export interface FleetAgentTaskCorrelation {
 /** Longest run summary / chat body the reconciler will store. */
 const MAX_SUMMARY_CHARS = 4000;
 const MAX_TAIL_CHARS = 1500;
+/** A node-reported identifier as far as it is ever quoted back to a human. */
+const MAX_QUOTED_CHARS = 120;
+const SHA_PATTERN = /^[0-9a-f]{40,64}$/i;
+
+/** The planned mounts of a job, keyed by lower-cased repository identity. */
+type PlannedMounts = Map<string, FleetTaskWorkspaceMountSpec>;
 
 /**
  * Agent execution v2 (slice B) — turn what a fleet node reported into
@@ -191,19 +201,28 @@ export class FleetAgentTaskReconcilerService {
             );
             // Multi-repo (slice C): branches a failed run still pushed in
             // mounted repositories are recorded (no pull request) so they
-            // are visible on the Task rather than orphaned on the remote.
-            if (task && result?.mountGit) {
+            // are visible on the Task rather than orphaned on the remote —
+            // for the repositories the PLAN put on the job, never for what
+            // the node chose to report.
+            if (task && result?.mountGit && result.mountGit.length > 0) {
+                const planned = this.plannedMounts(event.job, ctx.runId);
                 for (const entry of result.mountGit) {
-                    if (!entry.repositoryId || !entry.pushed || entry.empty) continue;
-                    await this.bestEffort(`record pushed mount ${entry.repositoryId}`, () =>
+                    const refusal = refuseMountEntry(entry, planned);
+                    if (refusal) {
+                        this.logger.warn(`Run ${ctx.runId}: mount result ignored — ${refusal}`);
+                        continue;
+                    }
+                    if (!entry.pushed || entry.empty) continue;
+                    const mount = planned.get(entry.repositoryId!.trim().toLowerCase())!;
+                    await this.bestEffort(`record pushed mount ${mount.repositoryId}`, () =>
                         this.taskWorkspace.finalizeMountPush({
                             task,
                             userId: event.userId,
                             agentId: agentId ?? run.agentId,
                             agentCanOpenPullRequests: false,
-                            repositoryId: entry.repositoryId!,
-                            branch: entry.branch,
-                            baseRef: findMount(result, entry.repositoryId)?.baseRef ?? null,
+                            repositoryId: mount.repositoryId,
+                            branch: mount.branch,
+                            baseRef: mount.baseRef,
                             headSha: entry.headSha ?? null,
                         }),
                     );
@@ -267,38 +286,67 @@ export class FleetAgentTaskReconcilerService {
         // Multi-repo Task workspaces (slice C): one pull request per mounted
         // repository the run pushed, recorded on the Task next to the primary,
         // then ONE Inbox notice listing everything the human now has to review.
+        //
+        // The wire is untrusted: a node (or a model that tampers with the
+        // node it shares an account with) must not be able to make the
+        // platform open pull requests, with the OWNER's credentials, in any
+        // repository it names. Repository, branch and base come from the
+        // planner's spec on the job; the node only says what it pushed.
         const mountNotes: string[] = [];
         const openedPullRequests: string[] = [];
-        if (task && Array.isArray(result.mountGit) && result.mountGit.length > 0) {
+        if (task && result.mountGit && result.mountGit.length > 0) {
             if (primaryPrUrl) openedPullRequests.push(primaryPrUrl);
+            const planned = this.plannedMounts(event.job, ctx.runId);
             for (const entry of result.mountGit) {
-                if (!entry.repositoryId) continue;
+                const refusal = refuseMountEntry(entry, planned);
+                if (refusal) {
+                    this.logger.warn(`Run ${ctx.runId}: mount result ignored — ${refusal}`);
+                    mountNotes.push(`ignored: ${refusal}.`);
+                    continue;
+                }
+                const mount = planned.get(entry.repositoryId!.trim().toLowerCase())!;
                 if (entry.empty) {
-                    mountNotes.push(`\`${entry.repositoryId}\`: no changes.`);
+                    mountNotes.push(`\`${mount.repositoryId}\`: no changes.`);
                     continue;
                 }
                 if (!entry.pushed) {
                     mountNotes.push(
-                        `\`${entry.repositoryId}\`: committed on \`${entry.branch}\` but not pushed${
-                            entry.error ? ` (${entry.error})` : ' (git policy)'
+                        `\`${mount.repositoryId}\`: committed on \`${mount.branch}\` but not pushed${
+                            entry.error
+                                ? ` (${truncate(entry.error, MAX_QUOTED_CHARS)})`
+                                : ' (git policy)'
                         }.`,
                     );
                     continue;
                 }
-                const outcome = await this.taskWorkspace.finalizeMountPush({
-                    task,
-                    userId: event.userId,
-                    agentId: agentId ?? run.agentId,
-                    agentCanOpenPullRequests: agent?.permissions?.canOpenPullRequests !== false,
-                    repositoryId: entry.repositoryId,
-                    branch: entry.branch,
-                    baseRef: findMount(result, entry.repositoryId)?.baseRef ?? null,
-                    headSha: entry.headSha ?? null,
-                    primaryPrUrl,
-                    summary,
-                });
-                mountNotes.push(describeMountOutcome(outcome, entry.branch));
-                if (outcome.prUrl) openedPullRequests.push(outcome.prUrl);
+                // The primary path is guarded the same way: an unexpected
+                // throw here (a DB outage while recording the link) must not
+                // abort before `markCompleted`, or the run stays `running`
+                // for a job that is already `done`.
+                try {
+                    const outcome = await this.taskWorkspace.finalizeMountPush({
+                        task,
+                        userId: event.userId,
+                        agentId: agentId ?? run.agentId,
+                        agentCanOpenPullRequests: agent?.permissions?.canOpenPullRequests !== false,
+                        repositoryId: mount.repositoryId,
+                        branch: mount.branch,
+                        baseRef: mount.baseRef,
+                        headSha: entry.headSha ?? null,
+                        primaryPrUrl,
+                        summary,
+                    });
+                    mountNotes.push(describeMountOutcome(outcome, mount.branch));
+                    if (outcome.prUrl) openedPullRequests.push(outcome.prUrl);
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    mountNotes.push(
+                        `\`${mount.repositoryId}\`: branch \`${mount.branch}\` pushed, but recording it failed: ${message}.`,
+                    );
+                    this.logger.warn(
+                        `Task ${task.id}: mount ${mount.repositoryId} finalize failed after fleet push: ${message}`,
+                    );
+                }
             }
             if (mountNotes.length > 0) {
                 finalizeNote = [
@@ -368,6 +416,42 @@ export class FleetAgentTaskReconcilerService {
         await this.bestEffort('dispatch-gate drain', () => this.dispatchGate!.drainForWork(workId));
     }
 
+    /**
+     * The mounts the PLANNER put on the job — the only repositories a node
+     * report may make the platform act on. Read from the job payload (the
+     * same `FleetTaskWorkspaceSpec` the node provisioned from), through the
+     * same normalizer, so a payload that does not normalize yields NO
+     * admissible mounts rather than a permissive default.
+     */
+    private plannedMounts(job: FleetJobView, runId: string): PlannedMounts {
+        const planned: PlannedMounts = new Map();
+        const payload = job.payload as Partial<FleetAgentTaskPayload> | null | undefined;
+        const workspace = payload?.workspace;
+        if (
+            !workspace ||
+            typeof workspace !== 'object' ||
+            typeof workspace.repositoryId !== 'string'
+        ) {
+            return planned;
+        }
+        try {
+            for (const mount of normalizeFleetTaskWorkspaceMounts(
+                workspace.mounts,
+                workspace.repositoryId,
+            )) {
+                planned.set(mount.repositoryId.toLowerCase(), mount);
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Run ${runId}: planned mounts of job ${job.id} did not normalize (${
+                    error instanceof Error ? error.message : String(error)
+                }); every node mount result is ignored`,
+            );
+            planned.clear();
+        }
+        return planned;
+    }
+
     private async describeNode(nodeId: string, userId: string): Promise<string> {
         if (!this.nodes) return nodeId;
         try {
@@ -405,6 +489,10 @@ export function parseAgentTaskResult(
         raw.model && typeof raw.model === 'object'
             ? (raw.model as FleetAgentTaskResult['model'])
             : null;
+    // Multi-repo (slice C): `mountGit` is an array of per-repository
+    // verdicts or nothing; a malformed shape must not throw half-way
+    // through a reconcile (after `markFailed`, before the chat / notice).
+    const mountGit = Array.isArray(raw.mountGit) ? raw.mountGit.filter(isMountGitResult) : null;
     return {
         ...(raw as FleetAgentTaskResult),
         status,
@@ -413,15 +501,42 @@ export function parseAgentTaskResult(
         checks,
         git: git && typeof git.branch === 'string' ? git : null,
         model,
+        mountGit,
         failureReason: typeof raw.failureReason === 'string' ? raw.failureReason : null,
     };
 }
 
-/** The provisioned mount descriptor for a repository, when the node reported one. */
-function findMount(result: FleetAgentTaskResult, repositoryId: string) {
-    return (result.workspace?.mounts ?? []).find(
-        (mount) => mount.repositoryId.toLowerCase() === repositoryId.toLowerCase(),
+function isMountGitResult(value: unknown): value is FleetAgentTaskGitResult {
+    return Boolean(
+        value &&
+        typeof value === 'object' &&
+        typeof (value as FleetAgentTaskGitResult).repositoryId === 'string' &&
+        typeof (value as FleetAgentTaskGitResult).branch === 'string' &&
+        typeof (value as FleetAgentTaskGitResult).pushed === 'boolean' &&
+        typeof (value as FleetAgentTaskGitResult).empty === 'boolean',
     );
+}
+
+/**
+ * Why a node-reported mount verdict is NOT acted on, or null when it is
+ * admissible: the repository must be a planned WRITABLE mount of this run,
+ * the branch must be the Task branch the plan named, and a reported head
+ * must look like a commit id. Everything quoted back is bounded.
+ */
+function refuseMountEntry(entry: FleetAgentTaskGitResult, planned: PlannedMounts): string | null {
+    const repositoryId = typeof entry.repositoryId === 'string' ? entry.repositoryId.trim() : '';
+    if (!repositoryId) return 'a mount verdict without a repository';
+    const quoted = `\`${truncate(repositoryId, MAX_QUOTED_CHARS)}\``;
+    const mount = planned.get(repositoryId.toLowerCase());
+    if (!mount) return `${quoted} was not a planned mount of this run`;
+    if (!mount.writable) return `${quoted} is a read-only mount`;
+    if (entry.branch !== mount.branch) {
+        return `${quoted}: branch \`${truncate(entry.branch, MAX_QUOTED_CHARS)}\` is not the Task branch \`${mount.branch}\``;
+    }
+    if (entry.headSha !== null && entry.headSha !== undefined && !SHA_PATTERN.test(entry.headSha)) {
+        return `${quoted}: the reported head is not a commit id`;
+    }
+    return null;
 }
 
 function describeMountOutcome(outcome: TaskMountPushOutcome, branch: string): string {
