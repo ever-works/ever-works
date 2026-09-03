@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
 import {
+	FLEET_AGENT_TASK_META_DIR,
 	normalizeFleetTaskWorkspaceMounts,
 	type FleetTaskWorkspaceDescriptor,
 	type FleetTaskWorkspaceMountDescriptor,
@@ -66,6 +67,41 @@ export interface FleetTaskWorkspaceMountFinalizeResult extends Partial<FleetTask
 /** Directory under the primary worktree the mounts are linked into. */
 export const FLEET_TASK_WORKSPACE_MOUNTS_DIR = '.mounts';
 
+/**
+ * Paths the fleet keeps out of EVERY Task repository's Git view: the mounts
+ * link directory (slice C) and the owner-question directory (slice Q).
+ * Written to the shared `info/exclude` of each repository the workspace
+ * touches — primary and mounts alike.
+ *
+ * `/.mounts/` is anchored at the worktree root on purpose: a nested
+ * `.mounts` directory is the owner's own. The owner-question directory is
+ * listed twice — anchored, where the OUTPUT CONTRACT tells the model to
+ * write it, and UNANCHORED (review SR-5): a model that `cd`-ed into a
+ * package of a monorepo and wrote `.ever-works/QUESTION.md` relative to
+ * its cwd would otherwise hand the finalize's `git add -A` a
+ * `packages/api/.ever-works/QUESTION.md` that is committed, pushed into
+ * the pull request, and never reported as a question. Git matches an
+ * unanchored `dir/` pattern at any depth, so the second rule is the
+ * safety net the first one promises.
+ */
+export const FLEET_TASK_WORKSPACE_EXCLUDE_RULES: readonly string[] = [
+	`/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`,
+	`/${FLEET_AGENT_TASK_META_DIR}/`,
+	`${FLEET_AGENT_TASK_META_DIR}/`
+];
+
+/**
+ * One path per exclude rule, in rule order, proven ignored through Git
+ * after the rules are written (`ensureFleetExcluded`). Slash-terminated so
+ * Git evaluates each as a directory whether or not it exists yet; the
+ * nested probe is what proves the unanchored rule.
+ */
+const FLEET_TASK_WORKSPACE_EXCLUDE_PROBES: readonly string[] = [
+	`${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`,
+	`${FLEET_AGENT_TASK_META_DIR}/`,
+	`nested/${FLEET_AGENT_TASK_META_DIR}/`
+];
+
 export interface FleetTaskWorkspaceProvisionerOptions {
 	/** Persistent cache/worktree root owned by the node service account. */
 	readonly rootPath: string;
@@ -126,7 +162,13 @@ export class FleetTaskWorkspaceProvisioner {
 		// link left behind by an earlier spec would otherwise keep a repository
 		// the operator has since removed reachable (and editable) by the model.
 		const mountsDir = await reconcileMountsDir(primary.path, mountSpecs);
-		if (mountSpecs.length === 0) return primary;
+		if (mountSpecs.length === 0) {
+			// Unconditional since slice Q: even a single-repository workspace
+			// may receive an owner-question file, and a forgotten one must
+			// never reach the finalize's `git add -A`.
+			await ensureFleetExcluded(primary.path, signal);
+			return primary;
+		}
 
 		// Multi-repo Task workspaces (self-build slice C). Every mount is an
 		// ordinary binding of its OWN repository under the fleet root — same
@@ -166,11 +208,15 @@ export class FleetTaskWorkspaceProvisioner {
 				}
 				throw error;
 			}
+			// The mount is a repository of its own: a question file the model
+			// writes while working under `.mounts/<dir>` must stay out of THAT
+			// repository's Git too (the node scans writable mounts for it).
+			await ensureFleetExcluded(provisioned.path, signal);
 			const linkPath = await linkMountIntoPrimary(mountsDir, mount.mountDir, provisioned.path);
 			mounts.push({ ...provisioned, mountDir: mount.mountDir, linkPath, writable: mount.writable });
 		}
 		throwIfCancelled(signal);
-		await ensureMountsExcluded(primary.path, signal);
+		await ensureFleetExcluded(primary.path, signal);
 		return { ...primary, mounts };
 	}
 
@@ -955,42 +1001,50 @@ async function linkMountIntoPrimary(mountsDir: string, mountDir: string, targetP
 }
 
 /**
- * Keep `.mounts/` out of the primary repository's view: `git status`,
- * `git add -A` (the finalize) and every diff ignore it. Written to the
- * repository's `info/exclude` (shared by all worktrees of the pool) rather
- * than a tracked `.gitignore`, so nothing about the fleet layout is ever
- * committed to the owner's repository.
+ * Keep the fleet's own paths (`FLEET_TASK_WORKSPACE_EXCLUDE_RULES`) out of
+ * one repository's view: `git status`, `git add -A` (the finalize) and
+ * every diff ignore them. Written to the repository's `info/exclude`
+ * (shared by all worktrees of the pool) rather than a tracked
+ * `.gitignore`, so nothing about the fleet layout is ever committed to
+ * the owner's repository.
  *
  * The file is shared by every worktree of the pool, and another Task's
  * finalize (`git add -A`) may be reading it at this very moment: a torn
  * rule would let that finalize commit `.mounts` — a symlink entry on POSIX,
- * an embedded-repository gitlink on Windows — silently, into the owner's
- * pushed branch. The merged content is therefore written to a sibling
- * temporary file and renamed over the exclude file (atomic on both
- * platforms), and the rule is verified through Git itself before the mount
- * layout is considered ready.
+ * an embedded-repository gitlink on Windows — or a forgotten
+ * `.ever-works/QUESTION.md` silently, into the owner's pushed branch. The
+ * merged content is therefore written to a sibling temporary file and
+ * renamed over the exclude file (atomic on both platforms), and every rule
+ * is verified through Git itself before the workspace is considered ready.
+ *
+ * Per-rule idempotent: a node upgraded from slice C, whose exclude file
+ * already carries `/.mounts/`, gains the `.ever-works/` rules exactly once
+ * and never a second copy of any. Called for the primary of EVERY
+ * workspace and for every mount, because the owner-question file
+ * (slice Q) can appear in any of them.
  */
-async function ensureMountsExcluded(primaryPath: string, signal?: AbortSignal): Promise<void> {
+async function ensureFleetExcluded(repoPath: string, signal?: AbortSignal): Promise<void> {
 	let commonDir: string;
 	try {
-		commonDir = (await runGitOutput(['rev-parse', '--git-common-dir'], primaryPath, signal)).trim();
+		commonDir = (await runGitOutput(['rev-parse', '--git-common-dir'], repoPath, signal)).trim();
 	} catch (error) {
 		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
 		if (signal?.aborted) throw cancelledError();
 		throw new FleetTaskWorkspaceError('git-failed', 'Task workspace Git directory could not be resolved');
 	}
-	const excludePath = resolve(isAbsolute(commonDir) ? commonDir : resolve(primaryPath, commonDir), 'info', 'exclude');
-	const rule = `/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`;
+	const excludePath = resolve(isAbsolute(commonDir) ? commonDir : resolve(repoPath, commonDir), 'info', 'exclude');
 	let current = '';
 	try {
 		current = await fs.readFile(excludePath, 'utf8');
 	} catch {
 		current = '';
 	}
-	if (!current.split(/\r?\n/).some((line) => line.trim() === rule)) {
+	const lines = current.split(/\r?\n/).map((line) => line.trim());
+	const missing = FLEET_TASK_WORKSPACE_EXCLUDE_RULES.filter((rule) => !lines.includes(rule));
+	if (missing.length > 0) {
 		await fs.mkdir(dirname(excludePath), { recursive: true });
 		const separator = current.length === 0 || current.endsWith('\n') ? '' : '\n';
-		const merged = `${current}${separator}# ever-works fleet: mounted repositories of multi-repo Task workspaces\n${rule}\n`;
+		const merged = `${current}${separator}# ever-works fleet: mounted repositories and the owner-question file of Task workspaces\n${missing.join('\n')}\n`;
 		const temporaryPath = `${excludePath}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`;
 		try {
 			await fs.writeFile(temporaryPath, merged, 'utf8');
@@ -1005,15 +1059,18 @@ async function ensureMountsExcluded(primaryPath: string, signal?: AbortSignal): 
 	}
 	throwIfCancelled(signal);
 	// `check-ignore -q` exits 0 only when the path IS ignored; anything else
-	// (rule not effective, Git error) surfaces as a thrown call.
-	try {
-		await runGitOutput(['check-ignore', '-q', FLEET_TASK_WORKSPACE_MOUNTS_DIR], primaryPath, signal);
-	} catch (error) {
-		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
-		if (signal?.aborted) throw cancelledError();
-		throw new FleetTaskWorkspaceError(
-			'git-failed',
-			`Task workspace exclude rule for '${FLEET_TASK_WORKSPACE_MOUNTS_DIR}' did not take effect`
-		);
+	// (rule not effective, Git error) surfaces as a thrown call. The probes
+	// are slash-terminated: a `dir/` rule matches directories only, and Git
+	// evaluates a slash-terminated pathname as a directory even before it
+	// exists — `.ever-works` never exists at provision time and `.mounts`
+	// only in a multi-repo workspace.
+	for (const probe of FLEET_TASK_WORKSPACE_EXCLUDE_PROBES) {
+		try {
+			await runGitOutput(['check-ignore', '-q', probe], repoPath, signal);
+		} catch (error) {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+			if (signal?.aborted) throw cancelledError();
+			throw new FleetTaskWorkspaceError('git-failed', `Task workspace exclude rule for '${probe}' did not take effect`);
+		}
 	}
 }

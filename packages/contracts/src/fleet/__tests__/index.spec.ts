@@ -125,6 +125,17 @@ const WORKSPACE_EXPORTS = [
 	'isReservedMountDir'
 ] as const;
 
+/** Owner question from a fleet run (self-build slice Q, `fleet-jobs.types.js`). */
+const QUESTION_EXPORTS = [
+	'FLEET_AGENT_TASK_META_DIR',
+	'FLEET_AGENT_TASK_QUESTION_FILE',
+	'FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES',
+	'FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS',
+	'FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES',
+	'parseFleetAgentTaskQuestionMarkdown',
+	'normalizeFleetAgentTaskQuestion'
+] as const;
+
 const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
@@ -132,7 +143,8 @@ const ALL_EXPORTS = [
 	...AGENT_EXECUTION_EXPORTS,
 	...NODE_EXPORTS,
 	...RUNNER_STATUS_EXPORTS,
-	...WORKSPACE_EXPORTS
+	...WORKSPACE_EXPORTS,
+	...QUESTION_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -157,7 +169,9 @@ const FUNCTION_EXPORTS = [
 	'normalizeFleetAgentModelExecution',
 	'FleetTaskWorkspaceMountError',
 	'normalizeFleetTaskWorkspaceMounts',
-	'isReservedMountDir'
+	'isReservedMountDir',
+	'parseFleetAgentTaskQuestionMarkdown',
+	'normalizeFleetAgentTaskQuestion'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -172,12 +186,12 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 84 runtime symbols', () => {
+	it('exposes exactly these 91 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(84);
+		expect(Object.keys(fleet)).toHaveLength(91);
 	});
 
 	it.each([
