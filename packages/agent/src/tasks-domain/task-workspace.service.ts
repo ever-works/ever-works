@@ -358,8 +358,12 @@ export class TaskWorkspaceService {
         for (const repo of attached) {
             const identity = repositoryIdFromCloneUrl(repo.url);
             if (!identity) {
+                // Never the raw URL: this refusal lands on the AgentRun, the
+                // Task page and the API log, and a registry URL may carry
+                // userinfo (`tokenFreeCloneUrl` would refuse it — but only
+                // AFTER this check).
                 throw new Error(
-                    `Attached repository ${repo.repoConnectionId} (${repo.url}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
+                    `Attached repository ${repo.repoConnectionId} (${credentialFreeUrlForMessages(repo.url)}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
                 );
             }
             if (identity.toLowerCase() === input.primaryRepositoryId.toLowerCase()) {
@@ -424,6 +428,35 @@ export class TaskWorkspaceService {
                 input,
                 `repository identity '${repositoryId}' is not <owner>/<repository>`,
             );
+        }
+
+        // Idempotent on the pull request, exactly like the primary path: the
+        // Task branch name is stable, so a re-run pushes MORE commits onto the
+        // branch behind an already-open pull request. Asking the provider for
+        // another one fails (`A pull request already exists for <branch>`),
+        // and that failure would REPLACE the recorded link with a `failed`
+        // entry — on every re-run of a multi-repo Task. Re-record the open one.
+        const alreadyOpen = await this.findOpenLinkedPullRequest(task, repositoryId, branch);
+        if (alreadyOpen) {
+            await this.recordLinkedPullRequest(task, {
+                repositoryId,
+                branch,
+                baseRef: input.baseRef?.trim() || alreadyOpen.baseRef,
+                headSha: input.headSha ?? alreadyOpen.headSha,
+                prNumber: alreadyOpen.prNumber,
+                prUrl: alreadyOpen.prUrl,
+                state: 'pr-open',
+                error: null,
+            });
+            this.logger.log(
+                `Task ${task.id}: mount ${repositoryId} already has PR #${alreadyOpen.prNumber}; push of ${branch} recorded without opening another.`,
+            );
+            return {
+                repositoryId,
+                outcome: 'pr-opened',
+                prNumber: alreadyOpen.prNumber,
+                prUrl: alreadyOpen.prUrl,
+            };
         }
         if (!this.gitFacade) {
             return this.recordMountFailure(
@@ -532,6 +565,34 @@ export class TaskWorkspaceService {
             `Task ${task.id}: mount ${input.repositoryId} branch ${input.branch} pushed but its pull request was not opened: ${error}`,
         );
         return { repositoryId: input.repositoryId, outcome: 'failed', error };
+    }
+
+    /**
+     * The Task's recorded, still-open pull request for `repositoryId` from
+     * exactly this branch — the one a re-run's push just updated. A `failed`
+     * or `pushed` entry, or an entry from another branch, is NOT a match: the
+     * pull request must then be (re)opened.
+     */
+    private async findOpenLinkedPullRequest(
+        task: Task,
+        repositoryId: string,
+        branch: string,
+    ): Promise<(TaskLinkedPullRequest & { prNumber: number; prUrl: string }) | null> {
+        const fresh = (await this.tasks.findById(task.id)) ?? task;
+        const entries = Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : [];
+        for (const entry of entries) {
+            if (
+                entry.repositoryId.toLowerCase() === repositoryId.toLowerCase() &&
+                entry.branch === branch &&
+                entry.state === 'pr-open' &&
+                typeof entry.prNumber === 'number' &&
+                typeof entry.prUrl === 'string' &&
+                entry.prUrl.length > 0
+            ) {
+                return { ...entry, prNumber: entry.prNumber, prUrl: entry.prUrl };
+            }
+        }
+        return null;
     }
 
     /** Upsert by repository, so a re-run updates the entry instead of duplicating it. */
@@ -1401,6 +1462,32 @@ export function tokenFreeCloneUrl(cloneUrl: string): string {
         );
     }
     return value;
+}
+
+/**
+ * A clone URL safe to put in an ERROR MESSAGE. Registry connection URLs
+ * are only checked for shape, so `https://user:token@host/…` is storable;
+ * `tokenFreeCloneUrl` refuses such a URL, but a refusal raised BEFORE it
+ * (an unparseable `owner/repository`) must not echo the raw value into the
+ * run failure reason, the Task page and the API log. Userinfo is dropped
+ * (the scp-like user part included), and anything that does not parse to a
+ * host degrades to a placeholder rather than the input.
+ */
+export function credentialFreeUrlForMessages(cloneUrl: string): string {
+    const value = typeof cloneUrl === 'string' ? cloneUrl.trim() : '';
+    if (!value) return '<no URL>';
+    if (/^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+$/.test(value)) {
+        return value.replace(/^[A-Za-z0-9._-]+@/, '');
+    }
+    try {
+        const parsed = new URL(value);
+        if (!parsed.host) return '<unparseable URL>';
+        parsed.username = '';
+        parsed.password = '';
+        return parsed.toString();
+    } catch {
+        return '<unparseable URL>';
+    }
 }
 
 /**
