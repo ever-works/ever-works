@@ -64,7 +64,13 @@ export const oauthAPI = {
         if (state) params.append('state', state);
         return serverFetch<OAuthConnectionInfo>(
             `/oauth/${providerId}/callback/plugins?${params.toString()}`,
-            state ? { headers: { cookie: `ew_oauth_state=${state}` } } : undefined,
+            {
+                ...(state ? { headers: { cookie: `ew_oauth_state=${state}` } } : {}),
+                // Top-level redirect from the provider, outside the proxy matcher: no
+                // workspace selector is present. The API binds the connection to the
+                // session user, so personal scope is correct by construction.
+                publicRouteScope: 'personal',
+            },
         );
     },
 
@@ -99,7 +105,13 @@ export const oauthAPI = {
         if (state) params.append('state', state);
         return serverFetch<{ providerId: string; connected: true }>(
             `/oauth/${providerId}/callback/plugins/read-packages?${params.toString()}`,
-            state ? { headers: { cookie: `ew_oauth_state=${state}` } } : undefined,
+            {
+                ...(state ? { headers: { cookie: `ew_oauth_state=${state}` } } : {}),
+                // Top-level redirect from the provider, outside the proxy matcher: no
+                // workspace selector is present. The API binds the connection to the
+                // session user, so personal scope is correct by construction.
+                publicRouteScope: 'personal',
+            },
         );
     },
 
