@@ -4,6 +4,10 @@ import { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
 import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-allowlist.entity';
 import { DatabaseModule } from '../database/database.module';
 import { AgentPluginPackageCatalogService } from './package-catalog.service';
+import { AgentPluginAllowlistService } from './allowlist.service';
+import { AgentPluginGitSource } from './git-source';
+import { AgentPluginNpmSource } from './npm-source';
+import { AgentPluginRemoteAcquireService } from './remote-acquire.service';
 import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 
 /**
@@ -30,6 +34,10 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
     ],
     providers: [
         AgentPluginPackageCatalogService,
+        AgentPluginAllowlistService,
+        AgentPluginGitSource,
+        AgentPluginNpmSource,
+        AgentPluginRemoteAcquireService,
         {
             // The facade consumes this @Optional(), so a deployment that never
             // imports this module keeps behaving exactly as it did before the
@@ -38,6 +46,13 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
             useExisting: AgentPluginPackageCatalogService,
         },
     ],
-    exports: [AgentPluginPackageCatalogService, AGENT_PLUGIN_SKILL_SOURCE],
+    exports: [
+        AgentPluginPackageCatalogService,
+        AgentPluginAllowlistService,
+        AgentPluginGitSource,
+        AgentPluginNpmSource,
+        AgentPluginRemoteAcquireService,
+        AGENT_PLUGIN_SKILL_SOURCE,
+    ],
 })
 export class AgentPluginsModule {}

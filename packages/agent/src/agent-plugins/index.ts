@@ -46,3 +46,36 @@ export {
     type LocalSourceScan,
     type ScanLocalPackagesOptions,
 } from './local-source';
+
+export { AgentPluginAllowlistService } from './allowlist.service';
+
+export {
+    AgentPluginGitSource,
+    gitPackageDir,
+    refMatchesPattern,
+    validateGitUrl,
+    type GitAcquireInput,
+    type GitAcquireResult,
+    type GitLike,
+    type GitUrlCheck,
+} from './git-source';
+
+export {
+    AgentPluginNpmSource,
+    DEFAULT_NPM_REGISTRY,
+    npmPackageDir,
+    versionPermitted,
+    type NpmAcquireInput,
+    type NpmAcquireResult,
+    type NpmManifest,
+    type PacoteLike,
+} from './npm-source';
+
+export {
+    AgentPluginRemoteAcquireService,
+    type AcquireGitInput,
+    type AcquireInput,
+    type AcquireNpmInput,
+    type AcquiredPackage,
+    type RemoteSourceKind,
+} from './remote-acquire.service';
