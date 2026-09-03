@@ -318,6 +318,12 @@ export const tasksAPI = {
         isolationMode?: TaskIsolationMode | null;
         acceptanceChecks?: TaskAcceptanceCheck[] | null;
         maxGateAttempts?: number | null;
+        /**
+         * Multi-repo: extra repositories by registry connection. Declared
+         * here, not only on the server action, so a future refactor that
+         * maps the DTO field by field cannot drop it without a type error.
+         */
+        extraRepos?: TaskExtraRepo[] | null;
     }) {
         return serverMutation<Task>({
             endpoint: '/tasks',
@@ -345,6 +351,7 @@ export const tasksAPI = {
                 | 'missionId'
                 | 'ideaId'
                 | 'agentId'
+                | 'extraRepos'
             >
         >,
     ) {
