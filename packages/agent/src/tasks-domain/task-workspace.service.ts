@@ -958,18 +958,21 @@ export class TaskWorkspaceService {
             );
         }
 
-        await this.stampChangedFiles(input.runId, input.changedFiles);
-        await this.tasks.updateById(task.id, {
-            branchRef: branch,
-            branchState: 'pushed',
-            ...(input.baseSha ? { baseSha: input.baseSha } : {}),
+        await this.recordRemotePush({
+            task,
+            branch,
+            runId: input.runId,
+            headSha: input.headSha ?? null,
+            baseSha: input.baseSha ?? null,
+            ...(typeof input.changedFiles === 'number' ? { changedFiles: input.changedFiles } : {}),
         });
 
         if (task.prNumber && task.prUrl) {
+            // `recordRemotePush` already kept the branch at `pr-open` for a
+            // Task that carries a pull request (review Q-R1-01).
             this.logger.log(
                 `Task ${task.id} already has PR #${task.prNumber}; remote push of ${branch} recorded without opening another.`,
             );
-            await this.tasks.updateById(task.id, { branchState: 'pr-open' });
             return { outcome: 'pr-opened', prNumber: task.prNumber, prUrl: task.prUrl };
         }
 
@@ -994,6 +997,50 @@ export class TaskWorkspaceService {
             branch,
             gate: input.gate,
             gateStatus: input.gateStatus ?? null,
+        });
+    }
+
+    /**
+     * Self-build slice Q — record a branch a fleet run pushed WITHOUT
+     * opening a pull request or moving the Task: the run is parked on an
+     * owner question, so the work is partial by definition and nobody
+     * should be asked to review it yet.
+     *
+     * Exactly the bookkeeping half of {@link finalizeRemotePush} —
+     * `branchRef` / `branchState` / `baseSha` on the Task plus the
+     * changed-files stamp on the run — and none of its tail:
+     * `openPullRequestForBranch` transitions the Task to `in_review` even
+     * on the pushed-no-pr path, which is precisely the signal a paused
+     * run must not send. `describeFleetWorkspace` reads `task.branchRef`
+     * back, so the run the owner's answer starts re-provisions THIS
+     * branch, with these commits, from the remote. `headSha` is accepted
+     * for call-site symmetry with `finalizeRemotePush` and, like there,
+     * not persisted on the Task (the remote owns the branch head).
+     *
+     * A Task that already carries a pull request stays `pr-open` (review
+     * Q-R1-01): a question asked in a LATER run of such a Task — the
+     * reviewer-rejection → resume loop — must not downgrade the row to
+     * `pushed` with `prNumber` / `prUrl` still set, which drops the PR
+     * link from the branch chip while the Inbox item still advertises it.
+     */
+    async recordRemotePush(input: {
+        task: Task;
+        branch: string;
+        runId?: string;
+        headSha?: string | null;
+        baseSha?: string | null;
+        changedFiles?: number;
+    }): Promise<void> {
+        const { task } = input;
+        const branch = typeof input.branch === 'string' ? input.branch.trim() : '';
+        if (!branch) {
+            throw new Error(`Task ${task.id} remote push cannot be recorded without a branch.`);
+        }
+        await this.stampChangedFiles(input.runId, input.changedFiles);
+        await this.tasks.updateById(task.id, {
+            branchRef: branch,
+            branchState: task.prNumber && task.prUrl ? 'pr-open' : 'pushed',
+            ...(input.baseSha ? { baseSha: input.baseSha } : {}),
         });
     }
 

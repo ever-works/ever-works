@@ -357,12 +357,6 @@ export class RunSteeringService implements RunSteeringPort {
             pendingInput: seeded.length > 0 ? seeded : null,
         });
 
-        // The source run is answered — it must stop showing up in the
-        // needs-attention filter.
-        if (run.awaitingInput) {
-            await this.runs.setAwaitingInput(run.id, false).catch(() => undefined);
-        }
-
         if (admission.admitted && this.dispatcher) {
             try {
                 const handle = await this.dispatcher.enqueue({
@@ -373,6 +367,16 @@ export class RunSteeringService implements RunSteeringPort {
                     // cannot collide with the original run's fan-out key.
                     dedupKey: `${run.taskId}:${run.agentId}:resume:${next.id}`,
                     runId: next.id,
+                    // Scope carriers, mirroring
+                    // `TaskTransitionService.dispatchAgentRun` (self-build
+                    // slice Q): the fleet router resolves the TENANT's job
+                    // runtime from `tenantId` and falls back to the INSTANCE
+                    // default when it is absent — without these, a tenant
+                    // whose fleet selection lives in the tenant job-runtime
+                    // overlay would resume a parked fleet run onto the cloud.
+                    // Ignored by adapters that don't route per tenant.
+                    tenantId: run.tenantId ?? null,
+                    organizationId: run.organizationId ?? null,
                 });
                 if (handle?.runId) {
                     await this.runs
@@ -394,6 +398,22 @@ export class RunSteeringService implements RunSteeringPort {
                 await this.runs.markDispatchFailed(next.id, reason).catch(() => undefined);
                 throw new ConflictException(`Resume could not be dispatched — ${reason}`);
             }
+        }
+
+        // The source run is answered — it must stop showing up in the
+        // needs-attention filter. Cleared ONLY here, once the successor is
+        // parked by the gate or actually enqueued (self-build slice Q): the
+        // fleet-aware dispatcher runs the planner on resume and can refuse
+        // (`FleetAgentTaskPlanError` for a done / cancelled Task, a Task
+        // without a repository or an oversize brief;
+        // `JobRuntimeNotConfiguredError` with the runtime off). Clearing
+        // before the enqueue left the source run terminal AND not awaiting —
+        // no longer resumable — so the Inbox question the failed reply
+        // reopened would route 'none' on the next attempt and the owner's
+        // answer could never reach a node. The catch above rethrows before
+        // this line, so a failed enqueue keeps the source run parked.
+        if (run.awaitingInput) {
+            await this.runs.setAwaitingInput(run.id, false).catch(() => undefined);
         }
 
         await this.stamp(next.id, userId, 'resume', {
