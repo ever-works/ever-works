@@ -83,9 +83,20 @@ rename is a breaking change.
 pnpm --filter @ever-works/agent-plugins test
 ```
 
-354 tests across seven suites, including a corpus of ~50 real packages under
+371 tests across eight suites, including a corpus of ~50 real packages under
 `fixtures/`. `conformance.spec.ts` walks the whole corpus and asserts the
 specification's package-level properties — the fatal boundary, failure isolation between
 component types, and one test per row of the Appendix A checklist.
+
+`dist-artifact.spec.ts` is the odd one out and earns its place: it loads the **built**
+bundles in a real Node process instead of importing `../src` through the test runner.
+Bundler resolution is more forgiving than Node's, so a packaging defect is otherwise
+invisible to a fully green suite — which is exactly how an unimportable ESM bundle
+survived 366 passing tests here. It also proves that a load performs no network access,
+since spec §5.2 forbids retrieving a schema while loading a plugin.
+
+Tests that depend on the environment — real symlinks for containment, a built `dist/`
+for the artifact checks — report a **visible skip** naming the reason when the
+environment cannot provide it. None of them passes vacuously.
 
 `fixtures/` is Prettier-ignored on purpose; see its README.
