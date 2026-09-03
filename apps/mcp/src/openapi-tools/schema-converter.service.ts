@@ -17,6 +17,8 @@ export interface JsonSchema {
 	maximum?: number;
 	minLength?: number;
 	maxLength?: number;
+	/** OpenAPI 3.0 spelling of "may be null" (`@ApiProperty({ nullable: true })`). */
+	nullable?: boolean;
 	[key: string]: unknown;
 }
 
@@ -58,6 +60,14 @@ export class SchemaConverterService {
 
 	convertToZod(schema: JsonSchema, required: boolean): z.ZodTypeAny {
 		let zodType = this.convertType(schema);
+
+		// Why: the API uses `null` as a first-class value on many fields ("detach
+		// this Task from its Work", "inherit the Work's gate budget"). Nest emits
+		// that as OpenAPI 3.0 `nullable: true`; without this the Zod schema would
+		// reject exactly the value the endpoint documents.
+		if (schema.nullable === true) {
+			zodType = zodType.nullable();
+		}
 
 		if (schema.description) {
 			zodType = zodType.describe(schema.description);
