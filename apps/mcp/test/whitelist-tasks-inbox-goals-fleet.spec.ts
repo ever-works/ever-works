@@ -1,10 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { WHITELIST } from '../src/openapi-tools/whitelist.js';
 
 /**
  * Self-build program (EW-762 / EW-769) — pins the MCP surface for the
  * work-orchestration domains so an external agent can drive Tasks,
- * answer the Inbox, steer Goals and Agents and watch the Fleet. The tool
+ * triage the Inbox, steer Goals and Agents and watch the Fleet. The tool
  * name + (method, path) tuple is what MCP clients bind to; a typo here
  * is silently breaking, so the whole set is spelled out.
  *
@@ -40,11 +41,6 @@ const TASK_ENTRIES: Entry[] = [
 	{ method: 'POST', path: '/api/tasks/{id}/approvers', toolName: 'add_task_approver' },
 	{ method: 'POST', path: '/api/tasks/{id}/relations', toolName: 'add_task_relation' },
 	{ method: 'GET', path: '/api/tasks/{id}/escalations', toolName: 'list_task_escalations' },
-	{
-		method: 'POST',
-		path: '/api/tasks/{id}/escalations/{escalationId}/resolve',
-		toolName: 'resolve_task_escalation'
-	},
 	{ method: 'GET', path: '/api/tasks/{id}/chat', toolName: 'get_task_chat' },
 	{ method: 'POST', path: '/api/tasks/{id}/chat', toolName: 'post_task_chat_message' },
 	{ method: 'GET', path: '/api/tasks/{id}/spend', toolName: 'get_task_spend' }
@@ -54,7 +50,6 @@ const INBOX_ENTRIES: Entry[] = [
 	{ method: 'GET', path: '/api/inbox', toolName: 'list_inbox' },
 	{ method: 'GET', path: '/api/inbox/unread-count', toolName: 'get_inbox_unread_count' },
 	{ method: 'GET', path: '/api/inbox/{id}', toolName: 'get_inbox_item' },
-	{ method: 'POST', path: '/api/inbox/{id}/reply', toolName: 'reply_inbox_item' },
 	{ method: 'PATCH', path: '/api/inbox/{id}/read', toolName: 'mark_inbox_item_read' },
 	{ method: 'POST', path: '/api/inbox/{id}/archive', toolName: 'archive_inbox_item' },
 	{ method: 'POST', path: '/api/inbox/{id}/unarchive', toolName: 'unarchive_inbox_item' },
@@ -71,8 +66,7 @@ const GOAL_ENTRIES: Entry[] = [
 	{ method: 'POST', path: '/api/me/goals/{id}/pause', toolName: 'pause_goal' },
 	{ method: 'POST', path: '/api/me/goals/{id}/evaluate-now', toolName: 'evaluate_goal_now' },
 	{ method: 'PATCH', path: '/api/me/goals/{id}/limits', toolName: 'update_goal_limits' },
-	{ method: 'POST', path: '/api/me/goals/{id}/dod/propose', toolName: 'propose_goal_dod' },
-	{ method: 'POST', path: '/api/me/goals/{id}/dod/approve', toolName: 'approve_goal_dod' }
+	{ method: 'POST', path: '/api/me/goals/{id}/dod/propose', toolName: 'propose_goal_dod' }
 ];
 
 const FLEET_ENTRIES: Entry[] = [
@@ -117,7 +111,7 @@ const AGENT_ENTRIES: Entry[] = [
 const ALL: Entry[] = [...TASK_ENTRIES, ...INBOX_ENTRIES, ...GOAL_ENTRIES, ...FLEET_ENTRIES, ...AGENT_ENTRIES];
 
 /** Routes the API itself treats as node-credential or secret-bearing; they must never become tools. */
-const FORBIDDEN_PATHS = [
+const NODE_CREDENTIAL_PATHS = [
 	'/api/fleet/enroll',
 	'/api/fleet/heartbeat',
 	'/api/fleet/pause',
@@ -126,14 +120,37 @@ const FORBIDDEN_PATHS = [
 	'/api/fleet/jobs/{id}/heartbeat',
 	'/api/fleet/jobs/{id}/complete',
 	'/api/fleet/enrollment-tokens',
+	'/api/fleet/enrollment-tokens/{id}',
 	'/api/fleet/nodes/enrollment-token',
 	'/api/fleet/nodes/{id}/rotate'
 ];
 
+/**
+ * Human-in-the-loop gates. The API cannot tell an MCP caller holding the
+ * owner's key from the owner, so a tool that ANSWERS a gate would let an
+ * Agent bound to this server approve its own proposal, resolve its own
+ * escalation or sign off its own definition of done. Asking stays
+ * (`propose_goal_dod`, `post_task_chat_message`, `list_task_escalations`,
+ * the Inbox reads); answering is done by a person in the app.
+ */
+const HUMAN_GATE_PATHS = [
+	'/api/inbox/{id}/reply',
+	'/api/tasks/{id}/escalations/{escalationId}/resolve',
+	'/api/me/goals/{id}/dod/approve'
+];
+
+const FORBIDDEN_PATHS = [...NODE_CREDENTIAL_PATHS, ...HUMAN_GATE_PATHS];
+
 const DESTRUCTIVE = ['delete_task', 'discard_task_branch', 'delete_inbox_item', 'clear_agent_node_affinity'];
+
+const ORGANIZATION_SCOPED = ['get_agent_node_affinity', 'set_agent_node_affinity', 'clear_agent_node_affinity'];
 
 function find(entry: Entry) {
 	return WHITELIST.find((w) => w.method === entry.method && w.path === entry.path);
+}
+
+function readRepoFile(relativeToThisFile: string): string {
+	return readFileSync(new URL(relativeToThisFile, import.meta.url), 'utf8');
 }
 
 describe('WHITELIST — self-build program (Tasks / Inbox / Goals / Fleet / Agents)', () => {
@@ -146,11 +163,12 @@ describe('WHITELIST — self-build program (Tasks / Inbox / Goals / Fleet / Agen
 	});
 
 	it('counts each domain', () => {
-		expect(TASK_ENTRIES).toHaveLength(24);
-		expect(INBOX_ENTRIES).toHaveLength(8);
-		expect(GOAL_ENTRIES).toHaveLength(11);
+		expect(TASK_ENTRIES).toHaveLength(23);
+		expect(INBOX_ENTRIES).toHaveLength(7);
+		expect(GOAL_ENTRIES).toHaveLength(10);
 		expect(FLEET_ENTRIES).toHaveLength(8);
 		expect(AGENT_ENTRIES).toHaveLength(9);
+		expect(ALL).toHaveLength(57);
 	});
 
 	it('annotates every GET as read-only and nothing else as read-only', () => {
@@ -175,7 +193,7 @@ describe('WHITELIST — self-build program (Tasks / Inbox / Goals / Fleet / Agen
 		}
 	});
 
-	it('keeps node-credential and token routes out of the tool surface', () => {
+	it('keeps node-credential, token and human-gate routes out of the tool surface', () => {
 		for (const path of FORBIDDEN_PATHS) {
 			expect(
 				WHITELIST.find((w) => w.path === path),
@@ -184,14 +202,31 @@ describe('WHITELIST — self-build program (Tasks / Inbox / Goals / Fleet / Agen
 		}
 	});
 
+	it('keeps the approver-gate override (`force`) off transition_task and off every other tool', () => {
+		const transition = find({ method: 'POST', path: '/api/tasks/{id}/transition', toolName: 'transition_task' });
+		expect(transition?.omitArgs).toEqual(['force']);
+		for (const entry of ALL) {
+			if (entry.toolName === 'transition_task') continue;
+			expect(find(entry)?.omitArgs, entry.toolName).toBeUndefined();
+		}
+	});
+
+	it('tells the LLM up front that node affinity needs an Organization scope', () => {
+		for (const name of ORGANIZATION_SCOPED) {
+			const entry = WHITELIST.find((w) => w.toolName === name);
+			expect(entry?.description, name).toContain('EVER_WORKS_SCOPE_SLUG');
+		}
+		for (const entry of ALL) {
+			if (ORGANIZATION_SCOPED.includes(entry.toolName)) continue;
+			expect(find(entry)?.description, entry.toolName).toBeUndefined();
+		}
+	});
+
 	it('uses OpenAPI-style path templates matching the Nest route parameters', () => {
 		for (const entry of ALL) {
 			expect(entry.path, entry.toolName).not.toMatch(/:[a-zA-Z]/);
 			expect(entry.path, entry.toolName).toMatch(/^\/api\//);
 		}
-		expect(
-			find({ method: 'POST', path: '/api/tasks/{id}/escalations/{escalationId}/resolve', toolName: '' })
-		).toBeDefined();
 		expect(find({ method: 'POST', path: '/api/agents/{id}/runs/{runId}/cancel', toolName: '' })).toBeDefined();
 	});
 
@@ -200,5 +235,39 @@ describe('WHITELIST — self-build program (Tasks / Inbox / Goals / Fleet / Agen
 		expect(new Set(names).size).toBe(names.length);
 		const tuples = WHITELIST.map((w) => `${w.method} ${w.path}`);
 		expect(new Set(tuples).size).toBe(tuples.length);
+	});
+
+	describe('documentation carries the real tool counts', () => {
+		// Why read the prose: the counts drifted twice in review (a heading
+		// said 127 for a 126-entry list; the feature page still said 36).
+		// Counting the whitelist here and matching the docs against it is
+		// the only pin that survives the next batch of entries.
+		const readme = readRepoFile('../README.md');
+		const featureDoc = readRepoFile('../../../docs/features/mcp-server.md');
+		const total = WHITELIST.length;
+
+		it('README heading and feature page intro state the whitelist length', () => {
+			expect(readme).toContain(`## Available Tools (${total})`);
+			expect(featureDoc).toContain(`whitelist of ${total} operations`);
+			expect(featureDoc).toContain(`exposes ${total} tools`);
+		});
+
+		it.each([
+			['Tasks', TASK_ENTRIES.length],
+			['Inbox', INBOX_ENTRIES.length],
+			['Goals', GOAL_ENTRIES.length],
+			['Fleet', FLEET_ENTRIES.length],
+			['Agents', AGENT_ENTRIES.length]
+		])('%s section heading carries %i', (domain, count) => {
+			expect(readme).toContain(`### ${domain} (${count})`);
+			expect(featureDoc).toContain(`### ${domain} (${count} tools)`);
+		});
+
+		it('no removed human-gate tool is still documented', () => {
+			for (const name of ['reply_inbox_item', 'resolve_task_escalation', 'approve_goal_dod']) {
+				expect(readme, name).not.toContain(`\`${name}\``);
+				expect(featureDoc, name).not.toContain(`\`${name}\``);
+			}
+		});
 	});
 });

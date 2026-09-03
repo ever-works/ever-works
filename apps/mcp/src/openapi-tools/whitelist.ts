@@ -7,7 +7,24 @@ export interface WhitelistEntry {
 		readOnlyHint?: boolean;
 		destructiveHint?: boolean;
 	};
+	/**
+	 * Argument names the tool must NOT expose or forward, even though the
+	 * OpenAPI operation accepts them. Why: some routes carry a flag that turns
+	 * an ordinary verb into a human-only override (`force` on a Task
+	 * transition skips the approver gate). The route stays useful without the
+	 * flag, so we keep the tool and cut the flag out of both the generated
+	 * schema and the outbound request instead of dropping the whole route.
+	 */
+	omitArgs?: string[];
 }
+
+/**
+ * Prefix for the node-affinity tool descriptions. Hand-written (trusted)
+ * text, so the connected LLM learns up front that the call needs an
+ * Organization scope instead of discovering it from a 400.
+ */
+const AFFINITY_SCOPE_NOTE =
+	'Requires an Organization scope: set EVER_WORKS_SCOPE_SLUG to the Organization slug on the MCP server, otherwise the API answers 400.';
 
 export const WHITELIST: WhitelistEntry[] = [
 	// Works (12)
@@ -271,11 +288,23 @@ export const WHITELIST: WhitelistEntry[] = [
 
 	// Self-build program (EW-762 / EW-769) — the work-orchestration surface.
 	// An external agent (Claude Code with this server attached, a CI bot, a
-	// desktop assistant) drives Tasks, answers the Inbox, steers Goals and
+	// desktop assistant) drives Tasks, triages the Inbox, steers Goals and
 	// Agents and watches the Fleet. Every route is owner-scoped by the API
 	// itself; the hints below only tell the MCP client what a call means.
+	//
+	// Human-in-the-loop gates are deliberately NOT exposed. The API cannot
+	// tell an MCP caller holding the owner's key from the owner, so any
+	// verb that ANSWERS a gate would let an Agent bound to this server
+	// approve its own proposal, resolve its own escalation or sign off its
+	// own definition of done. Kept out (and pinned by the whitelist spec):
+	//   POST /api/inbox/{id}/reply                          (approve/reject/resume)
+	//   POST /api/tasks/{id}/escalations/{escalationId}/resolve
+	//   POST /api/me/goals/{id}/dod/approve
+	//   `force` on POST /api/tasks/{id}/transition           (approver-gate override)
+	// The asking side stays: an agent can propose criteria, post to a Task's
+	// chat, list escalations and read the Inbox; a person answers in the app.
 
-	// Tasks (24) — `apps/api/src/tasks/tasks.controller.ts`
+	// Tasks (23) — `apps/api/src/tasks/tasks.controller.ts`
 	{
 		method: 'GET',
 		path: '/api/tasks',
@@ -309,7 +338,10 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'get_task_activity',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'POST', path: '/api/tasks/{id}/transition', toolName: 'transition_task' },
+	// `force` skips the approver gate on `→ done` (and the quality-gate
+	// refusal on `→ in_review`); that override belongs to a person, so the
+	// tool keeps the ordinary state-machine move and loses the flag.
+	{ method: 'POST', path: '/api/tasks/{id}/transition', toolName: 'transition_task', omitArgs: ['force'] },
 	{
 		method: 'GET',
 		path: '/api/tasks/{id}/run-candidates',
@@ -348,11 +380,6 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { readOnlyHint: true }
 	},
 	{
-		method: 'POST',
-		path: '/api/tasks/{id}/escalations/{escalationId}/resolve',
-		toolName: 'resolve_task_escalation'
-	},
-	{
 		method: 'GET',
 		path: '/api/tasks/{id}/chat',
 		toolName: 'get_task_chat',
@@ -366,8 +393,9 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { readOnlyHint: true }
 	},
 
-	// Inbox (8) — `apps/api/src/inbox/inbox.controller.ts`. Where agents ask
-	// humans for decisions; `reply_inbox_item` is how an approval is given.
+	// Inbox (7) — `apps/api/src/inbox/inbox.controller.ts`. Where agents ask
+	// humans for decisions. Read and triage only: the reply route is the
+	// approval itself and stays out (see the note above).
 	{
 		method: 'GET',
 		path: '/api/inbox',
@@ -386,7 +414,6 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'get_inbox_item',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'POST', path: '/api/inbox/{id}/reply', toolName: 'reply_inbox_item' },
 	{ method: 'PATCH', path: '/api/inbox/{id}/read', toolName: 'mark_inbox_item_read' },
 	{ method: 'POST', path: '/api/inbox/{id}/archive', toolName: 'archive_inbox_item' },
 	{ method: 'POST', path: '/api/inbox/{id}/unarchive', toolName: 'unarchive_inbox_item' },
@@ -397,7 +424,9 @@ export const WHITELIST: WhitelistEntry[] = [
 		annotations: { destructiveHint: true }
 	},
 
-	// Goals (11) — `apps/api/src/goals/goals.controller.ts` (`/api/me/goals`).
+	// Goals (10) — `apps/api/src/goals/goals.controller.ts` (`/api/me/goals`).
+	// `propose_goal_dod` appends criteria for a person to approve; the
+	// approve route is a human gate and stays out (see the note above).
 	{
 		method: 'GET',
 		path: '/api/me/goals',
@@ -423,13 +452,18 @@ export const WHITELIST: WhitelistEntry[] = [
 	{ method: 'POST', path: '/api/me/goals/{id}/evaluate-now', toolName: 'evaluate_goal_now' },
 	{ method: 'PATCH', path: '/api/me/goals/{id}/limits', toolName: 'update_goal_limits' },
 	{ method: 'POST', path: '/api/me/goals/{id}/dod/propose', toolName: 'propose_goal_dod' },
-	{ method: 'POST', path: '/api/me/goals/{id}/dod/approve', toolName: 'approve_goal_dod' },
 
 	// Fleet (8) — `apps/api/src/fleet/fleet.controller.ts` and
 	// `fleet-agent-affinity.controller.ts`. Owner-facing reads plus the two
 	// operator actions an agent may legitimately take (pin an Agent to a
 	// machine, drain a machine). Node-facing routes (enroll, heartbeat,
 	// lease, complete) and enrollment tokens are deliberately NOT exposed.
+	//
+	// Node affinity is an Organization feature: the API answers 400 unless
+	// the request runs under an Organization scope, and an MCP call only
+	// carries one when `EVER_WORKS_SCOPE_SLUG` is set (forwarded as
+	// `x-scope-slug`). The explicit descriptions say so, because the spec
+	// summaries alone leave the LLM guessing why the tool refused.
 	{
 		method: 'GET',
 		path: '/api/fleet/nodes',
@@ -458,17 +492,20 @@ export const WHITELIST: WhitelistEntry[] = [
 		method: 'GET',
 		path: '/api/fleet/agents/{agentId}/node-affinity',
 		toolName: 'get_agent_node_affinity',
+		description: `${AFFINITY_SCOPE_NOTE} Read which of the owner's Fleet nodes this Organization Agent is pinned to (null = any).`,
 		annotations: { readOnlyHint: true }
 	},
 	{
 		method: 'PUT',
 		path: '/api/fleet/agents/{agentId}/node-affinity',
-		toolName: 'set_agent_node_affinity'
+		toolName: 'set_agent_node_affinity',
+		description: `${AFFINITY_SCOPE_NOTE} Pin this Organization Agent to one of the owner's Fleet nodes.`
 	},
 	{
 		method: 'DELETE',
 		path: '/api/fleet/agents/{agentId}/node-affinity',
 		toolName: 'clear_agent_node_affinity',
+		description: `${AFFINITY_SCOPE_NOTE} Return this Organization Agent to "any of my Fleet nodes" (idempotent; queued jobs keep their node).`,
 		annotations: { destructiveHint: true }
 	},
 	{ method: 'POST', path: '/api/fleet/nodes/{id}/drain', toolName: 'drain_fleet_node' },
