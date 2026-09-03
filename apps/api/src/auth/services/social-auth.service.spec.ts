@@ -26,8 +26,9 @@ afterAll(() => {
     process.env = ORIGINAL_ENV;
 });
 
-import { BadRequestException } from '@nestjs/common';
-import { of } from 'rxjs';
+import { BadGatewayException, BadRequestException, HttpException, Logger } from '@nestjs/common';
+import { of, throwError } from 'rxjs';
+import { AxiosError } from 'axios';
 import type { HttpService } from '@nestjs/axios';
 import { SocialAuthService } from './social-auth.service';
 import type { AuthService } from './auth.service';
@@ -678,6 +679,208 @@ describe('SocialAuthService', () => {
             expect(args.tokenType).toBeNull();
             expect(args.scope).toBeNull();
             expect(args.refreshToken).toBeNull();
+        });
+    });
+
+    // Production 2026-09-03: a bogus `code` on /api/oauth/google/callback made
+    // the API log "ExceptionsHandler AxiosError: Request failed with status
+    // code 400" and answer a raw 500. The upstream HTTP failure escaped
+    // `firstValueFrom(httpService.post(...))` as an AxiosError, which Nest
+    // treats as an unhandled error. Upstream 4xx/5xx/network failures must
+    // surface as HttpExceptions with a SAFE message (provider name only,
+    // never the upstream body).
+    describe('upstream HTTP failures are mapped to HttpExceptions (never a raw 500)', () => {
+        const axiosHttpError = (status: number, body: unknown) =>
+            new AxiosError(
+                `Request failed with status code ${status}`,
+                status >= 500 ? AxiosError.ERR_BAD_RESPONSE : AxiosError.ERR_BAD_REQUEST,
+                { headers: {} } as never,
+                {},
+                {
+                    status,
+                    statusText: 'error',
+                    data: body,
+                    headers: {},
+                    config: { headers: {} } as never,
+                },
+            );
+
+        const axiosNetworkError = (code: string) =>
+            new AxiosError(`read ${code}`, code, { headers: {} } as never);
+
+        const GOOGLE_INVALID_GRANT = {
+            error: 'invalid_grant',
+            error_description: 'Malformed auth code. SECRET-UPSTREAM-DETAIL',
+        };
+
+        let warnSpy: jest.SpyInstance;
+
+        beforeEach(() => {
+            warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        });
+
+        afterEach(() => {
+            warnSpy.mockRestore();
+        });
+
+        const captureError = async (promise: Promise<unknown>) => {
+            try {
+                await promise;
+            } catch (error) {
+                return error as HttpException;
+            }
+            throw new Error('expected the promise to reject');
+        };
+
+        it('(a) token endpoint 400 invalid_grant (Google) -> BadRequestException with a safe, provider-named message', async () => {
+            httpService.post.mockReturnValueOnce(
+                throwError(() => axiosHttpError(400, GOOGLE_INVALID_GRANT)),
+            );
+
+            const error = await captureError(service.authenticate(AuthProvider.GOOGLE, 'bogus'));
+
+            expect(error).toBeInstanceOf(BadRequestException);
+            expect(error.getStatus()).toBe(400);
+            expect(error.message).toContain('Google');
+            expect(error.message).not.toContain('SECRET-UPSTREAM-DETAIL');
+            expect(error.message).not.toContain('Malformed');
+            expect(JSON.stringify(error.getResponse())).not.toContain('SECRET-UPSTREAM-DETAIL');
+            expect(error.message).not.toBe('Internal server error');
+            expect(authService.validateSocialUser).not.toHaveBeenCalled();
+
+            // Operators get provider + upstream status + the bare error code,
+            // but never the free-text description.
+            expect(warnSpy).toHaveBeenCalledTimes(1);
+            const logged = String(warnSpy.mock.calls[0][0]);
+            expect(logged).toContain('google');
+            expect(logged).toContain('400');
+            expect(logged).toContain('invalid_grant');
+            expect(logged).not.toContain('SECRET-UPSTREAM-DETAIL');
+        });
+
+        it('(a2) token endpoint 4xx from any provider maps to 400 and names that provider', async () => {
+            httpService.post.mockReturnValueOnce(
+                throwError(() => axiosHttpError(401, { error: 'invalid_client' })),
+            );
+
+            const error = await captureError(service.authenticate(AuthProvider.LINKEDIN, 'bogus'));
+
+            expect(error).toBeInstanceOf(BadRequestException);
+            expect(error.message).toContain('LinkedIn');
+        });
+
+        it.each([
+            [429, 'rate_limit_exceeded'],
+            [408, 'request_timeout'],
+        ])(
+            '(a3) token endpoint %s (%s) is a provider-side condition -> BadGatewayException (502), not a client-fault 400',
+            async (status, code) => {
+                httpService.post.mockReturnValueOnce(
+                    throwError(() => axiosHttpError(status, { error: code })),
+                );
+
+                const error = await captureError(service.authenticate(AuthProvider.GOOGLE, 'c'));
+
+                expect(error).toBeInstanceOf(BadGatewayException);
+                expect(error.getStatus()).toBe(502);
+                expect(error.message).toContain('Google');
+                expect(error.message).not.toContain('rejected');
+                expect(error.message).not.toBe('Internal server error');
+                expect(authService.validateSocialUser).not.toHaveBeenCalled();
+                expect(warnSpy).toHaveBeenCalledTimes(1);
+                const logged = String(warnSpy.mock.calls[0][0]);
+                expect(logged).toContain(String(status));
+                expect(logged).toContain(code);
+            },
+        );
+
+        it('(b) token endpoint 5xx -> BadGatewayException (502), not a raw 500', async () => {
+            httpService.post.mockReturnValueOnce(
+                throwError(() => axiosHttpError(503, '<html>upstream down</html>')),
+            );
+
+            const error = await captureError(service.authenticate(AuthProvider.GOOGLE, 'c'));
+
+            expect(error).toBeInstanceOf(HttpException);
+            expect(error).toBeInstanceOf(BadGatewayException);
+            expect(error.getStatus()).toBe(502);
+            expect(error.message).toContain('Google');
+            expect(error.message).not.toContain('upstream down');
+            expect(error.message).not.toBe('Internal server error');
+            expect(String(warnSpy.mock.calls[0][0])).toContain('503');
+        });
+
+        it('(c) network error (no response, ECONNRESET) -> HttpException (502), not a crash', async () => {
+            httpService.post.mockReturnValueOnce(throwError(() => axiosNetworkError('ECONNRESET')));
+
+            const error = await captureError(service.authenticate(AuthProvider.GOOGLE, 'c'));
+
+            expect(error).toBeInstanceOf(HttpException);
+            expect(error.getStatus()).toBe(502);
+            expect(error.message).toContain('Google');
+            expect(String(warnSpy.mock.calls[0][0])).toContain('ECONNRESET');
+        });
+
+        it('(d) user-info fetch rejecting with 401 -> BadRequestException, not a raw 500', async () => {
+            httpService.post.mockReturnValueOnce(of({ data: { access_token: 'tok' } }));
+            httpService.get.mockReturnValueOnce(
+                throwError(() =>
+                    axiosHttpError(401, {
+                        error: { code: 401, message: 'Invalid Credentials SECRET-UPSTREAM-DETAIL' },
+                    }),
+                ),
+            );
+
+            const error = await captureError(service.authenticate(AuthProvider.GOOGLE, 'c'));
+
+            expect(error).toBeInstanceOf(BadRequestException);
+            expect(error.message).toContain('Google');
+            expect(error.message).not.toContain('SECRET-UPSTREAM-DETAIL');
+            expect(authService.validateSocialUser).not.toHaveBeenCalled();
+        });
+
+        it('(d2) user-info fetch 5xx -> BadGatewayException (502)', async () => {
+            httpService.post.mockReturnValueOnce(of({ data: { access_token: 'tok' } }));
+            httpService.get.mockReturnValueOnce(throwError(() => axiosHttpError(502, 'boom')));
+
+            const error = await captureError(service.authenticate(AuthProvider.FACEBOOK, 'c'));
+
+            expect(error).toBeInstanceOf(BadGatewayException);
+            expect(error.message).toContain('Facebook');
+        });
+
+        it('(e) GitHub /user/emails failing upstream (inside resolveGitHubAccountEmail) -> 502, not a raw 500', async () => {
+            httpService.post.mockReturnValueOnce(of({ data: { access_token: 'gh' } }));
+            httpService.get
+                .mockReturnValueOnce(of({ data: { id: 1, login: 'octo', email: null } }))
+                .mockReturnValueOnce(throwError(() => axiosHttpError(500, 'github down')));
+
+            const error = await captureError(service.authenticate(AuthProvider.GITHUB, 'c'));
+
+            expect(error).toBeInstanceOf(BadGatewayException);
+            expect(error.message).toContain('GitHub');
+            expect(error.message).not.toContain('github down');
+        });
+
+        it('keeps the 200-with-error-body behaviour (GitHub) -> "Missing access_token" BadRequestException', async () => {
+            httpService.post.mockReturnValueOnce(
+                of({ data: { error: 'bad_verification_code', error_description: 'x' } }),
+            );
+
+            await expect(service.authenticate(AuthProvider.GITHUB, 'bad')).rejects.toThrow(
+                'Missing access_token from OAuth provider response',
+            );
+        });
+
+        it('does not mask non-HTTP programming errors as upstream failures', async () => {
+            httpService.post.mockReturnValueOnce(
+                throwError(() => new TypeError('bug in our code')),
+            );
+
+            const error = await captureError(service.authenticate(AuthProvider.GOOGLE, 'c'));
+
+            expect(error).toBeInstanceOf(TypeError);
+            expect(error).not.toBeInstanceOf(HttpException);
         });
     });
 });
