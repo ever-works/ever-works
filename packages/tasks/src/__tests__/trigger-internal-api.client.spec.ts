@@ -354,6 +354,56 @@ describe('TriggerInternalApiClient', () => {
             expect(fetchSpy).toHaveBeenCalledTimes(4);
         });
 
+        // ── Billing safety of the retry allow-list ──────────────────────
+        //
+        // `RETRY_SAFE_REMOTE_METHODS` is a default-DENY list, and the cost of a
+        // wrong entry is asymmetric: a missing entry loses one retry, a wrong
+        // entry silently doubles a charge. `WorkScheduleService.markRunCompleted`
+        // ends in `UsageLedgerService.recordUsage`, which INSERTs a ledger row
+        // and calls `BillingProvider.recordUsageCharge` with no dedup and no
+        // UNIQUE constraint on `generationHistoryId` — so re-issuing it bills a
+        // `billingMode: USAGE` customer twice. These two tests pin the split, so
+        // re-adding it to the allow-list turns red here instead of on an invoice.
+        const remoteArgs = superjson.serialize([{ scheduleId: 's-1' }]) as {
+            json: unknown;
+            meta?: unknown;
+        };
+
+        it('does NOT retry WorkScheduleService.markRunCompleted — it bills on every call', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValue(errorResponse(500, 'down'));
+
+            const promise = client.callRemote(
+                'WorkScheduleService',
+                'markRunCompleted',
+                remoteArgs,
+            );
+            promise.catch(() => undefined);
+            await flushAll();
+
+            await expect(promise).rejects.toThrow(
+                'Trigger internal API request failed (500): down',
+            );
+            // Exactly one attempt: a 504 after the API already ran the write
+            // must NOT re-issue it. No retries, no second ledger row.
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('DOES retry WorkScheduleService.markRunFailed — it carries an already-marked guard', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValue(errorResponse(500, 'down'));
+
+            const promise = client.callRemote('WorkScheduleService', 'markRunFailed', remoteArgs);
+            promise.catch(() => undefined);
+            await flushAll();
+
+            await expect(promise).rejects.toThrow(
+                'Trigger internal API request failed (500): down',
+            );
+            // initial + 3 retries = 4
+            expect(fetchSpy).toHaveBeenCalledTimes(4);
+        });
+
         it('uses exponential backoff (500ms, 1000ms, 2000ms) between retries', async () => {
             const client = new TriggerInternalApiClient();
             fetchSpy
