@@ -94,6 +94,7 @@ export {
 	isWithinResolved,
 	packageRelative,
 	pathExists,
+	pathPresent,
 	resolveRealPath,
 	resolveWithinRoot,
 	type ContainmentFailure,

@@ -22,7 +22,7 @@
  * resolving. This module answers one question: is it inside?
  */
 
-import { realpath, stat } from 'node:fs/promises';
+import { lstat, realpath, stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 
 /**
@@ -151,10 +151,41 @@ export async function isDirectory(path: string): Promise<boolean> {
 	}
 }
 
-/** Whether a path exists at all, following symlinks. */
+/**
+ * Whether a path exists and resolves, following symlinks.
+ *
+ * Note this is FALSE for a dangling symlink. For deciding whether a fixed
+ * component location is *absent* — a question spec 6.2 answers very
+ * differently from "present but broken" — use {@link pathPresent}.
+ */
 export async function pathExists(path: string): Promise<boolean> {
 	try {
 		await stat(path);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Whether a directory entry exists at `path`, **without** following symlinks.
+ *
+ * This is the right question for spec 6.2, which draws a sharp line:
+ *
+ *   "If a fixed component location is absent, the client MUST NOT treat that
+ *   as an error. If a fixed component location is present but does not
+ *   resolve to the expected filesystem kind [...] the client MUST treat that
+ *   component type as invalid."
+ *
+ * A dangling symlink named `skills` or `mcp.json` sits exactly on that line:
+ * it IS present, and it does NOT resolve. Deciding absence with `stat` would
+ * silently call it absent and load the package as though the author had
+ * never shipped that component — hiding a broken package instead of
+ * reporting it.
+ */
+export async function pathPresent(path: string): Promise<boolean> {
+	try {
+		await lstat(path);
 		return true;
 	} catch {
 		return false;

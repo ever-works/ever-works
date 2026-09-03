@@ -28,7 +28,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { classifyCwd, isReservedEnvKey, RESERVED_ENV_KEYS, type CwdAnchor } from './expand';
 import { finding, type Finding } from './findings';
-import { isRegularFile, pathExists, resolveWithinRoot } from './paths';
+import { isRegularFile, pathPresent, resolveWithinRoot } from './paths';
 import {
 	describeSchemaError,
 	mcpConfigValidator,
@@ -673,7 +673,10 @@ export function parseMcpConfig(text: string, options: ParseMcpConfigOptions): Mc
 export async function loadMcpConfig(pluginRoot: string, options: ParseMcpConfigOptions): Promise<McpConfigResult> {
 	const configPath = join(pluginRoot, MCP_CONFIG_FILENAME);
 
-	if (!(await pathExists(configPath))) {
+	// Spec 6.2 — absence is measured WITHOUT following symlinks, so a dangling
+	// `mcp.json` link is present-but-broken and reaches the not-a-file check
+	// below rather than being silently reported as absent.
+	if (!(await pathPresent(configPath))) {
 		return { componentValid: true, componentAbsent: true, servers: [], findings: [] };
 	}
 

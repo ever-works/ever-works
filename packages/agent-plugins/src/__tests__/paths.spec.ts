@@ -4,7 +4,15 @@ import { describe, expect, it } from 'vitest';
 import { fixture, scratchDir, tryMakeSymlink } from './fixtures';
 import { discoverSkills } from '../skills';
 import { checkServerContainment, loadMcpConfig, type McpServerEntry } from '../mcp';
-import { isPluginRelative, isWithinResolved, packageRelative, resolveRealPath, resolveWithinRoot } from '../paths';
+import {
+	isPluginRelative,
+	isWithinResolved,
+	packageRelative,
+	pathExists,
+	pathPresent,
+	resolveRealPath,
+	resolveWithinRoot
+} from '../paths';
 
 describe('paths — plugin-relative form (spec 4.1(4))', () => {
 	it.each(['./x', './a/b', './'])('treats %j as plugin-relative', (value) => {
@@ -311,6 +319,60 @@ describe('paths — MCP server containment (spec 4.1 boundary 4)', () => {
 		expect(await checkServerContainment(root, entry)).toEqual([]);
 		const withData = await checkServerContainment(root, entry, { pluginData: data });
 		expect(withData.map((f) => f.code)).toEqual(['mcp.server-cwd-invalid']);
+	});
+});
+
+describe('paths — present-but-broken versus absent (spec 6.2)', () => {
+	it('treats a dangling skills symlink as an invalid component, not an absent one', async (ctx) => {
+		const root = await scratchDir();
+		const made = await tryMakeSymlink(join(root, 'no-such-target'), join(root, 'skills'), 'dir');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		const result = await discoverSkills(root);
+		// Absent would silently load the package as though the author never
+		// shipped skills at all, hiding a broken package.
+		expect(result.componentAbsent).toBe(false);
+		expect(result.componentValid).toBe(false);
+		expect(result.findings.map((f) => f.code)).toEqual(['skills.location-not-a-directory']);
+	});
+
+	it('treats a dangling mcp.json symlink as disabling MCP, not as absent', async (ctx) => {
+		const root = await scratchDir();
+		const made = await tryMakeSymlink(join(root, 'no-such-target.json'), join(root, 'mcp.json'), 'file');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		const result = await loadMcpConfig(root, { manifestSpecVersion: '1.0.0' });
+		expect(result.componentAbsent).toBe(false);
+		expect(result.componentValid).toBe(false);
+		expect(result.findings.map((f) => f.code)).toEqual(['mcp.location-not-a-file']);
+	});
+
+	it('still reports a genuinely missing location as absent, with no finding', async () => {
+		const root = await scratchDir();
+		const skills = await discoverSkills(root);
+		expect(skills.componentAbsent).toBe(true);
+		expect(skills.componentValid).toBe(true);
+		expect(skills.findings).toEqual([]);
+		const mcp = await loadMcpConfig(root, { manifestSpecVersion: '1.0.0' });
+		expect(mcp.componentAbsent).toBe(true);
+		expect(mcp.componentValid).toBe(true);
+		expect(mcp.findings).toEqual([]);
+	});
+
+	it('distinguishes the two questions directly', async (ctx) => {
+		const root = await scratchDir();
+		const made = await tryMakeSymlink(join(root, 'nope'), join(root, 'dangling'), 'file');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		expect(await pathExists(join(root, 'dangling'))).toBe(false);
+		expect(await pathPresent(join(root, 'dangling'))).toBe(true);
+		expect(await pathPresent(join(root, 'truly-missing'))).toBe(false);
 	});
 });
 

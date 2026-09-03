@@ -29,7 +29,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import matter from 'gray-matter';
 import { finding, type Finding } from './findings';
-import { isDirectory, isRegularFile, packageRelative, pathExists, resolveWithinRoot } from './paths';
+import { isDirectory, isRegularFile, packageRelative, pathPresent, resolveWithinRoot } from './paths';
 
 /** The fixed skills location, relative to the plugin root (spec 6.1). */
 export const SKILLS_DIRNAME = 'skills';
@@ -345,8 +345,11 @@ export async function discoverSkills(pluginRoot: string): Promise<SkillsDiscover
 	const findings: Finding[] = [];
 	const skillsDir = join(pluginRoot, SKILLS_DIRNAME);
 
-	if (!(await pathExists(skillsDir))) {
-		// Spec 6.2 — a missing fixed location MUST NOT be treated as an error.
+	// Spec 6.2 — absence is measured WITHOUT following symlinks, so a dangling
+	// `skills` link counts as present-but-broken rather than absent and falls
+	// through to the not-a-directory check below.
+	if (!(await pathPresent(skillsDir))) {
+		// A missing fixed location MUST NOT be treated as an error.
 		return { componentValid: true, componentAbsent: true, skills: [], findings };
 	}
 
