@@ -316,7 +316,10 @@ async function runModelStep(
 		const step = buildModelCliStep(execution, command, execution.envPassthrough);
 		const result = await runNodeCommandStep(step, workspacePath, io, signal);
 		const rawOutput = await scratchFs.readFile(scratch.resultPath);
-		return parseModelCliResult(execution.provider, rawOutput, result);
+		// `envPassthrough` names the credential env vars this CLI was handed;
+		// their values are scrubbed out of the summary and output tail before
+		// the result leaves the node.
+		return parseModelCliResult(execution.provider, rawOutput, result, execution.envPassthrough);
 	} finally {
 		try {
 			await scratchFs.remove(scratchDir);
