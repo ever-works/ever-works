@@ -151,7 +151,10 @@ function io(over: Partial<AgentTaskIo> = {}): AgentTaskIo & { order: string[] } 
 			order.push('primary');
 			return { pushed: true, headSha: 'b'.repeat(40), empty: false, changedFiles: 2 };
 		}),
-		finalizeMounts: vi.fn(async (_taskId, descriptor) => {
+		// Typed explicitly: vitest's default `Procedure` signature would leave
+		// `descriptor` as `any`, and the package type-check (which includes
+		// every spec) refuses the implicit-any callbacks below.
+		finalizeMounts: vi.fn(async (_taskId: string, descriptor: FleetTaskWorkspaceDescriptor) => {
 			order.push('mounts');
 			return (descriptor.mounts ?? [])
 				.filter((mount) => mount.writable)
