@@ -1,6 +1,13 @@
+import { Test } from '@nestjs/testing';
 import { PromptAssemblerService } from '@ever-works/agent/agents';
+import {
+    AgentRepository,
+    SkillBindingRepository,
+    WorkRepository,
+} from '@ever-works/agent/database';
 import type { Agent, Task } from '@ever-works/agent/entities';
-import { TaskStatus } from '@ever-works/agent/tasks-domain';
+import { PluginSettingsService } from '@ever-works/agent/plugins';
+import { TaskRepository, TaskStatus, TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 import { FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES } from '@ever-works/contracts';
 import {
     FleetAgentTaskPlanError,
@@ -355,5 +362,56 @@ describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow
         await expect(build().plan(payload)).rejects.toThrow(
             /too large for fleet model instructions/,
         );
+    });
+});
+
+describe('FleetAgentTaskPlannerService — Nest wiring (review follow-up)', () => {
+    const originalEnv = process.env;
+    const required = () => [
+        { provide: TaskRepository, useValue: { findById: jest.fn() } },
+        { provide: AgentRepository, useValue: { findByIdAndUser: jest.fn() } },
+        { provide: WorkRepository, useValue: { findById: jest.fn() } },
+        { provide: TaskWorkspaceService, useValue: { describeFleetWorkspace: jest.fn() } },
+    ];
+
+    beforeEach(() => {
+        process.env = { ...originalEnv, FLEET_NODE_AGENT_EXECUTION_MODE: 'model-cli' };
+        delete process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD;
+    });
+
+    afterEach(() => {
+        process.env = originalEnv;
+    });
+
+    it('resolves from a compiled testing module without any of the @Optional() collaborators', async () => {
+        const moduleRef = await Test.createTestingModule({
+            providers: [FleetAgentTaskPlannerService, ...required()],
+        }).compile();
+
+        const service = moduleRef.get(FleetAgentTaskPlannerService);
+        expect(service).toBeInstanceOf(FleetAgentTaskPlannerService);
+        // Degraded but functional: instance-level settings only.
+        expect((await service.resolveSettings(USER)).maxBudgetUsd).toBeUndefined();
+    });
+
+    it('receives the optional collaborators when the module graph provides them', async () => {
+        const pluginSettings = {
+            getResolvedSettings: jest.fn().mockResolvedValue({
+                agentExecutionMaxBudgetUsd: { value: 500, source: 'user' },
+            }),
+        };
+        const moduleRef = await Test.createTestingModule({
+            providers: [
+                FleetAgentTaskPlannerService,
+                ...required(),
+                { provide: PromptAssemblerService, useValue: { assemble: jest.fn() } },
+                { provide: SkillBindingRepository, useValue: {} },
+                { provide: PluginSettingsService, useValue: pluginSettings },
+            ],
+        }).compile();
+
+        const service = moduleRef.get(FleetAgentTaskPlannerService);
+        expect((await service.resolveSettings(USER)).maxBudgetUsd).toBe(500);
+        expect(pluginSettings.getResolvedSettings).toHaveBeenCalled();
     });
 });
