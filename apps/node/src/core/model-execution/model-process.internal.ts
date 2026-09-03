@@ -120,6 +120,13 @@ export interface ModelExecutionIo {
 	/** Test-only cleanup seam; never exported by the production model-process API. */
 	readonly removeRunRoot?: (path: string) => Promise<void>;
 	/**
+	 * Test-only bound for a containment close that never settles; never exported
+	 * by the production model-process API. A test may shorten the production
+	 * termination-safety deadline so it controls the clock instead of racing the
+	 * real scheduler, but it can never extend that deadline.
+	 */
+	readonly terminationSettleMs?: number;
+	/**
 	 * Internal containment integration seam. Production supplies it only for a
 	 * configured trusted Windows launcher that assigns the suspended child to a
 	 * kill-on-close Job Object before resuming it.
@@ -164,7 +171,11 @@ export const MODEL_CLI_COMPATIBILITY = {
 	codex: { minimumVersion: '0.120.0', accessTokenMinimumVersion: '0.146.0' }
 } as const;
 
-const TERMINATION_SETTLE_MS = 2500;
+/**
+ * @internal Production termination-safety deadline for a containment close.
+ * The test-only `terminationSettleMs` seam may shorten it but never extend it.
+ */
+export const TERMINATION_SETTLE_MS = 2500;
 const WINDOWS_TREE_KILL_TIMEOUT_MS = 2000;
 const MODEL_RUN_ROOT_CLEANUP_ATTEMPTS = 3;
 const MODEL_RUN_ROOT_CLEANUP_ATTEMPT_TIMEOUT_MS = 250;
@@ -289,6 +300,7 @@ export async function executeModelProcessInternal(
 	const now = io.now ?? Date.now;
 	const monotonicNow = io.monotonicNow ?? (() => performance.now());
 	const platform = io.platform ?? process.platform;
+	const terminationSettleMs = resolveTerminationSettleMs(io);
 	if (request.signal?.aborted) {
 		return terminalResult(request.provider, 'cancelled', 0);
 	}
@@ -365,6 +377,7 @@ export async function executeModelProcessInternal(
 					io.spawnFn ?? spawn,
 					deadlineAt,
 					monotonicNow,
+					terminationSettleMs,
 					request.signal
 				);
 			} catch (error) {
@@ -418,6 +431,7 @@ export async function executeModelProcessInternal(
 					io.spawnFn ?? spawn,
 					deadlineAt,
 					monotonicNow,
+					terminationSettleMs,
 					request.signal
 				);
 			} catch (error) {
@@ -567,6 +581,7 @@ async function acquireModelProcessContainment(
 	spawnFn: typeof spawn,
 	deadlineAt: number,
 	monotonicNow: () => number,
+	terminationSettleMs: number,
 	signal?: AbortSignal
 ): Promise<ModelProcessContainment> {
 	const ownership: {
@@ -589,7 +604,7 @@ async function acquireModelProcessContainment(
 		if (!ownership.transferred && ownership.acquisition) {
 			void ownership.acquisition.then(
 				(containment) => {
-					void boundedProcessTreeTermination(() => containment.close());
+					void boundedProcessTreeTermination(() => containment.close(), terminationSettleMs);
 				},
 				() => undefined
 			);
@@ -1115,11 +1130,12 @@ async function runProcess(
 ): Promise<RawProcessResult> {
 	const spawnFn = io.spawnFn ?? spawn;
 	const platform = io.platform ?? process.platform;
+	const terminationSettleMs = resolveTerminationSettleMs(io);
 	let child: ChildProcess;
 	let processTimeoutMs: number;
 	const closeBeforeSpawn = async (raw: RawProcessResult): Promise<RawProcessResult> => {
 		if (!containment) return raw;
-		const outcome = await boundedProcessTreeTermination(() => containment.close());
+		const outcome = await boundedProcessTreeTermination(() => containment.close(), terminationSettleMs);
 		return outcome.verified
 			? raw
 			: {
@@ -1224,16 +1240,18 @@ async function runProcess(
 
 		const startTreeSafety = (): Promise<ProcessTreeTermination> => {
 			if (!terminationAttempt) {
-				terminationAttempt = boundedProcessTreeTermination(() =>
-					containment
-						? containment.close()
-						: terminateProcessTree(
-								child,
-								platform,
-								spawnFn,
-								io.processKill ?? process.kill,
-								withoutProviderCredentials(options.env)
-							)
+				terminationAttempt = boundedProcessTreeTermination(
+					() =>
+						containment
+							? containment.close()
+							: terminateProcessTree(
+									child,
+									platform,
+									spawnFn,
+									io.processKill ?? process.kill,
+									withoutProviderCredentials(options.env)
+								),
+					terminationSettleMs
 				);
 			}
 			return terminationAttempt;
@@ -1299,8 +1317,22 @@ async function runProcess(
 	});
 }
 
+/**
+ * The production termination-safety deadline, unless a test shortened it. An
+ * absent, non-finite, non-positive, or larger value keeps the production bound
+ * so the seam can only ever make the safety deadline stricter.
+ */
+function resolveTerminationSettleMs(io: ModelExecutionIo): number {
+	const requested = io.terminationSettleMs;
+	if (typeof requested !== 'number' || !Number.isFinite(requested) || requested <= 0) {
+		return TERMINATION_SETTLE_MS;
+	}
+	return Math.min(Math.ceil(requested), TERMINATION_SETTLE_MS);
+}
+
 function boundedProcessTreeTermination(
-	operation: () => Promise<ProcessTreeTermination>
+	operation: () => Promise<ProcessTreeTermination>,
+	settleMs: number
 ): Promise<ProcessTreeTermination> {
 	return new Promise<ProcessTreeTermination>((resolvePromise) => {
 		let settled = false;
@@ -1316,7 +1348,7 @@ function boundedProcessTreeTermination(
 					verified: false,
 					detail: 'The process containment close did not settle before its safety deadline'
 				}),
-			TERMINATION_SETTLE_MS
+			settleMs
 		);
 		Promise.resolve()
 			.then(operation)
