@@ -21,6 +21,7 @@ import { serverFetch, serverMutation } from './server-api';
  * hand-copy them, which is exactly how the three copies drifted.
  */
 import type {
+    FleetAgentNodeAffinityView,
     FleetNodeDetailView,
     FleetNodeDrainResult,
     FleetEnrollmentTokenView,
@@ -31,6 +32,10 @@ import type {
 } from '@ever-works/contracts';
 
 export type {
+    FleetAgentNodeAffinityView,
+    FleetJobKind,
+    FleetJobStatus,
+    FleetJobView,
     FleetNodeKind,
     FleetNodeStatus,
     FleetNodeView,
@@ -192,6 +197,45 @@ export const fleetAPI = {
             endpoint: `${BASE}/nodes/${nodeId}/drain`,
             data: { drain },
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Agent-to-node affinity (`FleetAgentAffinityController`, mounted at
+     * `/api/fleet/agents/:agentId/node-affinity`).
+     *
+     * A separate resource rather than a field on `PATCH /api/agents/:id`
+     * because the binding is scoped by the ACTIVE Organization (the
+     * request's scope header) on top of the owner, while the Agent row
+     * itself is owner-scoped only. The API answers `null` (not 404) for
+     * an unbound Agent, and 400 when the request carries no Organization
+     * scope — personal workspaces cannot pin an Agent to a node.
+     */
+    getAgentAffinity: async (agentId: string) => {
+        const affinity = await serverFetch<FleetAgentNodeAffinityView | null | undefined>(
+            `${BASE}/agents/${agentId}/node-affinity`,
+        );
+        // `serverFetch` collapses an empty body to `undefined`; the wire
+        // answer for "unbound" is a JSON `null`. Both mean the same here.
+        return affinity ?? null;
+    },
+
+    setAgentAffinity: async (agentId: string, nodeId: string) => {
+        return serverMutation<FleetAgentNodeAffinityView>({
+            endpoint: `${BASE}/agents/${agentId}/node-affinity`,
+            data: { nodeId },
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    /** Idempotent — clearing an unbound Agent is a no-op on the API. */
+    clearAgentAffinity: async (agentId: string) => {
+        return serverMutation<void>({
+            endpoint: `${BASE}/agents/${agentId}/node-affinity`,
+            data: {},
+            method: 'DELETE',
             wrapInData: false,
         });
     },

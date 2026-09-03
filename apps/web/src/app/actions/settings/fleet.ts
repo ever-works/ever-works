@@ -9,6 +9,7 @@ import {
     fleetAPI,
     type CreateFleetEnrollmentTokenPayload,
     type CreateFleetEnrollmentTokenResponse,
+    type FleetAgentNodeAffinityView,
     type FleetEnrollmentTokenView,
     type FleetNodeDetailView,
     type FleetNodeDrainResult,
@@ -251,6 +252,52 @@ export async function setFleetExecutionPreferenceAction(
             success: false,
             data: null,
             error: errorMessage(error, 'Failed to save the execution preference'),
+        };
+    }
+}
+
+/**
+ * Pin an Agent's `agent-task` jobs to ONE of the owner's nodes.
+ *
+ * Invalidates the Agent's Capabilities tab (where the picker lives)
+ * rather than the Fleet settings page: the binding is a property of the
+ * Agent, and nothing on the settings page renders it.
+ */
+export async function setFleetAgentAffinityAction(
+    agentId: string,
+    nodeId: string,
+): Promise<FleetActionResult<FleetAgentNodeAffinityView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setAgentAffinity(agentId, nodeId);
+        revalidatePath(`/agents/${agentId}/capabilities`);
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to set the preferred node'),
+        };
+    }
+}
+
+/**
+ * Return an Agent to "any of my nodes". Jobs already queued keep the node
+ * they were enqueued for; only future jobs become unbound.
+ */
+export async function clearFleetAgentAffinityAction(
+    agentId: string,
+): Promise<FleetActionResult<{ cleared: true }>> {
+    await ensureAuth();
+    try {
+        await fleetAPI.clearAgentAffinity(agentId);
+        revalidatePath(`/agents/${agentId}/capabilities`);
+        return { success: true, data: { cleared: true }, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to clear the preferred node'),
         };
     }
 }
