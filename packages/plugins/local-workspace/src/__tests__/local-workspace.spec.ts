@@ -525,4 +525,45 @@ describe('finalize — cancellation (agent execution v2 review follow-up)', () =
 		expect(git(handle.path, 'rev-parse', 'HEAD')).toBe(handle.baseSha);
 		expect(() => git(originDir, 'rev-parse', '--verify', 'refs/heads/task/cancel-1')).toThrow();
 	});
+
+	it('surfaces a cancellation that lands during the changed-files diff instead of reporting success', async () => {
+		const controller = new AbortController();
+		let abortedDuringDiff = false;
+		const abortingExecFile = ((
+			command: string,
+			args: readonly string[],
+			options: Record<string, unknown>,
+			callback: (error: Error | null, stdout?: string | Buffer, stderr?: string | Buffer) => void
+		) =>
+			execFile(
+				command,
+				[...args],
+				options as never,
+				((error, stdout, stderr) => {
+					if (!error && args[0] === 'diff' && args[1] === '--name-only') {
+						abortedDuringDiff = true;
+						controller.abort(new Error('lease lost'));
+					}
+					callback(error, stdout, stderr);
+				}) as never
+			)) as unknown as typeof execFile;
+		const interruptedPlugin = new LocalWorkspacePlugin({
+			execFile: abortingExecFile,
+			terminateProcessTree: async () => undefined
+		});
+		const handle = await interruptedPlugin.provision(spec('task-cancel-diff', 'task/cancel-diff'));
+		writeFileSync(join(handle.path, 'diff.txt'), 'committed locally, then cancelled\n');
+
+		// push:false is the path that used to return success here: the diff
+		// swallowed the abort and nothing after it re-checked the signal.
+		await expect(
+			interruptedPlugin.finalize(handle, {
+				commitMessage: 'agent: cancelled during diff',
+				push: false,
+				signal: controller.signal
+			})
+		).rejects.toMatchObject({ name: 'AbortError' });
+		expect(abortedDuringDiff).toBe(true);
+		expect(() => git(originDir, 'rev-parse', '--verify', 'refs/heads/task/cancel-diff')).toThrow();
+	});
 });
