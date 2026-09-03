@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
+import type { TaskExtraRepo } from '@ever-works/contracts';
 import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 
 /**
@@ -205,6 +206,15 @@ export class Task {
      */
     @Column({ type: 'simple-json', nullable: true })
     linkedPullRequests?: TaskLinkedPullRequest[] | null;
+
+    /**
+     * Multi-repo Task workspaces (self-build slice C, PR C2): repositories
+     * this Task spans in addition to its Work's, by repository-registry
+     * connection. On a fleet run they become workspace mounts next to the
+     * primary worktree. NULL = none beyond the run agent's attachments.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    extraRepos?: TaskExtraRepo[] | null;
 
     // ── PR insights (kanban run cockpit M5) ──────────────────────────
     // Cache written by `TaskPrStatusService` (on-demand refresh + the

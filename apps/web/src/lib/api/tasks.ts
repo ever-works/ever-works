@@ -3,6 +3,7 @@ import type {
     DecisionConflictReportDto,
     GateStatus,
     TaskAcceptanceCheck,
+    TaskExtraRepo,
 } from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
@@ -219,6 +220,8 @@ export interface Task {
      * `branchRef` / `prNumber` / `prUrl`). Absent or null = single repository.
      */
     linkedPullRequests?: TaskLinkedPullRequest[] | null;
+    /** Multi-repo: repositories this Task spans besides its Work's (registry connections). */
+    extraRepos?: TaskExtraRepo[] | null;
     conflictPaths: string[] | null;
     // PR insights (kanban M5) — cached PR/CI verdict, refreshed by the
     // `task-pr-status-sync` cron. All null until the Task opens a PR.
@@ -315,6 +318,12 @@ export const tasksAPI = {
         isolationMode?: TaskIsolationMode | null;
         acceptanceChecks?: TaskAcceptanceCheck[] | null;
         maxGateAttempts?: number | null;
+        /**
+         * Multi-repo: extra repositories by registry connection. Declared
+         * here, not only on the server action, so a future refactor that
+         * maps the DTO field by field cannot drop it without a type error.
+         */
+        extraRepos?: TaskExtraRepo[] | null;
     }) {
         return serverMutation<Task>({
             endpoint: '/tasks',
@@ -342,6 +351,7 @@ export const tasksAPI = {
                 | 'missionId'
                 | 'ideaId'
                 | 'agentId'
+                | 'extraRepos'
             >
         >,
     ) {

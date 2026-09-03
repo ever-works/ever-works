@@ -18,7 +18,31 @@ export type InboxItemKind = 'question' | 'approval' | 'escalation' | 'notice';
 
 export type InboxItemStatus = 'open' | 'answered' | 'archived';
 
-export type InboxItemSourceType = 'agent-run' | 'escalation' | 'proposal' | 'system' | 'work';
+export type InboxItemSourceType =
+    | 'agent-run'
+    | 'escalation'
+    | 'proposal'
+    | 'system'
+    | 'work'
+    | 'fleet-run';
+
+/**
+ * Self-build slice Q — where a `fleet-run` question came from. Mirrors the
+ * contracts `InboxItemSourceMeta`: every field optional and nullable
+ * because rows written by older producers (and every other source type)
+ * carry nothing. Plain text BY CONTRACT — render as chips, never as
+ * markup.
+ */
+export interface InboxItemSourceMeta {
+    nodeId?: string | null;
+    nodeName?: string | null;
+    /** Task branch the run pushed (or would have pushed) its work to. */
+    branch?: string | null;
+    taskTitle?: string | null;
+    prUrl?: string | null;
+    /** Set when the model asked from a mounted repository (`.mounts/<dir>`). */
+    mountDir?: string | null;
+}
 
 /** Mirrors `INBOX_MAX_REPLY_CHARS` — the API 400s past it. */
 export const INBOX_MAX_REPLY_CHARS = 8000;
@@ -40,6 +64,12 @@ export interface InboxItem {
     body: string;
     options: InboxItemOption[] | null;
     sourceType: InboxItemSourceType;
+    /**
+     * Fleet provenance (slice Q). OPTIONAL, not just nullable: an API
+     * older than this field omits the key entirely, and the UI must keep
+     * rendering those payloads as plain questions.
+     */
+    sourceMeta?: InboxItemSourceMeta | null;
     agentId: string | null;
     agentRunId: string | null;
     taskId: string | null;
@@ -83,4 +113,15 @@ export interface InboxReplyOutcome {
  */
 export function isAwaitingReply(item: InboxItem): boolean {
     return item.kind === 'question' && item.status === 'open';
+}
+
+/**
+ * A question a FLEET run asked (self-build slice Q) — the run executed on
+ * one of the owner's own machines, wrote `.ever-works/QUESTION.md`, and
+ * is parked until the reply starts a new run on the same branch. The
+ * source type is the whole test: the API only ever files `fleet-run`
+ * rows as questions, and `sourceMeta` is decoration, not the signal.
+ */
+export function isFleetQuestion(item: InboxItem): boolean {
+    return item.sourceType === 'fleet-run';
 }

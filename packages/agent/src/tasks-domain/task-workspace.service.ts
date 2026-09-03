@@ -14,6 +14,9 @@ import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
+import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
+import type { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
+import type { RepoConnectionProvider } from '../entities/repo-connection.entity';
 import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
@@ -23,6 +26,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { resolveTaskIsolation, taskBranchName } from './task-isolation';
 import {
+    mapAttachmentEdgesToRepos,
     resolveAttachedReposForAgent,
     toAdvisoryRepoSpecs,
     type AdvisoryAttachedRepoSpec,
@@ -134,6 +138,9 @@ export class TaskWorkspaceService {
         // the positional-spec arity rule; absent (or failing) resolves
         // to "no extra repos", never a failed provision.
         @Optional() private readonly agentRepoAttachments?: AgentRepoAttachmentRepository,
+        // Multi-repo Task workspaces (slice C, PR C2) — the Task's own extra
+        // repositories by registry connection. Appended LAST + @Optional.
+        @Optional() private readonly repoConnections?: RepoConnectionRepository,
     ) {}
 
     /**
@@ -307,6 +314,7 @@ export class TaskWorkspaceService {
 
         const repositoryId = `${owner}/${repo}`;
         const mounts = await this.resolveFleetMounts({
+            task,
             agentId: input.agentId,
             userId,
             workId: work.id,
@@ -336,22 +344,28 @@ export class TaskWorkspaceService {
      * log line — attaching it is harmless redundancy, not an error.
      */
     private async resolveFleetMounts(input: {
+        task: Task;
         agentId: string | undefined;
         userId: string;
         workId: string;
         primaryRepositoryId: string;
         branch: string;
     }): Promise<FleetTaskWorkspaceMountSpec[]> {
-        if (!input.agentId || !this.agentRepoAttachments) return [];
-        const attached = await resolveAttachedReposForAgent(
-            this.agentRepoAttachments,
-            input.agentId,
-            input.userId,
-        );
-        if (attached.length === 0) return [];
+        const extras = Array.isArray(input.task.extraRepos) ? input.task.extraRepos : [];
+        const attached =
+            input.agentId && this.agentRepoAttachments
+                ? await resolveAttachedReposForAgent(
+                      this.agentRepoAttachments,
+                      input.agentId,
+                      input.userId,
+                  )
+                : [];
+        if (attached.length === 0 && extras.length === 0) return [];
         if (!this.gitFacade) {
             throw new Error(
-                `Agent ${input.agentId} has attached repositories but no git facade is available to describe them for a fleet node.`,
+                extras.length > 0
+                    ? `Task ${input.task.id} lists extra repositories but no git facade is available to describe them for a fleet node.`
+                    : `Agent ${input.agentId} has attached repositories but no git facade is available to describe them for a fleet node.`,
             );
         }
         const mounts: FleetTaskWorkspaceMountSpec[] = [];
@@ -393,7 +407,124 @@ export class TaskWorkspaceService {
         }
         // The contracts normalizer is the same gate the node applies; failing
         // HERE names the attachment while the plan is still on the platform.
-        return normalizeFleetTaskWorkspaceMounts(mounts, input.primaryRepositoryId);
+        // Task-level extra repositories (PR C2) come AFTER the agent's
+        // attachments and win over them on the same repository or mount
+        // directory: the Task is the narrower scope. Two Task extras that
+        // collide are refused naming both — only an agent ATTACHMENT yields
+        // to a Task extra; a Task extra silently dropped in favour of another
+        // would be a run the operator never asked for.
+        const extraMounts: FleetTaskWorkspaceMountSpec[] = [];
+        const extraSources = new Map<string, string>();
+        for (const extra of extras) {
+            if (!this.repoConnections) {
+                throw new Error(
+                    `Task ${input.task.id} lists extra repositories but the repository registry is not available to describe them.`,
+                );
+            }
+            const connection = await this.repoConnections.findByIdAndUser(
+                extra.repoConnectionId,
+                input.userId,
+            );
+            if (!connection) {
+                throw new Error(
+                    `Task ${input.task.id} lists repository connection ${extra.repoConnectionId}, which no longer exists.`,
+                );
+            }
+            const [resolved] = mapAttachmentEdgesToRepos([
+                { repoConnection: connection } as unknown as AgentRepoAttachment,
+            ]);
+            if (!resolved) {
+                throw new Error(
+                    `Task ${input.task.id} lists repository connection ${connection.name}, which is disabled.`,
+                );
+            }
+            const identity = repositoryIdFromCloneUrl(resolved.url);
+            if (!identity) {
+                // Same rule as the attachments above: the raw registry URL may
+                // carry userinfo and this message reaches the run and the logs.
+                throw new Error(
+                    `Repository connection ${connection.name} (${credentialFreeUrlForMessages(resolved.url)}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
+                );
+            }
+            if (identity.toLowerCase() === input.primaryRepositoryId.toLowerCase()) {
+                this.logger.log(
+                    `Task ${input.task.id}: extra repository ${identity} is the primary repository; not mounted twice.`,
+                );
+                continue;
+            }
+            let baseRef = resolved.branch?.trim() || '';
+            if (!baseRef) {
+                const [mountOwner, mountName] = identity.split('/') as [string, string];
+                const remote = await this.gitFacade!.getRepository(mountOwner, mountName, {
+                    userId: input.userId,
+                    providerId: resolved.provider,
+                    workId: input.workId,
+                });
+                baseRef = remote.defaultBranch;
+            }
+            const mountDir = extra.mountDir?.trim() || resolved.mountDir;
+            const colliding = extraMounts.find(
+                (candidate) =>
+                    candidate.repositoryId.toLowerCase() === identity.toLowerCase() ||
+                    candidate.mountDir.toLowerCase() === mountDir.toLowerCase(),
+            );
+            if (colliding) {
+                const other = extraSources.get(colliding.repositoryId.toLowerCase());
+                throw new Error(
+                    `Task ${input.task.id}: extra repository connection ${connection.name} (${identity} at .mounts/${mountDir}) collides with ${other} (${colliding.repositoryId} at .mounts/${colliding.mountDir}); give one of them a distinct mountDir or remove it.`,
+                );
+            }
+            extraSources.set(identity.toLowerCase(), connection.name);
+            extraMounts.push({
+                repositoryId: identity,
+                repoUrl: tokenFreeCloneUrl(resolved.url),
+                baseRef,
+                branch: input.branch,
+                mountDir,
+                writable: extra.writable !== false,
+            });
+        }
+        const keptAttachments = mounts.filter(
+            (candidate) =>
+                !extraMounts.some(
+                    (extra) =>
+                        extra.repositoryId.toLowerCase() === candidate.repositoryId.toLowerCase() ||
+                        extra.mountDir.toLowerCase() === candidate.mountDir.toLowerCase(),
+                ),
+        );
+        return normalizeFleetTaskWorkspaceMounts(
+            [...keptAttachments, ...extraMounts],
+            input.primaryRepositoryId,
+        );
+    }
+
+    /**
+     * Provider of a Task extra repository (PR C2) by repository identity. An
+     * extra is not an agent attachment, so its OWN connection decides: a
+     * generic `git` connection has no pull requests, and a GitHub extra on a
+     * Work of another provider must not inherit that provider. Best-effort by
+     * contract — an unreadable registry resolves to null and the caller falls
+     * back to the Work's provider as before.
+     */
+    private async extraRepoProvider(
+        task: Task,
+        repositoryId: string,
+        userId: string,
+    ): Promise<RepoConnectionProvider | null> {
+        if (!this.repoConnections || !Array.isArray(task.extraRepos)) return null;
+        for (const extra of task.extraRepos) {
+            const connection = await this.repoConnections
+                .findByIdAndUser(extra.repoConnectionId, userId)
+                .catch(() => null);
+            if (!connection || typeof connection.url !== 'string') continue;
+            if (
+                repositoryIdFromCloneUrl(connection.url)?.toLowerCase() ===
+                repositoryId.toLowerCase()
+            ) {
+                return connection.provider;
+            }
+        }
+        return null;
     }
 
     /**
@@ -478,7 +609,13 @@ export class TaskWorkspaceService {
                 repositoryId.toLowerCase(),
         );
         const work = task.workId ? await this.works.findById(task.workId) : null;
-        const providerId = attachment?.provider ?? work?.gitProvider ?? 'github';
+        // Attachment first, then the Task's own extra repositories (PR C2),
+        // then the Work's provider — the same precedence the plan used.
+        const providerId =
+            attachment?.provider ??
+            (await this.extraRepoProvider(task, repositoryId, userId)) ??
+            work?.gitProvider ??
+            'github';
         const gitOptions = { userId, providerId, workId: task.workId ?? '' };
 
         if (!input.agentCanOpenPullRequests || providerId === 'git') {
@@ -821,18 +958,21 @@ export class TaskWorkspaceService {
             );
         }
 
-        await this.stampChangedFiles(input.runId, input.changedFiles);
-        await this.tasks.updateById(task.id, {
-            branchRef: branch,
-            branchState: 'pushed',
-            ...(input.baseSha ? { baseSha: input.baseSha } : {}),
+        await this.recordRemotePush({
+            task,
+            branch,
+            runId: input.runId,
+            headSha: input.headSha ?? null,
+            baseSha: input.baseSha ?? null,
+            ...(typeof input.changedFiles === 'number' ? { changedFiles: input.changedFiles } : {}),
         });
 
         if (task.prNumber && task.prUrl) {
+            // `recordRemotePush` already kept the branch at `pr-open` for a
+            // Task that carries a pull request (review Q-R1-01).
             this.logger.log(
                 `Task ${task.id} already has PR #${task.prNumber}; remote push of ${branch} recorded without opening another.`,
             );
-            await this.tasks.updateById(task.id, { branchState: 'pr-open' });
             return { outcome: 'pr-opened', prNumber: task.prNumber, prUrl: task.prUrl };
         }
 
@@ -857,6 +997,50 @@ export class TaskWorkspaceService {
             branch,
             gate: input.gate,
             gateStatus: input.gateStatus ?? null,
+        });
+    }
+
+    /**
+     * Self-build slice Q — record a branch a fleet run pushed WITHOUT
+     * opening a pull request or moving the Task: the run is parked on an
+     * owner question, so the work is partial by definition and nobody
+     * should be asked to review it yet.
+     *
+     * Exactly the bookkeeping half of {@link finalizeRemotePush} —
+     * `branchRef` / `branchState` / `baseSha` on the Task plus the
+     * changed-files stamp on the run — and none of its tail:
+     * `openPullRequestForBranch` transitions the Task to `in_review` even
+     * on the pushed-no-pr path, which is precisely the signal a paused
+     * run must not send. `describeFleetWorkspace` reads `task.branchRef`
+     * back, so the run the owner's answer starts re-provisions THIS
+     * branch, with these commits, from the remote. `headSha` is accepted
+     * for call-site symmetry with `finalizeRemotePush` and, like there,
+     * not persisted on the Task (the remote owns the branch head).
+     *
+     * A Task that already carries a pull request stays `pr-open` (review
+     * Q-R1-01): a question asked in a LATER run of such a Task — the
+     * reviewer-rejection → resume loop — must not downgrade the row to
+     * `pushed` with `prNumber` / `prUrl` still set, which drops the PR
+     * link from the branch chip while the Inbox item still advertises it.
+     */
+    async recordRemotePush(input: {
+        task: Task;
+        branch: string;
+        runId?: string;
+        headSha?: string | null;
+        baseSha?: string | null;
+        changedFiles?: number;
+    }): Promise<void> {
+        const { task } = input;
+        const branch = typeof input.branch === 'string' ? input.branch.trim() : '';
+        if (!branch) {
+            throw new Error(`Task ${task.id} remote push cannot be recorded without a branch.`);
+        }
+        await this.stampChangedFiles(input.runId, input.changedFiles);
+        await this.tasks.updateById(task.id, {
+            branchRef: branch,
+            branchState: task.prNumber && task.prUrl ? 'pr-open' : 'pushed',
+            ...(input.baseSha ? { baseSha: input.baseSha } : {}),
         });
     }
 

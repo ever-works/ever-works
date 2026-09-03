@@ -90,8 +90,10 @@ Routing preferences (**Settings → Fleet → Execution routing**) decide what h
 ### Tasks that span several repositories
 
 A Task keeps one primary Work and branch. When the run agent has **repository attachments** (Agent →
-Capabilities → Repositories, backed by the repository registry), a fleet run checks those repositories
-out next to the primary worktree, at `.mounts/<name>` inside it, each on the same Task branch name. The
+Capabilities → Repositories, backed by the repository registry), or the Task itself lists extra
+repositories (**Also work in** on the new-task form and the task page — registry connections, a Task
+entry wins over an agent attachment for the same repository or directory), a fleet run checks those
+repositories out next to the primary worktree, at `.mounts/<name>` inside it, each on the same Task branch name. The
 model is told exactly where each repository is; it edits them in place. When the run finishes the node
 commits and pushes every repository that changed, the platform opens **one pull request per
 repository** (each one linked to the primary's), records the extra ones on the Task ("Also in" on the
@@ -101,6 +103,53 @@ Limits: at most 8 mounted repositories per Task; a mount is never the primary re
 directory is excluded from the primary repository's Git, so nothing about the layout is ever committed.
 A repository the platform cannot describe (a URL that is not `owner/repository`, a default branch it
 cannot read) fails the plan naming the attachment rather than silently running without it.
+
+### When the agent needs you
+
+The agent on your machine has no platform tools — it cannot message you mid-run. What it can do is
+**pause the run with a question**: when it hits a decision only you can make (an ambiguous
+requirement, a risky or irreversible step, a choice between materially different directions) it
+writes `.ever-works/QUESTION.md` in the repository root — the first line (or a `# ` heading) is the
+question, the rest is optional context and options — and stops. The node reports the question and
+removes the file. It is never committed: the `.ever-works/` directory is excluded from Git — at the
+repository root and in any subdirectory — the same way `.mounts/` is, in every repository of the
+workspace, and a stale file from an earlier attempt is discarded before the model starts. Only a
+plain file is read: a link, a directory or a pipe at that path is removed without being opened.
+
+What happens next:
+
+- The run shows as **awaiting input** on the Task page and in the Runs history (its summary reads
+  "Paused with a question for the owner: …"). It is not a failure, whatever the acceptance checks
+  said — the platform records the check and model verdicts on the run and waits for you.
+- Whatever the agent did so far is **committed and pushed on the Task branch** (when the Agent's git
+  policy allows pushing), but **no pull request is opened and the Task does not move to _In
+  review_**: the work is partial by definition. Pushed mounted repositories are recorded on the Task
+  as pushed, without a pull request either.
+- The question lands in your **Inbox** tagged **From your fleet**, with the node it ran on, the
+  Task, the branch (and the mounted repository, if the agent asked from one), and a link to an
+  existing pull request. The Inbox body also says what the run managed before asking (pushed,
+  committed but not pushed, no changes, a failed push) and which required checks did not pass.
+- **Replying starts a new run for the same Task** — same Agent, same pinned node when the Agent is
+  pinned, same branch. The new run's instructions carry your question and answer under
+  **`# OWNER ANSWER`**, tell the model its earlier commits are on the branch (and whether they were
+  pushed), and ask it to continue from the answer rather than redo committed work or ask again. The
+  reply toast says "a new run is answering it".
+- The **Task page** shows the open question with an _Answer it in the Inbox_ link and hides the
+  free-text _Resume_ while a question is open: a resume from there would start a run that never sees
+  your answer.
+- **Archiving** (or deleting) the open question drops the parked run — it stops waiting and the Task
+  page returns to normal. Moving the question back to Active parks it again.
+
+Limits: one question per run (the answer run can ask a new one, which files a new Inbox message);
+answers are free text — a fleet question offers no option buttons; earlier questions and answers are
+not replayed into later runs, only the reply that resumed the run travels with it; asking needs an
+edit-capable permission mode — under `plan` the model cannot write the file and is not offered the
+protocol; a Task that is _Done_ or _Cancelled_ cannot be resumed — the reply is refused with the
+reason, the question stays open until you archive it; an Agent whose git policy forbids pushing may
+lose uncommitted work when the answer run lands on a different node, because that node starts from
+the base ref — the `# OWNER ANSWER` section tells the model when that is the case; a question file
+written somewhere other than the repository root (or a mounted repository's root) is kept out of Git
+but is not reported as a question.
 
 ## Related
 

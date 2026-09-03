@@ -10,6 +10,7 @@ import {
 	type AgentTaskIo,
 	type AgentTaskScratchFs
 } from './agent-task';
+import { ownerQuestionPath, type AgentTaskQuestionFs } from './agent-task-question';
 
 /**
  * `agent-task` with an `execution` block — agent execution v2.
@@ -85,11 +86,37 @@ function scratchFs(modelOutput: string | null): AgentTaskScratchFs & { files: Ma
 	};
 }
 
+/**
+ * In-memory owner-question filesystem (self-build slice Q). Records every
+ * removal in `events` so ordering against the spawn and the finalizers can
+ * be asserted; `readHead` is null for an absent path, so a test that never
+ * seeds a file never touches the real filesystem.
+ */
+function questionFs(seed: Record<string, string> = {}, events: string[] = []) {
+	const files = new Map<string, string>(Object.entries(seed));
+	const fs: AgentTaskQuestionFs & { files: Map<string, string>; events: string[] } = {
+		files,
+		events,
+		readHead: async (path, maxBytes) => {
+			const content = files.get(path);
+			if (content === undefined) return null;
+			return Buffer.from(content, 'utf8').subarray(0, maxBytes).toString('utf8');
+		},
+		remove: async (path) => {
+			events.push(`remove:${path}`);
+			files.delete(path);
+		},
+		removeDirIfEmpty: async () => undefined
+	};
+	return fs;
+}
+
 /** Spawn double that records every command and scripts exit codes by substring. */
-function recordingSpawn(exitCodes: Array<[match: string, code: number | null]>) {
+function recordingSpawn(exitCodes: Array<[match: string, code: number | null]>, onCommand?: (command: string) => void) {
 	const commands: string[] = [];
 	const spawnFn = ((command: string) => {
 		commands.push(command);
+		onCommand?.(command);
 		const handlers = new Map<string, (arg?: unknown) => void>();
 		queueMicrotask(() => {
 			const hit = exitCodes.find(([match]) => command.includes(match));
@@ -120,6 +147,7 @@ function baseIo(over: Partial<AgentTaskIo> = {}): AgentTaskIo {
 		modelCli: { 'claude-code': CLAUDE, codex: null },
 		scratchRoot: SCRATCH,
 		scratchFs: scratchFs(claudeEnvelope),
+		questionFs: questionFs(),
 		...over
 	};
 }
@@ -325,6 +353,152 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		});
 		await expect(runAgentTaskJob(job(payload), io, controller.signal)).rejects.toThrowError(/lease lost/);
 		expect(io.finalizeWorkspace).not.toHaveBeenCalled();
+	});
+});
+
+describe('runAgentTaskJob — owner question (self-build slice Q)', () => {
+	const QUESTION_PATH = ownerQuestionPath(ABSOLUTE);
+	const QUESTION_MD = '# Use Postgres?\n\nSQLite would be simpler, but the brief says production.';
+
+	/** A spawn double that writes the question file when the MODEL command runs, and logs phases. */
+	function questionRun(qfs: ReturnType<typeof questionFs>, events: string[], markdown: string | null) {
+		return recordingSpawn([], (command) => {
+			if (command.includes(CLAUDE)) {
+				events.push('spawn:model');
+				if (markdown !== null) qfs.files.set(QUESTION_PATH, markdown);
+			} else {
+				events.push('spawn:check');
+			}
+		});
+	}
+
+	it('reports the question the model wrote, removes the file, and still finalizes the partial work', async () => {
+		const events: string[] = [];
+		const qfs = questionFs({}, events);
+		const { spawnFn } = questionRun(qfs, events, QUESTION_MD);
+		const io = baseIo({
+			spawnFn,
+			questionFs: qfs,
+			finalizeWorkspace: vi.fn(async () => {
+				events.push('finalize:primary');
+				return { pushed: true, headSha: 'b'.repeat(40), empty: false, changedFiles: 1 };
+			})
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		expect(outcome.question).toEqual({
+			text: 'Use Postgres?',
+			context: 'SQLite would be simpler, but the brief says production.',
+			truncated: false,
+			mountDir: null
+		});
+		// A question is not a failure: the model, the check and the push all
+		// report exactly as they did, and the partial work is on the branch.
+		expect(outcome.status).toBe('succeeded');
+		expect(outcome.git).toMatchObject({ pushed: true, headSha: 'b'.repeat(40) });
+		expect(qfs.files.size).toBe(0);
+		// Ordering: the stale-file discard BEFORE the model, the collect
+		// (its removal) AFTER the model and BEFORE the check and the finalize.
+		expect(events).toEqual([
+			`remove:${QUESTION_PATH}`,
+			'spawn:model',
+			`remove:${QUESTION_PATH}`,
+			'spawn:check',
+			'finalize:primary'
+		]);
+	});
+
+	it('discards a stale file from an earlier attempt before the model runs and reports no question', async () => {
+		const events: string[] = [];
+		const qfs = questionFs({ [QUESTION_PATH]: '# Stale question from a crashed attempt?' }, events);
+		let staleVisibleToModel: boolean | null = null;
+		const { spawnFn } = recordingSpawn([], (command) => {
+			if (command.includes(CLAUDE)) staleVisibleToModel = qfs.files.has(QUESTION_PATH);
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn, questionFs: qfs }));
+
+		expect(staleVisibleToModel).toBe(false);
+		expect('question' in outcome).toBe(false);
+		expect(outcome.status).toBe('succeeded');
+		expect(events[0]).toBe(`remove:${QUESTION_PATH}`);
+	});
+
+	it('reports no question key at all when the model wrote no file', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn }));
+		expect('question' in outcome).toBe(false);
+	});
+
+	it('keeps the honest failure verdict AND the question when the model failed and a check is red', async () => {
+		const events: string[] = [];
+		const qfs = questionFs({}, events);
+		const { spawnFn } = recordingSpawn(
+			[
+				[CLAUDE, 1],
+				['pnpm test', 1]
+			],
+			(command) => {
+				if (command.includes(CLAUDE)) qfs.files.set(QUESTION_PATH, QUESTION_MD);
+			}
+		);
+		const io = baseIo({
+			spawnFn,
+			questionFs: qfs,
+			scratchFs: scratchFs(
+				JSON.stringify({ type: 'result', is_error: true, subtype: 'error_during_execution', result: 'blew up' })
+			)
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		// The platform decides what a paused run means; the node never
+		// launders a red verdict into a green one because a question exists.
+		expect(outcome.status).toBe('failed');
+		expect(outcome.failureReason).toContain('claude-code reported an error: blew up');
+		expect(outcome.failureReason).toContain('a required acceptance check did not pass');
+		expect(outcome.question?.text).toBe('Use Postgres?');
+	});
+
+	it('leaves the run untouched when the question file cannot be read', async () => {
+		const qfs = questionFs();
+		qfs.readHead = async () => {
+			throw Object.assign(new Error('permission denied'), { code: 'EACCES' });
+		};
+		const { spawnFn } = recordingSpawn([]);
+		const io = baseIo({ spawnFn, questionFs: qfs });
+		const outcome = await runAgentTaskJob(job(payload), io);
+		expect('question' in outcome).toBe(false);
+		expect(outcome.status).toBe('succeeded');
+		expect(io.finalizeWorkspace).toHaveBeenCalledTimes(1);
+	});
+
+	it('still reports the question and still finalizes when the file cannot be removed', async () => {
+		const events: string[] = [];
+		const qfs = questionFs({}, events);
+		qfs.remove = async () => {
+			throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+		};
+		const { spawnFn } = questionRun(qfs, events, QUESTION_MD);
+		const io = baseIo({ spawnFn, questionFs: qfs });
+		const outcome = await runAgentTaskJob(job(payload), io);
+		expect(outcome.question?.text).toBe('Use Postgres?');
+		expect(io.finalizeWorkspace).toHaveBeenCalledTimes(1);
+		expect(outcome.status).toBe('succeeded');
+	});
+
+	it('never looks for a question when the job has no model execution', async () => {
+		const qfs = questionFs({ [QUESTION_PATH]: '# Not a question — legacy steps run here' });
+		const { spawnFn } = recordingSpawn([]);
+		const { execution: _execution, acceptanceChecks: _checks, workspace: _workspace, ...rest } = payload;
+		const outcome = await runAgentTaskJob(
+			job({ ...rest, workspacePath: ABSOLUTE, steps: [{ id: 'lint', command: 'pnpm lint' }] }),
+			baseIo({ spawnFn, questionFs: qfs })
+		);
+		expect('question' in outcome).toBe(false);
+		expect(qfs.files.has(QUESTION_PATH)).toBe(true);
+		expect(qfs.events).toEqual([]);
 	});
 });
 

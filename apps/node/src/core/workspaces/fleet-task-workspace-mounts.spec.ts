@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import type { WorkspaceProvisionSpec } from '@ever-works/plugin';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+	FLEET_TASK_WORKSPACE_EXCLUDE_RULES,
 	FLEET_TASK_WORKSPACE_MOUNTS_DIR,
 	FleetTaskWorkspaceProvisioner,
 	type FleetWorkspacePlugin
@@ -160,6 +161,48 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 		);
 		// While the mount itself does see the edit.
 		expect(git(mount.path, 'status', '--porcelain')).toContain('edited-through-the-link.txt');
+	});
+
+	it('keeps the owner-question directory out of the MOUNT repository too, upgrading a slice-C exclude exactly once', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const descriptor = await provisioner.provision('task-m13', spec('task/mounts-13'));
+		const mount = descriptor.mounts![0]!;
+		const readExclude = async (repoPath: string): Promise<string[]> => {
+			const commonDir = git(repoPath, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+			return (await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8')).split(/\r?\n/).map((l) => l.trim());
+		};
+		const countRule = (lines: string[], rule: string): number => lines.filter((line) => line === rule).length;
+
+		// A question file written where the model was working — inside the
+		// mount, through the link — is invisible to the mount's Git and to
+		// the primary's.
+		mkdirSync(join(mount.linkPath, '.ever-works'), { recursive: true });
+		writeFileSync(join(mount.linkPath, '.ever-works', 'QUESTION.md'), '# Change the template too?\n');
+		// ...and so is one written from a subdirectory of the mount (review SR-5).
+		mkdirSync(join(mount.linkPath, 'src', '.ever-works'), { recursive: true });
+		writeFileSync(join(mount.linkPath, 'src', '.ever-works', 'QUESTION.md'), '# Nested in the mount?\n');
+		expect(git(mount.path, 'status', '--porcelain')).toBe('');
+		expect(git(descriptor.path, 'status', '--porcelain')).toBe('');
+		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
+			expect(countRule(await readExclude(mount.path), rule)).toBe(1);
+			expect(countRule(await readExclude(descriptor.path), rule)).toBe(1);
+		}
+
+		// Upgrade path: an exclude file a slice-C node left behind carries only
+		// `/.mounts/`. Two more provisions add `/.ever-works/` and the unanchored
+		// `.ever-works/` exactly once each and never a second `/.mounts/`.
+		const mountCommonDir = git(mount.path, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+		writeFileSync(
+			join(mountCommonDir, 'info', 'exclude'),
+			`# ever-works fleet: mounted repositories of multi-repo Task workspaces\n/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/\n`
+		);
+		await provisioner.provision('task-m13', spec('task/mounts-13'));
+		await provisioner.provision('task-m13', spec('task/mounts-13'));
+		const upgraded = await readExclude(mount.path);
+		expect(countRule(upgraded, `/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`)).toBe(1);
+		expect(countRule(upgraded, '/.ever-works/')).toBe(1);
+		expect(countRule(upgraded, '.ever-works/')).toBe(1);
+		expect(git(mount.path, 'status', '--porcelain')).toBe('');
 	});
 
 	it('commits and pushes a writable mount to its own origin and reports the verdict', async () => {

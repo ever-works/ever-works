@@ -6,8 +6,10 @@ import {
     INBOX_MAX_REPLY_CHARS,
     INBOX_MAX_TITLE_CHARS,
     normalizeInboxOptions,
+    normalizeInboxSourceMeta,
     type InboxItemKind,
     type InboxItemOption,
+    type InboxItemSourceMeta,
     type InboxItemSourceType,
     type InboxItemStatus,
 } from '@ever-works/contracts';
@@ -20,6 +22,8 @@ export interface CreateInboxItemInput {
     body: string;
     sourceType: InboxItemSourceType;
     options?: InboxItemOption[] | unknown | null;
+    /** Fleet provenance of a `fleet-run` question (slice Q); normalized before the write. */
+    sourceMeta?: InboxItemSourceMeta | null;
     agentId?: string | null;
     agentRunId?: string | null;
     taskId?: string | null;
@@ -33,6 +37,8 @@ export interface CreateInboxItemInput {
 export interface ListInboxItemsOptions {
     /** `undefined` = active view (open + answered, i.e. everything not archived). */
     status?: InboxItemStatus;
+    /** Only items linked to this Task (the Task page's open-question lookup, slice Q). */
+    taskId?: string;
     limit?: number;
     offset?: number;
 }
@@ -79,6 +85,9 @@ export class InboxItemRepository {
             unread: true,
             ...(input.organizationId !== undefined ? { organizationId: input.organizationId } : {}),
             ...(input.tenantId !== undefined ? { tenantId: input.tenantId } : {}),
+            ...(input.sourceMeta !== undefined
+                ? { sourceMeta: normalizeInboxSourceMeta(input.sourceMeta) }
+                : {}),
         });
         return this.repository.save(row);
     }
@@ -91,6 +100,21 @@ export class InboxItemRepository {
     /** Producer dedup: the item already mirroring this proposal, if any. */
     async findByProposalId(proposalId: string): Promise<InboxItem | null> {
         return this.repository.findOne({ where: { proposalId } });
+    }
+
+    /**
+     * Producer dedup (slice Q): the OPEN question already filed for this
+     * run, if any. A fleet completion event can be replayed and a node can
+     * report the same job twice; one parked run gets one question.
+     */
+    async findOpenQuestionByRunId(agentRunId: string): Promise<InboxItem | null> {
+        return this.repository.findOne({
+            where: {
+                agentRunId,
+                kind: 'question' as InboxItemKind,
+                status: 'open' as InboxItemStatus,
+            },
+        });
     }
 
     /**
@@ -109,6 +133,12 @@ export class InboxItemRepository {
             qb.andWhere('item.status = :status', { status: options.status });
         } else {
             qb.andWhere('item.status != :archived', { archived: 'archived' });
+        }
+        // Owner predicate first, Task filter second: the Task page asks
+        // "is there an open question for THIS Task" and must never see
+        // another owner's item through a guessed Task id.
+        if (options.taskId) {
+            qb.andWhere('item.taskId = :taskId', { taskId: options.taskId });
         }
         const [rows, total] = await qb
             .orderBy('item.createdAt', 'DESC')
