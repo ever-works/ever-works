@@ -19,6 +19,14 @@
  */
 
 export {
+    configuredPackageDirs,
+    loadedPackages,
+    rejectedPackages,
+    scanConfiguredPackages,
+    type ConfiguredScanResult,
+} from './configured-source';
+
+export {
     DEFAULT_MAX_LOCAL_ENTRIES,
     parsePackageDirs,
     scanLocalPackages,

@@ -869,6 +869,51 @@ export const config = {
         },
     },
 
+    /**
+     * Agent Plugins standard interop — support for the open, cross-vendor
+     * package format at <https://github.com/agentplugins/agent-plugins-spec>.
+     *
+     * Lives HERE, in the agent package, rather than in `apps/api`'s config,
+     * and that is not a stylistic choice: the first consumer is
+     * `SkillsFacadeService` in `packages/agent/src/facades/`, which has no
+     * import path to `apps/api`. Putting the flag in the API-tier constants
+     * would strand it from its own reader.
+     */
+    agentPlugins: {
+        /**
+         * Master switch. Default `false`, so every existing deployment keeps
+         * behaving exactly as it does today: no package registry is read, no
+         * additional catalog source is consulted, nothing changes.
+         */
+        isEnabled() {
+            return (process.env.FEATURE_AGENT_PLUGINS ?? 'false').toLowerCase() === 'true';
+        },
+
+        /**
+         * Directories scanned for locally-installed packages.
+         *
+         * Three deliberate decisions:
+         *
+         * 1. `||`, not `??`. `envsubst` renders a variable that a manifest
+         *    references but the deploy workflow does not export as an EMPTY
+         *    STRING, and `??` passes an empty string straight through as if
+         *    it were a real value. `||` falls back to the default, which is
+         *    what an operator means by "I did not set this".
+         * 2. The default is NOT `/app/plugins`. That path holds the ~66
+         *    native plugins baked into the image, and an emptyDir mounted
+         *    over it once took out every AI, search and deploy capability in
+         *    production because the loader then discovered zero plugins.
+         * 3. Nothing creates the default directory — no Dockerfile mkdir, no
+         *    volume mount. It will not exist on any current deployment, so
+         *    the scanner treats a missing directory as an empty registry
+         *    rather than an error. Turning this flag on must never be able to
+         *    fail a boot.
+         */
+        getPackageDirs(): string {
+            return process.env.AGENT_PLUGINS_DIR || '/app/agent-plugins';
+        },
+    },
+
     // EW-120 Activity Feed pull-mode plumbing — per-Work HMAC secret is
     // encrypted at rest with this key. AES-256-GCM expects a 32-byte key;
     // the consumer service decodes hex / base64 / utf8 in that order.

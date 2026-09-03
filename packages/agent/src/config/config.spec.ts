@@ -909,6 +909,7 @@ describe('agent/config', () => {
                 // PR #1019 — Agents/Skills/Tasks feature added `agents.*`
                 // config group (heartbeat dispatcher gates, stuck-timeout,
                 // max batch size, etc.). Pinned alphabetically here.
+                'agentPlugins',
                 'agents',
                 'billing',
                 'branding',
@@ -974,6 +975,56 @@ describe('agent/config', () => {
                 'trigger',
                 'websiteTemplate',
             ]);
+        });
+    });
+
+    describe('agentPlugins', () => {
+        describe('isEnabled', () => {
+            it('is false when unset, so every existing deployment is unaffected', () => {
+                expect(config.agentPlugins.isEnabled()).toBe(false);
+            });
+
+            it('is true only for an explicit "true", case-insensitively', () => {
+                process.env.FEATURE_AGENT_PLUGINS = 'true';
+                expect(config.agentPlugins.isEnabled()).toBe(true);
+                process.env.FEATURE_AGENT_PLUGINS = 'TRUE';
+                expect(config.agentPlugins.isEnabled()).toBe(true);
+                process.env.FEATURE_AGENT_PLUGINS = 'True';
+                expect(config.agentPlugins.isEnabled()).toBe(true);
+            });
+
+            it.each(['false', '1', 'yes', 'on', '', '  '])(
+                'is false for %j, which is not the word true',
+                (value) => {
+                    process.env.FEATURE_AGENT_PLUGINS = value;
+                    expect(config.agentPlugins.isEnabled()).toBe(false);
+                },
+            );
+        });
+
+        describe('getPackageDirs', () => {
+            it('defaults to a path of its own, never /app/plugins', () => {
+                // /app/plugins holds the native plugins baked into the image.
+                // Pointing this there — or mounting a volume over it — once
+                // took out every AI, search and deploy capability in
+                // production, because the loader then discovered zero plugins.
+                expect(config.agentPlugins.getPackageDirs()).toBe('/app/agent-plugins');
+                expect(config.agentPlugins.getPackageDirs()).not.toBe('/app/plugins');
+            });
+
+            it('returns an explicitly configured value', () => {
+                process.env.AGENT_PLUGINS_DIR = '/srv/packages';
+                expect(config.agentPlugins.getPackageDirs()).toBe('/srv/packages');
+            });
+
+            it('falls back to the default for an EMPTY value, not through it', () => {
+                // This is why the getter uses `||` rather than `??`. envsubst
+                // renders a variable that a manifest references but the deploy
+                // workflow never exports as an empty string, and `??` would
+                // pass that straight through as if an operator had chosen it.
+                process.env.AGENT_PLUGINS_DIR = '';
+                expect(config.agentPlugins.getPackageDirs()).toBe('/app/agent-plugins');
+            });
         });
     });
 });
