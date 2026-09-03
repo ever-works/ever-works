@@ -1,18 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import type { FleetExecutionPreferenceView, FleetNodeView } from '@ever-works/contracts';
+import type {
+    FleetAgentNodeAffinityView,
+    FleetExecutionPreferenceView,
+    FleetNodeView,
+} from '@ever-works/contracts';
 import {
+    composeAgentFleet,
     describeAccountExecutionPreference,
     nodeAvailability,
     preferredNodeState,
     selectableFleetNodes,
+    type AgentFleetReads,
 } from './agent-fleet.shared';
 
 /**
  * Execution section — the policy half.
  *
  * What these pin: which nodes may be offered as a binding target, what a
- * bound node's status means for the Agent's jobs, and which routing row
- * the read-only display reports as "in force".
+ * bound node's status means for the Agent's jobs, which routing row the
+ * read-only display reports as "in force", and how the page's three
+ * settled reads become the section's input (which failure hides it,
+ * which one degrades a single column).
  */
 
 function node(over: Partial<FleetNodeView> = {}): FleetNodeView {
@@ -138,6 +146,91 @@ describe('describeAccountExecutionPreference', () => {
             mode: 'local-fallback',
             configured: false,
             overrideCount: 2,
+        });
+    });
+});
+
+describe('composeAgentFleet', () => {
+    function fulfilled<T>(value: T): PromiseFulfilledResult<T> {
+        return { status: 'fulfilled', value };
+    }
+    function rejected(reason: string): PromiseRejectedResult {
+        return { status: 'rejected', reason: new Error(reason) };
+    }
+    function affinity(nodeId: string): FleetAgentNodeAffinityView {
+        return {
+            agentId: 'agent-1',
+            nodeId,
+            organizationId: 'org-1',
+            createdAt: null,
+            updatedAt: null,
+        };
+    }
+    const healthy: AgentFleetReads = {
+        nodes: fulfilled([node()]),
+        affinity: fulfilled(affinity('node-1')),
+        preferences: fulfilled([preference()]),
+    };
+
+    it('adopts every read when all three succeed in an Organization workspace', () => {
+        expect(composeAgentFleet(healthy, true)).toEqual({
+            nodes: [node()],
+            affinity: { available: true, nodeId: 'node-1' },
+            preferences: [preference()],
+        });
+    });
+
+    /**
+     * Both the picker and the "no nodes yet" pointer are statements about
+     * the node list; without it the section would claim the fleet is empty.
+     */
+    it('hides the whole section when the node list could not be read', () => {
+        expect(composeAgentFleet({ ...healthy, nodes: rejected('503') }, true)).toBeNull();
+    });
+
+    it('degrades only the affinity column when that read failed', () => {
+        expect(composeAgentFleet({ ...healthy, affinity: rejected('500') }, true)).toEqual({
+            nodes: [node()],
+            affinity: { available: false, reason: 'unavailable' },
+            preferences: [preference()],
+        });
+    });
+
+    it('degrades only the routing column when the preference read failed', () => {
+        expect(composeAgentFleet({ ...healthy, preferences: rejected('500') }, true)).toEqual({
+            nodes: [node()],
+            affinity: { available: true, nodeId: 'node-1' },
+            preferences: null,
+        });
+    });
+
+    /** Unbound is `null` on the wire; `serverFetch` may collapse it to `undefined`. */
+    it('treats a null or empty affinity answer as unbound', () => {
+        expect(
+            composeAgentFleet({ ...healthy, affinity: fulfilled(null) }, true)?.affinity,
+        ).toEqual({
+            available: true,
+            nodeId: null,
+        });
+        expect(
+            composeAgentFleet({ ...healthy, affinity: fulfilled(undefined) }, true)?.affinity,
+        ).toEqual({ available: true, nodeId: null });
+    });
+
+    /**
+     * The page never issues the affinity read in a personal workspace, so
+     * whatever the placeholder settled to must not leak into the state.
+     */
+    it('reports personal scope regardless of what the affinity slot holds', () => {
+        expect(composeAgentFleet(healthy, false)?.affinity).toEqual({
+            available: false,
+            reason: 'personal-scope',
+        });
+        expect(
+            composeAgentFleet({ ...healthy, affinity: rejected('400') }, false)?.affinity,
+        ).toEqual({
+            available: false,
+            reason: 'personal-scope',
         });
     });
 });

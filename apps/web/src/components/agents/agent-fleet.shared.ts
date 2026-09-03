@@ -1,5 +1,6 @@
 import {
     resolveFleetExecutionMode,
+    type FleetAgentNodeAffinityView,
     type FleetExecutionMode,
     type FleetExecutionPreferenceView,
     type FleetNodeStatus,
@@ -49,6 +50,51 @@ export type AgentFleetAffinityState =
      * the owner). `unavailable`: the read itself failed.
      */
     | { available: false; reason: 'personal-scope' | 'unavailable' };
+
+/**
+ * The three fleet reads the Capabilities page issues, each settled on its
+ * own. `affinity` is the read's RESULT rather than the API value because
+ * "asked and failed" and "asked and unbound" must land in different
+ * states — and a personal workspace never asks at all (the API answers
+ * 400), which is what `organizationScoped` tells the composer.
+ */
+export interface AgentFleetReads {
+    nodes: PromiseSettledResult<FleetNodeView[]>;
+    /** `serverFetch` collapses an empty body to `undefined`; unbound is `null` on the wire. */
+    affinity: PromiseSettledResult<FleetAgentNodeAffinityView | null | undefined>;
+    preferences: PromiseSettledResult<FleetExecutionPreferenceView[]>;
+}
+
+/**
+ * Turn the settled reads into what the section renders, or null when
+ * there is nothing true to show.
+ *
+ * The node list is the one read the section cannot render without —
+ * both the picker and the "no nodes yet" pointer are statements about
+ * it — so its failure hides the whole section rather than rendering a
+ * pointer that claims the fleet is empty. The other two degrade only
+ * their own column: a failed routing read must not hide the picker, and
+ * a failed affinity read must not become an "unbound" picker (see
+ * `AgentFleetAffinityState`).
+ */
+export function composeAgentFleet(
+    reads: AgentFleetReads,
+    organizationScoped: boolean,
+): AgentFleetData | null {
+    if (reads.nodes.status !== 'fulfilled') return null;
+
+    const affinity: AgentFleetAffinityState = !organizationScoped
+        ? { available: false, reason: 'personal-scope' }
+        : reads.affinity.status === 'fulfilled'
+          ? { available: true, nodeId: reads.affinity.value?.nodeId ?? null }
+          : { available: false, reason: 'unavailable' };
+
+    return {
+        nodes: reads.nodes.value,
+        affinity,
+        preferences: reads.preferences.status === 'fulfilled' ? reads.preferences.value : null,
+    };
+}
 
 /**
  * Whether the platform will lease work onto a node right now, from the

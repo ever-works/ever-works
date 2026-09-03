@@ -1,67 +1,13 @@
-import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { agentsAPI } from '@/lib/api/agents';
 import { skillsAPI } from '@/lib/api/skills';
 import { mcpConnectionsAPI } from '@/lib/api/mcp-connections';
 import { repoConnectionsAPI } from '@/lib/api/repo-connections';
 import { environmentsAPI } from '@/lib/api/environments';
-import { fleetAPI } from '@/lib/api/fleet';
-import { isFleetEnabled } from '@/lib/fleet-flags';
-import { BROWSER_WORKSPACE_SCOPE_HEADER, parseWorkspaceSelector } from '@/lib/workspace-scope';
 import { AgentCapabilitiesClient } from '@/components/agents/AgentCapabilitiesClient';
-import type { AgentFleetData } from '@/components/agents/agent-fleet.shared';
+import { loadAgentFleet } from './agent-fleet-data';
 
 type Params = Promise<{ id: string; locale: string }>;
-
-/**
- * Fleet facts for the Execution section, or null when there is nothing
- * true to show (Fleet disabled on this deployment, or its node list
- * could not be read).
- *
- * Three independent reads, settled independently: the routing
- * preference failing must not hide the node picker, and vice versa.
- * The node list is the one read the section cannot render without —
- * both the picker and the "no nodes yet" pointer are statements about
- * it — so its failure hides the whole section rather than rendering a
- * pointer that claims the fleet is empty.
- *
- * The affinity read is skipped outright in a PERSONAL workspace: the
- * API answers it with a 400 (a binding is Organization-scoped on top of
- * the owner), and `serverFetch` logs every non-404 failure as an API
- * error — a guaranteed error log on every page view is not degradation,
- * it is noise. The section renders the explanation instead.
- */
-async function loadAgentFleet(agentId: string): Promise<AgentFleetData | null> {
-    if (!isFleetEnabled()) return null;
-
-    let organizationScoped = false;
-    try {
-        const scope = parseWorkspaceSelector((await headers()).get(BROWSER_WORKSPACE_SCOPE_HEADER));
-        organizationScoped = scope.kind === 'organization';
-    } catch {
-        organizationScoped = false;
-    }
-
-    const [nodesResult, affinityResult, preferencesResult] = await Promise.allSettled([
-        fleetAPI.listNodes(),
-        organizationScoped ? fleetAPI.getAgentAffinity(agentId) : Promise.resolve(null),
-        fleetAPI.listExecutionPreferences(),
-    ]);
-
-    if (nodesResult.status !== 'fulfilled') return null;
-
-    const affinity: AgentFleetData['affinity'] = !organizationScoped
-        ? { available: false, reason: 'personal-scope' }
-        : affinityResult.status === 'fulfilled'
-          ? { available: true, nodeId: affinityResult.value?.nodeId ?? null }
-          : { available: false, reason: 'unavailable' };
-
-    return {
-        nodes: nodesResult.value,
-        affinity,
-        preferences: preferencesResult.status === 'fulfilled' ? preferencesResult.value : null,
-    };
-}
 
 /**
  * Capabilities tab — the per-Agent "what can it do" surface:
