@@ -140,6 +140,45 @@ describe('WorksCreateComposer Repository chip routing', () => {
         expect(params.get('prompt')).toBe('https://github.com/ever-works/ever-works');
     });
 
+    // Review finding (Major, security): the raw composer text used to be
+    // serialized into the query string, so a remote pasted straight from a
+    // terminal put its token into browser history, every later referrer and
+    // any proxy log before the form could reject it.
+    it('never puts a credential-bearing remote in the URL — it routes with no prompt at all', async () => {
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<WorksCreateComposer />);
+        clickChip(container, 'repo');
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'https://user:ghp_secret@github.com/ever-works/ever-works.git' },
+        });
+        fireEvent.click(getSubmit(container));
+
+        await waitFor(() => expect(routerPushMock).toHaveBeenCalledTimes(1));
+        const href = routerPushMock.mock.calls[0][0] as string;
+        expect(href).not.toContain('ghp_secret');
+        const params = new URLSearchParams(href.slice(href.indexOf('?') + 1));
+        expect(params.get('mode')).toBe('manual');
+        expect(params.get('kind')).toBe('repo');
+        expect(params.get('prompt')).toBeNull();
+    });
+
+    it('canonicalises what it does forward, so the URL carries no .git suffix or stray path', async () => {
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<WorksCreateComposer />);
+        clickChip(container, 'repo');
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'github.com/ever-works/ever-works.git/' },
+        });
+        fireEvent.click(getSubmit(container));
+
+        await waitFor(() => expect(routerPushMock).toHaveBeenCalledTimes(1));
+        const href = routerPushMock.mock.calls[0][0] as string;
+        const params = new URLSearchParams(href.slice(href.indexOf('?') + 1));
+        expect(params.get('prompt')).toBe('https://github.com/ever-works/ever-works');
+    });
+
     it('every other chip still opens a chat turn and routes to the AI form without the prompt in the URL', async () => {
         startFromPromptMock.mockClear();
         routerPushMock.mockClear();

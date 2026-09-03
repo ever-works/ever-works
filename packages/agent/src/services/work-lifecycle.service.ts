@@ -849,6 +849,25 @@ export class WorkLifecycleService {
         // Require at least editor role to update work
         const { work } = await this.ownershipService.ensureCanEdit(id, user.id);
 
+        // A Repository Work's `owner` is not a display field: it is the
+        // GitHub owner of the wrapped repository, and
+        // `WorkRepository.findRepositoryWorksWrapping` filters duplicate
+        // registrations on that column. Letting it drift would hide the
+        // existing Work from that check and let a second account register the
+        // same repository, so the column is immutable for this kind.
+        if (
+            isRepositoryWork(work) &&
+            updateDto.owner !== undefined &&
+            updateDto.owner !== work.owner
+        ) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    'The owner of a Repository Work is the owner of the repository it wraps and cannot be changed. ' +
+                    'Register a new Work for a different repository instead.',
+            });
+        }
+
         try {
             // Build update data object
             const updateData: Record<string, any> = {

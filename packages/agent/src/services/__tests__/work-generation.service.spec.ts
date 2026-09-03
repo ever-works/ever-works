@@ -30,6 +30,15 @@ import { WorkHistoryActivityType } from '@ever-works/contracts/api';
 import { GenerationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { createGenerationCancelledError, isGenerationCancelledError } from '@src/utils';
 import { GENERATION_CANCELLED } from '@src/constants/messages';
+import { WorkMemberRole } from '@src/entities/types';
+import type { WorkAccessResult } from '../work-ownership.service';
+import type {
+    CreateItemsGeneratorDto,
+    UpdateItemsGeneratorDto,
+} from '@src/items-generator/dto/create-items-generator.dto';
+import type { RemoveItemDto } from '@src/items-generator/dto/remove-item.dto';
+import type { UpdateItemDto } from '@src/items-generator/dto/update-item.dto';
+import type { SubmitItemDto } from '@src/items-generator/dto/submit-item.dto';
 
 import type { Work } from '@src/entities/work.entity';
 import type { User } from '@src/entities/user.entity';
@@ -2075,17 +2084,30 @@ describe('WorkGenerationService', () => {
         const repoWork = () =>
             buildWork({ kind: 'repo', name: 'Platform', slug: 'platform' } as Partial<Work>);
 
+        /**
+         * The guard runs before any DTO field is read, so these fixtures carry
+         * only what each signature requires. Typed rather than `as any` so a
+         * change to either contract fails here at compile time — which is the
+         * point of a guard suite (review follow-up).
+         */
+        const accessTo = (work: Work): WorkAccessResult => ({
+            work,
+            member: null,
+            role: WorkMemberRole.EDITOR,
+            isCreator: true,
+        });
+        const generatorInput = () => ({ name: 'X', prompt: 'p' }) as CreateItemsGeneratorDto;
+        const submitInput = () =>
+            ({ name: 'X', source_url: 'https://x.dev' }) as unknown as SubmitItemDto;
+        const removeInput = () => ({ item_slug: 'x' }) as RemoveItemDto;
+        const updateInput = () => ({ item_slug: 'x', featured: true }) as UpdateItemDto;
+
         it('generateItems: 400 before history, providers or dispatch', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService({ withDispatcher: true });
             await expect(
-                service.generateItems(
-                    'work-1',
-                    { name: 'X', prompt: 'p' } as any,
-                    buildUser(),
-                    false,
-                ),
+                service.generateItems('work-1', generatorInput(), buildUser(), false),
             ).rejects.toBeInstanceOf(BadRequestException);
 
             expect(generationHistoryRepository.createEntry).not.toHaveBeenCalled();
@@ -2093,13 +2115,13 @@ describe('WorkGenerationService', () => {
         });
 
         it('updateItemsGenerator: 400 even on the scheduled path — no skip bookkeeping, no history', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(
                 service.updateItemsGenerator({
                     workId: 'work-1',
-                    updateDto: {} as any,
+                    updateDto: {} as UpdateItemsGeneratorDto,
                     user: buildUser(),
                     awaitCompletion: false,
                     context: { triggeredBy: 'schedule', scheduleId: 'sched-1' },
@@ -2111,7 +2133,7 @@ describe('WorkGenerationService', () => {
         });
 
         it('regenerateMarkdown: 400 without touching the README generator', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(service.regenerateMarkdown('work-1', buildUser())).rejects.toBeInstanceOf(
@@ -2122,7 +2144,7 @@ describe('WorkGenerationService', () => {
         });
 
         it('updateReadme: 400 without touching the data repository', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(service.updateReadme('work-1', buildUser())).rejects.toBeInstanceOf(
@@ -2137,15 +2159,11 @@ describe('WorkGenerationService', () => {
         // Repository Work that is `items/<slug>.md` on the code repo's
         // default branch. Each refuses before ItemSubmissionService clones.
         it('submitItem: 400 before the item is written or the README regenerated', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(
-                service.submitItem(
-                    'work-1',
-                    { name: 'X', source_url: 'https://x.dev' } as any,
-                    buildUser(),
-                ),
+                service.submitItem('work-1', submitInput(), buildUser()),
             ).rejects.toBeInstanceOf(BadRequestException);
 
             expect(itemSubmissionService.submitItem).not.toHaveBeenCalled();
@@ -2153,11 +2171,11 @@ describe('WorkGenerationService', () => {
         });
 
         it('removeItem: 400 before the removal commit', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(
-                service.removeItem('work-1', { item_slug: 'x' } as any, buildUser()),
+                service.removeItem('work-1', removeInput(), buildUser()),
             ).rejects.toBeInstanceOf(BadRequestException);
 
             expect(itemSubmissionService.removeItem).not.toHaveBeenCalled();
@@ -2165,15 +2183,11 @@ describe('WorkGenerationService', () => {
         });
 
         it('updateItemMetadata: 400 before the metadata commit', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(
-                service.updateItemMetadata(
-                    'work-1',
-                    { item_slug: 'x', featured: true } as any,
-                    buildUser(),
-                ),
+                service.updateItemMetadata('work-1', updateInput(), buildUser()),
             ).rejects.toBeInstanceOf(BadRequestException);
 
             expect(itemSubmissionService.updateItem).not.toHaveBeenCalled();
@@ -2181,7 +2195,7 @@ describe('WorkGenerationService', () => {
         });
 
         it('extractItemDetails: 400 when scoped to a Repository Work, before any fetch', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(
@@ -2195,7 +2209,7 @@ describe('WorkGenerationService', () => {
         });
 
         it('bulkCaptureImages: 400 before the data repository is cloned for its items', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(
@@ -2206,7 +2220,7 @@ describe('WorkGenerationService', () => {
         });
 
         it('updateDomainType: 400 without touching the row', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(
@@ -2217,7 +2231,7 @@ describe('WorkGenerationService', () => {
         });
 
         it('updateWebsiteRepository: 400 — the kind provisions no website repository to sync into', async () => {
-            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+            ownershipService.ensureCanEdit.mockResolvedValue(accessTo(repoWork()));
 
             const service = buildService();
             await expect(service.updateWebsiteRepository('work-1', buildUser())).rejects.toThrow(
@@ -2242,7 +2256,7 @@ describe('WorkGenerationService', () => {
             const service = buildService({ withDispatcher: true });
             const result = await service.generateItems(
                 'work-1',
-                { name: 'X', prompt: 'p' } as any,
+                generatorInput(),
                 buildUser(),
                 false,
             );

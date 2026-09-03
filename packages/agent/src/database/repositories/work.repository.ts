@@ -306,9 +306,17 @@ export class WorkRepository {
             .getMany();
 
         const target = repo.toLowerCase();
+        const targetOwner = owner.toLowerCase();
         return candidates.filter((work) => {
             const data = work.sourceRepository?.relatedRepositories?.data;
-            return typeof data?.repo === 'string' && data.repo.toLowerCase() === target;
+            if (typeof data?.repo !== 'string' || data.repo.toLowerCase() !== target) {
+                return false;
+            }
+            // The `work.owner` column narrowed the query; the registered
+            // coordinates decide the match. Checking both means a row whose
+            // column ever drifted from what was registered cannot produce a
+            // false positive here (`updateWork` refuses to let it drift).
+            return typeof data.owner !== 'string' || data.owner.toLowerCase() === targetOwner;
         });
     }
 

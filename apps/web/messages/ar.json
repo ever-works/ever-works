@@ -6305,6 +6305,7 @@
                 "creatingButton": "جارٍ التسجيل…",
                 "cancelButton": "إلغاء",
                 "invalidUrl": "أدخل رابط مستودع مثل https://github.com/owner/repo",
+                "invalidSlug": "استخدم الأحرف الصغيرة والأرقام والشرطات فقط، مثل my-repo",
                 "success": "تم تسجيل المستودع كعمل",
                 "createFailed": "فشل تسجيل المستودع",
                 "noteTitle": "ملاحظة:",

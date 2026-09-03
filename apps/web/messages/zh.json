@@ -6212,6 +6212,7 @@
                 "creatingButton": "注册中…",
                 "cancelButton": "取消",
                 "invalidUrl": "请输入形如 https://github.com/owner/repo 的仓库 URL",
+                "invalidSlug": "只能使用小写字母、数字和连字符，例如 my-repo",
                 "success": "仓库已注册为 Work",
                 "createFailed": "注册仓库失败",
                 "noteTitle": "注意：",

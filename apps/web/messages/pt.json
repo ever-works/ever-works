@@ -6212,6 +6212,7 @@
                 "creatingButton": "Registrando…",
                 "cancelButton": "Cancelar",
                 "invalidUrl": "Informe uma URL de repositório como https://github.com/owner/repo",
+                "invalidSlug": "Use apenas letras minúsculas, dígitos e hífens, por exemplo my-repo",
                 "success": "Repositório registrado como Work",
                 "createFailed": "Falha ao registrar o repositório",
                 "noteTitle": "Observação:",

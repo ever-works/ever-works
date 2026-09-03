@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
+import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
 
 /**
  * Dashboard polish (2026-05-27) — Work-specific composer mounted at
@@ -146,10 +147,17 @@ export function WorksCreateComposer() {
             // A Repository Work has nothing to generate — hand the text
             // (a repo URL, typically) to the Repository form, no chat turn.
             if (selectedKind === 'repo') {
+                // Only canonical coordinates may ride in the query string:
+                // pasted remotes routinely carry a token in the user-info
+                // section, and a query parameter reaches browser history,
+                // the referrer of every later request and any proxy log.
+                // Anything that does not reduce to owner/repo routes with
+                // no seed at all, and the user types it into the form.
+                const canonical = canonicalRepositoryUrl(description);
                 const params = new URLSearchParams({
                     mode: 'manual',
                     kind: 'repo',
-                    prompt: description,
+                    ...(canonical ? { prompt: canonical } : {}),
                 });
                 router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
                 return;

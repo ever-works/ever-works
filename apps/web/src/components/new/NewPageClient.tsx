@@ -31,6 +31,7 @@ import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { attachUploadToMissionAction, createMissionAction } from '@/app/actions/dashboard/missions';
 import { RegisterCompanyDialog } from '@/components/organizations/RegisterCompanyDialog';
+import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -418,10 +419,17 @@ export function NewPageClient({
             // URL, typically) straight to the Repository form on the Work
             // canvas instead of opening a chat turn.
             if (effectiveChip === 'repo') {
+                // Only canonical coordinates may ride in the query string:
+                // pasted remotes routinely carry a token in the user-info
+                // section, and a query parameter reaches browser history,
+                // the referrer of every later request and any proxy log.
+                // Anything that does not reduce to owner/repo routes with
+                // no seed at all, and the user types it into the form.
+                const canonical = canonicalRepositoryUrl(description);
                 const params = new URLSearchParams({
                     mode: 'manual',
                     kind: 'repo',
-                    prompt: description,
+                    ...(canonical ? { prompt: canonical } : {}),
                 });
                 router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
                 return;
