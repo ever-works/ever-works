@@ -89,3 +89,10 @@ export {
     CONCURRENCY,
     type RematerializeResult,
 } from './package-bootstrap.service';
+
+export {
+    AgentPluginUpdateService,
+    MAX_REMOTE_CHECKS,
+    type PackageUpdate,
+    type UpdateCheckResult,
+} from './update.service';

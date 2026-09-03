@@ -10,6 +10,7 @@ import { AgentPluginNpmSource } from './npm-source';
 import { AgentPluginRemoteAcquireService } from './remote-acquire.service';
 import { AgentPluginPackageRepository } from './package.repository';
 import { AgentPluginPackageBootstrapService } from './package-bootstrap.service';
+import { AgentPluginUpdateService } from './update.service';
 import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 
 /**
@@ -56,6 +57,7 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
         AgentPluginRemoteAcquireService,
         AgentPluginPackageRepository,
         AgentPluginPackageBootstrapService,
+        AgentPluginUpdateService,
         AGENT_PLUGIN_SKILL_SOURCE,
     ],
 })

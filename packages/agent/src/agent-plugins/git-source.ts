@@ -51,6 +51,7 @@ export interface GitAcquireResult {
 export interface GitLike {
     clone(options: Record<string, unknown>): Promise<unknown>;
     resolveRef(options: Record<string, unknown>): Promise<string>;
+    listServerRefs(options: Record<string, unknown>): Promise<Array<{ ref: string; oid: string }>>;
 }
 
 /**
@@ -275,6 +276,45 @@ export class AgentPluginGitSource {
                 { statusCode: code, message: redactUrl(reason), url: redactUrl(input.url) },
                 code,
             );
+        }
+    }
+
+    /**
+     * The commit a remote currently points `ref` at, WITHOUT cloning.
+     *
+     * Update checks run for every installed package, so cloning to answer
+     * "is there anything new?" would download entire repositories on a
+     * schedule to usually learn that nothing changed. `listServerRefs` is a
+     * single ref-advertisement request and writes nothing to disk.
+     *
+     * Returns null rather than throwing: not knowing whether an update exists
+     * must never fail the page that asked.
+     */
+    async remoteSha(url: string, ref?: string): Promise<string | null> {
+        const parsed = validateGitUrl(url);
+        if (!parsed.ok) return null;
+
+        const allow = await this.allowlist.check(url, 'git');
+        if (!allow.allowed) return null;
+
+        const pattern = allow.entry?.versionRange?.trim();
+        if (pattern && ref && !refMatchesPattern(ref, pattern)) return null;
+
+        try {
+            const { git, http } = await this.load(url);
+            const refs = await git.listServerRefs({
+                http,
+                url,
+                prefix: ref ? `refs/heads/${ref}` : 'HEAD',
+            });
+            return refs[0]?.oid ?? null;
+        } catch (err) {
+            this.logger.debug(
+                `Remote ref lookup failed for ${redactUrl(url)}: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return null;
         }
     }
 
