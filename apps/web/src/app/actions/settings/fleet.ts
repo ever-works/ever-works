@@ -35,6 +35,17 @@ import {
 
 const SETTINGS_PAGE_PATTERN = '/[locale]/(dashboard)/settings/fleet';
 
+/**
+ * The Agent's Capabilities tab, where the preferred-node picker lives.
+ *
+ * The ROUTE pattern with `'page'`, like `SETTINGS_PAGE_PATTERN` above,
+ * rather than a literal `/agents/:id/capabilities`: the page is served
+ * under a locale prefix and, in an Organization workspace (the only
+ * place the picker is enabled), under `/org/<slug>` too, so a literal
+ * path would match nothing the moment the page became cacheable.
+ */
+const AGENT_CAPABILITIES_PAGE_PATTERN = '/[locale]/(dashboard)/agents/[id]/capabilities';
+
 async function ensureAuth() {
     const user = await getAuthFromCookie();
     if (!user) {
@@ -270,7 +281,7 @@ export async function setFleetAgentAffinityAction(
     await ensureAuth();
     try {
         const data = await fleetAPI.setAgentAffinity(agentId, nodeId);
-        revalidatePath(`/agents/${agentId}/capabilities`);
+        revalidatePath(AGENT_CAPABILITIES_PAGE_PATTERN, 'page');
         return { success: true, data, error: null };
     } catch (error) {
         return {
@@ -291,7 +302,7 @@ export async function clearFleetAgentAffinityAction(
     await ensureAuth();
     try {
         await fleetAPI.clearAgentAffinity(agentId);
-        revalidatePath(`/agents/${agentId}/capabilities`);
+        revalidatePath(AGENT_CAPABILITIES_PAGE_PATTERN, 'page');
         return { success: true, data: { cleared: true }, error: null };
     } catch (error) {
         return {

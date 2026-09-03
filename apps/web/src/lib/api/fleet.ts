@@ -211,10 +211,18 @@ export const fleetAPI = {
      * itself is owner-scoped only. The API answers `null` (not 404) for
      * an unbound Agent, and 400 when the request carries no Organization
      * scope — personal workspaces cannot pin an Agent to a node.
+     *
+     * The agent id reaches these helpers from a Server Action argument,
+     * i.e. from the browser. It is encoded as ONE path segment (as
+     * `agents.ts` does for slugs) so a crafted value carrying `/` or `..`
+     * cannot be dot-segment-normalised by `fetch` onto a different
+     * `/api/*` route under the caller's own bearer. The API's
+     * `ParseUUIDPipe` rejects it anyway; this keeps the request from
+     * leaving for the wrong route in the first place.
      */
     getAgentAffinity: async (agentId: string) => {
         const affinity = await serverFetch<FleetAgentNodeAffinityView | null | undefined>(
-            `${BASE}/agents/${agentId}/node-affinity`,
+            `${BASE}/agents/${encodeURIComponent(agentId)}/node-affinity`,
         );
         // `serverFetch` collapses an empty body to `undefined`; the wire
         // answer for "unbound" is a JSON `null`. Both mean the same here.
@@ -223,7 +231,7 @@ export const fleetAPI = {
 
     setAgentAffinity: async (agentId: string, nodeId: string) => {
         return serverMutation<FleetAgentNodeAffinityView>({
-            endpoint: `${BASE}/agents/${agentId}/node-affinity`,
+            endpoint: `${BASE}/agents/${encodeURIComponent(agentId)}/node-affinity`,
             data: { nodeId },
             method: 'PUT',
             wrapInData: false,
@@ -233,7 +241,7 @@ export const fleetAPI = {
     /** Idempotent — clearing an unbound Agent is a no-op on the API. */
     clearAgentAffinity: async (agentId: string) => {
         return serverMutation<void>({
-            endpoint: `${BASE}/agents/${agentId}/node-affinity`,
+            endpoint: `${BASE}/agents/${encodeURIComponent(agentId)}/node-affinity`,
             data: {},
             method: 'DELETE',
             wrapInData: false,
