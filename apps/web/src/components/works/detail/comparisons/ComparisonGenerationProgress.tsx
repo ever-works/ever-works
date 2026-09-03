@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 const STAGES = ['researching', 'analyzing', 'writing', 'writing_extended', 'saving'] as const;
 
@@ -40,7 +41,9 @@ export function ComparisonGenerationProgress({
                 // Use direct fetch to Route Handler instead of server action
                 // to avoid Next.js server action serialization (which would
                 // block this call while the generation server action is running)
-                const res = await fetch(`/api/works/${workId}/comparisons/generation-status`);
+                const res = await browserApiFetch(
+                    `/api/works/${workId}/comparisons/generation-status`,
+                );
                 if (res.ok) {
                     setStatus(await res.json());
                 }

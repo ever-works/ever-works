@@ -433,6 +433,10 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// (the caller then leaves the run's counter untouched rather
 		// than stamping a wrong 0) and never fails the finalize.
 		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth, signal);
+		// A cancellation that landed during the diff is not "no telemetry":
+		// a push:false finalize must not report success after the caller
+		// abandoned the run.
+		throwIfFinalizeAborted(signal);
 
 		let pushed = false;
 		if (opts.push) {
@@ -478,6 +482,9 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 				.filter((line) => line.length > 0);
 			return new Set(files).size;
 		} catch {
+			// Best-effort stops at cancellation: the aborted diff must surface
+			// as the finalize's cancellation, never degrade to "no data".
+			if (signal?.aborted) throwIfFinalizeAborted(signal);
 			return null;
 		}
 	}
