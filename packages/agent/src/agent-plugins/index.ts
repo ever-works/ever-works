@@ -1,3 +1,5 @@
+export { AgentPluginsModule } from './agent-plugins.module';
+
 /**
  * Agent Plugins standard interop — the platform side.
  *
