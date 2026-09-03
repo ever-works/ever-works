@@ -91,6 +91,10 @@ content pipelines either.
   (when scoped to a Work) / `bulkCaptureImages` / `updateDomainType` /
   `updateWebsiteRepository`; `WorkLifecycleService.syncFromDataRepository`
   and `updateWork` (a `deployProvider` for the kind);
+  `WorkScheduleService.updateSchedule` (the `PUT /works/:id/schedule` / MCP
+  `update_schedule` upsert — enable and pause alike, since both commit
+  `.works/works.yml` into the wrapped repo and a schedule would only tick
+  into the generator's 400);
   `WebsiteUpdateService.updateRepository` (every caller funnels through it,
   incl. `DeployService` and the template auto-update poller);
   `CommunityPrProcessorService.processWork` (the schedule skips the kind
@@ -146,11 +150,13 @@ content pipelines either.
   generate. `new-work-client` does the same in-page. One unit test per site.
 - Work detail: the Generator tab (`WorkTabs`), the generator page and the
   schedule page are not offered for the kind (the API refuses every
-  generator action); Settings hides the repository-visibility and
-  community-PR cards; the delete dialog offers only the repository
-  checkboxes the kind provisions (none for a Repository Work). Items and the
-  provider-repository settings were already capability-gated; the Deploy
-  tab is hidden because `configCache` is null for the kind.
+  generator action and the schedule upsert); Settings hides the
+  repository-visibility and community-PR cards; the delete dialog offers
+  only the repository checkboxes the kind provisions (none for a Repository
+  Work). Items and the provider-repository settings were already
+  capability-gated; the Deploy tab is hidden because `configCache` is null
+  for the kind. `WorkTabs`, `SettingsForm` and `DeleteComponent` each carry
+  a unit spec pinning the gate for `repo` against `default`.
 - i18n: `dashboard.newPage.chips.repo`, `newPage.chipDescriptions.repo`,
   `workCreation.kinds.repo`, `workCreation.kindDescriptions.repo`,
   `workKind.repo` and the `workCreation.repo.*` form block added to **all 21**
@@ -245,8 +251,8 @@ refusal cases that need no external credentials.
   generic repository info block.
 - **`.works/works.yml` for a Repository Work** is written into the user's
   code repository by `WorksConfigWriter` like any other kind (on a
-  `deployProvider` change — which the kind now refuses — and on the
-  generation paths, which the kind refuses too). That is the intended place
+  `deployProvider` change, on a schedule upsert and on the generation
+  paths — all of which the kind now refuses). That is the intended place
   for `spec.tasks.base_branch` / `checks`, but nothing reads those two keys
   yet — `TaskWorkspaceService` still takes the base branch from
   `work.taskIsolationBaseBranch` / the repo default. Whatever consumes
