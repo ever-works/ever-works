@@ -981,6 +981,9 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^2.0.41
         version: 2.0.41(zod@3.25.76)
+      '@ever-works/agent-plugins':
+        specifier: workspace:*
+        version: link:../agent-plugins
       '@ever-works/contracts':
         specifier: workspace:*
         version: link:../contracts
