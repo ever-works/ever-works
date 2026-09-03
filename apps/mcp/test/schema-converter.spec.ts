@@ -63,6 +63,22 @@ describe('SchemaConverterService', () => {
 			expect(zodType.safeParse([1, 2]).success).toBe(false);
 		});
 
+		it('carries minItems / maxItems into the array schema (run-batch and extraRepos limits)', () => {
+			const schema: JsonSchema = { type: 'array', items: { type: 'string' }, minItems: 1, maxItems: 2 };
+			const zodType = converter.convertToZod(schema, true);
+			expect(zodType.safeParse([]).success).toBe(false);
+			expect(zodType.safeParse(['a']).success).toBe(true);
+			expect(zodType.safeParse(['a', 'b']).success).toBe(true);
+			expect(zodType.safeParse(['a', 'b', 'c']).success).toBe(false);
+		});
+
+		it('ignores malformed array bounds instead of throwing', () => {
+			const schema = { type: 'array', items: { type: 'string' }, minItems: -1, maxItems: 1.5 } as JsonSchema;
+			const zodType = converter.convertToZod(schema, true);
+			expect(zodType.safeParse([]).success).toBe(true);
+			expect(zodType.safeParse(['a', 'b', 'c']).success).toBe(true);
+		});
+
 		it('converts object type with required/optional props', () => {
 			const schema: JsonSchema = {
 				type: 'object',

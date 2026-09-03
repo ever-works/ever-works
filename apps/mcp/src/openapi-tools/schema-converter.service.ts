@@ -19,6 +19,9 @@ export interface JsonSchema {
 	maxLength?: number;
 	/** OpenAPI 3.0 spelling of "may be null" (`@ApiProperty({ nullable: true })`). */
 	nullable?: boolean;
+	/** Array bounds (`@ArrayMinSize` / `@ArrayMaxSize`, `maxItems` on `@ApiProperty`). */
+	minItems?: number;
+	maxItems?: number;
 	[key: string]: unknown;
 }
 
@@ -151,7 +154,17 @@ export class SchemaConverterService {
 
 	private convertArray(schema: JsonSchema): z.ZodArray<z.ZodTypeAny> {
 		const items = schema.items ? this.convertType(schema.items) : z.any();
-		return z.array(items);
+		let array = z.array(items);
+		// Why: the API refuses an over-long batch with a 400; carrying the
+		// bound into the tool schema lets the client refuse it before the
+		// round trip, and documents the limit where the tool is described.
+		if (typeof schema.minItems === 'number' && Number.isInteger(schema.minItems) && schema.minItems >= 0) {
+			array = array.min(schema.minItems);
+		}
+		if (typeof schema.maxItems === 'number' && Number.isInteger(schema.maxItems) && schema.maxItems >= 0) {
+			array = array.max(schema.maxItems);
+		}
+		return array;
 	}
 
 	private convertObject(schema: JsonSchema): z.ZodTypeAny {
