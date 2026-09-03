@@ -19,7 +19,13 @@
 import matter from 'gray-matter';
 import { finding, type Finding } from './findings';
 import { isValidPluginName, PLUGIN_NAME_MAX_LENGTH, type AgentPluginManifest } from './manifest';
-import { isValidSkillName, SKILL_DESCRIPTION_MAX_LENGTH, SKILL_NAME_MAX_LENGTH, type SkillFrontmatter } from './skills';
+import {
+	isValidSkillName,
+	SKILL_COMPATIBILITY_MAX_LENGTH,
+	SKILL_DESCRIPTION_MAX_LENGTH,
+	SKILL_NAME_MAX_LENGTH,
+	type SkillFrontmatter
+} from './skills';
 
 import { pluginSchemaId, PUBLISHED_CONFORMANCE_VERSION, type SpecVersion } from './versions';
 
@@ -41,6 +47,19 @@ const satisfiesPluginNameRule = (value: string): boolean => isValidPluginName(va
  * tolerated by a reading client but is invalid to emit, so we never do it.
  */
 export const EVER_WORKS_EXTENSION_NAMESPACE = 'works.ever';
+
+/**
+ * True when `value` looks like a reverse-domain namespace — at least two
+ * dot-separated labels, each starting with a letter or digit.
+ *
+ * Used on the producer side only. A reader must ignore namespaces it does not
+ * implement without validating them (spec 8.1), so this is deliberately not
+ * applied on import.
+ */
+export function isReverseDomainNamespace(value: string): boolean {
+	const labels = value.split('.');
+	return labels.length >= 2 && labels.every((label) => /^[a-zA-Z0-9][a-zA-Z0-9-]*$/.test(label));
+}
 
 /** Reads one extension namespace from a manifest, without validating its contents (spec 8.1). */
 export function readExtension(
@@ -203,6 +222,19 @@ export function serializeManifest(
 		manifest['keywords'] = [...input.keywords];
 	}
 	if (input.extensions && Object.keys(input.extensions).length > 0) {
+		// Spec 8: "Client-specific manifest data MUST be represented under a
+		// reverse-domain namespace in `extensions`." A reader is required to
+		// ignore namespaces it does not implement WITHOUT validating them, so
+		// a malformed key would sail through every importer and never be
+		// reported — which is exactly why the producer has to be the one to
+		// catch it.
+		for (const namespace of Object.keys(input.extensions)) {
+			if (!isReverseDomainNamespace(namespace)) {
+				throw new Error(
+					`Extension namespace "${namespace}" is not a reverse-domain name; spec section 8 requires client-specific manifest data to live under one, for example "works.ever"`
+				);
+			}
+		}
 		manifest['extensions'] = input.extensions;
 	}
 
@@ -253,11 +285,31 @@ export function serializeSkillMd(input: SerializeSkillInput): string {
 		data['license'] = input.license;
 	}
 	if (input.compatibility !== undefined) {
+		// The Agent Skills rule is 1-500 characters when present. Emitting a
+		// longer one would produce a SKILL.md that this library's own reader
+		// skips — the round-trip law (AP-22) fails before the file is even
+		// handed to anyone else.
+		if (input.compatibility.length === 0 || input.compatibility.length > SKILL_COMPATIBILITY_MAX_LENGTH) {
+			throw new Error(
+				`Skill "${narrowed.name}" has a compatibility of ${input.compatibility.length} characters; the Agent Skills rule is 1-${SKILL_COMPATIBILITY_MAX_LENGTH}`
+			);
+		}
 		data['compatibility'] = input.compatibility;
 	}
-	if (input.allowedTools !== undefined && input.allowedTools.length > 0) {
-		// The specification's wire form is one space-separated string, even
-		// though every consumer works with tokens.
+	if (input.allowedTools !== undefined) {
+		// A token containing whitespace cannot survive the wire form: joining
+		// on a space and re-splitting on whitespace would yield a different
+		// token list. Refuse rather than silently change the tool policy.
+		const bad = input.allowedTools.filter((token) => /\s/u.test(token) || token.length === 0);
+		if (bad.length > 0) {
+			throw new Error(
+				`Skill "${narrowed.name}" has allowed-tools entries that cannot be represented in the specification's space-separated form: ${bad.map((t) => JSON.stringify(t)).join(', ')}`
+			);
+		}
+		// Emitted whenever the field was AUTHORED, including as an empty list.
+		// "Zero tools pre-approved" and "no policy declared" are different
+		// statements to anything that gates on this field, so dropping an
+		// empty list would quietly widen the policy.
 		data['allowed-tools'] = input.allowedTools.join(' ');
 	}
 	if (input.metadata !== undefined && Object.keys(input.metadata).length > 0) {
@@ -269,8 +321,12 @@ export function serializeSkillMd(input: SerializeSkillInput): string {
 		}
 	}
 
-	const body = input.body.startsWith('\n') ? input.body.slice(1) : input.body;
-	return matter.stringify(body.endsWith('\n') ? body : `${body}\n`, data);
+	// The body is written back exactly as given, apart from guaranteeing a
+	// trailing newline. An earlier version stripped a leading newline, which
+	// broke the byte-identical round trip for every real SKILL.md: a parser
+	// hands back the blank line that follows the closing `---`, and dropping
+	// it re-emitted a file one byte shorter than the one that was read.
+	return matter.stringify(input.body.endsWith('\n') ? input.body : `${input.body}\n`, data);
 }
 
 /** Rebuilds serializer input from a parsed skill, for a round trip. */
@@ -290,7 +346,10 @@ export function skillToSerializeInput(frontmatter: SkillFrontmatter, body: strin
 		...(frontmatter.license === undefined ? {} : { license: frontmatter.license }),
 		...(frontmatter.compatibility === undefined ? {} : { compatibility: frontmatter.compatibility }),
 		...(frontmatter.metadata === undefined ? {} : { metadata: frontmatter.metadata }),
-		...(typeof allowed === 'string' && allowed.trim().length > 0
+		// Presence of the field is what matters, not whether it has tokens: an
+		// authored-but-empty `allowed-tools` says "zero tools pre-approved",
+		// which is a different statement from the field being absent.
+		...(typeof allowed === 'string'
 			? { allowedTools: allowed.split(/\s+/u).filter((token) => token.length > 0) }
 			: {}),
 		...(Object.keys(extra).length > 0 ? { extraFrontmatter: extra } : {})

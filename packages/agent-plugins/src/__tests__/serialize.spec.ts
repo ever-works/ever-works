@@ -15,6 +15,8 @@ import {
 } from '../serialize';
 import { pluginSchemaId } from '../versions';
 
+const ORIGINAL_SKILL = '---\nname: s\ndescription: d\n---\n\n# Heading\n\nText.\n';
+
 describe('serialize — plugin.json emission', () => {
 	it('emits a minimal manifest that validates at full strictness', () => {
 		const text = serializeManifest({ name: 'my-plugin' });
@@ -130,10 +132,42 @@ describe('serialize — SKILL.md emission', () => {
 		expect(parsed.allowedTools).toEqual(['Bash(git:*)', 'Read']);
 	});
 
-	it('omits allowed-tools when the token list is empty', () => {
-		expect(serializeSkillMd({ name: 's', description: 'd', body: 'b', allowedTools: [] })).not.toContain(
-			'allowed-tools'
+	it('emits an authored-but-empty allowed-tools rather than dropping it', () => {
+		// "Zero tools pre-approved" and "no policy declared" are different
+		// statements to anything that gates on this field, so an empty list
+		// must survive export. Absence is expressed by omitting the field.
+		const emitted = serializeSkillMd({ name: 's', description: 'd', body: 'b', allowedTools: [] });
+		expect(emitted).toContain('allowed-tools');
+		const parsed = parseSkillMd(emitted, 's');
+		expect(parsed.ok && parsed.allowedTools).toEqual([]);
+		expect(serializeSkillMd({ name: 's', description: 'd', body: 'b' })).not.toContain('allowed-tools');
+	});
+
+	it('refuses an allowed-tools token containing whitespace', () => {
+		// Joining on a space and re-splitting on whitespace would yield a
+		// different token list, silently changing the tool policy.
+		expect(() => serializeSkillMd({ name: 's', description: 'd', body: 'b', allowedTools: ['Bash(a b)'] })).toThrow(
+			/space-separated/
 		);
+	});
+
+	it('refuses a compatibility outside the Agent Skills 1-500 range', () => {
+		// Emitting one would produce a SKILL.md this library's own reader
+		// skips, breaking the round-trip law before anyone else sees it.
+		expect(() =>
+			serializeSkillMd({ name: 's', description: 'd', body: 'b', compatibility: 'c'.repeat(501) })
+		).toThrow(/compatibility/);
+		expect(() => serializeSkillMd({ name: 's', description: 'd', body: 'b', compatibility: '' })).toThrow(
+			/compatibility/
+		);
+	});
+
+	it('preserves the body byte for byte, including the blank line after the frontmatter', () => {
+		const original = ORIGINAL_SKILL;
+		const parsed = parseSkillMd(original, 's');
+		expect(parsed.ok).toBe(true);
+		if (!parsed.ok) return;
+		expect(serializeSkillMd(skillToSerializeInput(parsed.frontmatter, parsed.body))).toBe(original);
 	});
 
 	it('writes known fields in a fixed order so re-export is byte-identical', () => {
@@ -318,6 +352,14 @@ describe('serialize — the round-trip law (export then import is identity)', ()
 describe('serialize — the Ever Works namespace', () => {
 	it('is the reverse of the ever.works domain', () => {
 		expect(EVER_WORKS_EXTENSION_NAMESPACE).toBe('works.ever');
+	});
+
+	it('refuses to emit an extension namespace that is not reverse-domain', () => {
+		// A reader must ignore namespaces it does not implement WITHOUT
+		// validating them (spec 8.1), so a malformed key would sail through
+		// every importer unreported. The producer is the only place to catch it.
+		expect(() => serializeManifest({ name: 'p', extensions: { mystuff: { a: 1 } } })).toThrow(/reverse-domain/);
+		expect(() => serializeManifest({ name: 'p', extensions: { 'works.ever': { a: 1 } } })).not.toThrow();
 	});
 
 	it('returns undefined for a namespace the package does not carry', () => {

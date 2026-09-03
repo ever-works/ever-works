@@ -31,7 +31,6 @@ import { finding, type Finding } from './findings';
 import { isRegularFile, pathPresent, resolveWithinRoot } from './paths';
 import {
 	describeSchemaError,
-	mcpConfigValidator,
 	mcpServerVariantValidator,
 	schemaErrorPointer,
 	type McpServerVariant
@@ -201,9 +200,14 @@ export function validateStdioCommand(command: string): string | undefined {
 	if (command.length === 0) {
 		return 'it must not be empty';
 	}
-	if (/\s/u.test(command)) {
-		return 'it must be a single executable token, not a shell command string';
-	}
+	// Note what is NOT rejected: whitespace. "A single executable token, not a
+	// shell command string" is a rule about never SPLITTING the value, and we
+	// never do — it is passed as one argument, with `args` separate and no
+	// shell involved. A path like `./my tools/server` is a single token that
+	// happens to contain a space, and refusing it would reject a conformant
+	// package. A package that does put a shell string here simply fails to
+	// resolve at launch, which spec 7.2.2 rule 5 already covers as a
+	// connection failure rather than invalid configuration.
 	if (command.startsWith('./')) {
 		const rest = command.slice(2);
 		if (rest.length === 0) {
@@ -298,7 +302,11 @@ function validateServerEntry(
 	if (!validate(raw)) {
 		const errors = validate.errors ?? [];
 		const pointer = errors[0] ? schemaErrorPointer(errors[0]) : '';
-		if (pointer.endsWith('/cwd')) {
+		// `cwd` exists only on the stdio variant. On a remote entry the same
+		// pointer means "unpermitted field", and reporting the cwd FORM rule
+		// there would send the author to fix a field that should not be
+		// present at all.
+		if (transport === 'stdio' && pointer.endsWith('/cwd')) {
 			return skip(
 				'mcp.server-cwd-invalid',
 				`MCP server "${name}" has an invalid "cwd": it must begin with "./", "\${PLUGIN_ROOT}" or "\${PLUGIN_DATA}"`
@@ -507,25 +515,13 @@ export function validateMcpConfig(value: unknown, options: ParseMcpConfigOptions
 		);
 	}
 
-	// A document-level pass over the canonical schema catches anything the
-	// field-by-field walk above does not model. Server entries are validated
-	// individually afterwards, so a single bad entry must not fail the
-	// document — hence the `mcpServers` stub here.
-	const documentValidate = mcpConfigValidator(specVersion);
-	if (!documentValidate({ $schema: rawSchemaId, mcpServers: {} })) {
-		return disabled(
-			[
-				finding(
-					'mcp.unknown-field',
-					'error',
-					'mcp-component',
-					`${MCP_CONFIG_FILENAME} does not satisfy the Agent Plugins ${specVersion} MCP schema: ${(documentValidate.errors ?? []).map(describeSchemaError).join('; ')}; MCP is disabled for this package`,
-					{ at: MCP_CONFIG_FILENAME }
-				)
-			],
-			specVersion
-		);
-	}
+	// Every top-level rule the canonical schema states — the `$schema` const,
+	// the required `mcpServers` object, no other fields — has now been checked
+	// by hand above, each with its own finding code. Running the document
+	// schema here as well would be dead code: it could only fail on a case
+	// already returned, and it would report that case under the wrong code.
+	// Individual server entries ARE validated against the schema, one at a
+	// time, which is what spec 7.2.1 exposes `#/$defs/server` for.
 
 	const findings: Finding[] = [];
 	const servers: McpServerEntry[] = [];

@@ -83,7 +83,7 @@ rename is a breaking change.
 pnpm --filter @ever-works/agent-plugins test
 ```
 
-371 tests across eight suites, including a corpus of ~50 real packages under
+388 tests across eight suites, including a corpus of ~50 real packages under
 `fixtures/`. `conformance.spec.ts` walks the whole corpus and asserts the
 specification's package-level properties — the fatal boundary, failure isolation between
 component types, and one test per row of the Appendix A checklist.

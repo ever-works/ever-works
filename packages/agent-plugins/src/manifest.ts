@@ -28,6 +28,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { finding, type Finding } from './findings';
+import { resolveWithinRoot } from './paths';
 import { describeSchemaError, pluginManifestValidator, schemaErrorPointer } from './schema-validator';
 import { specVersionFromPluginSchemaId, supportedPluginSchemaIds, type SpecVersion } from './versions';
 
@@ -212,13 +213,18 @@ export function validateManifest(value: unknown): ManifestResult {
 	if (!validate(candidate)) {
 		const fatal = (validate.errors ?? []).map((error) => {
 			const pointer = schemaErrorPointer(error);
-			const isName = pointer === '/name' || error.instancePath === '/name';
+			const aboutName = pointer === '/name' || error.instancePath === '/name';
+			// A missing required field and a malformed one are different
+			// problems with different fixes, and spec 5.3 asks a client to
+			// report WHICH required field is invalid — so do not hand someone
+			// the format rule when the field simply is not there.
+			const isMissing = error.keyword === 'required';
 			return finding(
-				isName ? 'manifest.name-invalid' : 'manifest.schema-violation',
+				aboutName && !isMissing ? 'manifest.name-invalid' : 'manifest.schema-violation',
 				'fatal',
 				'manifest',
-				isName
-					? `${MANIFEST_FILENAME} has an invalid "name": it must be 1-64 characters of lowercase letters, digits, "-" and ".", start and end alphanumeric, with no "--" or ".." (spec 5.5)`
+				aboutName && !isMissing
+					? `${MANIFEST_FILENAME} has an invalid "name": it must be 1-${PLUGIN_NAME_MAX_LENGTH} characters of lowercase letters, digits, "-" and ".", start and end alphanumeric, with no "--" or ".." (spec 5.5)`
 					: `${MANIFEST_FILENAME} is invalid: ${describeSchemaError(error)}`,
 				{ subject: pointer.split('/').filter(Boolean)[0] ?? undefined, at: pointer }
 			);
@@ -275,6 +281,28 @@ export function parseManifest(text: string): ManifestResult {
  */
 export async function loadManifest(pluginRoot: string): Promise<ManifestResult> {
 	const manifestPath = join(pluginRoot, MANIFEST_FILENAME);
+
+	// Spec 4.1 boundary 1, the harshest of the five: "If `plugin.json` does
+	// not resolve within the plugin root, the client MUST reject the plugin."
+	// Not a component failure and not a skip — the manifest is the one file
+	// every package must have, so a manifest that is really somewhere else
+	// means this directory is not that package.
+	const contained = await resolveWithinRoot(pluginRoot, MANIFEST_FILENAME);
+	if (!contained.ok) {
+		return {
+			ok: false,
+			findings: [
+				finding(
+					'package.path-escapes-root',
+					'fatal',
+					'package',
+					`${MANIFEST_FILENAME} resolves outside the plugin root, so the plugin is rejected`,
+					{ at: MANIFEST_FILENAME }
+				)
+			]
+		};
+	}
+
 	let text: string;
 	try {
 		text = await readFile(manifestPath, 'utf8');

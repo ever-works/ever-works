@@ -127,9 +127,12 @@ describe('mcp — per-entry validity skips one server (spec 7.2.2 rule 3)', () =
 	it('keeps the valid servers and skips each invalid one', async () => {
 		const result = await loadMcpConfig(fixture('mcp-skip-servers'), { manifestSpecVersion: '1.0.0' });
 		expect(result.componentValid).toBe(true);
-		expect(serverNames(result)).toEqual(['good', 'good-stdio']);
+		// `shell-command` is among the survivors: its value is a single token
+		// as far as this client is concerned, and refusing it would reject a
+		// conformant package (see the command-resolution suite).
+		expect(serverNames(result)).toEqual(['good', 'good-stdio', 'shell-command']);
 		// Every other entry in that fixture produced a finding.
-		expect(result.findings.length).toBeGreaterThanOrEqual(20);
+		expect(result.findings.length).toBeGreaterThanOrEqual(19);
 		expect(result.findings.every((f) => f.scope === 'mcp-server')).toBe(true);
 		expect(result.findings.every((f) => f.severity === 'error')).toBe(true);
 	});
@@ -188,8 +191,22 @@ describe('mcp — stdio command resolution (spec 7.2.1)', () => {
 		}
 	);
 
+	it.each(['./my tools/server', 'my server', 'sh -c "echo hi"'])(
+		'accepts %j rather than guessing it is a shell string',
+		(command) => {
+			// "A single executable token, not a shell command string" is a rule
+			// about never SPLITTING the value, and we never do: it is passed as
+			// one argument with `args` separate and no shell involved. A path
+			// like `./my tools/server` is one token that happens to contain a
+			// space, so rejecting whitespace would refuse a conformant package.
+			// A package that really does put a shell string here fails to
+			// resolve at launch, which spec 7.2.2 rule 5 already handles as a
+			// connection failure rather than invalid configuration.
+			expect(validateStdioCommand(command)).toBeUndefined();
+		}
+	);
+
 	it.each([
-		['sh -c "echo hi"', 'a shell command string'],
 		['/usr/bin/env', 'an absolute POSIX path'],
 		['C:/Windows/system32/cmd.exe', 'an absolute Windows path'],
 		['../bin/server', 'a parent-relative path'],
@@ -203,9 +220,9 @@ describe('mcp — stdio command resolution (spec 7.2.1)', () => {
 	});
 
 	it('reports a bad command against the right server', () => {
-		const result = parse({ shell: { type: 'stdio', command: 'sh -c "echo hi"' } });
+		const result = parse({ absolute: { type: 'stdio', command: '/usr/bin/env' } });
 		expect(codes(result.findings)).toEqual(['mcp.server-command-invalid']);
-		expect(result.findings[0]?.subject).toBe('shell');
+		expect(result.findings[0]?.subject).toBe('absolute');
 	});
 });
 

@@ -89,6 +89,14 @@ export type CwdAnchor = 'plugin-relative' | 'plugin-root' | 'plugin-data';
  * `${PLUGIN_DATA}`-rooted value must stay inside the plugin data directory.
  */
 export function classifyCwd(value: string): CwdAnchor | undefined {
+	// A `..` segment escapes its anchor by construction, whichever anchor that
+	// is, so it can be refused on the text alone. This matters most for
+	// `${PLUGIN_DATA}`: the loader does not know the data directory, so
+	// without a lexical check `${PLUGIN_DATA}/../elsewhere` would load as a
+	// valid entry and only fail much later, at launch.
+	if (escapesLexically(value)) {
+		return undefined;
+	}
 	if (value.startsWith('./')) {
 		return 'plugin-relative';
 	}
@@ -99,4 +107,9 @@ export function classifyCwd(value: string): CwdAnchor | undefined {
 		return 'plugin-data';
 	}
 	return undefined;
+}
+
+/** True when any path segment is `..`, which leaves the anchor no matter what it is. */
+function escapesLexically(value: string): boolean {
+	return value.split(/[/\\]/u).includes('..');
 }

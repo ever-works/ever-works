@@ -72,11 +72,6 @@ export function pluginManifestValidator(version: SpecVersion): ValidateFunction 
 	return requireValidator(pluginSchemaId(version));
 }
 
-/** Validator for a whole `mcp.json` document at a given release. */
-export function mcpConfigValidator(version: SpecVersion): ValidateFunction {
-	return requireValidator(mcpSchemaId(version));
-}
-
 /**
  * Validator for one MCP server entry.
  *

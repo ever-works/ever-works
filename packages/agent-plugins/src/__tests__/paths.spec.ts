@@ -3,6 +3,8 @@ import { join, resolve, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { fixture, scratchDir, tryMakeSymlink } from './fixtures';
 import { discoverSkills } from '../skills';
+import { loadManifest } from '../manifest';
+import { loadPluginPackage } from '../package-loader';
 import { checkServerContainment, loadMcpConfig, type McpServerEntry } from '../mcp';
 import {
 	isPluginRelative,
@@ -373,6 +375,88 @@ describe('paths — present-but-broken versus absent (spec 6.2)', () => {
 		expect(await pathExists(join(root, 'dangling'))).toBe(false);
 		expect(await pathPresent(join(root, 'dangling'))).toBe(true);
 		expect(await pathPresent(join(root, 'truly-missing'))).toBe(false);
+	});
+});
+
+describe('paths — plugin.json containment rejects the whole plugin (spec 4.1 boundary 1)', () => {
+	// The harshest of the five boundaries, and the only one that is fatal:
+	// "If `plugin.json` does not resolve within the plugin root, the client
+	// MUST reject the plugin." The manifest is the one file every package
+	// must have, so a manifest that is really somewhere else means this
+	// directory is not that package.
+
+	it('rejects a package whose manifest is a symlink out of the root', async (ctx) => {
+		const outside = await scratchDir();
+		await writeFile(
+			join(outside, 'plugin.json'),
+			JSON.stringify({
+				$schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+				name: 'smuggled'
+			}),
+			'utf8'
+		);
+		const root = await scratchDir();
+		const made = await tryMakeSymlink(join(outside, 'plugin.json'), join(root, 'plugin.json'), 'file');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+
+		const manifest = await loadManifest(root);
+		expect(manifest.ok).toBe(false);
+		expect(manifest.findings.map((f) => f.code)).toEqual(['package.path-escapes-root']);
+		expect(manifest.findings[0]?.severity).toBe('fatal');
+		expect(manifest.findings[0]?.scope).toBe('package');
+	});
+
+	it('discovers nothing at all from such a package, even a valid skill', async (ctx) => {
+		const outside = await scratchDir();
+		await writeFile(
+			join(outside, 'plugin.json'),
+			JSON.stringify({
+				$schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+				name: 'smuggled'
+			}),
+			'utf8'
+		);
+		const root = await scratchDir();
+		await mkdir(join(root, 'skills', 'legit'), { recursive: true });
+		await writeFile(
+			join(root, 'skills', 'legit', 'SKILL.md'),
+			'---\nname: legit\ndescription: A perfectly good skill that must NOT be discovered.\n---\n\nBody.\n',
+			'utf8'
+		);
+		const made = await tryMakeSymlink(join(outside, 'plugin.json'), join(root, 'plugin.json'), 'file');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+
+		const result = await loadPluginPackage(root);
+		expect(result.ok).toBe(false);
+		// Fatal means discover nothing — the result carries no components at all.
+		expect('skills' in result).toBe(false);
+	});
+
+	it('accepts a manifest reached through a symlink that stays inside the root', async (ctx) => {
+		const root = await scratchDir();
+		await mkdir(join(root, 'real'), { recursive: true });
+		await writeFile(
+			join(root, 'real', 'plugin.json'),
+			JSON.stringify({
+				$schema: 'https://agent-plugins.org/schemas/1.0.0/plugin.schema.json',
+				name: 'inside'
+			}),
+			'utf8'
+		);
+		const made = await tryMakeSymlink(join(root, 'real', 'plugin.json'), join(root, 'plugin.json'), 'file');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		// Spec 4.1(3): symlinks MAY resolve to targets within the plugin root.
+		const manifest = await loadManifest(root);
+		expect(manifest.ok).toBe(true);
 	});
 });
 

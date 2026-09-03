@@ -367,7 +367,7 @@ describe('conformance — Appendix A checklist', () => {
 		expect(unsupported.ok && unsupported.mcpComponent.valid).toBe(false);
 		const perEntry = await loadPluginPackage(fixture('mcp-skip-servers'));
 		expect(perEntry.ok && perEntry.mcpComponent.valid).toBe(true);
-		expect(perEntry.ok && names(perEntry.mcpServers)).toEqual(['good', 'good-stdio']);
+		expect(perEntry.ok && names(perEntry.mcpServers)).toEqual(['good', 'good-stdio', 'shell-command']);
 	});
 
 	it('implements both stdio and Streamable HTTP, and also legacy SSE', async () => {
@@ -419,12 +419,38 @@ describe('conformance — Appendix A checklist', () => {
 		expect(result.ok && codes(result.findings)).toContain('mcp.server-env-reserved-key');
 	});
 
-	it('ignores unsupported component types and continues when one fails', async () => {
+	it('continues loading when an independent component fails', async () => {
 		const result = await loadPluginPackage(fixture('skills-frontmatter-cases'));
 		expect(result.ok).toBe(true);
 		if (!result.ok) return;
 		expect(result.skills.length).toBeGreaterThan(0);
 		expect(result.findings.length).toBeGreaterThan(0);
+	});
+
+	it('ignores component types it does not support, reporting nothing about them', async () => {
+		// The previous version of this test claimed the row but only
+		// exercised per-skill failure isolation. Actually declining a
+		// component type is what spec 11.3.1 is about, so drive that.
+		const result = await loadPluginPackage(fixture('valid-full'), {
+			components: { skills: true, mcpServers: false }
+		});
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.mcpComponent.unsupported).toBe(true);
+		expect(result.mcpServers).toEqual([]);
+		// "lack of support for a component type ... is not itself an error"
+		expect(result.findings.filter((f) => f.scope === 'mcp-component')).toEqual([]);
+		expect(result.skills.length).toBe(2);
+	});
+
+	it('ignores a top-level directory that is not a component type at all', async () => {
+		// `com.example.client/` in this fixture is a client extension
+		// directory for a namespace we do not implement, and `LICENSE` is
+		// just a file. Neither may produce a finding.
+		const result = await loadPluginPackage(fixture('valid-full'));
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.findings).toEqual([]);
 	});
 
 	it('supports at least one component type', async () => {
@@ -438,7 +464,7 @@ describe('conformance — summary reporting', () => {
 		const result = await loadPluginPackage(fixture('mcp-skip-servers'));
 		const summary = summarizeLoad(result);
 		expect(summary.accepted).toBe(true);
-		expect(summary.mcpServerCount).toBe(2);
+		expect(summary.mcpServerCount).toBe(3);
 		expect(summary.errorCount).toBeGreaterThan(0);
 		expect(summary.fatalCount).toBe(0);
 	});

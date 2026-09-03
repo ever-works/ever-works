@@ -126,6 +126,11 @@ describe('expand — cwd classification (spec 7.2.1)', () => {
 	});
 
 	it.each([
+		'${PLUGIN_DATA}/../escape',
+		'${PLUGIN_ROOT}/../escape',
+		'${PLUGIN_DATA}/a/../../escape',
+		'./a/../../escape',
+		'${PLUGIN_DATA}/..',
 		'data',
 		'../data',
 		'/absolute',
@@ -139,6 +144,18 @@ describe('expand — cwd classification (spec 7.2.1)', () => {
 		''
 	])('refuses to classify %j', (value) => {
 		expect(classifyCwd(value)).toBeUndefined();
+	});
+
+	it('refuses a `..` segment lexically, whichever anchor it sits under', () => {
+		// The loader does not know PLUGIN_DATA, so without a text-level check
+		// `${PLUGIN_DATA}/../elsewhere` would load as a valid entry and only
+		// fail at launch. A `..` segment escapes its anchor by construction,
+		// so it can be refused without knowing where the anchor points.
+		expect(classifyCwd('${PLUGIN_DATA}/../elsewhere')).toBeUndefined();
+		expect(classifyCwd('${PLUGIN_ROOT}/../elsewhere')).toBeUndefined();
+		// A path merely CONTAINING the characters "..", not as a segment, is fine.
+		expect(classifyCwd('${PLUGIN_DATA}/a..b')).toBe('plugin-data');
+		expect(classifyCwd('./..hidden')).toBe('plugin-relative');
 	});
 
 	it('distinguishes the two roots, because containment differs between them', () => {

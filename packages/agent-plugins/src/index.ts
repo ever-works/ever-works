@@ -103,6 +103,7 @@ export {
 
 export {
 	EVER_WORKS_EXTENSION_NAMESPACE,
+	isReverseDomainNamespace,
 	readExtension,
 	serializeManifest,
 	serializeSkillMd,
