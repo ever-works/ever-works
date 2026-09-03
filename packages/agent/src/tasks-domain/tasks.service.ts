@@ -13,7 +13,10 @@ import type { GateStatus, TaskAcceptanceCheck, TaskExtraRepo } from '@ever-works
 import {
     FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN,
     TASK_MAX_EXTRA_REPOS,
+    isReservedMountDir,
 } from '@ever-works/contracts';
+import { resolveMountDir } from '../entities/repo-connection.entity';
+import { repositoryIdFromCloneUrl } from './task-workspace.service';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
 import type { TaskApprover } from '../entities/task-approver.entity';
 import { Mission } from '../entities/mission.entity';
@@ -588,16 +591,24 @@ export class TasksService {
     /**
      * Multi-repo Task workspaces (slice C, PR C2) — validate and normalize
      * the Task's extra repositories. Every connection must belong to the
-     * caller and be enabled; mount directories must be single safe names
-     * and unique (case-insensitively, Windows and macOS collide); at most
-     * TASK_MAX_EXTRA_REPOS entries. `null` / `[]` mean "none".
+     * Task OWNER (the identity the fleet plan resolves connections under —
+     * an org member editing another member's Task cannot use their own) and
+     * be enabled; the EFFECTIVE mount directory (explicit `mountDir`, else
+     * the connection's mount path or name) must pass the same gate the
+     * fleet normalizer applies at plan time and be unique
+     * case-insensitively (Windows and macOS collide); two connections may
+     * not point at the same repository; at most TASK_MAX_EXTRA_REPOS
+     * entries. `null` / `[]` mean "none". Refusing HERE, naming the
+     * connection, beats accepting an edit that every run then refuses.
      */
     private async normalizeExtraRepos(
-        userId: string,
+        ownerId: string,
         raw: TaskExtraRepo[] | null | undefined,
+        editorId: string = ownerId,
     ): Promise<TaskExtraRepo[] | null> {
-        if (raw === undefined || raw === null || raw.length === 0) return null;
+        if (raw === undefined || raw === null) return null;
         if (!Array.isArray(raw)) throw new BadRequestException('extraRepos must be an array.');
+        if (raw.length === 0) return null;
         if (raw.length > TASK_MAX_EXTRA_REPOS) {
             throw new BadRequestException(
                 `A Task can span at most ${TASK_MAX_EXTRA_REPOS} extra repositories (got ${raw.length}).`,
@@ -609,7 +620,8 @@ export class TasksService {
             );
         }
         const seenConnections = new Set<string>();
-        const seenDirs = new Set<string>();
+        const seenDirs = new Map<string, string>();
+        const seenRepositories = new Map<string, string>();
         const normalized: TaskExtraRepo[] = [];
         for (const entry of raw) {
             const repoConnectionId =
@@ -623,10 +635,15 @@ export class TasksService {
                 );
             }
             seenConnections.add(repoConnectionId);
-            const connection = await this.repoConnections.findByIdAndUser(repoConnectionId, userId);
+            const connection = await this.repoConnections.findByIdAndUser(
+                repoConnectionId,
+                ownerId,
+            );
             if (!connection) {
                 throw new BadRequestException(
-                    `Repository connection ${repoConnectionId} not found.`,
+                    editorId === ownerId
+                        ? `Repository connection ${repoConnectionId} not found.`
+                        : `Repository connection ${repoConnectionId} not found: extra repositories must be connections in the Task owner's repository registry.`,
                 );
             }
             if (!connection.enabled) {
@@ -634,28 +651,60 @@ export class TasksService {
                     `Repository connection ${connection.name} is disabled and cannot be added to a Task.`,
                 );
             }
+            // The plan derives the repository identity from the URL; a
+            // connection it cannot describe would fail every run.
+            const identity =
+                typeof connection.url === 'string'
+                    ? repositoryIdFromCloneUrl(connection.url)
+                    : null;
+            if (!identity) {
+                throw new BadRequestException(
+                    `Repository connection ${connection.name} cannot be mounted on a fleet run: its URL is not an <owner>/<repository> clone URL.`,
+                );
+            }
+            const sameRepository = seenRepositories.get(identity.toLowerCase());
+            if (sameRepository) {
+                throw new BadRequestException(
+                    `Repository connections ${sameRepository} and ${connection.name} both point at ${identity}; a Task mounts each repository once.`,
+                );
+            }
+            seenRepositories.set(identity.toLowerCase(), connection.name);
+
             const mountDirRaw =
                 typeof entry.mountDir === 'string'
                     ? entry.mountDir.trim()
                     : (entry.mountDir ?? null);
             const mountDir = mountDirRaw ? mountDirRaw : null;
-            if (mountDir !== null) {
-                if (
-                    !FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN.test(mountDir) ||
-                    ['.git', '.mounts', 'node_modules'].includes(mountDir.toLowerCase())
-                ) {
-                    throw new BadRequestException(
-                        `extraRepos mountDir '${mountDir}' must be a single directory name (letters, digits, '.', '_' or '-'; not '.git', '.mounts' or 'node_modules').`,
-                    );
-                }
-                const key = mountDir.toLowerCase();
-                if (seenDirs.has(key)) {
-                    throw new BadRequestException(
-                        `extraRepos mountDir '${mountDir}' is used twice.`,
-                    );
-                }
-                seenDirs.add(key);
+            if (
+                mountDir !== null &&
+                (!FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN.test(mountDir) ||
+                    isReservedMountDir(mountDir))
+            ) {
+                throw new BadRequestException(
+                    `extraRepos mountDir '${mountDir}' must be a single directory name (letters, digits, '.', '_' or '-'; no leading or trailing dot; not '.git', '.mounts', 'node_modules' or a Windows device name).`,
+                );
             }
+            // Registry mount paths are looser than fleet mount directories
+            // (a leading dot and up to 200 characters pass there), so the
+            // derived directory is checked against the fleet gate as well.
+            const effectiveDir = mountDir ?? resolveMountDir(connection.mountPath, connection.name);
+            if (
+                mountDir === null &&
+                (!FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN.test(effectiveDir) ||
+                    isReservedMountDir(effectiveDir))
+            ) {
+                throw new BadRequestException(
+                    `Repository connection ${connection.name} would be mounted at '${effectiveDir}', which is not a valid fleet mount directory (letters, digits, '.', '_' or '-'; no leading or trailing dot; up to 64 characters; not '.git', '.mounts', 'node_modules' or a Windows device name). Set an explicit mountDir for it.`,
+                );
+            }
+            const sameDir = seenDirs.get(effectiveDir.toLowerCase());
+            if (sameDir) {
+                throw new BadRequestException(
+                    `extraRepos mount directory '${effectiveDir}' is used twice (${sameDir} and ${connection.name}); set a distinct mountDir.`,
+                );
+            }
+            seenDirs.set(effectiveDir.toLowerCase(), connection.name);
+
             if (entry.writable !== undefined && typeof entry.writable !== 'boolean') {
                 throw new BadRequestException('extraRepos writable must be a boolean.');
             }
@@ -801,7 +850,14 @@ export class TasksService {
         if (input.acceptanceChecks !== undefined) patch.acceptanceChecks = input.acceptanceChecks;
         if (input.maxGateAttempts !== undefined) patch.maxGateAttempts = input.maxGateAttempts;
         if (input.extraRepos !== undefined) {
-            patch.extraRepos = await this.normalizeExtraRepos(userId, input.extraRepos);
+            // Validated under the Task OWNER: the fleet plan resolves the
+            // connections under `task.userId`, so an org member's own
+            // connection would be accepted here and refused on every run.
+            patch.extraRepos = await this.normalizeExtraRepos(
+                task.userId,
+                input.extraRepos,
+                userId,
+            );
         }
         if (input.requireAllApprovers !== undefined)
             patch.requireAllApprovers = input.requireAllApprovers;
