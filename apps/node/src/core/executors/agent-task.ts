@@ -128,6 +128,30 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 		opts: { commitMessage: string; push: boolean },
 		signal?: AbortSignal
 	) => Promise<{ pushed: boolean; headSha: string | null; empty: boolean; changedFiles?: number }>;
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): commit + push adapter
+	 * over the writable mounts of the provisioned workspace, one verdict per
+	 * mount. Absent means the node cannot finalize mounts; a run whose
+	 * workspace has writable mounts then fails naming the gap.
+	 */
+	finalizeMounts?: (
+		taskId: string,
+		descriptor: FleetTaskWorkspaceDescriptor,
+		opts: { commitMessage: string; push: boolean },
+		signal?: AbortSignal
+	) => Promise<
+		Array<{
+			repositoryId: string;
+			mountDir: string;
+			branch: string;
+			baseSha: string;
+			pushed: boolean;
+			headSha: string | null;
+			empty: boolean;
+			changedFiles?: number;
+			error?: string;
+		}>
+	>;
 	/** Model CLIs this node may drive, resolved once at startup. */
 	modelCli?: ModelCliPaths;
 	/** Root for per-job scratch files (instructions / CLI output). */
@@ -215,8 +239,17 @@ export async function runAgentTaskJob(
 	}
 
 	let git: FleetAgentTaskGitResult | null = null;
+	let mountGit: FleetAgentTaskGitResult[] | null = null;
 	const wantsCommit = payload.git?.commit !== false;
 	if (execution && workspaceResolution.descriptor && wantsCommit) {
+		// Multi-repo (slice C): mounts first, the primary last, so the primary
+		// pull request the platform opens can already link the others.
+		mountGit = await finalizeMounts(taskId, workspaceResolution.descriptor, payload, io, signal);
+		for (const entry of mountGit ?? []) {
+			if (entry.error) {
+				failures.push(`git finalize failed for mount ${entry.mountDir ?? entry.repositoryId}: ${entry.error}`);
+			}
+		}
 		git = await finalizeWorkspace(taskId, workspaceResolution.descriptor, payload, io, signal);
 		if (git.error) {
 			failures.push(`git finalize failed: ${git.error}`);
@@ -234,6 +267,7 @@ export async function runAgentTaskJob(
 		...(checks.length > 0 ? { checks: checkResults } : {}),
 		gateStatus,
 		...(git ? { git } : {}),
+		...(mountGit && mountGit.length > 0 ? { mountGit } : {}),
 		...(failures.length > 0 ? { failureReason: failures.join('; ') } : {})
 	};
 }
@@ -358,6 +392,61 @@ async function finalizeWorkspace(
 	} catch (error) {
 		if (error instanceof Error && error.name === 'AbortError') throw error;
 		return { ...base, error: error instanceof Error ? error.message : String(error) };
+	}
+}
+
+/**
+ * Multi-repo (slice C): one git verdict per WRITABLE mount. `null` when the
+ * workspace has no writable mounts, so single-repository runs report
+ * exactly what they did before.
+ */
+async function finalizeMounts(
+	taskId: string,
+	descriptor: FleetTaskWorkspaceDescriptor,
+	payload: FleetAgentTaskPayload,
+	io: AgentTaskIo,
+	signal?: AbortSignal
+): Promise<FleetAgentTaskGitResult[] | null> {
+	const writable = (descriptor.mounts ?? []).filter((mount) => mount.writable);
+	if (writable.length === 0) return null;
+	const toBase = (mount: (typeof writable)[number]): FleetAgentTaskGitResult => ({
+		repositoryId: mount.repositoryId,
+		mountDir: mount.mountDir,
+		branch: mount.branch,
+		baseSha: mount.baseSha,
+		headSha: null,
+		empty: false,
+		pushed: false
+	});
+	if (!io.finalizeMounts) {
+		return writable.map((mount) => ({ ...toBase(mount), error: 'this node has no mount finalizer configured' }));
+	}
+	const commitMessage =
+		typeof payload.git?.commitMessage === 'string' && payload.git.commitMessage.trim()
+			? payload.git.commitMessage.trim()
+			: defaultAgentTaskCommitMessage(taskId);
+	try {
+		const results = await io.finalizeMounts(
+			taskId,
+			descriptor,
+			{ commitMessage, push: payload.git?.push !== false },
+			signal
+		);
+		return results.map((result) => ({
+			repositoryId: result.repositoryId,
+			mountDir: result.mountDir,
+			branch: result.branch,
+			baseSha: result.baseSha,
+			headSha: result.headSha,
+			empty: result.empty,
+			pushed: result.pushed,
+			...(result.changedFiles === undefined ? {} : { changedFiles: result.changedFiles }),
+			...(result.error ? { error: result.error } : {})
+		}));
+	} catch (error) {
+		if (error instanceof Error && error.name === 'AbortError') throw error;
+		const message = error instanceof Error ? error.message : String(error);
+		return writable.map((mount) => ({ ...toBase(mount), error: message }));
 	}
 }
 

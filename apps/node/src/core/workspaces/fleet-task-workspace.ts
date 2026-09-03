@@ -2,7 +2,13 @@ import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
-import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from '@ever-works/contracts';
+import {
+	normalizeFleetTaskWorkspaceMounts,
+	type FleetTaskWorkspaceDescriptor,
+	type FleetTaskWorkspaceMountDescriptor,
+	type FleetTaskWorkspaceMountSpec,
+	type FleetTaskWorkspaceSpec
+} from '@ever-works/contracts';
 import { execFileWithVerifiedCancellation, LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
 import type { IWorkspacePlugin, WorkspaceHandle } from '@ever-works/plugin';
 
@@ -40,6 +46,25 @@ export interface FleetTaskWorkspaceFinalizeResult {
 	empty: boolean;
 	changedFiles?: number;
 }
+
+/**
+ * Multi-repo Task workspaces (self-build slice C): the verdict of one
+ * writable mount's commit + push. `error` is set instead of thrown so the
+ * remaining mounts (and the primary) still get their turn.
+ */
+export interface FleetTaskWorkspaceMountFinalizeResult extends Partial<FleetTaskWorkspaceFinalizeResult> {
+	repositoryId: string;
+	mountDir: string;
+	branch: string;
+	baseSha: string;
+	pushed: boolean;
+	headSha: string | null;
+	empty: boolean;
+	error?: string;
+}
+
+/** Directory under the primary worktree the mounts are linked into. */
+export const FLEET_TASK_WORKSPACE_MOUNTS_DIR = '.mounts';
 
 export interface FleetTaskWorkspaceProvisionerOptions {
 	/** Persistent cache/worktree root owned by the node service account. */
@@ -93,6 +118,55 @@ export class FleetTaskWorkspaceProvisioner {
 	): Promise<FleetTaskWorkspaceDescriptor> {
 		const normalizedTaskId = validateTaskId(taskId);
 		const spec = validateWorkspaceSpec(rawSpec);
+		const primary = await this.provisionOne(normalizedTaskId, spec, signal);
+		const mountSpecs = spec.mounts ?? [];
+		if (mountSpecs.length === 0) return primary;
+
+		// Multi-repo Task workspaces (self-build slice C). Every mount is an
+		// ordinary binding of its OWN repository under the fleet root — same
+		// pool, same reuse, same ownership proof as the primary — and is then
+		// linked into the primary worktree at `.mounts/<mountDir>` so the model
+		// reaches it by a relative path from its cwd. `.mounts/` is excluded
+		// from the primary's Git so the link never shows up as an untracked
+		// entry, is never committed, and never confuses the primary's diff.
+		const mounts: FleetTaskWorkspaceMountDescriptor[] = [];
+		for (const mount of mountSpecs) {
+			throwIfCancelled(signal);
+			// Re-validated with the NODE's stricter URL / ref rules, exactly like
+			// the primary (the contracts normalizer only checks shape).
+			const mountSpec = validateWorkspaceSpec({
+				repositoryId: mount.repositoryId,
+				repoUrl: mount.repoUrl,
+				baseRef: mount.baseRef,
+				branch: mount.branch,
+				...(mount.depth === undefined ? {} : { depth: mount.depth })
+			});
+			let provisioned: FleetTaskWorkspaceDescriptor;
+			try {
+				provisioned = await this.provisionOne(normalizedTaskId, mountSpec, signal);
+			} catch (error) {
+				if (error instanceof FleetTaskWorkspaceError && error.code !== 'cancelled') {
+					throw new FleetTaskWorkspaceError(
+						error.code,
+						`mount '${mount.mountDir}' (${mount.repositoryId}): ${error.message}`
+					);
+				}
+				throw error;
+			}
+			const linkPath = await linkMountIntoPrimary(primary.path, mount.mountDir, provisioned.path);
+			mounts.push({ ...provisioned, mountDir: mount.mountDir, linkPath, writable: mount.writable });
+		}
+		throwIfCancelled(signal);
+		await ensureMountsExcluded(primary.path, signal);
+		return { ...primary, mounts };
+	}
+
+	/** One repository binding — the slice A/B provision, unchanged. */
+	private async provisionOne(
+		normalizedTaskId: string,
+		spec: FleetTaskWorkspaceSpec,
+		signal?: AbortSignal
+	): Promise<FleetTaskWorkspaceDescriptor> {
 		throwIfCancelled(signal);
 
 		// A hash keeps Windows paths short and prevents two repositories with
@@ -279,6 +353,48 @@ export class FleetTaskWorkspaceProvisioner {
 			);
 		}
 	}
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): commit + push every
+	 * WRITABLE mount the model may have changed, one verdict per mount.
+	 *
+	 * A failure in one mount is recorded on its entry and does not stop the
+	 * others: they are independent branches in independent repositories, and
+	 * a branch already pushed is never rolled back. Cancellation is the one
+	 * exception — it propagates, exactly as for the primary.
+	 */
+	async finalizeMounts(
+		taskId: string,
+		descriptor: FleetTaskWorkspaceDescriptor,
+		opts: { commitMessage: string; push: boolean },
+		signal?: AbortSignal
+	): Promise<FleetTaskWorkspaceMountFinalizeResult[]> {
+		const results: FleetTaskWorkspaceMountFinalizeResult[] = [];
+		for (const mount of descriptor.mounts ?? []) {
+			if (!mount.writable) continue;
+			throwIfCancelled(signal);
+			const base = {
+				repositoryId: mount.repositoryId,
+				mountDir: mount.mountDir,
+				branch: mount.branch,
+				baseSha: mount.baseSha
+			};
+			try {
+				const finalized = await this.finalize(taskId, mount, opts, signal);
+				results.push({ ...base, ...finalized });
+			} catch (error) {
+				if (error instanceof FleetTaskWorkspaceError && error.code === 'cancelled') throw error;
+				if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+				results.push({
+					...base,
+					pushed: false,
+					headSha: null,
+					empty: false,
+					error: error instanceof Error ? error.message : String(error)
+				});
+			}
+		}
+		return results;
+	}
 }
 
 function validateRootPath(raw: string): string {
@@ -321,7 +437,20 @@ function validateWorkspaceSpec(raw: FleetTaskWorkspaceSpec): FleetTaskWorkspaceS
 	if (depth !== undefined && (!Number.isInteger(depth) || depth < 1 || depth > 1000)) {
 		throw new FleetTaskWorkspaceError('invalid-spec', 'Fleet workspace depth must be an integer from 1 to 1000');
 	}
-	return { repositoryId, repoUrl, baseRef, branch, ...(depth === undefined ? {} : { depth }) };
+	let mounts: FleetTaskWorkspaceMountSpec[];
+	try {
+		mounts = normalizeFleetTaskWorkspaceMounts(raw.mounts, repositoryId);
+	} catch (error) {
+		throw new FleetTaskWorkspaceError('invalid-spec', error instanceof Error ? error.message : String(error));
+	}
+	return {
+		repositoryId,
+		repoUrl,
+		baseRef,
+		branch,
+		...(depth === undefined ? {} : { depth }),
+		...(mounts.length > 0 ? { mounts } : {})
+	};
 }
 
 function validateRemoteUrl(raw: string): string {
@@ -658,4 +787,78 @@ function runGitOutput(args: string[], workspacePath: string, signal?: AbortSigna
 		if (error) throw error;
 		return String(stdout ?? '').trim();
 	});
+}
+
+/**
+ * Link one provisioned mount into the primary worktree at
+ * `<primary>/.mounts/<mountDir>`. A directory junction on Windows (no
+ * privilege needed) and a directory symlink elsewhere. An existing link to
+ * the same target is kept; a link elsewhere is replaced; a real directory
+ * or file at that path is a collision and is never touched.
+ */
+async function linkMountIntoPrimary(primaryPath: string, mountDir: string, targetPath: string): Promise<string> {
+	const mountsDir = resolve(primaryPath, FLEET_TASK_WORKSPACE_MOUNTS_DIR);
+	const linkPath = resolve(mountsDir, mountDir);
+	if (!isStrictDescendant(mountsDir, linkPath) || dirname(linkPath) !== mountsDir) {
+		throw new FleetTaskWorkspaceError('invalid-spec', `Mount directory '${mountDir}' escapes the mounts directory`);
+	}
+	await fs.mkdir(mountsDir, { recursive: true });
+	let existing: Awaited<ReturnType<typeof fs.lstat>> | null = null;
+	try {
+		existing = await fs.lstat(linkPath);
+	} catch {
+		existing = null;
+	}
+	if (existing) {
+		if (!existing.isSymbolicLink()) {
+			throw new FleetTaskWorkspaceError(
+				'path-collision',
+				`Mount path '${mountDir}' already exists in the task workspace and is not a mount link`
+			);
+		}
+		let current: string | null = null;
+		try {
+			current = await fs.realpath(linkPath);
+		} catch {
+			current = null;
+		}
+		if (current && samePath(current, targetPath)) return linkPath;
+		await fs.unlink(linkPath);
+	}
+	await fs.symlink(targetPath, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
+	return linkPath;
+}
+
+/**
+ * Keep `.mounts/` out of the primary repository's view: `git status`,
+ * `git add -A` (the finalize) and every diff ignore it. Written to the
+ * repository's `info/exclude` (shared by all worktrees of the pool) rather
+ * than a tracked `.gitignore`, so nothing about the fleet layout is ever
+ * committed to the owner's repository.
+ */
+async function ensureMountsExcluded(primaryPath: string, signal?: AbortSignal): Promise<void> {
+	let commonDir: string;
+	try {
+		commonDir = (await runGitOutput(['rev-parse', '--git-common-dir'], primaryPath, signal)).trim();
+	} catch (error) {
+		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+		if (signal?.aborted) throw cancelledError();
+		throw new FleetTaskWorkspaceError('git-failed', 'Task workspace Git directory could not be resolved');
+	}
+	const excludePath = resolve(isAbsolute(commonDir) ? commonDir : resolve(primaryPath, commonDir), 'info', 'exclude');
+	const rule = `/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`;
+	let current = '';
+	try {
+		current = await fs.readFile(excludePath, 'utf8');
+	} catch {
+		current = '';
+	}
+	if (current.split(/\r?\n/).some((line) => line.trim() === rule)) return;
+	await fs.mkdir(dirname(excludePath), { recursive: true });
+	const separator = current.length === 0 || current.endsWith('\n') ? '' : '\n';
+	await fs.appendFile(
+		excludePath,
+		`${separator}# ever-works fleet: mounted repositories of multi-repo Task workspaces\n${rule}\n`,
+		'utf8'
+	);
 }
