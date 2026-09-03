@@ -179,25 +179,33 @@ export class DeployService {
         options: DeployOptions = {},
     ): Promise<DeployResult> {
         const env = DeployService.buildEnvironmentOptions(options);
+
+        // Repository Work (self-build slice D, EW-766) — a `repo` Work wraps
+        // the user's own code repository and provisions no website
+        // repository, so there is nothing to deploy. Checked BEFORE the
+        // facade resolves a provider on purpose: `applyRepositoryWorkSource`
+        // persists `deployProvider: null`, so `resolvePluginAndTokenWithWork`
+        // would throw `NoDeployProviderError` (a 409 about configuration)
+        // first, and the "Repository Work" refusal would only ever be seen
+        // for a row whose provider was set later — which `updateWork` now
+        // rejects for the kind as well. One extra indexed read on a path
+        // that is about to push secrets and dispatch a workflow is the
+        // price of a refusal that says what is actually wrong. The Deploy
+        // tab is already hidden for the kind (`WORK_KIND_CAPABILITIES.repo
+        // .deploy`); this catches direct API calls and `deployBatch`, which
+        // funnels through here.
+        const candidate = await this.workRepository.findById(workId);
+        if (candidate && isRepositoryWorkKind(candidate.kind)) {
+            throw new BadRequestException(
+                `Work "${candidate.slug}" is a Repository Work — it has no website repository and nothing to deploy`,
+            );
+        }
+
         const { plugin, token, work, settings, settingSources } =
             await this.deployFacade.getPluginAndTokenAndSettings({
                 userId,
                 workId,
             });
-
-        // Repository Work (self-build slice D, EW-766) — a `repo` Work wraps
-        // the user's own code repository and provisions no website
-        // repository, so there is nothing to deploy. Its `deployProvider` is
-        // persisted as `null`; without this gate the `|| 'ever-works'`
-        // fallback below would try to ship a `<slug>-website` repo that was
-        // never created. The Deploy tab is already hidden for the kind
-        // (`WORK_KIND_CAPABILITIES.repo.deploy`); this catches direct API
-        // calls and `deployBatch`, which funnels through here.
-        if (isRepositoryWorkKind(work.kind)) {
-            throw new BadRequestException(
-                `Work "${work.slug}" is a Repository Work — it has no website repository and nothing to deploy`,
-            );
-        }
 
         const user = work.user as User;
         const gitToken = await this.gitFacade.getAccessToken({

@@ -1117,11 +1117,13 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
 
     describe('Repository Work kind (self-build slice D, EW-766)', () => {
         // A `repo` Work wraps the user's own code repository and has no
-        // website repository. Its deployProvider is persisted as null, which
-        // the EW-617 G6 fallback below would otherwise turn into an
-        // 'ever-works' deploy of a `<slug>-website` repo that never existed.
-        it('refuses to deploy a repo Work before touching git or the deploy plugin', async () => {
-            const { service, gitFacade, githubPlugin } = buildService({
+        // website repository. Its deployProvider is persisted as null, so in
+        // production `DeployFacade.resolvePluginAndTokenWithWork` throws
+        // `NoDeployProviderError` the moment it is asked — the kind check has
+        // to run BEFORE the facade, off the Work row, or the caller only ever
+        // sees "no deployment provider configured".
+        it('refuses to deploy a repo Work before the facade, git or the deploy plugin are touched', async () => {
+            const { service, deployFacade, gitFacade, githubPlugin } = buildService({
                 kind: 'repo',
                 deployProvider: '',
                 plugin: {
@@ -1130,9 +1132,15 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
                     getDeploymentSecrets: jest.fn().mockResolvedValue({}),
                 },
             });
+            // Mimic the production facade for a null-provider row: if the
+            // service asked it first, THIS is the error the caller would get.
+            deployFacade.getPluginAndTokenAndSettings.mockRejectedValue(
+                new Error('No deployment provider configured or available'),
+            );
 
             await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(/Repository Work/);
 
+            expect(deployFacade.getPluginAndTokenAndSettings).not.toHaveBeenCalled();
             expect(gitFacade.getAccessToken).not.toHaveBeenCalled();
             expect(githubPlugin.dispatchWorkflow).not.toHaveBeenCalled();
             expect(githubPlugin.setActionSecret).not.toHaveBeenCalled();
