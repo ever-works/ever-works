@@ -38,7 +38,8 @@ import {
 	buildModelCliStep,
 	ModelCliCommandError,
 	parseModelCliResult,
-	type ModelCliPaths
+	type ModelCliPaths,
+	MODEL_CLI_MAX_OUTPUT_BYTES
 } from './model-cli';
 
 /**
@@ -120,7 +121,13 @@ export interface AgentTaskScratchFs {
 	 */
 	createScratchDir(root: string, prefix: string): Promise<string>;
 	writeFile(path: string, content: string): Promise<void>;
-	/** Null when the file does not exist. */
+	/**
+	 * Null when the file does not exist.
+	 *
+	 * Implementations MUST bound what they load. The model CLI's stdout is
+	 * redirected here by the shell, so its size is set by the CLI, not by us
+	 * — see {@link MODEL_CLI_MAX_OUTPUT_BYTES}.
+	 */
 	readFile(path: string): Promise<string | null>;
 	remove(path: string): Promise<void>;
 }
@@ -401,7 +408,10 @@ async function runModelStep(
 		const step = buildModelCliStep(execution, command, execution.envPassthrough);
 		const result = await runNodeCommandStep(step, workspacePath, io, signal);
 		const rawOutput = await scratchFs.readFile(scratch.resultPath);
-		return parseModelCliResult(execution.provider, rawOutput, result);
+		// `envPassthrough` names the credential env vars this CLI was handed;
+		// their values are scrubbed out of the summary and output tail before
+		// the result leaves the node.
+		return parseModelCliResult(execution.provider, rawOutput, result, execution.envPassthrough);
 	} finally {
 		try {
 			await scratchFs.remove(scratchDir);
@@ -641,6 +651,25 @@ export const defaultScratchFs: AgentTaskScratchFs = {
 	writeFile: (path, content) => fs.writeFile(path, content, { encoding: 'utf8', mode: 0o600 }),
 	readFile: async (path) => {
 		try {
+			// Size the file BEFORE loading it. `buildModelCliCommand`
+			// redirects the CLI's stdout straight to disk with `>`, so this
+			// content never passes through Node's stdout capture and nothing
+			// upstream bounds it. `MODEL_CLI_OUTPUT_TAIL_BYTES` truncates for
+			// DISPLAY, but only after the whole file is already a string in
+			// memory — by which point a looping or compromised CLI running up
+			// to the 1800s ceiling has already exhausted the process, taking
+			// every other job on this node down with it.
+			//
+			// Refusing beats truncating: the payload is `model-output.json`
+			// and a partial read cannot be parsed anyway, so a clear failure
+			// is more useful than a JSON error further down.
+			const stat = await fs.stat(path);
+			if (stat.size > MODEL_CLI_MAX_OUTPUT_BYTES) {
+				throw new Error(
+					`Model CLI output is ${stat.size} bytes; the ceiling is ${MODEL_CLI_MAX_OUTPUT_BYTES}. ` +
+						'Refusing to load it — the run is failed rather than risking the node.'
+				);
+			}
 			return await fs.readFile(path, { encoding: 'utf8' });
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;

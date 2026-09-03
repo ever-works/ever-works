@@ -11,6 +11,7 @@ import {
 	type AgentTaskScratchFs
 } from './agent-task';
 import { ownerQuestionPath, type AgentTaskQuestionFs } from './agent-task-question';
+import { MODEL_CLI_MAX_OUTPUT_BYTES } from './model-cli';
 
 /**
  * `agent-task` with an `execution` block — agent execution v2.
@@ -526,6 +527,46 @@ describe('defaultScratchFs — scratch directories cannot be pre-planted (review
 			await defaultScratchFs.remove(created);
 			await realFs.rm(root, { recursive: true, force: true });
 			await realFs.rm(elsewhere, { recursive: true, force: true });
+		}
+	});
+});
+
+describe('defaultScratchFs — the model output read is bounded', () => {
+	/**
+	 * `buildModelCliCommand` redirects the CLI's stdout to this file with the
+	 * shell's `>`, so it never passes through Node's stdout capture and
+	 * nothing upstream bounds it. `MODEL_CLI_OUTPUT_TAIL_BYTES` trims for
+	 * DISPLAY, but only after the whole file is already a string in memory —
+	 * by which point a looping or compromised CLI has exhausted the process
+	 * and taken every other job on the node with it.
+	 */
+	it('refuses a scratch file larger than the ceiling instead of loading it', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-scratch-big-'));
+		const created = await defaultScratchFs.createScratchDir(root, 'job-big');
+		const target = join(created, 'model-output.json');
+		try {
+			await realFs.writeFile(target, 'x'.repeat(MODEL_CLI_MAX_OUTPUT_BYTES + 1));
+
+			await expect(defaultScratchFs.readFile(target)).rejects.toThrowError(/Refusing to load it/);
+		} finally {
+			await defaultScratchFs.remove(created);
+			await realFs.rm(root, { recursive: true, force: true });
+		}
+	});
+
+	it('still reads a file at the ceiling', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-scratch-ok-'));
+		const created = await defaultScratchFs.createScratchDir(root, 'job-ok');
+		const target = join(created, 'model-output.json');
+		try {
+			// Exactly at the bound is allowed — the check is a ceiling, not a
+			// budget, so an ordinary chatty run is never refused.
+			await realFs.writeFile(target, 'y'.repeat(MODEL_CLI_MAX_OUTPUT_BYTES));
+			const read = await defaultScratchFs.readFile(target);
+			expect(read).toHaveLength(MODEL_CLI_MAX_OUTPUT_BYTES);
+		} finally {
+			await defaultScratchFs.remove(created);
+			await realFs.rm(root, { recursive: true, force: true });
 		}
 	});
 });

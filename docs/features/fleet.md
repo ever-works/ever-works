@@ -24,6 +24,8 @@ Enrolled nodes go **offline** after five minutes without a heartbeat.
 
 Enrollment is outbound-only: the node calls the platform, never the other way round. Nothing needs to be reachable from the internet.
 
+0. **Install the node app** — `npm install -g ever-works-node` (Node.js ≥ 22). It is a single-file bundle published from `apps/node`; the unattended-run scripts (systemd unit, Windows service/scheduled-task installer) ship inside the package under `packaging/`.
+
 1. **Mint a token** — **Settings → Fleet → Add node**, or
 
     ```
