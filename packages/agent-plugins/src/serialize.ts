@@ -313,6 +313,17 @@ export function serializeSkillMd(input: SerializeSkillInput): string {
 		data['allowed-tools'] = input.allowedTools.join(' ');
 	}
 	if (input.metadata !== undefined && Object.keys(input.metadata).length > 0) {
+		// The Agent Skills rule is a map from string keys to string values.
+		// Emitting anything else produces a SKILL.md this library's own reader
+		// skips, which breaks the round-trip law (AP-22) before the file
+		// reaches anyone.
+		for (const [key, value] of Object.entries(input.metadata)) {
+			if (typeof value !== 'string') {
+				throw new Error(
+					`Skill "${narrowed.name}" has a non-string metadata value for "${key}"; the Agent Skills specification defines metadata as a map from string keys to string values`
+				);
+			}
+		}
 		data['metadata'] = input.metadata;
 	}
 	for (const key of Object.keys(input.extraFrontmatter ?? {}).sort()) {

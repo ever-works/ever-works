@@ -378,6 +378,57 @@ describe('paths — present-but-broken versus absent (spec 6.2)', () => {
 	});
 });
 
+describe('paths — `..` after a symlinked component (spec 4.1(3))', () => {
+	it('resolves `..` against the symlink TARGET, not the lexical path', async (ctx) => {
+		// The escape this closes: `path.join` collapses `..` lexically, BEFORE
+		// any symlink is followed, so `join(root, 'link/../x')` yields
+		// `root/x` and looks contained. The operating system resolves the same
+		// path to `<elsewhere>/x`, which is not. Segment-by-segment resolution
+		// gives the real answer.
+		const outside = await scratchDir();
+		await mkdir(join(outside, 'target'), { recursive: true });
+		const root = await scratchDir();
+		const made = await tryMakeSymlink(join(outside, 'target'), join(root, 'link'), 'dir');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		// A literal string, NOT path.join: join() collapses 'link/../x' to 'x'
+		// before the call, which is precisely the lexical behaviour under test.
+		const result = await resolveWithinRoot(root, 'link/../x');
+		expect(result.ok).toBe(false);
+		expect(result.ok === false && result.reason).toBe('escapes-root');
+	});
+
+	it('still accepts `..` that stays inside once resolved', async () => {
+		const root = await scratchDir();
+		await mkdir(join(root, 'a', 'b'), { recursive: true });
+		const result = await resolveWithinRoot(root, 'a/b/../c');
+		expect(result.ok).toBe(true);
+	});
+
+	it('denies an escaping skill directory without reading it (boundary 5)', async (ctx) => {
+		// Listing a directory is already access, so containment has to be
+		// settled before the read, not after.
+		const outside = await scratchDir();
+		await mkdir(join(outside, 'secrets'), { recursive: true });
+		await writeFile(join(outside, 'secrets', 'SKILL.md'), 'x', 'utf8');
+		const root = await scratchDir();
+		await mkdir(join(root, 'skills'), { recursive: true });
+		const made = await tryMakeSymlink(join(outside, 'secrets'), join(root, 'skills', 'peek'), 'dir');
+		if (!made) {
+			ctx.skip(SYMLINK_SKIP);
+			return;
+		}
+		const result = await discoverSkills(root);
+		expect(result.skills).toEqual([]);
+		expect(result.componentValid).toBe(true);
+		const escape = result.findings.filter((f) => f.code === 'package.path-escapes-root');
+		expect(escape).toHaveLength(1);
+		expect(escape[0]?.message).toContain('without being read');
+	});
+});
+
 describe('paths — plugin.json containment rejects the whole plugin (spec 4.1 boundary 1)', () => {
 	// The harshest of the five boundaries, and the only one that is fatal:
 	// "If `plugin.json` does not resolve within the plugin root, the client

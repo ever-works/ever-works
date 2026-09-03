@@ -121,12 +121,41 @@ export async function resolveWithinRoot(
 	}
 
 	const realRoot = await resolveRealPath(root);
-	const candidate = isAbsolute(value) ? value : join(realRoot, value);
-	const resolved = await resolveRealPath(candidate);
+	const resolved = isAbsolute(value) ? await resolveRealPath(value) : await resolveRelativeSegments(realRoot, value);
 
 	return isWithinResolved(realRoot, resolved)
 		? { ok: true, resolved }
 		: { ok: false, resolved, reason: 'escapes-root' };
+}
+
+/**
+ * Resolves a relative path one segment at a time, following symlinks as it
+ * goes — the way the operating system does.
+ *
+ * `path.join` cannot be used here, and the reason is a real escape rather
+ * than pedantry. `join` collapses `..` **lexically, before any symlink is
+ * followed**, so `join(root, 'link/../x')` yields `root/x`. If `link` points
+ * outside the package, the operating system would resolve that same path to
+ * `<elsewhere>/x` — so the lexical answer says "inside" about a path that is
+ * actually outside, and the containment check passes something it should
+ * reject.
+ *
+ * Resolving segment by segment gives the real semantics: `..` applies to the
+ * path resolved *so far*, after that prefix has been through `realpath`.
+ */
+async function resolveRelativeSegments(realRoot: string, value: string): Promise<string> {
+	let current = realRoot;
+	for (const segment of value.split(/[/\\]/u)) {
+		if (segment === '' || segment === '.') {
+			continue;
+		}
+		if (segment === '..') {
+			current = dirname(current);
+			continue;
+		}
+		current = await resolveRealPath(join(current, segment));
+	}
+	return current;
 }
 
 /**

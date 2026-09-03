@@ -244,6 +244,16 @@ describe('skills — frontmatter validation (Agent Skills specification)', () =>
 		expect(empty.ok && empty.allowedTools).toEqual([]);
 	});
 
+	it('rejects a YAML timestamp as metadata, which is a Date and not a mapping', () => {
+		// A `Date` passes a naive "object and not an array" test while
+		// `Object.entries` on it yields nothing, so a loop looking for
+		// non-string values would wave an unquoted `2020-01-01` straight
+		// through as a valid string-to-string map.
+		const result = validateSkillFrontmatter({ name: 'x', description: 'd', metadata: new Date('2020-01-01') }, 'x');
+		expect(result.ok).toBe(false);
+		expect(codes(result.findings)).toEqual(['skill.metadata-invalid']);
+	});
+
 	it('rejects a non-mapping frontmatter document', () => {
 		expect(codes(validateSkillFrontmatter('just a string', 'x').findings)).toEqual(['skill.frontmatter-invalid']);
 		expect(codes(validateSkillFrontmatter([], 'x').findings)).toEqual(['skill.frontmatter-invalid']);

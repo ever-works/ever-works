@@ -151,6 +151,17 @@ describe('serialize — SKILL.md emission', () => {
 		);
 	});
 
+	it('refuses a non-string metadata value rather than emitting an unreadable file', () => {
+		expect(() =>
+			serializeSkillMd({
+				name: 's',
+				description: 'd',
+				body: 'b',
+				metadata: { count: 3 } as unknown as Record<string, string>
+			})
+		).toThrow(/metadata/);
+	});
+
 	it('refuses a compatibility outside the Agent Skills 1-500 range', () => {
 		// Emitting one would produce a SKILL.md this library's own reader
 		// skips, breaking the round-trip law before anyone else sees it.

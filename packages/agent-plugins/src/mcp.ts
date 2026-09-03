@@ -118,8 +118,22 @@ const HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 /** RFC 9110 field-value: visible characters, space and horizontal tab; never CR or LF. */
 const HEADER_VALUE_PATTERN = /^[\t\x20-\x7e\x80-\xff]*$/;
 
+/**
+ * True for a JSON-shaped object, and deliberately false for a `Date`,
+ * `RegExp` or any other exotic object.
+ *
+ * That distinction is load-bearing for `metadata`. YAML parses an unquoted
+ * `2020-01-01` into a `Date`, and a `Date` passes every naive object test
+ * while `Object.entries` on it returns `[]` — so a plain "is it an object,
+ * is it not an array" guard would walk zero entries, find no non-string
+ * value, and wave a timestamp through as a valid string-to-string map.
+ */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+		return false;
+	}
+	const proto = Object.getPrototypeOf(value) as object | null;
+	return proto === Object.prototype || proto === null;
 }
 
 /**
@@ -604,6 +618,23 @@ export async function checkServerContainment(
 				)
 			);
 		}
+	}
+
+	if (config.cwd !== undefined && entry.cwdAnchor === undefined) {
+		// Parsing never produces this: an unclassifiable `cwd` skips the entry
+		// outright. It is reachable only through a hand-built entry, and
+		// treating it as "nothing to check" would be the one silent way past
+		// containment, so it is refused instead.
+		findings.push(
+			finding(
+				'mcp.server-cwd-invalid',
+				'error',
+				'mcp-server',
+				`MCP server "${entry.name}" has a "cwd" with no resolved anchor, so containment cannot be established; the server is skipped`,
+				{ subject: entry.name, at }
+			)
+		);
+		return findings;
 	}
 
 	if (config.cwd !== undefined && entry.cwdAnchor !== undefined) {

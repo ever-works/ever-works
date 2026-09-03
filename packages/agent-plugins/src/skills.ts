@@ -130,8 +130,22 @@ export function tokenizeAllowedTools(value: string): string[] {
 	return value.split(/\s+/u).filter((token) => token.length > 0);
 }
 
+/**
+ * True for a JSON-shaped object, and deliberately false for a `Date`,
+ * `RegExp` or any other exotic object.
+ *
+ * That distinction is load-bearing for `metadata`. YAML parses an unquoted
+ * `2020-01-01` into a `Date`, and a `Date` passes every naive object test
+ * while `Object.entries` on it returns `[]` — so a plain "is it an object,
+ * is it not an array" guard would walk zero entries, find no non-string
+ * value, and wave a timestamp through as a valid string-to-string map.
+ */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
+	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+		return false;
+	}
+	const proto = Object.getPrototypeOf(value) as object | null;
+	return proto === Object.prototype || proto === null;
 }
 
 /** Outcome of validating one skill's frontmatter. */
@@ -407,6 +421,24 @@ export async function discoverSkills(pluginRoot: string): Promise<SkillsDiscover
 		// Only immediate child *directories* are candidates. A symlinked
 		// directory is allowed, provided it resolves inside the root.
 		if (!entry.isDirectory() && !(entry.isSymbolicLink() && (await isDirectory(skillDir)))) {
+			continue;
+		}
+
+		// Spec 4.1 boundary 5 — "deny access to that path". Containment is
+		// checked BEFORE the directory is listed, because listing it is
+		// already access: a `skills/<x>` symlink pointing out of the package
+		// would otherwise have its contents read before anything objected.
+		const skillDirContained = await resolveWithinRoot(pluginRoot, join(SKILLS_DIRNAME, dirName));
+		if (!skillDirContained.ok) {
+			findings.push(
+				finding(
+					'package.path-escapes-root',
+					'error',
+					'skill',
+					`Skill directory "${dirName}" resolves outside the plugin root and is skipped without being read`,
+					{ subject: dirName, at: `${SKILLS_DIRNAME}/${dirName}` }
+				)
+			);
 			continue;
 		}
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { codes, fixture, subjectsFor } from './fixtures';
 import {
+	checkServerContainment,
 	isLoopbackHost,
 	isToolNamespaceSafeServerName,
 	loadMcpConfig,
@@ -9,6 +10,7 @@ import {
 	validateRemoteUrl,
 	validateStdioCommand,
 	type McpConfigResult,
+	type McpServerEntry,
 	type McpTransport
 } from '../mcp';
 import { mcpSchemaId } from '../versions';
@@ -418,6 +420,21 @@ describe('mcp — skills are unaffected by MCP problems (spec 7.2.2, 11.3.3)', (
 		const result = await loadMcpConfig(fixture('mcp-version-mismatch'), { manifestSpecVersion: '1.0.0' });
 		expect(result.componentValid).toBe(false);
 		expect(result.findings.every((f) => f.scope === 'mcp-component')).toBe(true);
+	});
+});
+
+describe('mcp — containment of a hand-built entry', () => {
+	it('refuses a cwd whose anchor could not be resolved rather than skipping the check', async () => {
+		// Parsing never produces this shape, but `checkServerContainment` is
+		// exported: treating an anchorless cwd as "nothing to check" would be
+		// the one silent way past containment.
+		const entry = {
+			name: 's',
+			config: { type: 'stdio', command: 'node', cwd: 'somewhere' },
+			transport: 'stdio'
+		} as unknown as McpServerEntry;
+		const findings = await checkServerContainment('/pkg', entry);
+		expect(findings.map((f) => f.code)).toEqual(['mcp.server-cwd-invalid']);
 	});
 });
 
