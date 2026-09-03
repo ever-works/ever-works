@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import { CheckCircle2, AlertCircle, Loader2, ExternalLink, Clock } from 'lucide-react';
 
 interface DeployStatus {
@@ -127,7 +128,7 @@ export function DeployProgressPanel({ workId, isDeploying }: DeployProgressPanel
 
         const poll = async () => {
             try {
-                const res = await fetch(`/api/works/${workId}/deploy/status`);
+                const res = await browserApiFetch(`/api/works/${workId}/deploy/status`);
                 if (res.ok) {
                     setStatus(await res.json());
                 }
