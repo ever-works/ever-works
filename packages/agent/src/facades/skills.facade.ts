@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type {
     FacadeOptions,
     ISkillsProviderPlugin,
@@ -11,6 +11,10 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { BaseFacadeService, FacadeError } from './base.facade';
+import {
+    AGENT_PLUGIN_SKILL_SOURCE,
+    type AgentPluginSkillSource,
+} from '../agent-plugins/skill-source.token';
 
 export class SkillsFacadeError extends FacadeError {
     constructor(message: string, operation: string, provider?: string, cause?: Error) {
@@ -45,6 +49,13 @@ export class SkillsFacadeService extends BaseFacadeService {
         registry: PluginRegistryService,
         settingsService: PluginSettingsService,
         @Optional() workPluginRepository?: WorkPluginRepository,
+        // APPENDED, never inserted. This facade is constructed positionally in
+        // tests (`new SkillsFacadeService(registry, settings)`), so putting a
+        // new parameter anywhere but last silently rebinds what every existing
+        // 2- and 3-argument construction passes.
+        @Optional()
+        @Inject(AGENT_PLUGIN_SKILL_SOURCE)
+        private readonly packageSource?: AgentPluginSkillSource,
     ) {
         super(registry, settingsService, workPluginRepository);
     }
@@ -59,7 +70,12 @@ export class SkillsFacadeService extends BaseFacadeService {
         facadeOptions: FacadeOptions,
     ): Promise<SkillCatalogListResult> {
         const plugins = await this.getEnabledPlugins(facadeOptions.workId, facadeOptions.userId);
-        if (plugins.length === 0) {
+        // The guard must consider the package source too. Only
+        // `everworks-skills` auto-enables, so "no skills-provider plugin
+        // enabled" is a real deployment state — and returning early there
+        // would make package skills silently invisible rather than merely
+        // absent.
+        if (plugins.length === 0 && !this.packageSource) {
             return { entries: [], total: 0 };
         }
 
@@ -104,6 +120,40 @@ export class SkillsFacadeService extends BaseFacadeService {
                 );
             }
         }
+        // Merged LAST, on purpose. The dedupe above is first-wins and
+        // `everworks-skills` sorts first as the default provider, so appending
+        // here is what guarantees a package can never displace a provider
+        // plugin's entry.
+        if (this.packageSource) {
+            try {
+                const packageEntries = await this.packageSource.listEntries({
+                    facadeOptions,
+                    tags: options.tags,
+                    search: options.search,
+                });
+                for (const entry of packageEntries) {
+                    if (seenSlugs.has(entry.slug)) {
+                        // The provider dedupe drops silently, which is fine
+                        // between plugins but not here: a package skill
+                        // colliding with a built-in slug would vanish with no
+                        // diagnostic at all.
+                        this.logger.debug(
+                            `Agent Plugins skill "${entry.slug}" from package ${entry.packageName ?? 'unknown'} is shadowed by an earlier provider entry.`,
+                        );
+                        continue;
+                    }
+                    seenSlugs.add(entry.slug);
+                    merged.push(entry);
+                }
+            } catch (err) {
+                // Same failure posture as a provider: one bad source must not
+                // turn a working catalog into a 500.
+                this.logger.warn(
+                    `Agent Plugins package source failed to listEntries: ${err instanceof Error ? err.message : err}`,
+                );
+            }
+        }
+
         return {
             entries: merged.slice(requestedOffset, requestedOffset + requestedLimit),
             total: merged.length,
@@ -131,6 +181,22 @@ export class SkillsFacadeService extends BaseFacadeService {
                 );
             }
         }
+
+        // Consulted after every provider, matching the precedence
+        // `listEntries` applies. Wiring only that method and not this one
+        // would produce a catalog card whose Install button 404s, because the
+        // install route resolves the slug through here.
+        if (this.packageSource) {
+            try {
+                const found = await this.packageSource.getEntry(slug, { facadeOptions });
+                if (found) return found;
+            } catch (err) {
+                this.logger.warn(
+                    `Agent Plugins package source failed to getEntry(${slug}): ${err instanceof Error ? err.message : err}`,
+                );
+            }
+        }
+
         return null;
     }
 }

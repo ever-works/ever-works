@@ -18,6 +18,15 @@
  * This is ordinary platform code for exactly that reason.
  */
 
+export { AgentPluginPackageCatalogService } from './package-catalog.service';
+
+export {
+    AGENT_PLUGIN_PROVIDER_ID,
+    AGENT_PLUGIN_SKILL_SOURCE,
+    type AgentPluginSkillSource,
+    type AgentPluginSkillSourceOptions,
+} from './skill-source.token';
+
 export {
     configuredPackageDirs,
     loadedPackages,
