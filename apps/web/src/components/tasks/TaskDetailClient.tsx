@@ -28,7 +28,7 @@ import { TaskActivitySection } from './TaskActivitySection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
-import { TaskRunControls } from './TaskRunControls';
+import { TaskRunControls, type TaskRunOpenQuestion } from './TaskRunControls';
 import { TaskRunsHistory } from './TaskRunsHistory';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
 import { TaskDecisionConflicts } from './TaskDecisionConflicts';
@@ -112,6 +112,7 @@ export function TaskDetailClient({
     initialChatError = null,
     initialAttachmentsError = null,
     initialGateRun = null,
+    initialOpenQuestion = null,
     initialRuns = [],
     initialSubtasks = [],
     initialSubtasksMeta = { total: 0, doneCount: 0 },
@@ -141,6 +142,14 @@ export function TaskDetailClient({
      * be pure waste.
      */
     initialGateRun?: AgentRunSession | null;
+    /**
+     * Self-build slice Q — the OPEN Inbox question the latest run is parked
+     * on, when a fleet node asked one (`GET /api/inbox?taskId=&status=open`,
+     * newest question). The run row cannot name its question, so the page
+     * looks it up; the run controls then show it and send the human to the
+     * Inbox instead of offering a free-text Resume the answer never reaches.
+     */
+    initialOpenQuestion?: TaskRunOpenQuestion | null;
     /**
      * Run-driven lifecycle (kanban M7) — the Task's run HISTORY, newest
      * first, server-fetched from the same `listSessions({ taskId })`
@@ -523,8 +532,10 @@ export function TaskDetailClient({
 
                     {/* Run steering (Wave 4 M5) + attach action (M8) — steer /
                         interrupt / resume the Task's latest run. Renders
-                        nothing when there is no actionable run. */}
-                    <TaskRunControls run={initialGateRun} />
+                        nothing when there is no actionable run. Slice Q: a
+                        run parked on a fleet question shows the question +
+                        Inbox link instead of the Resume form. */}
+                    <TaskRunControls run={initialGateRun} openQuestion={initialOpenQuestion} />
 
                     {/* Quality gates (Wave 3 M6) — Checks section */}
                     <TaskChecksSection task={task} initialGateRun={initialGateRun} />

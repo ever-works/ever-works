@@ -6,7 +6,7 @@ import { serverFetch, serverMutation } from './server-api';
  * owner-scoped `/api/inbox` surface
  * (`apps/api/src/inbox/inbox.controller.ts`).
  *
- *   GET    /api/inbox                 my messages (?status=) + unread count
+ *   GET    /api/inbox                 my messages (?status= ?taskId=) + unread count
  *   GET    /api/inbox/unread-count    the sidebar badge
  *   GET    /api/inbox/:id             one message
  *   POST   /api/inbox/:id/reply       answer it (routed per kind)
@@ -16,16 +16,21 @@ import { serverFetch, serverMutation } from './server-api';
  *   DELETE /api/inbox/:id             delete the message
  *
  * Omitting `status` asks for the ACTIVE view (open + answered); the
- * Archived tab passes `status=archived` explicitly.
+ * Archived tab passes `status=archived` explicitly. `taskId` narrows the
+ * list to one Task's messages — the Task page uses it (self-build slice
+ * Q) to find the open fleet question a parked run is waiting on, because
+ * the run row itself cannot name its question.
  */
 
 export {
     INBOX_MAX_REPLY_CHARS,
     INBOX_POLL_INTERVAL_MS,
     isAwaitingReply,
+    isFleetQuestion,
     type InboxItem,
     type InboxItemKind,
     type InboxItemOption,
+    type InboxItemSourceMeta,
     type InboxItemSourceType,
     type InboxItemStatus,
     type InboxReplyOutcome,
@@ -44,6 +49,8 @@ export interface ListInboxInput {
     /** The API clamps to 1–100 and defaults to 50. */
     limit?: number;
     offset?: number;
+    /** Only this Task's messages (owner-scoped server-side, like everything here). */
+    taskId?: string;
 }
 
 export interface ReplyInboxInput {
@@ -56,6 +63,7 @@ function buildListEndpoint(input?: ListInboxInput): string {
     if (input?.status) params.set('status', input.status);
     if (input?.limit) params.set('limit', String(input.limit));
     if (input?.offset && input.offset > 0) params.set('offset', String(input.offset));
+    if (input?.taskId) params.set('taskId', input.taskId);
     const qs = params.toString();
     return qs ? `/inbox?${qs}` : '/inbox';
 }
