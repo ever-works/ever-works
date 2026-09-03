@@ -79,3 +79,13 @@ export {
     type AcquiredPackage,
     type RemoteSourceKind,
 } from './remote-acquire.service';
+
+export { AgentPluginPackageRepository } from './package.repository';
+
+export {
+    AgentPluginPackageBootstrapService,
+    acquireInputFor,
+    BUDGET_MS,
+    CONCURRENCY,
+    type RematerializeResult,
+} from './package-bootstrap.service';

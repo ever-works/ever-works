@@ -8,6 +8,8 @@ import { AgentPluginAllowlistService } from './allowlist.service';
 import { AgentPluginGitSource } from './git-source';
 import { AgentPluginNpmSource } from './npm-source';
 import { AgentPluginRemoteAcquireService } from './remote-acquire.service';
+import { AgentPluginPackageRepository } from './package.repository';
+import { AgentPluginPackageBootstrapService } from './package-bootstrap.service';
 import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 
 /**
@@ -52,6 +54,8 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
         AgentPluginGitSource,
         AgentPluginNpmSource,
         AgentPluginRemoteAcquireService,
+        AgentPluginPackageRepository,
+        AgentPluginPackageBootstrapService,
         AGENT_PLUGIN_SKILL_SOURCE,
     ],
 })
