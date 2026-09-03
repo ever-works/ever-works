@@ -11,9 +11,11 @@ export interface WhitelistEntry {
 	 * Argument names the tool must NOT expose or forward, even though the
 	 * OpenAPI operation accepts them. Why: some routes carry a flag that turns
 	 * an ordinary verb into a human-only override (`force` on a Task
-	 * transition skips the approver gate). The route stays useful without the
-	 * flag, so we keep the tool and cut the flag out of both the generated
-	 * schema and the outbound request instead of dropping the whole route.
+	 * transition skips the approver gate; `requireAllApprovers` on a Task
+	 * create/update decides whether that gate runs at all). The route stays
+	 * useful without the flag, so we keep the tool and cut the flag out of both
+	 * the generated schema and the outbound request instead of dropping the
+	 * whole route.
 	 */
 	omitArgs?: string[];
 }
@@ -301,6 +303,8 @@ export const WHITELIST: WhitelistEntry[] = [
 	//   POST /api/tasks/{id}/escalations/{escalationId}/resolve
 	//   POST /api/me/goals/{id}/dod/approve
 	//   `force` on POST /api/tasks/{id}/transition           (approver-gate override)
+	//   `requireAllApprovers` on POST /api/tasks and PATCH /api/tasks/{id}
+	//                                                        (whether that gate runs at all)
 	// The asking side stays: an agent can propose criteria, post to a Task's
 	// chat, list escalations and read the Inbox; a person answers in the app.
 
@@ -311,7 +315,15 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'list_tasks',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'POST', path: '/api/tasks', toolName: 'create_task' },
+	// `requireAllApprovers` is the approver POLICY: the `→ done` transition only
+	// runs its approver check while the flag is true, so `false` skips it
+	// outright (not even an any-approver check). Setting it on create or
+	// flipping it on update is therefore the same override as `force` — a
+	// caller could pre-disarm a Task a person later adds approvers to, or turn
+	// the gate off and move to done without it. Both tools lose the field; a
+	// machine-created Task keeps the API default (`true`) and a person changes
+	// the policy in the app.
+	{ method: 'POST', path: '/api/tasks', toolName: 'create_task', omitArgs: ['requireAllApprovers'] },
 	{ method: 'POST', path: '/api/tasks/run-batch', toolName: 'run_tasks_batch' },
 	{
 		method: 'GET',
@@ -319,7 +331,7 @@ export const WHITELIST: WhitelistEntry[] = [
 		toolName: 'get_task',
 		annotations: { readOnlyHint: true }
 	},
-	{ method: 'PATCH', path: '/api/tasks/{id}', toolName: 'update_task' },
+	{ method: 'PATCH', path: '/api/tasks/{id}', toolName: 'update_task', omitArgs: ['requireAllApprovers'] },
 	{
 		method: 'DELETE',
 		path: '/api/tasks/{id}',

@@ -68,6 +68,21 @@ describe('ToolRegistrationService', () => {
 				},
 				required: ['to']
 			}
+		},
+		{
+			operationId: 'TasksController_update',
+			method: 'PATCH',
+			path: '/api/tasks/{id}',
+			summary: 'Partial update.',
+			pathParams: [{ name: 'id', required: true, schema: { type: 'string' } }],
+			queryParams: [],
+			requestBody: {
+				type: 'object',
+				properties: {
+					title: { type: 'string' },
+					requireAllApprovers: { type: 'boolean' }
+				}
+			}
 		}
 	];
 
@@ -130,17 +145,17 @@ describe('ToolRegistrationService', () => {
 	});
 
 	describe('omitArgs (human-gate overrides never reach the tool surface)', () => {
-		function registeredTransition() {
+		function registered(name: string) {
 			const call = registry.registerTool.mock.calls.find(
-				(c: unknown[]) => (c[0] as { name: string }).name === 'transition_task'
+				(c: unknown[]) => (c[0] as { name: string }).name === name
 			);
-			expect(call, 'transition_task registered').toBeDefined();
+			expect(call, `${name} registered`).toBeDefined();
 			return call![0] as { parameters: z.ZodObject<Record<string, z.ZodTypeAny>>; handler: Function };
 		}
 
 		it('cuts `force` out of the transition_task schema while keeping the ordinary move', () => {
 			service.registerTools();
-			const { parameters } = registeredTransition();
+			const { parameters } = registered('transition_task');
 			expect(Object.keys(parameters.shape).sort()).toEqual(['id', 'to']);
 			// The transport validates with safeParse before calling the handler;
 			// a Zod object strips keys it does not know, so `force` is gone here.
@@ -152,9 +167,29 @@ describe('ToolRegistrationService', () => {
 		it('never forwards an omitted argument upstream, even when handed raw arguments', async () => {
 			const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'abc', status: 'done' });
 			service.registerTools();
-			const { handler } = registeredTransition();
+			const { handler } = registered('transition_task');
 			await handler({ id: 'abc', to: 'done', force: true });
 			expect(requestSpy).toHaveBeenCalledWith('POST', '/tasks/abc/transition', { to: 'done' });
+		});
+
+		// `requireAllApprovers` is the approver POLICY, not the override: with it
+		// false the `→ done` approver check never runs, so flipping it through
+		// update_task would clear the very gate `force` was cut out to protect.
+		it('cuts `requireAllApprovers` out of the update_task schema while keeping the ordinary fields', () => {
+			service.registerTools();
+			const { parameters } = registered('update_task');
+			expect(Object.keys(parameters.shape).sort()).toEqual(['id', 'title']);
+			const parsed = parameters.safeParse({ id: 'abc', title: 'Ship it', requireAllApprovers: false });
+			expect(parsed.success).toBe(true);
+			expect(parsed.data).toEqual({ id: 'abc', title: 'Ship it' });
+		});
+
+		it('never forwards `requireAllApprovers` upstream from update_task', async () => {
+			const requestSpy = vi.spyOn(apiClient, 'request').mockResolvedValue({ id: 'abc', title: 'Ship it' });
+			service.registerTools();
+			const { handler } = registered('update_task');
+			await handler({ id: 'abc', title: 'Ship it', requireAllApprovers: false });
+			expect(requestSpy).toHaveBeenCalledWith('PATCH', '/tasks/abc', { title: 'Ship it' });
 		});
 
 		it('ignores omitArgs names the operation does not define instead of throwing', () => {

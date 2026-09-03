@@ -202,11 +202,26 @@ describe('WHITELIST — self-build program (Tasks / Inbox / Goals / Fleet / Agen
 		}
 	});
 
-	it('keeps the approver-gate override (`force`) off transition_task and off every other tool', () => {
-		const transition = find({ method: 'POST', path: '/api/tasks/{id}/transition', toolName: 'transition_task' });
-		expect(transition?.omitArgs).toEqual(['force']);
+	/**
+	 * Arguments cut out of a tool even though the route accepts them. `force`
+	 * overrides the approver gate on a transition; `requireAllApprovers` is the
+	 * policy that decides whether that gate runs at all (`false` skips the
+	 * `→ done` approver check outright), so a machine caller must neither set
+	 * it on create nor flip it on update. Every other tool exposes the full
+	 * operation — an unlisted `omitArgs` here would be a silent surface change.
+	 */
+	const OMITTED_ARGS: Record<string, string[]> = {
+		transition_task: ['force'],
+		create_task: ['requireAllApprovers'],
+		update_task: ['requireAllApprovers']
+	};
+
+	it('keeps the approver-gate overrides (`force`, `requireAllApprovers`) off their tools and no other tool omits arguments', () => {
+		for (const [toolName, omitted] of Object.entries(OMITTED_ARGS)) {
+			expect(WHITELIST.find((w) => w.toolName === toolName)?.omitArgs, toolName).toEqual(omitted);
+		}
 		for (const entry of ALL) {
-			if (entry.toolName === 'transition_task') continue;
+			if (entry.toolName in OMITTED_ARGS) continue;
 			expect(find(entry)?.omitArgs, entry.toolName).toBeUndefined();
 		}
 	});
