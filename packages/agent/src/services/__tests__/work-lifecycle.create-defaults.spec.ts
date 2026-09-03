@@ -51,8 +51,13 @@ const baseDto: CreateWorkDto = {
 } as CreateWorkDto;
 
 interface MockDeps {
-    workRepo: { create: jest.Mock; updateGenerateStatus: jest.Mock };
+    workRepo: {
+        create: jest.Mock;
+        updateGenerateStatus: jest.Mock;
+        findRepositoryWorksWrapping: jest.Mock;
+    };
     userRepo: { findById: jest.Mock };
+    gitFacade: { hasRepositoryAccess: jest.Mock };
     quota: { assertWithinQuota: jest.Mock };
     everWorksGit: { isEnabled: jest.Mock; createRepository: jest.Mock };
     everWorksDns: {
@@ -76,10 +81,16 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
             getRepoOwner: () => (data.owner as string) ?? 'evereq',
         })),
         updateGenerateStatus: jest.fn().mockResolvedValue(undefined),
+        // Self-build slice D (EW-766): nobody else wraps the repo by default.
+        findRepositoryWorksWrapping: jest.fn().mockResolvedValue([]),
     };
     const userRepo = {
         findById: jest.fn().mockResolvedValue({ id: baseUser.id, onboardingState }),
     };
+    // Self-build slice D (EW-766): the Repository Work create path probes
+    // the caller's access to the repository before persisting anything.
+    // Default to "accessible"; the repo-kind tests flip it.
+    const gitFacade = { hasRepositoryAccess: jest.fn().mockResolvedValue(true) };
     const dataGenerator = { getItems: jest.fn().mockResolvedValue([]) };
     const ownership = {};
     const templateCatalog = {
@@ -125,14 +136,25 @@ function makeService(onboardingState: OnboardingWizardStateV2 | null = null): {
         everWorksDns as never,
         funnel as never,
         eventEmitter as never,
-        // organizationRepository (EW-711 #27) — appended last; unused by the
-        // createWork defaults path under test, so a bare stub suffices.
+        // organizationRepository (EW-711 #27) — appended after the event
+        // emitter; unused by the createWork defaults path under test, so a
+        // bare stub suffices.
         {} as never,
+        gitFacade as never,
     );
 
     return {
         service,
-        deps: { workRepo, userRepo, quota, everWorksGit, everWorksDns, funnel, eventEmitter },
+        deps: {
+            workRepo,
+            userRepo,
+            gitFacade,
+            quota,
+            everWorksGit,
+            everWorksDns,
+            funnel,
+            eventEmitter,
+        },
     };
 }
 
@@ -631,9 +653,23 @@ describe('WorkLifecycleService.createWork — repository kind', () => {
         });
         expect(persisted.sourceRepository.relatedRepositories.work).toBeUndefined();
         expect(persisted.sourceRepository.relatedRepositories.website).toBeUndefined();
+        // Not opted into the EW-628 poller: nothing to sync, and the default
+        // of 5 would have the dispatcher hit the wrapped repo's API with the
+        // owner's token every five minutes, forever.
+        expect(persisted.syncIntervalMinutes).toBe(0);
         // No clone of a code repository looking for directory items.
         expect(dataGenerator.getItems).not.toHaveBeenCalled();
         expect(deps.workRepo.updateGenerateStatus).not.toHaveBeenCalled();
+        // The caller's own access to the repository was verified first, with
+        // the provider the URL names — not whatever the DTO defaulted to.
+        expect(deps.gitFacade.hasRepositoryAccess).toHaveBeenCalledWith(
+            'ever-works',
+            'ever-works',
+            {
+                userId: baseUser.id,
+                providerId: 'github',
+            },
+        );
     });
 
     it('skips the deploy quota and the managed Ever Works Git repo even when both would apply', async () => {
@@ -675,6 +711,9 @@ describe('WorkLifecycleService.createWork — repository kind', () => {
         ['blank', '   '],
         ['not a repository URL', 'https://example.com/not-a-repo'],
         ['an ssh remote', 'git@github.com:ever-works/ever-works.git'],
+        // Only the GitHub git-provider plugin exists; a GitLab Work would be
+        // one no Task can ever clone, so it is refused at the door.
+        ['a GitLab URL (no GitLab git-provider plugin yet)', 'https://gitlab.com/group/project'],
     ])(
         'rejects a repo Work whose repositoryUrl is %s before any side effect',
         async (_label, url) => {
@@ -701,5 +740,119 @@ describe('WorkLifecycleService.createWork — repository kind', () => {
         expect(persisted.kind).toBe('directory');
         expect(persisted.sourceRepository).toBeUndefined();
         expect(persisted.deployProvider).toBe('vercel');
+        // Nothing to verify for a generated data repository.
+        expect(deps.gitFacade.hasRepositoryAccess).not.toHaveBeenCalled();
+    });
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Registration is verified, not just parsed: the repository must be
+    // reachable with the caller's own connection, hosted on the provider
+    // they selected, and not already wrapped by another account. All of it
+    // BEFORE any row exists.
+    // ─────────────────────────────────────────────────────────────────────
+    it('rejects a repository the caller cannot read (404/403 from the provider) with a 400 and no row', async () => {
+        const { service, deps } = makeService(null);
+        deps.gitFacade.hasRepositoryAccess.mockResolvedValue(false);
+
+        await expect(service.createWork(repoDto, baseUser)).rejects.toMatchObject({
+            status: 400,
+            response: expect.objectContaining({
+                message: expect.stringContaining('not found or is not accessible'),
+            }),
+        });
+
+        expect(deps.workRepo.create).not.toHaveBeenCalled();
+        expect(deps.eventEmitter.emitAsync).not.toHaveBeenCalled();
+    });
+
+    it('turns "no connected account" from the git facade into a 400 that says so, with no row', async () => {
+        const { service, deps } = makeService(null);
+        deps.gitFacade.hasRepositoryAccess.mockRejectedValue(
+            new Error('No connected account found for user u-1 with provider github'),
+        );
+
+        await expect(service.createWork(repoDto, baseUser)).rejects.toMatchObject({
+            status: 400,
+            response: expect.objectContaining({
+                message: expect.stringContaining('Could not verify access'),
+            }),
+        });
+
+        expect(deps.workRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a URL hosted on a different provider than the one the caller selected, before probing anything', async () => {
+        const { service, deps } = makeService(null);
+
+        await expect(
+            service.createWork({ ...repoDto, gitProvider: 'gitlab' } as CreateWorkDto, baseUser),
+        ).rejects.toMatchObject({
+            status: 400,
+            response: expect.objectContaining({
+                message: expect.stringContaining('hosted on github'),
+            }),
+        });
+
+        expect(deps.gitFacade.hasRepositoryAccess).not.toHaveBeenCalled();
+        expect(deps.workRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses (409) a repository another account already wraps — the checkout is keyed by owner/repo, not by Work', async () => {
+        const { service, deps } = makeService(null);
+        deps.workRepo.findRepositoryWorksWrapping.mockResolvedValue([
+            { id: 'w-other', userId: 'someone-else', slug: 'their-platform' },
+        ]);
+
+        await expect(service.createWork(repoDto, baseUser)).rejects.toMatchObject({
+            status: 409,
+        });
+
+        expect(deps.workRepo.findRepositoryWorksWrapping).toHaveBeenCalledWith(
+            'ever-works',
+            'ever-works',
+        );
+        expect(deps.workRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('lets the SAME account register the repository again — one token, one checkout, no cross-tenant clobber', async () => {
+        const { service, deps } = makeService(null);
+        deps.workRepo.findRepositoryWorksWrapping.mockResolvedValue([
+            { id: 'w-mine', userId: baseUser.id, slug: 'platform' },
+        ]);
+
+        const result = await service.createWork(
+            { ...repoDto, slug: 'platform-again' } as CreateWorkDto,
+            baseUser,
+        );
+
+        expect(result.status).toBe('success');
+        expect(deps.workRepo.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects the quick-create shape (kind repo, no repositoryUrl on the DTO) with a 400 before any row', async () => {
+        // `POST /api/works/quick-create` builds a CreateWorkDto without
+        // `repositoryUrl` (QuickCreateWorkDto has none) — this is exactly
+        // what reaches createWork from that controller.
+        const { service, deps } = makeService(null);
+        const quickCreateShape = Object.assign(new CreateWorkDto(), {
+            slug: 'platform',
+            name: 'Platform',
+            description: 'A description',
+            owner: undefined,
+            organization: false,
+            gitProvider: 'github',
+            kind: 'repo',
+        });
+
+        await expect(service.createWork(quickCreateShape, baseUser)).rejects.toMatchObject({
+            status: 400,
+            response: expect.objectContaining({
+                message: expect.stringContaining('repositoryUrl'),
+            }),
+        });
+
+        expect(deps.workRepo.create).not.toHaveBeenCalled();
+        expect(deps.gitFacade.hasRepositoryAccess).not.toHaveBeenCalled();
+        expect(deps.eventEmitter.emitAsync).not.toHaveBeenCalled();
     });
 });

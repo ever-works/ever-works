@@ -38,17 +38,30 @@ describe('parseRepositoryWorkSource', () => {
         expect(parsed?.url).toBe('https://github.com/Ever-Works/Ever-Works');
     });
 
-    it('maps GitLab and Bitbucket hosts to their provider + storage choice', () => {
-        expect(parseRepositoryWorkSource('https://gitlab.com/group/project')).toMatchObject({
-            gitProvider: 'gitlab',
-            storageProvider: 'user-gitlab',
-            url: 'https://gitlab.com/group/project',
+    it('accepts repository names that start with a dot (`.github`, `.dotfiles`) — owners still may not', () => {
+        expect(parseRepositoryWorkSource('https://github.com/ever-works/.github')).toMatchObject({
+            owner: 'ever-works',
+            repo: '.github',
+            url: 'https://github.com/ever-works/.github',
         });
-        expect(parseRepositoryWorkSource('https://bitbucket.org/team/project')).toMatchObject({
-            gitProvider: 'bitbucket',
-            storageProvider: 'user-git',
-            url: 'https://bitbucket.org/team/project',
-        });
+        expect(parseRepositoryWorkSource('https://github.com/evereq/.dotfiles')?.repo).toBe(
+            '.dotfiles',
+        );
+        // A GitHub owner cannot start with a dot, and `.` / `..` are path
+        // components rather than repository names.
+        expect(parseRepositoryWorkSource('https://github.com/.ever-works/repo')).toBeNull();
+        expect(parseRepositoryWorkSource('https://github.com/ever-works/.')).toBeNull();
+        expect(parseRepositoryWorkSource('https://github.com/ever-works/..')).toBeNull();
+    });
+
+    it('returns null for GitLab and Bitbucket hosts until a git-provider plugin for them ships', () => {
+        // Only the `github` git-provider plugin exists. A Work persisted with
+        // `gitProvider: 'gitlab'` would be one no Task can ever clone, so the
+        // parser refuses the URL up front — the same 400 as an unknown host.
+        // When GitLab lands, remember nested groups (`group/subgroup/project`).
+        expect(parseRepositoryWorkSource('https://gitlab.com/group/project')).toBeNull();
+        expect(parseRepositoryWorkSource('https://gitlab.com/group/subgroup/project')).toBeNull();
+        expect(parseRepositoryWorkSource('https://bitbucket.org/team/project')).toBeNull();
     });
 
     it.each([

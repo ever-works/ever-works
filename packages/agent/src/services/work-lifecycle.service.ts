@@ -63,10 +63,17 @@ import { isRepositoryWorkKind } from '@ever-works/contracts';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
+import { GitFacadeService } from '@src/facades/git.facade';
 import {
     parseRepositoryWorkSource,
     type RepositoryWorkSource,
 } from '@src/works/repository-work-source';
+import {
+    REPOSITORY_WORK_REFUSAL,
+    assertNotRepositoryWork,
+    hasRepositoryRole,
+    isRepositoryWork,
+} from '@src/works/repository-work-guard';
 
 /**
  * Map a wizard "storage" choice onto the existing `gitProvider` field.
@@ -120,6 +127,10 @@ export class WorkLifecycleService {
         // Appended last (EW-711 #27) so existing positional test constructions
         // keep their argument slots; NestJS DI resolves by type, not position.
         private readonly organizationRepository: OrganizationRepository,
+        // Appended after it for the same reason (self-build slice D, EW-766):
+        // only the Repository Work create path probes the git provider, so
+        // every other positional construction can leave the slot empty.
+        private readonly gitFacade: GitFacadeService,
     ) {}
 
     /**
@@ -251,12 +262,13 @@ export class WorkLifecycleService {
         // column default `'default'` applies, exactly as before.
         const normalizedKind = normalizeCreateWorkKind(createWorkDto.kind);
 
-        // Repository Work (self-build slice D, EW-766) — resolve the source
-        // repository FIRST so a bad or missing URL fails before any side
-        // effect. A `repo` Work has no website template and no deploy, so
-        // template validation and the deploy quota are skipped for it.
+        // Repository Work (self-build slice D, EW-766) — resolve and verify
+        // the source repository FIRST so a bad, missing, unreachable or
+        // already-wrapped URL fails before any side effect. A `repo` Work
+        // has no website template and no deploy, so template validation and
+        // the deploy quota are skipped for it.
         const repositorySource = isRepositoryWorkKind(normalizedKind)
-            ? this.resolveRepositoryWorkSource(createWorkDto.repositoryUrl)
+            ? await this.resolveRepositoryWorkSource(createWorkDto, user)
             : null;
 
         const selectedWebsiteTemplateId = repositorySource
@@ -462,22 +474,112 @@ export class WorkLifecycleService {
      * Repository Work (self-build slice D, EW-766) — turn the caller's
      * `repositoryUrl` into persisted coordinates, or fail the create.
      *
-     * A `repo` Work without a repository is a contradiction, so a missing
-     * or unparseable URL is a 400 rather than a silently derived
-     * `<slug>-data` repository nobody ever created (the exact failure mode
-     * EW-028 fixed for managed storage).
+     * Four checks, in order, all BEFORE any persistence:
+     *
+     *   1. The URL parses. A `repo` Work without a repository is a
+     *      contradiction, so a missing or unparseable URL is a 400 rather
+     *      than a silently derived `<slug>-data` repository nobody ever
+     *      created (the exact failure mode EW-028 fixed for managed storage).
+     *   2. The URL's host agrees with the git provider the caller chose.
+     *      `applyRepositoryWorkSource` overwrites `gitProvider` from the URL;
+     *      overriding an explicit choice silently is how the web gate (which
+     *      proves the SIDEBAR provider is connected) and the persisted row
+     *      would end up disagreeing.
+     *   3. The caller can read the repository through their own connected
+     *      account. Every later operation — Task worktree provisioning, the
+     *      KB mirror, webhook-less polling — runs with the owner's token, so
+     *      a repository the owner cannot reach would fail late and
+     *      repeatedly instead of once, here. Same probe the import analyser
+     *      runs before it registers anything.
+     *   4. No OTHER account already wraps the same repository. The on-disk
+     *      checkout the git facade keeps is keyed by `owner/repo` alone, so
+     *      two tenants pointing at one third-party repository would share —
+     *      and clobber — a single working copy with two different tokens.
+     *      Collaborators join the existing Work as members instead.
      */
-    private resolveRepositoryWorkSource(repositoryUrl: string | undefined): RepositoryWorkSource {
-        const source = parseRepositoryWorkSource(repositoryUrl);
+    private async resolveRepositoryWorkSource(
+        createWorkDto: CreateWorkDto,
+        user: User,
+    ): Promise<RepositoryWorkSource> {
+        const source = parseRepositoryWorkSource(createWorkDto.repositoryUrl);
         if (!source) {
             throw new BadRequestException({
                 status: 'error',
                 message:
                     'A Repository Work needs `repositoryUrl` — an existing https://github.com/<owner>/<repo> ' +
-                    '(GitLab and Bitbucket URLs are accepted too).',
+                    'your connected GitHub account can access (only GitHub is supported today).',
             });
         }
+
+        if (createWorkDto.gitProvider && createWorkDto.gitProvider !== source.gitProvider) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    `Repository ${source.url} is hosted on ${source.gitProvider}, but the request selected ` +
+                    `the "${createWorkDto.gitProvider}" git provider. Select the provider that hosts the repository.`,
+            });
+        }
+
+        await this.assertRepositoryAccessible(source, user);
+        await this.assertRepositoryNotWrappedByAnotherAccount(source, user);
         return source;
+    }
+
+    private async assertRepositoryAccessible(
+        source: RepositoryWorkSource,
+        user: User,
+    ): Promise<void> {
+        let accessible: boolean;
+        try {
+            accessible = await this.gitFacade.hasRepositoryAccess(source.owner, source.repo, {
+                userId: user.id,
+                providerId: source.gitProvider,
+            });
+        } catch (error) {
+            if (error instanceof HttpException) {
+                throw error;
+            }
+            // `NoGitCredentialsError` (nothing connected), `GitProviderNotFoundError`
+            // (provider plugin not installed) or a provider outage. None of
+            // these means the URL is wrong, but all of them mean the platform
+            // cannot vouch for the repository — and registering it anyway would
+            // only move the same failure to the first fleet run. Say what was
+            // missing instead of persisting a Work nothing can clone.
+            const reason = error instanceof Error ? error.message : String(error);
+            throw new BadRequestException({
+                status: 'error',
+                message: `Could not verify access to ${source.url} with your connected ${source.gitProvider} account: ${reason}`,
+            });
+        }
+        if (!accessible) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    `Repository ${source.url} was not found or is not accessible with your connected ` +
+                    `${source.gitProvider} account. Check the URL and that the account can read the repository.`,
+            });
+        }
+    }
+
+    private async assertRepositoryNotWrappedByAnotherAccount(
+        source: RepositoryWorkSource,
+        user: User,
+    ): Promise<void> {
+        const existing = await this.workRepository.findRepositoryWorksWrapping(
+            source.owner,
+            source.repo,
+        );
+        // The same account registering the same repository twice shares one
+        // token and one checkout, which is the situation every other kind
+        // already lives with; only a DIFFERENT account is refused.
+        if (existing.some((work) => work.userId !== user.id)) {
+            throw new ConflictException({
+                status: 'error',
+                message:
+                    `Repository ${source.url} is already registered as a Work by another account. ` +
+                    "Ask that Work's owner to add you as a member instead of registering the repository again.",
+            });
+        }
     }
 
     /**
@@ -523,6 +625,14 @@ export class WorkLifecycleService {
         // linked import is stamped so the UI does not wait on a generation
         // that is never coming.
         workData.generateStatus = { status: GenerateStatusType.GENERATED, step: 'linked' };
+        // EW-628's data-sync poller selects every Work with a positive
+        // `syncIntervalMinutes` and no GitHub App installed, and the column
+        // default is 5. A Repository Work has nothing to sync — the render
+        // is a no-op for the kind — but the poller would still call the
+        // wrapped repository's API with the owner's token every five
+        // minutes, forever, and log a data-sync activity row each time.
+        // 0 is the column's "not opted in".
+        workData.syncIntervalMinutes = 0;
     }
 
     /**
@@ -755,6 +865,12 @@ export class WorkLifecycleService {
             // Handle deployProvider update with validation
             if (updateDto.deployProvider !== undefined) {
                 if (updateDto.deployProvider) {
+                    // A Repository Work provisions no website repository, so
+                    // there is nothing a deploy provider could ever ship and
+                    // `DeployService.deploy` refuses the kind regardless.
+                    // Refusing the setting keeps the row honest instead of
+                    // persisting a provider that can never run.
+                    assertNotRepositoryWork(work, 'choosing a deploy provider');
                     const availableProviders = this.deployFacade.getAvailableProviders();
                     const isSupported = availableProviders.some(
                         (p) => p.id === updateDto.deployProvider,
@@ -1157,6 +1273,11 @@ export class WorkLifecycleService {
     async syncFromDataRepository(workId: string, user: User) {
         // Require at least editor role to sync
         const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+        // The snapshot clones the data repository looking for directory
+        // items and a README template. For a Repository Work that is a full
+        // clone of somebody's code repository into the shared checkout, for
+        // content that cannot be there.
+        assertNotRepositoryWork(work, 'syncing from the data repository');
         const updates: Record<string, any> = {};
 
         try {
@@ -1216,10 +1337,32 @@ export class WorkLifecycleService {
         // Only owners can delete works
         const { work } = await this.ownershipService.ensureIsOwner(workId, user.id);
 
+        // Repository Work (self-build slice D, EW-766) — the data repository
+        // IS the user's code repository, and the `work` / `website` roles were
+        // never provisioned. Worse, the derived fallbacks are live names:
+        // `getMainRepo()` falls back to `<slug>` under the third-party owner
+        // — for a slug derived from the wrapped repo that is the wrapped repo
+        // AGAIN — and `getWebsiteRepo()` to `<slug>-website`, whatever real
+        // repository happens to carry that name in that org. Deleting the
+        // Work row must therefore never reach the git provider for this
+        // kind. An EXPLICIT request to delete the data repository is refused
+        // rather than ignored: the caller asked for the one thing the
+        // platform must never do to a repository it did not create.
+        const wrapsExistingRepository = isRepositoryWork(work);
+        if (wrapsExistingRepository && deleteWorkDto.delete_data_repository === true) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    `Work "${work.name}" ${REPOSITORY_WORK_REFUSAL} — its data repository is the code repository ` +
+                    `${work.getRepoOwner()}/${work.getDataRepo()} you registered, which the platform never deletes. ` +
+                    'Delete the Work without `delete_data_repository`.',
+            });
+        }
+
         try {
             const deletedRepositories: string[] = [];
 
-            if (deleteWorkDto.delete_data_repository !== false) {
+            if (!wrapsExistingRepository && deleteWorkDto.delete_data_repository !== false) {
                 try {
                     await this.dataGenerator.removeRepository(work, user);
                     deletedRepositories.push(`${work.getRepoOwner()}/${work.getDataRepo()}`);
@@ -1232,7 +1375,15 @@ export class WorkLifecycleService {
                 }
             }
 
-            if (deleteWorkDto.delete_markdown_repository !== false) {
+            // Roles this kind never provisions are skipped, not attempted:
+            // there is nothing of ours to delete, and the derived fallback
+            // name may well belong to somebody else (see above). Applies to
+            // Company / Campaign Works' missing website repo as much as to a
+            // Repository Work's missing work + website repos.
+            if (
+                hasRepositoryRole(work, 'work') &&
+                deleteWorkDto.delete_markdown_repository !== false
+            ) {
                 try {
                     await this.markdownGenerator.removeRepository(work, user);
                     deletedRepositories.push(`${work.getRepoOwner('work')}/${work.getMainRepo()}`);
@@ -1245,7 +1396,10 @@ export class WorkLifecycleService {
                 }
             }
 
-            if (deleteWorkDto.delete_website_repository !== false) {
+            if (
+                hasRepositoryRole(work, 'website') &&
+                deleteWorkDto.delete_website_repository !== false
+            ) {
                 try {
                     await this.websiteGenerator.removeRepository(work, user);
                     deletedRepositories.push(
@@ -1262,11 +1416,18 @@ export class WorkLifecycleService {
 
             await this.workRepository.delete(work.id);
 
-            await Promise.all([
-                this.dataGenerator.cleanup(work),
-                this.markdownGenerator.cleanup(work),
-                this.websiteGenerator.cleanup(work),
-            ]).catch((error) => this.logger.error('Failed to cleanup repositories:', error));
+            // Local checkouts are keyed by `owner/repo`, not by Work. Nothing
+            // was ever cloned for a Repository Work by the generators, so the
+            // only checkout that could sit under the wrapped repository's key
+            // belongs to another Work — possibly another account's — and is
+            // not ours to remove.
+            if (!wrapsExistingRepository) {
+                await Promise.all([
+                    this.dataGenerator.cleanup(work),
+                    this.markdownGenerator.cleanup(work),
+                    this.websiteGenerator.cleanup(work),
+                ]).catch((error) => this.logger.error('Failed to cleanup repositories:', error));
+            }
 
             // EW-617 G5: tear down the platform-managed CNAME so the slug is
             // immediately reusable. Only applies when the work deployed to

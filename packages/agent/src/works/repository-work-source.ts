@@ -32,8 +32,23 @@ interface HostRule {
     readonly canonicalHost: string;
 }
 
-// Mirrors `GIT_PROVIDER_PATTERNS` in `import/source-repo-analyzer.service.ts`
-// so a URL the import analyser accepts is accepted here too.
+/**
+ * Hosts a Repository Work may point at.
+ *
+ * GitHub only, on purpose. `packages/plugins/` ships exactly one git-provider
+ * plugin (`github`), so a Work persisted with `gitProvider: 'gitlab'` would
+ * be one no Task can ever clone: `TaskWorkspaceService.provisionForRun`
+ * asks the git facade for a token for that provider and dies with "no git
+ * credentials are available for provider gitlab" on every fleet run, with
+ * no hint at creation time. Refusing the URL here is the honest failure.
+ *
+ * When a GitLab / Bitbucket plugin lands, add its rule here AND revisit the
+ * path parsing below: GitLab allows nested groups
+ * (`https://gitlab.com/group/subgroup/project`), so `owner` must become
+ * every segment but the last rather than requiring exactly two. The
+ * `gitProvider` / `storageProvider` unions on `RepositoryWorkSource`
+ * already carry the future values so nothing downstream has to widen.
+ */
 const HOST_RULES: readonly HostRule[] = [
     {
         host: /^(www\.)?github\.com$/i,
@@ -41,21 +56,15 @@ const HOST_RULES: readonly HostRule[] = [
         storageProvider: 'user-github',
         canonicalHost: 'github.com',
     },
-    {
-        host: /^(www\.)?gitlab\.com$/i,
-        gitProvider: 'gitlab',
-        storageProvider: 'user-gitlab',
-        canonicalHost: 'gitlab.com',
-    },
-    {
-        host: /^(www\.)?bitbucket\.org$/i,
-        gitProvider: 'bitbucket',
-        storageProvider: 'user-git',
-        canonicalHost: 'bitbucket.org',
-    },
 ];
 
-const SEGMENT = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,99})$/;
+// GitHub owners (users and orgs) must start alphanumeric; repository names
+// may not — `.github` (org profile / shared workflows) and `.dotfiles`-style
+// repos are common and legitimate. Both stay bounded at 100 characters, and
+// a repo of only dots is rejected because `.` / `..` are path components,
+// not names.
+const OWNER_SEGMENT = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,99})$/;
+const REPO_SEGMENT = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/;
 
 /**
  * Parse a repository URL into the coordinates a Repository Work persists.
@@ -108,7 +117,7 @@ export function parseRepositoryWorkSource(
     }
     const owner = segments[0];
     const repo = segments[1].replace(/\.git$/i, '');
-    if (!SEGMENT.test(owner) || !SEGMENT.test(repo)) {
+    if (!OWNER_SEGMENT.test(owner) || !REPO_SEGMENT.test(repo)) {
         return null;
     }
 
