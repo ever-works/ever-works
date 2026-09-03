@@ -1,5 +1,4 @@
 import { Type } from 'class-transformer';
-<<<<<<< HEAD
 import {
     IsBoolean,
     IsIn,
@@ -11,10 +10,7 @@ import {
     MaxLength,
     Min,
 } from 'class-validator';
-=======
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
->>>>>>> origin/develop
 import {
     INBOX_ITEM_STATUSES,
     INBOX_MAX_OPTION_ID_CHARS,
@@ -37,7 +33,6 @@ export class ListInboxQueryDto {
     @IsIn(INBOX_ITEM_STATUSES as readonly string[])
     status?: InboxItemStatus;
 
-<<<<<<< HEAD
     /**
      * Only items linked to this Task — the Task page's lookup of the open
      * question a parked fleet run is waiting on (self-build slice Q).
@@ -46,18 +41,21 @@ export class ListInboxQueryDto {
      * column is `uuid`, and Postgres answers a non-UUID comparison with
      * `22P02`, which would surface as a 500 instead of this 400.
      */
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description: 'Only items linked to this Task.',
+    })
     @IsOptional()
     @IsUUID()
     taskId?: string;
 
-=======
     @ApiProperty({
         required: false,
         minimum: 1,
         maximum: 100,
         description: 'Page size (default 50).',
     })
->>>>>>> origin/develop
     @IsOptional()
     @Type(() => Number)
     @IsInt()
