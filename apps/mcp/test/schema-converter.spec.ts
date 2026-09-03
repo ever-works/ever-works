@@ -27,6 +27,60 @@ describe('SchemaConverterService', () => {
 			expect(zodType.safeParse('not-a-url').success).toBe(false);
 		});
 
+		it('accepts offset and naive ISO timestamps for date-time, like the API IsDateString does', () => {
+			const schema: JsonSchema = { type: 'string', format: 'date-time' };
+			const zodType = converter.convertToZod(schema, true);
+			expect(zodType.safeParse('2026-09-04T09:00:00Z').success).toBe(true);
+			expect(zodType.safeParse('2026-09-04T09:00:00+02:00').success).toBe(true);
+			expect(zodType.safeParse('2026-09-04T09:00:00').success).toBe(true);
+			// A bare date is not a date-time for either side.
+			expect(zodType.safeParse('2026-09-04').success).toBe(false);
+			expect(zodType.safeParse('tomorrow').success).toBe(false);
+		});
+
+		describe('nullable (OpenAPI 3.0 spelling of "may be null")', () => {
+			it('accepts null for a required nullable string (workId: null detaches a Task from its Work)', () => {
+				const schema: JsonSchema = { type: 'string', nullable: true };
+				const zodType = converter.convertToZod(schema, true);
+				expect(zodType.safeParse(null).success).toBe(true);
+				expect(zodType.safeParse('abc').success).toBe(true);
+				expect(zodType.safeParse(undefined).success).toBe(false);
+			});
+
+			it('accepts null and undefined for an optional nullable string', () => {
+				const schema: JsonSchema = { type: 'string', nullable: true };
+				const zodType = converter.convertToZod(schema, false);
+				expect(zodType.safeParse(null).success).toBe(true);
+				expect(zodType.safeParse(undefined).success).toBe(true);
+				expect(zodType.safeParse(42).success).toBe(false);
+			});
+
+			it('still rejects null when the schema is not nullable', () => {
+				expect(converter.convertToZod({ type: 'string' }, true).safeParse(null).success).toBe(false);
+				expect(converter.convertToZod({ type: 'string' }, false).safeParse(null).success).toBe(false);
+			});
+
+			it('accepts an enum member or null for a nullable enum (isolationMode)', () => {
+				const schema: JsonSchema = { enum: ['worktree', 'container'], nullable: true };
+				const zodType = converter.convertToZod(schema, true);
+				expect(zodType.safeParse('worktree').success).toBe(true);
+				expect(zodType.safeParse(null).success).toBe(true);
+				expect(zodType.safeParse('vm').success).toBe(false);
+			});
+
+			it('carries nullable through a request body property', () => {
+				const body: JsonSchema = {
+					type: 'object',
+					properties: { workId: { type: 'string', format: 'uuid', nullable: true } },
+					required: ['workId']
+				};
+				const result = converter.buildToolParameters([], [], body);
+				expect(result.safeParse({ workId: null }).success).toBe(true);
+				expect(result.safeParse({ workId: '550e8400-e29b-41d4-a716-446655440000' }).success).toBe(true);
+				expect(result.safeParse({ workId: 'not-a-uuid' }).success).toBe(false);
+			});
+		});
+
 		it('converts integer type', () => {
 			const schema: JsonSchema = { type: 'integer' };
 			const zodType = converter.convertToZod(schema, true);

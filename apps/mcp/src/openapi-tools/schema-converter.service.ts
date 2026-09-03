@@ -136,7 +136,12 @@ export class SchemaConverterService {
 				s = s.email();
 				break;
 			case 'date-time':
-				s = s.datetime();
+				// Why the options: the API validates these fields with
+				// `@IsDateString()`, which takes an offset ("+02:00") or a naive
+				// local timestamp as readily as a "Z" one. Zod's default is
+				// UTC-only, so without this the tool refused payloads the
+				// endpoint accepts. A bare date ("2026-09-04") stays rejected.
+				s = s.datetime({ offset: true, local: true });
 				break;
 		}
 		if (schema.minLength !== undefined) s = s.min(schema.minLength);
