@@ -69,6 +69,20 @@ export const MODEL_CLI_STEP_ID = 'model';
 /** Bytes of the CLI's raw output retained on the result when parsing fails. */
 export const MODEL_CLI_OUTPUT_TAIL_BYTES = 8 * 1024;
 
+/**
+ * Hard ceiling on the `model-output.json` scratch file the node will LOAD.
+ *
+ * Distinct from {@link MODEL_CLI_OUTPUT_TAIL_BYTES}, which trims for display
+ * once the content is already in memory. This one is checked against the file
+ * on disk before any read, because the CLI's stdout is redirected there by
+ * the shell and its size is the CLI's choice, not ours.
+ *
+ * Generous on purpose — three orders of magnitude above the display tail — so
+ * it only ever catches genuinely pathological output (a loop, a stuck agent,
+ * a compromised binary) and never a legitimately chatty run.
+ */
+export const MODEL_CLI_MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
+
 const ABSOLUTE_WIN32 = /^[A-Za-z]:[\\/]/;
 const UNSAFE_PATH_CHARS = /[\0\r\n"'`$&|;<>%!^]/;
 
