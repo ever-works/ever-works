@@ -758,9 +758,14 @@ describe('SocialAuthService', () => {
             expect(logged).not.toContain('SECRET-UPSTREAM-DETAIL');
         });
 
-        it('(a2) token endpoint 4xx from any provider maps to 400 and names that provider', async () => {
+        it('(a2) a client-fault 4xx from any provider maps to 400 and names that provider', async () => {
+            // `invalid_grant` — the authorization code we presented was
+            // rejected, which the user CAN fix by restarting the flow. This
+            // deliberately no longer uses 401 `invalid_client`: that is the
+            // platform's own credential being refused, and it now maps to 502
+            // (see the `(a3)` cases).
             httpService.post.mockReturnValueOnce(
-                throwError(() => axiosHttpError(401, { error: 'invalid_client' })),
+                throwError(() => axiosHttpError(400, { error: 'invalid_grant' })),
             );
 
             const error = await captureError(service.authenticate(AuthProvider.LINKEDIN, 'bogus'));
@@ -772,6 +777,11 @@ describe('SocialAuthService', () => {
         it.each([
             [429, 'rate_limit_exceeded'],
             [408, 'request_timeout'],
+            // 401 is OUR client credentials, not the user's grant: a rejected
+            // authorization code comes back 400 `invalid_grant`. Mapped to 400
+            // it was counted as a client error, so a revoked or expired client
+            // secret took every sign-in down without raising a single 5xx.
+            [401, 'invalid_client'],
         ])(
             '(a3) token endpoint %s (%s) is a provider-side condition -> BadGatewayException (502), not a client-fault 400',
             async (status, code) => {
@@ -821,7 +831,7 @@ describe('SocialAuthService', () => {
             expect(String(warnSpy.mock.calls[0][0])).toContain('ECONNRESET');
         });
 
-        it('(d) user-info fetch rejecting with 401 -> BadRequestException, not a raw 500', async () => {
+        it('(d) user-info fetch rejecting with 401 -> BadGatewayException, not a raw 500', async () => {
             httpService.post.mockReturnValueOnce(of({ data: { access_token: 'tok' } }));
             httpService.get.mockReturnValueOnce(
                 throwError(() =>
@@ -833,7 +843,12 @@ describe('SocialAuthService', () => {
 
             const error = await captureError(service.authenticate(AuthProvider.GOOGLE, 'c'));
 
-            expect(error).toBeInstanceOf(BadRequestException);
+            // The token we present here is the one WE just obtained, so a 401
+            // means our exchange produced a token the provider will not honour
+            // — a platform/provider condition. There is nothing for the user
+            // to correct, and 5xx-keyed alerting should see it.
+            expect(error).toBeInstanceOf(BadGatewayException);
+            expect(error.getStatus()).toBe(502);
             expect(error.message).toContain('Google');
             expect(error.message).not.toContain('SECRET-UPSTREAM-DETAIL');
             expect(authService.validateSocialUser).not.toHaveBeenCalled();
