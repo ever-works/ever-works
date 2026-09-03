@@ -3,6 +3,7 @@ import {
 	FLEET_TASK_WORKSPACE_MAX_MOUNTS,
 	FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN,
 	FleetTaskWorkspaceMountError,
+	isReservedMountDir,
 	normalizeFleetTaskWorkspaceMounts
 } from '../fleet-task-workspace.types.js';
 
@@ -81,7 +82,15 @@ describe('normalizeFleetTaskWorkspaceMounts', () => {
 		['node_modules', 'node_modules'],
 		['a 65-character name', 'a'.repeat(65)],
 		['a space', 'my template'],
-		['an empty string', '']
+		['an empty string', ''],
+		// Windows strips trailing dots: `api.` and `api` would be ONE directory.
+		['a trailing dot', 'api.'],
+		// Windows device names cannot be created at all.
+		['NUL', 'NUL'],
+		['con', 'con'],
+		['COM1', 'COM1'],
+		['lpt9', 'lpt9'],
+		['nul with an extension', 'nul.txt']
 	])('refuses a mount directory that is %s', (_label, mountDir) => {
 		expect(() => normalizeFleetTaskWorkspaceMounts([{ ...template, mountDir }], PRIMARY)).toThrow(
 			FleetTaskWorkspaceMountError
@@ -89,10 +98,27 @@ describe('normalizeFleetTaskWorkspaceMounts', () => {
 	});
 
 	it('accepts the documented directory-name shape', () => {
-		for (const mountDir of ['a', 'directory-web-template', 'v2.api', 'my_repo', 'A'.repeat(64)]) {
+		for (const mountDir of [
+			'a',
+			'directory-web-template',
+			'v2.api',
+			'my_repo',
+			'A'.repeat(64),
+			'console',
+			'com10'
+		]) {
 			expect(FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN.test(mountDir)).toBe(true);
+			expect(isReservedMountDir(mountDir)).toBe(false);
 			expect(normalizeFleetTaskWorkspaceMounts([{ ...template, mountDir }], PRIMARY)[0]?.mountDir).toBe(mountDir);
 		}
+	});
+
+	it('shares one reserved-name rule with the API and the Task validation', () => {
+		for (const name of ['.git', '.MOUNTS', 'node_modules', 'CON', 'nul', 'Com1', 'LPT1.log', ' aux ', '']) {
+			expect(isReservedMountDir(name)).toBe(true);
+		}
+		expect(isReservedMountDir('api')).toBe(false);
+		expect(isReservedMountDir('lpt0')).toBe(false);
 	});
 
 	it('refuses two mounts on the same directory, case-insensitively (Windows and macOS collide)', () => {
