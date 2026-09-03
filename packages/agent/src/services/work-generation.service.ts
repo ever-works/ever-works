@@ -50,6 +50,7 @@ import {
     RuntimeBindingStamperService,
 } from '@src/tasks';
 import { WorkScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
+import { isRepositoryWorkKind } from '@ever-works/contracts';
 import { WorkOwnershipService } from './work-ownership.service';
 import { WorkMemoryService } from './work-memory.service';
 import { normalizeGeneratorError } from './utils/error.utils';
@@ -177,6 +178,7 @@ export class WorkGenerationService {
     ): Promise<ItemsGeneratorResponseDto> {
         // Require editor role to generate/update items
         const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+        this.ensureNotRepositoryWork(work);
         this.ensureNotAlreadyGenerating(work);
         const triggerContext = this.resolveContext(context);
 
@@ -222,6 +224,7 @@ export class WorkGenerationService {
 
         // Require editor role to generate/update items
         const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+        this.ensureNotRepositoryWork(work);
 
         // For scheduled runs, skip gracefully if work is busy (don't penalize the schedule)
         if (
@@ -930,6 +933,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
         try {
             // Require editor role to generate/update items
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            this.ensureNotRepositoryWork(work);
 
             await this.markdownGenerator.initialize(work, user, {
                 generation_method: GenerationMethod.RECREATE,
@@ -955,6 +959,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
         try {
             // Require editor role to generate/update items
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            this.ensureNotRepositoryWork(work);
 
             const templateUpdate = await this.dataGenerator.updateMarkdownTemplate(work, user);
 
@@ -1792,6 +1797,26 @@ Only include image URLs that are absolute URLs (starting with http).`;
     private ensureNotAlreadyGenerating(work: Work): void {
         if (work.generateStatus?.status === GenerateStatusType.GENERATING) {
             throw new ConflictException(`Work "${work.name}" already has a generation in progress`);
+        }
+    }
+
+    /**
+     * Repository Work (self-build slice D, EW-766) — a `repo` Work's data
+     * repository is the user's own code repository (`ever-works/ever-works`,
+     * a template repo, …). Every pipeline behind this service clones that
+     * repository and writes into it: item generation lays down directory
+     * scaffolding and content, README regeneration rewrites `README.md`.
+     * Run against a code repository that would push generated content into
+     * a human's source tree, so refuse up front — before a history row, a
+     * provider warm-up or a dispatch exists. The web app never offers these
+     * actions for the kind (`WORK_KIND_CAPABILITIES.repo`); this is the API
+     * boundary catching a direct call.
+     */
+    private ensureNotRepositoryWork(work: Work): void {
+        if (isRepositoryWorkKind(work.kind)) {
+            throw new BadRequestException(
+                `Work "${work.name}" is a Repository Work — its data repository is the code repository itself and nothing is generated for it`,
+            );
         }
     }
 

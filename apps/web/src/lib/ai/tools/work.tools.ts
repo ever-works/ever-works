@@ -22,9 +22,10 @@ import type { ConfirmationRequired } from './generated/factory';
 // landing page…"), passing the matching kind persists it on the Work so
 // the kind-aware default website template applies.
 const workKindSchema = z
-    .enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo'])
+    .enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo', 'repo'])
     .describe(
-        'Kind of Work the user asked for (from their message, e.g. "I want to create a landing page" → landing-page). Omit if unclear.',
+        'Kind of Work the user asked for (from their message, e.g. "I want to create a landing page" → landing-page). ' +
+            '"repo" registers an EXISTING code repository as a Work (needs repositoryUrl; use createWorkManual, never the AI creator). Omit if unclear.',
     );
 
 // ────────────────────────────────────────────────────────────────
@@ -185,8 +186,14 @@ export const createWorkManual = tool({
         description: z.string().optional().describe('Work description'),
         gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
         kind: workKindSchema.optional(),
+        repositoryUrl: z
+            .string()
+            .optional()
+            .describe(
+                'Repository Work only (kind "repo"): the existing https://github.com/<owner>/<repo> to register as the Work\'s data repository.',
+            ),
     }),
-    execute: async ({ name, slug, description, gitProvider, kind }) => {
+    execute: async ({ name, slug, description, gitProvider, kind, repositoryUrl }) => {
         const result = await createWork({
             name,
             slug,
@@ -194,6 +201,7 @@ export const createWorkManual = tool({
             gitProvider,
             organization: false,
             kind,
+            repositoryUrl,
         });
         return {
             success: result.success,

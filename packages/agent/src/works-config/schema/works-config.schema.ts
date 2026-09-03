@@ -203,6 +203,32 @@ const awesomeRepoSpec = z.looseObject({
     enrich: z.looseObject({ enabled: z.boolean().optional() }).optional(),
 });
 
+/**
+ * A Repository Work (self-build slice D, EW-766) wraps an EXISTING code
+ * repository — the data repository IS that repository, nothing is
+ * generated. The spec therefore describes how agents should work IN the
+ * repo rather than what to build: where the code lives, which branch Task
+ * worktrees branch from, and how to check a change before proposing it.
+ */
+const repoSpec = z.looseObject({
+    kind: z.literal('repo'),
+    source: z
+        .looseObject({
+            repo: repoRef.optional(),
+            branch: z.string().optional(),
+        })
+        .optional(),
+    tasks: z
+        .looseObject({
+            /** Branch Task worktrees are cut from; the repo default when absent. */
+            base_branch: z.string().optional(),
+            /** Commands an agent runs before opening a pull request. */
+            checks: z.array(nonEmptyString).optional(),
+        })
+        .optional(),
+    branding: branding.optional(),
+});
+
 const companySpec = z.looseObject({
     kind: z.literal('company'),
     organization: z.string().optional(),
@@ -231,6 +257,7 @@ export const KIND_SPEC_SCHEMAS = {
     blog: blogSpec,
     directory: directorySpec,
     'awesome-repo': awesomeRepoSpec,
+    repo: repoSpec,
     company: companySpec,
 } as const;
 

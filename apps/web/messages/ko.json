@@ -5976,6 +5976,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "리포지토리",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -5990,6 +5991,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "기존 코드 리포지토리를 Work로 등록 — 태스크, 목표, 플릿 실행이 여기에 연결됩니다. 아무것도 생성되거나 배포되지 않습니다.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6139,6 +6141,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "새 Work — 리포지토리",
+                "formSubtitle": "기존 코드 리포지토리를 Work로 등록합니다. 아무것도 생성되거나 배포되지 않습니다 — 태스크, 목표, 플릿 실행이 해당 리포지토리에서 작업할 뿐입니다.",
+                "urlLabel": "리포지토리 URL",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "접근 가능한 GitHub, GitLab 또는 Bitbucket 리포지토리. 그대로 Work의 데이터 리포지토리가 됩니다.",
+                "nameLabel": "Work 이름",
+                "slugLabel": "Work 슬러그",
+                "slugHelp": "URL 친화적 식별자. 리포지토리 이름에서 파생됩니다 — 변경하려면 편집하세요.",
+                "descriptionLabel": "설명",
+                "submitButton": "리포지토리 등록",
+                "creatingButton": "등록 중…",
+                "cancelButton": "취소",
+                "invalidUrl": "https://github.com/owner/repo 같은 리포지토리 URL을 입력하세요",
+                "success": "리포지토리가 Work로 등록되었습니다",
+                "createFailed": "리포지토리 등록에 실패했습니다",
+                "noteTitle": "참고:",
+                "noteText": "리포지토리 Work에는 웹사이트 템플릿, 프로바이더 리포지토리, 배포가 생성되지 않습니다. 에이전트가 클론할 수 있도록 리포지토리를 호스팅하는 Git 프로바이더를 연결하세요."
             },
             "manual": {
                 "title": "수동 생성",
@@ -6382,14 +6403,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "리포지토리"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "기존 코드 리포지토리를 Work로 등록 — 태스크, 목표, 플릿 실행이 여기에 연결됩니다. 아무것도 생성되거나 배포되지 않습니다."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7877,6 +7900,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "리포지토리",
             "company": "Company",
             "campaign": "캠페인",
             "default": "Work"

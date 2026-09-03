@@ -47,18 +47,18 @@ activity_sync:
 spec: {} # kind-specific, see below
 ```
 
-| Field              | Type   | Notes                                                                      |
-| ------------------ | ------ | -------------------------------------------------------------------------- |
-| `version`          | int    | Advisory only. Absent means v1. See [Versioning](#versioning).             |
-| `kind`             | string | `website`, `landing-page`, `blog`, `directory`, `awesome-repo`, `company`. |
-| `name` / `title`   | string | Display name of the Work.                                                  |
-| `initial_prompt`   | string | Seeds generation. Capped at 8000 characters.                               |
-| `model`            | string | Preferred model id.                                                        |
-| `website_repo`     | string | `owner/repo` of the Work Repository.                                       |
-| `schedule_cadence` | enum   | How often scheduled generation runs.                                       |
-| `deploy_provider`  | string | Deployment plugin id. `deployProvider` is accepted as an alias.            |
-| `activity_sync`    | object | Activity Feed transport. See ADR-004.                                      |
-| `spec`             | object | Kind-specific configuration.                                               |
+| Field              | Type   | Notes                                                                              |
+| ------------------ | ------ | ---------------------------------------------------------------------------------- |
+| `version`          | int    | Advisory only. Absent means v1. See [Versioning](#versioning).                     |
+| `kind`             | string | `website`, `landing-page`, `blog`, `directory`, `awesome-repo`, `repo`, `company`. |
+| `name` / `title`   | string | Display name of the Work.                                                          |
+| `initial_prompt`   | string | Seeds generation. Capped at 8000 characters.                                       |
+| `model`            | string | Preferred model id.                                                                |
+| `website_repo`     | string | `owner/repo` of the Work Repository.                                               |
+| `schedule_cadence` | enum   | How often scheduled generation runs.                                               |
+| `deploy_provider`  | string | Deployment plugin id. `deployProvider` is accepted as an alias.                    |
+| `activity_sync`    | object | Activity Feed transport. See ADR-004.                                              |
+| `spec`             | object | Kind-specific configuration.                                                       |
 
 ## Versioning
 
@@ -147,6 +147,22 @@ spec:
         - { url: https://example.com/chairs }
     submissions: { enabled: true, moderation: manual }
     comparisons: { enabled: true }
+```
+
+### `repo`
+
+A Repository Work wraps an existing code repository; the data repository is
+that repository and nothing is generated. The spec describes how agents work
+_in_ the repo rather than what to build.
+
+```yaml
+kind: repo
+spec:
+    kind: repo
+    source: { repo: ever-works/ever-works, branch: develop }
+    tasks:
+        base_branch: develop
+        checks: ['pnpm lint', 'pnpm test']
 ```
 
 ### `awesome-repo`

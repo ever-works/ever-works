@@ -145,6 +145,14 @@ describe('worksConfigSchema', () => {
                 { kind: 'directory', submissions: { enabled: true, moderation: 'manual' } },
             ],
             ['awesome-repo', { kind: 'awesome-repo', source: { repo: 'o/r', branch: 'main' } }],
+            [
+                'repo',
+                {
+                    kind: 'repo',
+                    source: { repo: 'ever-works/ever-works', branch: 'develop' },
+                    tasks: { base_branch: 'develop', checks: ['pnpm lint', 'pnpm test'] },
+                },
+            ],
             ['company', { kind: 'company', departments: [{ name: 'Engineering' }] }],
         ])('accepts a %s spec', (kind, spec) => {
             const result = validateWorksConfig({ version: 2, kind, spec });

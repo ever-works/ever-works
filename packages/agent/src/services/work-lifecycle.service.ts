@@ -59,9 +59,14 @@ import {
     type EverWorksGitRepoRef,
 } from '@src/ever-works-providers';
 import { config } from '@src/config';
+import { isRepositoryWorkKind } from '@ever-works/contracts';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import { ZeroFrictionFunnelService } from './zero-friction-funnel.service';
+import {
+    parseRepositoryWorkSource,
+    type RepositoryWorkSource,
+} from '@src/works/repository-work-source';
 
 /**
  * Map a wizard "storage" choice onto the existing `gitProvider` field.
@@ -236,10 +241,27 @@ export class WorkLifecycleService {
         const { slug, name, description, owner, readmeConfig, organization, websiteTemplateId } =
             createWorkDto;
 
-        const selectedWebsiteTemplateId = await this.resolveValidatedWebsiteTemplateSelection(
-            websiteTemplateId,
-            user.id,
-        );
+        // Persist the user's work-kind choice (website / landing-page /
+        // blog / directory / awesome-repo / repo) so
+        // `WebsiteTemplateResolverService.resolveForWork` can apply the
+        // kind-aware default website template (PR #1681). Re-normalized
+        // here because `createWork` is also invoked programmatically with
+        // plain objects that never passed through the DTO transform
+        // (quick-create controller, onboarding adapter). Omitted → the
+        // column default `'default'` applies, exactly as before.
+        const normalizedKind = normalizeCreateWorkKind(createWorkDto.kind);
+
+        // Repository Work (self-build slice D, EW-766) — resolve the source
+        // repository FIRST so a bad or missing URL fails before any side
+        // effect. A `repo` Work has no website template and no deploy, so
+        // template validation and the deploy quota are skipped for it.
+        const repositorySource = isRepositoryWorkKind(normalizedKind)
+            ? this.resolveRepositoryWorkSource(createWorkDto.repositoryUrl)
+            : null;
+
+        const selectedWebsiteTemplateId = repositorySource
+            ? null
+            : await this.resolveValidatedWebsiteTemplateSelection(websiteTemplateId, user.id);
 
         const { storageProvider, deployProvider, gitProvider } = await this.resolveProviderDefaults(
             createWorkDto,
@@ -249,7 +271,7 @@ export class WorkLifecycleService {
         // Ever Works Deploy is capped per user. The check is a no-op when
         // the user isn't picking it; we still want a hard fail BEFORE the
         // create-work side-effects (repo creation etc.) kick in.
-        if (deployProvider === 'ever-works') {
+        if (deployProvider === 'ever-works' && !repositorySource) {
             await this.everWorksDeployQuota.assertWithinQuota(user.id);
         }
 
@@ -277,17 +299,17 @@ export class WorkLifecycleService {
             lastDeployCorrelationId: createWorkDto.correlationId ?? null,
         };
 
-        // Persist the user's work-kind choice (website / landing-page /
-        // blog / directory / awesome-repo) so
-        // `WebsiteTemplateResolverService.resolveForWork` can apply the
-        // kind-aware default website template (PR #1681). Re-normalized
-        // here because `createWork` is also invoked programmatically with
-        // plain objects that never passed through the DTO transform
-        // (quick-create controller, onboarding adapter). Omitted → the
-        // column default `'default'` applies, exactly as before.
-        const normalizedKind = normalizeCreateWorkKind(createWorkDto.kind);
         if (normalizedKind) {
             workData.kind = normalizedKind;
+        }
+
+        // A Repository Work registers the user's EXISTING repository as its
+        // data repository and provisions nothing — see
+        // `applyRepositoryWorkSource`. The managed Ever Works Git branch
+        // below is skipped for it on purpose: creating a fresh repo in the
+        // platform org is the opposite of what "wrap this repo" means.
+        if (repositorySource) {
+            this.applyRepositoryWorkSource(workData, repositorySource);
         }
 
         // EW-614 — when the user picks "Ever Works Git" AND the feature flag
@@ -327,7 +349,11 @@ export class WorkLifecycleService {
         // can derive a deterministic collision suffix from it. The same UUID
         // is persisted on the DB row in a single TypeORM `save()`.
         let everWorksRepo: EverWorksGitRepoRef | undefined;
-        if (storageProvider === 'ever-works-git' && this.everWorksGit.isEnabled()) {
+        if (
+            storageProvider === 'ever-works-git' &&
+            !repositorySource &&
+            this.everWorksGit.isEnabled()
+        ) {
             const workId = randomUUID();
             try {
                 everWorksRepo = await this.everWorksGit.createRepository({
@@ -363,11 +389,17 @@ export class WorkLifecycleService {
             const dir = await this.workRepository.create(workData, user);
             dir.owner = dir.getRepoOwner();
 
-            const items = await this.dataGenerator.getItems(dir, user).catch(() => []);
-            if (items.length > 0) {
-                await this.workRepository.updateGenerateStatus(dir.id, {
-                    status: GenerateStatusType.GENERATED,
-                });
+            // The items probe clones the data repository looking for
+            // directory content. A Repository Work's data repository is a
+            // code repository with no items to find, and it is already
+            // stamped `generated` — skip the clone.
+            if (!repositorySource) {
+                const items = await this.dataGenerator.getItems(dir, user).catch(() => []);
+                if (items.length > 0) {
+                    await this.workRepository.updateGenerateStatus(dir.id, {
+                        status: GenerateStatusType.GENERATED,
+                    });
+                }
             }
 
             // Emit `WorkCreatedEvent` so downstream listeners (activity log,
@@ -424,6 +456,73 @@ export class WorkLifecycleService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'creating work');
         }
+    }
+
+    /**
+     * Repository Work (self-build slice D, EW-766) — turn the caller's
+     * `repositoryUrl` into persisted coordinates, or fail the create.
+     *
+     * A `repo` Work without a repository is a contradiction, so a missing
+     * or unparseable URL is a 400 rather than a silently derived
+     * `<slug>-data` repository nobody ever created (the exact failure mode
+     * EW-028 fixed for managed storage).
+     */
+    private resolveRepositoryWorkSource(repositoryUrl: string | undefined): RepositoryWorkSource {
+        const source = parseRepositoryWorkSource(repositoryUrl);
+        if (!source) {
+            throw new BadRequestException({
+                status: 'error',
+                message:
+                    'A Repository Work needs `repositoryUrl` — an existing https://github.com/<owner>/<repo> ' +
+                    '(GitLab and Bitbucket URLs are accepted too).',
+            });
+        }
+        return source;
+    }
+
+    /**
+     * Repository Work (self-build slice D, EW-766) — register an EXISTING
+     * code repository as the Work's data repository, provisioning nothing.
+     *
+     * The repository is written under the `data` role of
+     * `sourceRepository.relatedRepositories` (plus `work.owner`), which is
+     * what `Work.getDataRepo()` / `getRepoOwner()` read — and therefore what
+     * `TaskWorkspaceService.provisionForRun` clones for an isolated Task
+     * worktree and what `WorkRepository.findByDataRepoFullName` matches
+     * inbound push webhooks against. Registering the `data` role explicitly
+     * (rather than only the top-level `owner`/`repo`, as `link_existing`
+     * imports do) is deliberate: `getRelatedRepository` falls back per
+     * FIELD, so an unrecorded role would resolve the owner correctly and
+     * the repo to the derived `<slug>-data` default.
+     *
+     * `type: 'link_existing'` is the closest existing `ImportSourceType`:
+     * nothing was copied or generated, the Work simply points at a repo the
+     * user already had. The `work` and `website` roles stay unset because
+     * `WORK_KIND_CAPABILITIES.repo` provisions neither.
+     */
+    private applyRepositoryWorkSource(workData: Partial<Work>, source: RepositoryWorkSource): void {
+        workData.owner = source.owner;
+        workData.gitProvider = source.gitProvider;
+        workData.storageProvider = source.storageProvider;
+        // No website to deploy — and `null` keeps the row out of the
+        // `deployProvider = 'ever-works'` quota count, exactly as
+        // `createCompanyWork` does (Codex P2 on PR #1075).
+        workData.deployProvider = null;
+        workData.websiteTemplateId = null;
+        workData.sourceRepository = {
+            url: source.url,
+            owner: source.owner,
+            repo: source.repo,
+            type: 'link_existing',
+            importedAt: new Date(),
+            relatedRepositories: {
+                data: { owner: source.owner, repo: source.repo },
+            },
+        };
+        // Nothing will ever be generated for this Work; stamp it the way a
+        // linked import is stamped so the UI does not wait on a generation
+        // that is never coming.
+        workData.generateStatus = { status: GenerateStatusType.GENERATED, step: 'linked' };
     }
 
     /**

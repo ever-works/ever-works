@@ -59,7 +59,14 @@ const readmeConfigSchema = z.object({
 // works/new/new-work-client.tsx). Persisted on `work.kind` by the API so
 // the kind-aware default website template applies (general-purpose kinds
 // → the `web` template). The API whitelists again server-side.
-const aiWorkKindSchema = z.enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo']);
+const aiWorkKindSchema = z.enum([
+    'website',
+    'landing-page',
+    'blog',
+    'directory',
+    'awesome-repo',
+    'repo',
+]);
 type AIWorkKind = z.infer<typeof aiWorkKindSchema>;
 
 const getCreateWorkSchema = async () => {
@@ -97,6 +104,13 @@ const getCreateWorkSchema = async () => {
         // Optional work-kind chip value — kept in the parsed output so it
         // reaches the API's CreateWorkDto (zod strips unknown keys).
         kind: aiWorkKindSchema.optional(),
+        // Repository Work (`kind: 'repo'`) — the existing repository the
+        // Work wraps. Declared so zod keeps it; the API parses + validates.
+        repositoryUrl: z
+            .string()
+            .optional()
+            .transform((val) => val?.trim() || undefined)
+            .pipe(z.string().max(400).optional()),
         readmeConfig: readmeConfigSchema.optional(),
     });
 
@@ -296,6 +310,7 @@ const AI_WORK_KIND_PROMPT_LABELS: Record<AIWorkKind, string> = {
     blog: 'blog',
     directory: 'directory',
     'awesome-repo': 'awesome repository list',
+    repo: 'code repository',
 };
 
 interface AIWorkOptions {

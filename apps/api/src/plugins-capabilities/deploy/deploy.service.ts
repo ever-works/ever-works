@@ -36,6 +36,7 @@ import {
     SubdomainAllocator,
     EverWorksDbProvisionService,
 } from '@ever-works/agent/ever-works-providers';
+import { isRepositoryWorkKind } from '@ever-works/contracts';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
 import {
     WebsiteUpdateService,
@@ -183,6 +184,20 @@ export class DeployService {
                 userId,
                 workId,
             });
+
+        // Repository Work (self-build slice D, EW-766) — a `repo` Work wraps
+        // the user's own code repository and provisions no website
+        // repository, so there is nothing to deploy. Its `deployProvider` is
+        // persisted as `null`; without this gate the `|| 'ever-works'`
+        // fallback below would try to ship a `<slug>-website` repo that was
+        // never created. The Deploy tab is already hidden for the kind
+        // (`WORK_KIND_CAPABILITIES.repo.deploy`); this catches direct API
+        // calls and `deployBatch`, which funnels through here.
+        if (isRepositoryWorkKind(work.kind)) {
+            throw new BadRequestException(
+                `Work "${work.slug}" is a Repository Work — it has no website repository and nothing to deploy`,
+            );
+        }
 
         const user = work.user as User;
         const gitToken = await this.gitFacade.getAccessToken({

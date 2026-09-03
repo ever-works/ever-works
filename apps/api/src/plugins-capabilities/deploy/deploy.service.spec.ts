@@ -70,11 +70,15 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         website?: string;
         /** Whether the Work owner is a platform admin — gates `k8s-works`. */
         isPlatformAdmin?: boolean;
+        /** Work kind. Defaults to `default`; `repo` (self-build slice D,
+         *  EW-766) is the one kind `deploy()` refuses outright. */
+        kind?: string;
     }) => {
         const websiteOwner = overrides.websiteOwner ?? 'acme';
         const work = {
             id: 'work-1',
             slug: 'my-site',
+            kind: overrides.kind ?? 'default',
             website: overrides.website,
             deployProvider: overrides.deployProvider ?? 'k8s',
             gitProvider: 'github',
@@ -1108,6 +1112,45 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             const { secrets, variables } = captureCalls(githubPlugin);
             expect(secrets.map((s: any) => s.key)).not.toContain('SITE_URL');
             expect(variables.map((v: any) => v.key)).not.toContain('SITE_URL');
+        });
+    });
+
+    describe('Repository Work kind (self-build slice D, EW-766)', () => {
+        // A `repo` Work wraps the user's own code repository and has no
+        // website repository. Its deployProvider is persisted as null, which
+        // the EW-617 G6 fallback below would otherwise turn into an
+        // 'ever-works' deploy of a `<slug>-website` repo that never existed.
+        it('refuses to deploy a repo Work before touching git or the deploy plugin', async () => {
+            const { service, gitFacade, githubPlugin } = buildService({
+                kind: 'repo',
+                deployProvider: '',
+                plugin: {
+                    id: 'ever-works',
+                    getWorkflowFilenames: () => ['deploy_ever_works.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(/Repository Work/);
+
+            expect(gitFacade.getAccessToken).not.toHaveBeenCalled();
+            expect(githubPlugin.dispatchWorkflow).not.toHaveBeenCalled();
+            expect(githubPlugin.setActionSecret).not.toHaveBeenCalled();
+        });
+
+        it('leaves every other kind on the existing path (awesome-repo is not a Repository Work)', async () => {
+            const { service, githubPlugin } = buildService({
+                kind: 'awesome-repo',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            expect(githubPlugin.dispatchWorkflow).toHaveBeenCalled();
         });
     });
 

@@ -5,6 +5,7 @@ import { AuthUser } from '@/lib/auth';
 import { cn } from '@/lib/utils/cn';
 import { WorkAICreator } from '@/components/works/WorkAICreator';
 import { WorkImportForm } from '@/components/works/WorkImportForm';
+import { RepositoryWorkForm } from '@/components/works/RepositoryWorkForm';
 import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
@@ -17,6 +18,7 @@ import {
     FolderInput,
     FolderKanban,
     FolderOpen,
+    GitBranch,
     Globe,
     Megaphone,
     PenLine,
@@ -41,7 +43,7 @@ import type { WorkProposal } from '@/lib/api/work-proposals';
 
 export type CreationMode = 'ai' | 'manual' | 'import';
 
-type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo';
+type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo' | 'repo';
 
 const WORK_KIND_ORDER: InitialWorkKind[] = [
     'website',
@@ -49,6 +51,8 @@ const WORK_KIND_ORDER: InitialWorkKind[] = [
     'blog',
     'directory',
     'awesome-repo',
+    // Self-build slice D (EW-766) — an existing code repository as a Work.
+    'repo',
 ];
 
 /**
@@ -71,6 +75,7 @@ const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
     // makes the two chips visually indistinguishable in the chip row.
     directory: FolderOpen,
     'awesome-repo': Star,
+    repo: GitBranch,
 };
 
 const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
@@ -103,6 +108,12 @@ const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
         'e.g. "Awesome list of TypeScript ESLint rules with examples and when-to-disable guidance"',
         'e.g. "Awesome list of self-hostable open-source SaaS alternatives — categorized + docker-ready"',
         'e.g. "Awesome list of agent frameworks (LangChain, AutoGen, CrewAI…) with pros/cons"',
+    ],
+    repo: [
+        'e.g. "https://github.com/ever-works/ever-works — the platform monorepo"',
+        'e.g. "https://github.com/ever-works/directory-web-template — the directory template"',
+        'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
+        'e.g. "https://gitlab.com/my-group/my-project — any GitHub, GitLab or Bitbucket repo"',
     ],
 };
 
@@ -172,6 +183,12 @@ export default function NewWorkClient({
     // Composer state used by the entry view (creationMode === null).
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
     const [selectedKind, setSelectedKind] = useState<InitialWorkKind>(initialKind ?? 'website');
+    // Repository kind — the composer text (typically the repo URL) is
+    // handed to the Repository form instead of the chat AI. Seeded from
+    // `?prompt=` when `/new` routed here with `kind=repo`.
+    const [repositoryUrlSeed, setRepositoryUrlSeed] = useState(
+        initialKind === 'repo' ? (initialPrompt ?? '') : '',
+    );
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
@@ -187,6 +204,7 @@ export default function NewWorkClient({
         blog: 'blog',
         directory: 'directory',
         'awesome-repo': 'awesome list repo',
+        repo: 'code repository',
     };
 
     const gitConnected = useMemo(() => {
@@ -265,6 +283,14 @@ export default function NewWorkClient({
         // chat carries it, the form starts empty so the user isn't
         // re-prompted to confirm the same text twice.
         startSubmit(() => {
+            // A Repository Work has nothing to generate, so there is no
+            // chat turn to open — the text goes straight to the form.
+            if (effectiveKind === 'repo') {
+                setRepositoryUrlSeed(description);
+                setPrompt('');
+                setCreationMode('manual');
+                return;
+            }
             startFromPrompt(description, {
                 intent: WORK_KIND_INTENT_LABEL[effectiveKind],
                 attachments: buildAttachmentRefs(attachments),
@@ -448,8 +474,20 @@ export default function NewWorkClient({
                     </button>
                 </div>
 
-                {(creationMode === 'ai' || creationMode === 'manual') && (
-                    /* The previously separate "Create with AI" and
+                {/* Self-build slice D (EW-766) — a Repository Work wraps an
+                    existing code repository: no prompt, no template, no
+                    generation. Its own small form replaces the AI creator in
+                    both the `ai` and `manual` modes; "Import Existing Work"
+                    keeps its own form regardless of the selected kind. */}
+                {effectiveKind === 'repo' && creationMode !== 'import' && (
+                    <RepositoryWorkForm
+                        gitProvider={selectedProviderId || undefined}
+                        initialRepositoryUrl={repositoryUrlSeed || initialPrompt}
+                    />
+                )}
+                {effectiveKind !== 'repo' &&
+                    (creationMode === 'ai' || creationMode === 'manual') && (
+                        /* The previously separate "Create with AI" and
                        "Create Manually" flows are merged here. The AI
                        creator carries the richer surface (name + slug
                        + prompt + advanced AI/provider settings +
@@ -461,18 +499,18 @@ export default function NewWorkClient({
                        prompt, the chat AI now carries the prompt text
                        and the form starts empty so we don't re-prompt
                        them inside the canvas. */
-                    <WorkAICreator
-                        gitProvider={selectedProviderId || undefined}
-                        gitConnected={gitConnected}
-                        managedGitStorage={managedGitStorage}
-                        deployProvider={selectedDeployProviderId || undefined}
-                        websiteTemplates={websiteTemplates}
-                        workBlueprints={workBlueprints}
-                        proposal={proposal ?? undefined}
-                        initialPrompt={initialPrompt}
-                        initialKind={effectiveKind || initialKind || undefined}
-                    />
-                )}
+                        <WorkAICreator
+                            gitProvider={selectedProviderId || undefined}
+                            gitConnected={gitConnected}
+                            managedGitStorage={managedGitStorage}
+                            deployProvider={selectedDeployProviderId || undefined}
+                            websiteTemplates={websiteTemplates}
+                            workBlueprints={workBlueprints}
+                            proposal={proposal ?? undefined}
+                            initialPrompt={initialPrompt}
+                            initialKind={effectiveKind || initialKind || undefined}
+                        />
+                    )}
                 {creationMode === 'import' && (
                     <WorkImportForm
                         user={user}

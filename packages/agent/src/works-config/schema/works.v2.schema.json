@@ -780,6 +780,68 @@
                     "additionalProperties": {}
                 },
                 {
+                    "title": "spec for kind: repo",
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "const": "repo"
+                        },
+                        "source": {
+                            "type": "object",
+                            "properties": {
+                                "repo": {
+                                    "type": "string",
+                                    "maxLength": 400
+                                },
+                                "branch": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "tasks": {
+                            "type": "object",
+                            "properties": {
+                                "base_branch": {
+                                    "type": "string"
+                                },
+                                "checks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "branding": {
+                            "type": "object",
+                            "properties": {
+                                "logo": {
+                                    "type": "string"
+                                },
+                                "favicon": {
+                                    "type": "string"
+                                },
+                                "theme": {
+                                    "type": "string"
+                                },
+                                "locale": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        }
+                    },
+                    "required": [
+                        "kind"
+                    ],
+                    "additionalProperties": {}
+                },
+                {
                     "title": "spec for kind: company",
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "type": "object",

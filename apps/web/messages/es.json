@@ -6046,6 +6046,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Repositorio",
                 "company": "Company"
             },
             "chipDescriptions": {
@@ -6058,6 +6059,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Un repositorio de código existente como Work: las tareas, los objetivos y las ejecuciones de la flota se vinculan a él. No se genera ni despliega nada.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6102,14 +6104,16 @@
                 "landing-page": "Página de aterrizaje",
                 "blog": "Blog",
                 "directory": "Directorio",
-                "awesome-repo": "Repo Awesome"
+                "awesome-repo": "Repo Awesome",
+                "repo": "Repositorio"
             },
             "kindDescriptions": {
                 "website": "Un sitio web de varias páginas para un negocio, servicio o marca — contenido generado + código.",
                 "landing-page": "Una página enfocada — listas de espera, lanzamientos de productos, inscripciones a seminarios web, captura de clientes potenciales.",
                 "blog": "Un blog con categorías, RSS, resaltado de código y contenido optimizado para SEO.",
                 "directory": "Un sitio de directorio curado con búsqueda, filtros y datos estructurados de elementos.",
-                "awesome-repo": "Un repo de lista awesome — índice markdown, enlaces categorizados y metadatos actualizables."
+                "awesome-repo": "Un repo de lista awesome — índice markdown, enlaces categorizados y metadatos actualizables.",
+                "repo": "Un repositorio de código existente como Work: las tareas, los objetivos y las ejecuciones de la flota se vinculan a él. No se genera ni despliega nada."
             },
             "promptHints": {
                 "minLength": "Añade una descripción (al menos 10 caracteres) para comenzar.",
@@ -6230,6 +6234,25 @@
                 "organizationNameLabel": "Nombre de la Organización",
                 "organizationNamePlaceholder": "Ingresa el nombre de la organización",
                 "websiteTemplateHelperText": "Seleccione la plantilla de trabajo que se utilizará cuando se cree el repositorio del trabajo por primera vez."
+            },
+            "repo": {
+                "formTitle": "Nuevo Work — Repositorio",
+                "formSubtitle": "Registra un repositorio de código existente como Work. No se genera ni despliega nada: las tareas, los objetivos y las ejecuciones de la flota simplemente trabajan en ese repositorio.",
+                "urlLabel": "URL del repositorio",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Un repositorio de GitHub, GitLab o Bitbucket al que tengas acceso. Se convierte tal cual en el repositorio de datos del Work.",
+                "nameLabel": "Nombre del Work",
+                "slugLabel": "Slug del Work",
+                "slugHelp": "Identificador apto para URL. Derivado del nombre del repositorio; edítalo para cambiarlo.",
+                "descriptionLabel": "Descripción",
+                "submitButton": "Registrar repositorio",
+                "creatingButton": "Registrando…",
+                "cancelButton": "Cancelar",
+                "invalidUrl": "Introduce una URL de repositorio como https://github.com/owner/repo",
+                "success": "Repositorio registrado como Work",
+                "createFailed": "No se pudo registrar el repositorio",
+                "noteTitle": "Nota:",
+                "noteText": "Para un Work de tipo Repositorio no se crea plantilla de sitio, repositorio del proveedor ni despliegue. Conecta el proveedor Git que aloja el repositorio para que los agentes puedan clonarlo."
             },
             "manual": {
                 "title": "Crear Manualmente",
@@ -7907,6 +7930,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Repositorio",
             "company": "Company",
             "campaign": "Campaña",
             "default": "Work"

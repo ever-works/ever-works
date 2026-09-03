@@ -5976,6 +5976,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "รีโพซิทอรี",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -5990,6 +5991,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "รีโพซิทอรีโค้ดที่มีอยู่แล้วในฐานะ Work — งาน เป้าหมาย และการรันของฟลีตจะผูกกับมัน ไม่มีการสร้างหรือดีพลอยใด ๆ",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6139,6 +6141,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Work ใหม่ — รีโพซิทอรี",
+                "formSubtitle": "ลงทะเบียนรีโพซิทอรีโค้ดที่มีอยู่แล้วเป็น Work ไม่มีการสร้างหรือดีพลอยใด ๆ — งาน เป้าหมาย และการรันของฟลีตจะทำงานในรีโพซิทอรีนั้นโดยตรง",
+                "urlLabel": "URL ของรีโพซิทอรี",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "รีโพซิทอรี GitHub, GitLab หรือ Bitbucket ที่คุณเข้าถึงได้ จะกลายเป็นรีโพซิทอรีข้อมูลของ Work ตามเดิม",
+                "nameLabel": "ชื่อ Work",
+                "slugLabel": "สลักของ Work",
+                "slugHelp": "ตัวระบุที่ใช้ใน URL ได้ สร้างจากชื่อรีโพซิทอรี — แก้ไขเพื่อเปลี่ยน",
+                "descriptionLabel": "คำอธิบาย",
+                "submitButton": "ลงทะเบียนรีโพซิทอรี",
+                "creatingButton": "กำลังลงทะเบียน…",
+                "cancelButton": "ยกเลิก",
+                "invalidUrl": "กรอก URL ของรีโพซิทอรี เช่น https://github.com/owner/repo",
+                "success": "ลงทะเบียนรีโพซิทอรีเป็น Work แล้ว",
+                "createFailed": "ลงทะเบียนรีโพซิทอรีไม่สำเร็จ",
+                "noteTitle": "หมายเหตุ:",
+                "noteText": "Work แบบรีโพซิทอรีจะไม่มีการสร้างเทมเพลตเว็บไซต์ รีโพซิทอรีของผู้ให้บริการ หรือการดีพลอย เชื่อมต่อผู้ให้บริการ Git ที่โฮสต์รีโพซิทอรีเพื่อให้เอเจนต์โคลนได้"
             },
             "manual": {
                 "title": "สร้างด้วยตนเอง",
@@ -6382,14 +6403,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "รีโพซิทอรี"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "รีโพซิทอรีโค้ดที่มีอยู่แล้วในฐานะ Work — งาน เป้าหมาย และการรันของฟลีตจะผูกกับมัน ไม่มีการสร้างหรือดีพลอยใด ๆ"
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7877,6 +7900,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "รีโพซิทอรี",
             "company": "Company",
             "campaign": "แคมเปญ",
             "default": "Work"

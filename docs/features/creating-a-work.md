@@ -30,6 +30,7 @@ flowchart TD
 | **AI Creation** | Starting from a topic or idea                    | Yes                    | Yes — AI researches, discovers, and writes items | Full (pipeline, AI, search, screenshot, content extractor) |
 | **Manual**      | Setting up structure first, adding content later | No                     | No — creates an empty work scaffold              | None                                                       |
 | **Import**      | Bootstrapping from an existing repository        | Depends on source type | Yes (for Awesome README) or copies existing data | Depends on source type                                     |
+| **Repository**  | Attaching agents to a code repository you own    | No                     | No — the repository is used as-is                | None                                                       |
 
 ## AI Creation
 
@@ -158,6 +159,33 @@ For Awesome README imports, you can also configure the **expansion factor** — 
 | 2.5x (default) | ~40%              | Recommended — significant discovery beyond the source          |
 | 3x             | ~33%              | Aggressive — two-thirds of items are newly discovered          |
 | 5x             | ~20%              | Maximum expansion — source is just the starting point          |
+
+## Repository Works
+
+The **Repository** kind (`kind: repo`) turns an existing code repository — the
+platform monorepo, a template repository, a website repository — into a
+first-class Work so Tasks, Goals and fleet runs can attach to it. Pick the
+**Repository** chip on `/new` or `/works/new`, paste the repository URL
+(GitHub, GitLab or Bitbucket — `https://github.com/owner/repo`), and adjust
+the derived name, slug and description if you like.
+
+What is different from every other kind:
+
+- **The data repository IS the code repository.** The URL you enter is
+  registered verbatim as the Work's data repository, which is what isolated
+  Task worktrees are cloned from and what inbound push webhooks are matched
+  against. Nothing is copied.
+- **Nothing is generated.** No website template, no provider ("GitHub")
+  repository, no deployment, no items or taxonomy. The Overview shows the
+  work happening on the repository (agents, open tasks, days active) and the
+  knowledge base stays available for the repository's conventions and
+  runbooks.
+- **You need access to the repository.** Connect the git provider that hosts
+  it so agents can clone it. The Work's git provider is taken from the URL.
+
+The API equivalent is `POST /api/works` with `kind: "repo"` and
+`repositoryUrl`; the call is rejected when the URL is missing or is not a
+`https://<github.com|gitlab.com|bitbucket.org>/<owner>/<repo>` address.
 
 ## Common Concepts
 

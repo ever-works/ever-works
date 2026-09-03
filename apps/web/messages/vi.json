@@ -5976,6 +5976,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Kho mã",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -5990,6 +5991,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Một kho mã nguồn hiện có dưới dạng Work — Task, Goal và các lượt chạy fleet gắn vào đó. Không có gì được tạo ra hay triển khai.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6139,6 +6141,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Work mới — Kho mã",
+                "formSubtitle": "Đăng ký một kho mã nguồn hiện có làm Work. Không có gì được tạo ra hay triển khai — Task, Goal và các lượt chạy fleet chỉ làm việc trong kho mã đó.",
+                "urlLabel": "URL kho mã",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Một kho GitHub, GitLab hoặc Bitbucket mà bạn có quyền truy cập. Nó trở thành kho dữ liệu của Work nguyên trạng.",
+                "nameLabel": "Tên Work",
+                "slugLabel": "Slug của Work",
+                "slugHelp": "Định danh thân thiện với URL. Lấy từ tên kho mã — chỉnh sửa để ghi đè.",
+                "descriptionLabel": "Mô tả",
+                "submitButton": "Đăng ký kho mã",
+                "creatingButton": "Đang đăng ký…",
+                "cancelButton": "Hủy",
+                "invalidUrl": "Nhập URL kho mã như https://github.com/owner/repo",
+                "success": "Đã đăng ký kho mã làm Work",
+                "createFailed": "Không thể đăng ký kho mã",
+                "noteTitle": "Lưu ý:",
+                "noteText": "Work dạng Kho mã không tạo template website, kho của nhà cung cấp hay triển khai. Hãy kết nối nhà cung cấp Git lưu trữ kho mã để các agent có thể clone."
             },
             "manual": {
                 "title": "Tạo Thủ Công",
@@ -6382,14 +6403,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Kho mã"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Một kho mã nguồn hiện có dưới dạng Work — Task, Goal và các lượt chạy fleet gắn vào đó. Không có gì được tạo ra hay triển khai."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7877,6 +7900,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Kho mã",
             "company": "Company",
             "campaign": "Chiến dịch",
             "default": "Work"

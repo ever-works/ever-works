@@ -55,7 +55,19 @@ const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
 // USER_SELECTABLE_WORK_KINDS in work.entity.ts). Each of these persists
 // verbatim; general-purpose kinds additionally drive the kind-aware `web`
 // website template downstream.
-const USER_SELECTABLE_KINDS = ['website', 'landing-page', 'blog', 'directory', 'awesome-repo'];
+const USER_SELECTABLE_KINDS = [
+    'website',
+    'landing-page',
+    'blog',
+    'directory',
+    'awesome-repo',
+    'repo',
+];
+
+// Self-build slice D (EW-766) — a `repo` Work wraps an EXISTING code
+// repository and REQUIRES `repositoryUrl` (400 without it); every other
+// kind ignores the field. Public repo so no credentials are involved.
+const REPO_KIND_EXTRA = { repositoryUrl: 'https://github.com/ever-works/ever-works' };
 
 function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -152,7 +164,10 @@ test.describe('Work-kind template activation — create persists the chip', () =
     test('every user-selectable kind round-trips verbatim', async ({ request }) => {
         const user = await registerUserViaAPI(request);
         for (const kind of USER_SELECTABLE_KINDS) {
-            const work = await createWorkOk(request, user.access_token, `kind-${kind}`, { kind });
+            const work = await createWorkOk(request, user.access_token, `kind-${kind}`, {
+                kind,
+                ...(kind === 'repo' ? REPO_KIND_EXTRA : {}),
+            });
             expect(work.kind, `kind '${kind}' persists verbatim`).toBe(kind);
             expect(work.websiteTemplateId ?? null, `kind '${kind}' template deferred`).toBeNull();
         }

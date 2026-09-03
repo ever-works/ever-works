@@ -17,6 +17,7 @@ import {
     EverWorksGitDisabledError,
     EverWorksGitRequestError,
 } from '../../ever-works-providers';
+import { BadRequestException } from '@nestjs/common';
 import { CreateWorkDto } from '@src/dto/create-work.dto';
 import type { User } from '@src/entities/user.entity';
 import type { OnboardingWizardStateV2 } from '@ever-works/contracts/api';
@@ -585,5 +586,120 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
         await service.createWork(baseDto, baseUser);
 
         expect(deps.everWorksGit.createRepository).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * Repository Work (self-build slice D, EW-766) — `kind: 'repo'` registers an
+ * EXISTING code repository as the Work's data repository and provisions
+ * nothing. These pin the create-path contract the fleet relies on:
+ * `getDataRepo()` / `getRepoOwner()` resolve to the user's repo, and no
+ * template, managed repo, deploy or generation is touched.
+ */
+describe('WorkLifecycleService.createWork — repository kind', () => {
+    const repoDto: CreateWorkDto = {
+        ...baseDto,
+        slug: 'platform',
+        name: 'Platform',
+        kind: 'repo',
+        repositoryUrl: 'https://github.com/ever-works/ever-works',
+    } as CreateWorkDto;
+
+    it('registers the repository as the data repository and provisions nothing', async () => {
+        const { service, deps } = makeService(null);
+        const dataGenerator = (service as unknown as { dataGenerator: { getItems: jest.Mock } })
+            .dataGenerator;
+
+        const result = await service.createWork(repoDto, baseUser);
+
+        expect(result.status).toBe('success');
+        expect(deps.workRepo.create).toHaveBeenCalledTimes(1);
+        const persisted = deps.workRepo.create.mock.calls[0][0];
+        expect(persisted.kind).toBe('repo');
+        expect(persisted.owner).toBe('ever-works');
+        expect(persisted.gitProvider).toBe('github');
+        expect(persisted.storageProvider).toBe('user-github');
+        expect(persisted.deployProvider).toBeNull();
+        expect(persisted.websiteTemplateId).toBeNull();
+        expect(persisted.generateStatus).toEqual({ status: 'generated', step: 'linked' });
+        expect(persisted.sourceRepository).toMatchObject({
+            url: 'https://github.com/ever-works/ever-works',
+            owner: 'ever-works',
+            repo: 'ever-works',
+            type: 'link_existing',
+            relatedRepositories: { data: { owner: 'ever-works', repo: 'ever-works' } },
+        });
+        expect(persisted.sourceRepository.relatedRepositories.work).toBeUndefined();
+        expect(persisted.sourceRepository.relatedRepositories.website).toBeUndefined();
+        // No clone of a code repository looking for directory items.
+        expect(dataGenerator.getItems).not.toHaveBeenCalled();
+        expect(deps.workRepo.updateGenerateStatus).not.toHaveBeenCalled();
+    });
+
+    it('skips the deploy quota and the managed Ever Works Git repo even when both would apply', async () => {
+        process.env.DEPLOY_EVER_WORKS_ENABLED = 'true';
+        const { service, deps } = makeService(null);
+        deps.everWorksGit.isEnabled.mockReturnValue(true);
+
+        await service.createWork(
+            { ...repoDto, storageProvider: 'ever-works-git', deployProvider: 'ever-works' },
+            baseUser,
+        );
+
+        expect(deps.quota.assertWithinQuota).not.toHaveBeenCalled();
+        expect(deps.everWorksGit.createRepository).not.toHaveBeenCalled();
+        const persisted = deps.workRepo.create.mock.calls[0][0];
+        // The user's repository wins over the managed-storage choice: a
+        // fresh platform-org repo is the opposite of "wrap this repo".
+        expect(persisted.owner).toBe('ever-works');
+        expect(persisted.storageProvider).toBe('user-github');
+        expect(persisted.deployProvider).toBeNull();
+        expect(persisted.id).toBeUndefined();
+    });
+
+    it('ignores a website template selection — a code repository has no template', async () => {
+        const { service } = makeService(null);
+        const templateCatalog = (
+            service as unknown as {
+                templateCatalogService: { getVisibleTemplateForUser: jest.Mock };
+            }
+        ).templateCatalogService;
+
+        await service.createWork({ ...repoDto, websiteTemplateId: 'classic' }, baseUser);
+
+        expect(templateCatalog.getVisibleTemplateForUser).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['missing', undefined],
+        ['blank', '   '],
+        ['not a repository URL', 'https://example.com/not-a-repo'],
+        ['an ssh remote', 'git@github.com:ever-works/ever-works.git'],
+    ])(
+        'rejects a repo Work whose repositoryUrl is %s before any side effect',
+        async (_label, url) => {
+            const { service, deps } = makeService(null);
+
+            await expect(
+                service.createWork({ ...repoDto, repositoryUrl: url } as CreateWorkDto, baseUser),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(deps.workRepo.create).not.toHaveBeenCalled();
+            expect(deps.eventEmitter.emitAsync).not.toHaveBeenCalled();
+        },
+    );
+
+    it('leaves every other kind on the existing path — repositoryUrl is ignored there', async () => {
+        const { service, deps } = makeService(null);
+
+        await service.createWork(
+            { ...baseDto, kind: 'directory', repositoryUrl: 'https://github.com/o/r' },
+            baseUser,
+        );
+
+        const persisted = deps.workRepo.create.mock.calls[0][0];
+        expect(persisted.kind).toBe('directory');
+        expect(persisted.sourceRepository).toBeUndefined();
+        expect(persisted.deployProvider).toBe('vercel');
     });
 });
