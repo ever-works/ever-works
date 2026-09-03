@@ -204,6 +204,15 @@ const awesomeRepoSpec = z.looseObject({
 });
 
 /**
+ * Bounds on `spec.tasks.checks` for a Repository Work. Generous for real
+ * use (a lint, a type-check, a test run, a build — a handful of commands
+ * well under a screen line each) and tight enough that a repository cannot
+ * hand a future consumer an unbounded script. See the field's doc comment.
+ */
+export const REPO_CHECKS_MAX = 20;
+export const REPO_CHECK_MAX_LENGTH = 500;
+
+/**
  * A Repository Work (self-build slice D, EW-766) wraps an EXISTING code
  * repository — the data repository IS that repository, nothing is
  * generated. The spec therefore describes how agents should work IN the
@@ -222,8 +231,23 @@ const repoSpec = z.looseObject({
         .looseObject({
             /** Branch Task worktrees are cut from; the repo default when absent. */
             base_branch: z.string().optional(),
-            /** Commands an agent runs before opening a pull request. */
-            checks: z.array(nonEmptyString).optional(),
+            /**
+             * Commands an agent runs before opening a pull request.
+             *
+             * TRUST BOUNDARY — these strings are authored by whoever can land
+             * a commit or a PR branch in the wrapped repository, which is a
+             * far wider set than the Work's owner. Nothing consumes the key
+             * yet; whatever does must treat it as advisory, untrusted input:
+             * run it only inside the isolated Task worktree sandbox, and
+             * match it against an operator / Work-level allowlist (or have
+             * the Work owner confirm it in Work settings) before executing.
+             * The bounds below exist so that consumer inherits a cap on how
+             * much a repository can push at it.
+             */
+            checks: z
+                .array(nonEmptyString.max(REPO_CHECK_MAX_LENGTH))
+                .max(REPO_CHECKS_MAX)
+                .optional(),
         })
         .optional(),
     branding: branding.optional(),

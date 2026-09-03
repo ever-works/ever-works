@@ -165,6 +165,17 @@ spec:
         checks: ['pnpm lint', 'pnpm test']
 ```
 
+`tasks.checks` is a **trust boundary**, not a setting. `.works/works.yml`
+lives inside the wrapped repository, so anyone who can land a commit or open
+a pull-request branch there — contributors, not just the Work's owner —
+authors these strings. Nothing consumes the key yet; when something does, it
+must treat the commands as advisory, untrusted input: run them only inside
+the isolated Task worktree sandbox, and match them against an operator- or
+Work-level allowlist (or have the Work owner confirm them in Work settings)
+before executing anything. The schema bounds the list (at most 20 commands,
+at most 500 characters each) so a future consumer inherits a cap on what a
+repository can push at it.
+
 ### `awesome-repo`
 
 ```yaml

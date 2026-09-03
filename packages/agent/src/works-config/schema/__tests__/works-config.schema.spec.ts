@@ -1,5 +1,7 @@
 import * as yaml from 'yaml';
 import {
+    REPO_CHECKS_MAX,
+    REPO_CHECK_MAX_LENGTH,
     WORKS_CONFIG_SCHEMA_VERSION,
     validateWorksConfig,
     worksConfigSchema,
@@ -158,6 +160,37 @@ describe('worksConfigSchema', () => {
             const result = validateWorksConfig({ version: 2, kind, spec });
             expect(result.errors).toEqual([]);
             expect(result.data?.spec).toMatchObject({ kind });
+        });
+
+        /**
+         * `spec.tasks.checks` on a Repository Work is authored by anyone who
+         * can land a commit in the wrapped repository — a trust boundary, not
+         * a setting. Nothing consumes it yet; the bounds are pinned so that
+         * whatever does inherits a cap on what a repository can push at it.
+         */
+        it('bounds a repo spec’s tasks.checks (count and length) — repository contents are untrusted', () => {
+            const okChecks = Array.from({ length: REPO_CHECKS_MAX }, (_, i) => `pnpm check-${i}`);
+            expect(
+                validateWorksConfig({
+                    version: 2,
+                    kind: 'repo',
+                    spec: { kind: 'repo', tasks: { checks: okChecks } },
+                }).errors,
+            ).toEqual([]);
+
+            const tooMany = validateWorksConfig({
+                version: 2,
+                kind: 'repo',
+                spec: { kind: 'repo', tasks: { checks: [...okChecks, 'one more'] } },
+            });
+            expect(tooMany.errors).not.toEqual([]);
+
+            const tooLong = validateWorksConfig({
+                version: 2,
+                kind: 'repo',
+                spec: { kind: 'repo', tasks: { checks: ['x'.repeat(REPO_CHECK_MAX_LENGTH + 1)] } },
+            });
+            expect(tooLong.errors).not.toEqual([]);
         });
 
         /**
