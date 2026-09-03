@@ -1,4 +1,4 @@
-import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { TaskAcceptanceCheck, TaskExtraRepo } from '@ever-works/contracts';
 import type { AgentExportEnvelope } from '../agents/agent-export.service';
 
 /**
@@ -133,6 +133,19 @@ export interface ExportedTask {
      * would launder a bogus payload value into a legitimate-looking setting.
      */
     maxGateAttempts?: number | null;
+    /**
+     * Repositories the Task spans in addition to its primary one
+     * ("Also work in"). Each entry names a connection in the OWNER's
+     * repository registry by id.
+     *
+     * Ids are account-local, so this follows the same rule as skill files:
+     * an entry is restored ONLY when the importing account owns an enabled
+     * connection with that id, and is dropped otherwise. Recreating it
+     * blind would leave a Task pointing at a connection row that either
+     * does not exist or belongs to somebody else — and every fleet run of
+     * that Task would then fail resolving it.
+     */
+    extraRepos?: TaskExtraRepo[] | null;
     createdAt: string;
     startedAt?: string | null;
     completedAt?: string | null;
