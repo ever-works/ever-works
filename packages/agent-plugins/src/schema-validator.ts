@@ -19,8 +19,15 @@
  * and 7.2.1 both state.
  */
 
-import { Ajv2020 } from 'ajv/dist/2020';
-import type { ErrorObject, ValidateFunction } from 'ajv/dist/2020';
+// The `.js` extension is REQUIRED, not stylistic. ajv 8 publishes no
+// `exports` map, so Node's ESM resolver takes this specifier literally: an
+// extensionless `ajv/dist/2020` resolves fine under bundler resolution (which
+// is why Vitest is happy) and throws ERR_MODULE_NOT_FOUND the moment the built
+// ESM bundle is imported by plain Node. CommonJS masks it too, because CJS
+// resolution retries with `.js`. A round-trip test imports `dist/index.js` in
+// real Node so this cannot regress silently.
+import { Ajv2020 } from 'ajv/dist/2020.js';
+import type { ErrorObject, ValidateFunction } from 'ajv/dist/2020.js';
 import {
 	mcpJsonSchema,
 	mcpSchemaId,
