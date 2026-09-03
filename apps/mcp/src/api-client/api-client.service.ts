@@ -55,6 +55,14 @@ export class ApiClientService {
 			headers['x-api-key'] = this.config.apiKey;
 		}
 
+		// Organization scope selection. Every whitelisted path is unprefixed,
+		// so this header is the only way an upstream call can run under an
+		// Organization (the API resolves it exactly as it does for the web
+		// client, then authorises the caller against it). Absent = personal.
+		if (this.config.scopeSlug) {
+			headers['x-scope-slug'] = this.config.scopeSlug;
+		}
+
 		const init: RequestInit = {
 			method,
 			headers,

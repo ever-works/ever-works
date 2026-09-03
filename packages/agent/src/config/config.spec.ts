@@ -974,6 +974,15 @@ describe('agent/config', () => {
                 'terminal',
                 'trigger',
                 'websiteTemplate',
+                // Judgment layer G5 — `workflows.*` group adds the
+                // `workflow_runs` stuck-row sweeper knobs
+                // (WORKFLOW_RUN_SWEEPER_ENABLED,
+                // WORKFLOW_RUN_STUCK_TIMEOUT_MINUTES,
+                // WORKFLOW_RUN_SWEEPER_MAX_BATCH). The cutoff is clamped
+                // above the `workflow-run` task's own 60-minute
+                // `maxDuration`, so a misconfigured value cannot reap a
+                // healthy walk. Pinned alphabetically, last.
+                'workflows',
             ]);
         });
     });

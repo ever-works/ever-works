@@ -174,7 +174,7 @@ strict).
 
 - `McpClientService`: connection lifecycle per (run, binding). Lazy connect at
   tool-resolution time; disconnect at run end; per-server failure isolation per
-  spec §6.2.2 (failed connect → skip server, WARN run-log, continue — mirrors the
+  spec §7.2.2 (failed connect → skip server, WARN run-log, continue — mirrors the
   suppressed-skill WARN pattern at `agent-run.service.ts:1594-1607`).
 - `McpToolSource`: the injection seam is a **new optional token-injected source
   inside `AgentToolService.resolveAllowedTools`** — exactly the

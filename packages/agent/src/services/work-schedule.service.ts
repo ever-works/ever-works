@@ -272,7 +272,14 @@ export class WorkScheduleService {
 
     /**
      * Single entry point for finalizing a schedule run.
-     * Idempotent — safe to call multiple times for the same run.
+     *
+     * NOT idempotent on the `completed` branch. `markRunFailed` and
+     * `markRunSkipped` both carry an `isAlreadyMarkedFailed` guard, but
+     * `markRunCompleted` appends a usage-ledger row and charges the billing
+     * provider on EVERY call (see its own doc comment). Call it once per run.
+     * `WorkScheduleService.markRunCompleted` is therefore excluded from
+     * `RETRY_SAFE_REMOTE_METHODS` in
+     * `packages/tasks/src/trigger/worker/services/trigger-internal-api.client.ts`.
      */
     async finalizeScheduleRun(scheduleId: string, outcome: ScheduleRunOutcome): Promise<void> {
         switch (outcome.status) {
@@ -292,6 +299,24 @@ export class WorkScheduleService {
         }
     }
 
+    /**
+     * Finalize a SUCCESSFUL schedule run: advance `nextRunAt` off the anchor,
+     * clear the dispatch marker, and record the run for billing.
+     *
+     * ## This method is not safe to call twice for one run
+     *
+     * The tail of it is `usageLedgerService.recordUsage(...)`, which for a
+     * `billingMode: USAGE` schedule performs a plain INSERT into
+     * `usage_ledger_entry` and then calls `BillingProvider.recordUsageCharge`.
+     * There is no already-completed guard here (`isAlreadyMarkedFailed` serves
+     * `markRunFailed` only), no pre-read on `generationHistoryId`, and no
+     * UNIQUE constraint on that column — so a second call bills a second time.
+     *
+     * The schedule columns themselves are an absolute SET and would tolerate a
+     * replay; the ledger write is what does not. Any transport that might
+     * re-issue this call must treat it as unsafe: that is why it is absent
+     * from `RETRY_SAFE_REMOTE_METHODS`.
+     */
     async markRunCompleted(options: {
         scheduleId: string;
         historyId?: string;

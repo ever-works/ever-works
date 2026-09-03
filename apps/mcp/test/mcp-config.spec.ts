@@ -73,4 +73,35 @@ describe('McpConfigService', () => {
 		const config = new McpConfigService();
 		expect(config.transport).toBe('stdio');
 	});
+
+	describe('EVER_WORKS_SCOPE_SLUG (Organization scope)', () => {
+		beforeEach(() => {
+			process.env.EVER_WORKS_API_KEY = 'ew_test_key';
+		});
+
+		it('is null (personal scope) when unset or blank', () => {
+			delete process.env.EVER_WORKS_SCOPE_SLUG;
+			expect(new McpConfigService().scopeSlug).toBeNull();
+			process.env.EVER_WORKS_SCOPE_SLUG = '   ';
+			expect(new McpConfigService().scopeSlug).toBeNull();
+		});
+
+		it('reads a well-formed Organization slug (trimmed)', () => {
+			process.env.EVER_WORKS_SCOPE_SLUG = ' ever-works-2 ';
+			expect(new McpConfigService().scopeSlug).toBe('ever-works-2');
+		});
+
+		it('accepts the @personal sentinel the web client also sends', () => {
+			process.env.EVER_WORKS_SCOPE_SLUG = '@personal';
+			expect(new McpConfigService().scopeSlug).toBe('@personal');
+		});
+
+		it.each(['Ever', 'ever works', '-ever', 'ever-', 'ever--works', 'ever/works', 'a'.repeat(129)])(
+			'refuses to boot on the malformed slug %j',
+			(slug) => {
+				process.env.EVER_WORKS_SCOPE_SLUG = slug;
+				expect(() => new McpConfigService()).toThrow('EVER_WORKS_SCOPE_SLUG');
+			}
+		);
+	});
 });

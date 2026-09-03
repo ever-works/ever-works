@@ -31,7 +31,7 @@ manifests are mutually incompatible by construction:
 - Spec `name` permits dots and 1-char names; our `PLUGIN_ID_PATTERN`
   (`plugin-manifest-validator.service.ts`) forbids both and enforces a 3-char
   minimum.
-- Our validator fatally rejects non-semver `version`; spec §4.4 forbids a client
+- Our validator fatally rejects non-semver `version`; spec §5.4 forbids a client
   from rejecting exactly that.
 - Our manifest requires `id`/`name`/`version`/`category`
   (`plugin-manifest-validator.service.ts:45-48`); `id` and `category` are not
@@ -77,7 +77,7 @@ _server_, `apps/mcp`), and an export serializer.
    skills, and `mcp.json` is pure data handling and is available everywhere.
    Remote MCP transports (`streamable-http`, `sse`) are outbound network clients,
    enabled where outbound policy allows, with Ever Works-managed credentials
-   injected as client-generated headers (never stored in packages — spec §6.2.1
+   injected as client-generated headers (never stored in packages — spec §7.2.1
    forbids it). `stdio` MCP servers execute a subprocess: **disabled by
    default**, operator-enabled on self-hosted/desktop; on the managed SaaS,
    stdio stays disabled in v1 — enabling it there requires a sandboxed
@@ -91,9 +91,10 @@ _server_, `apps/mcp`), and an export serializer.
 5. **`works.ever` is our extension namespace** (reverse-domain of `ever.works`),
    for Ever Works-specific data in exported manifests (`extensions["works.ever"]`)
    and, if ever needed, a `works.ever/` package directory. We ignore all other
-   namespaces without validating them (spec §7).
+   namespaces without validating them (spec §8.1).
 
-6. **Full client conformance is the target** — spec §10.1 including the optional
+6. **Full client conformance is the target** — spec §11.1 plus the Appendix A
+   checklist, including the optional
    `sse` transport, proven by a fixture suite of valid and malformed packages
    exercising every MUST (fatal vs non-fatal manifest errors, skip-one-skill,
    disable-MCP-only, per-server skip, containment escapes, expansion rules).
@@ -118,8 +119,78 @@ _server_, `apps/mcp`), and an export serializer.
 - **Extend the native manifest to swallow the spec** — rejected: the schemas
   conflict on closed-vs-open and validation severity; merging would either
   relax our validator (regression risk for 102 plugins) or violate spec MUSTs.
-- **Skills-only conformance (§10.2)** — valid per spec, rejected by product:
+- **Skills-only conformance (spec §11.2)** — valid per spec, rejected by product:
   MCP servers are half the standard's value and the founder wants full support.
 - **Treat spec packages as a new native plugin category** — rejected: spec
   packages are data; loading them through `import()`-based machinery would grant
   them a code-execution trust class they must not have.
+
+---
+
+## Addendum, 2026-09-03: recognising Agent Plugins 1.1.0 as compatible
+
+Recorded while implementing Phase 0 ([PR #2314](https://github.com/ever-works/ever-works/pull/2314)).
+
+### What changed upstream
+
+The `agentplugins/agent-plugins-spec` repository now publishes a **1.1.0**
+release alongside 1.0.0. Verified against the repository on 2026-09-03:
+
+- `schemas/1.1.0/plugin.schema.json` and `schemas/1.1.0/mcp.schema.json` are
+  **byte-identical** to their 1.0.0 counterparts apart from the version string
+  in `$id`, in `description`, and in the `$schema` `const`.
+- `spec/1.1.0.md` differs from `spec/1.0.0.md` only in version numbers plus
+  three editorial rewordings. Its status is **Working Draft**; 1.0.0 remains
+  **Published**.
+
+No requirement was added, removed or changed.
+
+### Decision
+
+`@ever-works/agent-plugins` registers **both** releases against the same
+validators. Spec §5.2 and §7.2.1 permit exactly this: "A client MAY map
+multiple canonical identifiers to the same implementation only when it
+explicitly recognizes those Agent Plugins versions as compatible." The
+registry in `src/versions.ts` is that explicit recognition, and it carries the
+verification note above so a future reader can re-check it.
+
+The **published conformance claim stays 1.0.0**, unchanged from the original
+decision. 1.1.0 is accepted, not advertised, because a Working Draft can still
+move; `WORKING_DRAFT_VERSIONS` marks it so.
+
+### The trap this creates
+
+Accepting two releases makes it easy to weaken a rule that must not weaken.
+Spec §10.1: "When `mcp.json` is present, the version in its `$schema` value
+MUST match the version declared by `plugin.json`."
+
+That is **string equality against the manifest's release**, not membership of
+the supported set. A 1.0.0 manifest beside a 1.1.0 `mcp.json` disables MCP for
+that package even though both releases load — and the reverse likewise.
+Compatibility governs which identifiers we _accept_, never whether a pair may
+_disagree_. `mcp.ts` implements it as an equality check and a test pins it.
+
+### Extension point
+
+AP-20's version registry is the mechanism, now exercised for the first time.
+A future 1.2.0 with real requirement changes would need its own validators
+rather than another alias — the registry maps an identifier to an
+implementation, so divergent releases simply get divergent entries.
+
+---
+
+## Addendum, 2026-09-03: specification section references
+
+The section numbers cited throughout `spec.md`, `plan.md`, `tasks.md` and this
+ADR were, until the same date, one lower than the published 1.0.0 document for
+everything from the manifest onward — the manifest was cited as §4 when it is
+§5, MCP servers as §6.2 when they are §7.2, subprocess environment as §8 when
+it is §9, and the conformance checklist as §10.1 when it is §11.1 plus
+Appendix A.
+
+They are corrected. The **AP-1…AP-23 requirement identifiers defined in
+`spec.md` §4 are unaffected** and remain the right thing for implementation
+and review to cite, since they are ours and stable. When citing the external
+document, quote the requirement sentence as well as the number: this drift went
+unnoticed through a full review pass precisely because a bare number looks
+authoritative.

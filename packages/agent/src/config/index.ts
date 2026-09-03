@@ -1218,6 +1218,53 @@ export const config = {
      */
 
     /**
+     * Saved workflow graphs (judgment layer G5) — the `workflow_runs`
+     * stuck-row sweep.
+     *
+     * `POST /api/workflows/:id/run` inserts the row `queued` and the
+     * Trigger.dev `workflow-run` task owns it from `markStarted` onward.
+     * That task runs `maxAttempts: 1`, so if its machine dies without
+     * reaching a terminal write — OOM, node eviction, a
+     * `release-trigger-prod` deploy, or `maxDuration` expiry — nothing
+     * re-delivers it and the row stays `queued`/`running` forever. A
+     * `queued` row is equally strandable: an enqueue that parks in
+     * `PENDING_VERSION` across an API/worker deploy skew may never run.
+     */
+    workflows: {
+        /** Kill switch for the `workflow_runs` stuck-row sweeper. Default on. */
+        getRunSweeperEnabled() {
+            return process.env.WORKFLOW_RUN_SWEEPER_ENABLED !== 'false';
+        },
+        /**
+         * Age past which a `queued`/`running` workflow run is considered
+         * abandoned, measured from `COALESCE(startedAt, createdAt)`.
+         *
+         * The two error costs are asymmetric in the same way
+         * `agents.getStuckTimeoutMinutes` documents, so this is deliberately
+         * generous. Sweeping LATE leaves a status field wrong for a few extra
+         * hours. Sweeping EARLY marks a LIVE walk `failed`; the worker's own
+         * `markCompleted` then no-ops against the terminal CAS and the real
+         * result is lost, which is unrecoverable.
+         *
+         * The floor is the task's own ceiling: `workflow-run.task.ts` pins
+         * `maxDuration: 60 * 60`, so a legitimate walk can occupy 60 minutes.
+         * 90 leaves half an hour of margin. A value at or below 60 would reap
+         * healthy long walks, so it is clamped up.
+         */
+        getRunStuckTimeoutMinutes() {
+            const raw = parseInt(process.env.WORKFLOW_RUN_STUCK_TIMEOUT_MINUTES || '90', 10);
+            const minutes = Number.isFinite(raw) && raw > 0 ? raw : 90;
+            // `maxDuration` is 60 minutes; never reap inside a walk's own budget.
+            return Math.max(minutes, 61);
+        },
+        /** Upper bound on rows reaped per sweep tick. */
+        getRunSweeperMaxBatch() {
+            const raw = parseInt(process.env.WORKFLOW_RUN_SWEEPER_MAX_BATCH || '100', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 100;
+        },
+    },
+
+    /**
      * Streaming-terminal M9 / founder decision D1 — persisted terminal
      * transcripts.
      *
