@@ -1,7 +1,7 @@
 import { statSync } from 'fs';
 import { promises as fs } from 'fs';
 import { tmpdir } from 'os';
-import { isAbsolute, join } from 'path';
+import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import type {
 	FleetAgentModelExecution,
 	FleetAgentTaskGitResult,
@@ -568,14 +568,17 @@ export function defaultScratchRoot(): string {
 
 /**
  * Production scratch filesystem. `createScratchDir` is `mkdtemp` under a
- * `0700` root: atomic and unique, so nothing sharing the temp dir can
- * pre-plant a symlink at the path the node is about to write to.
- * Exported for the regression test that proves exactly that.
+ * PRIVATE root: atomic and unique, so nothing sharing the temp dir can
+ * pre-plant a symlink at the path the node is about to write to — and
+ * the root itself is verified (`ensurePrivateScratchRoot`), so a link
+ * planted at the root's predictable name cannot redirect the whole job
+ * directory somewhere another local user controls. Exported for the
+ * regression tests that prove exactly that.
  */
 export const defaultScratchFs: AgentTaskScratchFs = {
 	createScratchDir: async (root, prefix) => {
-		await fs.mkdir(root, { recursive: true, mode: 0o700 });
-		return fs.mkdtemp(join(root, `${prefix}-`));
+		const privateRoot = await ensurePrivateScratchRoot(root);
+		return fs.mkdtemp(join(privateRoot, `${prefix}-`));
 	},
 	writeFile: (path, content) => fs.writeFile(path, content, { encoding: 'utf8', mode: 0o600 }),
 	readFile: async (path) => {
@@ -588,6 +591,67 @@ export const defaultScratchFs: AgentTaskScratchFs = {
 	},
 	remove: (path) => fs.rm(path, { recursive: true, force: true })
 };
+
+/**
+ * Creates the scratch root (`0700`) and refuses to use it unless it —
+ * and every ancestor below the OS temp dir — is a real directory that
+ * belongs to this user.
+ *
+ * `mkdir(root, { recursive: true })` silently follows a symlink or a
+ * junction planted at any of those names: on a shared temp dir another
+ * local user could point `ever-works-node/` at a directory they own,
+ * watch the job directory appear there and swap it for a link before
+ * the node writes the instructions file. The temp dir itself (and, for
+ * an operator-chosen root outside it, the root's ancestors) is trusted:
+ * whoever controls those controls the account anyway.
+ *
+ * On POSIX the verified directories must be owned by the current user;
+ * a root that pre-exists with group/other bits (an old umask) is
+ * tightened to `0700` rather than refused. Returns the absolute root.
+ */
+export async function ensurePrivateScratchRoot(root: string): Promise<string> {
+	const absolute = resolve(root);
+	await fs.mkdir(absolute, { recursive: true, mode: 0o700 });
+	const uid = process.platform === 'win32' ? undefined : process.getuid?.();
+	for (const dir of scratchRootComponentsToVerify(absolute)) {
+		const stat = await fs.lstat(dir);
+		if (stat.isSymbolicLink() || !stat.isDirectory()) {
+			throw new Error(
+				`Refusing scratch root ${absolute}: ${dir} is not a real directory (a symlink or junction was planted there)`
+			);
+		}
+		if (uid !== undefined) {
+			if (stat.uid !== uid) {
+				throw new Error(`Refusing scratch root ${absolute}: ${dir} is owned by another user`);
+			}
+			if ((stat.mode & 0o077) !== 0) await fs.chmod(dir, 0o700);
+		}
+	}
+	return absolute;
+}
+
+/**
+ * The directories `ensurePrivateScratchRoot` verifies: the root itself
+ * plus each ancestor strictly below the OS temp dir when the root lives
+ * there (the default), the root alone otherwise.
+ */
+function scratchRootComponentsToVerify(absolute: string): string[] {
+	const temp = resolve(tmpdir());
+	const rel = relative(temp, absolute);
+	const underTemp = rel !== '' && !rel.startsWith('..') && !isAbsolute(rel);
+	if (!underTemp) return [absolute];
+	const components: string[] = [];
+	let current = absolute;
+	while (!samePath(current, temp) && dirname(current) !== current) {
+		components.push(current);
+		current = dirname(current);
+	}
+	return components;
+}
+
+function samePath(a: string, b: string): boolean {
+	return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
 
 function throwIfAgentTaskAborted(signal?: AbortSignal): void {
 	if (!signal?.aborted) return;
