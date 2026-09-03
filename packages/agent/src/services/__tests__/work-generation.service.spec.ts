@@ -2133,6 +2133,100 @@ describe('WorkGenerationService', () => {
             expect(markdownGenerator.initialize).not.toHaveBeenCalled();
         });
 
+        // The item writers commit straight into the data repository — for a
+        // Repository Work that is `items/<slug>.md` on the code repo's
+        // default branch. Each refuses before ItemSubmissionService clones.
+        it('submitItem: 400 before the item is written or the README regenerated', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.submitItem(
+                    'work-1',
+                    { name: 'X', source_url: 'https://x.dev' } as any,
+                    buildUser(),
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(itemSubmissionService.submitItem).not.toHaveBeenCalled();
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        it('removeItem: 400 before the removal commit', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.removeItem('work-1', { item_slug: 'x' } as any, buildUser()),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(itemSubmissionService.removeItem).not.toHaveBeenCalled();
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        it('updateItemMetadata: 400 before the metadata commit', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.updateItemMetadata(
+                    'work-1',
+                    { item_slug: 'x', featured: true } as any,
+                    buildUser(),
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(itemSubmissionService.updateItem).not.toHaveBeenCalled();
+            expect(markdownGenerator.initialize).not.toHaveBeenCalled();
+        });
+
+        it('extractItemDetails: 400 when scoped to a Repository Work, before any fetch', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.extractItemDetails(
+                    { source_url: 'https://example.com/tool', workId: 'work-1' } as any,
+                    buildUser(),
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(contentExtractorFacade.extractContent).not.toHaveBeenCalled();
+        });
+
+        it('bulkCaptureImages: 400 before the data repository is cloned for its items', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.bulkCaptureImages('work-1', {} as any, buildUser()),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(dataGenerator.getItems).not.toHaveBeenCalled();
+        });
+
+        it('updateDomainType: 400 without touching the row', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(
+                service.updateDomainType('work-1', 'saas', buildUser()),
+            ).rejects.toBeInstanceOf(BadRequestException);
+
+            expect(workRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('updateWebsiteRepository: 400 — the kind provisions no website repository to sync into', async () => {
+            ownershipService.ensureCanEdit.mockResolvedValue({ work: repoWork() } as any);
+
+            const service = buildService();
+            await expect(service.updateWebsiteRepository('work-1', buildUser())).rejects.toThrow(
+                /provisions no website repository/,
+            );
+
+            expect(websiteUpdateService.updateRepository).not.toHaveBeenCalled();
+        });
+
         it('the awesome-repo kind is NOT a Repository Work — its pipeline keeps running', async () => {
             // Guards against a lazy substring check: `awesome-repo` contains
             // "repo" but its data repository is platform-generated.

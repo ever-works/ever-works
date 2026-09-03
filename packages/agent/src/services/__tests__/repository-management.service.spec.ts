@@ -308,6 +308,81 @@ describe('RepositoryManagementService', () => {
         });
     });
 
+    // ════════════════════════════════════════════════════════════════════
+    //  Repository roles follow the kind (self-build slice D, EW-766)
+    // ════════════════════════════════════════════════════════════════════
+    describe('kinds that provision fewer than three repositories', () => {
+        it('lists ONLY the data role for a Repository Work — the derived work/website names are not ours', async () => {
+            // With the default slug, `getMainRepo()`'s `<slug>` fallback IS the
+            // wrapped repository, so listing it under `work` would show the
+            // user's code repo twice and offer to flip its visibility twice.
+            const work = buildWork({
+                kind: 'repo',
+                getDataRepo: jest.fn().mockReturnValue('ever-works'),
+                getMainRepo: jest.fn().mockReturnValue('ever-works'),
+                getWebsiteRepo: jest.fn().mockReturnValue('ever-works-website'),
+            } as Partial<Work>);
+            gitFacade.getRepository.mockResolvedValue({
+                url: 'https://github.com/ever-works/ever-works',
+                isPrivate: false,
+            });
+
+            const results = await service.getRepositoriesStatus(work, buildUser());
+
+            expect(gitFacade.getRepository).toHaveBeenCalledTimes(1);
+            expect(results.map((r) => r.type)).toEqual(['data']);
+            // Unlisted roles are cached as the safe default, not as "public".
+            expect(workRepository.update).toHaveBeenCalledWith('work-1', {
+                repoVisibility: { data: false, work: true, website: true },
+            });
+        });
+
+        it('lists data + work but not website for a Company Work', async () => {
+            const work = buildWork({ kind: 'company' } as Partial<Work>);
+            gitFacade.getRepository.mockResolvedValue({ url: 'u', isPrivate: true });
+
+            const results = await service.getRepositoriesStatus(work, buildUser());
+
+            expect(results.map((r) => r.type)).toEqual(['data', 'work']);
+            expect(gitFacade.getRepository).toHaveBeenCalledTimes(2);
+        });
+
+        it.each(['data', 'work', 'website'] as const)(
+            'refuses to change the %s visibility of a Repository Work with a 400 — no facade call, no cache write',
+            async (repoType) => {
+                const work = buildWork({ kind: 'repo', name: 'Platform' } as Partial<Work>);
+
+                await expect(
+                    service.updateRepositoryVisibility(work, buildUser(), repoType, false),
+                ).rejects.toThrow(/is a Repository Work/);
+
+                expect(gitFacade.updateRepository).not.toHaveBeenCalled();
+                expect(workRepository.update).not.toHaveBeenCalled();
+            },
+        );
+
+        it('refuses a role the kind never provisions (company → website) but still flips the roles it has', async () => {
+            const work = buildWork({ kind: 'company', name: 'Acme' } as Partial<Work>);
+
+            await expect(
+                service.updateRepositoryVisibility(work, buildUser(), 'website', false),
+            ).rejects.toThrow(/provisions no website repository/);
+            expect(gitFacade.updateRepository).not.toHaveBeenCalled();
+
+            gitFacade.updateRepository.mockResolvedValue({ url: 'u', isPrivate: false });
+            await service.updateRepositoryVisibility(work, buildUser(), 'data', false);
+            expect(gitFacade.updateRepository).toHaveBeenCalledTimes(1);
+        });
+
+        it('keeps the unknown-role error for an unknown repoType even on a Repository Work', async () => {
+            const work = buildWork({ kind: 'repo' } as Partial<Work>);
+
+            await expect(
+                service.updateRepositoryVisibility(work, buildUser(), 'bogus' as any, true),
+            ).rejects.toThrow('Invalid repository type');
+        });
+    });
+
     describe('updateRepositoryVisibility', () => {
         const buildUpdated = (overrides: Partial<{ url: string; isPrivate: boolean }> = {}) => ({
             url: 'https://github.com/owner/repo',
