@@ -16,6 +16,7 @@ import { AgentRunRepository } from '../database/repositories/agent-run.repositor
 import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
 import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
 import type { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
+import type { RepoConnectionProvider } from '../entities/repo-connection.entity';
 import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
@@ -362,7 +363,9 @@ export class TaskWorkspaceService {
         if (attached.length === 0 && extras.length === 0) return [];
         if (!this.gitFacade) {
             throw new Error(
-                `Agent ${input.agentId} has attached repositories but no git facade is available to describe them for a fleet node.`,
+                extras.length > 0
+                    ? `Task ${input.task.id} lists extra repositories but no git facade is available to describe them for a fleet node.`
+                    : `Agent ${input.agentId} has attached repositories but no git facade is available to describe them for a fleet node.`,
             );
         }
         const mounts: FleetTaskWorkspaceMountSpec[] = [];
@@ -406,7 +409,12 @@ export class TaskWorkspaceService {
         // HERE names the attachment while the plan is still on the platform.
         // Task-level extra repositories (PR C2) come AFTER the agent's
         // attachments and win over them on the same repository or mount
-        // directory: the Task is the narrower scope.
+        // directory: the Task is the narrower scope. Two Task extras that
+        // collide are refused naming both — only an agent ATTACHMENT yields
+        // to a Task extra; a Task extra silently dropped in favour of another
+        // would be a run the operator never asked for.
+        const extraMounts: FleetTaskWorkspaceMountSpec[] = [];
+        const extraSources = new Map<string, string>();
         for (const extra of extras) {
             if (!this.repoConnections) {
                 throw new Error(
@@ -432,8 +440,10 @@ export class TaskWorkspaceService {
             }
             const identity = repositoryIdFromCloneUrl(resolved.url);
             if (!identity) {
+                // Same rule as the attachments above: the raw registry URL may
+                // carry userinfo and this message reaches the run and the logs.
                 throw new Error(
-                    `Repository connection ${connection.name} (${resolved.url}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
+                    `Repository connection ${connection.name} (${credentialFreeUrlForMessages(resolved.url)}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
                 );
             }
             if (identity.toLowerCase() === input.primaryRepositoryId.toLowerCase()) {
@@ -453,13 +463,19 @@ export class TaskWorkspaceService {
                 baseRef = remote.defaultBranch;
             }
             const mountDir = extra.mountDir?.trim() || resolved.mountDir;
-            const replaced = mounts.filter(
+            const colliding = extraMounts.find(
                 (candidate) =>
-                    candidate.repositoryId.toLowerCase() !== identity.toLowerCase() &&
-                    candidate.mountDir.toLowerCase() !== mountDir.toLowerCase(),
+                    candidate.repositoryId.toLowerCase() === identity.toLowerCase() ||
+                    candidate.mountDir.toLowerCase() === mountDir.toLowerCase(),
             );
-            mounts.length = 0;
-            mounts.push(...replaced, {
+            if (colliding) {
+                const other = extraSources.get(colliding.repositoryId.toLowerCase());
+                throw new Error(
+                    `Task ${input.task.id}: extra repository connection ${connection.name} (${identity} at .mounts/${mountDir}) collides with ${other} (${colliding.repositoryId} at .mounts/${colliding.mountDir}); give one of them a distinct mountDir or remove it.`,
+                );
+            }
+            extraSources.set(identity.toLowerCase(), connection.name);
+            extraMounts.push({
                 repositoryId: identity,
                 repoUrl: tokenFreeCloneUrl(resolved.url),
                 baseRef,
@@ -468,7 +484,47 @@ export class TaskWorkspaceService {
                 writable: extra.writable !== false,
             });
         }
-        return normalizeFleetTaskWorkspaceMounts(mounts, input.primaryRepositoryId);
+        const keptAttachments = mounts.filter(
+            (candidate) =>
+                !extraMounts.some(
+                    (extra) =>
+                        extra.repositoryId.toLowerCase() === candidate.repositoryId.toLowerCase() ||
+                        extra.mountDir.toLowerCase() === candidate.mountDir.toLowerCase(),
+                ),
+        );
+        return normalizeFleetTaskWorkspaceMounts(
+            [...keptAttachments, ...extraMounts],
+            input.primaryRepositoryId,
+        );
+    }
+
+    /**
+     * Provider of a Task extra repository (PR C2) by repository identity. An
+     * extra is not an agent attachment, so its OWN connection decides: a
+     * generic `git` connection has no pull requests, and a GitHub extra on a
+     * Work of another provider must not inherit that provider. Best-effort by
+     * contract — an unreadable registry resolves to null and the caller falls
+     * back to the Work's provider as before.
+     */
+    private async extraRepoProvider(
+        task: Task,
+        repositoryId: string,
+        userId: string,
+    ): Promise<RepoConnectionProvider | null> {
+        if (!this.repoConnections || !Array.isArray(task.extraRepos)) return null;
+        for (const extra of task.extraRepos) {
+            const connection = await this.repoConnections
+                .findByIdAndUser(extra.repoConnectionId, userId)
+                .catch(() => null);
+            if (!connection || typeof connection.url !== 'string') continue;
+            if (
+                repositoryIdFromCloneUrl(connection.url)?.toLowerCase() ===
+                repositoryId.toLowerCase()
+            ) {
+                return connection.provider;
+            }
+        }
+        return null;
     }
 
     /**
@@ -553,7 +609,13 @@ export class TaskWorkspaceService {
                 repositoryId.toLowerCase(),
         );
         const work = task.workId ? await this.works.findById(task.workId) : null;
-        const providerId = attachment?.provider ?? work?.gitProvider ?? 'github';
+        // Attachment first, then the Task's own extra repositories (PR C2),
+        // then the Work's provider — the same precedence the plan used.
+        const providerId =
+            attachment?.provider ??
+            (await this.extraRepoProvider(task, repositoryId, userId)) ??
+            work?.gitProvider ??
+            'github';
         const gitOptions = { userId, providerId, workId: task.workId ?? '' };
 
         if (!input.agentCanOpenPullRequests || providerId === 'git') {
