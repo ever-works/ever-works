@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { AgentCapabilitiesPayload, AgentCapabilityToolRow } from '@ever-works/contracts';
 import type { Agent } from '@/lib/api/agents';
 import { AgentCapabilitiesClient } from './AgentCapabilitiesClient';
+import type { AgentFleetData } from './agent-fleet.shared';
 
 /**
  * Capabilities tab — the wiring assertions.
@@ -67,6 +68,12 @@ vi.mock('@/app/actions/mcp-connections', () => ({
 vi.mock('@/app/actions/repo-connections', () => ({
     setAgentRepoAttachment: (...args: unknown[]) => setAgentRepoAttachment(...args),
     removeAgentRepoAttachment: (...args: unknown[]) => removeAgentRepoAttachment(...args),
+}));
+// The Execution section's own wiring is covered by
+// `AgentFleetSection.unit.spec.tsx`; here it only needs to be importable.
+vi.mock('@/app/actions/settings/fleet', () => ({
+    setFleetAgentAffinityAction: vi.fn(),
+    clearFleetAgentAffinityAction: vi.fn(),
 }));
 
 const AGENT_ID = 'agent-1';
@@ -199,6 +206,7 @@ interface ExtraProps {
     initialRepos?: unknown[];
     environments?: Array<{ id: string; name: string }>;
     environmentId?: string | null;
+    fleet?: AgentFleetData | null;
 }
 
 function renderTab(
@@ -217,6 +225,7 @@ function renderTab(
             initialMcpServers={(extra.initialMcpServers ?? []) as never}
             initialRepos={(extra.initialRepos ?? []) as never}
             environments={extra.environments ?? []}
+            fleet={extra.fleet ?? null}
         />,
     );
     return caps;
@@ -811,6 +820,48 @@ describe('AgentCapabilitiesClient — environment section', () => {
             expect(screen.getByTestId('capabilities-environment-trigger')).toHaveTextContent(
                 'Node 22 sandbox',
             ),
+        );
+    });
+});
+
+/**
+ * The Execution section is composed from Fleet reads the page may not be
+ * able to make (Fleet disabled, API unreachable). Its internals are
+ * pinned by `AgentFleetSection.unit.spec.tsx`; what matters here is the
+ * page-level contract: no fleet data, no section — never an empty card.
+ */
+describe('AgentCapabilitiesClient — execution section', () => {
+    it('is hidden when the page hands over no fleet data', () => {
+        renderTab();
+        expect(screen.queryByTestId('capabilities-fleet-section')).toBeNull();
+    });
+
+    it('renders the preferred-node picker and routing from the fleet data', () => {
+        renderTab({}, [], {
+            fleet: {
+                nodes: [
+                    {
+                        id: 'node-1',
+                        name: 'Office PC',
+                        kind: 'desktop-node',
+                        status: 'online',
+                        platform: 'win32/x64',
+                        version: null,
+                        capabilities: [],
+                        lastHeartbeatAt: null,
+                        createdAt: null,
+                        persisted: true,
+                    },
+                ],
+                affinity: { available: true, nodeId: 'node-1' },
+                preferences: [],
+            },
+        });
+
+        expect(screen.getByTestId('capabilities-fleet-section')).toBeInTheDocument();
+        expect(screen.getByTestId('capabilities-fleet-node')).toHaveTextContent('Office PC');
+        expect(screen.getByTestId('capabilities-fleet-routing-mode')).toHaveTextContent(
+            'routing.modes.local-fallback.label',
         );
     });
 });

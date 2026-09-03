@@ -5,6 +5,7 @@ import { mcpConnectionsAPI } from '@/lib/api/mcp-connections';
 import { repoConnectionsAPI } from '@/lib/api/repo-connections';
 import { environmentsAPI } from '@/lib/api/environments';
 import { AgentCapabilitiesClient } from '@/components/agents/AgentCapabilitiesClient';
+import { loadAgentFleet } from './agent-fleet-data';
 
 type Params = Promise<{ id: string; locale: string }>;
 
@@ -20,17 +21,19 @@ type Params = Promise<{ id: string; locale: string }>;
  *    connections, with the tenant-inherited rows badged;
  *  - Repositories — registry attachments; Work-derived rows read-only;
  *  - Environment — the published Environment this agent runs in;
+ *  - Execution — the preferred Fleet node (agent-to-node affinity) and
+ *    the account's execution routing, read-only with a link to change it;
  *  - Init Script — advisory v1 bootstrap script;
  *  - Permissions summary — read-only, editable in Settings.
  *
  * One composed API read (`GET /api/agents/:id/capabilities`) answers the
- * tools/permissions/init-script sections; skills, MCP servers, repos and
- * environments ride their own EXISTING endpoints — this page composes
- * them server-side and hands the client plain data.
+ * tools/permissions/init-script sections; skills, MCP servers, repos,
+ * environments and the Fleet facts ride their own EXISTING endpoints —
+ * this page composes them server-side and hands the client plain data.
  *
  * Every secondary read is defensive: a flaky skills / MCP / registry /
- * environments API degrades the section it feeds (empty picker, empty
- * list) and never turns the page into a 500.
+ * environments / fleet API degrades the section it feeds (empty picker,
+ * empty list, hidden section) and never turns the page into a 500.
  *
  * ADDITIVE: the standalone MCP Servers tab, the Repositories card on the
  * Settings page and the Settings Environment picker all keep working —
@@ -49,6 +52,7 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
         mcpServers,
         repos,
         environments,
+        fleet,
     ] = await Promise.all([
         agentsAPI.getCapabilities(id),
         agentsAPI.listSkills(id).catch(() => ({ data: [] })),
@@ -65,6 +69,7 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
         // PUBLISHED only — the API refuses assigning a draft Environment
         // with a 422, so the picker offers exactly what it will accept.
         environmentsAPI.list('published').catch(() => []),
+        loadAgentFleet(id).catch(() => null),
     ]);
 
     return (
@@ -89,6 +94,7 @@ export default async function AgentCapabilitiesPage({ params }: { params: Params
                 id: environment.id,
                 name: environment.name,
             }))}
+            fleet={fleet}
         />
     );
 }

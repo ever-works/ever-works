@@ -16,7 +16,7 @@ import {
     Post,
     Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
     TasksService,
@@ -173,6 +173,50 @@ export class TasksController {
 
     @Get()
     @ApiOperation({ summary: 'List my Tasks (filter by status/priority/scope/label/search).' })
+    // Why the explicit `@ApiQuery` rows: a bare `@Query('x') x?: string`
+    // is emitted as REQUIRED by @nestjs/swagger (this build runs no CLI
+    // plugin), and the MCP server turns that into a tool schema that forces
+    // every filter. Declaring them optional here is the only fix upstream.
+    @ApiQuery({
+        name: 'status',
+        required: false,
+        description:
+            'Comma-separated TaskStatus list (backlog, todo, in_progress, in_review, blocked, done, cancelled)',
+    })
+    @ApiQuery({
+        name: 'priority',
+        required: false,
+        description: 'Comma-separated TaskPriority list (p0..p4)',
+    })
+    @ApiQuery({ name: 'missionId', required: false, description: 'Filter by Mission (UUID)' })
+    @ApiQuery({ name: 'ideaId', required: false, description: 'Filter by Idea (UUID)' })
+    @ApiQuery({ name: 'workId', required: false, description: 'Filter by Work (UUID)' })
+    @ApiQuery({ name: 'teamId', required: false, description: 'Filter by Team (UUID)' })
+    @ApiQuery({ name: 'agentId', required: false, description: 'Filter by Agent (UUID)' })
+    @ApiQuery({ name: 'goalId', required: false, description: 'Filter by Goal (UUID)' })
+    @ApiQuery({
+        name: 'parentTaskId',
+        required: false,
+        description: 'Filter by parent Task (UUID) - returns its sub-tasks',
+    })
+    @ApiQuery({ name: 'label', required: false, description: 'Filter by label' })
+    @ApiQuery({
+        name: 'search',
+        required: false,
+        description: 'Free-text search over title/description',
+    })
+    @ApiQuery({ name: 'limit', required: false, description: 'Page size (default 50, max 200)' })
+    @ApiQuery({ name: 'offset', required: false, description: 'Pagination offset (default 0)' })
+    @ApiQuery({
+        name: 'includeRun',
+        required: false,
+        description: "'true' embeds each Task's latest agent run",
+    })
+    @ApiQuery({
+        name: 'includeHidden',
+        required: false,
+        description: "'true' also returns Tasks a trigger keeps off the board",
+    })
     @HttpCode(HttpStatus.OK)
     async list(
         @CurrentUser() auth: AuthenticatedUser,
@@ -431,6 +475,8 @@ export class TasksController {
         summary:
             'Activity rows for this Task (created / updated / transitioned / run dispatches), newest first. Owner-scoped: a Task the caller does not own 404s.',
     })
+    @ApiQuery({ name: 'limit', required: false, description: 'Page size (default 25, max 100)' })
+    @ApiQuery({ name: 'offset', required: false, description: 'Pagination offset (default 0)' })
     @HttpCode(HttpStatus.OK)
     async listActivity(
         @CurrentUser() auth: AuthenticatedUser,
@@ -538,6 +584,12 @@ export class TasksController {
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 120, ttl: 60_000 } })
+    @ApiQuery({
+        name: 'refresh',
+        required: false,
+        description:
+            "'true' re-reads the git provider instead of the cache (the 60s floor still applies)",
+    })
     async prStatus(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -559,6 +611,16 @@ export class TasksController {
     // It must never enter a shared or browser cache — plan 04 §7.2.
     @Header('Cache-Control', 'private, no-store')
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiQuery({
+        name: 'maxFiles',
+        required: false,
+        description: 'Cap on files in the diff (clamped to the server maximum)',
+    })
+    @ApiQuery({
+        name: 'maxBytes',
+        required: false,
+        description: 'Cap on patch bytes (clamped to the server maximum)',
+    })
     async diff(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
@@ -909,6 +971,8 @@ export class TasksController {
 
     @Get(':id/chat')
     @ApiOperation({ summary: 'Paginated chat thread for a Task.' })
+    @ApiQuery({ name: 'limit', required: false, description: 'Page size (default 50, max 200)' })
+    @ApiQuery({ name: 'offset', required: false, description: 'Pagination offset (default 0)' })
     @HttpCode(HttpStatus.OK)
     async listChat(
         @CurrentUser() auth: AuthenticatedUser,
@@ -930,6 +994,9 @@ export class TasksController {
 
     @Get(':id/spend')
     @ApiOperation({ summary: 'Per-Task spend rollup in cents.' })
+    @ApiQuery({ name: 'since', required: false, description: 'ISO datetime lower bound' })
+    @ApiQuery({ name: 'until', required: false, description: 'ISO datetime upper bound' })
+    @ApiQuery({ name: 'currency', required: false, description: "Currency code (default 'usd')" })
     @HttpCode(HttpStatus.OK)
     async spend(
         @CurrentUser() auth: AuthenticatedUser,

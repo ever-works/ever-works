@@ -40,6 +40,8 @@ import {
     repoIsReadOnly,
     toolToggleState,
 } from './agent-capabilities.shared';
+import { AgentFleetSection } from './AgentFleetSection';
+import type { AgentFleetData } from './agent-fleet.shared';
 import {
     bindSkillToAgentAction,
     installAndBindSkillAction,
@@ -60,7 +62,9 @@ import {
  *   4. MCP           — per-agent MCP connection state + inherited badge.
  *   5. Repositories  — registry attachments; Work-derived rows read-only.
  *   6. Environment   — the published Environment this agent runs in.
- *   7. Init Script   — advisory v1 bootstrap script.
+ *   7. Execution     — preferred Fleet node + the routing rule in force
+ *                      (`AgentFleetSection`; hidden when Fleet is off).
+ *   8. Init Script   — advisory v1 bootstrap script.
  *
  * Sections 4-6 are CONSOLIDATION, not a move: the standalone MCP Servers
  * tab, the Repositories card on Settings and the Settings Environment
@@ -120,6 +124,14 @@ interface Props {
      * with a 422, so the picker offers exactly what it will accept.
      */
     environments?: Array<{ id: string; name: string }>;
+    /**
+     * Fleet facts for the Execution section (nodes, this Agent's node
+     * affinity, the account's routing preferences), composed by the
+     * page. `null`/absent hides the section: Fleet is disabled for this
+     * deployment, or its API could not be reached — in neither case is
+     * there anything true to show.
+     */
+    fleet?: AgentFleetData | null;
 }
 
 /** Same labels the Settings tab uses for the 8 flags. */
@@ -152,6 +164,7 @@ export function AgentCapabilitiesClient({
     initialMcpServers = [],
     initialRepos = [],
     environments = [],
+    fleet = null,
 }: Props) {
     const t = useTranslations('dashboard.agentsPage.capabilities');
     const [caps, setCaps] = useState(initialCapabilities);
@@ -870,6 +883,14 @@ export function AgentCapabilitiesClient({
                     )}
                 </div>
             </section>
+
+            {/* ── Section: Execution (preferred Fleet node + routing) ──
+                Rendered only when the page could read the Fleet: a
+                deployment with Fleet off has no nodes to pin and no
+                routing rule to show. */}
+            {fleet && (
+                <AgentFleetSection agentId={agent.id} fleet={fleet} className={sectionClass} />
+            )}
 
             {/* ── Section: Init Script ── */}
             <section className={sectionClass} data-testid="capabilities-init-script-section">
