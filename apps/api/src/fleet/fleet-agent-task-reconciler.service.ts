@@ -12,6 +12,7 @@ import {
     TaskRunDenormService,
     TaskWorkspaceService,
     type TaskWorkspaceFinalizeOutcome,
+    type TaskMountPushOutcome,
 } from '@ever-works/agent/tasks-domain';
 import { redactSecrets } from '@ever-works/agent/utils';
 import type {
@@ -188,6 +189,26 @@ export class FleetAgentTaskReconcilerService {
             await this.bestEffort('board denorm', () =>
                 this.runDenorm.recordTerminal(ctx.taskId, ctx.runId, 'failed'),
             );
+            // Multi-repo (slice C): branches a failed run still pushed in
+            // mounted repositories are recorded (no pull request) so they
+            // are visible on the Task rather than orphaned on the remote.
+            if (task && result?.mountGit) {
+                for (const entry of result.mountGit) {
+                    if (!entry.repositoryId || !entry.pushed || entry.empty) continue;
+                    await this.bestEffort(`record pushed mount ${entry.repositoryId}`, () =>
+                        this.taskWorkspace.finalizeMountPush({
+                            task,
+                            userId: event.userId,
+                            agentId: agentId ?? run.agentId,
+                            agentCanOpenPullRequests: false,
+                            repositoryId: entry.repositoryId!,
+                            branch: entry.branch,
+                            baseRef: findMount(result, entry.repositoryId)?.baseRef ?? null,
+                            headSha: entry.headSha ?? null,
+                        }),
+                    );
+                }
+            }
             await this.postChat(task, event.userId, agentId, composeFailureMessage(reason, result));
             await this.bestEffort('inbox notice', async () => {
                 if (!this.inbox) return;
@@ -207,8 +228,9 @@ export class FleetAgentTaskReconcilerService {
 
         const summary = truncate(result.model?.summary || 'Fleet run finished.', MAX_SUMMARY_CHARS);
         let finalizeNote = '';
+        const agent = agentId ? await this.agents.findById(agentId).catch(() => null) : null;
+        let primaryPrUrl: string | null = null;
         if (task && result.git && result.git.pushed && !result.git.empty) {
-            const agent = agentId ? await this.agents.findById(agentId).catch(() => null) : null;
             const checksPassed =
                 result.gateStatus === 'green' && result.checks ? result.checks.length : 0;
             try {
@@ -228,6 +250,7 @@ export class FleetAgentTaskReconcilerService {
                     gateStatus: toGateStatus(result.gateStatus),
                 });
                 finalizeNote = describeFinalize(outcome, result.git.branch);
+                primaryPrUrl = outcome.prUrl ?? null;
             } catch (error) {
                 const message = error instanceof Error ? error.message : String(error);
                 finalizeNote = `The branch \`${result.git.branch}\` was pushed, but opening the pull request failed: ${message}`;
@@ -239,6 +262,74 @@ export class FleetAgentTaskReconcilerService {
             finalizeNote = result.git.empty
                 ? 'The run produced no file changes.'
                 : `Changes were committed on \`${result.git.branch}\` but not pushed (git policy).`;
+        }
+
+        // Multi-repo Task workspaces (slice C): one pull request per mounted
+        // repository the run pushed, recorded on the Task next to the primary,
+        // then ONE Inbox notice listing everything the human now has to review.
+        const mountNotes: string[] = [];
+        const openedPullRequests: string[] = [];
+        if (task && Array.isArray(result.mountGit) && result.mountGit.length > 0) {
+            if (primaryPrUrl) openedPullRequests.push(primaryPrUrl);
+            for (const entry of result.mountGit) {
+                if (!entry.repositoryId) continue;
+                if (entry.empty) {
+                    mountNotes.push(`\`${entry.repositoryId}\`: no changes.`);
+                    continue;
+                }
+                if (!entry.pushed) {
+                    mountNotes.push(
+                        `\`${entry.repositoryId}\`: committed on \`${entry.branch}\` but not pushed${
+                            entry.error ? ` (${entry.error})` : ' (git policy)'
+                        }.`,
+                    );
+                    continue;
+                }
+                const outcome = await this.taskWorkspace.finalizeMountPush({
+                    task,
+                    userId: event.userId,
+                    agentId: agentId ?? run.agentId,
+                    agentCanOpenPullRequests: agent?.permissions?.canOpenPullRequests !== false,
+                    repositoryId: entry.repositoryId,
+                    branch: entry.branch,
+                    baseRef: findMount(result, entry.repositoryId)?.baseRef ?? null,
+                    headSha: entry.headSha ?? null,
+                    primaryPrUrl,
+                    summary,
+                });
+                mountNotes.push(describeMountOutcome(outcome, entry.branch));
+                if (outcome.prUrl) openedPullRequests.push(outcome.prUrl);
+            }
+            if (mountNotes.length > 0) {
+                finalizeNote = [
+                    finalizeNote,
+                    'Mounted repositories:',
+                    ...mountNotes.map((note) => `- ${note}`),
+                ]
+                    .filter((line) => line.length > 0)
+                    .join('\n');
+            }
+            await this.bestEffort('inbox notice', async () => {
+                if (!this.inbox) return;
+                await this.inbox.notice(event.userId, {
+                    title: `Fleet run finished: ${task.title ? truncate(task.title, 120) : ctx.taskId}`,
+                    body: [
+                        summary,
+                        '',
+                        openedPullRequests.length > 0
+                            ? `Pull requests to review (${openedPullRequests.length}):\n${openedPullRequests
+                                  .map((url) => `- ${url}`)
+                                  .join('\n')}`
+                            : 'No pull request was opened.',
+                        ...(mountNotes.length > 0 ? ['', ...mountNotes] : []),
+                    ].join('\n'),
+                    agentId,
+                    agentRunId: ctx.runId,
+                    taskId: ctx.taskId,
+                    workId: task.workId ?? null,
+                    organizationId: task.organizationId ?? null,
+                });
+            });
         }
 
         await this.runs.markCompleted(ctx.runId, summary);
@@ -324,6 +415,24 @@ export function parseAgentTaskResult(
         model,
         failureReason: typeof raw.failureReason === 'string' ? raw.failureReason : null,
     };
+}
+
+/** The provisioned mount descriptor for a repository, when the node reported one. */
+function findMount(result: FleetAgentTaskResult, repositoryId: string) {
+    return (result.workspace?.mounts ?? []).find(
+        (mount) => mount.repositoryId.toLowerCase() === repositoryId.toLowerCase(),
+    );
+}
+
+function describeMountOutcome(outcome: TaskMountPushOutcome, branch: string): string {
+    switch (outcome.outcome) {
+        case 'pr-opened':
+            return `\`${outcome.repositoryId}\`: pull request #${outcome.prNumber} opened from \`${branch}\` (${outcome.prUrl}).`;
+        case 'pushed-no-pr':
+            return `\`${outcome.repositoryId}\`: branch \`${branch}\` pushed; the pull request is left to a human.`;
+        default:
+            return `\`${outcome.repositoryId}\`: branch \`${branch}\` pushed, but opening the pull request failed: ${outcome.error ?? 'unknown error'}.`;
+    }
 }
 
 function isCheckResult(value: unknown): value is TaskCheckResult {

@@ -79,7 +79,7 @@ describe('FleetAgentTaskReconcilerService', () => {
     let tasks: { findById: jest.Mock };
     let agents: { findById: jest.Mock };
     let runDenorm: { recordStarted: jest.Mock; recordTerminal: jest.Mock };
-    let taskWorkspace: { finalizeRemotePush: jest.Mock };
+    let taskWorkspace: { finalizeRemotePush: jest.Mock; finalizeMountPush: jest.Mock };
     let taskChat: { post: jest.Mock };
     let dispatchGate: { drainForWork: jest.Mock };
     let inbox: { notice: jest.Mock };
@@ -132,6 +132,12 @@ describe('FleetAgentTaskReconcilerService', () => {
                 prNumber: 42,
                 prUrl: 'https://github.com/acme/repo/pull/42',
             }),
+            finalizeMountPush: jest.fn(async (input: { repositoryId: string }) => ({
+                repositoryId: input.repositoryId,
+                outcome: 'pr-opened',
+                prNumber: 7,
+                prUrl: `https://github.com/${input.repositoryId}/pull/7`,
+            })),
         };
         taskChat = { post: jest.fn().mockResolvedValue({}) };
         dispatchGate = { drainForWork: jest.fn().mockResolvedValue({ dispatched: false }) };
@@ -388,6 +394,154 @@ describe('FleetAgentTaskReconcilerService', () => {
         await expect(
             build().onCompleted(new FleetJobCompletedEvent(job(), USER, 'node-report', NODE)),
         ).resolves.toBeUndefined();
+    });
+
+    describe('multi-repo mounts (slice C)', () => {
+        const mountedResult = {
+            ...successResult,
+            workspace: {
+                path: '/w',
+                repositoryId: 'acme/repo',
+                baseRef: 'develop',
+                branch: 'task/tsk-1-task1',
+                baseSha: 'a'.repeat(40),
+                headSha: 'b'.repeat(40),
+                reused: false,
+                mounts: [
+                    {
+                        path: '/m1',
+                        linkPath: '/w/.mounts/template',
+                        repositoryId: 'acme/template',
+                        baseRef: 'main',
+                        branch: 'task/tsk-1-task1',
+                        baseSha: 'c'.repeat(40),
+                        headSha: 'c'.repeat(40),
+                        reused: false,
+                        mountDir: 'template',
+                        writable: true,
+                    },
+                ],
+            },
+            mountGit: [
+                {
+                    repositoryId: 'acme/template',
+                    mountDir: 'template',
+                    branch: 'task/tsk-1-task1',
+                    baseSha: 'c'.repeat(40),
+                    headSha: 'd'.repeat(40),
+                    empty: false,
+                    pushed: true,
+                    changedFiles: 1,
+                },
+                {
+                    repositoryId: 'acme/docs',
+                    mountDir: 'docs',
+                    branch: 'task/tsk-1-task1',
+                    baseSha: 'e'.repeat(40),
+                    headSha: null,
+                    empty: true,
+                    pushed: false,
+                },
+            ],
+        };
+
+        it('opens one pull request per pushed mount, cross-linked to the primary, and posts one Inbox notice', async () => {
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    job(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+            expect(taskWorkspace.finalizeRemotePush).toHaveBeenCalledTimes(1);
+            expect(taskWorkspace.finalizeMountPush).toHaveBeenCalledTimes(1);
+            expect(taskWorkspace.finalizeMountPush).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    task: expect.objectContaining({ id: TASK }),
+                    userId: USER,
+                    agentId: AGENT,
+                    agentCanOpenPullRequests: true,
+                    repositoryId: 'acme/template',
+                    branch: 'task/tsk-1-task1',
+                    baseRef: 'main',
+                    headSha: 'd'.repeat(40),
+                    primaryPrUrl: 'https://github.com/acme/repo/pull/42',
+                    summary: 'Fixed it.',
+                }),
+            );
+            const body: string = taskChat.post.mock.calls[0][1].body;
+            expect(body).toContain('Mounted repositories:');
+            expect(body).toContain('`acme/template`: pull request #7 opened');
+            expect(body).toContain('`acme/docs`: no changes.');
+            expect(inbox.notice).toHaveBeenCalledWith(
+                USER,
+                expect.objectContaining({
+                    title: 'Fleet run finished: Fix the thing',
+                    body: expect.stringContaining('Pull requests to review (2):'),
+                    taskId: TASK,
+                    agentRunId: RUN,
+                }),
+            );
+            const noticeBody: string = inbox.notice.mock.calls[0][1].body;
+            expect(noticeBody).toContain('https://github.com/acme/repo/pull/42');
+            expect(noticeBody).toContain('https://github.com/acme/template/pull/7');
+            expect(runs.markCompleted).toHaveBeenCalledWith(RUN, 'Fixed it.');
+        });
+
+        it('keeps going when one mount pull request fails and reports it', async () => {
+            taskWorkspace.finalizeMountPush.mockResolvedValue({
+                repositoryId: 'acme/template',
+                outcome: 'failed',
+                error: '403: resource not accessible',
+            });
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    job(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    mountedResult as unknown as Record<string, unknown>,
+                ),
+            );
+            const body: string = taskChat.post.mock.calls[0][1].body;
+            expect(body).toContain(
+                '`acme/template`: branch `task/tsk-1-task1` pushed, but opening the pull request failed: 403',
+            );
+            expect(runs.markCompleted).toHaveBeenCalledTimes(1);
+            expect(inbox.notice.mock.calls[0][1].body).toContain('Pull requests to review (1):');
+        });
+
+        it('records branches a FAILED run still pushed in mounts, without opening pull requests', async () => {
+            const failed = {
+                ...mountedResult,
+                status: 'failed',
+                failureReason: 'a required acceptance check did not pass',
+            };
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    job(),
+                    USER,
+                    'node-report',
+                    NODE,
+                    failed as unknown as Record<string, unknown>,
+                ),
+            );
+            expect(runs.markFailed).toHaveBeenCalledWith(
+                RUN,
+                'a required acceptance check did not pass',
+            );
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+            expect(taskWorkspace.finalizeMountPush).toHaveBeenCalledTimes(1);
+            expect(taskWorkspace.finalizeMountPush).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    repositoryId: 'acme/template',
+                    agentCanOpenPullRequests: false,
+                    baseRef: 'main',
+                }),
+            );
+        });
     });
 });
 

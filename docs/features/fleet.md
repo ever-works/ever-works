@@ -87,6 +87,21 @@ When the node reports, the platform reconciles the result the same way a cloud r
 
 Routing preferences (**Settings → Fleet → Execution routing**) decide what happens when no runner is free: wait for one (`local-wait`), fall back to the cloud with a notice (`local-fallback`), or always use the cloud. An Agent can be pinned to one specific node (`PUT /api/fleet/agents/:agentId/node-affinity`); a pinned Agent never runs elsewhere.
 
+### Tasks that span several repositories
+
+A Task keeps one primary Work and branch. When the run agent has **repository attachments** (Agent →
+Capabilities → Repositories, backed by the repository registry), a fleet run checks those repositories
+out next to the primary worktree, at `.mounts/<name>` inside it, each on the same Task branch name. The
+model is told exactly where each repository is; it edits them in place. When the run finishes the node
+commits and pushes every repository that changed, the platform opens **one pull request per
+repository** (each one linked to the primary's), records the extra ones on the Task ("Also in" on the
+branch panel), and sends one Inbox notice listing every pull request to review.
+
+Limits: at most 8 mounted repositories per Task; a mount is never the primary repository; the mounts
+directory is excluded from the primary repository's Git, so nothing about the layout is ever committed.
+A repository the platform cannot describe (a URL that is not `owner/repository`, a default branch it
+cannot read) fails the plan naming the attachment rather than silently running without it.
+
 ## Related
 
 - [Desktop App](./desktop-app.md) · [Workers](./workers.md) · [Kubernetes Deployment](./k8s-deployment.md)

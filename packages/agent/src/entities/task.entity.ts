@@ -50,6 +50,26 @@ export enum TaskPriority {
 
 export type TaskActorType = 'user' | 'agent';
 
+/**
+ * One non-primary repository a fleet run pushed for a Task (multi-repo Task
+ * workspaces, self-build slice C). `state` follows the primary's
+ * `branchState` vocabulary for the states that apply: the branch is
+ * pushed, a pull request is open, or opening it failed (`error` says why;
+ * the branch stays pushed either way).
+ */
+export interface TaskLinkedPullRequest {
+    repositoryId: string;
+    branch: string;
+    baseRef: string | null;
+    headSha: string | null;
+    prNumber: number | null;
+    prUrl: string | null;
+    state: 'pushed' | 'pr-open' | 'failed';
+    error?: string | null;
+    /** ISO timestamp of the last update to this entry. */
+    updatedAt: string;
+}
+
 @Entity({ name: 'tasks' })
 // Review-fix C1: slug uniqueness is per-user (UserTaskCounter
 // increments per user, so two users both produce `T-1`). Global
@@ -175,6 +195,16 @@ export class Task {
      *  verbatim in the blocked banner and the task-chat system message. */
     @Column({ type: 'simple-json', nullable: true })
     conflictPaths?: string[] | null;
+
+    /**
+     * Multi-repo Task workspaces (self-build slice C): the NON-primary
+     * repositories a fleet run pushed for this Task, one entry per
+     * repository, keyed by `repositoryId`. The primary stays in
+     * `branchRef` / `prNumber` / `prUrl`. NULL = the Task never spanned a
+     * second repository.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    linkedPullRequests?: TaskLinkedPullRequest[] | null;
 
     // ── PR insights (kanban run cockpit M5) ──────────────────────────
     // Cache written by `TaskPrStatusService` (on-demand refresh + the

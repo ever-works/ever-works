@@ -1,12 +1,14 @@
 import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type {
+    FleetTaskWorkspaceMountSpec,
     FleetTaskWorkspaceSpec,
     GateStatus,
     MergeMethod,
     MergePolicySource,
     MergeRefusalCode,
 } from '@ever-works/contracts';
-import { TaskStatus, type Task } from '../entities/task.entity';
+import { normalizeFleetTaskWorkspaceMounts } from '@ever-works/contracts';
+import { TaskStatus, type Task, type TaskLinkedPullRequest } from '../entities/task.entity';
 import type { Work } from '../entities/work.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
@@ -66,6 +68,18 @@ export interface TaskWorkspaceFinalizeOutcome {
     conflictPaths?: string[];
     /** Present only on the `pr-opened` path (Wave 3, D4). */
     merge?: TaskAgentMergeOutcome;
+}
+
+/**
+ * Multi-repo Task workspaces (self-build slice C): the outcome of opening
+ * the pull request for ONE mounted repository a fleet run pushed.
+ */
+export interface TaskMountPushOutcome {
+    repositoryId: string;
+    outcome: 'pr-opened' | 'pushed-no-pr' | 'failed';
+    prNumber?: number;
+    prUrl?: string;
+    error?: string;
 }
 
 /**
@@ -255,6 +269,12 @@ export class TaskWorkspaceService {
     async describeFleetWorkspace(input: {
         task: Task;
         userId: string;
+        /**
+         * The run agent. Its enabled repository attachments become the
+         * workspace MOUNTS (multi-repo Task workspaces, self-build slice C);
+         * absent means a single-repository workspace.
+         */
+        agentId?: string;
     }): Promise<FleetTaskWorkspaceSpec | null> {
         const { task, userId } = input;
         if (!task.workId) return null;
@@ -285,12 +305,250 @@ export class TaskWorkspaceService {
             });
         }
 
+        const repositoryId = `${owner}/${repo}`;
+        const mounts = await this.resolveFleetMounts({
+            agentId: input.agentId,
+            userId,
+            workId: work.id,
+            primaryRepositoryId: repositoryId,
+            branch,
+        });
         return {
-            repositoryId: `${owner}/${repo}`,
+            repositoryId,
             repoUrl: tokenFreeCloneUrl(repository.cloneUrl),
             baseRef,
             branch,
+            ...(mounts.length > 0 ? { mounts } : {}),
         };
+    }
+
+    /**
+     * Multi-repo Task workspaces (self-build slice C) — the run agent's
+     * enabled repository attachments as fleet mount specs, on the SAME Task
+     * branch as the primary.
+     *
+     * Refuses rather than coerces, like the rest of the fleet planning: an
+     * attachment that cannot be described (a URL that is not `owner/repo`,
+     * a repository whose default branch cannot be read) fails the plan
+     * naming it, because a run that silently lacks one of its repositories
+     * would produce a pull request the operator never asked for. The one
+     * silent case is the primary repository itself, which is skipped with a
+     * log line — attaching it is harmless redundancy, not an error.
+     */
+    private async resolveFleetMounts(input: {
+        agentId: string | undefined;
+        userId: string;
+        workId: string;
+        primaryRepositoryId: string;
+        branch: string;
+    }): Promise<FleetTaskWorkspaceMountSpec[]> {
+        if (!input.agentId || !this.agentRepoAttachments) return [];
+        const attached = await resolveAttachedReposForAgent(
+            this.agentRepoAttachments,
+            input.agentId,
+            input.userId,
+        );
+        if (attached.length === 0) return [];
+        if (!this.gitFacade) {
+            throw new Error(
+                `Agent ${input.agentId} has attached repositories but no git facade is available to describe them for a fleet node.`,
+            );
+        }
+        const mounts: FleetTaskWorkspaceMountSpec[] = [];
+        for (const repo of attached) {
+            const identity = repositoryIdFromCloneUrl(repo.url);
+            if (!identity) {
+                throw new Error(
+                    `Attached repository ${repo.repoConnectionId} (${repo.url}) cannot be mounted on a fleet node: its URL is not an <owner>/<repository> clone URL.`,
+                );
+            }
+            if (identity.toLowerCase() === input.primaryRepositoryId.toLowerCase()) {
+                this.logger.log(
+                    `Attached repository ${identity} is the Task's primary repository; not mounted twice.`,
+                );
+                continue;
+            }
+            let baseRef = repo.branch?.trim() || '';
+            if (!baseRef) {
+                const [mountOwner, mountName] = identity.split('/') as [string, string];
+                const remote = await this.gitFacade.getRepository(mountOwner, mountName, {
+                    userId: input.userId,
+                    providerId: repo.provider,
+                    workId: input.workId,
+                });
+                baseRef = remote.defaultBranch;
+            }
+            mounts.push({
+                repositoryId: identity,
+                repoUrl: tokenFreeCloneUrl(repo.url),
+                baseRef,
+                branch: input.branch,
+                mountDir: repo.mountDir,
+                writable: true,
+            });
+        }
+        // The contracts normalizer is the same gate the node applies; failing
+        // HERE names the attachment while the plan is still on the platform.
+        return normalizeFleetTaskWorkspaceMounts(mounts, input.primaryRepositoryId);
+    }
+
+    /**
+     * Multi-repo Task workspaces (self-build slice C) — a fleet run pushed
+     * a branch in one of the Task's MOUNTED repositories; open its pull
+     * request and record it on the Task next to the primary.
+     *
+     * Never throws for a provider failure: the branch is already pushed,
+     * and the other repositories (and the primary) must still get their
+     * turn. The failure is recorded on the Task's entry instead, with the
+     * branch kept, so a human can open the pull request by hand.
+     */
+    async finalizeMountPush(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        agentCanOpenPullRequests: boolean;
+        repositoryId: string;
+        branch: string;
+        baseRef?: string | null;
+        headSha?: string | null;
+        /** The primary pull request, for the cross-link in the body. */
+        primaryPrUrl?: string | null;
+        summary?: string | null;
+    }): Promise<TaskMountPushOutcome> {
+        const { task, userId, repositoryId } = input;
+        const branch = input.branch.trim();
+        const [owner, repo] = repositoryId.split('/') as [string, string | undefined];
+        if (!owner || !repo || repositoryId.split('/').length !== 2) {
+            return this.recordMountFailure(
+                task,
+                input,
+                `repository identity '${repositoryId}' is not <owner>/<repository>`,
+            );
+        }
+        if (!this.gitFacade) {
+            return this.recordMountFailure(
+                task,
+                input,
+                'no git facade is available to open the pull request',
+            );
+        }
+        const attached = this.agentRepoAttachments
+            ? await resolveAttachedReposForAgent(
+                  this.agentRepoAttachments,
+                  input.agentId,
+                  userId,
+              ).catch(() => [])
+            : [];
+        const attachment = attached.find(
+            (candidate) =>
+                repositoryIdFromCloneUrl(candidate.url)?.toLowerCase() ===
+                repositoryId.toLowerCase(),
+        );
+        const work = task.workId ? await this.works.findById(task.workId) : null;
+        const providerId = attachment?.provider ?? work?.gitProvider ?? 'github';
+        const gitOptions = { userId, providerId, workId: task.workId ?? '' };
+
+        if (!input.agentCanOpenPullRequests || providerId === 'git') {
+            await this.recordLinkedPullRequest(task, {
+                repositoryId,
+                branch,
+                baseRef: input.baseRef ?? null,
+                headSha: input.headSha ?? null,
+                prNumber: null,
+                prUrl: null,
+                state: 'pushed',
+                error: null,
+            });
+            this.logger.log(
+                `Task ${task.id}: mount ${repositoryId} branch ${branch} pushed; ${
+                    providerId === 'git'
+                        ? 'a generic git remote has no pull requests'
+                        : 'agent lacks canOpenPullRequests'
+                } — leaving the pull request to a human.`,
+            );
+            return { repositoryId, outcome: 'pushed-no-pr' };
+        }
+
+        try {
+            let baseRef = input.baseRef?.trim() || '';
+            if (!baseRef) {
+                baseRef = (await this.gitFacade.getRepository(owner, repo, gitOptions))
+                    .defaultBranch;
+            }
+            const primaryNote = input.primaryPrUrl ? ` Part of ${input.primaryPrUrl}.` : '';
+            const summaryNote = input.summary ? `\n\n${input.summary}` : '';
+            const pr = await this.gitFacade.createPullRequest(
+                {
+                    owner,
+                    repo,
+                    title: `Task ${task.slug}: ${task.title ?? 'agent run output'} (${repositoryId})`,
+                    head: branch,
+                    base: baseRef,
+                    body: `Automated changes for Task \`${task.slug}\` (agent run) in \`${repositoryId}\`, one of the repositories the Task spans.${primaryNote} Review before merging — merge policy is governed by the Work's merge-policy settings.${summaryNote}`,
+                },
+                gitOptions,
+            );
+            await this.recordLinkedPullRequest(task, {
+                repositoryId,
+                branch,
+                baseRef,
+                headSha: input.headSha ?? null,
+                prNumber: pr.number,
+                prUrl: pr.url,
+                state: 'pr-open',
+                error: null,
+            });
+            this.logger.log(
+                `Task ${task.id}: mount ${repositoryId} opened PR #${pr.number} (${pr.url}).`,
+            );
+            return { repositoryId, outcome: 'pr-opened', prNumber: pr.number, prUrl: pr.url };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            return this.recordMountFailure(task, input, message);
+        }
+    }
+
+    private async recordMountFailure(
+        task: Task,
+        input: {
+            repositoryId: string;
+            branch: string;
+            baseRef?: string | null;
+            headSha?: string | null;
+        },
+        error: string,
+    ): Promise<TaskMountPushOutcome> {
+        await this.recordLinkedPullRequest(task, {
+            repositoryId: input.repositoryId,
+            branch: input.branch.trim(),
+            baseRef: input.baseRef ?? null,
+            headSha: input.headSha ?? null,
+            prNumber: null,
+            prUrl: null,
+            state: 'failed',
+            error,
+        });
+        this.logger.warn(
+            `Task ${task.id}: mount ${input.repositoryId} branch ${input.branch} pushed but its pull request was not opened: ${error}`,
+        );
+        return { repositoryId: input.repositoryId, outcome: 'failed', error };
+    }
+
+    /** Upsert by repository, so a re-run updates the entry instead of duplicating it. */
+    private async recordLinkedPullRequest(
+        task: Task,
+        entry: Omit<TaskLinkedPullRequest, 'updatedAt'>,
+    ): Promise<void> {
+        const fresh = (await this.tasks.findById(task.id)) ?? task;
+        const existing = Array.isArray(fresh.linkedPullRequests) ? fresh.linkedPullRequests : [];
+        const key = entry.repositoryId.toLowerCase();
+        const next: TaskLinkedPullRequest = { ...entry, updatedAt: new Date().toISOString() };
+        const merged = [
+            ...existing.filter((candidate) => candidate.repositoryId.toLowerCase() !== key),
+            next,
+        ];
+        await this.tasks.updateById(task.id, { linkedPullRequests: merged });
+        task.linkedPullRequests = merged;
     }
 
     /**
@@ -1143,4 +1401,34 @@ export function tokenFreeCloneUrl(cloneUrl: string): string {
         );
     }
     return value;
+}
+
+/**
+ * `owner/repository` from an HTTPS or SSH clone URL (GitHub / GitLab /
+ * Bitbucket style paths), or null when the URL does not name exactly one
+ * owner and one repository. Case is preserved: the identity is used
+ * verbatim in clone URLs and pull-request calls.
+ */
+export function repositoryIdFromCloneUrl(cloneUrl: string): string | null {
+    const value = cloneUrl.trim();
+    let path = '';
+    const scpLike = /^(?:[A-Za-z0-9._-]+@)?[A-Za-z0-9.-]+:(.+)$/.exec(value);
+    if (scpLike && !/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) {
+        path = scpLike[1];
+    } else {
+        try {
+            path = new URL(value).pathname;
+        } catch {
+            return null;
+        }
+    }
+    const segments = path
+        .replace(/\.git$/i, '')
+        .split('/')
+        .filter((segment) => segment.length > 0);
+    if (segments.length !== 2) return null;
+    const [owner, repo] = segments;
+    const safe = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+    if (!safe.test(owner) || !safe.test(repo) || owner === '..' || repo === '..') return null;
+    return `${owner}/${repo}`;
 }

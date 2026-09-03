@@ -150,6 +150,7 @@ describe('FleetAgentTaskPlannerService', () => {
         expect(taskWorkspace.describeFleetWorkspace).toHaveBeenCalledWith({
             task: expect.objectContaining({ id: 'task-1' }),
             userId: USER,
+            agentId: 'agent-1',
         });
 
         expect(plan!.workspace).toEqual(workspace);
@@ -355,5 +356,46 @@ describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow
         await expect(build().plan(payload)).rejects.toThrow(
             /too large for fleet model instructions/,
         );
+    });
+    it('describes mounted repositories in the WORKSPACE section (multi-repo, slice C)', async () => {
+        process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        taskWorkspace.describeFleetWorkspace.mockResolvedValue({
+            ...workspace,
+            mounts: [
+                {
+                    repositoryId: 'ever-works/directory-web-template',
+                    repoUrl: 'https://github.com/ever-works/directory-web-template.git',
+                    baseRef: 'develop',
+                    branch: 'task/task-1-tsk-7',
+                    mountDir: 'template',
+                    writable: true,
+                },
+                {
+                    repositoryId: 'ever-works/workspace',
+                    repoUrl: 'https://github.com/ever-works/workspace.git',
+                    baseRef: 'main',
+                    branch: 'task/task-1-tsk-7',
+                    mountDir: 'kb',
+                    writable: false,
+                },
+            ],
+        });
+
+        const plan = await build().plan(payload);
+        const text = plan!.execution.instructions;
+        expect(plan!.workspace.mounts).toHaveLength(2);
+        expect(text).toContain(
+            'Additional repositories this Task spans are checked out under `./.mounts/<dir>`',
+        );
+        expect(text).toContain(
+            '`.mounts/template` → `ever-works/directory-web-template` (branch `task/task-1-tsk-7` from `develop`)',
+        );
+        expect(text).toContain(
+            '`.mounts/kb` → `ever-works/workspace` (branch `task/task-1-tsk-7` from `main`) — READ-ONLY reference',
+        );
+        expect(text).toContain('one pull request per repository');
+        expect(text).toContain('which files (per repository)');
+        // The single-repository wording is not used for a multi-repo workspace.
+        expect(text).not.toContain('touch other repositories: when you finish');
     });
 });

@@ -220,6 +220,9 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         const workspace = await this.taskWorkspace.describeFleetWorkspace({
             task,
             userId: payload.userId,
+            // Multi-repo (slice C): the run agent's attached repositories
+            // become the workspace mounts.
+            agentId: payload.agentId,
         });
         if (!workspace) {
             throw new FleetAgentTaskPlanError(
@@ -322,16 +325,13 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
 
         const fleetSections = [
             '# WORKSPACE (fleet node)',
-            [
-                `You are running on one of the owner's own machines, inside an isolated Git worktree of \`${workspace.repositoryId}\`.`,
-                `The current directory is the repository root, checked out on branch \`${workspace.branch}\` (cut from \`${workspace.baseRef}\`).`,
-                'Make your changes here. Do NOT commit, push, switch branches, or touch other repositories: when you finish, the node commits everything you left in the working tree to this branch and pushes it, and the platform opens the pull request.',
-                'You have no platform tools in this session. If the Task cannot be completed as written, do not guess — leave the working tree unchanged and explain exactly what is missing in your final message.',
-            ].join('\n'),
+            describeWorkspaceSection(workspace),
             '# ACCEPTANCE CHECKS',
             checksSection,
             '# OUTPUT CONTRACT',
-            'Your final message is recorded as the run summary. State what you changed, which files, how you verified it, and anything a reviewer must know. Keep it under 300 words.',
+            `Your final message is recorded as the run summary. State what you changed, which files${
+                workspace.mounts && workspace.mounts.length > 0 ? ' (per repository)' : ''
+            }, how you verified it, and anything a reviewer must know. Keep it under 300 words.`,
         ].join('\n\n');
 
         const tail = `# TASK\n${userMessage}\n\n${fleetSections}`;
@@ -405,4 +405,41 @@ function truncateToBytes(value: string, maxBytes: number): string {
     if (byteLength(value) <= maxBytes) return value;
     const buffer = Buffer.from(value, 'utf8').subarray(0, Math.max(0, maxBytes));
     return buffer.toString('utf8').replace(/�+$/u, '');
+}
+
+/**
+ * The `# WORKSPACE` section of the fleet instructions.
+ *
+ * Multi-repo Task workspaces (self-build slice C): when the spec carries
+ * mounts, the model is told exactly where each repository is reachable
+ * from its cwd (`.mounts/<dir>`), that every changed repository gets its
+ * own branch and pull request, and which mounts are read-only. The
+ * single-repository wording is unchanged.
+ */
+export function describeWorkspaceSection(workspace: FleetTaskWorkspaceSpec): string {
+    const mounts = workspace.mounts ?? [];
+    const lines = [
+        `You are running on one of the owner's own machines, inside an isolated Git worktree of \`${workspace.repositoryId}\`.`,
+        `The current directory is the repository root, checked out on branch \`${workspace.branch}\` (cut from \`${workspace.baseRef}\`).`,
+    ];
+    if (mounts.length === 0) {
+        lines.push(
+            'Make your changes here. Do NOT commit, push, switch branches, or touch other repositories: when you finish, the node commits everything you left in the working tree to this branch and pushes it, and the platform opens the pull request.',
+        );
+    } else {
+        lines.push(
+            'Additional repositories this Task spans are checked out under `./.mounts/<dir>` on the same Task branch:',
+            ...mounts.map(
+                (mount) =>
+                    `- \`.mounts/${mount.mountDir}\` → \`${mount.repositoryId}\` (branch \`${mount.branch}\` from \`${mount.baseRef}\`)${
+                        mount.writable ? '' : ' — READ-ONLY reference, never edit it'
+                    }`,
+            ),
+            'Edit the primary repository here and the mounted repositories in place when the Task needs it. Do NOT commit, push, switch branches, or touch any other repository: when you finish, the node commits and pushes each repository that changed, and the platform opens one pull request per repository and links them.',
+        );
+    }
+    lines.push(
+        'You have no platform tools in this session. If the Task cannot be completed as written, do not guess — leave the working tree unchanged and explain exactly what is missing in your final message.',
+    );
+    return lines.join('\n');
 }
