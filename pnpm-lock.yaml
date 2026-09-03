@@ -86,6 +86,9 @@ overrides:
   brace-expansion@>=3.0.0 <3.0.6: '>=3.0.6 <4.0.0'
   brace-expansion@>=4.0.0 <5.0.9: '>=5.0.9 <6.0.0'
   nanoid@<3.3.17: '>=3.3.17 <4.0.0'
+  browserslist@<=4.28.6: '>=4.28.7 <5.0.0'
+  mysql2@<3.22.0: '>=3.22.0 <4.0.0'
+  fast-uri@<3.1.6: '>=3.1.6 <4.0.0'
 
 importers:
 
@@ -159,7 +162,7 @@ importers:
         version: 1.2.0(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/throttler@6.5.0(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2))(ioredis@5.10.1)(reflect-metadata@0.2.2)
       '@nestjs-modules/mailer':
         specifier: ^2.3.4
-        version: 2.3.4(b5a9fc8e8b421c31ea2092b3d00813ad)
+        version: 2.3.4(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/event-emitter@3.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18))(@nestjs/terminus@11.1.1(8e47f099d440ece1608976bc60fdf283))(bullmq@5.79.0)(chokidar@4.0.3)(nodemailer@9.0.1)(relateurl@0.2.7)(svgo@4.0.2)(terser@5.46.1)(typescript@5.9.3)
       '@nestjs/axios':
         specifier: ^4.0.1
         version: 4.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(axios@1.18.1)(rxjs@7.8.2)
@@ -192,13 +195,13 @@ importers:
         version: 11.2.6(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)
       '@nestjs/terminus':
         specifier: ^11.0.0
-        version: 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/axios@4.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(axios@1.18.1)(rxjs@7.8.2))(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/microservices@11.1.19)(@nestjs/typeorm@11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))))(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
+        version: 11.1.1(8e47f099d440ece1608976bc60fdf283)
       '@nestjs/throttler':
         specifier: ^6.5.0
         version: 6.5.0(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)
       '@nestjs/typeorm':
         specifier: ^11.0.1
-        version: 11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
+        version: 11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
       '@scalar/nestjs-api-reference':
         specifier: ^1.1.6
         version: 1.1.6
@@ -213,7 +216,7 @@ importers:
         version: 6.0.0
       better-auth:
         specifier: '>=1.6.22 <2.0.0'
-        version: 1.6.25(@opentelemetry/api@1.9.1)(better-sqlite3@12.6.2)(mysql2@3.17.1)(next@16.2.11(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(pg@8.18.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(solid-js@1.9.13)(vitest@4.1.0(@opentelemetry/api@1.9.1)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3)))
+        version: 1.6.25(@opentelemetry/api@1.9.1)(better-sqlite3@12.6.2)(mysql2@3.24.2(@types/node@22.19.11))(next@16.2.11(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(pg@8.18.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(solid-js@1.9.13)(vitest@4.1.0(@opentelemetry/api@1.9.1)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3)))
       better-sqlite3:
         specifier: ^12.5.0
         version: 12.6.2
@@ -242,8 +245,8 @@ importers:
         specifier: ^2.2.0
         version: 2.2.0
       mysql2:
-        specifier: ^3.16.0
-        version: 3.17.1
+        specifier: ^3.24.2
+        version: 3.24.2(@types/node@22.19.11)
       nodemailer:
         specifier: ^9.0.1
         version: 9.0.1
@@ -282,7 +285,7 @@ importers:
         version: 0.1.1(react@19.2.5)
       typeorm:
         specifier: ^0.3.31
-        version: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+        version: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
       ws:
         specifier: ^8.21.0
         version: 8.21.0
@@ -695,7 +698,7 @@ importers:
         version: 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
       '@rekog/mcp-nest':
         specifier: ^1.9.6
-        version: 1.9.6(3dd465df555724120f307260697943e6)
+        version: 1.9.6(92feeaa2350d77eea593a9080484e669)
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -1013,7 +1016,7 @@ importers:
         version: 11.2.6(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)
       '@nestjs/typeorm':
         specifier: ^11.0.1
-        version: 11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
+        version: 11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
       ai:
         specifier: ^6.0.154
         version: 6.0.154(zod@3.25.76)
@@ -1057,8 +1060,8 @@ importers:
         specifier: ^1.8.0
         version: 1.12.0
       mysql2:
-        specifier: ^3.14
-        version: 3.17.1
+        specifier: '>=3.22.0 <4.0.0'
+        version: 3.24.2(@types/node@22.19.11)
       p-map:
         specifier: ^7.0.4
         version: 7.0.4
@@ -1097,7 +1100,7 @@ importers:
         version: 7.2.2
       typeorm:
         specifier: ^0.3.31
-        version: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+        version: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
       yaml:
         specifier: ^2.8.3
         version: 2.8.3
@@ -2937,7 +2940,7 @@ importers:
         version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.26)(typescript@5.9.3)(yaml@2.8.3)
       typeorm:
         specifier: 0.3.31
-        version: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+        version: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -12809,7 +12812,7 @@ packages:
       drizzle-kit: '>=0.31.4'
       drizzle-orm: ^0.45.2
       mongodb: ^6.0.0 || ^7.0.0
-      mysql2: ^3.0.0
+      mysql2: '>=3.22.0 <4.0.0'
       next: '>=16.2.11 <16.3.0'
       pg: ^8.0.0
       prisma: ^5.0.0 || ^6.0.0 || ^7.0.0
@@ -12974,8 +12977,8 @@ packages:
     resolution: {integrity: sha512-yQbXgO/OSZVD2IsiLlro+7Hf6Q18EJrKSEsdoMzKePKXct3gvD8oLcOQdIzGupr5Fj+EDe8gO/lxc1BzfMpxvA==}
     engines: {node: '>=8'}
 
-  browserslist@4.28.2:
-    resolution: {integrity: sha512-48xSriZYYg+8qXna9kwqjIVzuQxi+KYWp2+5nCYnYKPTr0LvD89Jqk2Or5ogxz0NUMfIjhh2lIUX/LyX9B4oIg==}
+  browserslist@4.28.8:
+    resolution: {integrity: sha512-V2NpofLblG64mfOtSgDhOJESZEGogzDMBv/q+W6oc4LXWP/q75eOXoOaaOu1EOadB9U4Bwx/e0yzbvwKH8zalA==}
     engines: {node: ^6 || ^7 || ^8 || ^9 || ^10 || ^11 || ^12 || >=13.7}
     hasBin: true
 
@@ -14496,8 +14499,8 @@ packages:
   electron-publish@25.1.7:
     resolution: {integrity: sha512-+jbTkR9m39eDBMP4gfbqglDd6UvBC7RLh5Y0MhFSsc6UkGHj9Vj9TWobxevHYMMqmoujL11ZLjfPpMX+Pt6YEg==}
 
-  electron-to-chromium@1.5.334:
-    resolution: {integrity: sha512-mgjZAz7Jyx1SRCwEpy9wefDS7GvNPazLthHg8eQMJ76wBdGQQDW33TCrUTvQ4wzpmOrv2zrFoD3oNufMdyMpog==}
+  electron-to-chromium@1.5.419:
+    resolution: {integrity: sha512-nHMPn8x4yCxCI0iSnL+LlHL5sUoUfjLXkcRIagZ4GBdrfFLFaiLNvzJWbJqZhFT9IAhw5tUSNlhggWN+otvp/A==}
 
   electron@39.8.10:
     resolution: {integrity: sha512-zbYtGPYUI7PzqLAzkk21Rk6j67WN0hxn0Mq/njErZo1d0HSf33is4f8ICI5fMLy5vYe0JtCtM5sYunNOaochSQ==}
@@ -15082,8 +15085,8 @@ packages:
   fast-sha256@1.3.0:
     resolution: {integrity: sha512-n11RGP/lrWEFI/bWdygLxhI+pVeo1ZYIVwvvPkW7azl/rOy+F3HYRZ2K5zeE9mmkhQppyv9sQFx0JM9UabnpPQ==}
 
-  fast-uri@3.1.5:
-    resolution: {integrity: sha512-gHwA1O9LDIcKunMKhObS/HimwtehO1nPUECKAu5TpKgaO19fcWEl4bliWe1jWxVFvIXztJjjQ4L8XQ1EU9f7Jw==}
+  fast-uri@3.1.7:
+    resolution: {integrity: sha512-dOvZVzjdZdz7phd9v6jCbwxrBW3fK6n8Rc0CtdmM4bumzMnxywBYhuph6J819RRw/ku+rLbelwfMunktuzVVHg==}
 
   fast-xml-builder@1.2.0:
     resolution: {integrity: sha512-00aAWieqff+ZJhsXA4g1g7M8k+7AYoMUUHF+/zFb5U6Uv/P0Vl4QZo84/IcufzYalLuEj9928bXN9PbbFzMF0Q==}
@@ -15968,6 +15971,10 @@ packages:
 
   iconv-lite@0.7.2:
     resolution: {integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==}
+    engines: {node: '>=0.10.0'}
+
+  iconv-lite@0.7.3:
+    resolution: {integrity: sha512-IKXpvIzjnC9XTAUbVBcMfGS0EPaIXtW6v+zr+RRp+hqULEpo0owZax6wyRwPOJbWbzjYspQwusTsfVr0ifh4uQ==}
     engines: {node: '>=0.10.0'}
 
   icss-utils@5.1.0:
@@ -18050,9 +18057,11 @@ packages:
     resolution: {integrity: sha512-WWdIxpyjEn+FhQJQQv9aQAYlHoNVdzIzUySNV1gHUPDSdZJ3yZn7pAAbQcV7B56Mvu881q9FZV+0Vx2xC44VWA==}
     engines: {node: ^18.17.0 || >=20.5.0}
 
-  mysql2@3.17.1:
-    resolution: {integrity: sha512-UzIzdVwPXPoZm+FaJ4lNsRt28HtUwt68gpLH7NP1oSjd91M5Qn1XJzbIsSRMRc5CV3pvktLNshmbaFfMYqPBhQ==}
+  mysql2@3.24.2:
+    resolution: {integrity: sha512-l9kXeKGwd6VCbSjmpO/bLWb+YCYpbvE4whte8ec6InXebvCNyEEydyRCnRU+TSHNqRLJ8B+Tk1uWb+vMCJgJzA==}
     engines: {node: '>= 8.0'}
+    peerDependencies:
+      '@types/node': '>= 8'
 
   mz@2.7.0:
     resolution: {integrity: sha512-z81GNO7nnYMEhrGh9LeymoE4+Yr0Wn5McHIZMK5cfQCl+NDX08sCZgUc9/6MHni9IWuFLm1Z3HTCXu2z9fN62Q==}
@@ -18237,8 +18246,9 @@ packages:
     engines: {node: '>=16.0.0'}
     hasBin: true
 
-  node-releases@2.0.37:
-    resolution: {integrity: sha512-1h5gKZCF+pO/o3Iqt5Jp7wc9rH3eJJ0+nh/CIoiRwjRxde/hAHyLPXYN4V3CqKAbiZPSeJFSWHmJsbkicta0Eg==}
+  node-releases@2.0.54:
+    resolution: {integrity: sha512-YHs7BmmcsdAI5Ozuf8JZo6PT0mv2GIWC9vMfvUC3dp65M8hn7Ux8CPL+2oBI7juNuj9d0ndhTcznq2ODBps9cQ==}
+    engines: {node: '>=18'}
 
   nodemailer@9.0.1:
     resolution: {integrity: sha512-Gwv8SQewT616ZM/URn0H54b8PWo/Wum7md3EW2aWy1lO27+WZCX+Xyak3J+NlmHUjDh5ME+uesJUDRbR3Ye8Bw==}
@@ -20579,9 +20589,6 @@ packages:
     resolution: {integrity: sha512-1gnZf7DFcoIcajTjTwjwuDjzuz4PPcY2StKPlsGAQ1+YH20IRVrBaXSWmdjowTJ6u8Rc01PoYOGHXfP1mYcZNQ==}
     engines: {node: '>= 18'}
 
-  seq-queue@0.0.5:
-    resolution: {integrity: sha512-hr3Wtp/GZIc/6DAGPDcV4/9WoZhjrkXsi5B/07QgX8tsdc6ilr7BFM6PM6rbdAX1kFSDYeZGLipIZZKyQP0O5Q==}
-
   serialize-error-cjs@0.1.4:
     resolution: {integrity: sha512-6a6dNqipzbCPlTFgztfNP2oG+IGcflMe/01zSzGrQcxGMKbIjOemBBD85pH92klWaJavAUWxAh9Z0aU28zxW6A==}
     deprecated: Rolling release, please update to 0.2.0
@@ -20907,8 +20914,8 @@ packages:
   sprintf-js@1.1.3:
     resolution: {integrity: sha512-Oo+0REFV59/rz3gfJNKQiBlwfHaSESl1pcGyABQsnnIfWOFt6JNj5gCog2U6MLZ//IGYD+nA8nI+mTShREReaA==}
 
-  sql-escaper@1.3.2:
-    resolution: {integrity: sha512-lp+ZDVfSjHt+qAK1jXBTIXBNYnbo7gnaAGwoYTH9bE89kNkXwcu6g0WjJGRsdTKVpY1z70u3Y0IgmnBOoRybHw==}
+  sql-escaper@1.5.1:
+    resolution: {integrity: sha512-4toX5E1fQbBrpfXidaHnF0669nkAdETeIPTs2SUjxxD7RRIs9ICG4gtpmfc68JCEKehsdwLFqBu9VlQqZ1P1gg==}
     engines: {bun: '>=1.0.0', deno: '>=2.0.0', node: '>=12.0.0'}
 
   sql-highlight@6.1.0:
@@ -21750,7 +21757,7 @@ packages:
       ioredis: ^5.0.4
       mongodb: ^5.8.0 || ^6.0.0
       mssql: ^9.1.1 || ^10.0.0 || ^11.0.0 || ^12.0.0
-      mysql2: ^2.2.5 || ^3.0.1
+      mysql2: '>=3.22.0 <4.0.0'
       oracledb: ^6.3.0 || ^7.0.0
       pg: ^8.5.1
       pg-native: ^3.0.0
@@ -21976,11 +21983,11 @@ packages:
   unzipper@0.10.14:
     resolution: {integrity: sha512-ti4wZj+0bQTiX2KmKWuwj7lhV+2n//uXEotUmGuQqrbVZSEGFMbI68+c6JCQ8aAmUWYvtHEz2A8K6wXvueR/6g==}
 
-  update-browserslist-db@1.2.3:
-    resolution: {integrity: sha512-Js0m9cx+qOgDxo0eMiFGEueWztz+d4+M3rGlmKPT+T4IS/jP4ylw3Nwpu6cpTTP8R1MAC1kF4VbdLt3ARf209w==}
+  update-browserslist-db@1.3.2:
+    resolution: {integrity: sha512-UQ+MSxlhRm1bzjhU+DcuXfjFO1FzNtqhK5+9Yvlp90ItDLk5vT932A0rFu619nf7RVS+Y/VeaUW1jaRDqZ8VJw==}
     hasBin: true
     peerDependencies:
-      browserslist: '>= 4.21.0'
+      browserslist: '>=4.28.7 <5.0.0'
 
   update-notifier@6.0.2:
     resolution: {integrity: sha512-EDxhTEVPZZRLWYcJ4ZXjGFN0oP7qYvbXWzEgRm/Yql4dHX5wDbvh89YHP6PK1lzZJYrMtXUuZZz8XGK+U6U1og==}
@@ -23315,7 +23322,7 @@ snapshots:
     dependencies:
       '@babel/compat-data': 7.29.0
       '@babel/helper-validator-option': 7.27.1
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       lru-cache: 5.1.1
       semver: 6.3.1
 
@@ -23323,7 +23330,7 @@ snapshots:
     dependencies:
       '@babel/compat-data': 7.29.7
       '@babel/helper-validator-option': 7.29.7
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       lru-cache: 5.1.1
       semver: 6.3.1
 
@@ -25802,7 +25809,7 @@ snapshots:
 
   '@docusaurus/react-loadable@6.0.0(react@18.3.1)':
     dependencies:
-      '@types/react': 18.3.28
+      '@types/react': 19.2.14
       react: 18.3.1
 
   '@docusaurus/theme-classic@3.10.1(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)(typescript@5.6.3)':
@@ -27825,7 +27832,7 @@ snapshots:
       reflect-metadata: 0.2.2
       tslib: 2.8.1
 
-  '@nestjs-modules/mailer@2.3.4(b5a9fc8e8b421c31ea2092b3d00813ad)':
+  '@nestjs-modules/mailer@2.3.4(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/event-emitter@3.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18))(@nestjs/terminus@11.1.1(8e47f099d440ece1608976bc60fdf283))(bullmq@5.79.0)(chokidar@4.0.3)(nodemailer@9.0.1)(relateurl@0.2.7)(svgo@4.0.2)(terser@5.46.1)(typescript@5.9.3)':
     dependencies:
       '@css-inline/css-inline': 0.20.0
       '@nestjs/common': 11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -27835,7 +27842,7 @@ snapshots:
       tslib: 2.8.1
     optionalDependencies:
       '@nestjs/event-emitter': 3.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)
-      '@nestjs/terminus': 11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/axios@4.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(axios@1.18.1)(rxjs@7.8.2))(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/microservices@11.1.19)(@nestjs/typeorm@11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))))(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
+      '@nestjs/terminus': 11.1.1(8e47f099d440ece1608976bc60fdf283)
       '@types/ejs': 3.1.5
       '@types/mjml': 4.7.4
       '@types/pug': 2.0.10
@@ -28051,7 +28058,7 @@ snapshots:
       class-transformer: 0.5.1
       class-validator: 0.14.3
 
-  '@nestjs/terminus@11.1.1(@grpc/grpc-js@1.14.4)(@grpc/proto-loader@0.8.1)(@nestjs/axios@4.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(axios@1.18.1)(rxjs@7.8.2))(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/microservices@11.1.19)(@nestjs/typeorm@11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))))(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))':
+  '@nestjs/terminus@11.1.1(8e47f099d440ece1608976bc60fdf283)':
     dependencies:
       '@nestjs/common': 11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.18)(@nestjs/websockets@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -28064,8 +28071,8 @@ snapshots:
       '@grpc/proto-loader': 0.8.1
       '@nestjs/axios': 4.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(axios@1.18.1)(rxjs@7.8.2)
       '@nestjs/microservices': 11.1.19(@grpc/grpc-js@1.14.4)(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/websockets@11.1.18)(cache-manager@7.2.8)(ioredis@5.10.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@nestjs/typeorm': 11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
-      typeorm: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+      '@nestjs/typeorm': 11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
+      typeorm: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
 
   '@nestjs/testing@11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.18)':
     dependencies:
@@ -28082,13 +28089,13 @@ snapshots:
       '@nestjs/core': 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.18)(@nestjs/websockets@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
 
-  '@nestjs/typeorm@11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))':
+  '@nestjs/typeorm@11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))':
     dependencies:
       '@nestjs/common': 11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/microservices@11.1.19)(@nestjs/platform-express@11.1.18)(@nestjs/websockets@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
-      typeorm: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+      typeorm: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
 
   '@nestjs/websockets@11.1.18(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)':
     dependencies:
@@ -28277,7 +28284,7 @@ snapshots:
 
   '@npmcli/fs@5.0.0':
     dependencies:
-      semver: 7.8.1
+      semver: 7.8.5
 
   '@npmcli/git@7.0.2':
     dependencies:
@@ -31110,7 +31117,7 @@ snapshots:
     dependencies:
       react: 19.2.5
 
-  '@rekog/mcp-nest@1.9.6(3dd465df555724120f307260697943e6)':
+  '@rekog/mcp-nest@1.9.6(92feeaa2350d77eea593a9080484e669)':
     dependencies:
       '@modelcontextprotocol/sdk': 1.27.1(@cfworker/json-schema@4.1.1)(zod@4.4.3)
       '@nestjs/common': 11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -31130,8 +31137,8 @@ snapshots:
       rxjs: 7.8.2
       zod: 4.4.3
     optionalDependencies:
-      '@nestjs/typeorm': 11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
-      typeorm: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+      '@nestjs/typeorm': 11.0.1(@nestjs/common@11.1.18(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.18)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)))
+      typeorm: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
 
   '@remirror/core-constants@3.0.0': {}
 
@@ -32795,7 +32802,7 @@ snapshots:
   '@types/react-router@5.1.20':
     dependencies:
       '@types/history': 4.7.11
-      '@types/react': 18.3.28
+      '@types/react': 19.2.14
 
   '@types/react@18.3.28':
     dependencies:
@@ -33574,7 +33581,7 @@ snapshots:
   ajv@8.18.0:
     dependencies:
       fast-deep-equal: 3.1.3
-      fast-uri: 3.1.5
+      fast-uri: 3.1.7
       json-schema-traverse: 1.0.0
       require-from-string: 2.0.2
 
@@ -33900,7 +33907,7 @@ snapshots:
 
   autoprefixer@10.5.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       caniuse-lite: 1.0.30001809
       fraction.js: 5.3.4
       picocolors: 1.1.1
@@ -34105,7 +34112,7 @@ snapshots:
 
   before-after-hook@3.0.2: {}
 
-  better-auth@1.6.25(@opentelemetry/api@1.9.1)(better-sqlite3@12.6.2)(mysql2@3.17.1)(next@16.2.11(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(pg@8.18.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(solid-js@1.9.13)(vitest@4.1.0(@opentelemetry/api@1.9.1)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))):
+  better-auth@1.6.25(@opentelemetry/api@1.9.1)(better-sqlite3@12.6.2)(mysql2@3.24.2(@types/node@22.19.11))(next@16.2.11(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(pg@8.18.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(solid-js@1.9.13)(vitest@4.1.0(@opentelemetry/api@1.9.1)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))):
     dependencies:
       '@better-auth/core': 1.6.25(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.3.0)
       '@better-auth/drizzle-adapter': 1.6.25(@better-auth/core@1.6.25(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.3.7(zod@4.4.3))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.3.0))(@better-auth/utils@0.4.2)
@@ -34126,7 +34133,7 @@ snapshots:
       zod: 4.4.3
     optionalDependencies:
       better-sqlite3: 12.6.2
-      mysql2: 3.17.1
+      mysql2: 3.24.2(@types/node@22.19.11)
       next: 16.2.11(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.59.1)(@types/node@22.19.11)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       pg: 8.18.0
       react: 19.2.5
@@ -34298,13 +34305,13 @@ snapshots:
     dependencies:
       fill-range: 7.1.1
 
-  browserslist@4.28.2:
+  browserslist@4.28.8:
     dependencies:
       baseline-browser-mapping: 2.11.13
       caniuse-lite: 1.0.30001809
-      electron-to-chromium: 1.5.334
-      node-releases: 2.0.37
-      update-browserslist-db: 1.2.3(browserslist@4.28.2)
+      electron-to-chromium: 1.5.419
+      node-releases: 2.0.54
+      update-browserslist-db: 1.3.2(browserslist@4.28.8)
 
   bs-logger@0.2.6:
     dependencies:
@@ -34548,7 +34555,7 @@ snapshots:
 
   caniuse-api@3.0.0:
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       caniuse-lite: 1.0.30001809
       lodash.memoize: 4.1.2
       lodash.uniq: 4.5.0
@@ -34912,7 +34919,7 @@ snapshots:
       dot-prop: 9.0.0
       env-paths: 3.0.0
       json-schema-typed: 8.0.2
-      semver: 7.8.1
+      semver: 7.8.5
       uint8array-extras: 1.5.0
 
   confbox@0.1.8: {}
@@ -35011,7 +35018,7 @@ snapshots:
 
   core-js-compat@3.49.0:
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
 
   core-js@3.48.0: {}
 
@@ -35246,7 +35253,7 @@ snapshots:
       postcss-modules-scope: 3.2.1(postcss@8.5.26)
       postcss-modules-values: 4.0.0(postcss@8.5.26)
       postcss-value-parser: 4.2.0
-      semver: 7.8.1
+      semver: 7.8.5
     optionalDependencies:
       webpack: 5.105.4
 
@@ -35308,7 +35315,7 @@ snapshots:
   cssnano-preset-advanced@6.1.2(postcss@8.5.26):
     dependencies:
       autoprefixer: 10.5.0(postcss@8.5.26)
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       cssnano-preset-default: 6.1.2(postcss@8.5.26)
       postcss: 8.5.26
       postcss-discard-unused: 6.0.5(postcss@8.5.26)
@@ -35318,7 +35325,7 @@ snapshots:
 
   cssnano-preset-default@6.1.2(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       css-declaration-sorter: 7.4.0(postcss@8.5.26)
       cssnano-utils: 4.0.2(postcss@8.5.26)
       postcss: 8.5.26
@@ -35352,7 +35359,7 @@ snapshots:
 
   cssnano-preset-default@7.0.12(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       css-declaration-sorter: 7.4.0(postcss@8.5.26)
       cssnano-utils: 5.0.1(postcss@8.5.26)
       postcss: 8.5.26
@@ -36052,7 +36059,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron-to-chromium@1.5.334: {}
+  electron-to-chromium@1.5.419: {}
 
   electron@39.8.10:
     dependencies:
@@ -36945,7 +36952,7 @@ snapshots:
 
   fast-sha256@1.3.0: {}
 
-  fast-uri@3.1.5: {}
+  fast-uri@3.1.7: {}
 
   fast-xml-builder@1.2.0:
     dependencies:
@@ -38079,6 +38086,10 @@ snapshots:
       safer-buffer: 2.1.2
 
   iconv-lite@0.7.2:
+    dependencies:
+      safer-buffer: 2.1.2
+
+  iconv-lite@0.7.3:
     dependencies:
       safer-buffer: 2.1.2
 
@@ -41078,17 +41089,16 @@ snapshots:
 
   mute-stream@2.0.0: {}
 
-  mysql2@3.17.1:
+  mysql2@3.24.2(@types/node@22.19.11):
     dependencies:
+      '@types/node': 22.19.11
       aws-ssl-profiles: 1.1.2
-      denque: 2.1.0
       generate-function: 2.3.1
-      iconv-lite: 0.7.2
+      iconv-lite: 0.7.3
       long: 5.3.2
       lru.min: 1.1.4
       named-placeholders: 1.1.6
-      seq-queue: 0.0.5
-      sql-escaper: 1.3.2
+      sql-escaper: 1.5.1
 
   mz@2.7.0:
     dependencies:
@@ -41290,7 +41300,7 @@ snapshots:
       graceful-fs: 4.2.11
       nopt: 9.0.0
       proc-log: 6.1.0
-      semver: 7.8.1
+      semver: 7.8.5
       tar: 7.5.22
       tinyglobby: 0.2.17
       undici: 6.27.0
@@ -41321,7 +41331,7 @@ snapshots:
       node-gyp-build: 4.8.4
     optional: true
 
-  node-releases@2.0.37: {}
+  node-releases@2.0.54: {}
 
   nodemailer@9.0.1: {}
 
@@ -41345,7 +41355,7 @@ snapshots:
 
   npm-install-checks@8.0.0:
     dependencies:
-      semver: 7.8.1
+      semver: 7.8.5
 
   npm-normalize-package-bin@5.0.0: {}
 
@@ -41762,7 +41772,7 @@ snapshots:
       got: 12.6.1
       registry-auth-token: 5.1.1
       registry-url: 6.0.1
-      semver: 7.8.1
+      semver: 7.8.5
 
   package-manager-detector@0.2.11:
     dependencies:
@@ -42157,7 +42167,7 @@ snapshots:
 
   postcss-colormin@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       colord: 2.9.3
       postcss: 8.5.26
@@ -42166,7 +42176,7 @@ snapshots:
   postcss-colormin@7.0.7(postcss@8.5.26):
     dependencies:
       '@colordx/core': 5.0.3
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
@@ -42174,13 +42184,13 @@ snapshots:
 
   postcss-convert-values@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
 
   postcss-convert-values@7.0.9(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
     optional: true
@@ -42310,7 +42320,7 @@ snapshots:
       cosmiconfig: 8.3.6(typescript@5.6.3)
       jiti: 1.21.7
       postcss: 8.5.26
-      semver: 7.8.1
+      semver: 7.8.5
       webpack: 5.105.4
     transitivePeerDependencies:
       - typescript
@@ -42341,7 +42351,7 @@ snapshots:
 
   postcss-merge-rules@6.1.1(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       cssnano-utils: 4.0.2(postcss@8.5.26)
       postcss: 8.5.26
@@ -42349,7 +42359,7 @@ snapshots:
 
   postcss-merge-rules@7.0.8(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       cssnano-utils: 5.0.1(postcss@8.5.26)
       postcss: 8.5.26
@@ -42384,14 +42394,14 @@ snapshots:
 
   postcss-minify-params@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       cssnano-utils: 4.0.2(postcss@8.5.26)
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
 
   postcss-minify-params@7.0.6(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       cssnano-utils: 5.0.1(postcss@8.5.26)
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
@@ -42503,13 +42513,13 @@ snapshots:
 
   postcss-normalize-unicode@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
 
   postcss-normalize-unicode@7.0.6(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-value-parser: 4.2.0
     optional: true
@@ -42610,7 +42620,7 @@ snapshots:
       '@csstools/postcss-trigonometric-functions': 4.0.9(postcss@8.5.26)
       '@csstools/postcss-unset-value': 4.0.0(postcss@8.5.26)
       autoprefixer: 10.5.0(postcss@8.5.26)
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       css-blank-pseudo: 7.0.1(postcss@8.5.26)
       css-has-pseudo: 7.0.3(postcss@8.5.26)
       css-prefers-color-scheme: 10.0.0(postcss@8.5.26)
@@ -42654,13 +42664,13 @@ snapshots:
 
   postcss-reduce-initial@6.1.0(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       postcss: 8.5.26
 
   postcss-reduce-initial@7.0.6(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       caniuse-api: 3.0.0
       postcss: 8.5.26
     optional: true
@@ -42864,7 +42874,7 @@ snapshots:
       indent-string: 4.0.0
       lodash.merge: 4.6.2
       loglevel-colored-level-prefix: 1.0.0
-      prettier: 3.8.3
+      prettier: 3.9.6
       pretty-format: 29.7.0
       require-relative: 0.8.7
       tslib: 2.8.1
@@ -44140,13 +44150,13 @@ snapshots:
 
   semver-diff@4.0.0:
     dependencies:
-      semver: 7.8.1
+      semver: 7.8.5
 
   semver-regex@4.0.5: {}
 
   semver-truncate@3.0.0:
     dependencies:
-      semver: 7.8.1
+      semver: 7.8.5
 
   semver@6.3.1: {}
 
@@ -44189,8 +44199,6 @@ snapshots:
       statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
-
-  seq-queue@0.0.5: {}
 
   serialize-error-cjs@0.1.4: {}
 
@@ -44299,7 +44307,7 @@ snapshots:
       '@dotenvx/dotenvx': 1.52.0
       '@modelcontextprotocol/sdk': 1.27.1(@cfworker/json-schema@4.1.1)(zod@3.25.76)
       '@types/validate-npm-package-name': 4.0.2
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       commander: 14.0.3
       cosmiconfig: 9.0.1(typescript@5.9.3)
       dedent: 1.7.1
@@ -44706,7 +44714,7 @@ snapshots:
 
   sprintf-js@1.1.3: {}
 
-  sql-escaper@1.3.2: {}
+  sql-escaper@1.5.1: {}
 
   sql-highlight@6.1.0: {}
 
@@ -44954,13 +44962,13 @@ snapshots:
 
   stylehacks@6.1.1(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-selector-parser: 6.1.2
 
   stylehacks@7.0.8(postcss@8.5.26):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       postcss: 8.5.26
       postcss-selector-parser: 7.1.1
     optional: true
@@ -45203,7 +45211,7 @@ snapshots:
   terser@5.46.1:
     dependencies:
       '@jridgewell/source-map': 0.3.11
-      acorn: 8.16.0
+      acorn: 8.18.0
       commander: 2.20.3
       source-map-support: 0.5.21
 
@@ -45682,7 +45690,7 @@ snapshots:
 
   typedarray@0.0.6: {}
 
-  typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)):
+  typeorm@0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.24.2(@types/node@22.19.11))(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)):
     dependencies:
       '@sqltools/formatter': 1.2.5
       ansis: 4.3.1
@@ -45702,7 +45710,7 @@ snapshots:
     optionalDependencies:
       better-sqlite3: 12.6.2
       ioredis: 5.10.1
-      mysql2: 3.17.1
+      mysql2: 3.24.2(@types/node@22.19.11)
       pg: 8.18.0
       sql.js: 1.14.0
       ts-node: 10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3)
@@ -45899,9 +45907,9 @@ snapshots:
       readable-stream: 2.3.8
       setimmediate: 1.0.5
 
-  update-browserslist-db@1.2.3(browserslist@4.28.2):
+  update-browserslist-db@1.3.2(browserslist@4.28.8):
     dependencies:
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       escalade: 3.2.0
       picocolors: 1.1.1
 
@@ -46386,7 +46394,7 @@ snapshots:
       '@webassemblyjs/wasm-parser': 1.14.1
       acorn: 8.16.0
       acorn-import-phases: 1.0.4(acorn@8.16.0)
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.20.1
       es-module-lexer: 2.1.0
@@ -46418,7 +46426,7 @@ snapshots:
       '@webassemblyjs/wasm-parser': 1.14.1
       acorn: 8.16.0
       acorn-import-phases: 1.0.4(acorn@8.16.0)
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.20.1
       es-module-lexer: 2.1.0
@@ -46450,7 +46458,7 @@ snapshots:
       '@webassemblyjs/wasm-parser': 1.14.1
       acorn: 8.16.0
       acorn-import-phases: 1.0.4(acorn@8.16.0)
-      browserslist: 4.28.2
+      browserslist: 4.28.8
       chrome-trace-event: 1.0.4
       enhanced-resolve: 5.20.1
       es-module-lexer: 2.1.0

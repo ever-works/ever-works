@@ -71,7 +71,7 @@
         "helmet": "^8.1.0",
         "ioredis": "^5.10.1",
         "multer": "^2.2.0",
-        "mysql2": "^3.16.0",
+        "mysql2": "^3.24.2",
         "nodemailer": "^9.0.1",
         "passport": "^0.7.0",
         "passport-github2": "^0.1.12",

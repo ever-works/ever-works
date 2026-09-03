@@ -191,7 +191,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       this repo). Defaults keep boot non-fatal; the wiring is still required
       for the values to be settable.
 - [ ] **T32**. Full-spec conformance run: fixture packages exercising every
-      §10.1 checklist row against the live loader; publish the checklist result
+      Appendix A checklist row against the live loader; publish the checklist result
       as a doc page.
 
 ## Phase 5 — Sidecars + export (PR-8, PR-9)
@@ -230,7 +230,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       tools or document out-of-scope.
 - [ ] **T40**. Security review pass (stdio gate, SSRF policy, containment
       fuzzing over fixture escapes); Sentry tags; rate-limit re-check.
-- [ ] **T41**. Conformance statement doc: map every §10.1 row + AP-1…AP-23 to
+- [ ] **T41**. Conformance statement doc: map every Appendix A row + AP-1…AP-23 to
       test evidence; announce "Agent Plugins v1.0.0 compatible (client: skills + MCP; producer: skills packages, plus the Ever Works MCP-server package
       descriptor)" — the single canonical claim wording, used verbatim in spec
       §1.3, the ADR, and marketing. MUST document client-side policy refusals
