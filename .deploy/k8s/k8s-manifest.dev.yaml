@@ -310,6 +310,21 @@ spec:
             - name: CAPTCHA_SECRET
               value: "$CAPTCHA_SECRET"
 
+            # EW-772 — Agent Plugins v1.0.0 standard interop.
+            # Packages in the open cross-vendor format (skills + MCP server
+            # declarations) contribute to the skills catalog. Both variables
+            # are SAFE TO LEAVE EMPTY: the flag defaults to off and the
+            # directory to /app/agent-plugins, so an unset value cannot
+            # crash-loop the pod the way a missing required variable did in
+            # the 2026-06-12 PLATFORM_ENCRYPTION_KEY incident. Note the config
+            # layer reads these with `||`, not `??`, because envsubst renders
+            # an unset variable as an EMPTY STRING rather than leaving it
+            # undefined.
+            - name: FEATURE_AGENT_PLUGINS
+              value: "$FEATURE_AGENT_PLUGINS"
+            - name: AGENT_PLUGINS_DIR
+              value: "$AGENT_PLUGINS_DIR"
+
           resources:
             requests:
               # 2026-06-06 dev right-sizing: live `kubectl top pod` measured
