@@ -529,3 +529,65 @@ describe('defaultScratchFs — scratch directories cannot be pre-planted (review
 		}
 	});
 });
+
+describe('defaultScratchFs — the scratch ROOT cannot be pre-planted either (review round 2)', () => {
+	const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+
+	it('refuses a root that is itself a symlink or junction to somewhere else', async () => {
+		const base = mkdtempSync(join(tmpdir(), 'ew-scratch-base-'));
+		const elsewhere = join(base, 'elsewhere');
+		await realFs.mkdir(elsewhere);
+		// An attacker pre-plants the predictable root name as a link they control.
+		const root = join(base, 'agent-tasks');
+		await realFs.symlink(elsewhere, root, linkType);
+		try {
+			await expect(defaultScratchFs.createScratchDir(root, 'job-1')).rejects.toThrowError(/not a real directory/);
+			// No job directory appeared where the link points.
+			expect(await realFs.readdir(elsewhere)).toEqual([]);
+		} finally {
+			await realFs.rm(base, { recursive: true, force: true });
+		}
+	});
+
+	it('refuses a root whose parent below the OS temp dir is a symlink or junction', async () => {
+		const base = mkdtempSync(join(tmpdir(), 'ew-scratch-base-'));
+		const elsewhere = join(base, 'elsewhere');
+		await realFs.mkdir(elsewhere);
+		// `<temp>/<base>/ever-works-node` is the link; `agent-tasks` below it
+		// is what `mkdir -p` would happily create on the far side.
+		const parent = join(base, 'ever-works-node');
+		await realFs.symlink(elsewhere, parent, linkType);
+		const root = join(parent, 'agent-tasks');
+		try {
+			await expect(defaultScratchFs.createScratchDir(root, 'job-2')).rejects.toThrowError(/not a real directory/);
+			const leaked = await realFs.readdir(join(elsewhere, 'agent-tasks')).catch(() => [] as string[]);
+			expect(leaked).toEqual([]);
+		} finally {
+			await realFs.rm(base, { recursive: true, force: true });
+		}
+	});
+
+	it('still accepts a real root and creates the job directory inside it', async () => {
+		const base = mkdtempSync(join(tmpdir(), 'ew-scratch-base-'));
+		const root = join(base, 'ever-works-node', 'agent-tasks');
+		try {
+			const created = await defaultScratchFs.createScratchDir(root, 'job-3');
+			expect(created.startsWith(root)).toBe(true);
+			expect((await realFs.lstat(created)).isDirectory()).toBe(true);
+		} finally {
+			await realFs.rm(base, { recursive: true, force: true });
+		}
+	});
+
+	it.skipIf(process.platform === 'win32')('tightens a group/other-accessible pre-existing root to 0700', async () => {
+		const base = mkdtempSync(join(tmpdir(), 'ew-scratch-base-'));
+		const root = join(base, 'agent-tasks');
+		await realFs.mkdir(root, { mode: 0o755 });
+		try {
+			await defaultScratchFs.createScratchDir(root, 'job-4');
+			expect((await realFs.stat(root)).mode & 0o777).toBe(0o700);
+		} finally {
+			await realFs.rm(base, { recursive: true, force: true });
+		}
+	});
+});

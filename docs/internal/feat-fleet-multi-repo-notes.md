@@ -100,7 +100,9 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
   enabled and describe an `owner/repository` URL; the EFFECTIVE mount directory (explicit `mountDir`,
   else the connection's mount path or name) must pass the fleet gate (`isReservedMountDir` included)
   and be unique case-insensitively; two connections may not point at the same repository; at most 8.
-  The API DTOs carry `TaskExtraRepoDto` (`@ever-works/agent/dto`); the field is exposed to the web chat
+  The API DTOs carry `TaskExtraRepoDto` (`@ever-works/agent/dto`), which applies the mount-directory
+  pattern AND `isReservedMountDir` itself, so a Windows device name or `node_modules` is a 400 naming
+  `mountDir` at the request boundary rather than one layer later; the field is exposed to the web chat
   tools `create_task` / `update_task` (body hint) and in the Swagger document — the MCP server whitelist
   (`apps/mcp/src/openapi-tools/whitelist.ts`) does not include `/api/tasks`, so no MCP tool carries it.
 - `describeFleetWorkspace` merges the Task's extras AFTER the agent's attachments; a Task entry wins over
@@ -123,21 +125,39 @@ branch, mountDir, writable, depth? }`; `FleetTaskWorkspaceDescriptor.mounts?` wi
 - Acceptance checks still run in the primary worktree only.
 - The primary PR body is not edited after the mount PRs exist; the cross-link is on each mount PR
   ("Part of <primary PR>") and in the task chat / Inbox.
+- `recordLinkedPullRequest` is a plain read-modify-write of `Task.linkedPullRequests` (`simple-json`;
+  sqlite and postgres share no portable JSON merge). Two completions of ONE Task reconciled at the same
+  moment (two runs, or a failure path racing a success path) read the same base and the later write
+  drops the other's entry — the pull request stays open on the remote but leaves the Task and the Inbox
+  count. Serializing the upsert per Task (an optimistic `updatedAt` guard with one retry, or
+  `SELECT … FOR UPDATE` on postgres) is a follow-up.
 
 ## Verification
 
-| Check                                                                                                                                                                                                                  | Result                                          |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `cd packages/contracts && npx vitest run src/fleet`                                                                                                                                                                    | 8 files, 548 tests                              |
-| `cd packages/contracts && npx tsc --noEmit -p tsconfig.json`                                                                                                                                                           | clean                                           |
-| `cd apps/node && npx vitest run src/core/executors/agent-task-mounts.spec.ts src/core/executors/agent-task-model-cli.spec.ts src/core/executors/agent-task.spec.ts src/core/workspaces` (real Git for the mount suite) | 5 files, 83 tests                               |
-| `cd apps/node && npx tsc --noEmit`                                                                                                                                                                                     | clean                                           |
-| `cd packages/agent && npx jest --testPathPattern='task-workspace-mounts\|task-workspace-fleet\|task-workspace-remote-push\|repo-registry'`                                                                             | 4 suites, 65 tests                              |
-| `cd packages/agent && npx tsc --noEmit -p tsconfig.json`                                                                                                                                                               | clean                                           |
-| `cd apps/api && npx jest --testPathPattern='fleet-agent-task-planner\|fleet-agent-task-reconciler\|AddTaskLinkedPullRequests'`                                                                                         | planner + reconciler (17) + migration (3) green |
-| `cd apps/api && npx tsc -p tsconfig.build.json --noEmit`                                                                                                                                                               | clean                                           |
-| `cd apps/web && npx tsc --noEmit`                                                                                                                                                                                      | see PR body                                     |
-| Prettier on every changed file                                                                                                                                                                                         | clean                                           |
+| Check                                                                                                                                                                                                                  | Result                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `cd packages/contracts && npx vitest run src/fleet`                                                                                                                                                                    | 8 files, 557 tests                                   |
+| `cd packages/contracts && npx tsc --noEmit -p tsconfig.json`                                                                                                                                                           | clean                                                |
+| `cd apps/node && npx vitest run src/core/executors/agent-task-mounts.spec.ts src/core/executors/agent-task-model-cli.spec.ts src/core/executors/agent-task.spec.ts src/core/workspaces` (real Git for the mount suite) | 5 files, 89 tests                                    |
+| `cd apps/node && npx tsc --noEmit`                                                                                                                                                                                     | clean                                                |
+| `cd packages/agent && npx jest --testPathPattern='task-workspace-mounts\|task-workspace-fleet\|task-workspace-remote-push\|repo-registry'`                                                                             | 4 suites, 76 tests                                   |
+| `cd packages/agent && npx tsc --noEmit -p tsconfig.json`                                                                                                                                                               | clean                                                |
+| `cd apps/api && npx jest --testPathPattern='fleet-agent-task-planner\|fleet-agent-task-reconciler\|AddTaskLinkedPullRequests'`                                                                                         | planner (13) + reconciler (29) + migration (3) green |
+| `cd apps/api && npx tsc -p tsconfig.build.json --noEmit`                                                                                                                                                               | clean                                                |
+| `cd apps/web && npx tsc --noEmit`                                                                                                                                                                                      | clean                                                |
+| `cd apps/web && npx vitest run src/components/agents/AgentReposCard.unit.spec.tsx src/components/tasks/TaskBranchSection.unit.spec.tsx`                                                                                | 2 files, 4 tests                                     |
+| Prettier on every changed file                                                                                                                                                                                         | clean                                                |
+
+PR C2 (`feat/fleet-task-extra-repos`), on top of the table above:
+
+| Check                                                                                                                                      | Result                                                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cd packages/agent && npx jest --testPathPattern='dto.spec\|tasks.service.extra-repos\|task-workspace-extra-repos\|task-workspace-mounts'` | 5 suites, 260 tests (`src/dto` 109 incl. `TaskExtraRepoDto`, items-generator dto 85, extra-repos service 18, extra-repos workspace 16, mounts 32) |
+| `cd packages/agent && npx tsc --noEmit -p tsconfig.json`                                                                                   | clean                                                                                                                                             |
+| `cd apps/api && npx jest --testPathPattern='AddTaskExtraRepos'`                                                                            | 1 suite, 2 tests                                                                                                                                  |
+| `cd apps/api && npx tsc -p tsconfig.build.json --noEmit`                                                                                   | clean                                                                                                                                             |
+| `cd apps/web && npx vitest run src/components/tasks/TaskExtraReposPicker.unit.spec.tsx src/lib/ai/tools`                                   | 10 files, 102 tests                                                                                                                               |
+| `cd apps/web && npx tsc --noEmit`                                                                                                          | clean                                                                                                                                             |
 
 Not run: the end-to-end scenario on a real node (needs A+B on prod); documented in the Workspace
 runbook `EVER_WORKS_FLEET_NODES.md` §6.
