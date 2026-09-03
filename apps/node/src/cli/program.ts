@@ -1,4 +1,5 @@
 import { Command, CommanderError } from 'commander';
+import { posix, win32 } from 'node:path';
 import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
 import { resolveModelCliPaths } from '../core/model-cli-probe';
@@ -248,10 +249,61 @@ export interface StartCommandOptions {
 	claudePath?: string;
 	/** Agent execution v2 — pin the Codex executable for this process. */
 	codexPath?: string;
+	/**
+	 * Persistent worktree root for repository-backed agent Tasks (absolute).
+	 * Default: `EVER_WORKS_NODE_WORKSPACE_ROOT`, then `~/.ever-works/fleet-workspaces`.
+	 */
+	workspaceRoot?: string;
+}
+
+/**
+ * Parse `--workspace-root`: the directory the node keeps its bare-repository
+ * cache and per-Task worktrees under.
+ *
+ * It must be ABSOLUTE. The node runs as a service whose working directory
+ * is whatever the service manager happened to set (`%ProgramData%`,
+ * `/`, the unit's `WorkingDirectory`), so a relative root would land
+ * every checkout somewhere the operator did not choose — and a
+ * filesystem root is refused for the same reason the provisioner refuses
+ * it: the node deletes stale worktrees under this directory.
+ *
+ * Absoluteness is judged by the HOST platform (injected, so the rule is
+ * testable for both shapes): `C:\fleet` is absolute on Windows and not
+ * on POSIX, and `/srv/fleet` is absolute on both.
+ *
+ * On Windows "absolute" additionally means DRIVE- or UNC-ROOTED. Node's
+ * `path.win32.isAbsolute` accepts a rooted-but-driveless `\fleet` (and
+ * `/fleet`, `\\fleet`, `\\nas\`), all of which `path.win32.resolve` then
+ * completes with the drive of the CURRENT directory — exactly the
+ * service-manager-chosen location this flag exists to avoid. So a Windows
+ * root must start with `<drive>:\` (or `/`), or be a UNC path naming both
+ * a server and a share. `install-service.ps1` applies the same rule.
+ */
+const WIN32_DRIVE_OR_UNC_ROOTED = /^(?:[a-zA-Z]:[\\/]|[\\/]{2}[^\\/]+[\\/]+[^\\/]+)/;
+
+export function parseWorkspaceRoot(raw: string | undefined, platform: string): string | undefined {
+	if (raw === undefined) {
+		return undefined;
+	}
+	const value = raw.trim();
+	if (value.length === 0) {
+		throw new CliError('--workspace-root must not be empty');
+	}
+	const path = platform === 'win32' ? win32 : posix;
+	if (!path.isAbsolute(value) || (platform === 'win32' && !WIN32_DRIVE_OR_UNC_ROOTED.test(value))) {
+		throw new CliError(`--workspace-root must be an absolute directory (got "${raw}")`);
+	}
+	const normalized = path.resolve(value);
+	if (normalized === path.parse(normalized).root) {
+		throw new CliError(`--workspace-root cannot be a filesystem root (got "${raw}")`);
+	}
+	return normalized;
 }
 
 export async function runStart(deps: CliDeps, options: StartCommandOptions): Promise<void> {
 	const override = parseIntervalSeconds(options.heartbeatInterval);
+	// Usage errors first, before the config is even read.
+	const workspaceRoot = parseWorkspaceRoot(options.workspaceRoot, deps.platform);
 	const stored = await requireConfig(deps);
 	const config: NodeConfig = override === undefined ? stored : { ...stored, heartbeatIntervalMs: override };
 
@@ -306,6 +358,9 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		startPaused,
 		limits: effectiveLimits,
 		modelCli: modelCli.paths,
+		// Written directly (not via a conditional spread) so excess-property
+		// checking keeps this name tied to the runtime option it feeds.
+		agentTaskWorkspaceRoot: workspaceRoot,
 		persistUnsafe: async (unsafe) =>
 			saveConfig(
 				deps.fs,
@@ -641,6 +696,10 @@ export function buildProgram(deps: CliDeps): Command {
 		.option(
 			'--codex-path <file>',
 			'Codex executable used for model-cli agent tasks (default: EVER_WORKS_NODE_CODEX_PATH, then PATH)'
+		)
+		.option(
+			'--workspace-root <dir>',
+			'Absolute directory for the persistent per-Task worktrees of agent tasks (default: EVER_WORKS_NODE_WORKSPACE_ROOT, then ~/.ever-works/fleet-workspaces)'
 		)
 		.action(async (options: StartCommandOptions) => {
 			await runStart(deps, options);
