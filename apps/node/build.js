@@ -114,7 +114,7 @@ async function main() {
 function assertBundleShape(file) {
 	const bundle = fs.readFileSync(file, 'utf8');
 	const lines = bundle.split('\n', 2);
-	if (lines[0] !== '#!/usr/bin/env node' || lines[1].startsWith('#!')) {
+	if (lines[0] !== '#!/usr/bin/env node' || (lines[1] ?? '').startsWith('#!')) {
 		throw new Error(`${file}: expected exactly one shebang on line 1`);
 	}
 	if (/workspace:[*^~]/.test(bundle)) {

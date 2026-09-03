@@ -270,7 +270,17 @@ export interface StartCommandOptions {
  * Absoluteness is judged by the HOST platform (injected, so the rule is
  * testable for both shapes): `C:\fleet` is absolute on Windows and not
  * on POSIX, and `/srv/fleet` is absolute on both.
+ *
+ * On Windows "absolute" additionally means DRIVE- or UNC-ROOTED. Node's
+ * `path.win32.isAbsolute` accepts a rooted-but-driveless `\fleet` (and
+ * `/fleet`, `\\fleet`, `\\nas\`), all of which `path.win32.resolve` then
+ * completes with the drive of the CURRENT directory — exactly the
+ * service-manager-chosen location this flag exists to avoid. So a Windows
+ * root must start with `<drive>:\` (or `/`), or be a UNC path naming both
+ * a server and a share. `install-service.ps1` applies the same rule.
  */
+const WIN32_DRIVE_OR_UNC_ROOTED = /^(?:[a-zA-Z]:[\\/]|[\\/]{2}[^\\/]+[\\/]+[^\\/]+)/;
+
 export function parseWorkspaceRoot(raw: string | undefined, platform: string): string | undefined {
 	if (raw === undefined) {
 		return undefined;
@@ -280,7 +290,7 @@ export function parseWorkspaceRoot(raw: string | undefined, platform: string): s
 		throw new CliError('--workspace-root must not be empty');
 	}
 	const path = platform === 'win32' ? win32 : posix;
-	if (!path.isAbsolute(value)) {
+	if (!path.isAbsolute(value) || (platform === 'win32' && !WIN32_DRIVE_OR_UNC_ROOTED.test(value))) {
 		throw new CliError(`--workspace-root must be an absolute directory (got "${raw}")`);
 	}
 	const normalized = path.resolve(value);
@@ -348,7 +358,9 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		startPaused,
 		limits: effectiveLimits,
 		modelCli: modelCli.paths,
-		...(workspaceRoot !== undefined ? { agentTaskWorkspaceRoot: workspaceRoot } : {}),
+		// Written directly (not via a conditional spread) so excess-property
+		// checking keeps this name tied to the runtime option it feeds.
+		agentTaskWorkspaceRoot: workspaceRoot,
 		persistUnsafe: async (unsafe) =>
 			saveConfig(
 				deps.fs,

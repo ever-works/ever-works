@@ -31,7 +31,10 @@ at:
 ```
 
 (Windows: [NSSM](https://nssm.cc) is optional — with it the script registers a real Windows service,
-without it a boot-time Scheduled Task. The systemd unit for Linux is under `packaging/systemd/`.)
+without it a boot-time Scheduled Task. Either way it registers `node.exe` running the package's
+`cli.js` directly — never npm's `.ps1`/`.cmd` shims, which service managers cannot launch — and
+re-running it re-applies the current flags. From a source checkout pass
+`-CliPath <checkout>\apps\node\dist\cli.js`. The systemd unit for Linux is under `packaging/systemd/`.)
 
 **From source** instead — in the monorepo, `pnpm build:node` builds the node and its workspace
 dependencies into `apps/node/dist/`, and `cd apps/node && npm link` puts `ever-works-node` on `PATH`
@@ -171,7 +174,11 @@ pnpm --filter ever-works-node build:bundle  # stage the publishable npm package 
 
 `build:bundle` (`build.js`) inlines the `workspace:*` packages with esbuild into one `cli.js`,
 writes the public manifest beside it and copies `packaging/`. The workspace package itself stays
-`private`; `.github/workflows/publish-node.yml` publishes `dist-bundle/` on a `node-v<version>` tag.
+`private`; `.github/workflows/publish-node.yml` publishes `dist-bundle/` on a `node-v<version>` tag, with an
+npm provenance attestation. Release flow: bump `package.json` and `src/version.ts` together in a PR
+(`src/version.spec.ts` pins them to each other), merge, then tag the merge commit `node-v<version>` —
+the tag must equal the package version, so every published version maps to one commit. Running the
+workflow by hand is a dry run only (build, smoke test, `npm publish --dry-run`).
 
 ## Notes
 
@@ -235,6 +242,6 @@ dropped, which would leave it to expire and retry forever on the same incapable 
 - Workspace **provisioning** on the node: today `acceptance-checks` requires the workspace to
   already exist on this machine (it refuses a path it cannot resolve), so the end-to-end cloud
   path still wants a checkout step.
-- **Signing and auto-update.** The npm package is published unsigned (no provenance attestation yet)
-  and a node does not update itself — `npm install -g ever-works-node@latest` plus a service restart
+- **Auto-update.** The npm package carries an npm provenance attestation, but a node does not
+  update itself — `npm install -g ever-works-node@latest` plus a service restart
   is the upgrade path.

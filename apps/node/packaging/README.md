@@ -64,8 +64,19 @@ From an **elevated** PowerShell session:
 
 `-ClaudePath` / `-CodexPath` pin the model CLIs for the service (the service
 account's `PATH` often lacks the per-user npm directory) and `-WorkspaceRoot`
-sets the absolute directory the per-Task worktrees live under; each becomes
-the matching `start` flag.
+sets the absolute, drive- or UNC-rooted directory the per-Task worktrees live
+under; each becomes the matching `start` flag. `-CliPath` points the service
+at a specific `cli.js` (default: the globally installed package; from a source
+checkout use `apps\node\dist\cli.js`).
+
+The script registers `node.exe` running that `cli.js` directly. npm's global
+install also puts `ever-works-node.ps1` / `.cmd` shims on `PATH`, but a service
+manager cannot launch the `.ps1`, and the `.cmd` puts `cmd.exe` between the
+service and the node, where the console stop signal used for draining gets
+swallowed. The command line is quoted once, by the script, and handed to NSSM
+verbatim — Windows PowerShell 5.1 would otherwise re-quote pinned paths
+containing spaces without escaping them. Re-running the script re-applies the
+current flags to an existing service or task.
 
 The script prefers a real Windows service via [NSSM](https://nssm.cc).
 This matters: Node.js cannot answer Service Control Manager messages, so

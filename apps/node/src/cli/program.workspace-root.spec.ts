@@ -41,6 +41,20 @@ describe('parseWorkspaceRoot', () => {
 		}
 	});
 
+	it('refuses a rooted-but-driveless Windows path, which would resolve against the current drive', () => {
+		// `path.win32.isAbsolute` says yes to every one of these, and
+		// `path.win32.resolve` then completes them with the CWD's drive —
+		// i.e. wherever the service manager happened to start the node.
+		for (const raw of ['/fleet', '\\fleet', '//fleet', '\\\\fleet', '\\\\nas\\']) {
+			expect(() => parseWorkspaceRoot(raw, 'win32'), raw).toThrow(CliError);
+			expect(() => parseWorkspaceRoot(raw, 'win32'), raw).toThrow(
+				/--workspace-root must be an absolute directory/
+			);
+		}
+		// The same shapes stay absolute on POSIX, where a leading slash IS the root.
+		expect(parseWorkspaceRoot('/fleet', 'linux')).toBe('/fleet');
+	});
+
 	it('refuses an empty or blank value', () => {
 		expect(() => parseWorkspaceRoot('', 'linux')).toThrow(/--workspace-root must not be empty/);
 		expect(() => parseWorkspaceRoot('   ', 'win32')).toThrow(/--workspace-root must not be empty/);
