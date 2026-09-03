@@ -70,6 +70,13 @@ export function AgentFleetSection({ agentId, fleet, className }: Props) {
     const [, startTransition] = useTransition();
 
     const state = preferredNodeState(nodeId, nodes);
+    // The affinity row is not deleted with its node, so an Agent pinned
+    // to a machine that is gone keeps stamping every new job with the
+    // dead id — including after the owner enrols a fresh machine. When
+    // that machine was the owner's LAST node, the "no nodes" pointer
+    // would otherwise replace the picker and leave the one binding that
+    // most needs clearing with no control at all; the picker wins.
+    const bindingOutlivesFleet = state.kind === 'missing';
     const routing = fleet.preferences
         ? describeAccountExecutionPreference(fleet.preferences)
         : null;
@@ -92,6 +99,14 @@ export function AgentFleetSection({ agentId, fleet, className }: Props) {
                         setNodeId(previous);
                         toast.error(result.error);
                     }
+                } catch (error) {
+                    // A REJECTED action (the action request itself failed,
+                    // or prod redacted a throw) is not the refusal branch
+                    // above, yet must roll back the same way: without this
+                    // the picker re-enables on a node the API never bound
+                    // and says nothing. Same shape as `pickEnvironment`.
+                    setNodeId(previous);
+                    toast.error(error instanceof Error ? error.message : String(error));
                 } finally {
                     setSaving(false);
                 }
@@ -107,6 +122,26 @@ export function AgentFleetSection({ agentId, fleet, className }: Props) {
               : state.kind === 'node' && state.availability === 'draining'
                 ? t('hintDraining', { name: state.node.name })
                 : null;
+
+    // Rendered alone when the fleet is empty, and UNDER the picker when
+    // the fleet is empty but a binding to a removed node is still in
+    // force — the operator then needs both the way to clear it and the
+    // way to enrol what it should have been.
+    const noNodesPointer = (
+        <div
+            className="text-xs text-text-muted dark:text-text-muted-dark space-y-1"
+            data-testid="capabilities-fleet-no-nodes"
+        >
+            <p>{t('noNodes')}</p>
+            <Link
+                href={ROUTES.DASHBOARD_SETTINGS_FLEET}
+                className="text-primary hover:underline"
+                data-testid="capabilities-fleet-enroll-link"
+            >
+                {t('noNodesLink')}
+            </Link>
+        </div>
+    );
 
     return (
         <section className={className} data-testid="capabilities-fleet-section">
@@ -138,20 +173,8 @@ export function AgentFleetSection({ agentId, fleet, className }: Props) {
                     >
                         {t('nodeLabel')}
                     </label>
-                    {nodes.length === 0 ? (
-                        <div
-                            className="text-xs text-text-muted dark:text-text-muted-dark space-y-1"
-                            data-testid="capabilities-fleet-no-nodes"
-                        >
-                            <p>{t('noNodes')}</p>
-                            <Link
-                                href={ROUTES.DASHBOARD_SETTINGS_FLEET}
-                                className="text-primary hover:underline"
-                                data-testid="capabilities-fleet-enroll-link"
-                            >
-                                {t('noNodesLink')}
-                            </Link>
-                        </div>
+                    {nodes.length === 0 && !bindingOutlivesFleet ? (
+                        noNodesPointer
                     ) : !fleet.affinity.available ? (
                         <p
                             className="text-xs text-text-muted dark:text-text-muted-dark"
@@ -201,6 +224,7 @@ export function AgentFleetSection({ agentId, fleet, className }: Props) {
                                     <span>{hint}</span>
                                 </p>
                             )}
+                            {nodes.length === 0 && noNodesPointer}
                         </>
                     )}
                 </div>

@@ -191,6 +191,27 @@ describe('AgentFleetSection — preferred node picker', () => {
         );
     });
 
+    /**
+     * A REJECTED action (the action request failed, or prod redacted a
+     * throw) is a different path from a refusal returned as data, and it
+     * used to leave the picker re-enabled on a node the API never bound,
+     * with no toast. It must roll back exactly like a refusal.
+     */
+    it('restores the previous choice and toasts when the action throws', async () => {
+        const user = userEvent.setup();
+        setFleetAgentAffinityAction.mockRejectedValue(new Error('boom'));
+        renderSection();
+
+        await user.click(screen.getByTestId('capabilities-fleet-node'));
+        await user.click(screen.getByRole('option', { name: /Build server/ }));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith('boom'));
+        await waitFor(() =>
+            expect(screen.getByTestId('capabilities-fleet-node')).toHaveTextContent('anyNode'),
+        );
+        expect(screen.getByTestId('capabilities-fleet-node')).not.toBeDisabled();
+    });
+
     it('shows no hint while the bound node is online', () => {
         renderSection({ affinity: { available: true, nodeId: 'node-1' } });
         expect(screen.queryByTestId('capabilities-fleet-node-hint')).toBeNull();
@@ -222,6 +243,38 @@ describe('AgentFleetSection — preferred node picker', () => {
         renderSection({ affinity: { available: true, nodeId: 'gone' } });
         expect(screen.getByTestId('capabilities-fleet-node')).toHaveTextContent('missingNode');
         expect(screen.getByTestId('capabilities-fleet-node-hint')).toHaveTextContent('hintMissing');
+    });
+
+    /**
+     * The affinity row is not deleted with the node, so an Agent pinned
+     * to the owner's LAST machine keeps waiting on a dead id — and every
+     * new job is stamped with it, even after a fresh machine is enrolled.
+     * The "no nodes" pointer must not swallow the one control that can
+     * clear it; once cleared, the pointer is all that is left to show.
+     */
+    it('keeps a binding to a removed node clearable even when no machine is enrolled', async () => {
+        const user = userEvent.setup();
+        clearFleetAgentAffinityAction.mockResolvedValue({
+            success: true,
+            data: { cleared: true },
+            error: null,
+        });
+        renderSection({ nodes: [], affinity: { available: true, nodeId: 'gone' } });
+
+        expect(screen.getByTestId('capabilities-fleet-node')).toHaveTextContent('missingNode');
+        expect(screen.getByTestId('capabilities-fleet-node-hint')).toHaveTextContent('hintMissing');
+        expect(screen.getByTestId('capabilities-fleet-enroll-link')).toHaveAttribute(
+            'href',
+            '/settings/fleet',
+        );
+
+        await user.click(screen.getByTestId('capabilities-fleet-node'));
+        await user.click(screen.getByRole('option', { name: 'anyNode' }));
+
+        await waitFor(() => expect(clearFleetAgentAffinityAction).toHaveBeenCalledWith(AGENT_ID));
+        await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('cleared'));
+        expect(screen.queryByTestId('capabilities-fleet-node')).toBeNull();
+        expect(screen.getByTestId('capabilities-fleet-no-nodes')).toHaveTextContent('noNodes');
     });
 
     it('hides the picker and points at Settings › Fleet when no machine is enrolled', () => {
