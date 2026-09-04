@@ -104,3 +104,31 @@ Every row above cites evidence that exists and runs. Where a row says Met, the
 cited test or source enforces the rule; where it says Met (library), the rule is
 enforced by `@ever-works/agent-plugins`, and nothing outside it can accept a
 package the library rejects. No row is Met on the strength of an intention.
+
+---
+
+## Policy refusals — spec-valid packages this deployment may decline
+
+Everything below describes a package that is **conformant**, which Ever Works
+may still refuse to load or run. These are deployment policy, not gaps in the
+implementation, and they are listed because the distinction is invisible from
+the outside: an author whose package is refused deserves to know whether they
+broke a rule or met one this platform declines to exercise.
+
+The specification anticipates this. A conforming client may apply its own
+security policy; what it may not do is refuse and call the package invalid.
+Every refusal below is reported with a reason and a machine-readable `code`.
+
+| Refusal                                 | Applies to                                                                                      | Why                                                                                                                                                                                                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **stdio disabled**                      | Any `stdio` server, when `AGENT_PLUGINS_STDIO` is off                                           | Launching a subprocess from package contents is a far larger grant than reading documents, and no sandbox is built. Reported as `disabled-by-policy` with `enableable: true` — the only refusal an operator can lift with a setting.               |
+| **Loopback and private URLs**           | A remote server whose URL resolves to a private, loopback, link-local or cloud-metadata address | The specification permits plain `http:` to **loopback** hosts, which is right for a desktop client talking to a local dev server. Ever Works is a server, where loopback is the API pod's own localhost and `http://127.0.0.1:6379` reaches Redis. |
+| **Cross-origin credential forwarding**  | A remote server that redirects across an origin                                                 | Package headers are visible and non-secret (AP-15), but they are still forwarded on the first request. Every caller header is dropped on an origin change, so a server that relies on them surviving a redirect will not work.                     |
+| **`${PLUGIN_DATA}` in a remote server** | A `streamable-http` or `sse` URL or header referencing it                                       | Only a launched subprocess can resolve a per-package data path; nothing can supply one for a URL. A stdio server using the same placeholder is fine — the launcher resolves it.                                                                    |
+| **Ambiguous server names**              | A server whose name contains `__`                                                               | Tool names are `mcp__<server>__<tool>`, so such a name could not be split back apart and a call could route to the wrong server.                                                                                                                   |
+| **Unallowlisted remote sources**        | Any git or npm package not on the allowlist                                                     | Fetching is an operator decision. The allowlist fails **closed**: if it cannot be read, every remote package is refused rather than permitted.                                                                                                     |
+| **Non-registry npm specifiers**         | A version specifier naming a transport rather than a version                                    | `npm-package-arg` picks the transport from the spec's shape, so `pkg@git+https://host/x.git` would clone and run an arbitrary repository. Only semver, ranges and dist-tags are accepted.                                                          |
+
+None of these makes a package non-conformant, and none of them is reported as a
+validation failure. A refused package appears in `skipped` with its reason
+intact, and the operator can see exactly what was declined and why.

@@ -281,9 +281,11 @@ describe('PackageMcpReconcilerService', () => {
     });
 
     it('carries forward what the resolver already refused, in one report', async () => {
-        process.env.AGENT_PLUGINS_STDIO = 'true';
         await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
-            stateful: { type: 'stdio', command: 'node', args: ['${PLUGIN_DATA}/db.js'] },
+            // A REMOTE server referencing ${PLUGIN_DATA}: nothing can resolve
+            // it, so the resolver refuses it and the reconciler passes the
+            // refusal through rather than producing a second half-report.
+            api: { type: 'streamable-http', url: 'https://x.example.com/${PLUGIN_DATA}' },
         });
         const { service } = build();
 

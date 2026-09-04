@@ -240,7 +240,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
 
 ## Phase 6 — Hardening + docs + conformance claim (PR-10)
 
-- [ ] **T37**. User-facing docs page `docs/features/agent-plugins.md` +
+- [x] **T37**. User-facing docs page `docs/features/agent-plugins.md` +
       sidebar entry in `apps/docs/sidebarsPlatform.ts`; internal docs stay
       off-nav.
 - [ ] **T38**. Desktop staging (`prepare-bundle.js` + `<userData>/agent-plugins`
@@ -249,7 +249,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       tools or document out-of-scope.
 - [ ] **T40**. Security review pass (stdio gate, SSRF policy, containment
       fuzzing over fixture escapes); Sentry tags; rate-limit re-check.
-- [ ] **T41**. Conformance statement doc: map every Appendix A row + AP-1…AP-23 to
+- [x] **T41**. Conformance statement doc: map every Appendix A row + AP-1…AP-23 to
       test evidence; announce "Agent Plugins v1.0.0 compatible (client: skills + MCP; producer: skills packages, plus the Ever Works MCP-server package
       descriptor)" — the single canonical claim wording, used verbatim in spec
       §1.3, the ADR, and marketing. MUST document client-side policy refusals

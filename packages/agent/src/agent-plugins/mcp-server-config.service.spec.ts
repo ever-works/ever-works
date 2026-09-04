@@ -155,7 +155,7 @@ describe('McpServerConfigService', () => {
         expect(JSON.stringify(config)).not.toContain('PLUGIN_ROOT');
     });
 
-    it('SKIPS a server needing ${PLUGIN_DATA}, with a reason, rather than launching it broken', async () => {
+    it('leaves ${PLUGIN_DATA} INTACT for a stdio server, so the launcher can resolve it', async () => {
         process.env.AGENT_PLUGINS_STDIO = 'true';
         const root = await packagesRoot();
         await writePackage(root, 'acme', 'acme.tools', {
@@ -165,15 +165,43 @@ describe('McpServerConfigService', () => {
 
         const result = await service.resolveAll();
 
-        expect(result.servers).toHaveLength(0);
-        expect(result.skipped).toEqual([
-            expect.objectContaining({ name: 'stateful', packageName: 'acme.tools' }),
-        ]);
-        // The reason names the placeholder, so an operator knows what to do.
-        expect(result.skipped[0].reason).toContain('PLUGIN_DATA');
-        expect(result.skipped[0].code).toBe('needs-plugin-data');
-        // Nothing the operator can flip — this one needs the launcher.
-        expect(result.skipped[0].enableable).toBe(false);
+        // This resolver has no owner, and ${PLUGIN_DATA} is per (owner,
+        // package) — so it cannot supply the value and must not pretend to.
+        // The launcher, which does know the owner, resolves it.
+        expect(result.skipped).toEqual([]);
+        const config = result.servers[0]?.config as unknown as { args: string[] };
+        expect(config.args).toEqual(['${PLUGIN_DATA}/db.js']);
+    });
+
+    it('refuses a REMOTE server referencing ${PLUGIN_DATA}, which nothing can resolve', async () => {
+        const root = await packagesRoot();
+        await writePackage(root, 'acme', 'acme.tools', {
+            api: { type: 'streamable-http', url: 'https://acme.example.com/${PLUGIN_DATA}' },
+        });
+        process.env.AGENT_PLUGINS_DIR = root;
+
+        const result = await service.resolveAll();
+
+        // No launcher is involved, so nobody can supply it for a URL.
+        expect(result.servers).toEqual([]);
+        expect(result.skipped[0]?.code).toBe('needs-plugin-data');
+    });
+
+    it('never turns ${PLUGIN_DATA} into an absolute path at the filesystem root', async () => {
+        process.env.AGENT_PLUGINS_STDIO = 'true';
+        const root = await packagesRoot();
+        await writePackage(root, 'acme', 'acme.tools', {
+            stateful: { type: 'stdio', command: 'node', args: ['${PLUGIN_DATA}/db.sqlite'] },
+        });
+        process.env.AGENT_PLUGINS_DIR = root;
+
+        const result = await service.resolveAll();
+
+        // Expanding with an empty string, as this once did, silently produced
+        // `/db.sqlite`.
+        const config = result.servers[0]?.config as unknown as { args: string[] };
+        expect(config.args[0]).not.toBe('/db.sqlite');
+        expect(config.args[0]).toContain('${PLUGIN_DATA}');
     });
 
     describe('AP-19: stdio is present-but-disabled, not absent', () => {
