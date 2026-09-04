@@ -1065,6 +1065,26 @@ async function ensureFleetExcluded(repoPath: string, signal?: AbortSignal): Prom
 	// exists — `.ever-works` never exists at provision time and `.mounts`
 	// only in a multi-repo workspace.
 	for (const probe of FLEET_TASK_WORKSPACE_EXCLUDE_PROBES) {
+		// A probe path that exists as a LINK or a FILE cannot be verified this
+		// way, and does not need to be.
+		//
+		// `dir/` matches directories only, so Git answers "not ignored" for a
+		// symlink named `.mounts` — correctly. That is a POSIX-only outcome: on
+		// Windows a junction reads as a directory and the probe passes, which is
+		// why this surfaced first on Linux CI.
+		//
+		// Only the ASSERTION is skipped. The rule itself is still written above,
+		// and nothing is written through such a path anyway: `reconcileMountsDir`
+		// preserves a leftover link and refuses to use it, so there is no content
+		// for the rule to have to cover. Without this, one stale `.mounts` link
+		// left by an earlier run made the workspace unprovisionable forever —
+		// including for Tasks that use no mounts at all, which is exactly the
+		// case `fleet-task-workspace-mounts.spec.ts` pins as "not blocked by it".
+		const probePath = join(repoPath, probe.replace(/\/$/, ''));
+		const probeEntry = await fs.lstat(probePath).catch(() => null);
+		if (probeEntry && !probeEntry.isDirectory()) {
+			continue;
+		}
 		try {
 			await runGitOutput(['check-ignore', '-q', probe], repoPath, signal);
 		} catch (error) {
