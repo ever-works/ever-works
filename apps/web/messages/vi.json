@@ -2549,7 +2549,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Plugin tác nhân"
             },
             "githubApp": {
                 "title": "Cài đặt Ứng dụng GitHub",
@@ -3669,6 +3670,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Plugin tác nhân",
+                "description": "Các gói theo định dạng mở Agent Plugins bổ sung kỹ năng và máy chủ MCP cho không gian làm việc này. Chúng hoạt động trên mọi ứng dụng khách hỗ trợ tiêu chuẩn.",
+                "disabled": "Hỗ trợ plugin tác nhân đang tắt trên bản triển khai này. Người vận hành có thể bật bằng cách đặt:",
+                "loadFailed": "Không tải được các gói đã cài. Đây là sự cố kết nối, không phải dấu hiệu chưa cài gì.",
+                "scanning": "Đang quét {roots}",
+                "searchPlaceholder": "Tìm gói và kỹ năng",
+                "empty": "Chưa cài gói nào.",
+                "noMatches": "Không có gói nào khớp với tìm kiếm.",
+                "specVersion": "đặc tả {version}",
+                "skills": "{count, plural, other {# kỹ năng}}",
+                "mcpServers": "{count, plural, other {# máy chủ MCP}}",
+                "none": "Không có",
+                "rejected": "bị từ chối",
+                "rejectedHelp": "Không tải được gói này nên nó không đóng góp gì. Gói vẫn được liệt kê vì có người cố ý thêm vào.",
+                "rejectedHeading": "{count, plural, other {# gói bị từ chối}}",
+                "shadowedHeading": "Gói bị che",
+                "shadowedHelp": "Chúng khai báo tên mà một thư mục trước đó đã cung cấp, nên chỉ gói đầu tiên được dùng.",
+                "severity": {
+                    "fatal": "Nghiêm trọng",
+                    "error": "Lỗi",
+                    "warning": "Cảnh báo"
+                },
+                "scopes": {
+                    "package": "Gói",
+                    "manifest": "Manifest",
+                    "skills": "Kỹ năng",
+                    "mcp": "Máy chủ MCP"
                 }
             }
         },

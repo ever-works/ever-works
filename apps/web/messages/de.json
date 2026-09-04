@@ -2617,7 +2617,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Agent-Plugins"
             },
             "githubApp": {
                 "title": "GitHub-App-Installationen",
@@ -3737,6 +3738,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Agent-Plugins",
+                "description": "Pakete im offenen Agent-Plugins-Format steuern Skills und MCP-Server zu diesem Workspace bei. Sie funktionieren in jedem Client, der den Standard unterstützt.",
+                "disabled": "Die Unterstützung für Agent-Plugins ist in dieser Umgebung deaktiviert. Ein Betreiber kann sie aktivieren mit:",
+                "loadFailed": "Installierte Pakete konnten nicht geladen werden. Das ist ein Verbindungsproblem und kein Hinweis darauf, dass nichts installiert ist.",
+                "scanning": "Durchsucht {roots}",
+                "searchPlaceholder": "Pakete und Skills durchsuchen",
+                "empty": "Noch keine Pakete installiert.",
+                "noMatches": "Keine Pakete entsprechen Ihrer Suche.",
+                "specVersion": "Spez. {version}",
+                "skills": "{count, plural, =0 {Skills} one {# Skill} other {# Skills}}",
+                "mcpServers": "{count, plural, =0 {MCP-Server} one {# MCP-Server} other {# MCP-Server}}",
+                "none": "Keine",
+                "rejected": "abgelehnt",
+                "rejectedHelp": "Dieses Paket konnte nicht geladen werden und steuert daher nichts bei. Es wird aufgeführt, weil es jemand bewusst hinzugefügt hat.",
+                "rejectedHeading": "{count, plural, one {# abgelehntes Paket} other {# abgelehnte Pakete}}",
+                "shadowedHeading": "Überdeckte Pakete",
+                "shadowedHelp": "Diese deklarieren einen Namen, den ein früheres Verzeichnis bereits bereitstellt; nur das erste wird verwendet.",
+                "severity": {
+                    "fatal": "Schwerwiegend",
+                    "error": "Fehler",
+                    "warning": "Warnung"
+                },
+                "scopes": {
+                    "package": "Paket",
+                    "manifest": "Manifest",
+                    "skills": "Skills",
+                    "mcp": "MCP-Server"
                 }
             }
         },

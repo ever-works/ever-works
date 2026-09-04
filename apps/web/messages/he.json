@@ -2617,7 +2617,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "תוספי סוכן"
             },
             "githubApp": {
                 "title": "התקנות GitHub App",
@@ -3737,6 +3738,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "תוספי סוכן",
+                "description": "חבילות בפורמט הפתוח Agent Plugins מוסיפות מיומנויות ושרתי MCP למרחב העבודה הזה. הן פועלות בכל לקוח שתומך בתקן.",
+                "disabled": "התמיכה בתוספי סוכן כבויה בפריסה הזו. מפעיל יכול להפעיל אותה על ידי הגדרת:",
+                "loadFailed": "לא ניתן היה לטעון את החבילות המותקנות. זו בעיית חיבור, ולא סימן לכך שדבר אינו מותקן.",
+                "scanning": "סורק את {roots}",
+                "searchPlaceholder": "חיפוש חבילות ומיומנויות",
+                "empty": "עדיין לא הותקנו חבילות.",
+                "noMatches": "אין חבילות התואמות את החיפוש.",
+                "specVersion": "מפרט {version}",
+                "skills": "{count, plural, =0 {מיומנויות} one {מיומנות אחת} two {שתי מיומנויות} other {# מיומנויות}}",
+                "mcpServers": "{count, plural, =0 {שרתי MCP} one {שרת MCP אחד} two {שני שרתי MCP} other {# שרתי MCP}}",
+                "none": "אין",
+                "rejected": "נדחתה",
+                "rejectedHelp": "לא ניתן היה לטעון את החבילה הזו, ולכן היא אינה תורמת דבר. היא מוצגת משום שמישהו הוסיף אותה בכוונה.",
+                "rejectedHeading": "{count, plural, one {חבילה אחת שנדחתה} two {שתי חבילות שנדחו} other {# חבילות שנדחו}}",
+                "shadowedHeading": "חבילות מוסתרות",
+                "shadowedHelp": "הן מכריזות על שם שספרייה מוקדמת יותר כבר סיפקה, ולכן רק הראשונה בשימוש.",
+                "severity": {
+                    "fatal": "קריטי",
+                    "error": "שגיאה",
+                    "warning": "אזהרה"
+                },
+                "scopes": {
+                    "package": "חבילה",
+                    "manifest": "מניפסט",
+                    "skills": "מיומנויות",
+                    "mcp": "שרתי MCP"
                 }
             }
         },

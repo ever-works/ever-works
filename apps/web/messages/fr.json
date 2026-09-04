@@ -2617,7 +2617,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Plugins d’agent"
             },
             "githubApp": {
                 "title": "Installations GitHub App",
@@ -3737,6 +3738,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Plugins d’agent",
+                "description": "Les paquets au format ouvert Agent Plugins ajoutent des compétences et des serveurs MCP à cet espace de travail. Ils fonctionnent avec tout client compatible avec la norme.",
+                "disabled": "La prise en charge des plugins d’agent est désactivée sur ce déploiement. Un opérateur peut l’activer en définissant :",
+                "loadFailed": "Impossible de charger les paquets installés. Il s’agit d’un problème de connexion, pas d’un signe qu’aucun paquet n’est installé.",
+                "scanning": "Analyse de {roots}",
+                "searchPlaceholder": "Rechercher des paquets et des compétences",
+                "empty": "Aucun paquet installé pour l’instant.",
+                "noMatches": "Aucun paquet ne correspond à votre recherche.",
+                "specVersion": "spéc. {version}",
+                "skills": "{count, plural, =0 {Compétences} one {# compétence} other {# compétences}}",
+                "mcpServers": "{count, plural, =0 {Serveurs MCP} one {# serveur MCP} other {# serveurs MCP}}",
+                "none": "Aucun",
+                "rejected": "rejeté",
+                "rejectedHelp": "Ce paquet n’a pas pu être chargé et n’apporte donc rien. Il est répertorié parce que quelqu’un l’a ajouté délibérément.",
+                "rejectedHeading": "{count, plural, one {# paquet rejeté} other {# paquets rejetés}}",
+                "shadowedHeading": "Paquets masqués",
+                "shadowedHelp": "Ceux-ci déclarent un nom déjà fourni par un répertoire précédent ; seul le premier est utilisé.",
+                "severity": {
+                    "fatal": "Fatal",
+                    "error": "Erreur",
+                    "warning": "Avertissement"
+                },
+                "scopes": {
+                    "package": "Paquet",
+                    "manifest": "Manifeste",
+                    "skills": "Compétences",
+                    "mcp": "Serveurs MCP"
                 }
             }
         },

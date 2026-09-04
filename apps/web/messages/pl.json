@@ -2549,7 +2549,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Wtyczki agenta"
             },
             "githubApp": {
                 "title": "Instalacje aplikacji GitHub",
@@ -3669,6 +3670,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Wtyczki agenta",
+                "description": "Pakiety w otwartym formacie Agent Plugins dodają umiejętności i serwery MCP do tego obszaru roboczego. Działają w każdym kliencie obsługującym ten standard.",
+                "disabled": "Obsługa wtyczek agenta jest wyłączona w tym wdrożeniu. Operator może ją włączyć, ustawiając:",
+                "loadFailed": "Nie udało się wczytać zainstalowanych pakietów. To problem z połączeniem, a nie oznaka, że nic nie jest zainstalowane.",
+                "scanning": "Skanowanie {roots}",
+                "searchPlaceholder": "Szukaj pakietów i umiejętności",
+                "empty": "Nie zainstalowano jeszcze żadnych pakietów.",
+                "noMatches": "Żaden pakiet nie pasuje do wyszukiwania.",
+                "specVersion": "specyf. {version}",
+                "skills": "{count, plural, =0 {Umiejętności} one {# umiejętność} few {# umiejętności} many {# umiejętności} other {# umiejętności}}",
+                "mcpServers": "{count, plural, =0 {Serwery MCP} one {# serwer MCP} few {# serwery MCP} many {# serwerów MCP} other {# serwera MCP}}",
+                "none": "Brak",
+                "rejected": "odrzucony",
+                "rejectedHelp": "Tego pakietu nie udało się wczytać, więc nic nie wnosi. Jest wymieniony, ponieważ ktoś dodał go celowo.",
+                "rejectedHeading": "{count, plural, one {# odrzucony pakiet} few {# odrzucone pakiety} many {# odrzuconych pakietów} other {# odrzuconego pakietu}}",
+                "shadowedHeading": "Przesłonięte pakiety",
+                "shadowedHelp": "Deklarują nazwę udostępnianą już przez wcześniejszy katalog, więc używany jest tylko pierwszy.",
+                "severity": {
+                    "fatal": "Krytyczny",
+                    "error": "Błąd",
+                    "warning": "Ostrzeżenie"
+                },
+                "scopes": {
+                    "package": "Pakiet",
+                    "manifest": "Manifest",
+                    "skills": "Umiejętności",
+                    "mcp": "Serwery MCP"
                 }
             }
         },
