@@ -221,7 +221,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       `assertNoSecrets` (`packages/agent/src/utils/secret-scan.ts`) as a NEW
       check on text-like files only. Package service ingests sidecars; findings
       for oversized/rejected files.
-- [ ] **T34**. Materialization into claude-code workspace staging
+- [x] **T34**. Materialization into claude-code workspace staging
       (`claude-code.plugin.ts:542-558` seam): `.claude/skills/<name>/…` +
       `.mcp.json` next to `seedMetadata` writes — with the **execution-gate
       split** (plan §4.5/§5, Greptile P1 on PR #2000): `references/`+`assets/`

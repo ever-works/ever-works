@@ -146,3 +146,10 @@ export {
     type ExportSkillInput,
     type PackageFiles,
 } from './export.service';
+
+export {
+    planWorkspaceMaterialization,
+    type MaterializationInput,
+    type MaterializationPlan,
+    type MaterializedFile,
+} from './workspace-materialization';
