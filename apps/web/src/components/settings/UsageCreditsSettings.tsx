@@ -51,7 +51,7 @@ interface UsageCreditsSettingsProps {
 const MONTH_OPTION_COUNT = 12;
 
 async function fetchUsage<T>(query: string): Promise<T> {
-    // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
+    // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
     const response = await fetch(`/api/credits/usage-summary${query}`, {
         method: 'GET',
         cache: 'no-store',

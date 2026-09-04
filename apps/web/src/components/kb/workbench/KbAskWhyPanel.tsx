@@ -50,7 +50,7 @@ export function KbAskWhyPanel({
         setLoading(true);
         setError(null);
         try {
-            // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
+            // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
             const res = await fetch(
                 `/api/works/${encodeURIComponent(workId)}/kb/documents/${encodeURIComponent(
                     documentId,

@@ -44,7 +44,7 @@ const UNSCOPED_XHR =
  *
  * These are NOT dismissed. `set-state-in-effect` catches render loops and the
  * other three are real (a component created during render loses its state on
- * every parent render). They are tracked in EW-790; the right way to clear them
+ * every parent render). They are tracked in EW-789; the right way to clear them
  * is a few at a time, each verified, not one sweep.
  */
 const LINT_BACKLOG = {

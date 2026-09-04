@@ -153,7 +153,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
 
         const refreshActivity = async (id: string) => {
             try {
-                // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
+                // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
                 const response = await fetch(`/api/activity-log/${id}`, {
                     method: 'GET',
                     cache: 'no-store',

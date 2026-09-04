@@ -133,7 +133,7 @@ export function KbTreePanel({ workId, currentDocPath, refreshKey }: KbTreePanelP
         let cancelled = false;
         setLoading(true);
         setError(null);
-        // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
         fetch(`/api/works/${encodeURIComponent(workId)}/kb/documents${filterQuery}`, {
             cache: 'no-store',
         })

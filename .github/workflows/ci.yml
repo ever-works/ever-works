@@ -207,7 +207,7 @@ jobs:
       # Like `format:check` above, this runs on EVERY run: it needs only the
       # install, and a lint error should not wait for a 10-minute build to be
       # reported. The four rules with an existing backlog are demoted to
-      # warnings in `apps/web/eslint.config.mjs` (see EW-790) so the gate can
+      # warnings in `apps/web/eslint.config.mjs` (see EW-789) so the gate can
       # be switched on today rather than behind a large refactor; everything
       # else is enforced from now on.
       - name: Lint
