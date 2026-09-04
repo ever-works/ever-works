@@ -129,6 +129,64 @@ describe('PackageMcpReconcilerService', () => {
         );
     });
 
+    describe('SSRF: two layers, and what each one catches', () => {
+        /**
+         * The conformance library permits plain `http:` for LOOPBACK hosts
+         * (spec 7.2.2) — reasonable for a desktop client talking to a local
+         * dev server. Ever Works is the server case, where loopback means the
+         * API pod's own localhost, so a package pointing at `127.0.0.1:6379`
+         * would reach Redis. The library blocks non-loopback plain HTTP; the
+         * reconciler's own guard blocks what the spec deliberately allows.
+         */
+
+        it.each([
+            ['http://169.254.169.254/latest/meta-data/', 'cloud metadata'],
+            ['http://10.0.0.5/mcp', 'private range'],
+        ])('the LIBRARY rejects %s (%s) as non-loopback plain HTTP', async (url) => {
+            await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
+                api: { type: 'streamable-http', url },
+            });
+            const { service, repo } = build();
+
+            const result = await service.reconcile('user-1');
+
+            // Never becomes a valid server entry, so it never reaches the
+            // reconciler at all.
+            expect(result.created).toEqual([]);
+            expect(repo.create).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            ['http://127.0.0.1:6379/mcp', 'IPv4 loopback'],
+            ['http://[::1]/mcp', 'IPv6 loopback'],
+        ])('the RECONCILER rejects %s (%s), which the spec permits', async (url) => {
+            await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
+                api: { type: 'streamable-http', url },
+            });
+            const { service, repo } = build();
+
+            const result = await service.reconcile('user-1');
+
+            // This is the gap the second layer exists for: writing to the
+            // repository bypasses `McpConnectionsService`, so the SSRF guard
+            // every operator-entered URL must pass is repeated here.
+            expect(result.created).toEqual([]);
+            expect(repo.create).not.toHaveBeenCalled();
+            expect(result.skipped[0]?.reason).toContain('public http(s)');
+        });
+
+        it('still accepts an ordinary public https URL', async () => {
+            await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
+                api: { type: 'streamable-http', url: 'https://acme.example.com/mcp' },
+            });
+            const { service } = build();
+
+            const result = await service.reconcile('user-1');
+
+            expect(result.created).toEqual(['acme-tools-api']);
+        });
+    });
+
     it('is idempotent — a second run creates nothing', async () => {
         await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
             api: { type: 'streamable-http', url: 'https://acme.example.com/mcp' },

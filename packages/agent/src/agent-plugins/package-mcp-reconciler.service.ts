@@ -5,6 +5,7 @@ import {
     type McpServerConnection,
 } from '../entities/mcp-server-connection.entity';
 import { McpServerConfigService, type ResolvedMcpServer } from './mcp-server-config.service';
+import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 
 /**
  * Bridges package-declared MCP servers into the EXISTING MCP connection
@@ -174,6 +175,24 @@ export class PackageMcpReconcilerService {
         const url = (server.config as { url?: string }).url;
         if (!url) {
             return { kind: 'skipped', reason: 'Remote server declared no URL.' };
+        }
+
+        // The SAME lexical SSRF guard `McpConnectionsService.assertValidUrl`
+        // applies to an operator-entered URL. Writing to the repository
+        // directly bypasses that service, so the check has to be repeated
+        // here — and a package URL deserves it more than an operator's does,
+        // since nobody typed it. Without this a package could declare
+        // `http://169.254.169.254/...` or a loopback address and have it
+        // written into a connection row that looks ordinary; the row is
+        // created disabled, but an operator enabling something plausible
+        // would then point the client at a private address.
+        if (!isSafeWebhookUrl(url)) {
+            return {
+                kind: 'skipped',
+                reason:
+                    `URL is not a public http(s) address — private, loopback, link-local ` +
+                    `and cloud-metadata addresses are blocked.`,
+            };
         }
 
         const existing = await this.connections.findByUserAndName(userId, name);
