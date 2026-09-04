@@ -23,7 +23,7 @@ import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
  *
  * See Workspace `knowledge/design/EVER_WORKS_BFF_WORKSPACE_SCOPE.md`.
  *
- * ## The 55 pre-existing sites (EW-790) — triaged, not just frozen
+ * ## The 53 pre-existing sites (EW-790) — triaged, not just frozen
  *
  * Each carries its own `eslint-disable` saying which case it is. The disables
  * are the ratchet: new code cannot add one without writing it and defending it.
@@ -38,8 +38,9 @@ import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
  *   no BFF route or caller, and onboarding-state which has no BFF route and is
  *   reached by `serverFetch` from pages, where the proxy DOES stamp the
  *   selector).
- * - **19 in `components/memory/`** — genuinely org-aware and genuinely broken;
- *   fixed in #2343. Those disables disappear when it merges.
+ * - **17 in `components/memory/`** — genuinely org-aware and genuinely broken;
+ *   fixed in #2343. Those disables disappear when it merges. (`MemoryShell` was
+ *   the same bug and already landed as #2341, which is why this is 17 and not 19.)
  * - **3 in `lib/kb/kb-uploads.ts`** — Work-scoped (`workId` + `userId`), so the
  *   Organization never enters. The row is stamped `organizationId: null`, which
  *   is latent rather than live: every Work-scoped read pins `workId` and every
