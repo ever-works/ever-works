@@ -328,10 +328,11 @@ exactly as it does for the manual configuration above.
 Generate the descriptor with:
 
 ```bash
-ever-works plugins agent-plugins descriptor > ever-works-mcp.zip
+ever-works plugins agent-plugins descriptor
 ```
 
-Point it at a self-hosted deployment by overriding the URL. Nothing in this
+This writes a directory you can install directly, or archive if your client
+wants one. Point it at a self-hosted deployment by overriding the URL. Nothing in this
 page's manual configuration changes — the descriptor is an additional way to
 consume the same server, not a replacement for it.
 

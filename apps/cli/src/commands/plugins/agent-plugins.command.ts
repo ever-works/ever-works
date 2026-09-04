@@ -243,49 +243,48 @@ function buildCatalogCommand(): Command {
         });
 }
 
-
 function buildDescriptorCommand(): Command {
     return new Command('descriptor')
-        .description('Write the Ever Works MCP server as an Agent Plugins package (zip)')
-        .option('-o, --output <file>', 'Write here instead of ./ever-works-mcp.zip')
+        .description('Write the Ever Works MCP server as an Agent Plugins package')
+        .option('-o, --output <dir>', 'Write here instead of ./ever-works-mcp')
         .option('-u, --url <url>', 'Point at a self-hosted MCP endpoint')
         .action(async (options: { output?: string; url?: string }) => {
             try {
                 await requireAuth();
                 const spinner = ora('Building descriptor…').start();
                 const query = options.url ? `?url=${encodeURIComponent(options.url)}` : '';
-                const response = (await api().get(
-                    `/agent-plugins/descriptor${query}`,
-                )) as { files?: Record<string, string> };
+                const response = (await api().get(`/agent-plugins/descriptor${query}`)) as {
+                    files?: Record<string, string>;
+                };
                 spinner.stop();
 
                 const files = response.files ?? {};
                 if (Object.keys(files).length === 0) {
-                    console.log(chalk.yellow('
-The server returned an empty descriptor.'));
+                    console.log(chalk.yellow('\nThe server returned an empty descriptor.'));
                     return;
                 }
 
-                // Zipped here rather than server-side so the CLI never has to
-                // stream a binary body through the JSON API client.
-                const JSZip = (await import('jszip')).default;
-                const zip = new JSZip();
+                // A DIRECTORY, not an archive. A package IS a directory — every
+                // client that consumes one reads it as a tree — so writing the
+                // tree is both the useful output and the inspectable one.
+                // Zipping would also mean a bundling dependency the CLI does
+                // not otherwise carry, for a step `zip -r` already does.
+                const target = options.output ?? 'ever-works-mcp';
+                const { mkdir, writeFile } = await import('node:fs/promises');
+                const { dirname, join } = await import('node:path');
+
                 for (const [name, content] of Object.entries(files)) {
-                    zip.file(name, content);
+                    const file = join(target, name);
+                    await mkdir(dirname(file), { recursive: true });
+                    await writeFile(file, content, 'utf8');
                 }
-                const buffer = await zip.generateAsync({ type: 'nodebuffer' });
 
-                const target = options.output ?? 'ever-works-mcp.zip';
-                const { writeFile } = await import('node:fs/promises');
-                await writeFile(target, buffer);
-
-                console.log(chalk.green(`
-Wrote ${target}`));
-                console.log(chalk.gray(`  ${Object.keys(files).sort().join(', ')}`));
+                console.log(chalk.green(`\nWrote ${target}/`));
+                for (const name of Object.keys(files).sort()) {
+                    console.log(chalk.gray(`  ${name}`));
+                }
                 console.log(
-                    chalk.gray(
-                        '  Contains no credentials — your client supplies its own (AP-15).',
-                    ),
+                    chalk.gray('  Contains no credentials — your client supplies its own (AP-15).'),
                 );
             } catch (error) {
                 handleCliError(error);
