@@ -563,3 +563,309 @@ describe('TaskWorkspaceService.finalizeMountPush', () => {
         );
     });
 });
+
+/**
+ * Multi-repo Task workspaces (self-build slice C) meet the M6 "Discard
+ * branch" escape hatch.
+ *
+ * `taskBranchName` is a pure function of the Task id and slug, so the next
+ * run recomputes the SAME branch in EVERY repository the Task spans. A
+ * discard that resets only the primary therefore leaves the mount branch
+ * AND its recorded `pr-open` entry alive, and the next run's mount commits
+ * land straight back in the pull request the operator threw away.
+ */
+describe('TaskWorkspaceService discard reaches every repository the Task pushed', () => {
+    type Doubles = {
+        works: { findById: jest.Mock };
+        tasks: {
+            findByIdAndUser: jest.Mock;
+            findById: jest.Mock;
+            updateById: jest.Mock;
+            findBranchCleanupCandidates: jest.Mock;
+        };
+        gitFacade: { deleteBranch: jest.Mock };
+        attachments: { listEnabledForAgentWithRepos: jest.Mock };
+        repoConnections: { findByIdAndUser: jest.Mock };
+    };
+
+    let d: Doubles;
+
+    /** Primary PR #10 open, mount PR #3 open, a second mount only pushed. */
+    const multiRepoTask = () =>
+        makeTask({
+            agentId: 'agent-1',
+            branchState: 'pr-open',
+            prNumber: 10,
+            prUrl: 'https://github.com/ever-works/ever-works/pull/10',
+            extraRepos: [{ repoConnectionId: 'conn-2' }],
+            linkedPullRequests: [
+                {
+                    repositoryId: 'ever-works/directory-web-template',
+                    branch: 'task/tsk-9-task1',
+                    baseRef: 'develop',
+                    headSha: 'a'.repeat(40),
+                    prNumber: 3,
+                    prUrl: 'https://github.com/ever-works/directory-web-template/pull/3',
+                    state: 'pr-open',
+                    error: null,
+                    updatedAt: '2026-09-01T00:00:00.000Z',
+                },
+                {
+                    repositoryId: 'ever-works/workspace',
+                    branch: 'task/tsk-9-task1',
+                    baseRef: 'main',
+                    headSha: 'b'.repeat(40),
+                    prNumber: null,
+                    prUrl: null,
+                    state: 'pushed',
+                    error: null,
+                    updatedAt: '2026-09-01T00:00:00.000Z',
+                },
+            ],
+        });
+
+    const build = () =>
+        new TaskWorkspaceService(
+            d.works as unknown as ServiceArgs[0],
+            d.tasks as unknown as ServiceArgs[1],
+            {} as unknown as ServiceArgs[2],
+            {} as unknown as ServiceArgs[3],
+            d.gitFacade as unknown as ServiceArgs[4],
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            d.attachments as unknown as ServiceArgs[9],
+            d.repoConnections as unknown as ServiceArgs[10],
+        );
+
+    const deleted = () =>
+        d.gitFacade.deleteBranch.mock.calls.map((call: unknown[]) => [
+            `${call[0]}/${call[1]}`,
+            call[2],
+            (call[3] as { providerId: string }).providerId,
+        ]);
+
+    beforeEach(() => {
+        const task = multiRepoTask();
+        d = {
+            works: {
+                findById: jest
+                    .fn()
+                    .mockResolvedValue({ ...makeWork(), taskBranchCleanup: 'on-merge' }),
+            },
+            tasks: {
+                findByIdAndUser: jest.fn().mockResolvedValue(task),
+                findById: jest.fn().mockResolvedValue(task),
+                updateById: jest.fn().mockResolvedValue(undefined),
+                findBranchCleanupCandidates: jest.fn().mockResolvedValue([task]),
+            },
+            gitFacade: { deleteBranch: jest.fn().mockResolvedValue(undefined) },
+            // The template mount is an agent attachment (provider `github`)…
+            attachments: {
+                listEnabledForAgentWithRepos: jest.fn().mockResolvedValue([attachment()]),
+            },
+            // …and `ever-works/workspace` is a Task extra on a GENERIC git
+            // connection, so its own provider must be used, not the Work's.
+            repoConnections: {
+                findByIdAndUser: jest.fn().mockResolvedValue({
+                    id: 'conn-2',
+                    url: 'https://github.com/ever-works/workspace.git',
+                    provider: 'git',
+                }),
+            },
+        };
+    });
+
+    it('deletes every mount branch through its own provider and clears the links with the primary reset', async () => {
+        await build().discardBranch('user-1', 'task-1');
+
+        expect(deleted()).toEqual([
+            ['ever-works/ever-works', 'task/tsk-9-task1', 'github'],
+            ['ever-works/directory-web-template', 'task/tsk-9-task1', 'github'],
+            ['ever-works/workspace', 'task/tsk-9-task1', 'git'],
+        ]);
+        expect(d.tasks.updateById).toHaveBeenCalledWith('task-1', {
+            branchRef: null,
+            branchState: 'discarded',
+            baseSha: null,
+            prNumber: null,
+            prUrl: null,
+            conflictPaths: null,
+            linkedPullRequests: null,
+        });
+    });
+
+    it('keeps going when one remote refuses, and still resets the Task', async () => {
+        d.gitFacade.deleteBranch.mockImplementation((_owner: string, repo: string) =>
+            repo === 'directory-web-template'
+                ? Promise.reject(new Error('403: resource not accessible'))
+                : Promise.resolve(undefined),
+        );
+
+        await expect(build().discardBranch('user-1', 'task-1')).resolves.toBeUndefined();
+
+        expect(deleted().map((call) => call[0])).toEqual([
+            'ever-works/ever-works',
+            'ever-works/directory-web-template',
+            'ever-works/workspace',
+        ]);
+        // The refused branch is STILL on its remote and its pull request is
+        // still open — deleting the branch is what would have closed it. The
+        // row is the only record of either, so clearing it here would trade a
+        // recoverable leak for an unrecoverable one: after this patch
+        // `branchRef` is null, so the branch cockpit is gone from the Task
+        // page and `findBranchCleanupCandidates` will never look at the row
+        // again. It survives, downgraded to `failed` with its PR link intact.
+        expect(d.tasks.updateById).toHaveBeenCalledWith(
+            'task-1',
+            expect.objectContaining({
+                branchState: 'discarded',
+                linkedPullRequests: [
+                    expect.objectContaining({
+                        repositoryId: 'ever-works/directory-web-template',
+                        branch: 'task/tsk-9-task1',
+                        state: 'failed',
+                        prNumber: 3,
+                        prUrl: 'https://github.com/ever-works/directory-web-template/pull/3',
+                        error: expect.stringContaining('403: resource not accessible'),
+                    }),
+                ],
+            }),
+        );
+    });
+
+    it('refuses to reuse the pull request of a branch whose delete failed', async () => {
+        // The fence BD-1 exists for: the survivor above must not become the
+        // `pr-open` entry a later run's mount push lands in. `failed` is the
+        // one state `findOpenLinkedPullRequest` never matches.
+        d.gitFacade.deleteBranch.mockRejectedValue(new Error('403: resource not accessible'));
+
+        await build().discardBranch('user-1', 'task-1');
+
+        const [, patch] = d.tasks.updateById.mock.calls[0] as [
+            string,
+            { linkedPullRequests: Array<{ state: string }> },
+        ];
+        expect(patch.linkedPullRequests).toHaveLength(2);
+        expect(patch.linkedPullRequests.map((entry) => entry.state)).toEqual(['failed', 'failed']);
+    });
+
+    it('keeps no record for a mount branch that was already gone', async () => {
+        // The common case, not an error: a mount branch merged under
+        // auto-delete-on-merge, or a discard retried after a partial
+        // failure. GitHub answers `deleteRef` for a missing ref with
+        // "Reference does not exist" — that is a completed discard, and
+        // leaving a `failed` entry behind would tell the operator a branch
+        // is still live when it is not.
+        d.gitFacade.deleteBranch.mockRejectedValue(
+            new Error('Reference does not exist - https://docs.github.com/rest'),
+        );
+
+        await build().discardBranch('user-1', 'task-1');
+
+        expect(d.tasks.updateById).toHaveBeenCalledWith(
+            'task-1',
+            expect.objectContaining({ linkedPullRequests: null }),
+        );
+    });
+
+    it('keeps the record when the remote answers 404, which is also what a revoked token looks like', async () => {
+        // The deliberate asymmetry: GitHub answers 404 both for "no such
+        // branch" and for "your token cannot see this repository". Only the
+        // second is a branch left behind, and the two are indistinguishable
+        // from here — so an ambiguous failure keeps its record rather than
+        // silently dropping a live branch and its open pull request.
+        d.gitFacade.deleteBranch.mockRejectedValue(new Error('Not Found'));
+
+        await build().discardBranch('user-1', 'task-1');
+
+        const [, patch] = d.tasks.updateById.mock.calls[0] as [
+            string,
+            { linkedPullRequests: Array<{ state: string }> | null },
+        ];
+        expect(patch.linkedPullRequests).toHaveLength(2);
+    });
+
+    it('sweeps mount branches too, so a multi-repo Task cannot leak one branch per extra repository', async () => {
+        const result = await build().sweepStaleBranches({ staleDays: 30 });
+
+        expect(result).toEqual({ cleaned: 1 });
+        expect(deleted()).toEqual([
+            ['ever-works/ever-works', 'task/tsk-9-task1', 'github'],
+            ['ever-works/directory-web-template', 'task/tsk-9-task1', 'github'],
+            ['ever-works/workspace', 'task/tsk-9-task1', 'git'],
+        ]);
+        expect(d.tasks.updateById).toHaveBeenCalledWith('task-1', {
+            branchState: 'cleaned',
+            linkedPullRequests: null,
+        });
+    });
+
+    it('leaves a malformed linked entry to a human instead of stranding the reset', async () => {
+        const task = makeTask({
+            agentId: 'agent-1',
+            linkedPullRequests: [
+                {
+                    repositoryId: 'directory-web-template',
+                    branch: 'task/tsk-9-task1',
+                    baseRef: 'develop',
+                    headSha: null,
+                    prNumber: null,
+                    prUrl: null,
+                    state: 'pushed',
+                    error: null,
+                    updatedAt: '2026-09-01T00:00:00.000Z',
+                },
+            ],
+        });
+        d.tasks.findByIdAndUser.mockResolvedValue(task);
+
+        await build().discardBranch('user-1', 'task-1');
+
+        expect(deleted()).toEqual([['ever-works/ever-works', 'task/tsk-9-task1', 'github']]);
+        // "Leaving it to a human" only works if the human can still see it:
+        // the entry the discard could not parse is kept, marked failed, with
+        // the reason in `error`.
+        expect(d.tasks.updateById).toHaveBeenCalledWith(
+            'task-1',
+            expect.objectContaining({
+                linkedPullRequests: [
+                    expect.objectContaining({
+                        repositoryId: 'directory-web-template',
+                        state: 'failed',
+                        error: expect.stringContaining('not a deletable'),
+                    }),
+                ],
+            }),
+        );
+    });
+
+    it('sweeps only what it actually deleted, so a refused branch keeps its record', async () => {
+        // Worse here than in the interactive discard: the sweep KEEPS
+        // `branchRef` and only flips the state to `cleaned`, so an
+        // over-clearing sweep would leave the Task page rendering a branch
+        // cockpit whose linked-pull-request list had just been emptied while
+        // the branch and its PR were still live.
+        d.gitFacade.deleteBranch.mockImplementation((_owner: string, repo: string) =>
+            repo === 'workspace'
+                ? Promise.reject(new Error('Delete branch not supported by this provider'))
+                : Promise.resolve(undefined),
+        );
+
+        await expect(build().sweepStaleBranches({ staleDays: 30 })).resolves.toEqual({
+            cleaned: 1,
+        });
+
+        expect(d.tasks.updateById).toHaveBeenCalledWith('task-1', {
+            branchState: 'cleaned',
+            linkedPullRequests: [
+                expect.objectContaining({
+                    repositoryId: 'ever-works/workspace',
+                    state: 'failed',
+                    error: expect.stringContaining('Delete branch not supported by this provider'),
+                }),
+            ],
+        });
+    });
+});

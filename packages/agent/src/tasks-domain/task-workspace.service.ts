@@ -528,6 +528,46 @@ export class TaskWorkspaceService {
     }
 
     /**
+     * Git-facade options for ONE mounted repository of a multi-repo Task
+     * (self-build slice C): attachment first, then the Task's own extra
+     * repositories (PR C2), then the Work's provider — the same precedence
+     * the plan used to mount it.
+     *
+     * ONE definition, shared by `finalizeMountPush` (which opens the pull
+     * request) and `discardMountBranches` (which deletes the branch behind
+     * it). They must not drift: a discard that resolved a different provider
+     * than the push would delete nothing on the remote that actually holds
+     * the branch, while telling the operator the branch is gone.
+     */
+    private async resolveMountGitOptions(
+        task: Task,
+        repositoryId: string,
+        userId: string,
+        agentId?: string | null,
+    ): Promise<{ userId: string; providerId: string; workId: string }> {
+        const attached =
+            this.agentRepoAttachments && agentId
+                ? await resolveAttachedReposForAgent(
+                      this.agentRepoAttachments,
+                      agentId,
+                      userId,
+                  ).catch(() => [])
+                : [];
+        const attachment = attached.find(
+            (candidate) =>
+                repositoryIdFromCloneUrl(candidate.url)?.toLowerCase() ===
+                repositoryId.toLowerCase(),
+        );
+        const work = task.workId ? await this.works.findById(task.workId) : null;
+        const providerId =
+            attachment?.provider ??
+            (await this.extraRepoProvider(task, repositoryId, userId)) ??
+            work?.gitProvider ??
+            'github';
+        return { userId, providerId, workId: task.workId ?? '' };
+    }
+
+    /**
      * Multi-repo Task workspaces (self-build slice C) — a fleet run pushed
      * a branch in one of the Task's MOUNTED repositories; open its pull
      * request and record it on the Task next to the primary.
@@ -596,27 +636,13 @@ export class TaskWorkspaceService {
                 'no git facade is available to open the pull request',
             );
         }
-        const attached = this.agentRepoAttachments
-            ? await resolveAttachedReposForAgent(
-                  this.agentRepoAttachments,
-                  input.agentId,
-                  userId,
-              ).catch(() => [])
-            : [];
-        const attachment = attached.find(
-            (candidate) =>
-                repositoryIdFromCloneUrl(candidate.url)?.toLowerCase() ===
-                repositoryId.toLowerCase(),
+        const gitOptions = await this.resolveMountGitOptions(
+            task,
+            repositoryId,
+            userId,
+            input.agentId,
         );
-        const work = task.workId ? await this.works.findById(task.workId) : null;
-        // Attachment first, then the Task's own extra repositories (PR C2),
-        // then the Work's provider — the same precedence the plan used.
-        const providerId =
-            attachment?.provider ??
-            (await this.extraRepoProvider(task, repositoryId, userId)) ??
-            work?.gitProvider ??
-            'github';
-        const gitOptions = { userId, providerId, workId: task.workId ?? '' };
+        const { providerId } = gitOptions;
 
         if (!input.agentCanOpenPullRequests || providerId === 'git') {
             await this.recordLinkedPullRequest(task, {
@@ -1510,16 +1536,20 @@ export class TaskWorkspaceService {
      * M6 — "Discard branch" escape hatch: delete the remote task branch
      * and reset the Task's workspace identity so the next run starts
      * clean. Irreversible for the branch (the UI confirms first).
+     *
+     * Multi-repo Tasks (self-build slice C) discard EVERY repository the
+     * Task pushed, not just the primary: see `discardMountBranches`.
      */
     async discardBranch(userId: string, taskId: string): Promise<void> {
         const task = await this.tasks.findByIdAndUser(taskId, userId);
         if (!task) {
             throw new Error('TASK_NOT_FOUND');
         }
-        if (!task.branchRef) {
+        const mounts = Array.isArray(task.linkedPullRequests) ? task.linkedPullRequests : [];
+        if (!task.branchRef && mounts.length === 0) {
             return; // nothing to discard — idempotent
         }
-        if (task.workId && this.gitFacade) {
+        if (task.branchRef && task.workId && this.gitFacade) {
             const work = await this.works.findById(task.workId);
             if (work) {
                 try {
@@ -1540,6 +1570,7 @@ export class TaskWorkspaceService {
                 }
             }
         }
+        const survivingMounts = await this.discardMountBranches(task, userId, mounts);
         await this.tasks.updateById(task.id, {
             branchRef: null,
             branchState: 'discarded',
@@ -1547,6 +1578,18 @@ export class TaskWorkspaceService {
             prNumber: null,
             prUrl: null,
             conflictPaths: null,
+            // Cleared in the SAME patch as the primary reset — but only for
+            // the branches that really went. A surviving `pr-open` entry is
+            // what `findOpenLinkedPullRequest` matches to push a later run's
+            // commits back into the discarded pull request, so a deleted
+            // branch must lose its entry. A branch whose delete did NOT take
+            // is the opposite case: it is still on its remote with its pull
+            // request still open, and this row is the only record of it, so
+            // dropping the entry would strand both with nothing left
+            // pointing at them. Those are kept, downgraded to `failed` —
+            // never matched by `findOpenLinkedPullRequest`, so the reuse
+            // fence stays shut either way.
+            linkedPullRequests: survivingMounts.length > 0 ? survivingMounts : null,
         });
     }
 
@@ -1590,9 +1633,136 @@ export class TaskWorkspaceService {
                 } catch {
                     // already gone — fine
                 }
-                await this.tasks.updateById(task.id, { branchState: 'cleaned' });
+                // Same reach as the interactive discard: without this, every
+                // multi-repo Task leaks one branch per extra repository on
+                // every remote, forever — the GC only ever saw the primary.
+                const survivingMounts = await this.discardMountBranches(
+                    task,
+                    task.userId,
+                    Array.isArray(task.linkedPullRequests) ? task.linkedPullRequests : [],
+                );
+                await this.tasks.updateById(task.id, {
+                    branchState: 'cleaned',
+                    // Same rule as the interactive discard: only the branches
+                    // that really went lose their entry. The sweep is worse
+                    // than the discard when it over-clears, because it keeps
+                    // `branchRef` — so the row would still show a branch
+                    // cockpit while the only record of a live mount branch
+                    // and its open pull request had just been erased, and no
+                    // later sweep would look at this Task again.
+                    linkedPullRequests: survivingMounts.length > 0 ? survivingMounts : null,
+                });
             }
         }
+    }
+
+    /**
+     * Multi-repo Task workspaces (self-build slice C) — delete the branch
+     * this Task opened in each MOUNTED repository, through the same provider
+     * path that opened it (`resolveMountGitOptions`).
+     *
+     * Why discard has to reach this far: `taskBranchName` is a pure function
+     * of the Task id and slug, so the next run recomputes the SAME branch in
+     * every repository. Leave a mount branch behind and its recorded
+     * `pr-open` entry keeps matching in `findOpenLinkedPullRequest`, so the
+     * next run's mount commits land silently in the pull request the
+     * operator believed they had thrown away.
+     *
+     * Best-effort, exactly like the primary: a branch may already be gone
+     * (merged + auto-deleted) and one unreachable remote must not strand the
+     * other repositories or the Task's own reset. Failures are warned, never
+     * thrown — the caller has already told the operator the branch is going.
+     *
+     * Returns the entries whose branch is STILL on its remote — a refused
+     * delete (403, protected branch, revoked token) or a provider with no
+     * delete-branch surface at all, which is every `git` mount, since only
+     * the github plugin implements it. The caller keeps those on the row so
+     * a branch the discard could not reach does not lose the one record
+     * pointing at it and at the pull request it left open.
+     */
+    private async discardMountBranches(
+        task: Task,
+        userId: string,
+        entries: readonly TaskLinkedPullRequest[],
+    ): Promise<TaskLinkedPullRequest[]> {
+        if (entries.length === 0) return [];
+        if (!this.gitFacade) {
+            return entries.map((entry) =>
+                this.mountBranchSurvived(
+                    entry,
+                    'no git provider was available to delete this branch',
+                ),
+            );
+        }
+        const survivors: TaskLinkedPullRequest[] = [];
+        for (const entry of entries) {
+            const repositoryId =
+                typeof entry?.repositoryId === 'string' ? entry.repositoryId.trim() : '';
+            const branch = typeof entry?.branch === 'string' ? entry.branch.trim() : '';
+            const [owner, repo] = repositoryId.split('/') as [string, string | undefined];
+            if (!owner || !repo || repositoryId.split('/').length !== 2 || !branch) {
+                this.logger.warn(
+                    `Task ${task.id}: linked entry '${repositoryId}' / '${branch}' is not a deletable <owner>/<repository> + branch; leaving it to a human.`,
+                );
+                survivors.push(
+                    this.mountBranchSurvived(
+                        entry,
+                        'this linked entry is not a deletable <owner>/<repository> + branch; delete the branch by hand',
+                    ),
+                );
+                continue;
+            }
+            try {
+                const gitOptions = await this.resolveMountGitOptions(
+                    task,
+                    repositoryId,
+                    userId,
+                    task.agentId,
+                );
+                await this.gitFacade.deleteBranch(owner, repo, branch, gitOptions);
+                this.logger.log(
+                    `Task ${task.id}: discarded mount branch ${branch} in ${repositoryId}.`,
+                );
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                if (mountBranchAlreadyGone(message)) {
+                    // Nothing to keep a record of: the branch is gone, which
+                    // is what the discard wanted. The primary path has always
+                    // treated this as success ("discard stays idempotent") —
+                    // a merged branch under auto-delete-on-merge, or a
+                    // discard retried after a partial failure.
+                    this.logger.log(
+                        `Task ${task.id}: mount ${repositoryId} branch ${branch} was already gone.`,
+                    );
+                    continue;
+                }
+                this.logger.warn(
+                    `Task ${task.id}: mount ${repositoryId} branch ${branch} delete failed (continuing): ${message}`,
+                );
+                survivors.push(this.mountBranchSurvived(entry, message));
+            }
+        }
+        return survivors;
+    }
+
+    /**
+     * A mount branch the discard could not delete, rewritten for the row it
+     * stays on. `failed` rather than its old state on purpose: it is the one
+     * state `findOpenLinkedPullRequest` never matches, so the next run cannot
+     * push into a pull request the operator has already tried to throw away,
+     * while `prNumber` / `prUrl` are kept because that link is the only way
+     * the operator can go and close it by hand.
+     */
+    private mountBranchSurvived(
+        entry: TaskLinkedPullRequest,
+        reason: string,
+    ): TaskLinkedPullRequest {
+        return {
+            ...entry,
+            state: 'failed',
+            error: `branch delete failed — the branch is still on the remote: ${reason}`,
+            updatedAt: new Date().toISOString(),
+        };
     }
 
     private async postSystemMessage(
@@ -1615,6 +1785,23 @@ export class TaskWorkspaceService {
             );
         }
     }
+}
+
+/**
+ * Did a mount-branch delete fail because the branch was ALREADY gone?
+ *
+ * Deliberately narrow: ONLY GitHub's literal `deleteRef` answer for a ref
+ * that is not there (HTTP 422, "Reference does not exist"). A bare status
+ * is not enough to decide — GitHub answers 404 both for "no such branch"
+ * and for "your token cannot see this repository", and the second case is
+ * precisely the one whose record must survive the discard. Anything this
+ * predicate is unsure about is therefore treated as "still on the remote",
+ * because keeping a stale entry costs the operator a line on a row, while
+ * dropping a live one costs them a branch and an open pull request that
+ * nothing points at any more.
+ */
+function mountBranchAlreadyGone(message: string): boolean {
+    return message.toLowerCase().includes('reference does not exist');
 }
 
 /**
