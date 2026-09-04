@@ -324,6 +324,10 @@ spec:
               value: "$FEATURE_AGENT_PLUGINS"
             - name: AGENT_PLUGINS_DIR
               value: "$AGENT_PLUGINS_DIR"
+            - name: AGENT_PLUGINS_STDIO
+              value: "$AGENT_PLUGINS_STDIO"
+            - name: AGENT_PLUGINS_DATA_DIR
+              value: "$AGENT_PLUGINS_DATA_DIR"
 
           resources:
             requests:

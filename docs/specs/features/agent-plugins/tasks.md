@@ -199,11 +199,11 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       expanded package env overlay + `PLUGIN_ROOT`/`PLUGIN_DATA` last; single-
       token command resolution (bare vs `./`-relative) with containment; cwd
       rules per AP-13; process supervision + teardown at run end.
-- [ ] **T31**. Triple gate: feature flag + `AGENT_PLUGINS_STDIO` deployment
+- [x] **T31**. Triple gate: feature flag + `AGENT_PLUGINS_STDIO` deployment
       setting (default off; v1 SaaS keeps it off — no sandbox route is built in
       this feature) + per-binding explicit enable; disabled stdio surfaces as
       "present, disabled by policy" (AP-19).
-- [ ] **T31b**. Phase-4 env wiring repeat of the 2026-06-12 checklist for
+- [x] **T31b**. Phase-4 env wiring repeat of the 2026-06-12 checklist for
       `AGENT_PLUGINS_DATA_DIR` + `AGENT_PLUGINS_STDIO`: k8s manifests
       (dev/stage/prod) + deploy workflow env blocks + `.env.example` + compose
       files + explicit operator note for the ArgoCD-managed live env (outside

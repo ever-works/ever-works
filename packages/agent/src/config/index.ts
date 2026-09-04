@@ -912,6 +912,45 @@ export const config = {
         getPackageDirs(): string {
             return process.env.AGENT_PLUGINS_DIR || '/app/agent-plugins';
         },
+
+        /**
+         * Whether stdio MCP servers declared by packages may be LAUNCHED.
+         *
+         * A second switch, deliberately separate from `isEnabled()`, because
+         * the two authorise very different things. The master flag lets
+         * packages contribute documents and remote server declarations —
+         * inert data. This one lets the platform execute a subprocess from a
+         * package's contents, which is a categorically larger grant, and one
+         * a deployment may never want even while using packages happily.
+         *
+         * Default `false`, and SaaS keeps it off: no sandbox is built in this
+         * feature, so a stdio server would run with the API pod's own
+         * privileges. Self-hosted operators who control what they install can
+         * turn it on.
+         *
+         * A stdio server on a deployment with this off is reported as
+         * "present, disabled by policy" (AP-19) rather than hidden, so the
+         * operator can see what a package would run if they allowed it.
+         */
+        isStdioEnabled(): boolean {
+            return (process.env.AGENT_PLUGINS_STDIO ?? 'false').toLowerCase() === 'true';
+        },
+
+        /**
+         * Root for per-package writable data (`${PLUGIN_DATA}`).
+         *
+         * Deliberately NOT under `getPackageDirs()`. Package contents are
+         * read-only and replaced wholesale on update; data must survive that,
+         * and a writable directory inside a scanned tree would also be walked
+         * by the package scanner. `||` for the same envsubst reason as above.
+         *
+         * Nothing creates this directory either — the launcher creates the
+         * per-package subdirectory it needs, so turning the flag on cannot
+         * fail a boot.
+         */
+        getDataDir(): string {
+            return process.env.AGENT_PLUGINS_DATA_DIR || '/app/agent-plugins-data';
+        },
     },
 
     // EW-120 Activity Feed pull-mode plumbing — per-Work HMAC secret is

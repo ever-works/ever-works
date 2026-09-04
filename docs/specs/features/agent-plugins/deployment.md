@@ -19,10 +19,12 @@ same packages work across vendors.
 
 ## 1. The two variables
 
-| Variable                | Default              | Meaning                                                                                                                                                              |
-| ----------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `FEATURE_AGENT_PLUGINS` | `false`              | Lets installed packages contribute to the skills catalog.                                                                                                            |
-| `AGENT_PLUGINS_DIR`     | `/app/agent-plugins` | Where packages live. Several directories may be given, separated by `,`, `;` or the platform path delimiter. The **first** is the write target for fetched packages. |
+| Variable                 | Default                   | Meaning                                                                                                                                                              |
+| ------------------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FEATURE_AGENT_PLUGINS`  | `false`                   | Lets installed packages contribute to the skills catalog.                                                                                                            |
+| `AGENT_PLUGINS_DIR`      | `/app/agent-plugins`      | Where packages live. Several directories may be given, separated by `,`, `;` or the platform path delimiter. The **first** is the write target for fetched packages. |
+| `AGENT_PLUGINS_STDIO`    | `false`                   | Whether stdio MCP servers declared by packages may be **launched**.                                                                                                  |
+| `AGENT_PLUGINS_DATA_DIR` | `/app/agent-plugins-data` | Root for per-package writable data (`${PLUGIN_DATA}`).                                                                                                               |
 
 Both are **safe to leave unset**. This is deliberate, and it is the reason
 this feature cannot repeat the 2026-06-12 `PLATFORM_ENCRYPTION_KEY` incident,
@@ -120,3 +122,45 @@ For 1 and 2 the operator owns the bytes, so no allowlist entry is needed.
 Set `FEATURE_AGENT_PLUGINS` back to `false` and redeploy. Package skills
 disappear from the catalog immediately; nothing else is touched, and no data is
 removed. Packages already on disk stay there and are simply not read.
+
+---
+
+## 7. `AGENT_PLUGINS_STDIO` — a second, larger grant
+
+This is deliberately **not** covered by `FEATURE_AGENT_PLUGINS`, and the
+difference is worth being precise about.
+
+The master flag lets a package contribute **documents** — Markdown skills — and
+**declarations** of remote MCP servers. Those are inert: nothing in a package is
+executed, and a remote server still needs an allowlist entry and an explicit
+per-agent binding before an agent can reach it.
+
+`AGENT_PLUGINS_STDIO` lets the platform **execute a subprocess from a package's
+own contents**. That is a categorically larger grant, and one a deployment may
+never want even while using packages happily. No sandbox is built in this
+feature, so a stdio server runs with the API pod's own privileges and file
+access.
+
+**SaaS keeps this off.** Self-hosted operators who control exactly what they
+install can turn it on.
+
+### What "off" looks like
+
+A stdio server on a deployment with the gate closed is reported as **present and
+disabled by policy** (AP-19), not hidden. It appears under `skipped` with
+`code: "disabled-by-policy"` and `enableable: true`, so an operator can see what
+a package _would_ run before deciding whether to allow it — and a UI can offer
+"enable stdio" rather than the misleading "contact the package author".
+
+Every other skip reason carries `enableable: false`, because nothing the
+operator sets will change it.
+
+### `AGENT_PLUGINS_DATA_DIR`
+
+Per-package writable state for `${PLUGIN_DATA}`. Kept **outside**
+`AGENT_PLUGINS_DIR` on purpose: package contents are read-only and replaced
+wholesale on update, while data has to survive that — and a writable directory
+inside a scanned tree would also be walked by the package scanner.
+
+Nothing creates it at boot; the launcher creates the per-package subdirectory it
+needs, so setting the variable cannot fail a startup.

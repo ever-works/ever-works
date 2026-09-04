@@ -250,7 +250,7 @@ describe('PackageMcpReconcilerService', () => {
         expect(manual.url).toBe('https://trusted.example.com/mcp');
     });
 
-    it('skips a stdio server, which cannot be a URL-shaped connection', async () => {
+    it('skips a stdio server as DISABLED BY POLICY while the gate is off', async () => {
         await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
             local: { type: 'stdio', command: './bin/server' },
         });
@@ -259,11 +259,29 @@ describe('PackageMcpReconcilerService', () => {
         const result = await service.reconcile('user-1');
 
         expect(result.created).toEqual([]);
-        expect(result.skipped[0]?.reason).toContain('stdio');
+        expect(result.skipped[0]?.code).toBe('disabled-by-policy');
+        expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('skips a stdio server as UNSUPPORTED-TRANSPORT once the gate is open', async () => {
+        // With stdio allowed the resolver hands it over, and the reconciler
+        // refuses it for its own reason: a connection row is URL-shaped, and a
+        // stdio server is launched rather than connected to.
+        process.env.AGENT_PLUGINS_STDIO = 'true';
+        await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
+            local: { type: 'stdio', command: './bin/server' },
+        });
+        const { service, repo } = build();
+
+        const result = await service.reconcile('user-1');
+
+        expect(result.created).toEqual([]);
+        expect(result.skipped[0]?.code).toBe('unsupported-transport');
         expect(repo.create).not.toHaveBeenCalled();
     });
 
     it('carries forward what the resolver already refused, in one report', async () => {
+        process.env.AGENT_PLUGINS_STDIO = 'true';
         await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
             stateful: { type: 'stdio', command: 'node', args: ['${PLUGIN_DATA}/db.js'] },
         });
@@ -274,6 +292,8 @@ describe('PackageMcpReconcilerService', () => {
         // One report explaining every declared server beats two half-reports.
         expect(result.skipped).toHaveLength(1);
         expect(result.skipped[0].reason).toContain('PLUGIN_DATA');
+        // The resolver's code survives the reconciler boundary.
+        expect(result.skipped[0].code).toBe('needs-plugin-data');
     });
 
     it('reconciles several packages in one pass', async () => {

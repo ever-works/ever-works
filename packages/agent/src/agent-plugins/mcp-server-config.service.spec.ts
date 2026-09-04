@@ -115,6 +115,9 @@ describe('McpServerConfigService', () => {
     });
 
     it('expands ${PLUGIN_ROOT} against the package directory', async () => {
+        // stdio is gated separately, and this test is about expansion rather
+        // than the gate.
+        process.env.AGENT_PLUGINS_STDIO = 'true';
         const root = await packagesRoot();
         const dir = await writePackage(root, 'acme', 'acme.tools', {
             local: {
@@ -153,6 +156,7 @@ describe('McpServerConfigService', () => {
     });
 
     it('SKIPS a server needing ${PLUGIN_DATA}, with a reason, rather than launching it broken', async () => {
+        process.env.AGENT_PLUGINS_STDIO = 'true';
         const root = await packagesRoot();
         await writePackage(root, 'acme', 'acme.tools', {
             stateful: { type: 'stdio', command: 'node', args: ['${PLUGIN_DATA}/db.js'] },
@@ -167,6 +171,62 @@ describe('McpServerConfigService', () => {
         ]);
         // The reason names the placeholder, so an operator knows what to do.
         expect(result.skipped[0].reason).toContain('PLUGIN_DATA');
+        expect(result.skipped[0].code).toBe('needs-plugin-data');
+        // Nothing the operator can flip — this one needs the launcher.
+        expect(result.skipped[0].enableable).toBe(false);
+    });
+
+    describe('AP-19: stdio is present-but-disabled, not absent', () => {
+        it('reports a stdio server as disabled BY POLICY while the gate is off', async () => {
+            const root = await packagesRoot();
+            await writePackage(root, 'acme', 'acme.tools', {
+                local: { type: 'stdio', command: './bin/server' },
+            });
+            process.env.AGENT_PLUGINS_DIR = root;
+            // AGENT_PLUGINS_STDIO deliberately unset — the default.
+
+            const result = await service.resolveAll();
+
+            expect(result.servers).toEqual([]);
+            expect(result.skipped).toHaveLength(1);
+            expect(result.skipped[0]).toMatchObject({
+                name: 'local',
+                packageName: 'acme.tools',
+                code: 'disabled-by-policy',
+                // The distinction AP-19 asks for: this is a setting away from
+                // working, not a broken package. A UI can offer to enable it.
+                enableable: true,
+            });
+            expect(result.skipped[0].reason).toContain('AGENT_PLUGINS_STDIO');
+        });
+
+        it('resolves the same server once the gate is open', async () => {
+            const root = await packagesRoot();
+            await writePackage(root, 'acme', 'acme.tools', {
+                local: { type: 'stdio', command: './bin/server' },
+            });
+            process.env.AGENT_PLUGINS_DIR = root;
+            process.env.AGENT_PLUGINS_STDIO = 'true';
+
+            const result = await service.resolveAll();
+
+            expect(result.skipped).toEqual([]);
+            expect(result.servers[0]).toMatchObject({ name: 'local', transport: 'stdio' });
+        });
+
+        it('leaves REMOTE servers untouched by the stdio gate', async () => {
+            const root = await packagesRoot();
+            await writePackage(root, 'acme', 'acme.tools', {
+                api: { type: 'streamable-http', url: 'https://acme.example.com/mcp' },
+            });
+            process.env.AGENT_PLUGINS_DIR = root;
+            // Gate off: a remote server is inert data and is not affected.
+
+            const result = await service.resolveAll();
+
+            expect(result.servers.map((s) => s.name)).toEqual(['api']);
+            expect(result.skipped).toEqual([]);
+        });
     });
 
     it('resolves servers from several packages together', async () => {

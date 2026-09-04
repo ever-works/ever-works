@@ -4,7 +4,12 @@ import {
     MCP_CONNECTION_NAME_PATTERN,
     type McpServerConnection,
 } from '../entities/mcp-server-connection.entity';
-import { McpServerConfigService, type ResolvedMcpServer } from './mcp-server-config.service';
+import {
+    McpServerConfigService,
+    type ResolvedMcpServer,
+    type SkippedMcpReason,
+    type SkippedMcpServer,
+} from './mcp-server-config.service';
 import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 
 /**
@@ -46,8 +51,15 @@ export interface ReconcileResult {
     readonly unchanged: readonly string[];
     /** Existing rows whose URL or transport was updated to match the package. */
     readonly updated: readonly string[];
-    /** Declared servers that cannot become a connection, with the reason. */
-    readonly skipped: readonly { name: string; packageName: string; reason: string }[];
+    /**
+     * Declared servers that cannot become a connection, with the reason.
+     *
+     * Reuses the resolver's shape rather than a narrower local one, so the
+     * `code` and `enableable` fields survive this boundary. Narrowing here
+     * would drop exactly the AP-19 signal a UI needs to offer "enable stdio"
+     * instead of "contact the package author".
+     */
+    readonly skipped: readonly SkippedMcpServer[];
 }
 
 /**
@@ -97,7 +109,7 @@ export class PackageMcpReconcilerService {
         const created: string[] = [];
         const unchanged: string[] = [];
         const updated: string[] = [];
-        const skipped: { name: string; packageName: string; reason: string }[] = [];
+        const skipped: SkippedMcpServer[] = [];
 
         if (!resolution.enabled) {
             return { created, unchanged, updated, skipped };
@@ -116,6 +128,8 @@ export class PackageMcpReconcilerService {
                     name: server.name,
                     packageName: server.provenance.packageName,
                     reason: outcome.reason,
+                    code: outcome.code,
+                    enableable: outcome.enableable,
                 });
                 continue;
             }
@@ -140,15 +154,17 @@ export class PackageMcpReconcilerService {
         server: ResolvedMcpServer,
     ): Promise<
         | { kind: 'created' | 'updated' | 'unchanged'; name: string }
-        | { kind: 'skipped'; reason: string }
+        | { kind: 'skipped'; reason: string; code: SkippedMcpReason; enableable: boolean }
     > {
         if (!REMOTE_TRANSPORTS.has(server.transport)) {
             return {
                 kind: 'skipped',
                 reason:
                     `Transport "${server.transport}" cannot become a connection — a ` +
-                    `connection row is URL-shaped. stdio servers need the subprocess ` +
-                    `launcher, which is not built yet.`,
+                    `connection row is URL-shaped. A stdio server is launched as a ` +
+                    `subprocess and never becomes a connection at all.`,
+                code: 'unsupported-transport',
+                enableable: false,
             };
         }
 
@@ -159,6 +175,8 @@ export class PackageMcpReconcilerService {
             return {
                 kind: 'skipped',
                 reason: `Server name "${server.name}" is not safe to use as a tool namespace.`,
+                code: 'unsafe-namespace',
+                enableable: false,
             };
         }
 
@@ -169,12 +187,19 @@ export class PackageMcpReconcilerService {
                 reason:
                     `Could not derive a valid connection name from ` +
                     `"${server.provenance.packageName}" + "${server.name}".`,
+                code: 'underivable-name',
+                enableable: false,
             };
         }
 
         const url = (server.config as { url?: string }).url;
         if (!url) {
-            return { kind: 'skipped', reason: 'Remote server declared no URL.' };
+            return {
+                kind: 'skipped',
+                reason: 'Remote server declared no URL.',
+                code: 'underivable-name',
+                enableable: false,
+            };
         }
 
         // The SAME lexical SSRF guard `McpConnectionsService.assertValidUrl`
@@ -192,6 +217,8 @@ export class PackageMcpReconcilerService {
                 reason:
                     `URL is not a public http(s) address — private, loopback, link-local ` +
                     `and cloud-metadata addresses are blocked.`,
+                code: 'unsafe-url',
+                enableable: false,
             };
         }
 
@@ -221,6 +248,8 @@ export class PackageMcpReconcilerService {
                 reason:
                     `A manually-created connection named "${name}" already exists; ` +
                     `refusing to overwrite it.`,
+                code: 'name-taken',
+                enableable: false,
             };
         }
 

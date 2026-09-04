@@ -11,6 +11,7 @@ import {
     type McpServerEntry,
     type McpTransport,
 } from '@ever-works/agent-plugins';
+import { config } from '../config';
 import { loadedPackages, scanConfiguredPackages } from './configured-source';
 import type { LocalPackageCandidate } from './local-source';
 
@@ -64,10 +65,36 @@ export interface McpServerProvenance {
     readonly sourceKind: 'local' | 'git' | 'npm';
 }
 
+/**
+ * Why a declared server is not being offered.
+ *
+ * `disabled-by-policy` is kept distinct from every other code on purpose
+ * (AP-19): it means the package is fine and the deployment has chosen not to
+ * allow it, which is the one case an operator can act on by changing a
+ * setting rather than by fixing a package. Collapsing it into a generic
+ * "unsupported" would tell them the opposite — that nothing can be done.
+ */
+export type SkippedMcpReason =
+    | 'disabled-by-policy'
+    | 'needs-plugin-data'
+    | 'unsafe-namespace'
+    | 'unreadable-package'
+    | 'unsupported-transport'
+    | 'underivable-name'
+    | 'unsafe-url'
+    | 'name-taken';
+
 export interface SkippedMcpServer {
     readonly name: string;
     readonly packageName: string;
     readonly reason: string;
+    readonly code: SkippedMcpReason;
+    /**
+     * True when the only thing standing between this server and being usable
+     * is a deployment setting. Lets a UI offer "enable stdio" instead of
+     * "contact the package author".
+     */
+    readonly enableable: boolean;
 }
 
 export interface McpResolutionResult {
@@ -173,6 +200,8 @@ export class McpServerConfigService {
                     name,
                     packageName: candidate.name ?? candidate.dirName,
                     reason: `Package could not be re-read: ${reason}`,
+                    code: 'unreadable-package',
+                    enableable: false,
                 });
             }
             return [];
@@ -185,6 +214,22 @@ export class McpServerConfigService {
     ): ResolvedMcpServer | SkippedMcpServer {
         const packageName = pkg.name ?? pkg.dirName;
 
+        // AP-19: a stdio server on a deployment that has not allowed stdio is
+        // PRESENT and DISABLED, not absent. The operator should be able to see
+        // what a package would run before deciding whether to allow it.
+        if (entry.transport === 'stdio' && !config.agentPlugins.isStdioEnabled()) {
+            return {
+                name: entry.name,
+                packageName,
+                reason:
+                    'Stdio servers are disabled by policy on this deployment. Launching one ' +
+                    'executes a subprocess from package contents, so it is gated separately ' +
+                    'from Agent Plugins support itself (AGENT_PLUGINS_STDIO).',
+                code: 'disabled-by-policy',
+                enableable: true,
+            };
+        }
+
         if (usesPluginData(entry.config)) {
             return {
                 name: entry.name,
@@ -192,6 +237,8 @@ export class McpServerConfigService {
                 reason:
                     'The server references ${PLUGIN_DATA}, and this deployment does not yet ' +
                     'allocate a per-package data directory.',
+                code: 'needs-plugin-data',
+                enableable: false,
             };
         }
 
