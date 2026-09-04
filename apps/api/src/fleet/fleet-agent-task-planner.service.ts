@@ -24,6 +24,7 @@ import {
     FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
     FLEET_AGENT_EXECUTION_MODEL_PATTERN,
     FLEET_AGENT_TASK_QUESTION_FILE,
+    fleetAgentExecutionProviderSupportsMountGrants,
     isFleetAgentExecutionEffort,
     isFleetAgentExecutionMode,
     isFleetAgentExecutionPermissionMode,
@@ -275,6 +276,24 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         if (!workspace) {
             throw new FleetAgentTaskPlanError(
                 `Task ${task.slug ?? task.id} has no repository to work in — attach it to a Work with a Git repository before routing it to the fleet`,
+            );
+        }
+        // Multi-repo (slice C): a mount is provisioned OUTSIDE the primary
+        // worktree and only linked into it, and the node grants each writable
+        // mount to the CLI as an additional writable root. A provider with no
+        // way to express that grant would read every repository and silently
+        // fail every cross-repository edit — a green run that changed one
+        // repository and opened one pull request. Refuse the plan instead:
+        // the failure is recorded on the run row where an owner can see it.
+        const writableMounts = (workspace.mounts ?? []).filter((mount) => mount.writable);
+        if (
+            writableMounts.length > 0 &&
+            !fleetAgentExecutionProviderSupportsMountGrants(settings.provider)
+        ) {
+            throw new FleetAgentTaskPlanError(
+                `Task ${task.slug ?? task.id} spans ${writableMounts.length + 1} repositories, but the fleet provider ` +
+                    `'${settings.provider}' cannot be granted write access outside the primary worktree — the extra ` +
+                    `repositories would be read-only for the model. Switch the provider, or detach the extra repositories.`,
             );
         }
 

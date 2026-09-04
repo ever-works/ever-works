@@ -350,6 +350,29 @@ export function isFleetAgentExecutionProvider(value: unknown): value is FleetAge
 }
 
 /**
+ * Whether a provider can be told to treat a directory OUTSIDE its working
+ * root as an additional writable root.
+ *
+ * Multi-repo Task workspaces (self-build slice C) provision every extra
+ * repository as its own binding under the fleet root and only LINK it into
+ * the primary worktree at `.mounts/<dir>`. Both CLIs resolve that link
+ * before enforcing their sandbox, so the write lands outside the primary
+ * tree and is refused unless the mount's real path was granted explicitly:
+ *
+ *   - `claude-code` — `--add-dir <directories...>` (one variadic flag)
+ *   - `codex`       — `--add-dir <DIR>`, repeated once per directory
+ *
+ * A provider that cannot express the grant must REFUSE a Task with
+ * writable mounts, at plan time on the platform and at command-build time
+ * on the node. Running it anyway is the worst outcome available: the model
+ * reads every repository, silently fails every cross-repository edit, and
+ * the run reports success having changed one repository out of several.
+ */
+export function fleetAgentExecutionProviderSupportsMountGrants(provider: FleetAgentExecutionProvider): boolean {
+	return provider === 'claude-code' || provider === 'codex';
+}
+
+/**
  * How a tenant's fleet executes an `agent-task`:
  *
  *   - `command`   — the legacy path: the node runs the operator's

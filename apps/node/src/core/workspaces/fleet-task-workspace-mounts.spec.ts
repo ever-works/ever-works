@@ -7,6 +7,7 @@ import type { WorkspaceProvisionSpec } from '@ever-works/plugin';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
 	FLEET_TASK_WORKSPACE_EXCLUDE_RULES,
+	FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE,
 	FLEET_TASK_WORKSPACE_MOUNTS_DIR,
 	FleetTaskWorkspaceProvisioner,
 	type FleetWorkspacePlugin
@@ -361,6 +362,21 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 		// The writable counterpart is the idempotency case above: `scratch.txt` survives.
 	});
 
+	it('leaves no write probe behind in a writable mount', async () => {
+		// The probe proves the model can write through `.mounts/<dir>`, but a
+		// file it forgot to remove would be committed into the owner's
+		// repository by `finalizeMounts` — an artefact of the fleet layout in
+		// a pushed branch is exactly what the `.mounts` exclude rule exists to
+		// prevent everywhere else.
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const descriptor = await provisioner.provision('task-m13', spec('task/mounts-13'));
+		const mount = descriptor.mounts![0]!;
+
+		expect(existsSync(join(mount.path, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE))).toBe(false);
+		expect(existsSync(join(mount.linkPath, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE))).toBe(false);
+		expect(git(mount.path, 'status', '--porcelain')).toBe('');
+	});
+
 	it('writes the exclude rule atomically: concurrent provisions of one pool leave exactly one rule', async () => {
 		// A fresh root, so the rule does not exist yet when both provisions race.
 		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: join(ownedRoot, 'fleet-root-concurrent') });
@@ -531,5 +547,155 @@ describe('FleetTaskWorkspaceProvisioner — mounts and cancellation (faked Git)'
 		} finally {
 			await fs.rm(root, { recursive: true, force: true, maxRetries: 3 });
 		}
+	});
+});
+
+/**
+ * The provision-time write probe (self-build slice C).
+ *
+ * A mount is only LINKED into the primary worktree; its real worktree is a
+ * cousin under the fleet root. The model CLIs resolve that link before
+ * enforcing their sandbox, so a mount that is reachable but not writable
+ * produces the worst possible run: green, with one repository changed out
+ * of several and one pull request opened instead of one per repository.
+ * The provisioner therefore writes and removes a file THROUGH the link for
+ * every writable mount and fails the job when it cannot.
+ *
+ * Git provisioning is faked so the mount worktree can be sabotaged before
+ * the probe runs — deterministically, on every platform, without depending
+ * on file-mode semantics Windows does not share.
+ */
+describe('FleetTaskWorkspaceProvisioner — mount write probe', () => {
+	const SHA = 'b'.repeat(40);
+
+	const workspaceSpec = (writable: boolean) => ({
+		repositoryId: 'ever/platform',
+		repoUrl: 'https://fleet-probe.invalid/ever/platform.git',
+		baseRef: 'main',
+		branch: 'task/probe',
+		mounts: [
+			{
+				repositoryId: 'ever/template',
+				repoUrl: 'https://fleet-probe.invalid/ever/template.git',
+				baseRef: 'main',
+				branch: 'task/probe',
+				mountDir: 'template',
+				writable
+			}
+		]
+	});
+
+	/**
+	 * Real (empty) Git repositories so the exclude step still runs for real;
+	 * `sabotage` gets each freshly provisioned worktree before it is linked.
+	 */
+	const fakePlugin = (sabotage?: (repositoryId: string, path: string) => void): FleetWorkspacePlugin => ({
+		provision: async (received) => {
+			const path = join(String(received.settings?.baseDir), 'worktrees', received.bindingKey);
+			await fs.mkdir(path, { recursive: true });
+			git(path, 'init', '--initial-branch', received.branch);
+			sabotage?.(received.repositoryId ?? '', path);
+			return { path, baseSha: SHA, reused: false, branch: received.branch, bindingKey: received.bindingKey };
+		}
+	});
+
+	/** A directory where the probe file goes: the write through the link cannot succeed. */
+	const blockTheProbe = (repositoryId: string, path: string): void => {
+		if (repositoryId === 'ever/template') {
+			mkdirSync(join(path, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE), { recursive: true });
+		}
+	};
+
+	const withRoot = async (prefix: string, body: (root: string) => Promise<void>): Promise<void> => {
+		const root = temporaryRoot(prefix);
+		try {
+			await body(root);
+		} finally {
+			await fs.rm(root, { recursive: true, force: true, maxRetries: 3 });
+		}
+	};
+
+	it('fails the job naming the mount and its link when a writable mount cannot be written', async () => {
+		await withRoot('ew-fleet-probe-fail-', async (root) => {
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: root,
+				plugin: fakePlugin(blockTheProbe),
+				inspectHead: async () => SHA
+			});
+
+			const failure = await provisioner.provision('task-probe', workspaceSpec(true)).catch((error) => error);
+
+			expect(failure).toMatchObject({ name: 'FleetTaskWorkspaceError', code: 'provision-failed' });
+			expect(String(failure.message)).toContain("Writable mount 'template' (ever/template)");
+			// Named by its LINK, because that is the only path the model uses:
+			// a probe against the mount's own worktree would pass while the
+			// link is broken, stale, or pointing somewhere else entirely.
+			expect(String(failure.message)).toContain(join(FLEET_TASK_WORKSPACE_MOUNTS_DIR, 'template'));
+		});
+	});
+
+	it('probes only writable mounts: a read-only reference checkout is never written to', async () => {
+		await withRoot('ew-fleet-probe-readonly-', async (root) => {
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: root,
+				plugin: fakePlugin(blockTheProbe),
+				inspectHead: async () => SHA
+			});
+
+			// The same sabotage that fails a writable mount is irrelevant here:
+			// nothing is ever written into a read-only mount, so it must not be
+			// probed either.
+			const descriptor = await provisioner.provision('task-probe-ro', workspaceSpec(false));
+			expect(descriptor.mounts![0]).toMatchObject({ mountDir: 'template', writable: false });
+		});
+	});
+
+	it('never opens an entry already sitting at the probe path', async () => {
+		await withRoot('ew-fleet-probe-exists-', async (root) => {
+			// A writable mount is a directory an autonomous model was just
+			// granted write access to, and it is never reset between runs, so
+			// anything the last run left at this name is still here on the
+			// next one. Opened with the default `w` the probe would FOLLOW
+			// what it finds — truncating and overwriting a symlink's target
+			// anywhere the (unsandboxed) node service account can write, then
+			// unlinking only the link and leaving the damage behind. `wx`
+			// refuses, so the planted entry survives untouched and the
+			// provision fails naming it.
+			const SENTINEL = 'do not overwrite me\n';
+			let mountPath = '';
+			const plant = (repositoryId: string, path: string): void => {
+				if (repositoryId !== 'ever/template') return;
+				mountPath = path;
+				writeFileSync(join(path, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE), SENTINEL, 'utf8');
+			};
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: root,
+				plugin: fakePlugin(plant),
+				inspectHead: async () => SHA
+			});
+
+			const failure = await provisioner
+				.provision('task-probe-exists', workspaceSpec(true))
+				.catch((error) => error);
+
+			expect(failure).toMatchObject({ name: 'FleetTaskWorkspaceError', code: 'provision-failed' });
+			expect(String(failure.message)).toContain('already has an entry at');
+			expect(String(failure.message)).toContain("Writable mount 'template' (ever/template)");
+			expect(await fs.readFile(join(mountPath, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE), 'utf8')).toBe(SENTINEL);
+		});
+	});
+
+	it('removes the probe it wrote through the link', async () => {
+		await withRoot('ew-fleet-probe-clean-', async (root) => {
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: root,
+				plugin: fakePlugin(),
+				inspectHead: async () => SHA
+			});
+
+			const mount = (await provisioner.provision('task-probe-ok', workspaceSpec(true))).mounts![0]!;
+			expect(existsSync(join(mount.path, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE))).toBe(false);
+			expect(await fs.readdir(mount.path)).toEqual(['.git']);
+		});
 	});
 });
