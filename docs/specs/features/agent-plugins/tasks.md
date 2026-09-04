@@ -230,7 +230,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       servers. Tests assert a non-gated package's scripts NEVER reach the
       workspace. Explicitly does NOT touch the Wave-2 Task-workspace path
       (`workspaceCwd` has no consumer — see plan §4.5).
-- [ ] **T35**. Export API + CLI + UI: scope-selected skills → conformant
+- [x] **T35**. Export API + CLI + UI: scope-selected skills → conformant
       package (zip); round-trip gate (AP-22/23); slug guard enforcing the FULL
       spec name rule (≤64, no `--`, no leading/trailing hyphen — the DTO
       accepts all three) with rename prompt.

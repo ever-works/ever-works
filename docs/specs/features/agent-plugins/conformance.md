@@ -73,10 +73,10 @@ rows below say exactly where the subprocess half stops.
 
 ## Producer (AP-22 … AP-23)
 
-| ID    | Requirement                                            | Status        | Evidence                                                                                                                                                            |
-| ----- | ------------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AP-22 | Exported packages validate against our own importer    | **Not yet**   | `serialize.ts` produces conforming manifests and `SKILL.md` bodies byte-for-byte, and is round-trip tested; the export **flow** that assembles a package is Phase 5 |
-| AP-23 | Export maps slug → directory name + frontmatter `name` | Met (library) | `serialize.ts` `toSpecSkillName`, `repairName` — including the case where a legal period must survive repair                                                        |
+| ID    | Requirement                                            | Status        | Evidence                                                                                                                                                                                                                                                                                                                                                        |
+| ----- | ------------------------------------------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AP-22 | Exported packages validate against our own importer    | **Met**       | `export.service.ts` writes the package to a temporary directory and runs the REAL `loadPluginPackage` over it, refusing to return anything that does not load. Validating the in-memory strings would test something else: directory naming, the `skills/<name>/SKILL.md` layout and containment are facts about a tree, and a tree is what a consumer receives |
+| AP-23 | Export maps slug → directory name + frontmatter `name` | Met (library) | `serialize.ts` `toSpecSkillName`, `repairName` — including the case where a legal period must survive repair                                                                                                                                                                                                                                                    |
 
 ---
 
@@ -84,15 +84,23 @@ rows below say exactly where the subprocess half stops.
 
 |                     | Count     |
 | ------------------- | --------- |
-| Met / Met (library) | 21        |
+| Met / Met (library) | 22        |
 | Partial             | 1 (AP-14) |
-| Not yet             | 1 (AP-22) |
+| Not yet             | 0         |
 
-What remains traces to two things. **AP-22** waits on the package export flow,
-which is Phase 5. **AP-14** is partial because the stdio launcher exists and is
-tested but is not yet called from the agent run path — a stdio server can be
-planned, gated and spawned, and still contributes no tools to an agent.
+One row remains short of Met. **AP-14** is partial because the stdio launcher
+exists, is gated and is tested, but nothing in the agent run path calls it yet —
+a stdio server can be planned, gated and spawned, and still contributes no tools
+to an agent.
 
-Neither is required for the claim as stated: a client may support a subset of
-component types, and the claim names skills and MCP. Both are written here so
-the boundary is visible rather than implied.
+That is not required for the claim as stated: v1.0.0 lets a client support a
+subset of component types provided it is honest about which, and the claim names
+skills and MCP. It is written here so the boundary is visible rather than
+implied — the remaining work is wiring, not specification compliance.
+
+### A note on how to read "Met"
+
+Every row above cites evidence that exists and runs. Where a row says Met, the
+cited test or source enforces the rule; where it says Met (library), the rule is
+enforced by `@ever-works/agent-plugins`, and nothing outside it can accept a
+package the library rejects. No row is Met on the strength of an intention.
