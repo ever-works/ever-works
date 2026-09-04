@@ -1,12 +1,10 @@
+import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PromptAssemblerService } from '@ever-works/agent/agents';
-import {
-    AgentRepository,
-    SkillBindingRepository,
-    WorkRepository,
-} from '@ever-works/agent/database';
+import { AgentRepository, WorkRepository } from '@ever-works/agent/database';
 import type { Agent, Task } from '@ever-works/agent/entities';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
+import { SkillsService } from '@ever-works/agent/skills';
 import { TaskRepository, TaskStatus, TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 import {
     FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES,
@@ -112,18 +110,23 @@ describe('FleetAgentTaskPlannerService', () => {
     let agents: { findByIdAndUser: jest.Mock };
     let works: { findById: jest.Mock };
     let taskWorkspace: { describeFleetWorkspace: jest.Mock };
-    let skillBindings: { resolveActive: jest.Mock };
+    let skills: { resolveActiveForAgent: jest.Mock };
     let pluginSettings: { getResolvedSettings: jest.Mock };
     let runs: { findById: jest.Mock };
 
-    const build = (opts: { assembler?: boolean; settings?: boolean; runs?: boolean } = {}) =>
+    const build = (
+        opts: { assembler?: boolean; skills?: boolean; settings?: boolean; runs?: boolean } = {},
+    ) =>
         new FleetAgentTaskPlannerService(
             tasks as never,
             agents as never,
             works as never,
             taskWorkspace as never,
             opts.assembler === false ? undefined : new PromptAssemblerService(),
-            skillBindings as never,
+            // `skills: false` stands in for the module graph that cannot
+            // supply SkillsService — the state every fleet run was in until
+            // TasksModule imported SkillsModule.
+            opts.skills === false ? undefined : (skills as never),
             opts.settings === false ? undefined : (pluginSettings as never),
             opts.runs === false ? undefined : (runs as never),
         );
@@ -153,8 +156,8 @@ describe('FleetAgentTaskPlannerService', () => {
             }),
         };
         taskWorkspace = { describeFleetWorkspace: jest.fn().mockResolvedValue(workspace) };
-        skillBindings = {
-            resolveActive: jest.fn().mockResolvedValue([
+        skills = {
+            resolveActiveForAgent: jest.fn().mockResolvedValue([
                 {
                     binding: { priority: 10 },
                     skill: { slug: 'pr-etiquette', instructionsMd: 'Open small PRs.' },
@@ -297,9 +300,99 @@ describe('FleetAgentTaskPlannerService', () => {
         expect(settings.provider).toBe('claude-code');
     });
 
+    it('carries the agent ACTIVE SKILLS into the fleet instructions', async () => {
+        // The cloud path has always done this (AgentRunService reads the same
+        // repository). Pinning it on the fleet path is what makes the two
+        // comparable: an agent that honours a skill in the cloud and ignores
+        // it on the owner's machine is a silent behaviour fork.
+        process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        const plan = await build().plan(payload);
+        expect(skills.resolveActiveForAgent).toHaveBeenCalledWith(
+            USER,
+            'agent-1',
+            undefined,
+            undefined,
+            undefined,
+        );
+        expect(plan!.execution.instructions).toContain('# ACTIVE SKILLS');
+        expect(plan!.execution.instructions).toContain('Open small PRs.');
+    });
+
+    it('leaves out a skill whose every declared tool the grant matrix refuses', async () => {
+        // The fleet path must apply the SAME grant filter the cloud path does
+        // (audit item G12). It matters more here, not less: the node runs the
+        // CLI under the operator's own permission mode -- often
+        // skip-permissions -- so nothing downstream re-enforces the matrix,
+        // and a skill body describing a denied surface is a standing
+        // invitation to work around the denial.
+        //
+        // A REAL SkillsService over stubbed collaborators, so the assertion
+        // exercises the actual filter rather than a mock of it.
+        process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        const bindings = {
+            resolveActive: jest.fn().mockResolvedValue([
+                {
+                    binding: { priority: 10 },
+                    skill: {
+                        slug: 'shell-runbook',
+                        instructionsMd: 'Run the deploy script with bash.',
+                        frontmatter: { allowedTools: ['Bash'] },
+                    },
+                },
+                {
+                    binding: { priority: 5 },
+                    skill: { slug: 'pr-etiquette', instructionsMd: 'Open small PRs.' },
+                },
+            ]),
+        };
+        const toolGrants = {
+            resolve: jest.fn().mockResolvedValue({
+                matrix: { allow: ['*'], deny: ['Bash'] },
+                source: 'agent',
+                chain: [],
+            }),
+        };
+        skills = new SkillsService(
+            undefined as never,
+            bindings as never,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            toolGrants as never,
+        ) as never;
+
+        const plan = await build().plan(payload);
+
+        expect(plan!.execution.instructions).toContain('# ACTIVE SKILLS');
+        expect(plan!.execution.instructions).toContain('Open small PRs.');
+        expect(plan!.execution.instructions).not.toContain('Run the deploy script with bash.');
+        expect(toolGrants.resolve).toHaveBeenCalledWith(
+            expect.objectContaining({ userId: USER, agentId: 'agent-1' }),
+        );
+    });
+
+    it('warns when SkillsService is not wired, instead of degrading silently', async () => {
+        // The dependency is @Optional() so the planner still constructs; the
+        // point of the warn is that a graph missing it is discoverable from
+        // the logs rather than only from a diff of two prompts.
+        process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        try {
+            const plan = await build({ skills: false }).plan(payload);
+            expect(plan!.execution.instructions).not.toContain('# ACTIVE SKILLS');
+            expect(warn).toHaveBeenCalledWith(
+                expect.stringContaining('SkillsService is not wired'),
+            );
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
     it('works without the assembler and without skills (raw SOUL/AGENTS)', async () => {
         process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
-        skillBindings.resolveActive.mockRejectedValue(new Error('no skills table'));
+        skills.resolveActiveForAgent.mockRejectedValue(new Error('no skills table'));
         const plan = await build({ assembler: false }).plan(payload);
         expect(plan!.execution.instructions).toContain('You are the Senior Developer.');
         expect(plan!.execution.instructions).toContain('Ship small reviewed changes.');
@@ -725,7 +818,7 @@ describe('FleetAgentTaskPlannerService — Nest wiring (review follow-up)', () =
                 FleetAgentTaskPlannerService,
                 ...required(),
                 { provide: PromptAssemblerService, useValue: { assemble: jest.fn() } },
-                { provide: SkillBindingRepository, useValue: {} },
+                { provide: SkillsService, useValue: {} },
                 { provide: PluginSettingsService, useValue: pluginSettings },
             ],
         }).compile();
