@@ -1672,6 +1672,7 @@
                 "resolveError": "Failed to resolve conflicts",
                 "discard": "Discard branch",
                 "discardConfirm": "Discard this Task's branch? All unmerged changes on the branch will be permanently lost. This cannot be undone.",
+                "discardConfirmMultiRepo": "Discard this Task's branches in {count} repositories? Every unmerged change is permanently lost, and any pull request still open on those branches is closed. This cannot be undone.",
                 "discardError": "Failed to discard branch",
                 "isolationLabel": "Task isolation",
                 "isolationDescription": "Override the Work-level isolation setting for this Task. When off, agents work directly against the Work's repositories.",
