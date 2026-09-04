@@ -1,6 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { BROWSER_WORKSPACE_SCOPE_HEADER } from '@/lib/workspace-scope';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
@@ -197,5 +198,117 @@ describe('MemoryFilesPanel', () => {
         fireEvent.submit(form);
 
         await waitFor(() => expect(calls).toContain('PATCH /api/memory/files/folders/fold-1'));
+    });
+});
+
+/**
+ * EW-786 — the client half of the Files BFF scope contract.
+ *
+ * `GET /api/memory/files`, `PATCH /api/memory/files/move` and
+ * `POST /api/memory/files/folders/:id/sync` now mint the API's
+ * `X-Scope-Slug` from the per-tab `x-ever-workspace` selector and answer
+ * 400 without it, so every call this panel makes has to go through
+ * `browserApiFetch`. With a raw `fetch()` the list came back at HTTP 200
+ * with the Organization's Memory originals silently missing — the Files
+ * area looked complete and was not.
+ *
+ * The sibling tree / upload / folder-CRUD proxies are per-user and stay
+ * unscoped, but they share this transport on purpose: `refresh()` fires
+ * tree and list as one `Promise.all`, and splitting the transport across
+ * that pair is how a half-landed change hides.
+ */
+describe('MemoryFilesPanel BFF transport', () => {
+    /** Records the workspace selector each request carried. */
+    function installScopedFetch(folders: MemoryFolderNode[] = [folder]) {
+        const seen: Array<{ url: string; selector: string | null }> = [];
+        const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = String(input);
+            seen.push({
+                url,
+                selector: new Headers(init?.headers).get(BROWSER_WORKSPACE_SCOPE_HEADER),
+            });
+            if (url.startsWith('/api/memory/files/tree')) {
+                return new Response(JSON.stringify({ folders }), { status: 200 });
+            }
+            if (url.startsWith('/api/memory/files?') || url === '/api/memory/files') {
+                return new Response(JSON.stringify({ files: [file] }), { status: 200 });
+            }
+            return new Response(JSON.stringify({ results: [] }), { status: 200 });
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        return seen;
+    }
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+        window.history.replaceState({}, '', '/');
+    });
+
+    it.each([
+        ['/org/ever/memory', 'org:ever'],
+        ['/memory', 'personal'],
+    ])('stamps the %s selector on the initial tree + list pair', async (pathname, selector) => {
+        window.history.replaceState({}, '', pathname);
+        const seen = installScopedFetch();
+
+        render(<MemoryFilesPanel />);
+
+        await waitFor(() => expect(screen.getByTestId('memory-files-folder-fold-1')).toBeVisible());
+        const listed = seen.filter((r) => r.url.startsWith('/api/memory/files'));
+        expect(listed.length).toBeGreaterThanOrEqual(2);
+        // Every call, not just the scoped ones — the pair must not split.
+        expect(listed.every((r) => r.selector === selector)).toBe(true);
+    });
+
+    it('stamps the selector on the move request', async () => {
+        window.history.replaceState({}, '', '/org/ever/memory');
+        const seen = installScopedFetch();
+        render(<MemoryFilesPanel />);
+        await waitFor(() => expect(screen.getByTestId('memory-files-folder-fold-1')).toBeVisible());
+
+        fireEvent.change(screen.getByTestId('memory-files-move-up-1'), {
+            target: { value: 'fold-1' },
+        });
+
+        await waitFor(() =>
+            expect(seen.some((r) => r.url === '/api/memory/files/move')).toBe(true),
+        );
+        expect(seen.find((r) => r.url === '/api/memory/files/move')?.selector).toBe('org:ever');
+    });
+
+    it('stamps the selector on the folder sync request', async () => {
+        window.history.replaceState({}, '', '/org/ever/memory');
+        // "Sync now" only renders once a git target is configured.
+        const seen = installScopedFetch([
+            { ...folder, syncRepo: { owner: 'acme', repo: 'docs', branch: 'main' } },
+        ]);
+        render(<MemoryFilesPanel />);
+        await waitFor(() => expect(screen.getByTestId('memory-files-folder-fold-1')).toBeVisible());
+
+        fireEvent.click(screen.getByTestId('memory-files-sync-fold-1'));
+
+        const syncUrl = '/api/memory/files/folders/fold-1/sync';
+        await waitFor(() => expect(seen.some((r) => r.url === syncUrl)).toBe(true));
+        expect(seen.find((r) => r.url === syncUrl)?.selector).toBe('org:ever');
+    });
+
+    /**
+     * KNOWN GAP (EW-786), pinned deliberately. A document navigation
+     * carries no custom header, so the Download control stays a plain
+     * `<a href>` and `app/api/memory/files/[id]/download/route.ts` stays
+     * unscoped. Org-scoped Memory originals — which the now-scoped list
+     * above is what makes visible here — 404 on download. If this
+     * assertion ever fails because someone put the scope in the href,
+     * that is the design decision this fix deliberately did not make.
+     */
+    it('leaves the download control a bare anchor with no scope carrier', async () => {
+        window.history.replaceState({}, '', '/org/ever/memory');
+        installScopedFetch();
+        render(<MemoryFilesPanel />);
+
+        const anchor = await screen.findByTestId('memory-files-download-up-1');
+        expect(anchor.tagName).toBe('A');
+        expect(anchor).toHaveAttribute('href', '/api/memory/files/up-1/download?source=upload');
     });
 });

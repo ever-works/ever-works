@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Check, Loader2, ShieldQuestion, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 /**
  * The Memory review queue.
@@ -20,6 +21,12 @@ import { cn } from '@/lib/utils/cn';
  * this — so the row leaves the queue and stops being eligible for any
  * context, while the text itself stays readable. Nothing on this page is
  * irreversible.
+ *
+ * Every call here goes through `browserApiFetch`, never a raw `fetch()`.
+ * The BFF routes behind `/api/memory/review` derive the Organization
+ * solely from the per-tab `x-ever-workspace` selector that helper stamps
+ * from the visible URL (EW-786); a plain `fetch()` sends no selector, and
+ * the queue then read as permanently empty while both verbs would refuse.
  */
 
 type ReviewAction = 'accept' | 'reject';
@@ -51,7 +58,7 @@ export function MemoryReviewPanel() {
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/memory/review?limit=50', {
+            const res = await browserApiFetch('/api/memory/review?limit=50', {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store',
             });
@@ -88,7 +95,9 @@ export function MemoryReviewPanel() {
             return next;
         });
         try {
-            const res = await fetch(`/api/memory/review/${docId}/${action}`, { method: 'POST' });
+            const res = await browserApiFetch(`/api/memory/review/${docId}/${action}`, {
+                method: 'POST',
+            });
             if (res.ok) {
                 // Drop it locally rather than refetching: the row is
                 // gone from the queue by definition once acted on, and
