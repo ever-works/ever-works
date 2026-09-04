@@ -249,10 +249,13 @@ export class ListMemoryUploadsDto {
  *
  * **Org resolution + security.** Unlike the per-Work KB routes, Memory
  * is session-scoped: the Organization comes from the request SCOPE
- * CONTEXT (`ScopeContextService.getOrganizationId()`), which the
- * `SessionScopeGuard` seeds from the authenticated user's validated
- * last-active Org on these legacy un-prefixed routes — never from a
- * query/body param. When no Organization is resolvable (bare-Tenant
+ * CONTEXT (`ScopeContextService.getOrganizationId()`) — never from a
+ * query/body param. That scope is resolved from the `/api/<slug>/…` path
+ * param or the `x-scope-slug` header, BOTH CALLER-SUPPLIED. It is NOT
+ * seeded from the user's last-active Org: commit 8f28edca0 (2026-08-23)
+ * retired that fallback so two tabs in different Orgs cannot race, and
+ * `SessionScopeGuard` now seeds `organizationId: null` on an unprefixed
+ * request. When no Organization is resolvable (bare-Tenant
  * "personal" surface, or an un-upgraded user) the endpoint returns an
  * EMPTY aggregation — there is no unscoped or cross-tenant scan (spec
  * §2.1 / §7). As defense-in-depth we also assert org membership via the
@@ -353,11 +356,15 @@ export class OrgMemoryController {
             };
         }
 
-        // Defense-in-depth: the caller must belong to the Tenant that owns
-        // the active org. The scope was seeded from the user's own
-        // validated last-active Org, so this is normally a formality — but
-        // it keeps the authorization explicit and consistent with the
-        // sibling org-KB routes. Throws NotFound (not Forbidden) on a
+        // NOT defence-in-depth, and NOT a formality. This comment used to say
+        // the check was "normally a formality" because "the scope was seeded
+        // from the user's own validated last-active Org" — that seeding was
+        // retired by 8f28edca0. `organizationId` now comes from the caller's
+        // own `x-scope-slug` header (or path param), so ANY authenticated user
+        // can name ANY Organization here. This `ensureMember` call is the
+        // load-bearing authorization check standing between them and another
+        // Organization's Memory, and it must not be weakened or reordered
+        // after the aggregation. Throws NotFound (not Forbidden) on a
         // cross-tenant mismatch, matching the existence-leak contract.
         await this.membership.ensureMember(organizationId, auth.userId);
 

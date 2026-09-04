@@ -13,6 +13,7 @@ import {
     Sparkles,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { MemoryUploadsPanel } from './MemoryUploadsPanel';
@@ -119,7 +120,14 @@ export function MemoryShell({ initial, meetings }: MemoryShellProps) {
         inflightRef.current = controller;
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/memory${qs}`, {
+            // `browserApiFetch`, not bare `fetch`: it stamps the per-tab
+            // `x-ever-workspace` selector from window.location.pathname, which
+            // the BFF route forwards upstream as `x-scope-slug`. Next middleware
+            // cannot do this for us — its matcher excludes `/api`. With a bare
+            // fetch this request carried no scope, so the API resolved PERSONAL
+            // and the feed emptied on the first keystroke while the SSR render
+            // above it stayed correctly org-scoped.
+            const res = await browserApiFetch(`/api/memory${qs}`, {
                 method: 'GET',
                 headers: { Accept: 'application/json' },
                 cache: 'no-store',
@@ -182,7 +190,11 @@ export function MemoryShell({ initial, meetings }: MemoryShellProps) {
             setIsConsolidating(true);
             setConsolidateFailed(false);
             try {
-                const res = await fetch('/api/memory/consolidate', {
+                // Scope-aware for the same reason as the feed query, and it
+                // matters more here: this WRITES when `apply` is true, so
+                // without the selector a consolidation could never land in the
+                // Organization the user was looking at.
+                const res = await browserApiFetch('/api/memory/consolidate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
                     cache: 'no-store',
