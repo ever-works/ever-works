@@ -36,7 +36,7 @@ async function loadInvocableSkills(): Promise<InvocableSkillOption[] | null> {
     if (!inflight) {
         inflight = (async () => {
             try {
-                // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
+                // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
                 const res = await fetch('/api/skills/invocable', { cache: 'no-store' });
                 if (!res.ok) return null;
                 const body = (await res.json()) as { data?: InvocableSkillOption[] };

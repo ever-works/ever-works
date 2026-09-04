@@ -321,7 +321,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         const query = params.toString();
 
         try {
-            // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
+            // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
             const response = await fetch(`/api/activity-log/export${query ? `?${query}` : ''}`, {
                 method: 'GET',
             });

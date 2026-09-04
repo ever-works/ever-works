@@ -68,7 +68,7 @@ export function AgentMemoryPanel({
     const load = useCallback(async () => {
         setLoading(true);
         try {
-            // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
+            // eslint-disable-next-line no-restricted-syntax -- EW-790: fixed in #2343 — this disable goes away when that merges
             const availRes = await fetch('/api/agent-memory/check-availability', {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store',
@@ -88,7 +88,7 @@ export function AgentMemoryPanel({
 
             const qs = new URLSearchParams({ limit: '20' });
             if (workId) qs.set('workId', workId);
-            // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
+            // eslint-disable-next-line no-restricted-syntax -- EW-790: fixed in #2343 — this disable goes away when that merges
             const res = await fetch(`/api/agent-memory/sessions?${qs.toString()}`, {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store',

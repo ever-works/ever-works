@@ -116,7 +116,7 @@ export function KbCitationHover({
         void (async () => {
             try {
                 const slugPath = encodeURIComponent(slug);
-                // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
+                // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
                 const response = await fetch(
                     `/api/works/${encodeURIComponent(workId)}/kb/citations/${encodeURIComponent(cls)}/${slugPath}`,
                     { signal: controller.signal, cache: 'no-store' },

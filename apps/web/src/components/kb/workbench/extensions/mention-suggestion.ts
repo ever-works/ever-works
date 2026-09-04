@@ -65,7 +65,7 @@ export const WORKBENCH_MENTION_PLUGIN_KEY = new PluginKey('kb-workbench-mention-
 async function defaultFetchDocs(workId: string, query: string): Promise<MentionDocItem[]> {
     try {
         const params = new URLSearchParams({ q: query, limit: '10' });
-        // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
+        // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
         const response = await fetch(
             `/api/works/${encodeURIComponent(workId)}/kb/search?${params.toString()}`,
             { cache: 'no-store' },
@@ -91,7 +91,7 @@ async function defaultFetchDocs(workId: string, query: string): Promise<MentionD
 async function defaultFetchAgents(workId: string, query: string): Promise<MentionAgentItem[]> {
     try {
         const params = new URLSearchParams({ q: query, limit: '10' });
-        // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
+        // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
         const response = await fetch(
             `/api/works/${encodeURIComponent(workId)}/agents?${params.toString()}`,
             { cache: 'no-store' },

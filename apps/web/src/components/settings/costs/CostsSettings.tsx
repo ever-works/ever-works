@@ -25,7 +25,7 @@ interface CostsSettingsProps {
 }
 
 async function fetchCosts<T>(section: CostsSection, windowDays: CostsWindowDays): Promise<T> {
-    // eslint-disable-next-line no-restricted-syntax -- EW-790 baseline: unaudited, may be a real scope bug
+    // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
     const response = await fetch(`/api/usage/costs/${section}${buildCostsQuery({ windowDays })}`, {
         method: 'GET',
         cache: 'no-store',

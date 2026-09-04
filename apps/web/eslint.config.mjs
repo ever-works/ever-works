@@ -22,6 +22,36 @@ import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
  * `applyBrowserWorkspaceScope` from the same module.
  *
  * See Workspace `knowledge/design/EVER_WORKS_BFF_WORKSPACE_SCOPE.md`.
+ *
+ * ## The 55 pre-existing sites (EW-790) — triaged, not just frozen
+ *
+ * Each carries its own `eslint-disable` saying which case it is. The disables
+ * are the ratchet: new code cannot add one without writing it and defending it.
+ * What the triage found, so nobody has to redo it:
+ *
+ * - **32 verified clear.** Their handlers never read the Organization. The 14
+ *   route families behind them — activity-log, agent-memory, skills, credits
+ *   `ledger` + `usage-summary`, email messages, transcription, usage costs,
+ *   works, merge-policy resolve — have zero `getOrganizationId` calls. Checked
+ *   from the other direction too: only three services read the scope directly
+ *   rather than through a controller (uploads, existing-website-link which has
+ *   no BFF route or caller, and onboarding-state which has no BFF route and is
+ *   reached by `serverFetch` from pages, where the proxy DOES stamp the
+ *   selector).
+ * - **19 in `components/memory/`** — genuinely org-aware and genuinely broken;
+ *   fixed in #2343. Those disables disappear when it merges.
+ * - **3 in `lib/kb/kb-uploads.ts`** — Work-scoped (`workId` + `userId`), so the
+ *   Organization never enters. The row is stamped `organizationId: null`, which
+ *   is latent rather than live: every Work-scoped read pins `workId` and every
+ *   org read pins `workId IS NULL`.
+ * - **1 in `lib/api/uploads.ts`** — org-aware and really broken (EW-788), but it
+ *   cannot be fixed here: the paired serve route is an `<img src>`, a document
+ *   navigation that cannot carry a header. Blocked on the carrier decision.
+ *
+ * `credits` is the one worth knowing about: its controller DOES inject the scope
+ * service and DOES call `getOrganizationId`, so `ledger` and `usage-summary`
+ * look like hits. The single call sits inside `usage/export`. They are
+ * user-scoped.
  */
 const UNSCOPED_BFF_CALL =
     'Use browserApiFetch from @/lib/api/browser-api instead of a bare fetch to a /api/ route — it stamps the x-ever-workspace selector the BFF needs to resolve your Organization. Without it the call silently runs in the personal scope (empty results, HTTP 200) or fails closed. If this route genuinely must be scope-free, add an eslint-disable with a comment saying why.';
