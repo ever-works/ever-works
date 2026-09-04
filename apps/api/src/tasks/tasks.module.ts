@@ -51,6 +51,7 @@ import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetRunRouterService } from '../fleet/fleet-run-router.service';
 import { createFleetAwareAgentTaskExecuteDispatcher } from '../fleet/fleet-agent-task.dispatcher';
 import { FleetAgentTaskPlannerService } from '../fleet/fleet-agent-task-planner.service';
+import { FleetAgentTaskReconcilerService } from '../fleet/fleet-agent-task-reconciler.service';
 import { FleetTaskScopeResolverService } from '../fleet/fleet-task-scope.resolver';
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
@@ -102,6 +103,11 @@ import { TaskChatController } from './task-chat.controller';
         // the scope resolver is: it needs the Task / Agent / workspace
         // services this module already has.
         FleetAgentTaskPlannerService,
+        // Agent execution v2 (slice B) — listens for `fleet.job.leased` /
+        // `fleet.job.completed` and mirrors the node's verdict onto the
+        // AgentRun, the Task board, the pull request and the Task chat.
+        // Same placement rationale as the planner.
+        FleetAgentTaskReconcilerService,
         {
             provide: AGENT_TASK_EXECUTE_DISPATCHER,
             useFactory: (

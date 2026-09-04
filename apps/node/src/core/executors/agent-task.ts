@@ -7,6 +7,7 @@ import type {
 	FleetAgentTaskGitResult,
 	FleetAgentTaskModelResult,
 	FleetAgentTaskPayload,
+	FleetAgentTaskQuestion,
 	FleetAgentTaskResult,
 	FleetAgentTaskStep,
 	FleetJobView,
@@ -28,11 +29,18 @@ import {
 	type WireCheck
 } from './acceptance-checks';
 import {
+	collectOwnerQuestion,
+	defaultQuestionFs,
+	discardOwnerQuestion,
+	type AgentTaskQuestionFs
+} from './agent-task-question';
+import {
 	buildModelCliCommand,
 	buildModelCliStep,
 	ModelCliCommandError,
 	parseModelCliResult,
-	type ModelCliPaths
+	type ModelCliPaths,
+	MODEL_CLI_MAX_OUTPUT_BYTES
 } from './model-cli';
 
 /**
@@ -65,6 +73,17 @@ import {
  * (`runNodeCommandStep`), so the env scrub, the timeout policy, the
  * cancellation path and the verdict rules cannot drift between them —
  * or between this kind and `acceptance-checks`.
+ *
+ * **Owner question (self-build slice Q)** — a model that needs a decision
+ * only the Task owner can make writes `.ever-works/QUESTION.md` in the
+ * worktree and stops. After the model step (before the checks, before
+ * any Git command) the node reads and REMOVES that file and reports it
+ * as `result.question`; a stale file from an earlier attempt is
+ * discarded before the model runs so only this run's words count. A
+ * question is not a failure and never makes the job `failed` on its
+ * own: the node still reports the model, check and git verdicts
+ * honestly, and the platform decides what a paused run means. See
+ * `agent-task-question.ts`.
  *
  * ## Failure posture
  *
@@ -103,7 +122,13 @@ export interface AgentTaskScratchFs {
 	 */
 	createScratchDir(root: string, prefix: string): Promise<string>;
 	writeFile(path: string, content: string): Promise<void>;
-	/** Null when the file does not exist. */
+	/**
+	 * Null when the file does not exist.
+	 *
+	 * Implementations MUST bound what they load. The model CLI's stdout is
+	 * redirected here by the shell, so its size is set by the CLI, not by us
+	 * — see {@link MODEL_CLI_MAX_OUTPUT_BYTES}.
+	 */
 	readFile(path: string): Promise<string | null>;
 	remove(path: string): Promise<void>;
 }
@@ -136,6 +161,36 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 		publishWithheld?: string;
 	}>;
 	/**
+	 * Multi-repo Task workspaces (self-build slice C): commit + push adapter
+	 * over the writable mounts of the provisioned workspace, one verdict per
+	 * mount. Absent means the node cannot finalize mounts; a run whose
+	 * workspace has writable mounts then fails naming the gap.
+	 *
+	 * Fenced by the same lease as the primary branch: every mount is another
+	 * remote this run may no longer be entitled to write to, and a stale
+	 * node publishing half a multi-repo change is worse than publishing
+	 * none of it.
+	 */
+	finalizeMounts?: (
+		taskId: string,
+		descriptor: FleetTaskWorkspaceDescriptor,
+		opts: { commitMessage: string; push: boolean; publishFence?: WorkspacePublishFence },
+		signal?: AbortSignal
+	) => Promise<
+		Array<{
+			repositoryId: string;
+			mountDir: string;
+			branch: string;
+			baseSha: string;
+			pushed: boolean;
+			headSha: string | null;
+			empty: boolean;
+			changedFiles?: number;
+			error?: string;
+			publishWithheld?: string;
+		}>
+	>;
+	/**
 	 * The lease deadline this run is publishing under, resolved as LATE as
 	 * possible — right before the commit/push — because the keep-alive
 	 * advances it on every renewal and a model step outlives four or five
@@ -160,6 +215,11 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	/** Root for per-job scratch files (instructions / CLI output). */
 	scratchRoot?: string;
 	scratchFs?: AgentTaskScratchFs;
+	/**
+	 * Self-build slice Q: reads / removes the owner-question file in the
+	 * worktree (and in writable mounts). Defaults to `node:fs`.
+	 */
+	questionFs?: AgentTaskQuestionFs;
 	platform?: NodeJS.Platform;
 }
 
@@ -202,6 +262,24 @@ export async function runAgentTaskJob(
 	const workspaceResolution = await resolveAgentTaskWorkspace(taskId, payload, io, signal);
 	throwIfAgentTaskAborted(signal);
 
+	const questionFs = io.questionFs ?? defaultQuestionFs;
+	const questionMounts = (workspaceResolution.descriptor?.mounts ?? []).map((mount) => ({
+		mountDir: mount.mountDir,
+		path: mount.path,
+		writable: mount.writable
+	}));
+	if (execution) {
+		// The worktree is reused in place across runs (no clean, no
+		// re-clone): a question file left by an aborted attempt, or by the
+		// previous run whose question the owner already answered, must never
+		// become a phantom question — nor context the model reads.
+		await discardOwnerQuestion(workspaceResolution.path, questionFs, signal);
+		for (const mount of questionMounts) {
+			if (mount.writable) await discardOwnerQuestion(mount.path, questionFs, signal);
+		}
+		throwIfAgentTaskAborted(signal);
+	}
+
 	const failures: string[] = [];
 	let model: FleetAgentTaskModelResult | null = null;
 	if (execution) {
@@ -210,6 +288,20 @@ export async function runAgentTaskJob(
 		if (model.status !== 'succeeded') {
 			failures.push(describeModelFailure(model));
 		}
+	}
+
+	// Self-build slice Q: read the owner question BEFORE the checks and
+	// BEFORE finalize, so `git add -A` can never stage the file. A question
+	// NEVER pushes to `failures` — the platform decides what a paused run
+	// means, and the model / check / git verdicts below stay honest.
+	let question: FleetAgentTaskQuestion | null = null;
+	if (execution) {
+		question = await collectOwnerQuestion(
+			{ primaryPath: workspaceResolution.path, mounts: questionMounts },
+			questionFs,
+			signal
+		);
+		throwIfAgentTaskAborted(signal);
 	}
 
 	const stepResults: NodeCheckResult[] = [];
@@ -242,9 +334,35 @@ export async function runAgentTaskJob(
 	}
 
 	let git: FleetAgentTaskGitResult | null = null;
+	let mountGit: FleetAgentTaskGitResult[] | null = null;
 	const wantsCommit = payload.git?.commit !== false;
 	if (execution && workspaceResolution.descriptor && wantsCommit) {
-		git = await finalizeWorkspace(taskId, workspaceResolution.descriptor, payload, io, signal);
+		// Resolved ONCE, here, for every publish this run makes. Late, because
+		// the keep-alive advances the deadline on each renewal and a model step
+		// outlives several — fencing against the value the job was leased with
+		// would refuse nearly every run. Once, because the mounts and the
+		// primary branch are written under the same claim and re-asking the
+		// platform per repository would spend a round trip on an answer that
+		// cannot have changed in between.
+		const publishFence = (await io.publishFence?.()) ?? null;
+		// Resolving the fence can itself learn the claim is gone and cancel
+		// the run. Check before touching any repository: an abort arriving
+		// here means no commit is wanted, in the mounts or the primary.
+		throwIfAgentTaskAborted(signal);
+		// Multi-repo (slice C): mounts first, the primary last, so the primary
+		// pull request the platform opens can already link the others.
+		mountGit = await finalizeMounts(taskId, workspaceResolution.descriptor, payload, io, publishFence, signal);
+		for (const entry of mountGit ?? []) {
+			if (entry.error) {
+				failures.push(`git finalize failed for mount ${entry.mountDir ?? entry.repositoryId}: ${entry.error}`);
+			} else if (entry.publishWithheld) {
+				failures.push(
+					`publish withheld for mount ${entry.mountDir ?? entry.repositoryId}: ${entry.publishWithheld}`
+				);
+				io.onPublishWithheld?.(entry.publishWithheld);
+			}
+		}
+		git = await finalizeWorkspace(taskId, workspaceResolution.descriptor, payload, io, publishFence, signal);
 		if (git.error) {
 			failures.push(`git finalize failed: ${git.error}`);
 		} else if (git.publishWithheld) {
@@ -267,6 +385,10 @@ export async function runAgentTaskJob(
 		...(checks.length > 0 ? { checks: checkResults } : {}),
 		gateStatus,
 		...(git ? { git } : {}),
+		...(mountGit && mountGit.length > 0 ? { mountGit } : {}),
+		// Conditional key: a run without a question reports exactly what it
+		// always did (`question: null` would be a wire change for nothing).
+		...(question ? { question } : {}),
 		...(failures.length > 0 ? { failureReason: failures.join('; ') } : {})
 	};
 }
@@ -342,7 +464,10 @@ async function runModelStep(
 		const step = buildModelCliStep(execution, command, execution.envPassthrough);
 		const result = await runNodeCommandStep(step, workspacePath, io, signal);
 		const rawOutput = await scratchFs.readFile(scratch.resultPath);
-		return parseModelCliResult(execution.provider, rawOutput, result);
+		// `envPassthrough` names the credential env vars this CLI was handed;
+		// their values are scrubbed out of the summary and output tail before
+		// the result leaves the node.
+		return parseModelCliResult(execution.provider, rawOutput, result, execution.envPassthrough);
 	} finally {
 		try {
 			await scratchFs.remove(scratchDir);
@@ -358,6 +483,7 @@ async function finalizeWorkspace(
 	descriptor: FleetTaskWorkspaceDescriptor,
 	payload: FleetAgentTaskPayload,
 	io: AgentTaskIo,
+	publishFence: WorkspacePublishFence | null,
 	signal?: AbortSignal
 ): Promise<FleetAgentTaskGitResult> {
 	const base: FleetAgentTaskGitResult = {
@@ -374,14 +500,6 @@ async function finalizeWorkspace(
 		typeof payload.git?.commitMessage === 'string' && payload.git.commitMessage.trim()
 			? payload.git.commitMessage.trim()
 			: defaultAgentTaskCommitMessage(taskId);
-	// Resolved here rather than at job start: the lease this run began on
-	// has been renewed several times over by the time a model step is done,
-	// and fencing against the stale value would refuse every long run.
-	const publishFence = (await io.publishFence?.()) ?? null;
-	// Resolving the fence can itself learn the claim is gone and cancel the
-	// run. Check before touching the repository rather than leaving it to
-	// the provider: an abort that arrives here means no commit is wanted.
-	throwIfAgentTaskAborted(signal);
 	try {
 		const finalized = await io.finalizeWorkspace(
 			taskId,
@@ -404,6 +522,67 @@ async function finalizeWorkspace(
 	} catch (error) {
 		if (error instanceof Error && error.name === 'AbortError') throw error;
 		return { ...base, error: error instanceof Error ? error.message : String(error) };
+	}
+}
+
+/**
+ * Multi-repo (slice C): one git verdict per WRITABLE mount. `null` when the
+ * workspace has no writable mounts, so single-repository runs report
+ * exactly what they did before.
+ */
+async function finalizeMounts(
+	taskId: string,
+	descriptor: FleetTaskWorkspaceDescriptor,
+	payload: FleetAgentTaskPayload,
+	io: AgentTaskIo,
+	publishFence: WorkspacePublishFence | null,
+	signal?: AbortSignal
+): Promise<FleetAgentTaskGitResult[] | null> {
+	const writable = (descriptor.mounts ?? []).filter((mount) => mount.writable);
+	if (writable.length === 0) return null;
+	const toBase = (mount: (typeof writable)[number]): FleetAgentTaskGitResult => ({
+		repositoryId: mount.repositoryId,
+		mountDir: mount.mountDir,
+		branch: mount.branch,
+		baseSha: mount.baseSha,
+		headSha: null,
+		empty: false,
+		pushed: false
+	});
+	if (!io.finalizeMounts) {
+		return writable.map((mount) => ({ ...toBase(mount), error: 'this node has no mount finalizer configured' }));
+	}
+	const commitMessage =
+		typeof payload.git?.commitMessage === 'string' && payload.git.commitMessage.trim()
+			? payload.git.commitMessage.trim()
+			: defaultAgentTaskCommitMessage(taskId);
+	try {
+		const results = await io.finalizeMounts(
+			taskId,
+			descriptor,
+			{
+				commitMessage,
+				push: payload.git?.push !== false,
+				...(publishFence ? { publishFence } : {})
+			},
+			signal
+		);
+		return results.map((result) => ({
+			repositoryId: result.repositoryId,
+			mountDir: result.mountDir,
+			branch: result.branch,
+			baseSha: result.baseSha,
+			headSha: result.headSha,
+			empty: result.empty,
+			pushed: result.pushed,
+			...(result.changedFiles === undefined ? {} : { changedFiles: result.changedFiles }),
+			...(result.error ? { error: result.error } : {}),
+			...(result.publishWithheld === undefined ? {} : { publishWithheld: result.publishWithheld })
+		}));
+	} catch (error) {
+		if (error instanceof Error && error.name === 'AbortError') throw error;
+		const message = error instanceof Error ? error.message : String(error);
+		return writable.map((mount) => ({ ...toBase(mount), error: message }));
 	}
 }
 
@@ -540,6 +719,25 @@ export const defaultScratchFs: AgentTaskScratchFs = {
 	writeFile: (path, content) => fs.writeFile(path, content, { encoding: 'utf8', mode: 0o600 }),
 	readFile: async (path) => {
 		try {
+			// Size the file BEFORE loading it. `buildModelCliCommand`
+			// redirects the CLI's stdout straight to disk with `>`, so this
+			// content never passes through Node's stdout capture and nothing
+			// upstream bounds it. `MODEL_CLI_OUTPUT_TAIL_BYTES` truncates for
+			// DISPLAY, but only after the whole file is already a string in
+			// memory — by which point a looping or compromised CLI running up
+			// to the 1800s ceiling has already exhausted the process, taking
+			// every other job on this node down with it.
+			//
+			// Refusing beats truncating: the payload is `model-output.json`
+			// and a partial read cannot be parsed anyway, so a clear failure
+			// is more useful than a JSON error further down.
+			const stat = await fs.stat(path);
+			if (stat.size > MODEL_CLI_MAX_OUTPUT_BYTES) {
+				throw new Error(
+					`Model CLI output is ${stat.size} bytes; the ceiling is ${MODEL_CLI_MAX_OUTPUT_BYTES}. ` +
+						'Refusing to load it — the run is failed rather than risking the node.'
+				);
+			}
 			return await fs.readFile(path, { encoding: 'utf8' });
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;

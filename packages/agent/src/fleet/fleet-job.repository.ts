@@ -115,9 +115,21 @@ export class FleetJobRepository {
      * CAS-claim one queued job for a node. The row must STILL be
      * `queued` — a raced second lease matches zero rows and returns
      * false, so exactly one node ever wins a given job.
+     *
+     * `cancelRequestedAt IS NULL` is part of the same predicate, not a
+     * separate read. A cancelled job must never be leased, and the status
+     * column alone cannot express that: `reclaim()` returns a lapsed claim
+     * to `queued` without clearing the flag, so a flagged row can legally
+     * BE `queued`. `FleetJobService.reclaimExpired` now settles those
+     * instead of requeuing them, but this is the invariant itself rather
+     * than one caller remembering it — any future path that queues a
+     * flagged row is refused here.
      */
     async claim(id: string, patch: ClaimJobPatch): Promise<boolean> {
-        const result = await this.repository.update({ id, status: 'queued' }, patch);
+        const result = await this.repository.update(
+            { id, status: 'queued', cancelRequestedAt: IsNull() },
+            patch,
+        );
         return (result.affected ?? 0) === 1;
     }
 
@@ -170,6 +182,41 @@ export class FleetJobRepository {
      * `userId` is supplied (the inline reclaim on the lease path) and
      * global when it is not (the cron sweep).
      */
+    /**
+     * Agent execution v2 (slice B) — fail a job NO node has claimed yet.
+     * Pinned to `queued`, so a claim that lands first wins and the caller
+     * falls through to the active-cancel path.
+     */
+    async cancelQueued(id: string, error: string, completedAt: Date): Promise<boolean> {
+        const updated = await this.repository.update(
+            { id, status: 'queued' },
+            {
+                status: 'failed',
+                error,
+                completedAt,
+                cancelRequestedAt: completedAt,
+                leaseExpiresAt: null,
+                queuedReason: null,
+            },
+        );
+        return (updated.affected ?? 0) === 1;
+    }
+
+    /**
+     * Agent execution v2 (slice B) — flag an ACTIVE job for cancellation.
+     * The node holding it is never contacted directly (outbound-only
+     * transport); `FleetJobService.heartbeatJob` refuses its next beat
+     * instead. Pinned to the active statuses and to rows not yet flagged,
+     * so a repeated request is a no-op rather than a fresh timestamp.
+     */
+    async requestCancel(id: string, at: Date): Promise<boolean> {
+        const updated = await this.repository.update(
+            { id, status: In([...FLEET_JOB_ACTIVE_STATUSES]), cancelRequestedAt: IsNull() },
+            { cancelRequestedAt: at },
+        );
+        return (updated.affected ?? 0) === 1;
+    }
+
     async findExpiredLeases(cutoff: Date, limit: number, userId?: string): Promise<FleetJob[]> {
         return this.repository.find({
             where: {

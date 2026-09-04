@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, KeyRound, Pin, PinOff, Plus, X } from 'lucide-react';
+import { QUEUED_REASON_WAITING_FOR_RUNNER } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,7 +13,14 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import type { FleetNodeDetailView, FleetNodeView } from '@/lib/api/fleet';
+import type { FleetJobView, FleetNodeDetailView, FleetNodeView } from '@/lib/api/fleet';
+import {
+    FLEET_JOB_FILTERS,
+    filterFleetJobs,
+    fleetJobDurationMs,
+    formatFleetJobDuration,
+    type FleetJobFilter,
+} from './fleet-node-drawer.shared';
 
 interface FleetNodeDrawerProps {
     node: FleetNodeView | null;
@@ -44,16 +52,34 @@ function formatMoment(value: string | null): string {
     }
 }
 
+/** Tailwind classes for the job status badge; `failed` is the one that must stand out. */
+function jobStatusBadgeClass(status: FleetJobView['status']): string {
+    switch (status) {
+        case 'failed':
+            return 'bg-danger/10 text-danger';
+        case 'done':
+            return 'bg-success/10 text-success';
+        case 'running':
+        case 'leased':
+            return 'bg-info/10 text-info';
+        default:
+            return 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark';
+    }
+}
+
 /**
  * Node detail — everything about ONE machine that the table row cannot
- * carry: its recent job history, the failures pulled out of that history,
- * an editor for its capability tags, and the two credential-lifecycle
- * controls (rotate, drain).
+ * carry: its recent job history with each job's outcome, an editor for
+ * its capability tags, and the two credential-lifecycle controls
+ * (rotate, drain).
  *
- * The failure list is the reason this exists. "Node X is online" is not
- * an answer to "why did my checks stop passing on X": before this, the
- * only way to see that a machine had failed its last nine jobs was to
- * read the database.
+ * The job history is the reason this exists. "Node X is online" is not
+ * an answer to "why did my checks stop passing on X", and neither is a
+ * bare list of failed kinds: the operator needs to see WHEN a job ran,
+ * how long it took, how many attempts it burned and — for a job that
+ * never started — why it is still queued. Every one of those facts is on
+ * `FleetJobView`; the rows below render them, and the All / Failed /
+ * Running filter keeps a busy machine's history scannable.
  */
 export function FleetNodeDrawer({
     node,
@@ -70,6 +96,7 @@ export function FleetNodeDrawer({
     const [tags, setTags] = useState<string[]>([]);
     const [pinned, setPinned] = useState(false);
     const [draft, setDraft] = useState('');
+    const [jobFilter, setJobFilter] = useState<FleetJobFilter>('all');
 
     // Re-seed the editor whenever a different node (or fresher data for
     // the same node) arrives, so the form never shows another machine's
@@ -86,7 +113,26 @@ export function FleetNodeDrawer({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [seedKey]);
 
+    // A filter chosen for one machine must not carry over to the next:
+    // opening a healthy node straight after a broken one would otherwise
+    // greet the operator with an empty "Failed" list.
+    const nodeId = node?.id ?? '';
+    useEffect(() => {
+        setJobFilter('all');
+    }, [nodeId]);
+
     if (!node) return null;
+
+    const recentJobs = detail?.recentJobs ?? [];
+    const visibleJobs = filterFleetJobs(recentJobs, jobFilter);
+    // One clock reading per render, so every running job's elapsed time
+    // is measured against the same instant.
+    const now = Date.now();
+
+    const queuedReasonLabel = (reason: string): string =>
+        reason === QUEUED_REASON_WAITING_FOR_RUNNER
+            ? t('jobs.queuedReasons.waitingForRunner')
+            : reason;
 
     const addTag = () => {
         const tag = draft.trim().slice(0, MAX_TAG_LENGTH);
@@ -269,11 +315,46 @@ export function FleetNodeDrawer({
                         </p>
                     </section>
 
-                    {/* Failure history */}
-                    <section className="space-y-2" data-testid="fleet-node-failures">
-                        <h4 className="text-sm font-semibold text-text dark:text-text-dark">
-                            {t('history.failuresTitle')}
-                        </h4>
+                    {/* Job history — every recent job with its outcome */}
+                    <section className="space-y-2" data-testid="fleet-node-jobs">
+                        <div className="flex items-center justify-between gap-3 flex-wrap">
+                            <h4 className="text-sm font-semibold text-text dark:text-text-dark">
+                                {t('jobs.title')}
+                            </h4>
+                            <div
+                                className="inline-flex rounded-lg border border-border dark:border-border-dark p-0.5"
+                                role="group"
+                                aria-label={t('jobs.title')}
+                                data-testid="fleet-node-jobs-filter"
+                            >
+                                {FLEET_JOB_FILTERS.map((filter) => {
+                                    const active = filter === jobFilter;
+                                    return (
+                                        <button
+                                            key={filter}
+                                            type="button"
+                                            onClick={() => setJobFilter(filter)}
+                                            aria-pressed={active}
+                                            className={`px-2 py-0.5 rounded-md text-xs font-medium transition-colors ${
+                                                active
+                                                    ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark'
+                                                    : 'text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark'
+                                            }`}
+                                            data-testid={`fleet-node-jobs-filter-${filter}`}
+                                        >
+                                            {filter === 'all'
+                                                ? t('jobs.filterAll')
+                                                : filter === 'failed'
+                                                  ? t('jobs.filterFailed')
+                                                  : t('jobs.filterRunning')}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('jobs.description')}
+                        </p>
                         {loading ? (
                             <p className="text-sm text-text-muted dark:text-text-muted-dark">
                                 {t('history.loading')}
@@ -282,48 +363,138 @@ export function FleetNodeDrawer({
                             <p className="text-sm text-text-muted dark:text-text-muted-dark">
                                 {t('history.unavailable')}
                             </p>
-                        ) : (detail?.failures.length ?? 0) === 0 ? (
+                        ) : visibleJobs.length === 0 ? (
                             <p
                                 className="text-sm text-text-muted dark:text-text-muted-dark"
-                                data-testid="fleet-node-failures-empty"
+                                data-testid="fleet-node-jobs-empty"
                             >
-                                {t('history.noFailures')}
+                                {jobFilter === 'failed'
+                                    ? t('jobs.emptyFailed')
+                                    : jobFilter === 'running'
+                                      ? t('jobs.emptyRunning')
+                                      : t('jobs.emptyAll')}
                             </p>
                         ) : (
                             <ul className="space-y-1.5">
-                                {detail?.failures.map((job) => (
-                                    <li
-                                        key={job.id}
-                                        className="p-2 rounded-lg border border-danger/20 bg-danger/5 text-sm"
-                                        data-testid={`fleet-node-failure-${job.id}`}
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <span className="font-medium text-text dark:text-text-dark">
-                                                {job.kind}
-                                            </span>
-                                            <span className="text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
-                                                {formatMoment(job.completedAt ?? job.createdAt)}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                            {t('history.attempts', {
-                                                attempts: job.attempts,
-                                                maxAttempts: job.maxAttempts,
-                                            })}
-                                        </p>
-                                    </li>
-                                ))}
+                                {visibleJobs.map((job) => {
+                                    const failed = job.status === 'failed';
+                                    const durationMs = fleetJobDurationMs(job, now);
+                                    const duration = formatFleetJobDuration(durationMs);
+                                    return (
+                                        <li
+                                            key={job.id}
+                                            className={`p-2 rounded-lg border text-sm ${
+                                                failed
+                                                    ? 'border-danger/20 bg-danger/5'
+                                                    : 'border-border dark:border-border-dark'
+                                            }`}
+                                            data-testid={`fleet-node-job-${job.id}`}
+                                            data-status={job.status}
+                                        >
+                                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                                                <span className="flex items-center gap-2 min-w-0">
+                                                    <span className="font-medium font-mono text-text dark:text-text-dark truncate">
+                                                        {job.kind}
+                                                    </span>
+                                                    <span
+                                                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${jobStatusBadgeClass(job.status)}`}
+                                                        data-testid={`fleet-node-job-status-${job.id}`}
+                                                    >
+                                                        {t(`jobs.statuses.${job.status}` as never)}
+                                                    </span>
+                                                    {job.targetNodeId === node.id && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] bg-primary/10 text-primary">
+                                                            {t('jobs.pinned')}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="text-xs text-text-muted dark:text-text-muted-dark whitespace-nowrap">
+                                                    {t('jobs.attempts', {
+                                                        attempts: job.attempts,
+                                                        maxAttempts: job.maxAttempts,
+                                                    })}
+                                                </span>
+                                            </div>
+                                            <dl className="mt-1 grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-0.5 text-xs text-text-muted dark:text-text-muted-dark">
+                                                <div>
+                                                    <dt className="sr-only">
+                                                        {t('jobs.queuedAt')}
+                                                    </dt>
+                                                    <dd>
+                                                        {t('jobs.queuedAtValue', {
+                                                            time: formatMoment(job.createdAt),
+                                                        })}
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="sr-only">{t('jobs.started')}</dt>
+                                                    <dd
+                                                        data-testid={`fleet-node-job-started-${job.id}`}
+                                                    >
+                                                        {job.startedAt
+                                                            ? t('jobs.startedValue', {
+                                                                  time: formatMoment(job.startedAt),
+                                                              })
+                                                            : t('jobs.notStarted')}
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="sr-only">
+                                                        {t('jobs.completed')}
+                                                    </dt>
+                                                    <dd
+                                                        data-testid={`fleet-node-job-completed-${job.id}`}
+                                                    >
+                                                        {job.completedAt
+                                                            ? t('jobs.completedValue', {
+                                                                  time: formatMoment(
+                                                                      job.completedAt,
+                                                                  ),
+                                                              })
+                                                            : t('jobs.notCompleted')}
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="sr-only">
+                                                        {t('jobs.duration')}
+                                                    </dt>
+                                                    <dd
+                                                        data-testid={`fleet-node-job-duration-${job.id}`}
+                                                    >
+                                                        {duration
+                                                            ? job.completedAt
+                                                                ? t('jobs.durationValue', {
+                                                                      duration,
+                                                                  })
+                                                                : t('jobs.elapsedValue', {
+                                                                      duration,
+                                                                  })
+                                                            : '-'}
+                                                    </dd>
+                                                </div>
+                                            </dl>
+                                            {job.status === 'queued' && job.queuedReason ? (
+                                                <p
+                                                    className="mt-1 text-xs text-warning"
+                                                    data-testid={`fleet-node-job-queued-reason-${job.id}`}
+                                                >
+                                                    {t('jobs.queuedReason', {
+                                                        reason: queuedReasonLabel(job.queuedReason),
+                                                    })}
+                                                </p>
+                                            ) : null}
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         )}
 
-                        {(detail?.recentJobs.length ?? 0) > 0 ? (
+                        {recentJobs.length > 0 && !loading && !detail?.historyUnavailable ? (
                             <p
                                 className="text-xs text-text-muted dark:text-text-muted-dark"
                                 data-testid="fleet-node-history-count"
                             >
-                                {t('history.recentCount', {
-                                    count: detail?.recentJobs.length ?? 0,
-                                })}
+                                {t('history.recentCount', { count: recentJobs.length })}
                             </p>
                         ) : null}
                     </section>

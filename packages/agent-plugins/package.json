@@ -1,0 +1,59 @@
+{
+	"name": "@ever-works/agent-plugins",
+	"version": "1.0.0",
+	"description": "TypeScript reference loader for the Agent Plugins specification (agent-plugins.org): closed manifest validation, Agent Skills discovery, MCP configuration parsing, path containment and plugin-variable expansion",
+	"keywords": [
+		"agent-plugins",
+		"agent-skills",
+		"mcp",
+		"model-context-protocol",
+		"plugins",
+		"conformance"
+	],
+	"homepage": "https://ever.works",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/ever-works/ever-works.git",
+		"directory": "packages/agent-plugins"
+	},
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "MIT",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"ajv": "^8.18.0",
+		"gray-matter": "^4.0.3"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.3",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	}
+}

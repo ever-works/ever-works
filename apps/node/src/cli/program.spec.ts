@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { CapabilityEnvironment, CommandRunner } from '../core/capabilities';
 import { parseConfig, type ConfigFileSystem } from '../core/config-store';
 import type { FetchLike } from '../core/fleet-client';
@@ -15,6 +15,21 @@ import {
 	runCli,
 	type CliDeps
 } from './program';
+
+// Pass-through spy on the runtime factory: `start` is only observable from
+// the outside through what it hands to createNodeRuntime, and TypeScript
+// cannot prove that a CLI flag reaches the runtime option it is meant for.
+const runtimeCalls = vi.hoisted(() => ({ options: [] as Array<Record<string, unknown>> }));
+vi.mock('../core/runtime', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../core/runtime')>();
+	return {
+		...actual,
+		createNodeRuntime: (...args: Parameters<typeof actual.createNodeRuntime>) => {
+			runtimeCalls.options.push(args[2] as unknown as Record<string, unknown>);
+			return actual.createNodeRuntime(...args);
+		}
+	};
+});
 
 const TOKEN = 'ZmFrZS1lbnJvbGxtZW50LXRva2VuLWZvci10ZXN0aW5n';
 const SECRET = 'ZmFrZS1zZWNyZXQtdmFsdWUtZm9yLXVuaXQtdGVzdHM';
@@ -305,6 +320,50 @@ describe('ever-works-node start', () => {
 		h.deps.waitForShutdown = () => Promise.resolve();
 
 		expect(await runCli(['start', '--heartbeat-interval', '99999'], h.deps)).toBe(EXIT_FAILURE);
+	});
+
+	it('rejects a relative --workspace-root as a usage error before the config is read', async () => {
+		// No config file on purpose: had the config been read first, the
+		// outcome would be EXIT_NOT_ENROLLED, not the usage failure.
+		const h = harness();
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start', '--workspace-root', 'relative/dir'], h.deps)).toBe(EXIT_FAILURE);
+		expect(h.logged()).toContain('--workspace-root must be an absolute directory');
+	});
+
+	it('hands --workspace-root to the runtime as agentTaskWorkspaceRoot', async () => {
+		runtimeCalls.options.length = 0;
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig },
+			fetchFn: async () => ({
+				ok: true,
+				status: 200,
+				text: async () => JSON.stringify({ ok: true, node: apiNode })
+			})
+		});
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start', '--workspace-root', '/srv/fleet'], h.deps)).toBe(EXIT_OK);
+		expect(runtimeCalls.options).toHaveLength(1);
+		expect(runtimeCalls.options[0]?.agentTaskWorkspaceRoot).toBe('/srv/fleet');
+	});
+
+	it('leaves agentTaskWorkspaceRoot unset when --workspace-root is not given', async () => {
+		runtimeCalls.options.length = 0;
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig },
+			fetchFn: async () => ({
+				ok: true,
+				status: 200,
+				text: async () => JSON.stringify({ ok: true, node: apiNode })
+			})
+		});
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start'], h.deps)).toBe(EXIT_OK);
+		expect(runtimeCalls.options).toHaveLength(1);
+		expect(runtimeCalls.options[0]?.agentTaskWorkspaceRoot).toBeUndefined();
 	});
 });
 

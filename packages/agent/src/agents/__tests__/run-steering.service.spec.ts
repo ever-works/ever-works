@@ -307,6 +307,68 @@ describe('RunSteeringService', () => {
             );
         });
 
+        // ── self-build slice Q: a parked FLEET run is resumed from the Inbox ──
+
+        it('keeps the SOURCE run resumable when the enqueue throws (slice Q)', async () => {
+            // The fleet-aware dispatcher runs the planner on resume and can
+            // refuse (done/cancelled Task, no repository, oversize brief).
+            // Clearing the parked flag first would strand the question: the
+            // reopened Inbox item routes 'none' on the next reply.
+            runs.findByIdAndUser.mockResolvedValue(
+                makeRun({ status: 'completed', awaitingInput: true }),
+            );
+            dispatcher.enqueue.mockRejectedValue(
+                new Error('Task TSK-7 is done — a fleet run cannot be planned for it'),
+            );
+            await expect(makeSvc().resume(runId, userId, 'Postgres')).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+            expect(runs.markDispatchFailed).toHaveBeenCalledWith(
+                'run-2',
+                expect.stringContaining('dispatch-failed'),
+            );
+        });
+
+        it('clears the parked flag only AFTER the successor is enqueued', async () => {
+            runs.findByIdAndUser.mockResolvedValue(
+                makeRun({ status: 'completed', awaitingInput: true }),
+            );
+            await makeSvc().resume(runId, userId, 'Postgres');
+            expect(runs.setAwaitingInput).toHaveBeenCalledWith(runId, false);
+            expect(runs.setAwaitingInput.mock.invocationCallOrder[0]).toBeGreaterThan(
+                dispatcher.enqueue.mock.invocationCallOrder[0],
+            );
+        });
+
+        it('clears the parked flag when the gate parks the successor instead of enqueuing it', async () => {
+            // A queued successor exists and will be drained later — the
+            // question IS answered, so the source must leave the attention
+            // filter even though nothing was enqueued yet.
+            runs.findByIdAndUser.mockResolvedValue(
+                makeRun({ status: 'completed', awaitingInput: true }),
+            );
+            gate.admit.mockResolvedValue({ admitted: false, queuedReason: 'concurrency-limit' });
+            const result = await makeSvc().resume(runId, userId, 'Postgres');
+            expect(result.queued).toBe(true);
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+            expect(runs.setAwaitingInput).toHaveBeenCalledWith(runId, false);
+        });
+
+        it("carries the run's tenant and organization on the resume dispatch (fleet routing)", async () => {
+            // `FleetRunRouterService.resolveRuntimeId(undefined)` is the
+            // INSTANCE default — a tenant-overlay fleet would otherwise
+            // resume its parked run onto the cloud runtime.
+            runs.findByIdAndUser.mockResolvedValue(parked());
+            await makeSvc().resume(runId, userId);
+            expect(dispatcher.enqueue).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    tenantId: everScope.tenantId,
+                    organizationId: everScope.organizationId,
+                }),
+            );
+        });
+
         it('404s a run owned by another user', async () => {
             runs.findByIdAndUser.mockResolvedValue(null);
             await expect(makeSvc().resume(runId, userId)).rejects.toBeInstanceOf(NotFoundException);
@@ -355,6 +417,18 @@ describe('RunSteeringService', () => {
 
             expect(runs.findByIdAndUser).toHaveBeenCalledWith(runId, userId, personalScope);
             expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ tenantId: null, organizationId: null }),
+            );
+        });
+
+        it('dispatches a resumed legacy personal run with null scope carriers (slice Q)', async () => {
+            runs.findByIdAndUser.mockResolvedValue(
+                legacyPersonal({ status: 'completed', terminalEndedReason: 'parked' }),
+            );
+
+            await makeSvc().resume(runId, userId, null, personalScope);
+
+            expect(dispatcher.enqueue).toHaveBeenCalledWith(
                 expect.objectContaining({ tenantId: null, organizationId: null }),
             );
         });

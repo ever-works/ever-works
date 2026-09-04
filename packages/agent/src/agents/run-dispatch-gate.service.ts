@@ -340,6 +340,13 @@ export class RunDispatchGateService {
                           taskId: candidate.taskId,
                           dedupKey,
                           runId: candidate.id,
+                          // Scope carriers (self-build slice Q), same as the
+                          // fan-out and resume paths: a parked run drained
+                          // here may be a resumed FLEET run, and the fleet
+                          // router resolves the tenant's job runtime from
+                          // `tenantId` — absent, it is the instance default.
+                          tenantId: candidate.tenantId ?? null,
+                          organizationId: candidate.organizationId ?? null,
                       });
                 if (handle?.runId) {
                     try {

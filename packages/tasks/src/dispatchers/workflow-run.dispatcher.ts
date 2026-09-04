@@ -1,5 +1,24 @@
-import { logger, tasks } from '@trigger.dev/sdk';
+import { Logger } from '@nestjs/common';
+import { tasks } from '@trigger.dev/sdk';
 import type { WorkflowRunDispatcher, WorkflowRunPayload } from '@ever-works/agent/tasks';
+
+/**
+ * A Nest logger, NOT `logger` from `@trigger.dev/sdk`.
+ *
+ * The SDK's `logger` writes through its run-scoped `LoggerAPI` singleton,
+ * which resolves to a `NoopTaskLogger` outside a task run. This adapter is
+ * bound to `WORKFLOW_RUN_DISPATCHER` by the API-side `WorkflowsModule` and so
+ * only ever executes in the API process, where that logger discards every
+ * call. The dispatch-failure branch below was therefore silent: the whole
+ * point of catching before returning `null` is to leave an account of WHY,
+ * and it was writing to nothing.
+ *
+ * The sibling adapters in this directory (`idea-build-execute.dispatcher.ts`,
+ * `agent-task-dispatchers.ts`) import only `tasks` from the SDK and never hit
+ * this; the trigger-side tasks, which DO run inside a task, keep using the
+ * SDK logger correctly.
+ */
+const logger = new Logger('WorkflowRunDispatcher');
 
 /**
  * Judgment layer G5 — production dispatcher adapter that hands a
@@ -55,11 +74,12 @@ export const workflowRunTriggerAdapter: WorkflowRunDispatcher = {
             // and an unreachable Trigger.dev API would all reach the
             // operator as the same shrug. The row records that dispatch
             // failed; this records what actually happened.
-            logger.error('workflow-run dispatch failed', {
-                workflowRunId: payload.workflowRunId,
-                workflowId: payload.workflowId,
-                error: err instanceof Error ? err.message : String(err),
-            });
+            logger.error(
+                `workflow-run dispatch failed (workflowRunId=${payload.workflowRunId}, ` +
+                    `workflowId=${payload.workflowId}): ` +
+                    (err instanceof Error ? err.message : String(err)),
+                err instanceof Error ? err.stack : undefined,
+            );
             return null;
         }
     },

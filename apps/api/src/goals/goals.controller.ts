@@ -14,7 +14,7 @@ import {
     Put,
     Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
     GoalOrchestratorService,
@@ -86,6 +86,18 @@ export class GoalsController {
 
     @Get()
     @ApiOperation({ summary: 'List my goals' })
+    // Why the explicit `@ApiQuery` rows: a bare `@Query('x') x?: string`
+    // is emitted as REQUIRED by @nestjs/swagger (this build runs no CLI
+    // plugin), and the MCP server turns that into a tool schema that forces
+    // every filter. Declaring them optional here is the only fix upstream.
+    @ApiQuery({ name: 'status', required: false, description: 'Filter by GoalStatus' })
+    @ApiQuery({ name: 'limit', required: false, description: 'Page size' })
+    @ApiQuery({ name: 'offset', required: false, description: 'Pagination offset (default 0)' })
+    @ApiQuery({
+        name: 'archived',
+        required: false,
+        description: "'true' | 'false' | 'all' (default: not archived)",
+    })
     @HttpCode(HttpStatus.OK)
     async list(
         @CurrentUser() auth: AuthenticatedUser,
@@ -148,6 +160,7 @@ export class GoalsController {
 
     @Get(':id/samples')
     @ApiOperation({ summary: 'Observation history (append-only samples, newest first)' })
+    @ApiQuery({ name: 'limit', required: false, description: 'Max samples (1..500, default 100)' })
     @HttpCode(HttpStatus.OK)
     async samples(
         @CurrentUser() auth: AuthenticatedUser,
