@@ -5,10 +5,10 @@ import {
     AgentRepository,
     AgentRunRepository,
     ownershipRelationScopeOf,
-    SkillBindingRepository,
     WorkRepository,
 } from '@ever-works/agent/database';
 import type { Agent, Task } from '@ever-works/agent/entities';
+import { SkillsService } from '@ever-works/agent/skills';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import {
     resolveAcceptanceChecks,
@@ -145,7 +145,9 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         // (fewer prompt segments, instance-level settings) rather than
         // failing to construct in a module graph that lacks it.
         @Optional() private readonly promptAssembler?: PromptAssemblerService,
-        @Optional() private readonly skillBindings?: SkillBindingRepository,
+        // The GRANT-AWARE service, never `SkillBindingRepository` directly:
+        // see `resolveSkills`.
+        @Optional() private readonly skills?: SkillsService,
         @Optional() private readonly pluginSettings?: PluginSettingsService,
         // Self-build slice Q — reads the resumed run's `pendingInput` for
         // the `# OWNER ANSWER` section. Appended LAST + @Optional() so
@@ -496,20 +498,47 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         return system ? `${system}\n\n${tail}` : tail;
     }
 
-    /** Active skills in the assembler's shape; best-effort, never fatal. */
+    /**
+     * Active skills in the assembler's shape; best-effort, never fatal.
+     *
+     * Resolved through `SkillsService.resolveActiveForAgent`, NOT through
+     * `SkillBindingRepository` directly. The service is the grant-aware half
+     * (audit item G12): it drops a Skill whose every declared
+     * `frontmatter.allowedTools` entry the operator's tool-grant matrix
+     * refuses, which is exactly what `AgentRunService` does before assembling
+     * the cloud prompt. Reading the raw repository here would inject skill
+     * bodies for surfaces the operator deliberately took away — worse on the
+     * fleet path than in the cloud, because the node runs the CLI under the
+     * operator's own permission mode (often skip-permissions) and nothing
+     * downstream re-enforces the matrix. The service degrades safely on its
+     * own (no enforcer bound, or a failed policy read → every bound skill
+     * stays active, and it says so), so this adds no new failure mode.
+     */
     private async resolveSkills(
         agent: Agent,
     ): Promise<Array<{ slug: string; body: string; priority: number }> | undefined> {
-        if (!this.skillBindings) return undefined;
+        if (!this.skills) {
+            // The dependency stays @Optional() so a reduced module graph can
+            // still construct the planner — but an absent one is a WIRING
+            // BUG, not a mode: the fleet prompt then ships with no
+            // `# ACTIVE SKILLS` segment on every run while the same agent
+            // honours its skills on the cloud path, and nothing else in the
+            // pipeline surfaces that (the run still succeeds). This warn is
+            // the only signal an operator gets that the two paths are
+            // running different prompts.
+            this.logger.warn(
+                `SkillsService is not wired into this module graph — fleet instructions for agent ${agent.id} carry NO active skills (the cloud path still applies them)`,
+            );
+            return undefined;
+        }
         try {
-            const rows = await this.skillBindings.resolveActive({
-                userId: agent.userId,
-                agentId: agent.id,
-                workId: agent.workId ?? undefined,
-                missionId: agent.missionId ?? undefined,
-                ideaId: agent.ideaId ?? undefined,
-                forAgentRun: true,
-            });
+            const rows = await this.skills.resolveActiveForAgent(
+                agent.userId,
+                agent.id,
+                agent.workId ?? undefined,
+                agent.missionId ?? undefined,
+                agent.ideaId ?? undefined,
+            );
             return rows.map(({ binding, skill }) => ({
                 slug: skill.slug,
                 body: skill.instructionsMd ?? '',

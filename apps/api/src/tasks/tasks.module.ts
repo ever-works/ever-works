@@ -30,6 +30,21 @@ import { SubAgentDelegationDepthResolverService } from '../agents/sub-agent-dele
 // without it the API fails to boot with an
 // `UnknownDependenciesException: TasksController (..., ?)`.
 import { KnowledgeBaseModule } from '@ever-works/agent/services';
+// Agent execution v2 — the ONLY module that provides + exports
+// `SkillsService` (and `SkillBindingRepository` behind it).
+// `FleetAgentTaskPlannerService` (provided below) injects the SERVICE
+// `@Optional()` to assemble the fleet system prompt's `# ACTIVE SKILLS`
+// segment — the service is the grant-aware wrapper, so the fleet prompt
+// drops the same skills the cloud path drops. The agent-side
+// `AgentsModule` imports this module for `AgentRunService` but does NOT
+// re-export it, and neither does the @Global() api-side AgentsModule
+// (token list only) — so without this import the planner's dependency
+// silently resolved to `undefined` and every fleet run shipped a prompt
+// with no skills, while the SAME agent honoured them on the cloud path.
+// Same reason (and same import) `apps/api/src/agents` and
+// `.../organizations` already carry it; SkillsModule is a leaf here, so
+// no cycle.
+import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 // Tasks upgrades — the per-Task activity feed endpoint injects
 // ActivityLogService, which TasksDomainModule imports but does not
 // re-export; the controller resolves it against THIS module's imports.
@@ -82,6 +97,10 @@ import { TaskChatController } from './task-chat.controller';
         TasksDomainModule,
         DatabaseModule,
         AgentsModule,
+        // Supplies SkillsService to FleetAgentTaskPlannerService — see the
+        // import comment above; without it the fleet prompt carries no
+        // ACTIVE SKILLS.
+        AgentSkillsModule,
         KnowledgeBaseModule,
         FleetApiModule,
         AgentActivityLogModule,

@@ -1,10 +1,14 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { Task } from '@/lib/api/tasks';
 
+// Returns the key, plus the ICU values when the caller passed any — so a
+// test can assert WHICH message was chosen and what count it was given
+// without depending on the English wording.
 vi.mock('next-intl', () => ({
-    useTranslations: () => (key: string) => key,
+    useTranslations: () => (key: string, values?: Record<string, unknown>) =>
+        values ? `${key} ${JSON.stringify(values)}` : key,
 }));
 vi.mock('next/navigation', () => ({
     useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
@@ -22,6 +26,7 @@ vi.mock('@/app/actions/tasks', () => ({
     updateTaskAction: vi.fn(),
 }));
 
+import { discardTaskBranchAction } from '@/app/actions/tasks';
 import { TaskBranchSection } from './TaskBranchSection';
 
 /**
@@ -142,5 +147,69 @@ describe('TaskBranchSection — linked pull requests', () => {
             'href',
             'https://github.com/acme/repo/pull/10',
         );
+    });
+});
+
+/**
+ * Discard is an irreversible, credentialed, cross-repository action. Since the
+ * discard learned to reach every repository the Task pushed, one click deletes
+ * N+1 branches and closes every pull request open on them — so the sentence the
+ * operator actually gives consent against has to describe that, not the
+ * single-branch action it used to be.
+ */
+describe('TaskBranchSection - the discard confirmation matches what discard does', () => {
+    const linked = (repositoryId: string) => ({
+        repositoryId,
+        branch: 'task/t-1-add-field-x',
+        baseRef: 'main',
+        headSha: 'b'.repeat(40),
+        prNumber: 7,
+        prUrl: `https://github.com/${repositoryId}/pull/7`,
+        state: 'pr-open' as const,
+        error: null,
+        updatedAt: '2026-09-03T00:00:00.000Z',
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.mocked(discardTaskBranchAction).mockClear();
+    });
+
+    it('names every repository it will delete a branch in, counting the primary', () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        render(
+            <TaskBranchSection
+                task={make({
+                    linkedPullRequests: [linked('acme/template'), linked('acme/docs')],
+                })}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('task-discard-branch'));
+
+        // Two mounts plus the Task's own branch: three branches, three
+        // pull requests. The single-branch wording would understate it.
+        expect(confirmSpy).toHaveBeenCalledWith('discardConfirmMultiRepo {"count":3}');
+        expect(discardTaskBranchAction).toHaveBeenCalledWith('t1');
+    });
+
+    it('keeps the single-branch wording for a Task that spans one repository', () => {
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        render(<TaskBranchSection task={make({ linkedPullRequests: null })} />);
+
+        fireEvent.click(screen.getByTestId('task-discard-branch'));
+
+        expect(confirmSpy).toHaveBeenCalledWith('discardConfirm');
+    });
+
+    it('discards nothing when the operator declines', () => {
+        vi.spyOn(window, 'confirm').mockReturnValue(false);
+        render(
+            <TaskBranchSection task={make({ linkedPullRequests: [linked('acme/template')] })} />,
+        );
+
+        fireEvent.click(screen.getByTestId('task-discard-branch'));
+
+        expect(discardTaskBranchAction).not.toHaveBeenCalled();
     });
 });

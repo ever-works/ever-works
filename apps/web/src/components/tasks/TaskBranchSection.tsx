@@ -83,8 +83,19 @@ function BranchPanel({ task }: { task: Task }) {
         });
     };
 
+    // Multi-repo Task workspaces (self-build slice C): the discard reaches
+    // EVERY repository the Task pushed, and deleting a branch closes the pull
+    // request on it. One click is therefore N+1 branch deletions and up to
+    // N+1 closed pull requests — the consent text has to name that, or the
+    // operator authorises one thing and gets another.
+    const linkedRepoCount = task.linkedPullRequests?.length ?? 0;
+
     const handleDiscard = () => {
-        if (!confirm(t('discardConfirm'))) return;
+        const confirmMessage =
+            linkedRepoCount > 0
+                ? t('discardConfirmMultiRepo', { count: linkedRepoCount + 1 })
+                : t('discardConfirm');
+        if (!confirm(confirmMessage)) return;
         setError(null);
         startDiscard(() => {
             void (async () => {
