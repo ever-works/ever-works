@@ -340,6 +340,7 @@ function FilesSection({ skillId, initialFiles }: { skillId: string; initialFiles
                 form.append('file', file, file.name);
                 const kind = kindOverride || defaultKindForFilename(file.name);
                 form.append('kind', kind);
+                // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
                 const res = await fetch(`/api/skills/${encodeURIComponent(skillId)}/files`, {
                     method: 'POST',
                     body: form,

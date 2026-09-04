@@ -34,6 +34,7 @@ export function ItemsExportButton({ workId }: ItemsExportButtonProps) {
 
     useEffect(() => {
         let cancelled = false;
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
         fetch(`/api/works/${workId}/export-items/settings`, { credentials: 'include' })
             .then((response) => response.json())
             .then((data: { export_enabled?: boolean } | null) => {

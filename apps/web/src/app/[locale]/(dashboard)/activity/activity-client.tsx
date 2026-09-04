@@ -321,6 +321,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         const query = params.toString();
 
         try {
+            // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
             const response = await fetch(`/api/activity-log/export${query ? `?${query}` : ''}`, {
                 method: 'GET',
             });

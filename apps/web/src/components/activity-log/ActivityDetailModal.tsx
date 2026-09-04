@@ -165,6 +165,7 @@ export function ActivityDetailModal({ entry, onClose, onStopRequested }: Activit
 
         const refresh = async () => {
             try {
+                // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
                 const res = await fetch(`/api/activity-log/${entry.id}`, {
                     method: 'GET',
                     cache: 'no-store',
