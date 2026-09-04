@@ -37,31 +37,31 @@ appends, locale key appends) are expected and fine.
 
 ## Phase 0 — Conformance library (PR-1)
 
-- [ ] **T1**. Scaffold `packages/agent-plugins` (`@ever-works/agent-plugins`):
+- [x] **T1**. Scaffold `packages/agent-plugins` (`@ever-works/agent-plugins`):
       tsup ESM build, Vitest, MIT, zero NestJS deps. Own deps: `ajv@^8`,
       `gray-matter@^4`, `yaml` if needed.
-- [ ] **T2**. Vendor canonical schemas under `src/schemas/1.0.0/`
+- [x] **T2**. Vendor canonical schemas under `src/schemas/1.0.0/`
       (plugin.schema.json, mcp.schema.json) imported via `resolveJsonModule`
       so they ship inside `dist/`.
-- [ ] **T3**. `src/manifest.ts`: closed manifest validator with exact AP-4
+- [x] **T3**. `src/manifest.ts`: closed manifest validator with exact AP-4
       severity split. Unit tests per AP-1…AP-6 (incl. MUST-NOT-reject cases:
       non-semver version, weird URLs, 1-char and dotted names).
-- [ ] **T4** (parallel). `src/skills.ts`: discovery walker (immediate children,
+- [x] **T4** (parallel). `src/skills.ts`: discovery walker (immediate children,
       regular-file check) + Agent Skills frontmatter validator (name=dir,
       charset, lengths, `allowed-tools` string→array tokenizer, metadata
       string-map check). Tests per AP-7…AP-9.
-- [ ] **T5** (parallel). `src/mcp.ts`: closed mcp.json validator, closed server
+- [x] **T5** (parallel). `src/mcp.ts`: closed mcp.json validator, closed server
       union, URL/header rules, reserved env keys, version-match with
       plugin.json. Tests per AP-11…AP-15.
-- [ ] **T6** (parallel). `src/paths.ts` containment (realpath symlink
+- [x] **T6** (parallel). `src/paths.ts` containment (realpath symlink
       resolution) + `src/expand.ts` placeholder expansion. Tests per AP-10,
       AP-16…AP-17 (expansion in args/env-values/cwd only; non-recursive;
       unknown placeholders literal).
-- [ ] **T7**. `fixtures/`: full conformance corpus (valid minimal, valid full,
+- [x] **T7**. `fixtures/`: full conformance corpus (valid minimal, valid full,
       every fatal/non-fatal manifest case, skip-one-skill, disable-MCP-only,
       per-server skip, containment escapes, dir-name mismatch, oversized
       description). Add fixtures path to `.prettierignore`.
-- [ ] **T8**. `src/serialize.ts`: plugin.json + SKILL.md emitters; slug→name
+- [x] **T8**. `src/serialize.ts`: plugin.json + SKILL.md emitters; slug→name
       guard; round-trip property test (emit → parse → deep-equal).
 - [ ] **T9**. Optional CI oracle job: `skills-ref validate` (Python) over skill
       fixtures, non-blocking.
@@ -155,7 +155,7 @@ appends, locale key appends) are expected and fine.
       configs + provenance via the conformance lib. No plugin capability, no
       `facade-capabilities.ts` append. Barrel-export from
       `packages/agent/package.json` export map (TS2305 bug class).
-- [ ] **T24**. Entity `agent_mcp_server_bindings` (Tier C — skill_bindings
+- [x] **T24**. Entity `agent_mcp_server_bindings` (Tier C — skill_bindings
       template PLUS net-new columns `serverName`/`enabled`/`settings`/
       `secretSettings`/`credentialsSecretRef`, per plan §2.5) + migration +
       inventory append. Account-transfer whitelist entries for bindings (same
@@ -165,19 +165,19 @@ appends, locale key appends) are expected and fine.
       package → pending-reference row + bindings imported `enabled: false`;
       disallowed source → skip-and-report; never auto-fetch content on import;
       never fail the whole import.
-- [ ] **T25**. `packages/agent/src/mcp/`: `McpClientService`
+- [x] **T25**. `packages/agent/src/mcp/`: `McpClientService`
       (streamable-http + sse via `@modelcontextprotocol/sdk` — new dep of
       `packages/agent`), per-server failure isolation, connect-time credential
       injection (client-generated headers; masked reads), SSRF egress policy,
       **redirect policy per AP-15** (no package-header cross-origin forwarding
       without explicit authorization; no client-generated credential forwarding
       cross-origin at all — with tests), run-end disconnect.
-- [ ] **T26**. `McpToolSource` injected into `AgentToolService.
+- [x] **T26**. `McpToolSource` injected into `AgentToolService.
 resolveAllowedTools` as a new optional source (domain-tool-source
       pattern); `mcp__<server>__<tool>` naming; name/description sanitization;
       builtin-collision drop + WARN; run-log WARNs for skipped servers.
       Update module pin specs.
-- [ ] **T27**. Bindings API (`/api/agents/:id/mcp-servers` CRUD + standalone
+- [x] **T27**. Bindings API (`/api/agents/:id/mcp-servers` CRUD + standalone
       delete; agent-scoped targets only in v1) + **MCP Servers tab** on
       `/agents/[id]` + i18n + e2e specs (binding CRUD, authz matrix,
       cross-tenant isolation). Domain chat tools per the in-code DoD
