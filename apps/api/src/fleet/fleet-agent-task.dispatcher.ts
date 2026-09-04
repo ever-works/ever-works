@@ -4,8 +4,45 @@ import type {
     AgentTaskExecuteDispatcher,
     AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
-import type { FleetExecutionScopeQuery, FleetRunRoutingDecision } from '@ever-works/contracts';
+import type {
+    FleetAgentModelExecution,
+    FleetAgentTaskGitPolicy,
+    FleetExecutionScopeQuery,
+    FleetRunRoutingDecision,
+    FleetTaskWorkspaceSpec,
+    TaskAcceptanceCheck,
+} from '@ever-works/contracts';
 import type { FleetRunRouterService } from './fleet-run-router.service';
+
+/**
+ * Agent execution v2 — everything a node needs to run the Task's agent
+ * with a local model CLI. Built by the planner once the router has
+ * decided the run goes to the fleet; merged into the job payload by
+ * the router.
+ */
+export interface FleetAgentTaskPlan {
+    execution: FleetAgentModelExecution;
+    workspace: FleetTaskWorkspaceSpec;
+    acceptanceChecks: TaskAcceptanceCheck[];
+    git: FleetAgentTaskGitPolicy;
+}
+
+/**
+ * Builds a {@link FleetAgentTaskPlan} for one dispatch, or returns null
+ * when the tenant's fleet runs in the legacy `command` mode.
+ *
+ * A PORT rather than a service import, for the same reason
+ * {@link FleetTaskScopeResolver} is: the planner needs the Task, Agent
+ * and workspace services, which live in the api-side `TasksModule`, and
+ * this file must stay a leaf on the dispatch path.
+ *
+ * A planner that THROWS is deliberate and propagates: the run is then
+ * marked failed with the reason (no repository, missing agent, …) where
+ * a human reads it, instead of a job the node cannot execute.
+ */
+export interface FleetAgentTaskPlanner {
+    plan(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskPlan | null>;
+}
 
 const logger = new Logger('FleetAwareAgentTaskExecuteDispatcher');
 
@@ -27,6 +64,11 @@ export interface FleetAwareDispatcherDeps {
     scopeResolver?: FleetTaskScopeResolver;
     /** Emits the "local runner fallback → cloud" inbox entry. */
     notifications?: Pick<NotificationService, 'notifyFleetRunnerFallback'>;
+    /**
+     * Agent execution v2 — supplies the model-CLI plan for a fleet-bound
+     * run. Absent = every fleet run is the legacy command job.
+     */
+    planner?: FleetAgentTaskPlanner;
 }
 
 /**
@@ -77,6 +119,7 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
     router: Pick<FleetRunRouterService, 'routeAgentTask' | 'enqueueAgentTask'>,
     deps: FleetAwareDispatcherDeps = {},
 ): AgentTaskExecuteDispatcher {
+    // (deps.planner is read per dispatch below — see FleetAgentTaskPlanner.)
     return {
         async enqueue(payload: AgentTaskExecuteDispatchPayload): Promise<{ runId: string }> {
             let decision: FleetRunRoutingDecision = { target: 'cloud', mode: 'cloud' };
@@ -93,7 +136,13 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             }
 
             if (decision.target === 'fleet' || decision.target === 'fleet-waiting') {
-                return router.enqueueAgentTask(payload, decision.queuedReason ?? null);
+                // Agent execution v2 — the plan is built AFTER the routing
+                // decision (a cloud run never pays for it) and its failure
+                // is NOT swallowed: a fleet run that cannot be planned has
+                // no honest fallback, so the transition service records
+                // the reason on the run row.
+                const plan = deps.planner ? await deps.planner.plan(payload) : null;
+                return router.enqueueAgentTask(payload, decision.queuedReason ?? null, plan);
             }
 
             // Notify ONLY on a real fallback — a decision carrying a

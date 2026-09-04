@@ -1,4 +1,5 @@
 import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
     ArrayMaxSize,
     ArrayNotEmpty,
@@ -25,7 +26,7 @@ import {
     type TaskActorType,
     type TaskIsolationMode,
 } from '@ever-works/agent/tasks-domain';
-import { AcceptanceCheckDto } from '@ever-works/agent/dto';
+import { AcceptanceCheckDto, TaskExtraRepoDto } from '@ever-works/agent/dto';
 
 // Why every field carries `@ApiProperty`: the API build runs no
 // `@nestjs/swagger` CLI plugin, so a DTO field without an explicit decorator
@@ -170,6 +171,25 @@ export class CreateTaskDto {
     maxGateAttempts?: number | null;
 
     /**
+     * Multi-repo Task workspaces (slice C, PR C2): repositories this Task
+     * spans in addition to its Work's, by repository-registry connection.
+     * `null` = none beyond the run agent's attachments.
+     */
+    @ApiPropertyOptional({
+        type: [TaskExtraRepoDto],
+        nullable: true,
+        maxItems: 8,
+        description:
+            'Extra repositories the Task spans (registry connection ids); each becomes a mount next to the primary worktree on a fleet run, with its own pull request when it changes.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(8)
+    @ValidateNested({ each: true })
+    @Type(() => TaskExtraRepoDto)
+    extraRepos?: TaskExtraRepoDto[] | null;
+
+    /**
      * Schedule mode "Scheduled": run once at this instant (ISO datetime,
      * must be in the future — service validation). Omitted = Run Once.
      */
@@ -310,6 +330,25 @@ export class UpdateTaskDto {
     @Min(1)
     @Max(5)
     maxGateAttempts?: number | null;
+
+    /**
+     * Multi-repo Task workspaces (slice C, PR C2): repositories this Task
+     * spans in addition to its Work's, by repository-registry connection.
+     * `null` = none beyond the run agent's attachments.
+     */
+    @ApiPropertyOptional({
+        type: [TaskExtraRepoDto],
+        nullable: true,
+        maxItems: 8,
+        description:
+            'Extra repositories the Task spans (registry connection ids); each becomes a mount next to the primary worktree on a fleet run, with its own pull request when it changes.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(8)
+    @ValidateNested({ each: true })
+    @Type(() => TaskExtraRepoDto)
+    extraRepos?: TaskExtraRepoDto[] | null;
 
     /**
      * Schedule mode "Scheduled" — ISO datetime, must be in the future

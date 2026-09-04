@@ -295,6 +295,7 @@ export class TasksController {
                 requireAllApprovers: body.requireAllApprovers,
                 acceptanceChecks: body.acceptanceChecks ?? null,
                 maxGateAttempts: body.maxGateAttempts ?? null,
+                extraRepos: body.extraRepos ?? null,
                 scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
             },
             this.scopeContext.getScope(),

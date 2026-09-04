@@ -508,3 +508,200 @@ describe('gc', () => {
 		}
 	});
 });
+
+/**
+ * The publish fence. A fleet node holds its job on a LEASE, and the
+ * platform re-offers the work the moment that lease lapses — while the
+ * old node may still be mid-run behind a dropped Wi-Fi link or a lid
+ * that was closed for an hour. Cancellation cannot help here: killing
+ * `git push` does not retract a ref the remote already accepted, so two
+ * nodes end up writing one task branch and the run that legitimately
+ * owned the lease is the one that sees a non-fast-forward failure.
+ *
+ * These cases pin the only rule that holds during a total partition:
+ * decide from the node's OWN clock, before the push spawns, and keep
+ * the commit either way so the work is never lost.
+ */
+describe('finalize — publish fence (lease-bound side effects)', () => {
+	const at = (clock: { ms: number }) => new LocalWorkspacePlugin({ now: () => clock.ms });
+
+	it('withholds the push once the lease deadline has passed, keeping the commit local', async () => {
+		const clock = { ms: Date.parse('2026-09-04T09:00:00.000Z') };
+		const fenced = at(clock);
+		const branch = 'task/fence-expired-11112222';
+		const handle = await fenced.provision(spec('lw-fence-expired', branch));
+		writeFileSync(join(handle.path, 'agent-output.txt'), 'work that must not be published\n');
+
+		const fin = await fenced.finalize(handle, {
+			commitMessage: 'agent: fenced by an expired lease',
+			push: true,
+			publishFence: { deadlineAt: clock.ms - 12_000, marginMs: 60_000 }
+		});
+
+		expect(fin.pushed).toBe(false);
+		expect(fin.publishWithheld).toMatch(/lease on this work expired 12s ago/);
+		// The work is COMMITTED and recoverable — only the publish is withheld.
+		expect(fin.empty).toBe(false);
+		expect(fin.headSha).not.toBe(handle.baseSha);
+		expect(git(handle.path, 'rev-parse', 'HEAD')).toBe(fin.headSha);
+		expect(git(handle.path, 'status', '--porcelain')).toBe('');
+		// …and the remote task branch was never created.
+		expect(() => git(originDir, 'rev-parse', '--verify', `refs/heads/${branch}`)).toThrow();
+	});
+
+	it('withholds the push when less lease remains than a push needs', async () => {
+		const clock = { ms: Date.parse('2026-09-04T10:00:00.000Z') };
+		const fenced = at(clock);
+		const branch = 'task/fence-margin-33334444';
+		const handle = await fenced.provision(spec('lw-fence-margin', branch));
+		writeFileSync(join(handle.path, 'agent-output.txt'), 'not enough lease left\n');
+
+		const fin = await fenced.finalize(handle, {
+			commitMessage: 'agent: fenced inside the margin',
+			push: true,
+			publishFence: { deadlineAt: clock.ms + 30_000, marginMs: 60_000 }
+		});
+
+		expect(fin.pushed).toBe(false);
+		expect(fin.publishWithheld).toMatch(/only 30s of the lease remains, below the 60s/);
+		expect(git(handle.path, 'rev-parse', 'HEAD')).toBe(fin.headSha);
+		expect(() => git(originDir, 'rev-parse', '--verify', `refs/heads/${branch}`)).toThrow();
+	});
+
+	it('fails CLOSED on a fence whose deadline cannot be read', async () => {
+		const clock = { ms: Date.parse('2026-09-04T10:30:00.000Z') };
+		const fenced = at(clock);
+		const branch = 'task/fence-unreadable-55556666';
+		const handle = await fenced.provision(spec('lw-fence-unreadable', branch));
+		writeFileSync(join(handle.path, 'agent-output.txt'), 'deadline unknown\n');
+
+		const fin = await fenced.finalize(handle, {
+			commitMessage: 'agent: unreadable lease deadline',
+			push: true,
+			publishFence: { deadlineAt: Number.NaN, marginMs: 60_000 }
+		});
+
+		expect(fin.pushed).toBe(false);
+		expect(fin.publishWithheld).toMatch(/lease deadline for this work is unknown/);
+		expect(() => git(originDir, 'rev-parse', '--verify', `refs/heads/${branch}`)).toThrow();
+	});
+
+	it('pushes exactly as before while the lease comfortably covers the push', async () => {
+		const clock = { ms: Date.parse('2026-09-04T11:00:00.000Z') };
+		const fenced = at(clock);
+		const branch = 'task/fence-open-77778888';
+		const handle = await fenced.provision(spec('lw-fence-open', branch));
+		writeFileSync(join(handle.path, 'agent-output.txt'), 'published normally\n');
+
+		const fin = await fenced.finalize(handle, {
+			commitMessage: 'agent: inside the lease',
+			push: true,
+			publishFence: { deadlineAt: clock.ms + 10 * 60_000, marginMs: 60_000 }
+		});
+
+		expect(fin.pushed).toBe(true);
+		expect(fin.publishWithheld).toBeUndefined();
+		expect(git(originDir, 'rev-parse', `refs/heads/${branch}`)).toBe(fin.headSha);
+	});
+
+	it('leaves a caller that supplies NO fence — the cloud runner — byte-for-byte unchanged', async () => {
+		// The cloud path holds no lease at all, so the fence must be
+		// unreachable rather than merely lenient there: same Git commands,
+		// same order, same push.
+		const invocations: string[][] = [];
+		const recording = ((
+			command: string,
+			args: readonly string[],
+			options: Record<string, unknown>,
+			callback: (error: Error | null, stdout?: string | Buffer, stderr?: string | Buffer) => void
+		) => {
+			invocations.push([command, ...args]);
+			return execFile(command, [...args], options as never, callback as never);
+		}) as unknown as typeof execFile;
+		const cloudLike = new LocalWorkspacePlugin({
+			execFile: recording,
+			// A clock that is ALWAYS past any conceivable deadline: if the
+			// fence were ever consulted without one being supplied, this
+			// finalize could not push.
+			now: () => Number.MAX_SAFE_INTEGER
+		});
+		const branch = 'task/fence-absent-9999aaaa';
+		const handle = await cloudLike.provision(spec('lw-fence-absent', branch));
+		writeFileSync(join(handle.path, 'agent-output.txt'), 'cloud parity\n');
+		invocations.length = 0;
+
+		const fin = await cloudLike.finalize(handle, { commitMessage: 'agent: no lease here', push: true });
+
+		expect(fin.pushed).toBe(true);
+		expect(fin.publishWithheld).toBeUndefined();
+		expect(git(originDir, 'rev-parse', `refs/heads/${branch}`)).toBe(fin.headSha);
+		expect(invocations.map((argv) => argv.slice(0, 3))).toEqual([
+			['git', 'add', '-A'],
+			['git', 'status', '--porcelain'],
+			['git', '-c', 'user.name=Ever Works Agent'],
+			['git', 'rev-parse', 'HEAD'],
+			['git', 'diff', '--name-only'],
+			['git', 'remote', 'get-url'],
+			['git', 'push', originUrl]
+		]);
+	});
+});
+
+describe('finalize — cancellation (agent execution v2 review follow-up)', () => {
+	it('refuses an already-aborted finalize before any Git call, leaving the tree uncommitted', async () => {
+		const handle = await plugin.provision(spec('task-cancel-1', 'task/cancel-1'));
+		writeFileSync(join(handle.path, 'cancel.txt'), 'never committed\n');
+		const controller = new AbortController();
+		controller.abort(new Error('lease lost'));
+
+		await expect(
+			plugin.finalize(handle, { commitMessage: 'agent: cancelled', push: true, signal: controller.signal })
+		).rejects.toMatchObject({ name: 'AbortError' });
+
+		// Nothing was staged, committed or pushed.
+		expect(git(handle.path, 'status', '--porcelain')).toContain('cancel.txt');
+		expect(git(handle.path, 'rev-parse', 'HEAD')).toBe(handle.baseSha);
+		expect(() => git(originDir, 'rev-parse', '--verify', 'refs/heads/task/cancel-1')).toThrow();
+	});
+
+	it('surfaces a cancellation that lands during the changed-files diff instead of reporting success', async () => {
+		const controller = new AbortController();
+		let abortedDuringDiff = false;
+		const abortingExecFile = ((
+			command: string,
+			args: readonly string[],
+			options: Record<string, unknown>,
+			callback: (error: Error | null, stdout?: string | Buffer, stderr?: string | Buffer) => void
+		) =>
+			execFile(
+				command,
+				[...args],
+				options as never,
+				((error, stdout, stderr) => {
+					if (!error && args[0] === 'diff' && args[1] === '--name-only') {
+						abortedDuringDiff = true;
+						controller.abort(new Error('lease lost'));
+					}
+					callback(error, stdout, stderr);
+				}) as never
+			)) as unknown as typeof execFile;
+		const interruptedPlugin = new LocalWorkspacePlugin({
+			execFile: abortingExecFile,
+			terminateProcessTree: async () => undefined
+		});
+		const handle = await interruptedPlugin.provision(spec('task-cancel-diff', 'task/cancel-diff'));
+		writeFileSync(join(handle.path, 'diff.txt'), 'committed locally, then cancelled\n');
+
+		// push:false is the path that used to return success here: the diff
+		// swallowed the abort and nothing after it re-checked the signal.
+		await expect(
+			interruptedPlugin.finalize(handle, {
+				commitMessage: 'agent: cancelled during diff',
+				push: false,
+				signal: controller.signal
+			})
+		).rejects.toMatchObject({ name: 'AbortError' });
+		expect(abortedDuringDiff).toBe(true);
+		expect(() => git(originDir, 'rev-parse', '--verify', 'refs/heads/task/cancel-diff')).toThrow();
+	});
+});

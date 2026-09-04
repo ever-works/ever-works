@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process';
-import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
+import { accessSync, constants as fsConstants, existsSync, statSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -10,6 +10,7 @@ import { resolveConfigPath, type ConfigFileSystem } from './core/config-store';
 import type { FetchLike } from './core/fleet-client';
 import type { Logger } from './core/logger';
 import { keychainDisabledByEnv, resolveSecretStore, type SecretStore } from './core/secret-store';
+import { resolveModelCliPaths } from './core/model-cli-probe';
 import type { ResourceProbe, ResourceSample } from './core/resource-limits';
 import type { DiskProbeIo } from './core/telemetry-probe';
 
@@ -125,14 +126,18 @@ export function defaultConfigPath(): string {
 	});
 }
 
-/** True when the path is an existing file this process may execute. */
+/**
+ * True when the path is an existing REGULAR FILE this process may execute.
+ * A directory (or a socket, a device) is never an executable, even though
+ * it may exist and — on POSIX — carry the execute bit.
+ */
 export function isExecutableFile(filePath: string): boolean {
 	try {
-		if (!existsSync(filePath)) {
+		if (!existsSync(filePath) || !statSync(filePath).isFile()) {
 			return false;
 		}
 		if (process.platform === 'win32') {
-			// Windows has no execute bit; existence is the whole test.
+			// Windows has no execute bit; a regular file is the whole test.
 			return true;
 		}
 		accessSync(filePath, fsConstants.X_OK);
@@ -144,6 +149,18 @@ export function isExecutableFile(filePath: string): boolean {
 
 /** Resolve a bare command name on `PATH`, or null. */
 export function lookupOnPath(command: string): string | null {
+	const hits = lookupAllOnPath(command);
+	return hits.length > 0 ? hits[0] : null;
+}
+
+/**
+ * Every `PATH` hit for a bare command, in `which`/`where` order.
+ *
+ * Windows `where` lists each launchable form (`claude`, `claude.cmd`);
+ * the model-CLI probe needs the whole list to pick one `cmd.exe` can
+ * actually run, so the single-hit variant above is a view over this.
+ */
+export function lookupAllOnPath(command: string): string[] {
 	const which = process.platform === 'win32' ? 'where' : 'which';
 	try {
 		const output = execFileSync(which, [command], {
@@ -152,10 +169,12 @@ export function lookupOnPath(command: string): string | null {
 			stdio: ['ignore', 'pipe', 'ignore'],
 			timeout: 5_000
 		});
-		const first = output.split(/\r?\n/).find((line) => line.trim());
-		return first ? first.trim() : null;
+		return output
+			.split(/\r?\n/)
+			.map((line) => line.trim())
+			.filter((line) => line.length > 0);
 	} catch {
-		return null;
+		return [];
 	}
 }
 
@@ -167,7 +186,7 @@ export function lookupOnPath(command: string): string | null {
  * pointed at the same binary.
  */
 export function currentEnvironment(): CapabilityEnvironment {
-	return readEnvironment(
+	const environment = readEnvironment(
 		{
 			platform: process.platform,
 			arch: process.arch,
@@ -177,6 +196,18 @@ export function currentEnvironment(): CapabilityEnvironment {
 		resolveBrowserPath,
 		{ fileExists: isExecutableFile, lookupOnPath }
 	);
+	// Agent execution v2 — the model CLIs this machine can drive, resolved
+	// once here for the same reason the browser is: the tag and the
+	// executor must point at the same binary.
+	const modelCli = resolveModelCliPaths({
+		env: process.env,
+		platform: process.platform,
+		fileExists: isExecutableFile,
+		lookupAllOnPath
+	});
+	environment.modelCli = modelCli.paths;
+	environment.modelCliNotes = modelCli.notes;
+	return environment;
 }
 
 /**

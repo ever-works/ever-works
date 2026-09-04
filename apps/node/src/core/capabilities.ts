@@ -1,5 +1,6 @@
 import { FLEET_BROWSER_CAPABILITY, FLEET_GPU_CAPABILITY } from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
+import type { ModelCliPaths } from './executors/model-cli';
 import { detectGpu } from './gpu-probe';
 import {
 	MAX_CAPABILITY_TAG_LENGTH,
@@ -43,6 +44,16 @@ export interface CapabilityEnvironment {
 	 * the executor can never disagree about what is installed.
 	 */
 	browserPath?: string | null;
+	/**
+	 * Absolute paths of the model CLIs this machine can drive for an
+	 * `agent-task` (agent execution v2), resolved once at startup by
+	 * `resolveModelCliPaths`. A resolved path is what turns the
+	 * `claude-code` / `codex` tag on — the SAME path the model step
+	 * spawns, so the tag and the executor can never disagree.
+	 */
+	modelCli?: ModelCliPaths;
+	/** Startup log lines explaining each model-CLI decision. */
+	modelCliNotes?: string[];
 }
 
 /**
@@ -177,6 +188,9 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 	]);
 	const major = nodeMajor(environment.nodeVersion);
 	const hasBrowser = typeof environment.browserPath === 'string' && environment.browserPath.length > 0;
+	const hasClaude =
+		typeof environment.modelCli?.['claude-code'] === 'string' && environment.modelCli['claude-code'].length > 0;
+	const hasCodex = typeof environment.modelCli?.codex === 'string' && environment.modelCli.codex.length > 0;
 
 	return normalizeCapabilities([
 		`os:${environment.platform}`,
@@ -187,6 +201,10 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		git ? 'git' : null,
 		environment.hasDisplay ? 'display' : null,
 		hasBrowser ? FLEET_BROWSER_CAPABILITY : null,
+		// Agent execution v2 — a model CLI the node can actually spawn.
+		// Same rule as `browser`: the tag is backed by a resolved path.
+		hasClaude ? 'claude-code' : null,
+		hasCodex ? 'codex' : null,
 		gpu ? FLEET_GPU_CAPABILITY : null,
 		// Vendor is a second, narrower tag rather than a replacement:
 		// a job that needs "any accelerator" must not have to enumerate
