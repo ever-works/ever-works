@@ -198,21 +198,6 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
-      # This job has been called `lint-and-test` since it was written and did
-      # not lint. Nothing in any workflow ran ESLint, which is how 42 errors
-      # accumulated on `develop` unnoticed — and it would have made the new
-      # rule banning unscoped BFF calls decorative, since a guardrail nobody
-      # enforces is a comment.
-      #
-      # Like `format:check` above, this runs on EVERY run: it needs only the
-      # install, and a lint error should not wait for a 10-minute build to be
-      # reported. The four rules with an existing backlog are demoted to
-      # warnings in `apps/web/eslint.config.mjs` (see EW-789) so the gate can
-      # be switched on today rather than behind a large refactor; everything
-      # else is enforced from now on.
-      - name: Lint
-        run: pnpm lint
-
       # Decide whether the expensive half of this job is needed.
       #
       # `lint-and-test` is the ONLY required status check on main/develop/stage,
@@ -252,6 +237,25 @@ jobs:
       - name: Build all packages
         if: steps.scope.outputs.code == 'true'
         run: pnpm build --filter=!./apps/docs
+
+      # Lint runs AFTER the build, and that ordering is load-bearing.
+      # `apps/mcp` lints with `recommendedTypeChecked` + `projectService`, so
+      # its rules need REAL types. With `@ever-works/contracts` unbuilt, every
+      # value crossing that import is `error`-typed and `no-unsafe-assignment`
+      # fires on correct code. Placing this next to `format:check` — where it
+      # only needs the install and reports sooner — failed exactly that way.
+      #
+      # Nothing ran ESLint at all before this. The job has been named
+      # `lint-and-test` since it was written and did format:check, build and
+      # test, which is how 42 errors accumulated on develop unnoticed and would
+      # have made the rule banning unscoped BFF calls decorative. The four
+      # rules with an existing backlog are demoted to warnings in
+      # `apps/web/eslint.config.mjs` (see EW-789) so the gate can switch on
+      # today rather than behind a large refactor; everything else is enforced
+      # from now on.
+      - name: Lint
+        if: steps.scope.outputs.code == 'true'
+        run: pnpm lint
 
       # --- Regression guard: the /login locale-rewrite defect class -----------
       #
