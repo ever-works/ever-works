@@ -43,16 +43,25 @@ function trustedBrowserOrigin(): string | null {
 }
 
 /**
- * Convert the browser's explicit, per-tab selector into the API contract.
- * Referer is optional, but when present it must come from this deployment's own
- * public origin and agree with the selector. Both browser and API scope headers
- * are always overwritten.
+ * Query-string carrier for routes a browser NAVIGATES to.
+ *
+ * `<a href download>`, `<img src>` and `<video src>` cannot send a custom
+ * header, so `x-ever-workspace` never reaches those routes — and Next
+ * middleware cannot supply it either, because `proxy.ts`'s matcher excludes
+ * `/api`. Those routes read the selector from `?scope=` instead.
+ *
+ * The value is the SAME grammar as the header (`personal` | `org:<slug>`), so
+ * the two carriers cannot disagree about what a valid selector is.
  */
-export function applyBffWorkspaceScope(request: Request, baseHeaders: HeadersInit): Headers {
+export const WORKSPACE_SCOPE_QUERY_PARAM = 'scope' as const;
+
+function toScopedHeaders(
+    rawSelector: string | null,
+    request: Request,
+    baseHeaders: HeadersInit,
+): Headers {
     try {
-        const selected = parseWorkspaceSelector(
-            request.headers.get(BROWSER_WORKSPACE_SCOPE_HEADER),
-        );
+        const selected = parseWorkspaceSelector(rawSelector);
         const referer = request.headers.get('referer');
         if (referer) {
             const refererUrl = new URL(referer);
@@ -72,4 +81,51 @@ export function applyBffWorkspaceScope(request: Request, baseHeaders: HeadersIni
     } catch {
         throw new Error('Invalid workspace scope');
     }
+}
+
+/**
+ * Convert the browser's explicit, per-tab selector into the API contract.
+ * Referer is optional, but when present it must come from this deployment's own
+ * public origin and agree with the selector. Both browser and API scope headers
+ * are always overwritten.
+ *
+ * Header ONLY. This deliberately ignores `?scope=`: an XHR route that also
+ * honoured the query string would let a crafted link influence a fetch the
+ * page's own transport thought it controlled. Routes reached by navigation use
+ * {@link applyBffWorkspaceScopeFromNavigation}.
+ */
+export function applyBffWorkspaceScope(request: Request, baseHeaders: HeadersInit): Headers {
+    return toScopedHeaders(
+        request.headers.get(BROWSER_WORKSPACE_SCOPE_HEADER),
+        request,
+        baseHeaders,
+    );
+}
+
+/**
+ * For routes a browser navigates to: `?scope=` first, then the header.
+ *
+ * The query string wins when both are present because a navigation IS the
+ * user's action — the URL they clicked is the authority, in the same way the
+ * visible pathname is for the app shell. When neither is present this throws,
+ * exactly like the header variant: an old bookmark with no scope is a request
+ * with no answer to "which workspace?", and silently defaulting to personal is
+ * the bug this whole family of fixes removes.
+ *
+ * The Referer check in {@link toScopedHeaders} does extra work here for free.
+ * For a navigation, Referer is the page the link sat on — so a `?scope=` that
+ * disagrees with the page the user is actually looking at is rejected, which
+ * makes a copied-and-edited URL fail closed rather than cross scopes.
+ *
+ * `request.url`'s ORIGIN is unreliable inside Next (see `trustedBrowserOrigin`),
+ * but its path and query are intact, which is all this reads.
+ */
+export function applyBffWorkspaceScopeFromNavigation(
+    request: Request,
+    baseHeaders: HeadersInit,
+): Headers {
+    const fromQuery = new URL(request.url).searchParams.get(WORKSPACE_SCOPE_QUERY_PARAM);
+    const raw =
+        fromQuery !== null ? fromQuery : request.headers.get(BROWSER_WORKSPACE_SCOPE_HEADER);
+    return toScopedHeaders(raw, request, baseHeaders);
 }
