@@ -1,7 +1,8 @@
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AgentPluginStdioServerService } from './stdio-server.service';
+import { AgentPluginStdioServerService, createStdioTransportFactory } from './stdio-server.service';
 import { AgentPluginPackageDataDirService } from './package-data-dir.service';
 import { LaunchRefused } from './stdio-launcher';
 
@@ -235,4 +236,76 @@ describe('AgentPluginStdioServerService', () => {
         await expect(service.shutdownAll()).resolves.toEqual({ stopped: 0, failed: 0 });
         expect(closes).toBe(1);
     });
+});
+
+/**
+ * The REAL factory, spawning a REAL process.
+ *
+ * Everything above injects a fake factory, which is right for testing the gate
+ * and the lifecycle but means `createStdioTransportFactory` — the only code
+ * that starts a process — ran in no test at all. It shipped a stall.
+ */
+describe('createStdioTransportFactory', () => {
+    let dir: string;
+    let child: string;
+
+    beforeAll(async () => {
+        dir = await mkdtemp(join(tmpdir(), 'stdio-real-'));
+        child = join(dir, 'child.cjs');
+        // Writes `PROBE_SIZE` bytes to stderr, then records that the write
+        // actually FLUSHED. A blocked child never reaches the callback.
+        await writeFile(
+            child,
+            [
+                "const fs = require('node:fs');",
+                "process.stderr.write('x'.repeat(Number(process.env.PROBE_SIZE)), () => {",
+                "    try { fs.writeFileSync(process.env.PROBE_MARKER, 'flushed'); } catch {}",
+                '});',
+                'setInterval(() => {}, 10000);',
+            ].join('\n'),
+            'utf8',
+        );
+    });
+
+    async function spawnWriting(bytes: number): Promise<boolean> {
+        const marker = join(dir, `marker-${bytes}-${Date.now()}`);
+
+        const factory = await createStdioTransportFactory();
+        const transport = await factory.create({
+            command: process.execPath,
+            args: [child],
+            env: { PROBE_SIZE: String(bytes), PROBE_MARKER: marker },
+            cwd: dir,
+            stderr: 'pipe',
+        });
+
+        try {
+            // Generous, because the assertion is "does it EVER finish", not
+            // "how fast". A stalled child never writes the marker at all.
+            for (let waited = 0; waited < 4000; waited += 100) {
+                if (existsSync(marker)) return true;
+                await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+            return false;
+        } finally {
+            await transport.close().catch(() => undefined);
+        }
+    }
+
+    it('spawns a process that can write a little to stderr', async () => {
+        await expect(spawnWriting(10)).resolves.toBe(true);
+    }, 30000);
+
+    /**
+     * The regression. `stderr: 'pipe'` routes the child's stderr into a
+     * PassThrough that nothing reads, so past roughly 80 KB (16 KB PassThrough
+     * + ~64 KB OS pipe) backpressure stalls the child mid-write — and an MCP
+     * server frozen inside a write to stderr stops answering entirely.
+     *
+     * 10 bytes passes either way, which is exactly why this needs a payload
+     * larger than the buffers rather than a token one.
+     */
+    it('does not stall a process that writes 200 KB to stderr', async () => {
+        await expect(spawnWriting(200_000)).resolves.toBe(true);
+    }, 30000);
 });

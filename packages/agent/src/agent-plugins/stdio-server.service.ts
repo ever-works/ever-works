@@ -183,16 +183,52 @@ export class AgentPluginStdioServerService {
 
     private async getFactory(): Promise<StdioTransportFactory> {
         if (this.factory) return this.factory;
-
-        const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
-
-        this.factory = {
-            async create(params) {
-                const transport = new StdioClientTransport(params);
-                await transport.start();
-                return transport as unknown as { close(): Promise<void> };
-            },
-        };
+        this.factory = await createStdioTransportFactory();
         return this.factory;
     }
+}
+
+/**
+ * The factory that actually spawns.
+ *
+ * Exported, and not inlined into `getFactory`, because it was previously
+ * unreachable from any test: every spec injects a fake factory, so the one
+ * function that starts a real process ran nowhere. That is the same shape that
+ * hid the `pinnedFetch` deadlock, and it hid a second one here.
+ */
+export async function createStdioTransportFactory(): Promise<StdioTransportFactory> {
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+
+    return {
+        async create(params) {
+            const transport = new StdioClientTransport(params);
+            await transport.start();
+
+            // MANDATORY, not hygiene. `stderr: 'pipe'` keeps a package's output
+            // out of the platform's log stream — the whole reason it is not
+            // 'inherit' — but the SDK only pipes the child's stderr into a
+            // PassThrough and hands it over; nothing reads it. Once roughly
+            // 80 KB accumulates (a 16 KB PassThrough plus the ~64 KB OS pipe)
+            // backpressure stalls the CHILD mid-write, and an MCP server frozen
+            // inside a write to stderr stops answering entirely.
+            //
+            // Measured against the real SDK: 10 bytes of stderr completes,
+            // 200 KB never does, and 200 KB with this line completes. Exactly
+            // the size-dependent stealth that let it past review — a chatty
+            // debug log is enough to reach it, and nothing looks wrong until a
+            // server silently stops responding.
+            //
+            // `resume()` discards rather than captures. That is deliberate:
+            // retaining package stderr would mean either putting attacker-
+            // controlled text into our logs (the risk 'pipe' exists to avoid)
+            // or building a buffer nothing reads, which is a dead seam.
+            // `.on('data')` rather than `.resume()`: the SDK types this as the
+            // base `Stream`, which has no `resume`, and attaching a data
+            // listener puts the readable into flowing mode — the same drain
+            // without an `as` cast over the SDK's own typing.
+            transport.stderr?.on('data', () => undefined);
+
+            return transport as unknown as { close(): Promise<void> };
+        },
+    };
 }
