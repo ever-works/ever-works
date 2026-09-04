@@ -1,4 +1,4 @@
-import { createGuardedFetch, MAX_REDIRECTS } from './guarded-fetch';
+import { createGuardedFetch, MAX_REDIRECTS, pinnedFetch } from './guarded-fetch';
 
 /**
  * The property under test is what CROSSES a redirect, not whether fetch works.
@@ -230,5 +230,67 @@ describe('createGuardedFetch', () => {
         // target is handed to it for checking rather than fetched directly.
         expect(hops[1].url).toBe('http://127.0.0.1:6379/');
         expect(impl).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('pinnedFetch — DNS rebinding', () => {
+    it('refuses when ANY resolved address is private, not just the first', async () => {
+        // A response mixing a public and a private record would otherwise pass
+        // whenever the public one happens to be picked — a coin toss, not a
+        // control.
+        const resolver = jest.fn().mockResolvedValue([
+            { address: '93.184.216.34', family: 4 },
+            { address: '127.0.0.1', family: 4 },
+        ]);
+
+        await expect(
+            pinnedFetch('https://rebind.example.com/mcp', undefined, resolver),
+        ).rejects.toMatchObject({ code: 'dns_private_ip' });
+    });
+
+    it('refuses a private IPv6 answer', async () => {
+        const resolver = jest.fn().mockResolvedValue([{ address: '::1', family: 6 }]);
+
+        await expect(
+            pinnedFetch('https://rebind.example.com/mcp', undefined, resolver),
+        ).rejects.toMatchObject({ code: 'dns_private_ip' });
+    });
+
+    it('refuses when the lookup returns nothing', async () => {
+        const resolver = jest.fn().mockResolvedValue([]);
+
+        await expect(
+            pinnedFetch('https://nowhere.example.com/mcp', undefined, resolver),
+        ).rejects.toMatchObject({ code: 'dns_no_results' });
+    });
+
+    it('refuses a lookup failure rather than falling through to fetch', async () => {
+        const resolver = jest.fn().mockRejectedValue(new Error('SERVFAIL'));
+
+        await expect(
+            pinnedFetch('https://broken.example.com/mcp', undefined, resolver),
+        ).rejects.toMatchObject({ code: 'dns_lookup_failed' });
+    });
+
+    it('applies the lexical guard before spending a DNS lookup', async () => {
+        const resolver = jest.fn();
+
+        await expect(
+            pinnedFetch('http://169.254.169.254/latest/meta-data/', undefined, resolver),
+        ).rejects.toMatchObject({ code: 'lexical_blocked' });
+
+        expect(resolver).not.toHaveBeenCalled();
+    });
+
+    it('does NOT resolve a literal-IP host — there is no name to rebind', async () => {
+        const resolver = jest.fn();
+
+        // Rejected by the lexical guard, and the point is that the resolver
+        // was never consulted: a literal address cannot be rebound.
+        await expect(
+            pinnedFetch('http://127.0.0.1:6379/mcp', undefined, resolver),
+        ).rejects.toMatchObject({ code: 'lexical_blocked' });
+
+        expect(resolver).not.toHaveBeenCalled();
     });
 });

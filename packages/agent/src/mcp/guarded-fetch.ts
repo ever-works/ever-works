@@ -1,4 +1,12 @@
-import { safeFetchWithDnsPin, SsrfBlockedError, type DnsResolver } from '../utils/ssrf-guard';
+import { isIP } from 'node:net';
+import { lookup as dnsLookup } from 'node:dns/promises';
+import {
+    isPrivateIPv4,
+    isPrivateIPv6,
+    isSafeWebhookUrl,
+    SsrfBlockedError,
+    type DnsResolver,
+} from '../utils/ssrf-guard';
 
 /**
  * SSRF- and redirect-hardened `fetch` for the MCP client (AP-15).
@@ -51,6 +59,104 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
  */
 const REWRITE_TO_GET = new Set([301, 302, 303]);
 
+/**
+ * Resolve a host, validate every address, and CONNECT TO THE ONE VALIDATED.
+ *
+ * `safeFetchWithDnsPin` does the first two steps correctly — it rejects the
+ * lookup if any returned address is private — and then calls
+ * `fetch(rawUrl, init)`, which resolves the hostname AGAIN. Its own docstring
+ * says as much: it "closes the obvious half of that race". The half left open
+ * is the one that matters: a name the attacker controls can answer publicly
+ * for the validation lookup and privately for the connection a moment later,
+ * and nothing in between notices.
+ *
+ * Pinning closes it by taking the address out of the connection's hands. The
+ * URL, and therefore the `Host` header and the TLS SNI, are untouched — so
+ * certificate validation still happens against the hostname, and a pinned
+ * connection to a host presenting the wrong certificate still fails.
+ *
+ * A literal-IP URL skips DNS entirely: there is no name to rebind, and the
+ * lexical guard has already judged the address.
+ */
+export async function pinnedFetch(
+    url: string,
+    init: RequestInit | undefined,
+    resolver: DnsResolver | undefined,
+): Promise<Response> {
+    if (!isSafeWebhookUrl(url)) {
+        throw new SsrfBlockedError('lexical_blocked', 'URL rejected by lexical SSRF guard');
+    }
+
+    const parsed = new URL(url);
+    let host = parsed.hostname.toLowerCase();
+    if (host.startsWith('[') && host.endsWith(']')) {
+        host = host.slice(1, -1);
+    }
+
+    // A literal address was already judged above and cannot be rebound.
+    if (isIP(host) !== 0) {
+        return fetch(url, init);
+    }
+
+    let addresses: { address: string; family: number }[];
+    try {
+        addresses = resolver
+            ? await resolver(host)
+            : await dnsLookup(host, { all: true, verbatim: true });
+    } catch (err) {
+        throw new SsrfBlockedError(
+            'dns_lookup_failed',
+            `DNS lookup failed for ${host}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+    }
+
+    if (!Array.isArray(addresses) || addresses.length === 0) {
+        throw new SsrfBlockedError(
+            'dns_no_results',
+            `DNS lookup returned no addresses for ${host}`,
+        );
+    }
+
+    // EVERY address, not the one we happen to pick. A response mixing a public
+    // and a private record would otherwise pass whenever the public one is
+    // chosen, which is a coin toss rather than a control.
+    for (const entry of addresses) {
+        if (entry.family === 4 && isPrivateIPv4(entry.address)) {
+            throw new SsrfBlockedError(
+                'dns_private_ip',
+                `${host} resolved to private IPv4 ${entry.address}`,
+            );
+        }
+        if (entry.family === 6 && isPrivateIPv6(entry.address)) {
+            throw new SsrfBlockedError(
+                'dns_private_ip',
+                `${host} resolved to private IPv6 ${entry.address}`,
+            );
+        }
+    }
+
+    const pinned = addresses[0];
+    const { Agent } = await import('undici');
+    const dispatcher = new Agent({
+        connect: {
+            // Hand back only the address just validated. undici still uses the
+            // URL's hostname for SNI and the Host header, so TLS verification
+            // is unchanged.
+            lookup: (
+                _hostname: string,
+                _options: unknown,
+                callback: (err: Error | null, address: string, family: number) => void,
+            ) => callback(null, pinned.address, pinned.family),
+        },
+    });
+
+    try {
+        return await fetch(url, { ...init, dispatcher } as RequestInit);
+    } finally {
+        await dispatcher.close().catch(() => undefined);
+    }
+}
+
 export interface GuardedFetchOptions {
     /** Injected in tests so no DNS or network is required. */
     dnsResolver?: DnsResolver;
@@ -75,12 +181,7 @@ function headerEntries(init: RequestInit | undefined): [string, string][] {
 export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFetch {
     const doFetch =
         options.fetchImpl ??
-        ((url: string, init?: RequestInit) =>
-            safeFetchWithDnsPin(
-                url,
-                init,
-                options.dnsResolver ? { dnsResolver: options.dnsResolver } : undefined,
-            ));
+        ((url: string, init?: RequestInit) => pinnedFetch(url, init, options.dnsResolver));
 
     return async function guardedFetch(input, init) {
         let currentUrl = typeof input === 'string' ? input : input.toString();
