@@ -27,6 +27,17 @@ import type { MemoryFileRow } from '@/lib/api/memory-files-types';
  * Unlike the KB (which stores a rendered body to show instead), Files
  * has only bytes, so this component fetches small text payloads itself
  * and renders them; anything else falls back to a download card.
+ *
+ * **Transport (EW-786).** The text preview below stays on a raw
+ * `fetch()` — the exception to the rest of Memory, which moved to
+ * `browserApiFetch`. `url` is the download route, and that route is
+ * deliberately left UNSCOPED because the binary viewers put the very
+ * same `url` on an `<img>`/`<video>`/object element and the overlay's
+ * own Download control is an `<a href>`; neither can carry a header, and
+ * a scoped route 400s without one. Sending the selector from here alone
+ * would imply a contract the route does not honour. The consequence is
+ * that previewing an org-scoped Memory original 404s — see
+ * `app/api/memory/files/[id]/download/route.ts` for the full analysis.
  */
 
 /** Text payloads above this are not fetched for inline display. */
