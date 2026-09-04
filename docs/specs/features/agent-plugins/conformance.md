@@ -93,6 +93,12 @@ exists, is gated and is tested, but nothing in the agent run path calls it yet â
 a stdio server can be planned, gated and spawned, and still contributes no tools
 to an agent.
 
+Whoever closes that gap must wire `AgentPluginStdioServerService.launch` **and**
+`shutdownAll` in the same change. `shutdownAll` has no caller today either, so
+wiring only the spawn leaks one subprocess per run for the lifetime of the pod â€”
+invisible until the pod is OOM-killed. The generation counter makes the pair safe
+to interleave; it does not make either safe to omit.
+
 That is not required for the claim as stated: v1.0.0 lets a client support a
 subset of component types provided it is honest about which, and the claim names
 skills and MCP. It is written here so the boundary is visible rather than

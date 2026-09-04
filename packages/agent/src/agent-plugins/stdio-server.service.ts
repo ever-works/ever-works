@@ -155,10 +155,20 @@ export class AgentPluginStdioServerService {
     /**
      * Stop every process this service started.
      *
-     * Called at run end. Failures are swallowed per process so that one
-     * unresponsive server cannot strand the others — a half-completed
-     * teardown leaks processes for the lifetime of the pod, which is worse
-     * than a noisy log line.
+     * **Nothing calls this yet, and nothing calls `launch` either.** This said
+     * "Called at run end", which was not true — the same dead-seam claim this
+     * programme has criticised elsewhere, written into a docstring where it
+     * would be believed.
+     *
+     * It matters to whoever finishes AP-14: `launch` and `shutdownAll` have to
+     * be wired in the SAME change. Wiring only the spawn leaks one subprocess
+     * per run for the lifetime of the pod, and the leak is invisible until the
+     * pod is OOM-killed. The generation counter makes the pair safe to
+     * interleave; it does not make either safe to omit.
+     *
+     * Failures are swallowed per process so that one unresponsive server
+     * cannot strand the others — a half-completed teardown leaks processes,
+     * which is worse than a noisy log line.
      */
     async shutdownAll(): Promise<{ stopped: number; failed: number }> {
         // Bumped BEFORE the snapshot, so a launch that completes during
