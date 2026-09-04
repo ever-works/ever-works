@@ -165,7 +165,14 @@ describe('AgentPluginInstallService', () => {
         // This is the production caller the reconciler was missing. Without
         // it, package MCP declarations never became connection rows outside
         // tests — the same dead-seam shape as `checkForUpdates`.
-        expect(reconciler.reconcile).toHaveBeenCalledWith('owner');
+        // Scoped to the package JUST INSTALLED, and carrying the owner's
+        // tenancy. The packages root is shared across the deployment, so a
+        // reconcile of everything under it would mint rows for this owner
+        // pointing at other tenants' packages' servers.
+        expect(reconciler.reconcile).toHaveBeenCalledWith(
+            { userId: 'owner', tenantId: null, organizationId: null },
+            'acme.tools',
+        );
     });
 
     it('does NOT fail the install when reconciliation fails', async () => {

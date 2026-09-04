@@ -120,7 +120,7 @@ describe('PackageMcpReconcilerService', () => {
         delete process.env.FEATURE_AGENT_PLUGINS;
         const { service, repo } = build();
 
-        const result = await service.reconcile('user-1');
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
         expect(result.created).toEqual([]);
         expect(repo.create).not.toHaveBeenCalled();
@@ -132,7 +132,7 @@ describe('PackageMcpReconcilerService', () => {
         });
         const { service, repo } = build();
 
-        const result = await service.reconcile('user-1');
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
         expect(result.created).toEqual(['acme-tools-api']);
         // The security property of this whole bridge: a package arriving on
@@ -168,7 +168,7 @@ describe('PackageMcpReconcilerService', () => {
             });
             const { service, repo } = build();
 
-            const result = await service.reconcile('user-1');
+            const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
             // Never becomes a valid server entry, so it never reaches the
             // reconciler at all.
@@ -185,7 +185,7 @@ describe('PackageMcpReconcilerService', () => {
             });
             const { service, repo } = build();
 
-            const result = await service.reconcile('user-1');
+            const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
             // This is the gap the second layer exists for: writing to the
             // repository bypasses `McpConnectionsService`, so the SSRF guard
@@ -201,7 +201,7 @@ describe('PackageMcpReconcilerService', () => {
             });
             const { service } = build();
 
-            const result = await service.reconcile('user-1');
+            const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
             expect(result.created).toEqual(['acme-tools-api']);
         });
@@ -213,8 +213,8 @@ describe('PackageMcpReconcilerService', () => {
         });
         const { service, repo } = build();
 
-        await service.reconcile('user-1');
-        const second = await service.reconcile('user-1');
+        await service.reconcile({ userId: 'user-1' }, 'acme.tools');
+        const second = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
         expect(second.created).toEqual([]);
         expect(second.unchanged).toEqual(['acme-tools-api']);
@@ -235,7 +235,7 @@ describe('PackageMcpReconcilerService', () => {
         } as McpServerConnection;
         const { service, repo } = build(repoStub([existing]));
 
-        const result = await service.reconcile('user-1');
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
         expect(result.updated).toEqual(['acme-tools-api']);
         expect(repo.save).toHaveBeenCalled();
@@ -259,7 +259,7 @@ describe('PackageMcpReconcilerService', () => {
         } as McpServerConnection;
         const { service, repo } = build(repoStub([manual]));
 
-        const result = await service.reconcile('user-1');
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
         // Otherwise a package could silently repoint a connection the operator
         // created and trusts at an address of its choosing.
@@ -276,7 +276,7 @@ describe('PackageMcpReconcilerService', () => {
         });
         const { service, repo } = build();
 
-        const result = await service.reconcile('user-1');
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
         expect(result.created).toEqual([]);
         expect(result.skipped[0]?.code).toBe('disabled-by-policy');
@@ -293,7 +293,7 @@ describe('PackageMcpReconcilerService', () => {
         });
         const { service, repo } = build();
 
-        const result = await service.reconcile('user-1');
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
         expect(result.created).toEqual([]);
         expect(result.skipped[0]?.code).toBe('unsupported-transport');
@@ -309,7 +309,7 @@ describe('PackageMcpReconcilerService', () => {
         });
         const { service } = build();
 
-        const result = await service.reconcile('user-1');
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
         // One report explaining every declared server beats two half-reports.
         expect(result.skipped).toHaveLength(1);
@@ -318,7 +318,14 @@ describe('PackageMcpReconcilerService', () => {
         expect(result.skipped[0].code).toBe('needs-plugin-data');
     });
 
-    it('reconciles several packages in one pass', async () => {
+    it('reconciles ONLY the named package, never everything on the shared root', async () => {
+        // The packages root is deployment-wide: remote packages are keyed by
+        // ORIGIN (`git/<url>/<sha>`, `npm/<name>/<version>`) and never by
+        // owner, so every user's packages sit side by side under it. A
+        // reconcile that walked all of them would mint connection rows for
+        // whichever owner happened to install something, pointing at URLs
+        // chosen by another tenant's package. The rows arrive disabled, but
+        // their new owner can enable them.
         const root = process.env.AGENT_PLUGINS_DIR!;
         await writePackage(root, 'one', 'pkg.one', {
             api: { type: 'streamable-http', url: 'https://one.example.com/mcp' },
@@ -326,11 +333,34 @@ describe('PackageMcpReconcilerService', () => {
         await writePackage(root, 'two', 'pkg.two', {
             api: { type: 'sse', url: 'https://two.example.com/sse' },
         });
-        const { service } = build();
+        const { service, repo } = build();
 
-        const result = await service.reconcile('user-1');
+        const result = await service.reconcile({ userId: 'user-1' }, 'pkg.one');
 
-        // Same server name in both packages, distinct connection names.
-        expect([...result.created].sort()).toEqual(['pkg-one-api', 'pkg-two-api']);
+        expect(result.created).toEqual(['pkg-one-api']);
+        expect(repo.rows.map((row) => row.name)).toEqual(['pkg-one-api']);
+    });
+
+    it('stamps the owner tenancy onto a row it creates', async () => {
+        // The install row carries tenantId/organizationId (EW-651 Tier A). A
+        // connection minted because of that install must carry the same, or a
+        // scoped query cannot account for it.
+        await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
+            api: { type: 'streamable-http', url: 'https://acme.example.com/mcp' },
+        });
+        const { service, repo } = build();
+
+        await service.reconcile(
+            { userId: 'user-1', tenantId: 'tenant-1', organizationId: 'org-1' },
+            'acme.tools',
+        );
+
+        expect(repo.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: 'user-1',
+                tenantId: 'tenant-1',
+                organizationId: 'org-1',
+            }),
+        );
     });
 });

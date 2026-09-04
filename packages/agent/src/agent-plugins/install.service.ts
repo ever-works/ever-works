@@ -90,7 +90,14 @@ export class AgentPluginInstallService {
         // later. Losing a good install over a connection row is the wrong
         // trade.
         try {
-            const outcome = await this.reconciler.reconcile(owner.userId);
+            const outcome = await this.reconciler.reconcile(
+                {
+                    userId: owner.userId,
+                    tenantId: owner.tenantId ?? null,
+                    organizationId: owner.organizationId ?? null,
+                },
+                pkg.manifest.name,
+            );
             if (outcome.created.length > 0) {
                 this.logger.log(
                     `Created ${outcome.created.length} package MCP connection(s), ` +

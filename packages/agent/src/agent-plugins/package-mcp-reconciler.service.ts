@@ -104,6 +104,19 @@ export function connectionNameFor(packageName: string, serverName: string): stri
     return MCP_CONNECTION_NAME_PATTERN.test(truncated) ? truncated : null;
 }
 
+/**
+ * Who the reconciled rows belong to.
+ *
+ * The Tier A scope columns ride along so a package-created connection carries
+ * the same tenancy as the install row that caused it, rather than being written
+ * with a null tenant that no scoped query can then account for.
+ */
+export interface ReconcileOwner {
+    userId: string;
+    tenantId?: string | null;
+    organizationId?: string | null;
+}
+
 @Injectable()
 export class PackageMcpReconcilerService {
     private readonly logger = new Logger(PackageMcpReconcilerService.name);
@@ -114,8 +127,19 @@ export class PackageMcpReconcilerService {
     ) {}
 
     /**
-     * Make the connection rows for `userId` agree with what installed packages
-     * declare.
+     * Make `owner`'s connection rows agree with what the package named
+     * `packageName` declares.
+     *
+     * SCOPED TO ONE PACKAGE ON PURPOSE. The resolver reads the shared,
+     * deployment-wide packages root — remote packages live at
+     * `<root>/git/<url>/<sha>` and `<root>/npm/<name>/<version>`, keyed by
+     * origin and never by owner — so `resolveAll()` returns every package any
+     * user on this deployment has ever installed. Reconciling all of them
+     * against whichever owner happened to trigger an install would mint
+     * connection rows for that owner pointing at other tenants' packages'
+     * servers. The rows arrive disabled and unbound, but they are still
+     * enableable by their new owner, who never installed the package that
+     * chose the URL. Only the package actually being installed is reconciled.
      *
      * Idempotent: running it twice creates nothing the second time. It does
      * NOT delete connections for servers that have disappeared — a row may
@@ -123,7 +147,7 @@ export class PackageMcpReconcilerService {
      * that because a directory was momentarily unreadable would be worse than
      * leaving a stale row that is visibly disabled.
      */
-    async reconcile(userId: string): Promise<ReconcileResult> {
+    async reconcile(owner: ReconcileOwner, packageName: string): Promise<ReconcileResult> {
         const resolution = await this.resolver.resolveAll();
         const created: string[] = [];
         const unchanged: string[] = [];
@@ -137,11 +161,13 @@ export class PackageMcpReconcilerService {
         // Carry forward whatever the resolver already refused, so one report
         // explains every declared server rather than two half-reports.
         for (const entry of resolution.skipped) {
+            if (entry.packageName !== packageName) continue;
             skipped.push(entry);
         }
 
         for (const server of resolution.servers) {
-            const outcome = await this.reconcileOne(userId, server);
+            if (server.provenance.packageName !== packageName) continue;
+            const outcome = await this.reconcileOne(owner, server);
             if (outcome.kind === 'skipped') {
                 skipped.push({
                     name: server.name,
@@ -159,7 +185,8 @@ export class PackageMcpReconcilerService {
 
         if (created.length > 0 || updated.length > 0) {
             this.logger.log(
-                `Package MCP reconcile for ${userId}: ${created.length} created, ` +
+                `Package MCP reconcile for ${owner.userId} (${packageName}): ` +
+                    `${created.length} created, ` +
                     `${updated.length} updated, ${unchanged.length} unchanged, ` +
                     `${skipped.length} skipped`,
             );
@@ -169,7 +196,7 @@ export class PackageMcpReconcilerService {
     }
 
     private async reconcileOne(
-        userId: string,
+        owner: ReconcileOwner,
         server: ResolvedMcpServer,
     ): Promise<
         | { kind: 'created' | 'updated' | 'unchanged'; name: string }
@@ -241,11 +268,13 @@ export class PackageMcpReconcilerService {
             };
         }
 
-        const existing = await this.connections.findByUserAndName(userId, name);
+        const existing = await this.connections.findByUserAndName(owner.userId, name);
 
         if (!existing) {
             await this.connections.create({
-                userId,
+                userId: owner.userId,
+                tenantId: owner.tenantId ?? null,
+                organizationId: owner.organizationId ?? null,
                 name,
                 url,
                 transport: server.transport as McpServerConnection['transport'],
