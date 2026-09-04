@@ -234,7 +234,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       package (zip); round-trip gate (AP-22/23); slug guard enforcing the FULL
       spec name rule (≤64, no `--`, no leading/trailing hyphen — the DTO
       accepts all three) with rename prompt.
-- [ ] **T36**. `ever-works-mcp` package descriptor export (streamable-http
+- [x] **T36**. `ever-works-mcp` package descriptor export (streamable-http
       `https://mcp.ever.works/mcp`, credential-free; docs updated by addition —
       pointer from `docs/features/mcp-server.md`, no removal).
 

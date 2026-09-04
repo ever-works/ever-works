@@ -1,4 +1,10 @@
-import { AgentPluginExportService, ExportFailed } from './export.service';
+import {
+    AgentPluginExportService,
+    everWorksMcpDescriptorFiles,
+    EVER_WORKS_MCP_PACKAGE,
+    EVER_WORKS_MCP_URL,
+    ExportFailed,
+} from './export.service';
 
 /**
  * These run the REAL serializer and the REAL importer against a real
@@ -127,5 +133,72 @@ describe('AgentPluginExportService', () => {
         // An export can carry a user's private instructions; a temp directory
         // nobody cleans is exactly where those would linger.
         expect(after).toBe(before);
+    });
+});
+
+describe('Ever Works MCP descriptor (T36)', () => {
+    it('passes the SAME importer gate as any other export', async () => {
+        // A descriptor we publish is a package other clients install, so it
+        // has to pass exactly what we would demand of theirs.
+        const result = await service.buildEverWorksMcpDescriptor();
+
+        expect([...result.files.keys()].sort()).toEqual(['mcp.json', 'plugin.json']);
+    });
+
+    it('declares a streamable-http server at the hosted endpoint', async () => {
+        const files = everWorksMcpDescriptorFiles();
+        const mcp = JSON.parse(files.get('mcp.json')!);
+
+        expect(mcp.mcpServers['ever-works']).toEqual({
+            type: 'streamable-http',
+            url: EVER_WORKS_MCP_URL,
+        });
+    });
+
+    it('carries NO credentials, which AP-15 makes a rule rather than a preference', async () => {
+        const files = everWorksMcpDescriptorFiles();
+        const mcp = JSON.parse(files.get('mcp.json')!);
+
+        // Package-configured headers are visible and non-secret, so a
+        // descriptor embedding an API key would publish that key to every
+        // consumer of the package.
+        expect(mcp.mcpServers['ever-works'].headers).toBeUndefined();
+        expect(JSON.stringify(files.get('mcp.json'))).not.toMatch(/token|secret|api[-_]?key/iu);
+    });
+
+    it('uses a server name that is safe as a tool namespace', async () => {
+        const files = everWorksMcpDescriptorFiles();
+        const mcp = JSON.parse(files.get('mcp.json')!);
+
+        // Becomes `mcp__ever-works__<tool>`, so it must not contain the
+        // `__` separator or the name could not be split back apart.
+        for (const name of Object.keys(mcp.mcpServers)) {
+            expect(name).not.toContain('__');
+            expect(name).toMatch(/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/u);
+        }
+    });
+
+    it('names the package with a reverse-domain identifier the spec accepts', async () => {
+        const files = everWorksMcpDescriptorFiles();
+        const plugin = JSON.parse(files.get('plugin.json')!);
+
+        expect(plugin.name).toBe(EVER_WORKS_MCP_PACKAGE);
+        expect(plugin.$schema).toContain('1.0.0');
+    });
+
+    it('is a valid package despite having NO skills', async () => {
+        // The specification lets a package support any subset of the
+        // component types; a descriptor declares a server and nothing else.
+        const result = await service.buildEverWorksMcpDescriptor();
+
+        expect(result.files.has('skills')).toBe(false);
+        expect([...result.files.keys()].some((k) => k.startsWith('skills/'))).toBe(false);
+    });
+
+    it('accepts an override URL for a self-hosted deployment', async () => {
+        const files = everWorksMcpDescriptorFiles({ url: 'https://mcp.example.com/mcp' });
+        const mcp = JSON.parse(files.get('mcp.json')!);
+
+        expect(mcp.mcpServers['ever-works'].url).toBe('https://mcp.example.com/mcp');
     });
 });

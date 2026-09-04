@@ -13,6 +13,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import {
+    AgentPluginExportService,
     AgentPluginInstallService,
     AgentPluginPackageCatalogService,
     AgentPluginUpdateService,
@@ -52,6 +53,7 @@ export class AgentPluginsController {
         private readonly catalog: AgentPluginPackageCatalogService,
         private readonly installer: AgentPluginInstallService,
         private readonly updateService: AgentPluginUpdateService,
+        private readonly exporter: AgentPluginExportService,
     ) {}
 
     @Get()
@@ -159,6 +161,18 @@ export class AgentPluginsController {
     @Throttle({ long: { limit: 20, ttl: 60_000 } })
     async listUpdates(@CurrentUser() _auth: AuthenticatedUser) {
         return this.updateService.checkForUpdates();
+    }
+
+    @Get('descriptor')
+    @ApiOperation({
+        summary: 'The Ever Works MCP server as an Agent Plugins package',
+        description:
+            'Returns the package files so any conforming client can consume this MCP server by installing a package rather than by hand-configuring it. Contains no credentials: the specification treats package headers as visible and non-secret, so the consuming client supplies its own authentication.',
+    })
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async descriptor(@CurrentUser() _auth: AuthenticatedUser, @Query('url') url?: string) {
+        const built = await this.exporter.buildEverWorksMcpDescriptor(url ? { url } : {});
+        return { files: Object.fromEntries(built.files), findings: built.findings };
     }
 
     @Post()

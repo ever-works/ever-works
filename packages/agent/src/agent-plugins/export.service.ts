@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
     loadPluginPackage,
+    mcpSchemaId,
+    PUBLISHED_CONFORMANCE_VERSION,
     serializeManifest,
     serializeSkillMd,
     toSpecSkillName,
@@ -91,6 +93,75 @@ function narrowingFailure(value: NameNarrowing): { reason: string; suggestion?: 
     };
 }
 
+/** The hosted Ever Works MCP endpoint the descriptor points at. */
+export const EVER_WORKS_MCP_URL = 'https://mcp.ever.works/mcp';
+
+/** Package name for the descriptor. Reverse-domain, per the spec's name rule. */
+export const EVER_WORKS_MCP_PACKAGE = 'works.ever.mcp';
+
+/**
+ * The Ever Works MCP server, as an Agent Plugins package descriptor (T36).
+ *
+ * This is the PRODUCER half of the conformance claim: it lets any conforming
+ * client — not just Ever Works — consume the Ever Works MCP server by
+ * installing an ordinary package, rather than by following prose in our
+ * documentation and hand-writing a config.
+ *
+ * ## It carries no credentials, and that is a rule rather than a convenience
+ *
+ * AP-15 treats package-configured headers as visible and non-secret, so a
+ * descriptor that embedded an API key would be publishing that key to every
+ * consumer of the package. The endpoint does require authentication — it
+ * answers 401 — and supplying it is the consuming client's job, through
+ * whatever credential mechanism that client already has. The descriptor's
+ * only job is to say where the server is and how to speak to it.
+ *
+ * No `skills/` directory: this package declares a server and nothing else,
+ * which the specification permits — a package may support any subset of the
+ * component types.
+ */
+export function everWorksMcpDescriptorFiles(
+    options: { url?: string; version?: string } = {},
+): Map<string, string> {
+    const url = options.url ?? EVER_WORKS_MCP_URL;
+
+    const files = new Map<string, string>();
+    files.set(
+        'plugin.json',
+        serializeManifest({
+            name: EVER_WORKS_MCP_PACKAGE,
+            ...(options.version ? { version: options.version } : {}),
+            description: 'Manage Ever Works works, items and deployments over MCP.',
+            homepage: 'https://ever.works',
+            repository: 'https://github.com/ever-works/ever-works',
+            license: 'AGPL-3.0',
+            keywords: ['ever-works', 'mcp', 'works'],
+        }),
+    );
+
+    // `mcp.json` is emitted directly: the library validates this shape but
+    // does not serialise it, and the schema is small and closed enough that a
+    // serialiser would add indirection without adding a guarantee. The
+    // round-trip gate is what proves the result is right.
+    files.set(
+        'mcp.json',
+        JSON.stringify(
+            {
+                $schema: mcpSchemaId(PUBLISHED_CONFORMANCE_VERSION),
+                mcpServers: {
+                    // Namespace-safe: this becomes `mcp__ever-works__<tool>`,
+                    // so it must not contain the `__` separator.
+                    'ever-works': { type: 'streamable-http', url },
+                },
+            },
+            null,
+            2,
+        ) + '\n',
+    );
+
+    return files;
+}
+
 @Injectable()
 export class AgentPluginExportService {
     private readonly logger = new Logger(AgentPluginExportService.name);
@@ -157,7 +228,10 @@ export class AgentPluginExportService {
      * private instructions, and a temp directory nobody cleans is where those
      * would linger.
      */
-    private async proveItImports(files: PackageFiles): Promise<readonly Finding[]> {
+    private async proveItImports(
+        files: PackageFiles,
+        options: { requireSkills?: boolean } = {},
+    ): Promise<readonly Finding[]> {
         const dir = await mkdtemp(join(tmpdir(), 'ap-export-'));
         try {
             for (const [relative, content] of files) {
@@ -174,10 +248,12 @@ export class AgentPluginExportService {
                 );
             }
 
-            // A package that loads but contributed nothing is almost certainly
-            // not what the user asked for, and it would be a confusing thing
-            // to hand them a zip of.
-            if (load.skills.length === 0) {
+            // A skills export that loads but contributed nothing is almost
+            // certainly not what the user asked for, and a confusing thing to
+            // hand them a zip of. The MCP descriptor legitimately has no
+            // skills, so it opts out — the specification lets a package
+            // support any subset of the component types.
+            if ((options.requireSkills ?? true) && load.skills.length === 0) {
                 throw new ExportFailed(
                     'The exported package contains no valid skills.',
                     load.findings,
@@ -191,6 +267,22 @@ export class AgentPluginExportService {
         } finally {
             await rm(dir, { recursive: true, force: true }).catch(() => undefined);
         }
+    }
+
+    /**
+     * Build the Ever Works MCP descriptor, proved against our own importer.
+     *
+     * Uses the same gate as any other export: a descriptor we publish is a
+     * package other clients install, so it has to pass exactly what we would
+     * demand of theirs.
+     */
+    async buildEverWorksMcpDescriptor(options: { url?: string; version?: string } = {}): Promise<{
+        files: PackageFiles;
+        findings: readonly Finding[];
+    }> {
+        const files = everWorksMcpDescriptorFiles(options);
+        const findings = await this.proveItImports(files, { requireSkills: false });
+        return { files, findings };
     }
 
     /**

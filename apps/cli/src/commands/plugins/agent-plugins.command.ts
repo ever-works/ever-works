@@ -243,6 +243,57 @@ function buildCatalogCommand(): Command {
         });
 }
 
+
+function buildDescriptorCommand(): Command {
+    return new Command('descriptor')
+        .description('Write the Ever Works MCP server as an Agent Plugins package (zip)')
+        .option('-o, --output <file>', 'Write here instead of ./ever-works-mcp.zip')
+        .option('-u, --url <url>', 'Point at a self-hosted MCP endpoint')
+        .action(async (options: { output?: string; url?: string }) => {
+            try {
+                await requireAuth();
+                const spinner = ora('Building descriptor…').start();
+                const query = options.url ? `?url=${encodeURIComponent(options.url)}` : '';
+                const response = (await api().get(
+                    `/agent-plugins/descriptor${query}`,
+                )) as { files?: Record<string, string> };
+                spinner.stop();
+
+                const files = response.files ?? {};
+                if (Object.keys(files).length === 0) {
+                    console.log(chalk.yellow('
+The server returned an empty descriptor.'));
+                    return;
+                }
+
+                // Zipped here rather than server-side so the CLI never has to
+                // stream a binary body through the JSON API client.
+                const JSZip = (await import('jszip')).default;
+                const zip = new JSZip();
+                for (const [name, content] of Object.entries(files)) {
+                    zip.file(name, content);
+                }
+                const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+
+                const target = options.output ?? 'ever-works-mcp.zip';
+                const { writeFile } = await import('node:fs/promises');
+                await writeFile(target, buffer);
+
+                console.log(chalk.green(`
+Wrote ${target}`));
+                console.log(chalk.gray(`  ${Object.keys(files).sort().join(', ')}`));
+                console.log(
+                    chalk.gray(
+                        '  Contains no credentials — your client supplies its own (AP-15).',
+                    ),
+                );
+            } catch (error) {
+                handleCliError(error);
+                process.exit(1);
+            }
+        });
+}
+
 /** The `agent-plugins` subcommand group, for mounting on `plugins`. */
 export function buildAgentPluginsCommand(): Command {
     const command = new Command('agent-plugins').description(
@@ -251,5 +302,6 @@ export function buildAgentPluginsCommand(): Command {
     command.addCommand(buildListCommand());
     command.addCommand(buildFindingsCommand());
     command.addCommand(buildCatalogCommand());
+    command.addCommand(buildDescriptorCommand());
     return command;
 }

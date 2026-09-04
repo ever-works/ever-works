@@ -312,8 +312,35 @@ The tool's description, parameters, and validation are derived automatically fro
 - **Scope selection, not widening** — `EVER_WORKS_SCOPE_SLUG` is forwarded as `x-scope-slug` and the API authorises the caller against it the same way it does for the web client
 - **Request timeout** — API calls time out after 2 minutes
 
+## Use it from any Agent Plugins client
+
+Ever Works publishes this server as an **Agent Plugins v1.0.0** package
+descriptor, so a client that supports the open standard can install it as an
+ordinary package instead of following the configuration steps above by hand.
+
+The descriptor declares one `streamable-http` server and nothing else — no
+skills, and deliberately **no credentials**. The specification treats
+package-configured headers as visible and non-secret, so a descriptor that
+embedded an API key would publish that key to everyone who installed it.
+Authentication stays where it belongs: your client supplies its own key,
+exactly as it does for the manual configuration above.
+
+Generate the descriptor with:
+
+```bash
+ever-works plugins agent-plugins descriptor > ever-works-mcp.zip
+```
+
+Point it at a self-hosted deployment by overriding the URL. Nothing in this
+page's manual configuration changes — the descriptor is an additional way to
+consume the same server, not a replacement for it.
+
+See the [conformance statement](/specs/features/agent-plugins/conformance) for
+what Ever Works implements of the standard, including what it does not.
+
 ## Related
 
 - [API Keys](./api-keys) — Generate API keys for MCP server authentication
 - [Authentication](/api/authentication) — Full API authentication reference
 - [Plugin System](/plugin-system/) — Plugins that power generation, search, and deployment
+- [Agent Plugins conformance](/specs/features/agent-plugins/conformance) — What Ever Works implements of the open Agent Plugins v1.0.0 standard
