@@ -28,10 +28,15 @@ function allowlistStub(result: {
 function gitStub(sha = 'a'.repeat(40)): GitLike & {
     clone: jest.Mock;
     resolveRef: jest.Mock;
+    listServerRefs: jest.Mock;
 } {
     return {
         clone: jest.fn().mockResolvedValue(undefined),
         resolveRef: jest.fn().mockResolvedValue(sha),
+        // Part of `GitLike` since the update check landed. Stubbing the whole
+        // interface rather than a subset is what makes a later addition to it
+        // fail HERE, at compile time, instead of at the first call.
+        listServerRefs: jest.fn().mockResolvedValue([{ ref: 'HEAD', oid: sha }]),
     };
 }
 

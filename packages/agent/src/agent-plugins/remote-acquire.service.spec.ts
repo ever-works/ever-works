@@ -52,6 +52,7 @@ function gitServiceWriting(
                 await writePackage(options.dir as string, manifest, skills);
             }),
             resolveRef: jest.fn().mockResolvedValue(sha),
+            listServerRefs: jest.fn().mockResolvedValue([{ ref: 'HEAD', oid: sha }]),
         },
         {},
     );
