@@ -30,8 +30,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * `down` drops both tables. They hold no financial or audit record, and a
  * package is re-discoverable from its source, so a clean rollback is safe.
  */
-export class CreateAgentPluginPackages1787700000000 implements MigrationInterface {
-    name = 'CreateAgentPluginPackages1787700000000';
+export class CreateAgentPluginPackages1787750000000 implements MigrationInterface {
+    name = 'CreateAgentPluginPackages1787750000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (!(await queryRunner.hasTable('agent_plugin_packages'))) {
