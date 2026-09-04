@@ -24,7 +24,7 @@ Connect the MCP server to Claude Desktop, Claude Code, or any MCP-compatible cli
 The MCP server is a standalone NestJS application in `apps/mcp/` that:
 
 1. **Fetches** the Ever Works API's OpenAPI spec at startup
-2. **Filters** endpoints through a curated whitelist of 123 operations
+2. **Filters** endpoints through a curated whitelist of 127 operations
 3. **Converts** OpenAPI schemas to MCP tool definitions automatically
 4. **Proxies** tool calls to the API using your API key
 
@@ -112,7 +112,7 @@ Add the MCP server to your project's `.mcp.json`:
 
 ## Available Tools
 
-The MCP server exposes 123 tools organized by domain. Each tool's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
+The MCP server exposes 127 tools organized by domain. Each tool's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
 
 ### Human-in-the-loop gates are not tools
 
@@ -282,6 +282,20 @@ Agents are the workers; runs are their executions.
 | `pause_agent`      | Pause an Agent                 |
 | `resume_agent`     | Resume a paused Agent          |
 | `get_agent_budget` | Budget and spend of an Agent   |
+
+### Agent Plugins (4 tools)
+
+Read-only by design. Installing an Agent Plugins package installs **skills** —
+instructions the agent then follows — and this server is reachable by agents
+processing scraped web content and community-PR text, so an install tool would
+let a prompt-injected run acquire its own future instructions. Install, resync
+and the allowlist routes stay available to a human through the API, web UI and
+CLI; only the tool surface excludes them.
+
+- `list_agent_plugin_packages` — installed packages
+- `list_agent_plugin_findings` — validation findings recorded at install
+- `list_agent_plugin_catalog_entries` — skills contributed by packages
+- `list_agent_plugin_updates` — packages with a newer version available
 
 ## Adding New Tools
 
