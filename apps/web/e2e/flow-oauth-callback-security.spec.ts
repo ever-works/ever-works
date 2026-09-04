@@ -44,15 +44,34 @@ import { API_BASE } from './helpers/api';
  *      state query, no cookie      → 400 "...failed: missing state cookie"
  *      cookie len ≠ state len      → 400 "...failed: state length mismatch"
  *      cookie ≠ state (same len)   → 400 "...failed: state value mismatch"
- *      cookie === state, supported → 500 (code exchange vs fake provider creds)
+ *      cookie === state, supported → 400 or 502 (code exchange fails against
+ *                                    the real provider — see the note below)
  *      cookie === state, bad prov  → 400 "Unsupported OAuth provider: <id>"
  *      EVERY outcome               → Set-Cookie ew_oauth_state=; Max-Age=0 ...
  *   GET /api/oauth/bogus/url        → 400 "Unsupported OAuth provider: bogus"
  *
  * This env wires up github + google social login with FAKE client ids, so the
  * authorize URL forms correctly and the code-exchange step reaches a real but
- * unauthorised provider (→ 500). Upstream github.com / accounts.google.com are
- * NEVER contacted — every assertion is platform-side behaviour.
+ * unauthorised provider. NOTE: on the guard-PASSES paths the API really does
+ * make a SERVER-SIDE POST to the provider's token endpoint (github.com /
+ * oauth2.googleapis.com) — Playwright's route() cannot intercept an outbound
+ * call made by the API process, so those cases depend on the runner having
+ * egress and on the provider refusing the fake client id. Every OTHER
+ * assertion in this file is purely platform-side.
+ *
+ * Since be0148efc ("fix(api): map upstream OAuth failures to 400/502 instead
+ * of a raw 500") SocialAuthService.callUpstream converts that AxiosError
+ * rather than letting it escape to Nest's ExceptionsHandler: an upstream 4xx
+ * other than 401/408/429 → 400 "<Provider> rejected the OAuth <step>", while
+ * 401/408/429, 5xx and no-response-at-all → 502. The guard-PASSES branch lands
+ * on whichever of the two the runner produces — it is 400 where github.com is
+ * reachable (it answers the fake client id, and a 200-with-error body is
+ * already a 400 "Missing access_token"), and 502 where it is not (the sibling
+ * flow-oauth-git-providers.spec.ts calls the provider "unreachable", and the
+ * e2e job can run on an in-network ARC pool) — so the case accepts EITHER
+ * mapped status and pins the distinction that matters by REASON instead: the
+ * failure must not be the state-verification one, which is also a 400. What
+ * the pair still excludes is the raw unmapped 500 be0148efc removed.
  */
 
 const OAUTH_STATE_COOKIE = 'ew_oauth_state';
@@ -119,7 +138,10 @@ test.describe('flow: OAuth callback single-use clear-cookie is the replay defenc
             provider: string;
             query: string;
             cookie?: string;
-            expectStatus: number;
+            /** One status, or the accepted set where the outcome is upstream-dependent. */
+            expectStatus: number | number[];
+            /** True for the one case that gets PAST the state gate. */
+            pastGate?: boolean;
         }> = [
             {
                 name: 'missing state query',
@@ -148,11 +170,19 @@ test.describe('flow: OAuth callback single-use clear-cookie is the replay defenc
                 expectStatus: 400,
             },
             {
+                // Past the gate, so the API really posts to github.com's token
+                // endpoint from the SERVER. Which of the two mapped failures
+                // comes back depends on the runner's egress (see the note in the
+                // file docblock): a refusal from github.com → 400, an
+                // unreachable/rate-limited/5xx provider → 502. Both are
+                // callUpstream's mapping; the raw 500 be0148efc removed is
+                // excluded by this pair, and `pastGate` pins the REASON.
                 name: 'guard PASSES → code exchange fails (matching cookie+state)',
                 provider: 'github',
                 query: `?code=e2e-invalid-code&state=${minted.state}`,
                 cookie: `${OAUTH_STATE_COOKIE}=${minted.state}`,
-                expectStatus: 500,
+                expectStatus: [400, 502],
+                pastGate: true,
             },
         ];
 
@@ -165,7 +195,18 @@ test.describe('flow: OAuth callback single-use clear-cookie is the replay defenc
                     headers,
                 },
             );
-            expect(res.status(), `${o.name} → status ${o.expectStatus}`).toBe(o.expectStatus);
+            const accepted = Array.isArray(o.expectStatus) ? o.expectStatus : [o.expectStatus];
+            expect(accepted, `${o.name} → status ${accepted.join('/')}`).toContain(res.status());
+            if (o.pastGate) {
+                // 400 is ALSO a state-gate rejection status, so the status alone
+                // no longer separates "gate passed" from "gate rejected". Pin the
+                // distinction by reason: this case must fail at the exchange,
+                // never at the state guard.
+                expect(
+                    await jsonMessage(res),
+                    `${o.name} failed past the state gate, not at it`,
+                ).not.toMatch(/OAuth state verification failed/i);
+            }
             // The defence: the cookie is cleared on this very response.
             const sc = setCookieString(res.headers()['set-cookie']);
             expect(sc, `${o.name} emits a Set-Cookie`).toContain(OAUTH_STATE_COOKIE);
