@@ -68,7 +68,12 @@ export interface GitLike {
  * check that reports the secret it is protecting is worse than no check.
  */
 export function redactUrl(value: string): string {
-    return value.replace(/(\/\/)[^/@\s]*:[^/@\s]*@/gu, '$1<redacted>@');
+    // Matches ALL userinfo before `@`, not only `user:password`. A
+    // token-only credential — `https://ghp_xxxx@host/repo.git`, which is how
+    // GitHub PATs are normally embedded — has no colon, so a pattern
+    // requiring one left it in the message, the response body and the log.
+    // The `@` is what makes something userinfo; the colon is optional.
+    return value.replace(/(\/\/)[^/@\s]+@/gu, '$1<redacted>@');
 }
 
 /**
@@ -217,6 +222,26 @@ export class AgentPluginGitSource {
         // fetched. Without it, allowlisting a repository would authorise every
         // branch in it, including one an outside contributor can push to.
         const pattern = allow.entry?.versionRange?.trim();
+
+        // A restricted entry with NO ref requested is the gap: `git.clone`
+        // then checks out the remote's default branch, which the pattern
+        // never authorised. An operator writing `v1.*` means "these refs and
+        // no others", and silently taking whatever `HEAD` points at is not a
+        // subset of that.
+        if (pattern && !input.ref) {
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.CONFLICT,
+                    message:
+                        `"${redactUrl(input.url)}" is restricted to refs matching ` +
+                        `"${pattern}", so a ref must be given explicitly — the remote's ` +
+                        `default branch is not necessarily one of them.`,
+                    url: redactUrl(input.url),
+                },
+                HttpStatus.CONFLICT,
+            );
+        }
+
         if (pattern && input.ref && !refMatchesPattern(input.ref, pattern)) {
             throw new HttpException(
                 {
@@ -297,7 +322,11 @@ export class AgentPluginGitSource {
         const allow = await this.allowlist.check(url, 'git');
         if (!allow.allowed) return null;
 
+        // Same rule as `acquire`: a restricted entry with no ref would report
+        // the default branch's commit as "the" remote SHA, and an update
+        // offered from an unauthorised ref is an invitation to install one.
         const pattern = allow.entry?.versionRange?.trim();
+        if (pattern && !ref) return null;
         if (pattern && ref && !refMatchesPattern(ref, pattern)) return null;
 
         try {

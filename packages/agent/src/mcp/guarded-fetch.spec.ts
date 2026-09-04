@@ -160,6 +160,43 @@ describe('createGuardedFetch', () => {
         expect(hops[1].init?.method).toBe('POST');
     });
 
+    it('drops to GET on a cross-origin 307, rather than sending a bodyless POST', async () => {
+        const { impl, hops } = scriptedFetch([
+            { status: 307, location: 'https://evil.example.net/collect' },
+            { status: 200 },
+        ]);
+        const fetchImpl = createGuardedFetch({ fetchImpl: impl });
+
+        await fetchImpl('https://api.example.com/mcp', {
+            method: 'POST',
+            body: '{"a":1}',
+            headers: { 'X-API-Key': 'secret' },
+        });
+
+        // A 307 preserves the method by definition, so keeping POST while
+        // dropping the body would send a bodyless POST to a host the caller
+        // never addressed — a request neither side asked for, which a server
+        // may still act on.
+        expect(hops[1].init?.method).toBe('GET');
+        expect(hops[1].init?.body).toBeUndefined();
+        expect(hops[1].init?.headers).toBeUndefined();
+    });
+
+    it('still preserves POST across a SAME-origin 307', async () => {
+        const { impl, hops } = scriptedFetch([
+            { status: 307, location: 'https://api.example.com/v2' },
+            { status: 200 },
+        ]);
+        const fetchImpl = createGuardedFetch({ fetchImpl: impl });
+
+        await fetchImpl('https://api.example.com/mcp', { method: 'POST', body: '{}' });
+
+        // Same origin keeps the caller's request intact; only the origin
+        // crossing forfeits it.
+        expect(hops[1].init?.method).toBe('POST');
+        expect(hops[1].init?.body).toBe('{}');
+    });
+
     it('refuses a redirect loop rather than following it forever', async () => {
         const { impl } = scriptedFetch([{ status: 302, location: 'https://api.example.com/a' }]);
         const fetchImpl = createGuardedFetch({ fetchImpl: impl });

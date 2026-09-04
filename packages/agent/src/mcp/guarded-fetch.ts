@@ -111,15 +111,18 @@ export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFe
             const target = new URL(location, currentUrl);
 
             if (target.origin !== origin) {
-                // Cross-origin: forward the method and nothing else. See the
+                // Cross-origin: forward nothing the caller supplied. See the
                 // class docstring — an allow-list cannot tell a secret header
                 // from a benign one by its name.
-                currentInit = {
-                    method: REWRITE_TO_GET.has(response.status)
-                        ? 'GET'
-                        : (currentInit.method ?? 'GET'),
-                    redirect: 'manual',
-                };
+                //
+                // The body goes too, and that forces the method. A 307/308
+                // preserves the method by definition, so keeping POST while
+                // dropping the body would send a bodyless POST to a host the
+                // caller never addressed — a request neither side asked for,
+                // and one a server may act on. Dropping to GET makes the hop
+                // a plain retrieval, which is the only thing that can be said
+                // to be safe without the caller's data.
+                currentInit = { method: 'GET', redirect: 'manual' };
             } else if (REWRITE_TO_GET.has(response.status)) {
                 currentInit = {
                     ...currentInit,
