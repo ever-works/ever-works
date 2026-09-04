@@ -93,7 +93,7 @@ const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status
 export function bffProxy<Ctx = unknown>(
     handler: (scoped: ScopedBffRequest, context: Ctx) => Promise<Response> | Response,
     options: BffProxyOptions = {},
-): (request: NextRequest, context: Ctx) => Promise<Response> {
+): (request: NextRequest, context?: Ctx) => Promise<Response> {
     const { scope = 'workspace', reason, onUnauthorized = unauthorized } = options;
 
     if (scope === 'none' && !reason?.trim()) {
@@ -104,13 +104,19 @@ export function bffProxy<Ctx = unknown>(
         );
     }
 
-    return async (request: NextRequest, context: Ctx): Promise<Response> => {
+    // `context` is OPTIONAL so a STATIC route's handler can still be called
+    // with one argument. Next always passes two, but the route specs in this
+    // repo call the exported handler directly as `await GET(request)` — a
+    // required parameter turned every one of those into TS2554 and blocked
+    // the migration of every static route. An optional trailing parameter is
+    // still assignable to Next's two-parameter route-handler type.
+    return async (request: NextRequest, context?: Ctx): Promise<Response> => {
         const token = await getAuthAccessCookie();
         if (!token) return onUnauthorized();
 
         const base: HeadersInit = { Authorization: `Bearer ${token}` };
         if (scope === 'none') {
-            return handler({ request, headers: new Headers(base), token }, context);
+            return handler({ request, headers: new Headers(base), token }, context as Ctx);
         }
 
         let headers: Headers;
@@ -120,6 +126,6 @@ export function bffProxy<Ctx = unknown>(
             return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
         }
 
-        return handler({ request, headers, token }, context);
+        return handler({ request, headers, token }, context as Ctx);
     };
 }
