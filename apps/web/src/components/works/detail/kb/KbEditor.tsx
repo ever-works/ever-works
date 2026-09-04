@@ -127,6 +127,7 @@ export function KbEditor({
                 fetchAgents: async (id, query) => {
                     try {
                         const params = new URLSearchParams({ q: query, limit: '8' });
+                        // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
                         const response = await fetch(
                             `/api/works/${encodeURIComponent(id)}/agents?${params.toString()}`,
                             { cache: 'no-store' },

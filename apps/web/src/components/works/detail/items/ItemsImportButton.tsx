@@ -22,6 +22,7 @@ export function ItemsImportButton({ workId }: ItemsImportButtonProps) {
 
     useEffect(() => {
         let cancelled = false;
+        // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
         fetch(`/api/works/${workId}/import-items/settings`, { credentials: 'include' })
             .then((response) => response.json())
             .then((data: { import_enabled?: boolean } | null) => {

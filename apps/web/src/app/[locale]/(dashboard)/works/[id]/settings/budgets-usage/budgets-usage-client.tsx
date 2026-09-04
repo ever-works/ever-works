@@ -105,6 +105,7 @@ export function BudgetsUsageClient({
     const downloadCsv = async () => {
         setIsExporting(true);
         try {
+            // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
             const response = await fetch(`/api/works/${workId}/usage/export?format=csv`, {
                 method: 'GET',
                 cache: 'no-store',

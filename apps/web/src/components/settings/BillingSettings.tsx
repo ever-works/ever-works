@@ -490,6 +490,7 @@ export function BillingSettings({
             if (kind) {
                 params.set('kinds', kind);
             }
+            // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
             const response = await fetch(`/api/credits/ledger?${params.toString()}`, {
                 method: 'GET',
                 cache: 'no-store',

@@ -58,6 +58,7 @@ export function useMergePolicy(params: {
         setError(null);
         void (async () => {
             try {
+                // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
                 const response = await fetch(`/api/merge-policy/resolve?${search.toString()}`, {
                     credentials: 'include',
                     cache: 'no-store',

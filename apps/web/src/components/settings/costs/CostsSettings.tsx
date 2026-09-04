@@ -25,6 +25,7 @@ interface CostsSettingsProps {
 }
 
 async function fetchCosts<T>(section: CostsSection, windowDays: CostsWindowDays): Promise<T> {
+    // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
     const response = await fetch(`/api/usage/costs/${section}${buildCostsQuery({ windowDays })}`, {
         method: 'GET',
         cache: 'no-store',

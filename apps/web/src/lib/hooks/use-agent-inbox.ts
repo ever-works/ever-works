@@ -51,6 +51,7 @@ function emit(store: InboxStore): void {
 async function fetchInbox(agentId: string): Promise<void> {
     const store = getStore(agentId);
     try {
+        // eslint-disable-next-line no-restricted-syntax -- EW-789 baseline: unaudited, may be a real scope bug
         const res = await fetch(`/api/email/messages?agentId=${encodeURIComponent(agentId)}`, {
             cache: 'no-store',
         });
