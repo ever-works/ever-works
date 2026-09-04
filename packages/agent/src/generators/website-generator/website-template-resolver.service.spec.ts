@@ -105,7 +105,11 @@ describe('WebsiteTemplateResolverService', () => {
             },
         );
 
-        it.each(['default', 'directory', 'awesome-repo', 'company', 'not-a-kind'])(
+        // `repo` is listed for completeness only: a Repository Work never
+        // reaches the website generator (`WORK_KIND_CAPABILITIES.repo.repos.website`
+        // is false and the create path persists `websiteTemplateId: null`),
+        // so the fall-through is documented here, not relied on.
+        it.each(['default', 'directory', 'awesome-repo', 'repo', 'company', 'not-a-kind'])(
             'kind %s → still the system default (classic)',
             async (kind) => {
                 await expect(service.resolveForWork(workOfKind(kind))).resolves.toEqual(

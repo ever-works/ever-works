@@ -240,6 +240,10 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_ENVIRONMENTS: '/settings/environments',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
+    // Agent Plugins (EW-772) — packages in the open cross-vendor format.
+    // Sits beside Connections: both are about capabilities the platform
+    // consumes from outside rather than code it ships.
+    DASHBOARD_SETTINGS_AGENT_PLUGINS: '/settings/agent-plugins',
     // Fleet — enrolled local runners. The page has existed since Wave 12;
     // it simply had no route constant, so every link to it was a literal.
     DASHBOARD_SETTINGS_FLEET: '/settings/fleet',

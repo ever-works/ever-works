@@ -666,6 +666,13 @@
                 "unarchive": "Move to Active",
                 "delete": "Delete"
             },
+            "fleet": {
+                "badge": "From your fleet",
+                "node": "Node",
+                "task": "Task",
+                "branch": "Branch",
+                "pullRequest": "Pull request"
+            },
             "detail": {
                 "none": "Select a message to read it.",
                 "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
@@ -1338,6 +1345,30 @@
                     "saved": "초기화 스크립트가 저장되었습니다",
                     "bytes": "{used} / {max} KB",
                     "tooLong": "초기화 스크립트가 16KB를 초과합니다."
+                },
+                "fleet": {
+                    "title": "Execution",
+                    "description": "Where this agent's work runs when machines are enrolled in your Fleet: pin the agent to one of your nodes, and see the routing rule in force for your account.",
+                    "manage": "Manage fleet",
+                    "nodeLabel": "Preferred node",
+                    "nodeHelper": "With a node chosen, this agent's jobs are leased only by that machine — pick the one that holds the checkout, the credentials or the hardware the work needs. Any node lets whichever of your machines is free take them.",
+                    "anyNode": "Any node",
+                    "missingNode": "A node that is no longer enrolled",
+                    "hintOffline": "{name} is offline. Jobs for this agent will wait until it reports in again.",
+                    "hintDraining": "{name} is drained (paused or disabled). Jobs for this agent will wait until it returns to service.",
+                    "hintMissing": "The preferred node was removed from your fleet. Jobs for this agent would wait for a machine that no longer exists — pick another node, or Any node.",
+                    "noNodes": "No machines are enrolled in your Fleet yet, so there is nothing to pin this agent to.",
+                    "noNodesLink": "Enroll a machine in Settings → Fleet",
+                    "affinityPersonalScope": "A preferred node can be set for Organization agents only. Switch to an Organization workspace to pin this agent to a machine.",
+                    "affinityUnavailable": "The preferred node could not be loaded right now. Reload the page to try again.",
+                    "saved": "Preferred node saved",
+                    "cleared": "Preferred node cleared — any of your nodes can take this agent's work",
+                    "routingLabel": "Execution routing",
+                    "routingAccountDefault": "Your account default.",
+                    "routingPlatformDefault": "Platform default — nothing is configured for your account yet.",
+                    "routingOverrides": "{count, plural, one {# Work or Goal override takes} other {# Work or Goal overrides take}} precedence for runs in their own scope.",
+                    "routingUnavailable": "Execution routing could not be loaded right now.",
+                    "routingChange": "Change in Settings → Fleet"
                 }
             }
         },
@@ -1447,7 +1478,9 @@
                 "stepApproval": "approval",
                 "featureName": "Feature name",
                 "featureDescription": "Feature description",
-                "createFromTemplate": "Create workflow"
+                "createFromTemplate": "Create workflow",
+                "extraRepos": "Also work in",
+                "extraReposHint": "Optional. Repositories checked here are checked out next to the Work's repository when the task runs on one of your machines; each one that changes gets its own pull request. The agent's attached repositories are included automatically."
             },
             "detail": {
                 "moveTo": "이동 대상",
@@ -1501,6 +1534,9 @@
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
                     "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "waitingForAnswer": "The agent paused this run with a question for you.",
+                    "answerInInbox": "Answer it in the Inbox",
+                    "parkedHintQuestion": "Answer the question in the Inbox to continue on the same branch. Archive the question there if you want to drop this run.",
                     "steerPlaceholder": "Message the running agent…",
                     "resumePlaceholder": "Optional instruction to resume with…",
                     "steer": "Steer",
@@ -1529,7 +1565,9 @@
                 "openWork": "이 Work 열기",
                 "openMission": "이 임무 열기",
                 "openIdea": "이 아이디어 열기",
-                "openAgent": "이 에이전트 열기"
+                "openAgent": "이 에이전트 열기",
+                "extraRepos": "Also in",
+                "extraReposUpdateError": "Failed to update the extra repositories"
             },
             "recurring": {
                 "section": "반복 일정",
@@ -1609,7 +1647,10 @@
                 "isolationInherit": "Inherit from Work",
                 "isolationOn": "On — isolated branch",
                 "isolationOff": "Off — work directly",
-                "isolationSaveError": "Failed to update isolation override"
+                "isolationSaveError": "Failed to update isolation override",
+                "linkedPullRequests": "Also in",
+                "linkedPrPushed": "branch pushed, no pull request yet",
+                "linkedPrFailed": "branch pushed; opening the pull request failed"
             },
             "gateChip": {
                 "green": "Gate passed",
@@ -1713,6 +1754,12 @@
                 "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
                 "deleteError": "Failed to delete the template",
                 "requiresApproval": "Requires approval"
+            },
+            "extraRepos": {
+                "loading": "Loading repositories…",
+                "loadError": "Could not load your repositories.",
+                "empty": "No repositories in your registry yet.",
+                "emptyLink": "Add one in Settings → Repositories"
             }
         },
         "skillsPage": {
@@ -2525,7 +2572,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "에이전트 플러그인"
             },
             "githubApp": {
                 "title": "GitHub 앱 설치",
@@ -3100,7 +3148,8 @@
                     "enrolling": "Enrolling",
                     "online": "Online",
                     "offline": "Offline",
-                    "disabled": "Disabled"
+                    "disabled": "Disabled",
+                    "paused": "Paused"
                 },
                 "table": {
                     "name": "Name",
@@ -3230,10 +3279,7 @@
                     "downloadNode": "Headless node"
                 },
                 "history": {
-                    "failuresTitle": "Recent failures",
-                    "noFailures": "No failures in the recent history.",
                     "recentCount": "{count} recent jobs",
-                    "attempts": "{count} attempts",
                     "loading": "Loading history…",
                     "unavailable": "Job history is unavailable right now. The node itself is fine."
                 },
@@ -3264,6 +3310,40 @@
                             "label": "Cloud",
                             "helper": "Always uses the platform runtime, even when a local runner is free."
                         }
+                    }
+                },
+                "jobs": {
+                    "title": "Job history",
+                    "description": "The most recent jobs leased to this machine, newest first.",
+                    "filterAll": "All",
+                    "filterFailed": "Failed",
+                    "filterRunning": "Running",
+                    "emptyAll": "No jobs in the recent history.",
+                    "emptyFailed": "No failed jobs in the recent history.",
+                    "emptyRunning": "No job is running on this node right now.",
+                    "statuses": {
+                        "queued": "Queued",
+                        "leased": "Leased",
+                        "running": "Running",
+                        "done": "Done",
+                        "failed": "Failed"
+                    },
+                    "pinned": "Pinned to this node",
+                    "attempts": "Attempt {attempts} of {maxAttempts}",
+                    "queuedAt": "Queued",
+                    "queuedAtValue": "Queued {time}",
+                    "started": "Started",
+                    "startedValue": "Started {time}",
+                    "notStarted": "Not started",
+                    "completed": "Completed",
+                    "completedValue": "Completed {time}",
+                    "notCompleted": "Not completed",
+                    "duration": "Duration",
+                    "durationValue": "Took {duration}",
+                    "elapsedValue": "Running for {duration}",
+                    "queuedReason": "Waiting: {reason}",
+                    "queuedReasons": {
+                        "waitingForRunner": "no runner can take it yet"
                     }
                 }
             },
@@ -3553,6 +3633,7 @@
                 "agentCard": {
                     "title": "Repositories",
                     "subtitle": "Grant this agent access to repositories from your registry.",
+                    "fleetHint": "Attached repositories are mounted next to the Task's repository on fleet runs and get their own pull request when they change.",
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
@@ -3613,6 +3694,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "에이전트 플러그인",
+                "description": "개방형 Agent Plugins 형식의 패키지는 이 워크스페이스에 스킬과 MCP 서버를 추가합니다. 표준을 지원하는 모든 클라이언트에서 작동합니다.",
+                "disabled": "이 배포에서는 에이전트 플러그인 지원이 꺼져 있습니다. 운영자는 다음을 설정해 활성화할 수 있습니다:",
+                "loadFailed": "설치된 패키지를 불러오지 못했습니다. 연결 문제이며, 설치된 것이 없다는 뜻은 아닙니다.",
+                "scanning": "{roots} 검사 중",
+                "searchPlaceholder": "패키지 및 스킬 검색",
+                "empty": "아직 설치된 패키지가 없습니다.",
+                "noMatches": "검색과 일치하는 패키지가 없습니다.",
+                "specVersion": "사양 {version}",
+                "skills": "{count, plural, =0 {스킬} other {스킬 #개}}",
+                "mcpServers": "{count, plural, =0 {MCP 서버} other {MCP 서버 #개}}",
+                "none": "없음",
+                "rejected": "거부됨",
+                "rejectedHelp": "이 패키지는 불러올 수 없어 아무것도 제공하지 않습니다. 누군가 의도적으로 추가했기 때문에 목록에 표시됩니다.",
+                "rejectedHeading": "{count, plural, other {거부된 패키지 #개}}",
+                "shadowedHeading": "가려진 패키지",
+                "shadowedHelp": "앞선 디렉터리가 이미 제공한 이름을 선언하므로 첫 번째만 사용됩니다.",
+                "severity": {
+                    "fatal": "치명적",
+                    "error": "오류",
+                    "warning": "경고"
+                },
+                "scopes": {
+                    "package": "패키지",
+                    "manifest": "매니페스트",
+                    "skills": "스킬",
+                    "mcp": "MCP 서버"
                 }
             }
         },
@@ -5976,6 +6087,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "리포지토리",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -5990,6 +6102,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "기존 코드 리포지토리를 Work로 등록 — 태스크, 목표, 플릿 실행이 여기에 연결됩니다. 아무것도 생성되거나 배포되지 않습니다.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6139,6 +6252,26 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "새 Work — 리포지토리",
+                "formSubtitle": "기존 코드 리포지토리를 Work로 등록합니다. 아무것도 생성되거나 배포되지 않습니다 — 태스크, 목표, 플릿 실행이 해당 리포지토리에서 작업할 뿐입니다.",
+                "urlLabel": "리포지토리 URL",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "접근 가능한 GitHub 리포지토리. 그대로 Work의 데이터 리포지토리가 됩니다.",
+                "nameLabel": "Work 이름",
+                "slugLabel": "Work 슬러그",
+                "slugHelp": "URL 친화적 식별자. 리포지토리 이름에서 파생됩니다 — 변경하려면 편집하세요.",
+                "descriptionLabel": "설명",
+                "submitButton": "리포지토리 등록",
+                "creatingButton": "등록 중…",
+                "cancelButton": "취소",
+                "invalidUrl": "https://github.com/owner/repo 같은 리포지토리 URL을 입력하세요",
+                "invalidSlug": "소문자, 숫자, 하이픈만 사용하세요. 예: my-repo",
+                "success": "리포지토리가 Work로 등록되었습니다",
+                "createFailed": "리포지토리 등록에 실패했습니다",
+                "noteTitle": "참고:",
+                "noteText": "리포지토리 Work에는 웹사이트 템플릿, 프로바이더 리포지토리, 배포가 생성되지 않습니다. 에이전트가 클론할 수 있도록 리포지토리를 호스팅하는 Git 프로바이더를 연결하세요."
             },
             "manual": {
                 "title": "수동 생성",
@@ -6382,14 +6515,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "리포지토리"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "기존 코드 리포지토리를 Work로 등록 — 태스크, 목표, 플릿 실행이 여기에 연결됩니다. 아무것도 생성되거나 배포되지 않습니다."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7877,6 +8012,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "리포지토리",
             "company": "Company",
             "campaign": "캠페인",
             "default": "Work"

@@ -23,6 +23,7 @@ import { ContentExtractorFacadeService } from '../facades/content-extractor.faca
 import { DataRepository } from '../generators/data-generator/data-repository';
 import type { CheckItemHealthResponseDto } from '../items-generator/dto';
 import { CACHE_MANAGER, type Cache } from '../cache';
+import { assertNotRepositoryWork } from '../works/repository-work-guard';
 
 type HealthCheckTrigger = 'manual' | 'schedule';
 
@@ -111,6 +112,9 @@ export class ItemHealthService {
         }
 
         const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+        // The check clones the data repository and commits health metadata
+        // back into it — neither has a place in a wrapped code repository.
+        assertNotRepositoryWork(work, 'item source validation');
         const cacheKey = this.buildManualCheckCacheKey(workId, itemSlug);
         const cachedResult = await this.cacheManager?.get<CheckItemHealthResponseDto>(cacheKey);
         if (cachedResult) {

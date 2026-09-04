@@ -55,6 +55,15 @@ const HUNG_CLOSE_TEST_BUDGET_MS = HUNG_CLOSE_DETECTION_MS + 4_000;
  * vitest budget stays above it so that diagnosis is what the failure shows.
  */
 const REAL_PROCESS_RUN_BUDGET_MS = 15_000;
+/**
+ * Real process-timer window left for the version probe once the injected clock
+ * has been advanced to just inside the deadline. Every per-process timer is a
+ * real `setTimeout` no matter what `monotonicNow` returns, so a probe overrun
+ * can only be provoked with real milliseconds; a stub child that never closes
+ * makes that timer the sole way the run can end, so load may delay the verdict
+ * but can never hand it to a competing outcome.
+ */
+const PROBE_OVERRUN_TIMER_MS = 50;
 
 const STUB_SOURCE = String.raw`
 const fs = require('node:fs');
@@ -458,6 +467,22 @@ function createVerifiedTestContainment(): NonNullable<ModelExecutionIo['createMo
 	};
 }
 
+/**
+ * A stub child that closes cleanly, driving every deadline-precedence test.
+ *
+ * It deliberately declares NO `exitCode`/`signalCode`. A child that has already
+ * exited reports a non-null `exitCode`, so `createVerifiedTestContainment`
+ * short-circuits on its first line and resolves `{ verified: true }` without
+ * ever reaching taskkill — that, not the length of the 2.5 s production settle
+ * window, is what keeps the precedence tests off `boundedProcessTreeTermination`'s
+ * real timer and makes them load-independent. Giving this stub `exitCode: null`
+ * (as `hangingProcess` does, for the opposite reason) is not a cosmetic
+ * "realism" fix: it sends all four precedence tests straight back to the CI
+ * signature this file was repaired for — verified by mutation, 4 failed with
+ * `expected 'termination-failed' to be 'timed-out'`. The invariant is pinned
+ * executably by 'keeps the deadline-precedence stubs on the sides of the
+ * containment short-circuit they depend on'.
+ */
 function closedProcess(stdoutText: string): ChildProcess {
 	const stdout = new PassThrough();
 	const stderr = new PassThrough();
@@ -465,6 +490,7 @@ function closedProcess(stdoutText: string): ChildProcess {
 		stdout,
 		stderr,
 		stdin: new PassThrough(),
+		// No exitCode/signalCode here on purpose — see the note above before adding them.
 		kill: () => true
 	}) as unknown as ChildProcess;
 	// Close on a later macrotask, not a microtask: `runProcess` awaits the
@@ -477,6 +503,26 @@ function closedProcess(stdoutText: string): ChildProcess {
 		setImmediate(() => child.emit('close', 0, null));
 	});
 	return child;
+}
+
+/**
+ * A stub child that never closes, so the only way out of `runProcess` is its
+ * per-process timer. It reports itself alive (`exitCode`/`signalCode` null) the
+ * way a real hung child does, which is what makes the termination path — not a
+ * lucky exit — the thing under test. That pair is exactly what `closedProcess`
+ * must never grow: the two stubs sit on opposite sides of the
+ * `createVerifiedTestContainment` short-circuit deliberately, so consolidating
+ * them re-arms the deadline-precedence flake.
+ */
+function hangingProcess(): ChildProcess {
+	return Object.assign(new EventEmitter(), {
+		stdout: new PassThrough(),
+		stderr: new PassThrough(),
+		stdin: new PassThrough(),
+		exitCode: null,
+		signalCode: null,
+		kill: () => true
+	}) as unknown as ChildProcess;
 }
 
 function envValue(env: Record<string, string>, name: string): string | undefined {
@@ -1658,6 +1704,43 @@ if (process.argv.includes('--version')) {
 	);
 });
 
+// Every deadline- and cancellation-precedence test below asserts WHICH terminal
+// status wins, so none of them may let a real subprocess race a real timer for
+// that answer. The injected `monotonicNow` supplies only the numbers; each
+// per-process timer is still a real `setTimeout`
+// (model-process.internal.ts:1311), so a 1 s request budget armed a REAL 1 s
+// window around the version-probe subprocess. A saturated 33-shard runner needs
+// about that long just to boot and exit a bare Node process, so the probe was
+// killed, its containment close could not prove the tree dead, and
+// `resolveCliVersionProbe` (internal.ts:1039) short-circuited the whole run into
+// `toTerminalResult`, where `terminationFailure` (internal.ts:1553) outranks
+// `termination` (internal.ts:1563). That reddened #2297, #2303, #2304 and #2305
+// on 2026-09-03, always as `expected 'termination-failed' to be 'timed-out'`.
+// The precedence is correct — an agent whose credential-bearing tree cannot be
+// proven dead must not be reported as a routine, retryable timeout — and it is
+// not what these tests are for, so the precedence tests now drive closed stubs
+// (`closedProcess`) on the real-process request budget and the fake clock is the
+// only thing that moves a deadline.
+//
+// No coverage moved. The probe-overrun precedence those tests were accidentally
+// racing is now pinned on both sides, deterministically, by 'a proven /
+// unprovable kill ... when the version probe overruns its budget' below: its
+// stub child never closes, so the process timer is the only possible outcome and
+// load can only make the verdict later, never different. The
+// `termination-failed` status itself stays pinned by 'fails closed and stays
+// bounded when an acquired but unused containment close rejects / never
+// settles', the 2.5 s production bound by the `terminationSettleMs` clamp table,
+// and the real taskkill by the tests named above the 'real process boundary'
+// describe, where the real kill IS the subject — but on windows-2022 only.
+// The `lint-and-test` ubuntu job that went red here has never run a real
+// process-tree kill: the it.runIf(win32) tests skip outright, and the two plain
+// ones return at `!process.env.SystemRoot` in `createVerifiedTestContainment`
+// before taskkill.exe is spawned (which is why their expected status is
+// platform-conditional). So on ubuntu the precedence coverage is the
+// deterministic pair below — previously ubuntu had it only by accident, through
+// the flake itself. Anyone tempted to stub more of the win32 describe should
+// weigh that against .github/workflows/windows-job-launcher.yml, which is the
+// only job where the real kill actually runs.
 describe('executeModelProcess — request refusal', () => {
 	it('refuses a local session request that also smuggles a raw credential environment', async () => {
 		const harness = await createHarness('success');
@@ -1778,25 +1861,61 @@ describe('executeModelProcess — request refusal', () => {
 		await expect(access(harness.capturePath)).rejects.toThrow();
 	});
 
+	// Executable guard for the one unstated fact the four precedence tests below
+	// rest on. Their determinism is not a margin, it is a branch: `closedProcess`
+	// reports an exited child, so the containment close returns verified without
+	// touching taskkill or the 2.5 s settle timer, while `hangingProcess` reports
+	// a live one and cannot be verified. Adding `exitCode: null` to
+	// `closedProcess` reproduces the original CI failure on all four
+	// (`expected 'termination-failed' to be 'timed-out'`), so the invariant is
+	// asserted here rather than left to a comment a refactor can out-run.
+	it('keeps the deadline-precedence stubs on the sides of the containment short-circuit they depend on', async () => {
+		const createContainment = createVerifiedTestContainment();
+		const exited = await createContainment((() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn);
+		await exited.spawn('node', [], {});
+		const alive = await createContainment((() => hangingProcess()) as typeof spawn);
+		await alive.spawn('node', [], {});
+		const neverSpawned = await createContainment((() => closedProcess('')) as typeof spawn);
+
+		await expect(exited.close()).resolves.toEqual({ verified: true });
+		await expect(neverSpawned.close()).resolves.toEqual({ verified: true });
+		// Never a real taskkill: the stub carries no pid, so this is the same
+		// verdict on ubuntu and windows-2022.
+		await expect(alive.close()).resolves.toMatchObject({ verified: false });
+	});
+
 	it('rechecks the monotonic deadline immediately before the credentialed model spawn', async () => {
 		const harness = await createHarness('success');
 		let monotonicTime = 0;
 		let spawnCount = 0;
-		const baseSpawn = harness.spawnWithTaskkill();
-		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-			...harness.io,
-			monotonicNow: () => monotonicTime,
-			beforeSpawn: (purpose) => {
-				if (purpose === 'model') monotonicTime = 1_001;
-			},
-			spawnFn: ((...args: Parameters<typeof spawn>) => {
-				spawnCount += 1;
-				return baseSpawn(...args);
-			}) as typeof spawn
-		});
+		const spawnPurposes: string[] = [];
+		const result = await executeModelProcess(
+			request('codex', harness.workspacePath, { timeoutMs: REAL_PROCESS_RUN_BUDGET_MS }),
+			{
+				...harness.io,
+				monotonicNow: () => monotonicTime,
+				beforeSpawn: (purpose) => {
+					spawnPurposes.push(purpose);
+					if (purpose === 'model') monotonicTime = REAL_PROCESS_RUN_BUDGET_MS + 1;
+				},
+				// The recheck under test is reached only after a clean probe, so
+				// the probe is a stub that closes without a subprocess and the
+				// request budget is the real-process one: a 1 s budget armed a
+				// real 1 s timer around a real probe child and the resulting
+				// unprovable kill reported termination-failed instead.
+				spawnFn: (() => {
+					spawnCount += 1;
+					return closedProcess('codex-cli 0.146.0\n');
+				}) as typeof spawn
+			}
+		);
 
 		expect(result.status).toBe('timed-out');
+		expect(result.summary).toMatch(/wall-clock/i);
 		expect(spawnCount).toBe(1);
+		// Without this the run could satisfy both assertions above by dying at
+		// the version probe and never reaching the recheck this test names.
+		expect(spawnPurposes).toEqual(['version-probe', 'model']);
 		await expect(access(harness.capturePath)).rejects.toThrow();
 	});
 
@@ -1805,28 +1924,37 @@ describe('executeModelProcess — request refusal', () => {
 		let monotonicTime = 0;
 		let containmentCount = 0;
 		const baseCreateContainment = harness.io.createModelProcessContainment!;
-		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-			...harness.io,
-			monotonicNow: () => monotonicTime,
-			createModelProcessContainment: async (spawnFn) => {
-				const containment = await baseCreateContainment(spawnFn);
-				containmentCount += 1;
-				// The first containment owns the version probe. Advance the fake
-				// deadline only for the credentialed model process this test names;
-				// attaching to both made the outcome depend on probe close ordering.
-				if (containmentCount === 1) return containment;
-				return {
-					...containment,
-					spawn: (async (...args: Parameters<TestContainment['spawn']>) => {
-						const child = await containment.spawn(...args);
-						child.once('close', () => {
-							monotonicTime = 1_001;
-						});
-						return child;
-					}) as TestContainment['spawn']
-				};
+		const result = await executeModelProcess(
+			request('codex', harness.workspacePath, { timeoutMs: REAL_PROCESS_RUN_BUDGET_MS }),
+			{
+				...harness.io,
+				monotonicNow: () => monotonicTime,
+				// The close event is what this test is about, and a stub emits the
+				// same one through the same handler without putting two real
+				// subprocesses under two real sub-second timers: with a 1 s budget
+				// either child could overrun, and the unprovable kill that followed
+				// reported termination-failed instead of the deadline.
+				spawnFn: (() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn,
+				createModelProcessContainment: async (spawnFn) => {
+					const containment = await baseCreateContainment(spawnFn);
+					containmentCount += 1;
+					// The first containment owns the version probe. Advance the fake
+					// deadline only for the credentialed model process this test names;
+					// attaching to both made the outcome depend on probe close ordering.
+					if (containmentCount === 1) return containment;
+					return {
+						...containment,
+						spawn: (async (...args: Parameters<TestContainment['spawn']>) => {
+							const child = await containment.spawn(...args);
+							child.once('close', () => {
+								monotonicTime = REAL_PROCESS_RUN_BUDGET_MS + 1;
+							});
+							return child;
+						}) as TestContainment['spawn']
+					};
+				}
 			}
-		});
+		);
 
 		expect(result.status).toBe('timed-out');
 		expect(result.summary).toMatch(/wall-clock/i);
@@ -1877,29 +2005,101 @@ describe('executeModelProcess — request refusal', () => {
 		expect(spawnPurposes).toEqual(['version-probe']);
 	});
 
+	it.each([
+		['a proven kill still reports the deadline', { verified: true }, 'timed-out', /exceeded its wall-clock limit/],
+		[
+			'an unprovable kill outranks the deadline',
+			{ verified: false, detail: 'test taskkill exited with code 128' },
+			'termination-failed',
+			/termination was not verified: test taskkill exited with code 128/
+		]
+	] as const)('%s when the version probe overruns its budget', async (_shape, closeOutcome, status, summary) => {
+		const harness = await createHarness('success');
+		let monotonicTime = 0;
+		let closeCalls = 0;
+		const spawnPurposes: string[] = [];
+		let deferredRunRoot: string | undefined;
+		try {
+			const result = await executeModelProcess(
+				request('codex', harness.workspacePath, { timeoutMs: REAL_PROCESS_RUN_BUDGET_MS }),
+				{
+					...harness.io,
+					monotonicNow: () => monotonicTime,
+					directoryExists: async () => true,
+					removeRunRoot: async (path) => {
+						deferredRunRoot = path;
+					},
+					// Filesystem preparation keeps the full real-process budget —
+					// every preparation step is wrapped in a real deadline timer, so
+					// a small request budget would starve the setup rather than the
+					// probe. Only once the probe is about to spawn does the injected
+					// clock leave PROBE_OVERRUN_TIMER_MS, which is exactly what
+					// `runProcess` arms its real per-process timer with.
+					beforeSpawn: (purpose) => {
+						spawnPurposes.push(purpose);
+						if (purpose === 'version-probe') {
+							monotonicTime = REAL_PROCESS_RUN_BUDGET_MS - PROBE_OVERRUN_TIMER_MS;
+						}
+					},
+					spawnFn: (() => hangingProcess()) as typeof spawn,
+					createModelProcessContainment: async (spawnFn) => ({
+						spawn: (executable, arguments_, options) => spawnFn(executable, [...arguments_], options),
+						close: async () => {
+							closeCalls += 1;
+							return closeOutcome;
+						}
+					})
+				}
+			);
+
+			expect(result.status).toBe(status);
+			expect(result.summary).toMatch(summary);
+			// This is the pair the flaky deadline tests used to decide by accident:
+			// the overrun must actually request the process-tree kill, and only an
+			// unprovable kill may displace the deadline the run asked for.
+			expect(closeCalls).toBe(1);
+			expect(result.exitCode).toBeNull();
+			// A probe that had to be killed never reaches the credentialed model.
+			expect(spawnPurposes).toEqual(['version-probe']);
+		} finally {
+			if (deferredRunRoot) await rm(deferredRunRoot, { recursive: true, force: true });
+		}
+	});
+
 	it('closes containment acquired exactly as the absolute budget expires before model spawn', async () => {
 		const harness = await createHarness('success');
 		let monotonicTime = 0;
 		let closeCalls = 0;
 		let modelSpawned = false;
-		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-			...harness.io,
-			monotonicNow: () => monotonicTime,
-			spawnFn: (() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn,
-			createModelProcessContainment: async () => {
-				monotonicTime = 1_001;
-				return {
-					spawn: (() => {
-						modelSpawned = true;
-						throw new Error('model must not spawn after the deadline');
-					}) as typeof spawn,
-					close: async () => {
-						closeCalls += 1;
-						return { verified: true };
-					}
-				};
+		// Same family as the tests above, caught before it could redden a run:
+		// the injected clock only moves at containment acquisition, so with a 1 s
+		// budget every preparation step before that (validate, trusted command,
+		// run-root realpath + mkdtemp + mkdirs — internal.ts:316-413) sat inside
+		// a REAL 1 s `withinExecutionDeadline` timer. Overrunning any of them
+		// ends the run before acquisition, leaving `expected 0 to be 1` on
+		// closeCalls. The fake clock jump is what proves the deadline here, so
+		// the real number only has to be too large for a real timer to pre-empt.
+		const result = await executeModelProcess(
+			request('codex', harness.workspacePath, { timeoutMs: REAL_PROCESS_RUN_BUDGET_MS }),
+			{
+				...harness.io,
+				monotonicNow: () => monotonicTime,
+				spawnFn: (() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn,
+				createModelProcessContainment: async () => {
+					monotonicTime = REAL_PROCESS_RUN_BUDGET_MS + 1;
+					return {
+						spawn: (() => {
+							modelSpawned = true;
+							throw new Error('model must not spawn after the deadline');
+						}) as typeof spawn,
+						close: async () => {
+							closeCalls += 1;
+							return { verified: true };
+						}
+					};
+				}
 			}
-		});
+		);
 
 		expect(result.status).toBe('timed-out');
 		expect(closeCalls).toBe(1);
@@ -2186,25 +2386,37 @@ describe('executeModelProcess — request refusal', () => {
 		const baseCreateContainment = harness.io.createModelProcessContainment!;
 		let containmentCount = 0;
 		let monotonicTime = 0;
-		const result = await executeModelProcess(request('codex', harness.workspacePath, { timeoutMs: 1_000 }), {
-			...harness.io,
-			monotonicNow: () => monotonicTime,
-			createModelProcessContainment: async (spawnFn) => {
-				const containment = await baseCreateContainment(spawnFn);
-				containmentCount += 1;
-				if (containmentCount === 1) return containment;
-				return {
-					...containment,
-					spawn: async () => {
-						monotonicTime = 1_001;
-						throw new Error('trusted broker stopped after deadline');
-					}
-				};
+		const result = await executeModelProcess(
+			request('codex', harness.workspacePath, { timeoutMs: REAL_PROCESS_RUN_BUDGET_MS }),
+			{
+				...harness.io,
+				monotonicNow: () => monotonicTime,
+				// The launcher under test rejects before it ever calls the base
+				// spawn, so the version probe was the only real subprocess here —
+				// and under a 1 s budget its real timer, not this launcher, decided
+				// the status. A closed stub leaves the launcher as the only path to
+				// a terminal result.
+				spawnFn: (() => closedProcess('codex-cli 0.146.0\n')) as typeof spawn,
+				createModelProcessContainment: async (spawnFn) => {
+					const containment = await baseCreateContainment(spawnFn);
+					containmentCount += 1;
+					if (containmentCount === 1) return containment;
+					return {
+						...containment,
+						spawn: async () => {
+							monotonicTime = REAL_PROCESS_RUN_BUDGET_MS + 1;
+							throw new Error('trusted broker stopped after deadline');
+						}
+					};
+				}
 			}
-		});
+		);
 
 		expect(result.status).toBe('timed-out');
 		expect(result.summary).toMatch(/wall-clock/i);
+		// Without this the run could satisfy both assertions above by failing at
+		// the version probe and never reaching the launcher this test names.
+		expect(containmentCount).toBe(2);
 	});
 
 	it('bounds a never-resolving workspace validation inside the one execution deadline', async () => {

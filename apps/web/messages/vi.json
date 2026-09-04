@@ -666,6 +666,13 @@
                 "unarchive": "Move to Active",
                 "delete": "Delete"
             },
+            "fleet": {
+                "badge": "From your fleet",
+                "node": "Node",
+                "task": "Task",
+                "branch": "Branch",
+                "pullRequest": "Pull request"
+            },
             "detail": {
                 "none": "Select a message to read it.",
                 "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
@@ -1338,6 +1345,30 @@
                     "saved": "Đã lưu tập lệnh khởi tạo",
                     "bytes": "{used} / {max} KB",
                     "tooLong": "Tập lệnh khởi tạo vượt quá 16 KB."
+                },
+                "fleet": {
+                    "title": "Execution",
+                    "description": "Where this agent's work runs when machines are enrolled in your Fleet: pin the agent to one of your nodes, and see the routing rule in force for your account.",
+                    "manage": "Manage fleet",
+                    "nodeLabel": "Preferred node",
+                    "nodeHelper": "With a node chosen, this agent's jobs are leased only by that machine — pick the one that holds the checkout, the credentials or the hardware the work needs. Any node lets whichever of your machines is free take them.",
+                    "anyNode": "Any node",
+                    "missingNode": "A node that is no longer enrolled",
+                    "hintOffline": "{name} is offline. Jobs for this agent will wait until it reports in again.",
+                    "hintDraining": "{name} is drained (paused or disabled). Jobs for this agent will wait until it returns to service.",
+                    "hintMissing": "The preferred node was removed from your fleet. Jobs for this agent would wait for a machine that no longer exists — pick another node, or Any node.",
+                    "noNodes": "No machines are enrolled in your Fleet yet, so there is nothing to pin this agent to.",
+                    "noNodesLink": "Enroll a machine in Settings → Fleet",
+                    "affinityPersonalScope": "A preferred node can be set for Organization agents only. Switch to an Organization workspace to pin this agent to a machine.",
+                    "affinityUnavailable": "The preferred node could not be loaded right now. Reload the page to try again.",
+                    "saved": "Preferred node saved",
+                    "cleared": "Preferred node cleared — any of your nodes can take this agent's work",
+                    "routingLabel": "Execution routing",
+                    "routingAccountDefault": "Your account default.",
+                    "routingPlatformDefault": "Platform default — nothing is configured for your account yet.",
+                    "routingOverrides": "{count, plural, one {# Work or Goal override takes} other {# Work or Goal overrides take}} precedence for runs in their own scope.",
+                    "routingUnavailable": "Execution routing could not be loaded right now.",
+                    "routingChange": "Change in Settings → Fleet"
                 }
             }
         },
@@ -1447,7 +1478,9 @@
                 "stepApproval": "approval",
                 "featureName": "Feature name",
                 "featureDescription": "Feature description",
-                "createFromTemplate": "Create workflow"
+                "createFromTemplate": "Create workflow",
+                "extraRepos": "Also work in",
+                "extraReposHint": "Optional. Repositories checked here are checked out next to the Work's repository when the task runs on one of your machines; each one that changes gets its own pull request. The agent's attached repositories are included automatically."
             },
             "detail": {
                 "moveTo": "Di chuyển đến",
@@ -1501,6 +1534,9 @@
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
                     "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "waitingForAnswer": "The agent paused this run with a question for you.",
+                    "answerInInbox": "Answer it in the Inbox",
+                    "parkedHintQuestion": "Answer the question in the Inbox to continue on the same branch. Archive the question there if you want to drop this run.",
                     "steerPlaceholder": "Message the running agent…",
                     "resumePlaceholder": "Optional instruction to resume with…",
                     "steer": "Steer",
@@ -1529,7 +1565,9 @@
                 "openWork": "Mở Work này",
                 "openMission": "Mở Nhiệm vụ này",
                 "openIdea": "Mở Ý tưởng này",
-                "openAgent": "Mở Agent này"
+                "openAgent": "Mở Agent này",
+                "extraRepos": "Also in",
+                "extraReposUpdateError": "Failed to update the extra repositories"
             },
             "recurring": {
                 "section": "Lên lịch định kỳ",
@@ -1609,7 +1647,10 @@
                 "isolationInherit": "Inherit from Work",
                 "isolationOn": "On — isolated branch",
                 "isolationOff": "Off — work directly",
-                "isolationSaveError": "Failed to update isolation override"
+                "isolationSaveError": "Failed to update isolation override",
+                "linkedPullRequests": "Also in",
+                "linkedPrPushed": "branch pushed, no pull request yet",
+                "linkedPrFailed": "branch pushed; opening the pull request failed"
             },
             "gateChip": {
                 "green": "Gate passed",
@@ -1713,6 +1754,12 @@
                 "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
                 "deleteError": "Failed to delete the template",
                 "requiresApproval": "Requires approval"
+            },
+            "extraRepos": {
+                "loading": "Loading repositories…",
+                "loadError": "Could not load your repositories.",
+                "empty": "No repositories in your registry yet.",
+                "emptyLink": "Add one in Settings → Repositories"
             }
         },
         "skillsPage": {
@@ -2525,7 +2572,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Plugin tác nhân"
             },
             "githubApp": {
                 "title": "Cài đặt Ứng dụng GitHub",
@@ -3100,7 +3148,8 @@
                     "enrolling": "Enrolling",
                     "online": "Online",
                     "offline": "Offline",
-                    "disabled": "Disabled"
+                    "disabled": "Disabled",
+                    "paused": "Paused"
                 },
                 "table": {
                     "name": "Name",
@@ -3230,10 +3279,7 @@
                     "downloadNode": "Headless node"
                 },
                 "history": {
-                    "failuresTitle": "Recent failures",
-                    "noFailures": "No failures in the recent history.",
                     "recentCount": "{count} recent jobs",
-                    "attempts": "{count} attempts",
                     "loading": "Loading history…",
                     "unavailable": "Job history is unavailable right now. The node itself is fine."
                 },
@@ -3264,6 +3310,40 @@
                             "label": "Cloud",
                             "helper": "Always uses the platform runtime, even when a local runner is free."
                         }
+                    }
+                },
+                "jobs": {
+                    "title": "Job history",
+                    "description": "The most recent jobs leased to this machine, newest first.",
+                    "filterAll": "All",
+                    "filterFailed": "Failed",
+                    "filterRunning": "Running",
+                    "emptyAll": "No jobs in the recent history.",
+                    "emptyFailed": "No failed jobs in the recent history.",
+                    "emptyRunning": "No job is running on this node right now.",
+                    "statuses": {
+                        "queued": "Queued",
+                        "leased": "Leased",
+                        "running": "Running",
+                        "done": "Done",
+                        "failed": "Failed"
+                    },
+                    "pinned": "Pinned to this node",
+                    "attempts": "Attempt {attempts} of {maxAttempts}",
+                    "queuedAt": "Queued",
+                    "queuedAtValue": "Queued {time}",
+                    "started": "Started",
+                    "startedValue": "Started {time}",
+                    "notStarted": "Not started",
+                    "completed": "Completed",
+                    "completedValue": "Completed {time}",
+                    "notCompleted": "Not completed",
+                    "duration": "Duration",
+                    "durationValue": "Took {duration}",
+                    "elapsedValue": "Running for {duration}",
+                    "queuedReason": "Waiting: {reason}",
+                    "queuedReasons": {
+                        "waitingForRunner": "no runner can take it yet"
                     }
                 }
             },
@@ -3553,6 +3633,7 @@
                 "agentCard": {
                     "title": "Repositories",
                     "subtitle": "Grant this agent access to repositories from your registry.",
+                    "fleetHint": "Attached repositories are mounted next to the Task's repository on fleet runs and get their own pull request when they change.",
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
@@ -3613,6 +3694,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Plugin tác nhân",
+                "description": "Các gói theo định dạng mở Agent Plugins bổ sung kỹ năng và máy chủ MCP cho không gian làm việc này. Chúng hoạt động trên mọi ứng dụng khách hỗ trợ tiêu chuẩn.",
+                "disabled": "Hỗ trợ plugin tác nhân đang tắt trên bản triển khai này. Người vận hành có thể bật bằng cách đặt:",
+                "loadFailed": "Không tải được các gói đã cài. Đây là sự cố kết nối, không phải dấu hiệu chưa cài gì.",
+                "scanning": "Đang quét {roots}",
+                "searchPlaceholder": "Tìm gói và kỹ năng",
+                "empty": "Chưa cài gói nào.",
+                "noMatches": "Không có gói nào khớp với tìm kiếm.",
+                "specVersion": "đặc tả {version}",
+                "skills": "{count, plural, other {# kỹ năng}}",
+                "mcpServers": "{count, plural, other {# máy chủ MCP}}",
+                "none": "Không có",
+                "rejected": "bị từ chối",
+                "rejectedHelp": "Không tải được gói này nên nó không đóng góp gì. Gói vẫn được liệt kê vì có người cố ý thêm vào.",
+                "rejectedHeading": "{count, plural, other {# gói bị từ chối}}",
+                "shadowedHeading": "Gói bị che",
+                "shadowedHelp": "Chúng khai báo tên mà một thư mục trước đó đã cung cấp, nên chỉ gói đầu tiên được dùng.",
+                "severity": {
+                    "fatal": "Nghiêm trọng",
+                    "error": "Lỗi",
+                    "warning": "Cảnh báo"
+                },
+                "scopes": {
+                    "package": "Gói",
+                    "manifest": "Manifest",
+                    "skills": "Kỹ năng",
+                    "mcp": "Máy chủ MCP"
                 }
             }
         },
@@ -5976,6 +6087,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Kho mã",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -5990,6 +6102,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Một kho mã nguồn hiện có dưới dạng Work — Task, Goal và các lượt chạy fleet gắn vào đó. Không có gì được tạo ra hay triển khai.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6139,6 +6252,26 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Work mới — Kho mã",
+                "formSubtitle": "Đăng ký một kho mã nguồn hiện có làm Work. Không có gì được tạo ra hay triển khai — Task, Goal và các lượt chạy fleet chỉ làm việc trong kho mã đó.",
+                "urlLabel": "URL kho mã",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Một kho GitHub mà bạn có quyền truy cập. Nó trở thành kho dữ liệu của Work nguyên trạng.",
+                "nameLabel": "Tên Work",
+                "slugLabel": "Slug của Work",
+                "slugHelp": "Định danh thân thiện với URL. Lấy từ tên kho mã — chỉnh sửa để ghi đè.",
+                "descriptionLabel": "Mô tả",
+                "submitButton": "Đăng ký kho mã",
+                "creatingButton": "Đang đăng ký…",
+                "cancelButton": "Hủy",
+                "invalidUrl": "Nhập URL kho mã như https://github.com/owner/repo",
+                "invalidSlug": "Chỉ dùng chữ thường, chữ số và dấu gạch ngang, ví dụ my-repo",
+                "success": "Đã đăng ký kho mã làm Work",
+                "createFailed": "Không thể đăng ký kho mã",
+                "noteTitle": "Lưu ý:",
+                "noteText": "Work dạng Kho mã không tạo template website, kho của nhà cung cấp hay triển khai. Hãy kết nối nhà cung cấp Git lưu trữ kho mã để các agent có thể clone."
             },
             "manual": {
                 "title": "Tạo Thủ Công",
@@ -6382,14 +6515,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Kho mã"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Một kho mã nguồn hiện có dưới dạng Work — Task, Goal và các lượt chạy fleet gắn vào đó. Không có gì được tạo ra hay triển khai."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7877,6 +8012,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Kho mã",
             "company": "Company",
             "campaign": "Chiến dịch",
             "default": "Work"

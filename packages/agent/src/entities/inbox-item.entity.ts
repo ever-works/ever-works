@@ -9,6 +9,7 @@ import {
 import type {
     InboxItemKind,
     InboxItemOption,
+    InboxItemSourceMeta,
     InboxItemSourceType,
     InboxItemStatus,
 } from '@ever-works/contracts';
@@ -16,9 +17,10 @@ import { PortableDateColumn } from './_types';
 
 /**
  * Inbox (operator message center) — one row per message addressed to
- * the HUMAN: a blocking question from a run (`askHuman`), an approval
- * request mirroring a pending action proposal, an escalation mirror,
- * or a system notice.
+ * the HUMAN: a blocking question from a run (`askHuman`), a question a
+ * FLEET run asked through its worktree (`fleet-run`, self-build slice
+ * Q), an approval request mirroring a pending action proposal, an
+ * escalation mirror, or a system notice.
  *
  * ## Why a table and not a view over the fragments
  *
@@ -34,6 +36,10 @@ import { PortableDateColumn } from './_types';
  *
  *   question   → steer the live run / resume the parked one with the
  *                composed reply; the run's `awaitingInput` clears.
+ *                A `fleet-run` question is always the resume case (the
+ *                run is parked terminal before the row exists) and the
+ *                reply travels with the question text folded in, since
+ *                the next fleet run has no session that remembers it.
  *   approval   → proxy to the approvals decide path by option id.
  *   escalation → resolve the escalation with the reply as the note.
  *   notice     → just mark answered.
@@ -76,8 +82,23 @@ export class InboxItem {
     @Column({ type: 'simple-json', nullable: true })
     options?: InboxItemOption[] | null;
 
+    /**
+     * Which producer wrote the row: `agent-run` (askHuman), `fleet-run`
+     * (a question a node-executed run asked, slice Q), `escalation`,
+     * `proposal`, `system`, `work`. Drives the reply routing above.
+     */
     @Column({ type: 'varchar', length: 24 })
     sourceType: InboxItemSourceType;
+
+    /**
+     * Self-build slice Q — provenance of a `fleet-run` question (node id
+     * and name, Task branch, Task title, pull request, mount directory).
+     * NULL for every other producer; normalized by
+     * `normalizeInboxSourceMeta` before every write. Rendered as chips
+     * by the web, never as markup.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    sourceMeta?: InboxItemSourceMeta | null;
 
     // Cross-links — nullable raw uuids, no @ManyToOne (EW-654).
     @Column({ type: 'uuid', nullable: true })

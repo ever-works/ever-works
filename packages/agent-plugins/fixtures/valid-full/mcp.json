@@ -1,0 +1,28 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "local-validator": {
+      "type": "stdio",
+      "command": "./bin/validator",
+      "args": [
+        "--data",
+        "${PLUGIN_DATA}/validator"
+      ],
+      "env": {
+        "CONFIG": "${PLUGIN_ROOT}/config.json"
+      },
+      "cwd": "${PLUGIN_ROOT}"
+    },
+    "deployment-api": {
+      "type": "streamable-http",
+      "url": "https://deploy.example.com/mcp",
+      "headers": {
+        "X-Tenant": "public-tenant"
+      }
+    },
+    "legacy-events": {
+      "type": "sse",
+      "url": "https://legacy.example.com/sse"
+    }
+  }
+}

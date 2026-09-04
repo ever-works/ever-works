@@ -103,3 +103,13 @@ export async function removeAgentRepoAttachment(agentId: string, repoConnectionI
         'Failed to detach repository',
     );
 }
+
+/**
+ * The owner's repository connections, for pickers (the "Also work in"
+ * list on a Task). Read-only; the registry page keeps its own listing.
+ */
+export async function listRepoConnections() {
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+    return repoConnectionsAPI.list();
+}

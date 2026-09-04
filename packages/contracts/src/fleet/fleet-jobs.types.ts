@@ -1,4 +1,6 @@
-import type { FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
+import { INBOX_MAX_TITLE_CHARS } from '../inbox/inbox.types.js';
+import type { TaskAcceptanceCheck, TaskCheckResult } from '../tasks/task-gates.types.js';
+import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
 
 /**
  * Fleet job lease protocol — the wire shapes an enrolled node and the
@@ -214,6 +216,13 @@ export interface FleetJobView {
 	 * still satisfies this type on a newer client.
 	 */
 	queuedReason?: string | null;
+	/**
+	 * ISO timestamp of an operator cancel request on an ACTIVE job. The
+	 * node learns of it through its next job heartbeat being refused
+	 * (the same "lease lost" path a dead server produces), aborts, and
+	 * reports; the row then settles `failed`. Null / absent otherwise.
+	 */
+	cancelRequestedAt?: string | null;
 }
 
 /** Owner-safe view of one active-Organization Agent-to-node binding. */
@@ -306,6 +315,579 @@ export interface FleetAgentTaskPayload {
 	workspace?: FleetTaskWorkspaceSpec | null;
 	/** Ordered commands the node executes for this run. */
 	steps?: FleetAgentTaskStep[];
+	/**
+	 * Model-CLI execution (agent execution v2). When present the node runs
+	 * a local agent CLI (Claude Code / Codex) in the provisioned workspace
+	 * with `instructions` on stdin, BEFORE any `steps`. `null` is the
+	 * legacy wire representation of an absent field.
+	 */
+	execution?: FleetAgentModelExecution | null;
+	/**
+	 * Dispatch-frozen acceptance checks, run in the workspace AFTER the
+	 * model (and after `steps`). Same shape the cloud gate runner grades,
+	 * so the reported verdict is comparable with a cloud run's.
+	 */
+	acceptanceChecks?: TaskAcceptanceCheck[] | null;
+	/**
+	 * What the node does with the working tree once the model is done.
+	 * Absent = commit + push when a repository workspace was provisioned
+	 * (the platform opens the pull request from the pushed branch).
+	 */
+	git?: FleetAgentTaskGitPolicy | null;
+}
+
+// ─── Agent execution v2 — model CLIs on the node ─────────────────────
+
+/** Local model CLIs a fleet node knows how to drive for an `agent-task`. */
+export type FleetAgentExecutionProvider = 'claude-code' | 'codex';
+
+export const FLEET_AGENT_EXECUTION_PROVIDERS: readonly FleetAgentExecutionProvider[] = ['claude-code', 'codex'];
+
+export const DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER: FleetAgentExecutionProvider = 'claude-code';
+
+export function isFleetAgentExecutionProvider(value: unknown): value is FleetAgentExecutionProvider {
+	return typeof value === 'string' && (FLEET_AGENT_EXECUTION_PROVIDERS as readonly string[]).includes(value);
+}
+
+/**
+ * Whether a provider can be told to treat a directory OUTSIDE its working
+ * root as an additional writable root.
+ *
+ * Multi-repo Task workspaces (self-build slice C) provision every extra
+ * repository as its own binding under the fleet root and only LINK it into
+ * the primary worktree at `.mounts/<dir>`. Both CLIs resolve that link
+ * before enforcing their sandbox, so the write lands outside the primary
+ * tree and is refused unless the mount's real path was granted explicitly:
+ *
+ *   - `claude-code` — `--add-dir <directories...>` (one variadic flag)
+ *   - `codex`       — `--add-dir <DIR>`, repeated once per directory
+ *
+ * A provider that cannot express the grant must REFUSE a Task with
+ * writable mounts, at plan time on the platform and at command-build time
+ * on the node. Running it anyway is the worst outcome available: the model
+ * reads every repository, silently fails every cross-repository edit, and
+ * the run reports success having changed one repository out of several.
+ */
+export function fleetAgentExecutionProviderSupportsMountGrants(provider: FleetAgentExecutionProvider): boolean {
+	return provider === 'claude-code' || provider === 'codex';
+}
+
+/**
+ * How a tenant's fleet executes an `agent-task`:
+ *
+ *   - `command`   — the legacy path: the node runs the operator's
+ *                   `FLEET_NODE_AGENT_TASK_COMMAND` template. Kept as the
+ *                   default so every existing install behaves exactly as
+ *                   it did before this mode existed.
+ *   - `model-cli` — the platform assembles the agent's instructions and
+ *                   the node runs a local model CLI on them in an isolated
+ *                   worktree, then grades the acceptance checks and pushes
+ *                   the task branch.
+ */
+export type FleetAgentExecutionMode = 'command' | 'model-cli';
+
+export const FLEET_AGENT_EXECUTION_MODES: readonly FleetAgentExecutionMode[] = ['command', 'model-cli'];
+
+export const DEFAULT_FLEET_AGENT_EXECUTION_MODE: FleetAgentExecutionMode = 'command';
+
+export function isFleetAgentExecutionMode(value: unknown): value is FleetAgentExecutionMode {
+	return typeof value === 'string' && (FLEET_AGENT_EXECUTION_MODES as readonly string[]).includes(value);
+}
+
+/** Claude Code `--effort` levels. Ignored by CLIs that have no such knob. */
+export type FleetAgentExecutionEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+export const FLEET_AGENT_EXECUTION_EFFORTS: readonly FleetAgentExecutionEffort[] = [
+	'low',
+	'medium',
+	'high',
+	'xhigh',
+	'max'
+];
+
+export function isFleetAgentExecutionEffort(value: unknown): value is FleetAgentExecutionEffort {
+	return typeof value === 'string' && (FLEET_AGENT_EXECUTION_EFFORTS as readonly string[]).includes(value);
+}
+
+/**
+ * What the CLI may do without asking. Named after Claude Code's
+ * `--permission-mode`; the node maps it onto Codex's sandbox policy
+ * (`acceptEdits` → `workspace-write`, `plan` → `read-only`).
+ */
+export type FleetAgentExecutionPermissionMode = 'acceptEdits' | 'dontAsk' | 'plan' | 'default';
+
+export const FLEET_AGENT_EXECUTION_PERMISSION_MODES: readonly FleetAgentExecutionPermissionMode[] = [
+	'acceptEdits',
+	'dontAsk',
+	'plan',
+	'default'
+];
+
+export const DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE: FleetAgentExecutionPermissionMode = 'acceptEdits';
+
+export function isFleetAgentExecutionPermissionMode(value: unknown): value is FleetAgentExecutionPermissionMode {
+	return typeof value === 'string' && (FLEET_AGENT_EXECUTION_PERMISSION_MODES as readonly string[]).includes(value);
+}
+
+/** Wall-clock budget for one model-CLI run when the job names none. */
+export const FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC = 1200;
+
+/** Floor / ceiling for a model-CLI run. The ceiling matches the node's per-step cap. */
+export const FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC = 60;
+export const FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC = 1800;
+
+/** Instructions ride inside the job payload, which is itself capped at 256 KB. */
+export const FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES = 160 * 1024;
+
+/** Hard ceiling on a per-run dollar budget handed to the CLI. */
+export const FLEET_AGENT_EXECUTION_MAX_BUDGET_USD = 500;
+
+/**
+ * Model ids are placed on a command line by the node, so anything that
+ * is not an opaque identifier is refused rather than escaped.
+ */
+export const FLEET_AGENT_EXECUTION_MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/;
+
+/**
+ * Executor input for the model-CLI half of an `agent-task`.
+ *
+ * `instructions` is the ONLY free-form field and it never touches argv:
+ * the node writes it to a file and feeds it to the CLI on stdin. Every
+ * other field is an enum, a bounded number, or an id validated against
+ * {@link FLEET_AGENT_EXECUTION_MODEL_PATTERN} — see
+ * {@link normalizeFleetAgentModelExecution}.
+ */
+export interface FleetAgentModelExecution {
+	provider: FleetAgentExecutionProvider;
+	/** Full prompt for the CLI (system + task body), UTF-8. */
+	instructions: string;
+	/** Provider model id, e.g. `claude-opus-5`. Absent = the CLI's default. */
+	model?: string;
+	effort?: FleetAgentExecutionEffort;
+	permissionMode?: FleetAgentExecutionPermissionMode;
+	/**
+	 * Tenant-authorised escape hatch: `--dangerously-skip-permissions` /
+	 * `--dangerously-bypass-approvals-and-sandbox`. Recorded on the job
+	 * so a node can refuse what the tenant did not authorise.
+	 */
+	skipPermissions?: boolean;
+	/** Wall-clock budget; the node clamps it to its own ceiling. */
+	timeoutSec?: number;
+	/** Dollar cap handed to the CLI (Claude Code `--max-budget-usd`). */
+	maxBudgetUsd?: number;
+	/**
+	 * Env var NAMES the CLI may read from the node's own environment
+	 * (its credential), same semantics as `FleetAgentTaskStep.envPassthrough`.
+	 */
+	envPassthrough?: string[];
+}
+
+/** What the node does with the working tree after the model ran. */
+export interface FleetAgentTaskGitPolicy {
+	/** Stage + commit whatever the run left behind. Default true. */
+	commit?: boolean;
+	/** Push the task branch to the remote. Default true. */
+	push?: boolean;
+	/** Commit subject; the node supplies a default naming the Task. */
+	commitMessage?: string;
+}
+
+export class FleetAgentExecutionError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'FleetAgentExecutionError';
+	}
+}
+
+/**
+ * Validate a model-CLI execution block arriving off the wire.
+ *
+ * REFUSES rather than coerces: a job the node cannot honour exactly as
+ * written must fail naming the field, because a silently-adjusted
+ * budget or model is a verdict the operator never asked for.
+ */
+export function normalizeFleetAgentModelExecution(raw: unknown): FleetAgentModelExecution {
+	if (!raw || typeof raw !== 'object') {
+		throw new FleetAgentExecutionError('Fleet agent execution block is missing');
+	}
+	const input = raw as Record<string, unknown>;
+	if (!isFleetAgentExecutionProvider(input.provider)) {
+		throw new FleetAgentExecutionError(
+			`Fleet agent execution provider must be one of ${FLEET_AGENT_EXECUTION_PROVIDERS.join(', ')}`
+		);
+	}
+	const instructions = typeof input.instructions === 'string' ? input.instructions : '';
+	if (!instructions.trim()) {
+		throw new FleetAgentExecutionError('Fleet agent execution instructions must not be empty');
+	}
+	if (byteLength(instructions) > FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES) {
+		throw new FleetAgentExecutionError(
+			`Fleet agent execution instructions exceed ${FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES} bytes`
+		);
+	}
+	const out: FleetAgentModelExecution = { provider: input.provider, instructions };
+
+	if (input.model !== undefined && input.model !== null) {
+		if (typeof input.model !== 'string' || !FLEET_AGENT_EXECUTION_MODEL_PATTERN.test(input.model)) {
+			throw new FleetAgentExecutionError('Fleet agent execution model id is not an opaque identifier');
+		}
+		out.model = input.model;
+	}
+	if (input.effort !== undefined && input.effort !== null) {
+		if (!isFleetAgentExecutionEffort(input.effort)) {
+			throw new FleetAgentExecutionError(
+				`Fleet agent execution effort must be one of ${FLEET_AGENT_EXECUTION_EFFORTS.join(', ')}`
+			);
+		}
+		out.effort = input.effort;
+	}
+	if (input.permissionMode !== undefined && input.permissionMode !== null) {
+		if (!isFleetAgentExecutionPermissionMode(input.permissionMode)) {
+			throw new FleetAgentExecutionError(
+				`Fleet agent execution permissionMode must be one of ${FLEET_AGENT_EXECUTION_PERMISSION_MODES.join(', ')}`
+			);
+		}
+		out.permissionMode = input.permissionMode;
+	}
+	if (input.skipPermissions !== undefined && input.skipPermissions !== null) {
+		if (typeof input.skipPermissions !== 'boolean') {
+			throw new FleetAgentExecutionError('Fleet agent execution skipPermissions must be a boolean');
+		}
+		out.skipPermissions = input.skipPermissions;
+	}
+	if (input.timeoutSec !== undefined && input.timeoutSec !== null) {
+		if (
+			typeof input.timeoutSec !== 'number' ||
+			!Number.isFinite(input.timeoutSec) ||
+			input.timeoutSec < FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC ||
+			input.timeoutSec > FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC
+		) {
+			throw new FleetAgentExecutionError(
+				`Fleet agent execution timeoutSec must be between ${FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC} and ${FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC}`
+			);
+		}
+		out.timeoutSec = Math.round(input.timeoutSec);
+	}
+	if (input.maxBudgetUsd !== undefined && input.maxBudgetUsd !== null) {
+		if (
+			typeof input.maxBudgetUsd !== 'number' ||
+			!Number.isFinite(input.maxBudgetUsd) ||
+			input.maxBudgetUsd <= 0 ||
+			input.maxBudgetUsd > FLEET_AGENT_EXECUTION_MAX_BUDGET_USD
+		) {
+			throw new FleetAgentExecutionError(
+				`Fleet agent execution maxBudgetUsd must be a positive number up to ${FLEET_AGENT_EXECUTION_MAX_BUDGET_USD}`
+			);
+		}
+		out.maxBudgetUsd = Math.round(input.maxBudgetUsd * 100) / 100;
+	}
+	if (input.envPassthrough !== undefined && input.envPassthrough !== null) {
+		if (!Array.isArray(input.envPassthrough)) {
+			throw new FleetAgentExecutionError('Fleet agent execution envPassthrough must be an array of names');
+		}
+		out.envPassthrough = input.envPassthrough.filter((name): name is string => typeof name === 'string');
+	}
+	return out;
+}
+
+function byteLength(value: string): number {
+	// `TextEncoder` is available in every runtime this package targets
+	// (Node ≥ 18, browsers); it is the only dependency-free UTF-8 sizer.
+	return new TextEncoder().encode(value).length;
+}
+
+// ─── Agent-task result (what the node reports back) ──────────────────
+
+/** Outcome of the model-CLI step, as parsed by the node. */
+export interface FleetAgentTaskModelResult {
+	provider: FleetAgentExecutionProvider;
+	/**
+	 * `succeeded` — the CLI exited 0 and reported success;
+	 * `failed`    — the CLI ran to a nonzero exit or reported an error;
+	 * `timeout`   — killed at its wall-clock budget;
+	 * `error`     — could not be spawned (no CLI, bad workspace).
+	 */
+	status: 'succeeded' | 'failed' | 'timeout' | 'error';
+	exitCode: number | null;
+	durationMs: number;
+	/** The CLI's final message (Claude Code `result`), when it produced one. */
+	summary: string | null;
+	/** Spend the CLI reported for this run, when it did. */
+	costUsd?: number | null;
+	/** Model round-trips the CLI reported, when it did. */
+	turns?: number | null;
+	/** CLI session id, for a later resume. */
+	sessionId?: string | null;
+	/** Last bytes of combined stdout/stderr, for the run report. */
+	outputTail?: string;
+}
+
+/** What the node did with the working tree after the model ran. */
+export interface FleetAgentTaskGitResult {
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): which repository this
+	 * verdict is about. Absent on the primary (`result.git`), set on every
+	 * entry of `result.mountGit`.
+	 */
+	repositoryId?: string;
+	/** The mount directory the repository was linked at (`.mounts/<dir>`); mounts only. */
+	mountDir?: string;
+	branch: string;
+	baseSha: string;
+	headSha: string | null;
+	/** True when there was nothing to commit AND nothing beyond the base. */
+	empty: boolean;
+	pushed: boolean;
+	changedFiles?: number;
+	/** Set when commit/push failed; the run is reported as failed. */
+	error?: string;
+	/**
+	 * Set when the commit landed on the local branch but the push was
+	 * deliberately withheld because the node's lease on this job had run
+	 * out (or was about to). Distinct from `error` on purpose: nothing is
+	 * broken in Git, the node simply refused to write to a task branch it
+	 * may no longer own, and `headSha` names the commit the next attempt
+	 * can resume from. The run is still reported as failed — the branch
+	 * did not reach the remote — but the operator is told why rather than
+	 * being sent after a phantom Git fault.
+	 */
+	publishWithheld?: string;
+}
+
+// ─── Owner question (self-build slice Q) ─────────────────────────────
+
+/**
+ * Directory, relative to a worktree root, the fleet reserves for its own
+ * out-of-band files. Kept out of every Task repository's Git view by the
+ * node (`info/exclude`, next to `/.mounts/`), so nothing written here can
+ * be staged by the finalize's `git add -A`.
+ */
+export const FLEET_AGENT_TASK_META_DIR = '.ever-works';
+
+/**
+ * The file a model writes, in the PRIMARY worktree root, when it needs a
+ * decision only the Task owner can make.
+ *
+ * WHY a file: a fleet run executes a model CLI on the owner's own machine
+ * with no platform credentials and no platform tools — the working tree
+ * is the only channel it has back to the platform. The node reads the
+ * file after the model step, removes it, and reports it as
+ * `FleetAgentTaskResult.question`; the reconciler parks the run and files
+ * an Inbox question; the owner's answer reaches the NEXT run of the same
+ * Task inside its instructions.
+ *
+ * Case-exact and matched by name: NTFS would find `question.md`, ext4
+ * would not, and a node must behave the same on both.
+ */
+export const FLEET_AGENT_TASK_QUESTION_FILE = '.ever-works/QUESTION.md';
+
+/**
+ * Caps. WHY they are mandatory rather than advisory: the platform REJECTS
+ * an oversize job result outright (`FLEET_JOB_MAX_RESULT_BYTES`, enforced
+ * with a 400 by `FleetJobService.completeJob`), and a rejected report
+ * turns a run that merely asked a question into a failed job. So the node
+ * never reads more than `MAX_FILE_BYTES` of the file, the question line is
+ * capped at the Inbox title width, the context at a budget that keeps
+ * title + context inside the Inbox body width — and every cut is
+ * deterministic and code-point safe, never a throw.
+ */
+export const FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES = 64 * 1024;
+/** The question line IS the Inbox item's title, so it shares that cap. */
+export const FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS = INBOX_MAX_TITLE_CHARS;
+/** UTF-8 bytes of context; text + blank line + context stays below `INBOX_MAX_BODY_CHARS`. */
+export const FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES = 6 * 1024;
+
+/** A question the model asked the Task owner through `FLEET_AGENT_TASK_QUESTION_FILE`. */
+export interface FleetAgentTaskQuestion {
+	/** First non-empty line (leading `#{1,6}` stripped), ≤ 300 code points; the Inbox title. */
+	text: string;
+	/**
+	 * Everything after the first line, trimmed. When the first line
+	 * exceeded the text cap the FULL first line is prepended here so the
+	 * cut never loses words — the title is a headline, the body keeps the
+	 * question. `null` when empty.
+	 */
+	context: string | null;
+	/** True only when bytes were actually dropped by a cap. */
+	truncated: boolean;
+	/**
+	 * Where the file was found: `null` = the primary worktree, otherwise
+	 * the `.mounts/<dir>` mount directory (the node scans writable mounts
+	 * as a safety net for a model that wrote the file where it was working).
+	 */
+	mountDir: string | null;
+}
+
+const QUESTION_MOUNT_DIR_PATTERN = /^[A-Za-z0-9._-]{1,64}$/;
+const QUESTION_HEADING_PREFIX = /^#{1,6}\s*/;
+/** ANSI CSI sequences (`ESC [ … m` and friends) — a terminal-coloured line pasted into the file. */
+const ANSI_CSI_SEQUENCE = /\x1B\[[0-9;?]*[ -/]*[@-~]/g;
+/** C0 control characters except TAB / LF / CR, plus DEL — the class `sanitizeText` strips. */
+const C0_CONTROL_CHARACTERS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+
+/**
+ * Drop control characters a question can only have picked up by accident
+ * (a binary head, a symlink target, a terminal escape pasted into the
+ * file). WHY here, at the contract: the question line becomes the run
+ * summary, the Inbox title and the next run's instructions, and Postgres
+ * REJECTS a NUL in `text` / `varchar` — the reconciler's very first write
+ * would throw and leave the run `running`, neither parked nor failed.
+ * CSI sequences go first so their ESC does not leave `[31m` behind.
+ */
+function stripControlCharacters(value: string): string {
+	return value.replace(ANSI_CSI_SEQUENCE, '').replace(C0_CONTROL_CHARACTERS, '');
+}
+
+/**
+ * Parse the Markdown the model wrote into a question.
+ *
+ * Tolerant on the input (a leading UTF-8 BOM, CRLF or bare CR line ends,
+ * leading blank lines, a `# ` heading marker, control characters — a
+ * line that is nothing but control characters is skipped like a blank
+ * one) and strict on the output: the result has been through
+ * {@link normalizeFleetAgentTaskQuestion}, so it already satisfies every
+ * cap. `null` when the file carries no question line at all — a blank
+ * file is not a question.
+ */
+export function parseFleetAgentTaskQuestionMarkdown(
+	markdown: string,
+	mountDir?: string | null
+): FleetAgentTaskQuestion | null {
+	if (typeof markdown !== 'string') return null;
+	const lines = markdown
+		.replace(/^\uFEFF/, '')
+		.replace(/\r\n?/g, '\n')
+		.split('\n');
+	let index = -1;
+	let questionLine = '';
+	for (let i = 0; i < lines.length; i += 1) {
+		const candidate = stripControlCharacters(lines[i]).trim().replace(QUESTION_HEADING_PREFIX, '').trim();
+		if (candidate.length > 0) {
+			index = i;
+			questionLine = candidate;
+			break;
+		}
+	}
+	if (index < 0) return null;
+	const points = Array.from(questionLine);
+	const overflowed = points.length > FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS;
+	const text = overflowed
+		? points.slice(0, FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS).join('').trimEnd()
+		: questionLine;
+	const remainder = lines
+		.slice(index + 1)
+		.join('\n')
+		.trim();
+	const context = `${overflowed ? `${questionLine}\n\n` : ''}${remainder}`.trim();
+	return normalizeFleetAgentTaskQuestion({
+		text,
+		context: context.length > 0 ? context : null,
+		truncated: false,
+		...(mountDir ? { mountDir } : {})
+	});
+}
+
+/**
+ * Coerce an untrusted `question` (off the wire, out of a column) into a
+ * `FleetAgentTaskQuestion`, or `null` when nothing usable survives.
+ *
+ * COERCING, never throwing: the reconciler consumes this from a node's
+ * result, and a malformed question must not cost the run its verdict —
+ * the model, check and git outcomes in the same result are still true.
+ * Only the four declared fields come out; a smuggled `userId` / `taskId`
+ * is dropped here so no consumer can be talked into trusting it, and
+ * control characters are stripped from both strings (a NUL would make
+ * the first Postgres write of the parked-run path throw).
+ */
+export function normalizeFleetAgentTaskQuestion(raw: unknown): FleetAgentTaskQuestion | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	const input = raw as Record<string, unknown>;
+	if (typeof input.text !== 'string') return null;
+	let truncated = input.truncated === true;
+
+	const firstLine = stripControlCharacters(input.text)
+		.trim()
+		.split(/\r\n?|\n/, 1)[0]
+		.trim();
+	if (firstLine.length === 0) return null;
+	const points = Array.from(firstLine);
+	let text = firstLine;
+	if (points.length > FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS) {
+		text = points.slice(0, FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS).join('').trimEnd();
+		truncated = true;
+	}
+
+	let context: string | null = null;
+	if (typeof input.context === 'string') {
+		const cut = truncateToUtf8Bytes(
+			stripControlCharacters(input.context).trim(),
+			FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES
+		);
+		truncated = truncated || cut.truncated;
+		context = cut.value.length > 0 ? cut.value : null;
+	}
+
+	const mountDir =
+		typeof input.mountDir === 'string' && QUESTION_MOUNT_DIR_PATTERN.test(input.mountDir) ? input.mountDir : null;
+
+	return { text, context, truncated, mountDir };
+}
+
+/**
+ * Cut a string to at most `maxBytes` of UTF-8 without splitting a code
+ * point: decode the byte prefix leniently and drop the replacement
+ * character a torn trailing sequence leaves behind.
+ */
+function truncateToUtf8Bytes(value: string, maxBytes: number): { value: string; truncated: boolean } {
+	const bytes = new TextEncoder().encode(value);
+	if (bytes.length <= maxBytes) return { value, truncated: false };
+	const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes.subarray(0, maxBytes));
+	return { value: decoded.replace(/\uFFFD+$/, '').trimEnd(), truncated: true };
+}
+
+/**
+ * The `result` an `agent-task` job carries back to the platform.
+ *
+ * Shared between the node (which produces it) and the API-side
+ * reconciler (which turns it into AgentRun / Task state), so the two
+ * cannot drift on what "the run succeeded" means: the model finished,
+ * every required check is green, and — when a repository workspace was
+ * provisioned — the branch was committed and pushed.
+ */
+export interface FleetAgentTaskResult extends Record<string, unknown> {
+	status: 'succeeded' | 'failed';
+	/** Platform Task the run belongs to (echoed for correlation). */
+	taskId: string;
+	/** Platform `AgentRun` the result correlates to, when the job carried one. */
+	runId: string | null;
+	/** Validated repository checkout used by this run; null for path-only jobs. */
+	workspace: FleetTaskWorkspaceDescriptor | null;
+	/** Verdicts of the legacy command steps, in declared order. */
+	steps: TaskCheckResult[];
+	/** Present when the job carried an `execution` block. */
+	model?: FleetAgentTaskModelResult | null;
+	/** Verdicts of the acceptance checks, when the job carried any. */
+	checks?: TaskCheckResult[] | null;
+	/** Gate verdict over `checks` (`none` when the job carried no checks). */
+	gateStatus?: 'green' | 'red' | 'none' | null;
+	/** Present when the node attempted a commit / push. */
+	git?: FleetAgentTaskGitResult | null;
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): one verdict per
+	 * WRITABLE mount the node attempted to commit / push, in spec order.
+	 * Read-only mounts never appear here.
+	 */
+	mountGit?: FleetAgentTaskGitResult[] | null;
+	/**
+	 * Self-build slice Q: present when the model wrote
+	 * `FLEET_AGENT_TASK_QUESTION_FILE`. The run is NOT failed for it — the
+	 * reconciler parks it awaiting the owner's answer whatever `status`
+	 * says, because partial work almost always reports a red check or a
+	 * non-zero model exit and that verdict is still true.
+	 */
+	question?: FleetAgentTaskQuestion | null;
+	/** Why `status` is `failed`, in one sentence, for the run report. */
+	failureReason?: string | null;
 }
 
 /**

@@ -1,5 +1,6 @@
 'use server';
 
+import type { TaskExtraRepo } from '@ever-works/contracts';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { DecisionConflictReportDto, TaskAcceptanceCheck } from '@ever-works/contracts';
@@ -43,6 +44,8 @@ export async function createTaskAction(input: {
     /** Quality gates (Wave 3 M6) — acceptance checks declared at create. */
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     maxGateAttempts?: number | null;
+    /** Multi-repo: extra repositories by registry connection. */
+    extraRepos?: TaskExtraRepo[] | null;
 }): Promise<Task> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
@@ -71,6 +74,7 @@ export async function updateTaskAction(
             | 'missionId'
             | 'ideaId'
             | 'agentId'
+            | 'extraRepos'
         >
     >,
 ): Promise<Task> {

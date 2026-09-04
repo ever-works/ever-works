@@ -98,6 +98,24 @@ describe('WebsiteUpdateService', () => {
             expect(gitFacade.getLatestCommit).not.toHaveBeenCalled();
         });
 
+        it.each(['repo', 'company', 'campaign'])(
+            'refuses a %s Work (no website repository) before even asking the provider whether one exists',
+            async (kind) => {
+                // Self-build slice D (EW-766): every caller funnels through
+                // here, so this is where a kind that provisions no website
+                // repository is turned away — before `<slug>-website` is
+                // derived under an owner that may not be ours.
+                const work = makeWork({ kind, name: 'Platform' });
+
+                await expect(
+                    service.updateRepository(work as any, { id: 'u' } as any),
+                ).rejects.toThrow(/provisions no website repository/);
+
+                expect(gitFacade.repositoryExists).not.toHaveBeenCalled();
+                expect(websiteTemplateResolver.resolveForWork).not.toHaveBeenCalled();
+            },
+        );
+
         it('uses the duplicate method on success and returns commitSha + branchSync envelope', async () => {
             const work = makeWork();
             gitFacade.repositoryExists.mockResolvedValue(true);

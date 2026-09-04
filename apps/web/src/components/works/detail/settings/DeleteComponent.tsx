@@ -20,6 +20,7 @@ import {
 import { GenerateStatusType } from '@/lib/api/enums';
 import { useWorkPermissions } from '../WorkDetailContext';
 import { TriangleAlertIcon } from 'lucide-react';
+import { getWorkCapabilities, isRepositoryWorkKind } from '@ever-works/contracts';
 
 export function DeleteComponent({ work }: { work: Work }) {
     const permissions = useWorkPermissions();
@@ -33,6 +34,15 @@ export function DeleteComponent({ work }: { work: Work }) {
         delete_markdown_repository: false,
         delete_website_repository: false,
     });
+
+    // Which repositories this kind actually provisions. A checkbox for a
+    // repository the platform never created is worse than misleading: for a
+    // Repository Work the "data repository" IS the user's own code repo and
+    // the API refuses to delete it, so none of the three is offered.
+    const provisioned = getWorkCapabilities(work.kind).repos;
+    const canDeleteDataRepository = provisioned.data && !isRepositoryWorkKind(work.kind);
+    const offersRepositoryOptions =
+        canDeleteDataRepository || provisioned.work || provisioned.website;
 
     // Only owners can delete works
     if (!permissions.canDelete) {
@@ -117,56 +127,68 @@ export function DeleteComponent({ work }: { work: Work }) {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                        {/* Repository options */}
-                        <div className="rounded-lg border border-card-border dark:border-border-secondary-dark divide-y divide-card-border dark:divide-card-border-dark">
-                            <div className="px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                    {t('deleteOptions')}
-                                </p>
+                        {/* Repository options — only the roles this kind provisions */}
+                        {offersRepositoryOptions && (
+                            <div className="rounded-lg border border-card-border dark:border-border-secondary-dark divide-y divide-card-border dark:divide-card-border-dark">
+                                <div className="px-4 py-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                        {t('deleteOptions')}
+                                    </p>
+                                </div>
+                                {canDeleteDataRepository && (
+                                    <div className="px-4 py-3">
+                                        <Checkbox
+                                            checked={deleteOptions.delete_data_repository || false}
+                                            onChange={(e) =>
+                                                setDeleteOptions((current) => ({
+                                                    ...current,
+                                                    delete_data_repository: e.target.checked,
+                                                }))
+                                            }
+                                            label={t('deleteDataRepository')}
+                                            description={t('deleteDataRepositoryDescription')}
+                                            variant="form"
+                                        />
+                                    </div>
+                                )}
+                                {provisioned.work && (
+                                    <div className="px-4 py-3">
+                                        <Checkbox
+                                            checked={
+                                                deleteOptions.delete_markdown_repository || false
+                                            }
+                                            onChange={(e) =>
+                                                setDeleteOptions((current) => ({
+                                                    ...current,
+                                                    delete_markdown_repository: e.target.checked,
+                                                }))
+                                            }
+                                            label={t('deleteMarkdownRepository')}
+                                            description={t('deleteMarkdownRepositoryDescription')}
+                                            variant="form"
+                                        />
+                                    </div>
+                                )}
+                                {provisioned.website && (
+                                    <div className="px-4 py-3">
+                                        <Checkbox
+                                            checked={
+                                                deleteOptions.delete_website_repository || false
+                                            }
+                                            onChange={(e) =>
+                                                setDeleteOptions((current) => ({
+                                                    ...current,
+                                                    delete_website_repository: e.target.checked,
+                                                }))
+                                            }
+                                            label={t('deleteWebsiteRepository')}
+                                            description={t('deleteWebsiteRepositoryDescription')}
+                                            variant="form"
+                                        />
+                                    </div>
+                                )}
                             </div>
-                            <div className="px-4 py-3">
-                                <Checkbox
-                                    checked={deleteOptions.delete_data_repository || false}
-                                    onChange={(e) =>
-                                        setDeleteOptions({
-                                            ...deleteOptions,
-                                            delete_data_repository: e.target.checked,
-                                        })
-                                    }
-                                    label={t('deleteDataRepository')}
-                                    description={t('deleteDataRepositoryDescription')}
-                                    variant="form"
-                                />
-                            </div>
-                            <div className="px-4 py-3">
-                                <Checkbox
-                                    checked={deleteOptions.delete_markdown_repository || false}
-                                    onChange={(e) =>
-                                        setDeleteOptions({
-                                            ...deleteOptions,
-                                            delete_markdown_repository: e.target.checked,
-                                        })
-                                    }
-                                    label={t('deleteMarkdownRepository')}
-                                    description={t('deleteMarkdownRepositoryDescription')}
-                                    variant="form"
-                                />
-                            </div>
-                            <div className="px-4 py-3">
-                                <Checkbox
-                                    checked={deleteOptions.delete_website_repository || false}
-                                    onChange={(e) =>
-                                        setDeleteOptions({
-                                            ...deleteOptions,
-                                            delete_website_repository: e.target.checked,
-                                        })
-                                    }
-                                    label={t('deleteWebsiteRepository')}
-                                    description={t('deleteWebsiteRepositoryDescription')}
-                                    variant="form"
-                                />
-                            </div>
-                        </div>
+                        )}
 
                         {/* Name confirmation */}
                         <div className="space-y-2">

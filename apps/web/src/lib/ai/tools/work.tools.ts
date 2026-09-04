@@ -21,10 +21,29 @@ import type { ConfirmationRequired } from './generated/factory';
 // When the user's message says what they're building ("I want to create a
 // landing page…"), passing the matching kind persists it on the Work so
 // the kind-aware default website template applies.
-const workKindSchema = z
-    .enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo'])
+const workKindEnum = z.enum([
+    'website',
+    'landing-page',
+    'blog',
+    'directory',
+    'awesome-repo',
+    'repo',
+]);
+
+const workKindSchema = workKindEnum.describe(
+    'Kind of Work the user asked for (from their message, e.g. "I want to create a landing page" → landing-page). ' +
+        '"repo" registers an EXISTING code repository as a Work (needs repositoryUrl; use createWorkManual, never the AI creator). Omit if unclear.',
+);
+
+// The AI creator cannot collect a repositoryUrl, so a `repo` Work is not
+// something it can validly ask for — the description used to say so and hope.
+// Excluding it from the schema means a model that tries anyway gets a
+// validation error instead of a Work that fails registration.
+const aiWorkKindSchema = workKindEnum
+    .exclude(['repo'])
     .describe(
-        'Kind of Work the user asked for (from their message, e.g. "I want to create a landing page" → landing-page). Omit if unclear.',
+        'Kind of Work the user asked for (from their message, e.g. "I want to create a landing page" → landing-page). ' +
+            'To register an EXISTING code repository, use createWorkManual with kind "repo" and a repositoryUrl. Omit if unclear.',
     );
 
 // ────────────────────────────────────────────────────────────────
@@ -185,8 +204,14 @@ export const createWorkManual = tool({
         description: z.string().optional().describe('Work description'),
         gitProvider: z.string().describe('Git provider ID from checkGitConnection'),
         kind: workKindSchema.optional(),
+        repositoryUrl: z
+            .string()
+            .optional()
+            .describe(
+                'Repository Work only (kind "repo"): the existing https://github.com/<owner>/<repo> to register as the Work\'s data repository.',
+            ),
     }),
-    execute: async ({ name, slug, description, gitProvider, kind }) => {
+    execute: async ({ name, slug, description, gitProvider, kind, repositoryUrl }) => {
         const result = await createWork({
             name,
             slug,
@@ -194,6 +219,7 @@ export const createWorkManual = tool({
             gitProvider,
             organization: false,
             kind,
+            repositoryUrl,
         });
         return {
             success: result.success,
@@ -225,7 +251,7 @@ export const createWorkWithAITool = tool({
             .describe(
                 'User-chosen providers from listAvailablePipelines (e.g., { pipeline: "sim-ai", ai: "openrouter" })',
             ),
-        workKind: workKindSchema.optional(),
+        workKind: aiWorkKindSchema.optional(),
     }),
     execute: async ({
         name,

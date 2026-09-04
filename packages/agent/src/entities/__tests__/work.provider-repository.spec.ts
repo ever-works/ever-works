@@ -40,6 +40,22 @@ describe('Work.shouldGenerateProviderRepository', () => {
         ).toBe(false);
     });
 
+    /**
+     * A Repository Work wraps the user's own code repository; publishing a
+     * generated "{provider} Repository" beside it would be noise at best
+     * and a second copy of their code at worst. The kind gate must win
+     * regardless of the stored flag.
+     */
+    it('never generates for the repo kind, even with the flag on', () => {
+        expect(
+            makeWork({
+                kind: 'repo',
+                providerRepositoryEnabled: true,
+            }).shouldGenerateProviderRepository(),
+        ).toBe(false);
+        expect(WORK_KIND_CAPABILITIES.repo.repos.work).toBe(false);
+    });
+
     it.each(['default', 'directory', 'awesome-repo', 'blog', 'website', 'landing-page'])(
         'generates for the %s kind when enabled',
         (kind) => {

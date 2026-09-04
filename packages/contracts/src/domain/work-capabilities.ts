@@ -130,6 +130,30 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		repos: { data: true, work: true, website: true }
 	},
 
+	// A Repository Work wraps an EXISTING code repository (self-build slice
+	// D, EW-766): the platform monorepo, a template repo, the website repo.
+	// The data repository IS that code repository — `Work.getDataRepo()` /
+	// `getRepoOwner()` resolve to it, which is exactly what
+	// `TaskWorkspaceService` derives the isolated worktree from, so Tasks,
+	// Goals and fleet runs attach to the repo unchanged. Nothing is
+	// generated for it: no website template, no "{provider} Repository", no
+	// deploy. Items and taxonomy are off because a code repo has neither;
+	// the knowledge base stays on so the repo's conventions, runbooks and
+	// decisions have a home. Metrics describe the work happening ON the
+	// repo rather than any content in it.
+	repo: {
+		items: { enabled: false, labelKey: 'items' },
+		taxonomy: false,
+		comparisons: false,
+		communityPr: false,
+		itemImportExport: false,
+		sourceValidation: false,
+		deploy: false,
+		kb: true,
+		metrics: ['agents', 'open-tasks', 'days-active'],
+		repos: { data: true, work: false, website: false }
+	},
+
 	// A Company Work is an organizational shell, not a generated site: it
 	// backs an Organization rather than producing deployable output.
 	company: {

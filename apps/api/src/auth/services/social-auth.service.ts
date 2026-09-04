@@ -70,11 +70,24 @@ interface LinkedInUserInfo {
 type UpstreamStep = 'token exchange' | 'user profile request';
 
 /**
- * Upstream 4xx statuses that are NOT the client's fault: 408 Request Timeout
- * and 429 Too Many Requests are provider-side / quota conditions and are mapped
- * like a provider outage (502) rather than a rejected code (400).
+ * Upstream 4xx statuses that are NOT the end user's fault. These map like a
+ * provider outage (502) rather than a rejected code (400).
+ *
+ *  - 408 Request Timeout / 429 Too Many Requests — provider-side or quota
+ *    conditions. Telling the user to restart a flow that would fail again is
+ *    the wrong advice.
+ *  - 401 Unauthorized — OUR client credentials, not the user's grant. A
+ *    rejected authorization code comes back 400 `invalid_grant`; 401 is
+ *    `invalid_client`, meaning the platform's own client id/secret is wrong,
+ *    revoked or expired (and on the userinfo step, that the token WE just
+ *    obtained was refused). Both are platform misconfiguration.
+ *
+ *    401 matters beyond the status code the user sees. Mapped to 400 it was
+ *    counted as a client error, so a total sign-in outage — every user of
+ *    that provider failing — raised no 5xx alert at all and looked like a
+ *    crowd of people mistyping something.
  */
-const UPSTREAM_THROTTLE_STATUSES: ReadonlySet<number> = new Set([408, 429]);
+const UPSTREAM_NOT_USER_FAULT_STATUSES: ReadonlySet<number> = new Set([401, 408, 429]);
 
 @Injectable()
 export class SocialAuthService {
@@ -393,12 +406,14 @@ export class SocialAuthService {
      * a BadRequestException.
      *
      * Mapping:
-     *  - upstream 4xx other than 408/429 -> 400 BadRequestException (the
+     *  - upstream 4xx other than 401/408/429 -> 400 BadRequestException (the
      *    code / token we presented was rejected; the user has to restart the
      *    flow)
-     *  - upstream 408 / 429 (provider timeout or rate limit — our app or the
-     *    provider is throttled, the user did nothing wrong), upstream 5xx, or
-     *    no response at all (ECONNRESET, timeout, DNS) -> 502
+     *  - upstream 401 (OUR client credentials, not the user's grant — a
+     *    rejected code is 400 `invalid_grant`, while 401 is `invalid_client`),
+     *    408 / 429 (provider timeout or rate limit — our app or the provider
+     *    is throttled, the user did nothing wrong), upstream 5xx, or no
+     *    response at all (ECONNRESET, timeout, DNS) -> 502
      *    BadGatewayException (the identity provider is the problem, the user
      *    should simply retry; 5xx-keyed alerting keeps seeing the outage)
      *
@@ -453,7 +468,7 @@ export class SocialAuthService {
             typeof status === 'number' &&
             status >= 400 &&
             status < 500 &&
-            !UPSTREAM_THROTTLE_STATUSES.has(status)
+            !UPSTREAM_NOT_USER_FAULT_STATUSES.has(status)
         );
     }
 

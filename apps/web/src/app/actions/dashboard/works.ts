@@ -59,7 +59,20 @@ const readmeConfigSchema = z.object({
 // works/new/new-work-client.tsx). Persisted on `work.kind` by the API so
 // the kind-aware default website template applies (general-purpose kinds
 // → the `web` template). The API whitelists again server-side.
-const aiWorkKindSchema = z.enum(['website', 'landing-page', 'blog', 'directory', 'awesome-repo']);
+const workKindSchema = z.enum([
+    'website',
+    'landing-page',
+    'blog',
+    'directory',
+    'awesome-repo',
+    'repo',
+]);
+
+// `repo` is manual-only: registering one means naming an existing repository,
+// and the AI creation path neither collects nor constructs `repositoryUrl`, so
+// a Work created there with `kind: 'repo'` could never satisfy the API's
+// registration contract. Excluded at the schema so it cannot arrive at all.
+const aiWorkKindSchema = workKindSchema.exclude(['repo']);
 type AIWorkKind = z.infer<typeof aiWorkKindSchema>;
 
 const getCreateWorkSchema = async () => {
@@ -95,8 +108,17 @@ const getCreateWorkSchema = async () => {
         storageProvider: z.string().optional(),
         websiteTemplateId: z.string().optional(),
         // Optional work-kind chip value — kept in the parsed output so it
-        // reaches the API's CreateWorkDto (zod strips unknown keys).
-        kind: aiWorkKindSchema.optional(),
+        // reaches the API's CreateWorkDto (zod strips unknown keys). This is
+        // the MANUAL create path, which does collect `repositoryUrl`, so the
+        // full vocabulary applies here.
+        kind: workKindSchema.optional(),
+        // Repository Work (`kind: 'repo'`) — the existing repository the
+        // Work wraps. Declared so zod keeps it; the API parses + validates.
+        repositoryUrl: z
+            .string()
+            .optional()
+            .transform((val) => val?.trim() || undefined)
+            .pipe(z.string().max(400).optional()),
         readmeConfig: readmeConfigSchema.optional(),
     });
 
@@ -247,7 +269,18 @@ export async function createWork(data: CreateWorkDto) {
         // two tiers would silently disagree again.
         const managedStorage = await resolveManagedStorageStatus(validation.data.storageProvider);
 
-        const gate = await resolveCreateWorkGitGate(providerId, managedStorage);
+        // Repository Work (self-build slice D, EW-766): the API verifies that
+        // the caller can read the repository with THEIR OWN connected
+        // account before it registers anything, so managed storage — which
+        // needs no personal connection — is no shortcut for the kind. Gate
+        // on a personal connection so the form says "connect GitHub" up
+        // front instead of relaying the API's 400 after the round-trip.
+        const gate = await resolveCreateWorkGitGate(
+            providerId,
+            validation.data.kind === 'repo'
+                ? { ...managedStorage, managedGitActive: false }
+                : managedStorage,
+        );
         if (!gate.ok) {
             return {
                 success: false,

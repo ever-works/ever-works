@@ -125,6 +125,10 @@
             "types": "./dist/template-catalog/index.d.ts",
             "default": "./dist/template-catalog/index.js"
         },
+        "./agent-plugins": {
+            "types": "./dist/agent-plugins/index.d.ts",
+            "default": "./dist/agent-plugins/index.js"
+        },
         "./account-transfer": {
             "types": "./dist/account-transfer/index.d.ts",
             "default": "./dist/account-transfer/index.js"
@@ -289,6 +293,7 @@
     },
     "dependencies": {
         "@ai-sdk/openai-compatible": "^2.0.41",
+        "@ever-works/agent-plugins": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/plugin": "workspace:*",
         "@langchain/textsplitters": "^0.1.0",
@@ -307,6 +312,7 @@
         "date-fns": "^4.1.0",
         "exceljs": "^4.4.0",
         "github-slugger": "^2.0.0",
+        "isomorphic-git": "^1.36.3",
         "jszip": "^3.10.1",
         "lodash": "^4.18.1",
         "mammoth": "^1.8.0",

@@ -55,7 +55,7 @@ function getSubmit(container: HTMLElement): HTMLButtonElement {
 }
 
 describe('NewPageClient (chat-open + canvas-route on submit)', () => {
-    it('renders all 10 live chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo, Company (with `works-store` disabled so the catalog matches its production state)', () => {
+    it('renders all 11 live chips in the spec order: Mission, Idea, Agent, Task, Website, Landing Page, Blog, Directory, Awesome Repo, Repository, Company (with `works-store` disabled so the catalog matches its production state)', () => {
         // `store` is now flag-controlled via `works-store` like every
         // other kind. We pass `disabledKinds={['store']}` here to mirror
         // its current PostHog state (`active: false`), which keeps `store`
@@ -66,11 +66,12 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         const chipButtons = Array.from(
             container.querySelectorAll('button[role="option"][aria-selected]'),
         ) as HTMLButtonElement[];
-        // EW-662 Phase 10 — `company` joined the live chip set so the
-        // total is now 10. `store` renders as an inert "Soon" chip
+        // EW-662 Phase 10 — `company` joined the live chip set (10), and
+        // self-build slice D (EW-766) added `repo` — the Repository kind —
+        // so the total is now 11. `store` renders as an inert "Soon" chip
         // (a `span[aria-disabled="true"]` — filtered out by the selector
         // above).
-        expect(chipButtons).toHaveLength(10);
+        expect(chipButtons).toHaveLength(11);
         const labels = chipButtons.map((b) => b.textContent?.trim());
         expect(labels).toEqual([
             'dashboard.newPage.chips.mission',
@@ -82,6 +83,7 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
             'dashboard.newPage.chips.blog',
             'dashboard.newPage.chips.directory',
             'dashboard.newPage.chips.awesome-repo',
+            'dashboard.newPage.chips.repo',
             'dashboard.newPage.chips.company',
         ]);
     });
@@ -270,6 +272,30 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         expect(href).toContain('kind=website');
         // Critically, the prompt is NOT in the URL — the chat carries it.
         expect(href).not.toContain('prompt=');
+    });
+
+    it('Submit with chip=repo hands the text to the Repository form (mode=manual&kind=repo&prompt=…) and opens NO chat turn', () => {
+        // Self-build slice D (EW-766): a Repository Work has nothing for the
+        // chat AI to generate, so the composer text — a repo URL, typically —
+        // goes straight to the form on the Work canvas.
+        startFromPromptMock.mockClear();
+        routerPushMock.mockClear();
+        const { container } = render(<NewPageClient initialType="repo" />);
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'https://github.com/ever-works/ever-works' },
+        });
+        fireEvent.click(getSubmit(container));
+
+        expect(startFromPromptMock).not.toHaveBeenCalled();
+        expect(routerPushMock).toHaveBeenCalledTimes(1);
+        const href = routerPushMock.mock.calls[0][0] as string;
+        expect(href.startsWith('/works/new?')).toBe(true);
+        const params = new URLSearchParams(href.slice(href.indexOf('?') + 1));
+        expect(params.get('mode')).toBe('manual');
+        expect(params.get('kind')).toBe('repo');
+        // Unlike every other Work chip, the text DOES travel in the URL: the
+        // form seeds its Repository URL field from it.
+        expect(params.get('prompt')).toBe('https://github.com/ever-works/ever-works');
     });
 
     it('renders initialPrompt verbatim in the prompt textarea', () => {

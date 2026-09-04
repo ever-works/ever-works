@@ -278,6 +278,51 @@ export class WorkRepository {
     }
 
     /**
+     * Repository Work (self-build slice D, EW-766) — every `repo` Work that
+     * wraps `<owner>/<repo>`, case-insensitively, regardless of who owns it.
+     *
+     * The create path uses this to refuse a second tenant registering a
+     * repository another tenant already wraps: the on-disk checkout the git
+     * facade keeps is keyed by `owner/repo` alone, so two accounts pointing
+     * at the same third-party repository would share — and clobber — one
+     * working copy with two different tokens.
+     *
+     * Scoped to `kind = 'repo'` on purpose. For those rows `work.owner` IS
+     * the wrapped repository's owner (see `applyRepositoryWorkSource`), so
+     * the indexed `owner` column narrows the candidate set in SQL and only
+     * the `data` role of the `simple-json` column is compared in memory —
+     * the same portable split `findByDataRepoFullName` uses. Generated data
+     * repositories of other kinds are deliberately not considered: their
+     * owner is the tenant's own login, not a third party's.
+     */
+    async findRepositoryWorksWrapping(owner: string, repo: string): Promise<Work[]> {
+        if (!owner || !repo) {
+            return [];
+        }
+        const candidates = await this.repository
+            .createQueryBuilder('work')
+            .where('work.kind = :kind', { kind: 'repo' })
+            .andWhere('LOWER(work.owner) = :owner', { owner: owner.toLowerCase() })
+            .getMany();
+
+        const target = repo.toLowerCase();
+        const targetOwner = owner.toLowerCase();
+        return candidates.filter((work) => {
+            const data = work.sourceRepository?.relatedRepositories?.data;
+            if (typeof data?.repo !== 'string' || data.repo.toLowerCase() !== target) {
+                return false;
+            }
+            // The `work.owner` column narrowed the query; the registered
+            // coordinates decide the match. Both must be present and agree:
+            // treating a row whose registered owner is missing or malformed
+            // as a match would let one broken row block every other account
+            // from registering that repository, and we cannot prove such a
+            // row wraps it. `updateWork` refuses to let the column drift.
+            return typeof data.owner === 'string' && data.owner.toLowerCase() === targetOwner;
+        });
+    }
+
+    /**
      * EW-628 — dispatcher Path A (webhook flush). Picks Works where the
      * GitHub App push handler stamped `pendingSyncRequestedAt` long
      * enough ago that the 30 s quiet-period debounce has elapsed.

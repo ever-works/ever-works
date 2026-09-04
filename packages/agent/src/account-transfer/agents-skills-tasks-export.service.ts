@@ -206,6 +206,10 @@ export class AgentsSkillsTasksExportService {
                     : null,
                 maxGateAttempts:
                     typeof task.maxGateAttempts === 'number' ? task.maxGateAttempts : null,
+                // "Also work in" repositories. Emitted as stored — the
+                // import side is what decides whether an entry may be
+                // restored into the receiving account (see `ExportedTask`).
+                extraRepos: Array.isArray(task.extraRepos) ? task.extraRepos : null,
                 createdAt: task.createdAt.toISOString(),
                 startedAt: task.startedAt?.toISOString() ?? null,
                 completedAt: task.completedAt?.toISOString() ?? null,
