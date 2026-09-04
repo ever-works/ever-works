@@ -186,7 +186,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       exempt (admin-only surface, like `plugin_allowlist` which has no chat
       tools) and `skill_files` is exempt (child rows surfaced through existing
       skill tools) — exemptions stated so the DoD check is explicit.
-- [ ] **T28**. Decision + implementation: MCP tool invocations →
+- [x] **T28**. Decision + implementation: MCP tool invocations →
       `PluginUsageEvent` usage accounting (recommended: on).
 
 ## Phase 4 — stdio transport + PLUGIN_DATA (PR-7)

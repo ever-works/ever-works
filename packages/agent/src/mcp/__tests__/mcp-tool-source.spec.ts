@@ -57,6 +57,7 @@ function makeSource(options: {
     connections: McpServerConnection[];
     bindings: AgentMcpServerBinding[];
     toolsByConnection?: Record<string, McpToolInfo[] | Error>;
+    usage?: { record: jest.Mock };
 }) {
     const connectionsRepo = {
         findEnabledByUser: jest
@@ -96,7 +97,12 @@ function makeSource(options: {
         { findByIdAndUser: jest.fn() } as never,
         undefined,
     );
-    return { source: new McpToolSource(connections, client), client };
+    const usage = options.usage;
+    return {
+        source: new McpToolSource(connections, client, usage as never),
+        client,
+        usage,
+    };
 }
 
 describe('McpToolSource', () => {
@@ -233,5 +239,89 @@ describe('McpToolSource', () => {
                 { q: 'bug' },
             );
         });
+    });
+});
+
+describe('usage accounting (T28)', () => {
+    it('records one event per successful tool invocation', async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }));
+        await tools[0].invoke({ q: 'x' });
+
+        expect(usage.record).toHaveBeenCalledTimes(1);
+        expect(usage.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                workId: 'work-1',
+                userId: 'u1',
+                capability: 'mcp',
+                units: 1,
+            }),
+        );
+    });
+
+    it('does NOT record a failed tool call', async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source, client } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+        (client.callTool as jest.Mock).mockRejectedValue(new Error('server down'));
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }));
+        await expect(tools[0].invoke({ q: 'x' })).rejects.toThrow('server down');
+
+        // Recording after the call is what makes this true: a failed
+        // invocation consumed nothing, so counting it would overstate spend.
+        expect(usage.record).not.toHaveBeenCalled();
+    });
+
+    it('NEVER breaks a tool call when accounting fails', async () => {
+        const usage = { record: jest.fn().mockRejectedValue(new Error('db down')) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }));
+
+        // Trading a working tool for a complete ledger is the wrong way round.
+        await expect(tools[0].invoke({ q: 'x' })).resolves.toEqual({ ok: true });
+    });
+
+    it('skips an agent with no workId rather than inventing one', async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        // `plugin_usage_events.workId` is NOT NULL, and an agent scoped to a
+        // Mission or Idea has none. Making that column nullable is a migration
+        // on a table five other capabilities write to — a larger change than
+        // this feature should make alone, so such agents are simply not
+        // counted, and the gap is stated rather than hidden.
+        const tools = await source.buildTools(makeAgent({ workId: null }));
+        await tools[0].invoke({ q: 'x' });
+
+        expect(usage.record).not.toHaveBeenCalled();
+    });
+
+    it('works with no usage repository bound at all', async () => {
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }));
+        await expect(tools[0].invoke({ q: 'x' })).resolves.toEqual({ ok: true });
     });
 });
