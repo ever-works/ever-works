@@ -273,6 +273,18 @@ describe('AgentPluginNpmSource', () => {
             await expect(source.latestVersion('acme-skills')).resolves.toBeNull();
         });
 
+        it('refuses a malformed package NAME, which npa would read as a transport', async () => {
+            const pacote = pacoteStub();
+            const source = new AgentPluginNpmSource(allowlistStub({ allowed: true }));
+            source.setPacote(pacote);
+
+            // The version is the literal `latest` here, so the injection has
+            // to ride on the name — and an update check is the quieter
+            // entrance: it runs on a schedule and swallows its own errors.
+            await expect(source.latestVersion('../evil')).resolves.toBeNull();
+            expect(pacote.manifest).not.toHaveBeenCalled();
+        });
+
         it('returns the version when it is permitted', async () => {
             const source = new AgentPluginNpmSource(allowlistStub({ allowed: true }));
             source.setPacote(pacoteStub({ version: '1.4.0' }));

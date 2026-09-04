@@ -257,6 +257,25 @@ export class AgentPluginNpmSource {
      * anything — so an update check costs one manifest request and no disk.
      */
     async latestVersion(packageName: string, registry?: string): Promise<string | null> {
+        // The same grammar `acquire` enforces. The version here is the literal
+        // `latest`, so the version-injection vector is closed by construction —
+        // but the NAME still reaches `npm-package-arg`, which picks a transport
+        // from the shape of either half. `../evil@latest` resolves as a
+        // directory spec.
+        //
+        // Every name that reaches this today came through `acquire`, which now
+        // validates it, so this is defence in depth rather than a live hole.
+        // It is here because the argument for validating at the entrance
+        // applies to every entrance, and an update check is a quieter one:
+        // it runs on a schedule, swallows its own errors, and would not
+        // announce that it had been used.
+        if (!NPM_PACKAGE_NAME.test(packageName)) {
+            this.logger.warn(
+                `Refusing update check for "${packageName}": not a valid npm package name.`,
+            );
+            return null;
+        }
+
         const allow = await this.allowlist.check(packageName, 'npm');
         if (!allow.allowed) return null;
         try {
