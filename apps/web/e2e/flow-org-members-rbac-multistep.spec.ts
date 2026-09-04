@@ -756,10 +756,19 @@ test.describe('Org RBAC — end-to-end org-admin journey', () => {
 
         // 1. Create a team and staff it: an agent LEAD + the human owner as a MEMBER.
         const team = await createTeam(request, ctx, { name: `Ops ${stamp()}` });
-        const agent = await createAgentViaAPI(request, ctx.token, {
-            scope: 'tenant',
-            name: `OpsBot ${stamp()}`,
-        });
+        // Created IN org A. An agent created with no workspace selector is
+        // tenant-wide (organizationId NULL), and the org-chart deliberately
+        // projects tenant-wide agents into every org of the tenant (spec §5) —
+        // which is exactly what the disjointness check below must not see.
+        const agent = await createAgentViaAPI(
+            request,
+            ctx.token,
+            {
+                scope: 'tenant',
+                name: `OpsBot ${stamp()}`,
+            },
+            ctx.orgSlug,
+        );
         expect(
             (
                 await request.post(`${orgBase(ctx.orgId)}/teams/${team.id}/members`, {
