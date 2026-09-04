@@ -37,9 +37,12 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *  POST /api/me/goals {title,metricSource:{pluginId,metricId},comparator,targetValue,
  *       unit,window} → 201 GoalDto status:'draft', nextCheckAt/currentValue/
  *       baselineValue/deadline/outcome all null, checkFrequencyMinutes:60. The DTO
- *       NEVER leaks userId/tenantId/organizationId.
+ *       NEVER leaks the owning userId, but it DOES carry the ownership scope pair
+ *       (tenantId/organizationId) it is stamped with.
  *  POST /api/me/missions/:id/goals {goalId,isPrimary?} → 201 MissionGoalLinkDto
- *       { id, missionId, goalId, isPrimary, createdAt, goal:GoalDto } — ALWAYS 201,
+ *       { id, tenantId, organizationId, missionId, goalId, isPrimary, createdAt,
+ *       goal:GoalDto } — the edge carries the same ownership scope pair as the
+ *       Goal it nests (e49936d8) — ALWAYS 201,
  *       even when it merely updates an existing edge's isPrimary (idempotent).
  *       Promoting a second primary demotes the incumbent (one-primary-per-mission).
  *       Unknown goal → 404 "Goal not found"; foreign/unknown mission → 404
@@ -121,6 +124,13 @@ interface LinkRow {
 
 const GOAL_DTO_KEYS = [
     'id',
+    // Ownership scope: the DTO deliberately surfaces the tenant/Organization
+    // pair a Goal is stamped with (e49936d8 "fix(api): expose and enforce
+    // organization ownership"), so a client can tell a personal Goal from an
+    // Organization-scoped one. Either may be null, but the keys are always
+    // present — `toGoalDto` writes both unconditionally.
+    'tenantId',
+    'organizationId',
     'title',
     'description',
     'metricSource',
@@ -332,7 +342,7 @@ test.describe('Mission goal-portfolio composition', () => {
         }
     });
 
-    test('each link nests a full GoalDto projection that mirrors the standalone Goal and leaks no owner/scope', async ({
+    test('each link nests a full GoalDto projection that mirrors the standalone Goal and leaks no owning userId', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -358,11 +368,12 @@ test.describe('Mission goal-portfolio composition', () => {
             params: { currency: 'usd' },
         });
         expect(nested.status).toBe('draft');
-        // …exposing exactly the GoalDto surface — no userId/tenantId/organizationId.
+        // …exposing exactly the GoalDto surface — the ownership scope pair is part
+        // of that surface, the owning userId is not.
         expect(Object.keys(nested).sort()).toEqual([...GOAL_DTO_KEYS].sort());
         expect(nested).not.toHaveProperty('userId');
-        expect(nested).not.toHaveProperty('tenantId');
-        expect(nested).not.toHaveProperty('organizationId');
+        expect(nested).toHaveProperty('tenantId');
+        expect(nested).toHaveProperty('organizationId');
     });
 
     test('promoting a second Goal to primary demotes the incumbent — one-primary holds across a 3-goal set', async ({

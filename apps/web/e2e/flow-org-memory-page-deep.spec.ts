@@ -33,9 +33,12 @@
  *
  * ── Verified live against http://127.0.0.1:3100 (sqlite in-memory — the CI
  *    driver) before assertions were written. The Organization is taken from the
- *    request scope context: on these legacy un-prefixed routes it is seeded from
- *    the user's last-active Org, or resolved from the `X-Scope-Slug` header. We
- *    drive the header explicitly so scope is deterministic.
+ *    request scope context, which since 8f28edca0 is populated ONLY from an
+ *    explicit `X-Scope-Slug` header or an `/api/<slug>/…` path — the guard
+ *    deliberately refuses to fall back to the user's last-active Org, so an
+ *    unprefixed bare-Bearer call runs in the personal scope and these handlers
+ *    early-return an empty payload with HTTP 200. We drive the header
+ *    explicitly, which is now required rather than merely deterministic.
  *
  * Isolation discipline: every test builds a FRESH registerUserViaAPI() owner +
  * a lazily-minted org. Fully API-orchestrated (safe `flow-` prefix, not matched
@@ -66,9 +69,10 @@ function stamp(): string {
 }
 
 /**
- * An owner + their org, with both a plain-authed header set and a
- * scope-pinned header set (`X-Scope-Slug`) so the legacy /api/memory route
- * resolves this exact org regardless of the user's last-active pointer.
+ * An owner + their org, with both a plain-authed header set (the PERSONAL
+ * contract — it resolves no Organization at all) and a scope-pinned header set
+ * (`X-Scope-Slug`) which is the only way an unprefixed /api/memory call can
+ * reach this org.
  */
 interface OrgCtx {
     user: RegisteredUser;

@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+    IsBoolean,
+    IsIn,
+    IsOptional,
+    IsString,
+    IsUrl,
+    MaxLength,
+    MinLength,
+} from 'class-validator';
 
 /**
  * Remote sources that require an allowlist entry.
@@ -131,4 +139,43 @@ export class InstallAgentPluginPackageDto {
     @IsString()
     @MaxLength(256)
     version?: string;
+}
+
+export class DescriptorQueryDto {
+    /**
+     * Override the endpoint the descriptor points at, for a self-hosted
+     * deployment.
+     *
+     * Validated rather than taken raw. This value is written verbatim into the
+     * `mcp.json` we hand out, and a consuming client connects to whatever it
+     * finds there — so an unvalidated string here becomes somebody else's
+     * outbound request. A bare `@Query('url')` string bypasses the global
+     * pipe entirely, because the pipe validates DTO classes.
+     *
+     * https only, for the same reason the git acquirer requires it: package
+     * contents are read as agent instructions, and a plaintext hop is an
+     * injection point.
+     *
+     * `disallow_auth` and `allow_fragments: false` are not decoration — they
+     * are what makes this agree with `validateRemoteUrl`, which spec 7.2.1
+     * requires and which rejects both. `@IsUrl` permits both by default, so
+     * without them `https://user:pass@host/` reached the descriptor, and
+     * `buildEverWorksMcpDescriptor` REPORTS a bad URL in `findings` rather
+     * than throwing. The endpoint would answer 200 with an `mcp.json`
+     * carrying embedded credentials — contradicting the one promise it makes
+     * in its own OpenAPI description, that the descriptor contains none. A
+     * consumer writing `files` to disk and ignoring `findings` gets the
+     * credential; a fragment is refused for the same reason the importer
+     * refuses it, so the two ends cannot disagree about what is valid.
+     */
+    @ApiPropertyOptional({ description: 'Self-hosted MCP endpoint (https).' })
+    @IsOptional()
+    @IsUrl({
+        protocols: ['https'],
+        require_protocol: true,
+        disallow_auth: true,
+        allow_fragments: false,
+    })
+    @MaxLength(2048)
+    url?: string;
 }

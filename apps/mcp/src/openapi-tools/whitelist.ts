@@ -557,5 +557,48 @@ export const WHITELIST: WhitelistEntry[] = [
 		path: '/api/agents/{id}/budget',
 		toolName: 'get_agent_budget',
 		annotations: { readOnlyHint: true }
+	},
+
+	// Agent Plugins (EW-772) — READ ONLY, deliberately.
+	//
+	// Installing an Agent Plugins package means installing SKILLS, and a skill
+	// is instructions the agent will then follow. Exposing the install route
+	// as a tool would let an agent bound to this server acquire its own future
+	// instructions — and this server is reachable by agents processing scraped
+	// web content and community-PR text, so a prompt-injected run could ask it
+	// to install a package whose skills redirect it further. That is a
+	// self-modification loop, not a convenience.
+	//
+	// The same reasoning the "human gates stay human" rule applies to
+	// approvals: the route stays available to a human through the API, the web
+	// UI and the CLI. It is only absent from the TOOL surface.
+	//
+	// Also excluded for the same reason: POST /:id/resync (re-fetches content
+	// that may have changed since a human reviewed it) and the allowlist
+	// routes (an agent must not be able to widen what it is permitted to
+	// fetch). Reading is safe and useful, so it is offered.
+	{
+		method: 'GET',
+		path: '/api/agent-plugins',
+		toolName: 'list_agent_plugin_packages',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/agent-plugins/findings',
+		toolName: 'list_agent_plugin_findings',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/agent-plugins/catalog',
+		toolName: 'list_agent_plugin_catalog_entries',
+		annotations: { readOnlyHint: true }
+	},
+	{
+		method: 'GET',
+		path: '/api/agent-plugins/updates',
+		toolName: 'list_agent_plugin_updates',
+		annotations: { readOnlyHint: true }
 	}
 ];

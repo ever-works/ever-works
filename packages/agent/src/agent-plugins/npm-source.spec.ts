@@ -192,6 +192,35 @@ describe('AgentPluginNpmSource', () => {
         expect(pacote.extract).not.toHaveBeenCalled();
     });
 
+    it('REFUSES when a pin exists but the registry returns no integrity', async () => {
+        const pacote = pacoteStub({ _integrity: undefined });
+        const source = new AgentPluginNpmSource(
+            allowlistStub({ allowed: true, entry: { integrity: 'sha512-pinned' } }),
+        );
+        source.setPacote(pacote);
+
+        await expect(
+            source.acquire({ packageName: 'acme-skills', destDir: await scratch() }),
+        ).rejects.toMatchObject({ status: 424 });
+
+        // A pin with nothing to compare against is a pin that did not happen.
+        // Skipping the check ALSO meant extracting with no integrity option at
+        // all, so the tarball was written unverified.
+        expect(pacote.extract).not.toHaveBeenCalled();
+    });
+
+    it('is unaffected when no pin is configured and the registry omits integrity', async () => {
+        const pacote = pacoteStub({ _integrity: undefined });
+        const source = new AgentPluginNpmSource(allowlistStub({ allowed: true }));
+        source.setPacote(pacote);
+
+        // No pin means the operator asked for no guarantee, so this proceeds —
+        // refusing here would be a different bug.
+        await expect(
+            source.acquire({ packageName: 'acme-skills', destDir: await scratch() }),
+        ).resolves.toMatchObject({ integrity: null });
+    });
+
     it('extracts with the manifest integrity, and creates NO node_modules symlink', async () => {
         const pacote = pacoteStub();
         const source = new AgentPluginNpmSource(allowlistStub({ allowed: true }));

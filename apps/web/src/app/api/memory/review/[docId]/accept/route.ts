@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 type RouteContext = { params: Promise<{ docId: string }> };
 
@@ -11,18 +12,37 @@ type RouteContext = { params: Promise<{ docId: string }> };
  * for context injection, so the upstream re-fetches it scoped to the
  * caller's Organization before writing and answers 404 — not 403 — when
  * it belongs to someone else. Nothing about that decision happens here;
- * this only forwards the caller's bearer.
+ * this only forwards the caller's bearer and the caller's scope.
+ *
+ * EW-786: the scope half was missing. `acceptMemoryDocument` reads the
+ * Organization off the request scope and refuses with 422 when there is
+ * none, so every Accept click from an Organization tab failed — the
+ * write path has no empty-payload fallback the way the queue read does.
+ * Translating the browser's `x-ever-workspace` selector into
+ * `x-scope-slug` here is what makes the button work at all, and it must
+ * land in the same change as the panel's `browserApiFetch` transport:
+ * scoped route + raw `fetch()` caller is a guaranteed 400.
  */
-export async function POST(_request: NextRequest, { params }: RouteContext) {
+export async function POST(request: NextRequest, { params }: RouteContext) {
     const { docId } = await params;
     const token = await getAuthAccessCookie();
     if (!token) {
         return new Response('Unauthorized', { status: 401 });
     }
 
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, {
+            Accept: 'application/json',
+            Authorization: `Bearer ${token}`,
+        });
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
+
     const upstream = await fetch(`${API_URL}/memory/review/${encodeURIComponent(docId)}/accept`, {
         method: 'POST',
-        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+        headers,
         cache: 'no-store',
     });
 

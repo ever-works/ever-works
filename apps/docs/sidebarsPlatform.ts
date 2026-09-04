@@ -111,6 +111,7 @@ const sidebars: SidebarsConfig = {
 				'features/work-templates',
 				'features/k8s-deployment',
 				'features/mcp-server',
+				'features/agent-plugins',
 				'features/data-management'
 			]
 		},

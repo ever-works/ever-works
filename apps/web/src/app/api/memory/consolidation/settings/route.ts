@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
 
 /**
  * Proxy for the scheduled Memory Consolidation settings.
@@ -11,15 +12,43 @@ import { getAuthAccessCookie } from '@/lib/auth/cookies';
  * The write matters more than it looks: the scheduler only selects
  * organizations whose settings column is non-null, and nothing used to
  * write that column, so the scheduled pass could never run for anyone.
+ *
+ * EW-786 — both handlers are genuinely Organization-scoped:
+ * `OrgMemoryController.getConsolidationSettings` /
+ * `putConsolidationSettings` take the Organization from
+ * `ScopeContextService.getOrganizationId()`, which the API populates only
+ * from an `/api/<slug>/…` path or the `X-Scope-Slug` header. Translating
+ * the browser's per-tab `x-ever-workspace` selector into that header is
+ * therefore the whole feature on an Organization: without it `GET`
+ * answered with the personal-scope defaults instead of the stored
+ * settings, and `PUT` answered 422 "No active Organization", which the
+ * panel showed as a toggle that flipped and quietly flipped back.
+ *
+ * The selector only arrives if the caller sends it, so this change and
+ * the `browserApiFetch` switch in `MemoryConsolidationSettings` are one
+ * change: scoping the route alone would turn those silent failures into
+ * a hard 400.
  */
 
-async function forward(method: 'GET' | 'PUT', body?: string) {
+async function forward(request: NextRequest, method: 'GET' | 'PUT', body?: string) {
     const token = await getAuthAccessCookie();
     if (!token) return new Response('Unauthorized', { status: 401 });
 
-    const headers = new Headers({ Accept: 'application/json' });
-    headers.set('Authorization', `Bearer ${token}`);
-    if (body !== undefined) headers.set('Content-Type', 'application/json');
+    const base: Record<string, string> = {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+    };
+    if (body !== undefined) base['Content-Type'] = 'application/json';
+
+    // Fail closed. A missing or stale selector is answered here rather
+    // than forwarded unscoped, which would silently read and write the
+    // caller's personal scope while they are looking at an Organization.
+    let headers: Headers;
+    try {
+        headers = applyBffWorkspaceScope(request, base);
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
 
     const upstream = await fetch(`${API_URL}/memory/consolidation/settings`, {
         method,
@@ -43,13 +72,13 @@ async function forward(method: 'GET' | 'PUT', body?: string) {
     return NextResponse.json(json ?? {}, { status: 200 });
 }
 
-export async function GET(_request: NextRequest) {
-    return forward('GET');
+export async function GET(request: NextRequest) {
+    return forward(request, 'GET');
 }
 
 export async function PUT(request: NextRequest) {
     // Read and re-serialize rather than streaming: this is a small JSON
     // body, and buffering keeps the upstream Content-Length honest.
     const raw = await request.text().catch(() => '{}');
-    return forward('PUT', raw || '{}');
+    return forward(request, 'PUT', raw || '{}');
 }

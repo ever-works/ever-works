@@ -243,6 +243,66 @@ function buildCatalogCommand(): Command {
         });
 }
 
+function buildDescriptorCommand(): Command {
+    return new Command('descriptor')
+        .description('Write the Ever Works MCP server as an Agent Plugins package')
+        .option('-o, --output <dir>', 'Write here instead of ./ever-works-mcp')
+        .option('-u, --url <url>', 'Point at a self-hosted MCP endpoint')
+        .action(async (options: { output?: string; url?: string }) => {
+            try {
+                await requireAuth();
+                const spinner = ora('Building descriptor…').start();
+                const query = options.url ? `?url=${encodeURIComponent(options.url)}` : '';
+                const response = (await api().get(`/agent-plugins/descriptor${query}`)) as {
+                    files?: Record<string, string>;
+                };
+                spinner.stop();
+
+                const files = response.files ?? {};
+                if (Object.keys(files).length === 0) {
+                    console.log(chalk.yellow('\nThe server returned an empty descriptor.'));
+                    return;
+                }
+
+                // A DIRECTORY, not an archive. A package IS a directory — every
+                // client that consumes one reads it as a tree — so writing the
+                // tree is both the useful output and the inspectable one.
+                // Zipping would also mean a bundling dependency the CLI does
+                // not otherwise carry, for a step `zip -r` already does.
+                const target = options.output ?? 'ever-works-mcp';
+                const { mkdir, writeFile } = await import('node:fs/promises');
+                const { dirname, resolve, sep } = await import('node:path');
+
+                // `files` is SERVER-SUPPLIED, and --url lets it come from a self-hosted
+                // endpoint. join() resolves an entry named ../../.ssh/authorized_keys
+                // happily, and the mkdir below would create its parents — zip-slip, writing
+                // anywhere the CLI user can write. Refuse anything outside the output dir.
+                const root = resolve(target);
+                for (const [name, content] of Object.entries(files)) {
+                    const file = resolve(root, name);
+                    if (file !== root && !file.startsWith(root + sep)) {
+                        throw new Error(
+                            `Descriptor entry "${name}" resolves outside ${target} — refusing to write it.`,
+                        );
+                    }
+                    await mkdir(dirname(file), { recursive: true });
+                    await writeFile(file, content, 'utf8');
+                }
+
+                console.log(chalk.green(`\nWrote ${target}/`));
+                for (const name of Object.keys(files).sort()) {
+                    console.log(chalk.gray(`  ${name}`));
+                }
+                console.log(
+                    chalk.gray('  Contains no credentials — your client supplies its own (AP-15).'),
+                );
+            } catch (error) {
+                handleCliError(error);
+                process.exit(1);
+            }
+        });
+}
+
 /** The `agent-plugins` subcommand group, for mounting on `plugins`. */
 export function buildAgentPluginsCommand(): Command {
     const command = new Command('agent-plugins').description(
@@ -251,5 +311,6 @@ export function buildAgentPluginsCommand(): Command {
     command.addCommand(buildListCommand());
     command.addCommand(buildFindingsCommand());
     command.addCommand(buildCatalogCommand());
+    command.addCommand(buildDescriptorCommand());
     return command;
 }

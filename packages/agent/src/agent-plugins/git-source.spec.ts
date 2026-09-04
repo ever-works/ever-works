@@ -75,6 +75,20 @@ describe('validateGitUrl', () => {
 });
 
 describe('redactUrl', () => {
+    it('removes a TOKEN-ONLY credential, which has no colon', () => {
+        // `https://ghp_xxxx@host/repo.git` is how a GitHub PAT is normally
+        // embedded. A pattern requiring `user:password` left it in the
+        // message, the response body and the log.
+        expect(redactUrl('https://ghp_secret@example.com/x.git')).toBe(
+            'https://<redacted>@example.com/x.git',
+        );
+    });
+
+    it('leaves an @ in a PATH alone', () => {
+        // Only userinfo sits before the first `/` after the authority.
+        expect(redactUrl('https://example.com/a@b')).toBe('https://example.com/a@b');
+    });
+
     it('removes credentials from a parseable URL', () => {
         expect(redactUrl('https://user:hunter2@example.com/x.git')).toBe(
             'https://<redacted>@example.com/x.git',
@@ -176,6 +190,33 @@ describe('AgentPluginGitSource', () => {
         ).rejects.toMatchObject({ status: 409 });
 
         expect(git.clone).not.toHaveBeenCalled();
+    });
+
+    it('refuses when the allowlist restricts refs but none is given', async () => {
+        const git = gitStub();
+        const source = new AgentPluginGitSource(
+            allowlistStub({ allowed: true, entry: { versionRange: 'v1.*' } }),
+        );
+        source.setGitImplementation(git, {});
+
+        await expect(
+            source.acquire({ url: 'https://example.com/x.git', destDir: await scratch() }),
+        ).rejects.toMatchObject({ status: 409 });
+
+        // Otherwise `git.clone` checks out the remote's DEFAULT branch, which
+        // the pattern never authorised — "v1.* and no others" is not a
+        // licence to take whatever HEAD points at.
+        expect(git.clone).not.toHaveBeenCalled();
+    });
+
+    it('still allows an unrestricted entry to use the default branch', async () => {
+        const git = gitStub();
+        const source = new AgentPluginGitSource(allowlistStub({ allowed: true }));
+        source.setGitImplementation(git, {});
+
+        await source.acquire({ url: 'https://example.com/x.git', destDir: await scratch() });
+
+        expect(git.clone).toHaveBeenCalled();
     });
 
     it('clones shallow, single-branch, without tags and without an auth callback', async () => {

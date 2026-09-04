@@ -311,10 +311,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // EW-664 (Phase 12) — runs AFTER AuthSessionGuard (guard order
         // matches providers-array order) so request.user is set, and
         // BEFORE ScopeOwnershipGuard so the ownership check sees the
-        // seeded scope. Falls back to the authenticated user's default
-        // scope (their Tenant + last-active Org) on legacy un-prefixed
-        // routes where no slug resolved a scope. No-op for slug routes
-        // (scope already set) and unauthenticated requests.
+        // seeded scope. On unprefixed routes where no slug resolved a
+        // scope it seeds the authenticated user's Tenant and leaves the
+        // Organization NULL — since 8f28edca0 it deliberately does not
+        // fall back to their last-active Org, so an unprefixed request is
+        // the personal contract. No-op for slug routes (scope already set)
+        // and unauthenticated requests.
         {
             provide: APP_GUARD,
             useClass: SessionScopeGuard,
