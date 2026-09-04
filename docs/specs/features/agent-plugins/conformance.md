@@ -47,22 +47,22 @@ rows below say exactly where the subprocess half stops.
 
 ## MCP (AP-11 … AP-15)
 
-| ID    | Requirement                                                                               | Status        | Evidence                                                                                                                                                                                                        |
-| ----- | ----------------------------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AP-11 | MCP config only from `mcp.json`, closed schema                                            | Met (library) | `PERMITTED_MCP_FIELDS`, `parseMcpConfig`                                                                                                                                                                        |
-| AP-12 | `mcp.json` `$schema` version must match `plugin.json`'s                                   | Met (library) | `versions.ts`. Note the trap recorded in ADR-018: this is a string **equality** check, not a compatibility-set check, so a 1.0.0 manifest beside a 1.1.0 `mcp.json` disables MCP even though both releases load |
-| AP-13 | Server entries form a closed union on `type`                                              | Met (library) | `validateMcpConfig`; `McpServerConfig` union                                                                                                                                                                    |
-| AP-14 | All three transports supported                                                            | **Partial**   | `streamable-http` and `sse` are resolved and reach the client. `stdio` is parsed, validated and reported, but **not launched** — see AP-19                                                                      |
-| AP-15 | Package `headers`/`env` are visible and non-secret; no cross-origin credential forwarding | Met           | `guarded-fetch.ts` — redirects are followed manually, each hop re-checked, and **every** caller header dropped on an origin change; `guarded-fetch.spec.ts` covers port-only and scheme-downgrade hops          |
+| ID    | Requirement                                                                               | Status        | Evidence                                                                                                                                                                                                                           |
+| ----- | ----------------------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AP-11 | MCP config only from `mcp.json`, closed schema                                            | Met (library) | `PERMITTED_MCP_FIELDS`, `parseMcpConfig`                                                                                                                                                                                           |
+| AP-12 | `mcp.json` `$schema` version must match `plugin.json`'s                                   | Met (library) | `versions.ts`. Note the trap recorded in ADR-018: this is a string **equality** check, not a compatibility-set check, so a 1.0.0 manifest beside a 1.1.0 `mcp.json` disables MCP even though both releases load                    |
+| AP-13 | Server entries form a closed union on `type`                                              | Met (library) | `validateMcpConfig`; `McpServerConfig` union                                                                                                                                                                                       |
+| AP-14 | All three transports supported                                                            | **Partial**   | `streamable-http` and `sse` reach the client. `stdio` is now parsed, gated, planned and launchable (`stdio-server.service.ts`), but nothing in the agent run path calls it yet, so a stdio server contributes no tools to an agent |
+| AP-15 | Package `headers`/`env` are visible and non-secret; no cross-origin credential forwarding | Met           | `guarded-fetch.ts` — redirects are followed manually, each hop re-checked, and **every** caller header dropped on an origin change; `guarded-fetch.spec.ts` covers port-only and scheme-downgrade hops                             |
 
 ## Subprocess (AP-16 … AP-19)
 
-| ID    | Requirement                                                            | Status        | Evidence                                                                                                                                                                                                                                    |
-| ----- | ---------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AP-16 | Every spawned process gets `PLUGIN_ROOT` and `PLUGIN_DATA`             | **Not yet**   | Nothing spawns a process. `AGENT_PLUGINS_DATA_DIR` is configured and wired, but the launcher is not built                                                                                                                                   |
-| AP-17 | `${PLUGIN_ROOT}` / `${PLUGIN_DATA}` expanded by single substitution    | Met (library) | `expand.ts`; `mcp-server-config.service.ts` expands `PLUGIN_ROOT` and **refuses** any server referencing `PLUGIN_DATA`, because no data directory is allocated yet — a refusal with a reason rather than an empty path that fails at launch |
-| AP-18 | Subprocess base environment is client-chosen                           | **Not yet**   | Same as AP-16                                                                                                                                                                                                                               |
-| AP-19 | `stdio` execution is gated; when off, entries are present-but-disabled | **Met**       | `AGENT_PLUGINS_STDIO`, default off. A stdio server is reported with `code: "disabled-by-policy"` and `enableable: true` — distinguishable from every other skip, all of which are `enableable: false`. `mcp-server-config.service.spec.ts`  |
+| ID    | Requirement                                                            | Status        | Evidence                                                                                                                                                                                                                                                                          |
+| ----- | ---------------------------------------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AP-16 | Every spawned process gets `PLUGIN_ROOT` and `PLUGIN_DATA`             | **Met**       | `stdio-launcher.ts` `buildLaunchEnv` writes both LAST and unconditionally, so a package cannot redirect them by declaring them; `AgentPluginPackageDataDirService` allocates the data directory per (owner, package) before launch                                                |
+| AP-17 | `${PLUGIN_ROOT}` / `${PLUGIN_DATA}` expanded by single substitution    | Met (library) | `expand.ts`; `mcp-server-config.service.ts` expands `PLUGIN_ROOT` and **refuses** any server referencing `PLUGIN_DATA`, because no data directory is allocated yet — a refusal with a reason rather than an empty path that fails at launch                                       |
+| AP-18 | Subprocess base environment is client-chosen                           | **Met**       | Built from `{}` with only PATH/HOME/TMPDIR inherited, never filtered from `process.env` — a denylist would have to enumerate every platform secret added later. `stdio-launcher.spec.ts` asserts DATABASE*URL, AUTH_SECRET, a PLUGIN*\* key and the encryption key are all absent |
+| AP-19 | `stdio` execution is gated; when off, entries are present-but-disabled | **Met**       | `AGENT_PLUGINS_STDIO`, default off. A stdio server is reported with `code: "disabled-by-policy"` and `enableable: true` — distinguishable from every other skip, all of which are `enableable: false`. `mcp-server-config.service.spec.ts`                                        |
 
 ## Versioning and updates (AP-20 … AP-21)
 
@@ -82,14 +82,17 @@ rows below say exactly where the subprocess half stops.
 
 ## Summary
 
-|                     | Count                   |
-| ------------------- | ----------------------- |
-| Met / Met (library) | 19                      |
-| Partial             | 1 (AP-14)               |
-| Not yet             | 3 (AP-16, AP-18, AP-22) |
+|                     | Count     |
+| ------------------- | --------- |
+| Met / Met (library) | 21        |
+| Partial             | 1 (AP-14) |
+| Not yet             | 1 (AP-22) |
 
-The three "Not yet" rows and the one "Partial" all trace to the same two
-unbuilt pieces: **the stdio subprocess launcher** and **the package export
-flow**. Neither is required for the claim as stated — a client may support a
-subset of component types — but both are named here so the boundary is visible
-rather than implied.
+What remains traces to two things. **AP-22** waits on the package export flow,
+which is Phase 5. **AP-14** is partial because the stdio launcher exists and is
+tested but is not yet called from the agent run path — a stdio server can be
+planned, gated and spawned, and still contributes no tools to an agent.
+
+Neither is required for the claim as stated: a client may support a subset of
+component types, and the claim names skills and MCP. Both are written here so
+the boundary is visible rather than implied.

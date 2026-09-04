@@ -130,3 +130,10 @@ export {
     type LaunchContext,
     type LaunchPlan,
 } from './stdio-launcher';
+
+export {
+    AgentPluginStdioServerService,
+    type RunningStdioServer,
+    type StdioLaunchRequest,
+    type StdioTransportFactory,
+} from './stdio-server.service';
