@@ -1,11 +1,13 @@
 import type {
 	FleetAgentExecutionProvider,
 	FleetAgentModelExecution,
-	FleetAgentTaskModelResult
+	FleetAgentTaskModelResult,
+	FleetTaskWorkspaceMountDescriptor
 } from '@ever-works/contracts';
 import {
 	FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC,
 	FLEET_AGENT_EXECUTION_MODEL_PATTERN,
+	fleetAgentExecutionProviderSupportsMountGrants,
 	isFleetAgentExecutionEffort,
 	isFleetAgentExecutionPermissionMode
 } from '@ever-works/contracts';
@@ -121,12 +123,21 @@ function formatBudget(value: number | undefined): string | null {
  *
  * Codex: `exec -` reading the prompt from stdin with `--json` event
  * lines, the permission mode mapped onto its sandbox policy.
+ *
+ * `mounts` are the provisioned extra repositories of a multi-repo Task
+ * workspace. They become additional directories on the CLI's command line,
+ * with the set chosen per provider because the two flags mean different
+ * things — see the grant block below. Omitting them, or passing none — a
+ * single-repository run — produces byte-for-byte the command this step has
+ * always built.
  */
 export function buildModelCliCommand(input: {
 	execution: FleetAgentModelExecution;
 	executable: string;
 	workspacePath: string;
 	scratch: ModelCliScratchFiles;
+	/** Provisioned mounts of a multi-repo Task workspace, in spec order. */
+	mounts?: readonly FleetTaskWorkspaceMountDescriptor[];
 	platform?: NodeJS.Platform;
 }): string {
 	const platform = input.platform ?? process.platform;
@@ -144,6 +155,66 @@ export function buildModelCliCommand(input: {
 	}
 	const budget = formatBudget(execution.maxBudgetUsd);
 
+	// ── Additional directories for a multi-repo Task (self-build slice C)
+	//
+	// Every mount is provisioned as its OWN binding under the fleet root and
+	// only LINKED into the primary worktree at `.mounts/<dir>`, so
+	// `realpath('.mounts/<dir>')` is a COUSIN of the primary worktree, never
+	// a descendant of it. Both CLIs resolve that link before enforcing their
+	// confinement, so a mount that is merely linked sits outside every root
+	// the CLI will act on. Without the grant the run reports success having
+	// edited one repository and one pull request is opened instead of one
+	// per changed repository — the silent half-run this block exists to stop.
+	//
+	// The two flags do NOT mean the same thing, and that difference decides
+	// which mounts each provider is given. Quoted verbatim from the help of
+	// the CLIs this node drives:
+	//
+	//   claude-code — `--add-dir <directories...>`, "Additional directories
+	//     to allow tool access to". An ACCESS grant, and variadic. A mount
+	//     it is not given cannot even be READ: every file tool answers
+	//     "Path is outside allowed working directories". So EVERY mount is
+	//     granted here, read-only ones included — their entire purpose is to
+	//     be read, and the instructions point the model straight at them.
+	//     There is no read-only form of the flag, and a `permissions.deny`
+	//     rule would bind the file tools while leaving a shell redirect
+	//     untouched, so it is not a containment boundary and is not
+	//     pretended to be one.
+	//   codex — `--add-dir <DIR>`, "Additional directories that should be
+	//     writable alongside the primary workspace". A WRITE grant, one flag
+	//     per directory. Codex does not restrict reads, so a read-only mount
+	//     is already readable and granting it would add only the write
+	//     access it must not have. Writable mounts only, therefore.
+	//
+	// Read-only stays read-only where the contract defines it:
+	// `FleetTaskWorkspaceMountSpec.writable` is "whether the node commits
+	// and pushes changes left in this mount", and the node enforces that on
+	// its own, twice — `finalizeMounts` finalizes writable mounts only, and
+	// a reused read-only mount is reset to its base commit before the next
+	// run. Nothing a model leaves in a read-only mount reaches a repository.
+	//
+	// SECURITY — how wide the grant is allowed to be. It is EXACTLY the
+	// mounts' own canonical worktrees, one directory per mount, taken from
+	// the descriptor this Task's own provisioner produced and root-proved —
+	// never from wire input, never `linkPath`, and never an ancestor. The
+	// mounts are cousins of the primary, so their nearest common ancestor is
+	// the shared `repositories/` pool: a grant there would hand this Task's
+	// model every other Task's worktree and every cached repository on the
+	// machine.
+	const mounts = input.mounts ?? [];
+	const writableMounts = mounts.filter((mount) => mount.writable);
+	if (writableMounts.length > 0 && !fleetAgentExecutionProviderSupportsMountGrants(execution.provider)) {
+		throw new ModelCliCommandError(
+			`Provider '${String(execution.provider)}' cannot be granted an additional writable root, so the ` +
+				`${writableMounts.length} writable mount(s) of this multi-repo Task would be silently read-only`
+		);
+	}
+	// Refused, not skipped, when a path is shell-interpretable: a mount the
+	// model cannot be granted must fail the step, because the alternative is
+	// the exact silent no-op above.
+	const grantedRoots = (granted: readonly FleetTaskWorkspaceMountDescriptor[]): string[] =>
+		granted.map((mount) => quoteShellPath(mount.path, platform));
+
 	const args: string[] = [];
 	if (execution.provider === 'claude-code') {
 		args.push('-p', '--output-format', 'json', '--permission-mode', permissionMode);
@@ -151,9 +222,24 @@ export function buildModelCliCommand(input: {
 		if (execution.effort) args.push('--effort', execution.effort);
 		if (budget) args.push('--max-budget-usd', budget);
 		if (execution.skipPermissions === true) args.push('--dangerously-skip-permissions');
+		// `--add-dir <directories...>` is variadic — ONE flag, every granted
+		// directory after it. Emitted LAST so it can never swallow another
+		// option's value, and only when there is something to grant so a
+		// single-repository run keeps the exact command it always had.
+		const roots = grantedRoots(mounts);
+		if (roots.length > 0) args.push('--add-dir', ...roots);
 	} else if (execution.provider === 'codex') {
 		const sandbox = permissionMode === 'plan' ? 'read-only' : 'workspace-write';
 		args.push('exec', '--json', '--sandbox', sandbox, '-C', quoteShellPath(input.workspacePath, platform));
+		// `--add-dir <DIR>` takes ONE directory and accumulates across
+		// occurrences. Only alongside `workspace-write`: in `read-only` the
+		// run writes nowhere at all, the primary included, so an extra
+		// WRITABLE root would contradict the mode the tenant asked for —
+		// and Codex would refuse it anyway ("Ignoring --add-dir … because
+		// the effective permissions do not allow additional writable roots").
+		if (sandbox === 'workspace-write') {
+			for (const root of grantedRoots(writableMounts)) args.push('--add-dir', root);
+		}
 		if (model) args.push('-m', model);
 		if (execution.skipPermissions === true) args.push('--dangerously-bypass-approvals-and-sandbox');
 		args.push('-');
@@ -162,6 +248,53 @@ export function buildModelCliCommand(input: {
 	}
 
 	return `${exe} ${args.join(' ')} < ${stdin} > ${stdout}`;
+}
+
+/**
+ * Refuse to spawn a multi-repo run whose command line does not actually
+ * carry the grant every writable mount depends on.
+ *
+ * This is the ONLY runtime check that covers the sandbox grant, and it
+ * belongs here rather than at provision time. The provisioner's write probe
+ * runs in the node process, which no model CLI sandboxes: it proves the
+ * link resolves and the filesystem accepts a write, and it passes exactly
+ * the same whether or not `--add-dir` was ever emitted. The property that
+ * decides whether the model can write a mount lives in argv, so argv is
+ * where it is checked — on the real string the node is about to hand the
+ * shell, immediately before the spawn.
+ *
+ * Writable mounts only, because that is the provider-independent invariant:
+ * both CLIs grant a writable root the same way, so a missing one is always
+ * a defect. Which additional directories a provider needs beyond that
+ * (Claude Code also needs the read-only mounts, to read them at all) is
+ * provider-specific and pinned by {@link buildModelCliCommand}'s own tests.
+ *
+ * The failure mode this catches is a refactor, a new provider branch or a
+ * reordering that computes the grant and then fails to emit it: the run
+ * would go green having silently discarded every cross-repository edit.
+ *
+ * `plan` is exempt because that run writes NOTHING anywhere — the primary
+ * repository included — so a missing writable root costs it nothing and
+ * failing the job would refuse a legitimate planning run.
+ */
+export function assertMountGrantsInCommand(input: {
+	command: string;
+	execution: FleetAgentModelExecution;
+	mounts?: readonly FleetTaskWorkspaceMountDescriptor[];
+	platform?: NodeJS.Platform;
+}): void {
+	if ((input.execution.permissionMode ?? 'acceptEdits') === 'plan') return;
+	const platform = input.platform ?? process.platform;
+	for (const mount of input.mounts ?? []) {
+		if (!mount.writable) continue;
+		if (!input.command.includes(quoteShellPath(mount.path, platform))) {
+			throw new ModelCliCommandError(
+				`Writable mount '${mount.mountDir}' (${mount.repositoryId}) is not granted on the ` +
+					`${String(input.execution.provider)} command line, so every edit the model makes in it ` +
+					`would be silently discarded`
+			);
+		}
+	}
 }
 
 /** The step as the shared command runner sees it. */

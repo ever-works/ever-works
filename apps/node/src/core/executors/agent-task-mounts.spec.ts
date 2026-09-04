@@ -17,6 +17,7 @@ import { ownerQuestionPath, type AgentTaskQuestionFs } from './agent-task-questi
 
 const ABSOLUTE = process.platform === 'win32' ? 'C:\\workspace' : '/workspace';
 const CLAUDE = process.platform === 'win32' ? 'C:\\npm\\claude.cmd' : '/usr/local/bin/claude';
+const CODEX = process.platform === 'win32' ? 'C:\\npm\\codex.cmd' : '/usr/local/bin/codex';
 const SCRATCH = process.platform === 'win32' ? 'C:\\scratch' : '/scratch';
 
 const primary: FleetTaskWorkspaceDescriptor = {
@@ -123,11 +124,11 @@ function questionFs(seed: Record<string, string> = {}, log: string[] = []) {
 	return fs;
 }
 
-function spawnOk() {
+function spawnOk(commands?: string[]) {
 	return ((command: string) => {
 		const handlers = new Map<string, (arg?: unknown) => void>();
 		queueMicrotask(() => handlers.get('close')?.(0));
-		void command;
+		commands?.push(command);
 		return {
 			stdout: { on: () => undefined, destroy: () => undefined },
 			stderr: { on: () => undefined, destroy: () => undefined },
@@ -283,6 +284,49 @@ describe('runAgentTaskJob — multi-repo mounts', () => {
 		expect(deps.finalizeMounts).not.toHaveBeenCalled();
 		expect('mountGit' in outcome).toBe(false);
 		expect(deps.order).toEqual(['primary']);
+	});
+
+	it('grants the descriptor mounts to the model CLI, by worktree and never by link', async () => {
+		// The whole premise of a multi-repo run: the descriptor's mounts must
+		// reach the spawn builder. Without the grant the CLI is confined to
+		// its cwd, the model's edits to `.mounts/<dir>` are refused, and the
+		// run reports success having changed only the primary repository.
+		const commands: string[] = [];
+		const writable = withMounts.mounts!.find((mount) => mount.writable)!;
+		const readOnly = withMounts.mounts!.find((mount) => !mount.writable)!;
+
+		const outcome = await runAgentTaskJob(job(payload), io({ spawnFn: spawnOk(commands) }));
+
+		expect(outcome.status).toBe('succeeded');
+		expect(commands[0]).toContain(CLAUDE);
+		expect(commands[0]).toContain(`--add-dir "${writable.path}" "${readOnly.path}"`);
+		// The grant is each mount's own worktree, never the link inside the
+		// primary and never an ancestor holding other Tasks' worktrees.
+		expect(commands[0]).not.toContain('.mounts');
+	});
+
+	it('grants codex the writable mount only — its --add-dir is a write grant', async () => {
+		const commands: string[] = [];
+		const writable = withMounts.mounts!.find((mount) => mount.writable)!;
+		const readOnly = withMounts.mounts!.find((mount) => !mount.writable)!;
+
+		const outcome = await runAgentTaskJob(
+			job({ ...payload, execution: { ...payload.execution, provider: 'codex' } }),
+			io({ spawnFn: spawnOk(commands), modelCli: { 'claude-code': null, codex: CODEX } })
+		);
+
+		expect(outcome.status).toBe('succeeded');
+		expect(commands[0]).toContain(`--add-dir "${writable.path}"`);
+		expect(commands[0]).not.toContain(readOnly.path);
+	});
+
+	it('spawns the unchanged single-repository command when the workspace has no mounts', async () => {
+		const commands: string[] = [];
+		await runAgentTaskJob(
+			job({ ...payload, workspace: { ...payload.workspace, mounts: [] } }),
+			io({ spawnFn: spawnOk(commands), provisionWorkspace: vi.fn(async () => primary) })
+		);
+		expect(commands[0]).not.toContain('--add-dir');
 	});
 
 	it('honours the git policy: no commit means neither mounts nor the primary are finalized', async () => {

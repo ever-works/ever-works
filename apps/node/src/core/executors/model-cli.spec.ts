@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { FleetAgentModelExecution } from '@ever-works/contracts';
+import type { FleetAgentModelExecution, FleetTaskWorkspaceMountDescriptor } from '@ever-works/contracts';
 import type { NodeCheckResult } from './acceptance-checks';
 import {
+	assertMountGrantsInCommand,
 	buildModelCliCommand,
 	buildModelCliStep,
 	MODEL_CLI_STEP_ID,
@@ -37,6 +38,42 @@ function execution(over: Partial<FleetAgentModelExecution> = {}): FleetAgentMode
 function step(over: Partial<NodeCheckResult> = {}): NodeCheckResult {
 	return { id: MODEL_CLI_STEP_ID, status: 'green', exitCode: 0, durationMs: 1234, ...over };
 }
+
+/**
+ * One provisioned mount, shaped like the real descriptor: `path` is the
+ * mount's OWN worktree under the fleet root — a cousin of the primary, NOT
+ * a descendant — and `linkPath` is where the primary reaches it.
+ */
+function mount(over: Partial<FleetTaskWorkspaceMountDescriptor> = {}): FleetTaskWorkspaceMountDescriptor {
+	return {
+		path: '/fleet/repositories/tpl-pool/worktrees/fleet-tpl',
+		linkPath: '/work/ws/.mounts/template',
+		mountDir: 'template',
+		repositoryId: 'ever-works/directory-web-template',
+		baseRef: 'develop',
+		branch: 'task/t1-fix',
+		baseSha: 'c'.repeat(40),
+		headSha: 'c'.repeat(40),
+		reused: false,
+		writable: true,
+		...over
+	};
+}
+
+const WRITABLE_MOUNT = mount();
+const SECOND_WRITABLE_MOUNT = mount({
+	path: '/fleet/repositories/ws-pool/worktrees/fleet-ws',
+	linkPath: '/work/ws/.mounts/workspace',
+	mountDir: 'workspace',
+	repositoryId: 'ever-works/workspace'
+});
+const READ_ONLY_MOUNT = mount({
+	path: '/fleet/repositories/docs-pool/worktrees/fleet-docs',
+	linkPath: '/work/ws/.mounts/docs',
+	mountDir: 'docs',
+	repositoryId: 'ever-works/docs',
+	writable: false
+});
 
 describe('quoteShellPath', () => {
 	it('double-quotes an absolute path on both platforms', () => {
@@ -146,6 +183,335 @@ describe('buildModelCliCommand — codex', () => {
 		});
 		expect(command).toContain('--sandbox read-only');
 		expect(command).toContain('--dangerously-bypass-approvals-and-sandbox');
+	});
+});
+
+/**
+ * Additional writable roots for a multi-repo Task (self-build slice C).
+ *
+ * The mounts live OUTSIDE the primary worktree and are only linked into it,
+ * and both CLIs resolve that link before enforcing their sandbox — so
+ * without an explicit grant the model reads a mount and silently cannot
+ * write it: a green run that changed one repository out of several. What is
+ * pinned here:
+ *
+ *   1. Every WRITABLE mount's real path is granted, in spec order, using
+ *      the option each CLI actually documents.
+ *   2. A READ-ONLY mount is never granted — the flag is a writable grant on
+ *      both providers, so granting one would make `writable: false` a lie.
+ *   3. The grant is the mount's own worktree, never its `linkPath` and
+ *      never an ancestor: an ancestor is the shared repository pool, i.e.
+ *      every other Task's worktree on the machine.
+ *   4. A run with no mounts builds byte-for-byte the command it always did.
+ */
+describe('buildModelCliCommand — writable mount grants', () => {
+	it('grants every mount to claude-code with one variadic --add-dir, last', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts: [WRITABLE_MOUNT, READ_ONLY_MOUNT, SECOND_WRITABLE_MOUNT],
+			platform: POSIX
+		});
+		// Claude Code's `--add-dir` is "Additional directories to allow tool
+		// access to" — an ACCESS grant, so the READ-ONLY mount is granted
+		// too: without it every file tool answers "Path is outside allowed
+		// working directories" and the reference repository the instructions
+		// point the model at cannot even be opened. Read-only-ness is kept
+		// by the node (never finalized, reset on reuse), not by the CLI.
+		expect(command).toBe(
+			'"/usr/local/bin/claude" -p --output-format json --permission-mode acceptEdits ' +
+				'--add-dir "/fleet/repositories/tpl-pool/worktrees/fleet-tpl" ' +
+				'"/fleet/repositories/docs-pool/worktrees/fleet-docs" ' +
+				'"/fleet/repositories/ws-pool/worktrees/fleet-ws" ' +
+				'< "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+		);
+		// Every mount by its OWN worktree, never by its link inside the
+		// primary, and no ancestor of the mounts (the shared repository pool,
+		// which holds every other Task's worktree) is ever granted.
+		expect(command).not.toContain('.mounts');
+		expect(command).not.toContain('"/fleet"');
+		expect(command).not.toContain('"/fleet/repositories"');
+	});
+
+	it('keeps --add-dir after every other claude-code option so it swallows no value', () => {
+		const command = buildModelCliCommand({
+			execution: execution({
+				model: 'claude-opus-5',
+				effort: 'xhigh',
+				maxBudgetUsd: 12.5,
+				skipPermissions: true
+			}),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts: [WRITABLE_MOUNT],
+			platform: POSIX
+		});
+		// `--add-dir <directories...>` is variadic: it consumes every token up
+		// to the next option, so anything after it would be read as a granted
+		// directory instead of its own flag's value.
+		expect(command).toBe(
+			'"/usr/local/bin/claude" -p --output-format json --permission-mode acceptEdits ' +
+				'--model claude-opus-5 --effort xhigh --max-budget-usd 12.5 --dangerously-skip-permissions ' +
+				'--add-dir "/fleet/repositories/tpl-pool/worktrees/fleet-tpl" ' +
+				'< "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+		);
+	});
+
+	it('grants every writable mount to codex with one --add-dir each, inside the workspace-write sandbox', () => {
+		const command = buildModelCliCommand({
+			execution: execution({ provider: 'codex', model: 'gpt-5.3-codex' }),
+			executable: '/usr/local/bin/codex',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts: [WRITABLE_MOUNT, READ_ONLY_MOUNT, SECOND_WRITABLE_MOUNT],
+			platform: POSIX
+		});
+		expect(command).toBe(
+			'"/usr/local/bin/codex" exec --json --sandbox workspace-write -C "/work/ws" ' +
+				'--add-dir "/fleet/repositories/tpl-pool/worktrees/fleet-tpl" ' +
+				'--add-dir "/fleet/repositories/ws-pool/worktrees/fleet-ws" ' +
+				'-m gpt-5.3-codex - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+		);
+		// Codex's `--add-dir` is "Additional directories that should be
+		// writable alongside the primary workspace" — a WRITE grant. Codex
+		// does not restrict reads, so a read-only mount is already readable
+		// and granting it would add only the access it must not have.
+		expect(command).not.toContain(READ_ONLY_MOUNT.path);
+		expect(command).not.toContain('.mounts');
+	});
+
+	it('grants codex nothing in plan mode: a read-only run writes nowhere, mounts included', () => {
+		const command = buildModelCliCommand({
+			execution: execution({ provider: 'codex', permissionMode: 'plan' }),
+			executable: '/usr/local/bin/codex',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts: [WRITABLE_MOUNT, SECOND_WRITABLE_MOUNT],
+			platform: POSIX
+		});
+		expect(command).toContain('--sandbox read-only');
+		expect(command).not.toContain('--add-dir');
+	});
+
+	it('still gives claude-code a read-only mount, because its flag is the only way to read one', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/cli',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts: [READ_ONLY_MOUNT],
+			platform: POSIX
+		});
+		expect(command).toContain(`--add-dir "${READ_ONLY_MOUNT.path}"`);
+	});
+
+	it('gives codex nothing when every mount is read-only', () => {
+		const command = buildModelCliCommand({
+			execution: execution({ provider: 'codex' }),
+			executable: '/usr/local/bin/cli',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts: [READ_ONLY_MOUNT],
+			platform: POSIX
+		});
+		expect(command).not.toContain('--add-dir');
+		expect(command).not.toContain(READ_ONLY_MOUNT.path);
+	});
+
+	it.each([[undefined], [[] as FleetTaskWorkspaceMountDescriptor[]]])(
+		'builds byte-for-byte the single-repository command when mounts are %j',
+		(mounts) => {
+			expect(
+				buildModelCliCommand({
+					execution: execution(),
+					executable: '/usr/local/bin/claude',
+					workspacePath: '/work/ws',
+					scratch: scratchPosix,
+					...(mounts === undefined ? {} : { mounts }),
+					platform: POSIX
+				})
+			).toBe(
+				'"/usr/local/bin/claude" -p --output-format json --permission-mode acceptEdits < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+			);
+			expect(
+				buildModelCliCommand({
+					execution: execution({ provider: 'codex', model: 'gpt-5.3-codex' }),
+					executable: '/usr/local/bin/codex',
+					workspacePath: '/work/ws',
+					scratch: scratchPosix,
+					...(mounts === undefined ? {} : { mounts }),
+					platform: POSIX
+				})
+			).toBe(
+				'"/usr/local/bin/codex" exec --json --sandbox workspace-write -C "/work/ws" -m gpt-5.3-codex - < "/tmp/job/instructions.md" > "/tmp/job/model-output.json"'
+			);
+		}
+	);
+
+	it('grants Windows mount paths verbatim', () => {
+		const command = buildModelCliCommand({
+			execution: execution(),
+			executable: 'C:\\npm\\claude.cmd',
+			workspacePath: 'C:\\work\\ws',
+			scratch: scratchWin,
+			mounts: [mount({ path: 'C:\\fleet\\repositories\\tpl\\worktrees\\fleet-tpl' })],
+			platform: WIN
+		});
+		expect(command).toContain('--add-dir "C:\\fleet\\repositories\\tpl\\worktrees\\fleet-tpl"');
+	});
+
+	it('refuses a provider that cannot be granted an additional writable root', () => {
+		expect(() =>
+			buildModelCliCommand({
+				execution: execution({ provider: 'gemini' as never }),
+				executable: '/usr/local/bin/gemini',
+				workspacePath: '/work/ws',
+				scratch: scratchPosix,
+				mounts: [WRITABLE_MOUNT],
+				platform: POSIX
+			})
+		).toThrowError(/cannot be granted an additional writable root/);
+	});
+
+	it('refuses a mount path the shell could interpret rather than dropping the grant', () => {
+		// Dropping it silently would reproduce the very bug this grant fixes.
+		expect(() =>
+			buildModelCliCommand({
+				execution: execution(),
+				executable: '/usr/local/bin/claude',
+				workspacePath: '/work/ws',
+				scratch: scratchPosix,
+				mounts: [mount({ path: '/fleet/repositories/a$b/worktrees/fleet-tpl' })],
+				platform: POSIX
+			})
+		).toThrowError(/interpret/);
+	});
+});
+
+/**
+ * The one runtime check that covers the sandbox grant.
+ *
+ * The provisioner's write probe cannot: it writes from the node process,
+ * which no CLI sandboxes, so it passes identically with and without
+ * `--add-dir`. The property lives in argv, so it is checked in argv,
+ * against the exact string the node is about to hand the shell.
+ */
+describe('assertMountGrantsInCommand', () => {
+	const granted = (...mounts: FleetTaskWorkspaceMountDescriptor[]): string =>
+		buildModelCliCommand({
+			execution: execution(),
+			executable: '/usr/local/bin/claude',
+			workspacePath: '/work/ws',
+			scratch: scratchPosix,
+			mounts,
+			platform: POSIX
+		});
+
+	it('passes the command the builder actually produces, for both providers', () => {
+		const mounts = [WRITABLE_MOUNT, READ_ONLY_MOUNT, SECOND_WRITABLE_MOUNT];
+		for (const provider of ['claude-code', 'codex'] as const) {
+			const command = buildModelCliCommand({
+				execution: execution({ provider }),
+				executable: '/usr/local/bin/cli',
+				workspacePath: '/work/ws',
+				scratch: scratchPosix,
+				mounts,
+				platform: POSIX
+			});
+			expect(() =>
+				assertMountGrantsInCommand({ command, execution: execution({ provider }), mounts, platform: POSIX })
+			).not.toThrow();
+		}
+	});
+
+	it('refuses a command that dropped one writable mount, naming it and the provider', () => {
+		// Exactly what a refactor, a reordering or a new provider branch
+		// that computes the grant and forgets to emit it would produce.
+		expect(() =>
+			assertMountGrantsInCommand({
+				command: granted(WRITABLE_MOUNT),
+				execution: execution(),
+				mounts: [WRITABLE_MOUNT, SECOND_WRITABLE_MOUNT],
+				platform: POSIX
+			})
+		).toThrowError(/'workspace' \(ever-works\/workspace\) is not granted on the claude-code command line/);
+	});
+
+	it('refuses a command that granted the link instead of the mount worktree', () => {
+		// A grant on `.mounts/<dir>` looks right and is useless: the CLI
+		// resolves it straight back out of its own allowed root.
+		expect(() =>
+			assertMountGrantsInCommand({
+				command: '"/usr/local/bin/claude" -p --add-dir "/work/ws/.mounts/template" < "a" > "b"',
+				execution: execution(),
+				mounts: [WRITABLE_MOUNT],
+				platform: POSIX
+			})
+		).toThrowError(/not granted/);
+	});
+
+	it('exempts plan mode, which writes nothing anywhere — the primary included', () => {
+		expect(() =>
+			assertMountGrantsInCommand({
+				command: '"/usr/local/bin/codex" exec --json --sandbox read-only -C "/work/ws" - < "a" > "b"',
+				execution: execution({ provider: 'codex', permissionMode: 'plan' }),
+				mounts: [WRITABLE_MOUNT],
+				platform: POSIX
+			})
+		).not.toThrow();
+	});
+
+	it('says nothing about read-only mounts: which provider needs them is provider-specific', () => {
+		for (const command of [
+			granted(READ_ONLY_MOUNT),
+			'"/usr/local/bin/codex" exec --json --sandbox workspace-write -C "/work/ws" - < "a" > "b"'
+		]) {
+			expect(() =>
+				assertMountGrantsInCommand({
+					command,
+					execution: execution(),
+					mounts: [READ_ONLY_MOUNT],
+					platform: POSIX
+				})
+			).not.toThrow();
+		}
+	});
+
+	it.each([[undefined], [[] as FleetTaskWorkspaceMountDescriptor[]]])(
+		'passes a single-repository run (mounts %j)',
+		(mounts) => {
+			expect(() =>
+				assertMountGrantsInCommand({
+					command: '"/usr/local/bin/claude" -p < "a" > "b"',
+					execution: execution(),
+					...(mounts === undefined ? {} : { mounts }),
+					platform: POSIX
+				})
+			).not.toThrow();
+		}
+	);
+
+	it('checks Windows mount paths in the platform quoting', () => {
+		const winMount = mount({ path: 'C:\\fleet\\repositories\\tpl\\worktrees\\fleet-tpl' });
+		expect(() =>
+			assertMountGrantsInCommand({
+				command: `"C:\\npm\\claude.cmd" -p --add-dir "${winMount.path}" < "a" > "b"`,
+				execution: execution(),
+				mounts: [winMount],
+				platform: WIN
+			})
+		).not.toThrow();
+		expect(() =>
+			assertMountGrantsInCommand({
+				command: '"C:\\npm\\claude.cmd" -p < "a" > "b"',
+				execution: execution(),
+				mounts: [winMount],
+				platform: WIN
+			})
+		).toThrowError(/not granted/);
 	});
 });
 

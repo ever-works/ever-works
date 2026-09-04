@@ -102,6 +102,15 @@ const FLEET_TASK_WORKSPACE_EXCLUDE_PROBES: readonly string[] = [
 	`nested/${FLEET_AGENT_TASK_META_DIR}/`
 ];
 
+/**
+ * File name {@link FleetTaskWorkspaceProvisioner} creates and removes inside
+ * every WRITABLE mount, through the mount's link, to prove the model can
+ * actually write there. Named rather than random so a leftover after a hard
+ * kill is instantly recognisable (and greppable) instead of looking like
+ * something the model produced.
+ */
+export const FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE = '.ever-works-mount-write-probe';
+
 export interface FleetTaskWorkspaceProvisionerOptions {
 	/** Persistent cache/worktree root owned by the node service account. */
 	readonly rootPath: string;
@@ -213,6 +222,9 @@ export class FleetTaskWorkspaceProvisioner {
 			// repository's Git too (the node scans writable mounts for it).
 			await ensureFleetExcluded(provisioned.path, signal);
 			const linkPath = await linkMountIntoPrimary(mountsDir, mount.mountDir, provisioned.path);
+			if (mount.writable) {
+				await assertMountWritableThroughLink(mount.mountDir, mount.repositoryId, linkPath, provisioned.path);
+			}
 			mounts.push({ ...provisioned, mountDir: mount.mountDir, linkPath, writable: mount.writable });
 		}
 		throwIfCancelled(signal);
@@ -998,6 +1010,93 @@ async function linkMountIntoPrimary(mountsDir: string, mountDir: string, targetP
 	}
 	await fs.symlink(targetPath, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
 	return linkPath;
+}
+
+/**
+ * Prove a WRITABLE mount is reachable and writable the way the model will
+ * reach it: create and delete a file at `<primary>/.mounts/<dir>/…`,
+ * THROUGH the link, never through the mount's own canonical path.
+ *
+ * What this proves, exactly: the `.mounts/<dir>` link exists, resolves to
+ * THIS mount's own worktree, and the filesystem and its ACLs accept a write
+ * there. A broken, stale or retargeted junction fails here instead of
+ * quietly diverting the run's edits into another directory, and an
+ * unwritable checkout fails before the model burns a budget on edits that
+ * cannot land. The probe goes through the link because that is the only
+ * path the model ever uses: a probe against `mount.path` would pass while
+ * the link is broken, certifying exactly the state it exists to catch.
+ *
+ * What this does NOT prove, and must not be read as proving: that the model
+ * CLI was granted the mount as an additional directory. This runs in the
+ * node process, which no CLI sandboxes, so its verdict is identical whether
+ * or not `--add-dir` was emitted. That half lives in argv and is checked in
+ * argv — `assertMountGrantsInCommand` in `executors/model-cli.ts`, run
+ * immediately before the spawn.
+ *
+ * A probe file left behind would be committed into the owner's repository
+ * by `finalizeMounts`, so a removal that does not succeed fails the
+ * provision naming the path rather than being swallowed.
+ */
+async function assertMountWritableThroughLink(
+	mountDir: string,
+	repositoryId: string,
+	linkPath: string,
+	mountPath: string
+): Promise<void> {
+	const probeThroughLink = join(linkPath, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE);
+	const probeInWorktree = join(mountPath, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE);
+	const label = `Writable mount '${mountDir}' (${repositoryId})`;
+	try {
+		// `wx` (O_CREAT|O_EXCL), never the default `w`. The probe path sits
+		// inside a directory an autonomous model was just granted write
+		// access to, and a writable mount is never reset between runs, so
+		// whatever the last run left at this name is still there. `w`
+		// follows a final symlink: an entry planted here — by a model, or
+		// committed into the mount's own repository — would make this
+		// UNSANDBOXED node process truncate and overwrite whatever it points
+		// at, anywhere the service account can write. O_EXCL refuses instead.
+		await fs.writeFile(probeThroughLink, `${process.pid} ${randomBytes(8).toString('hex')}\n`, {
+			encoding: 'utf8',
+			flag: 'wx'
+		});
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException | null)?.code === 'EEXIST') {
+			throw new FleetTaskWorkspaceError(
+				'provision-failed',
+				`${label} already has an entry at '${probeThroughLink}'; a previous run was killed mid-probe, or the mount's repository carries that name. Inspect it and remove it before running this Task again`
+			);
+		}
+		throw new FleetTaskWorkspaceError(
+			'provision-failed',
+			`${label} is not writable through its link at '${linkPath}': ${
+				error instanceof Error ? error.message : String(error)
+			}`
+		);
+	}
+	try {
+		const stats = await fs.lstat(probeInWorktree);
+		if (!stats.isFile()) throw new Error('not a regular file');
+	} catch (error) {
+		await fs.rm(probeThroughLink, { force: true, maxRetries: 3, retryDelay: 50 }).catch(() => undefined);
+		throw new FleetTaskWorkspaceError(
+			'provision-failed',
+			`${label} does not resolve to its own worktree ('${mountPath}') through '${linkPath}': ${
+				error instanceof Error ? error.message : String(error)
+			}`
+		);
+	}
+	try {
+		// Retries: on Windows an antivirus or indexer can hold a just-written
+		// file open for a few milliseconds.
+		await fs.rm(probeThroughLink, { force: true, maxRetries: 3, retryDelay: 50 });
+	} catch (error) {
+		throw new FleetTaskWorkspaceError(
+			'provision-failed',
+			`${label} kept the write probe at '${probeThroughLink}'; remove it before running this Task again: ${
+				error instanceof Error ? error.message : String(error)
+			}`
+		);
+	}
 }
 
 /**
