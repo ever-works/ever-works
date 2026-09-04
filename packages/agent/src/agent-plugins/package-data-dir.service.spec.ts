@@ -127,7 +127,47 @@ describe('AgentPluginPackageDataDirService', () => {
             return;
         }
 
-        await expect(service.ensure(owner)).rejects.toThrow(/outside the configured data root/u);
+        // One message covers both escapes now: the check compares the resolved
+        // path to the EXPECTED leaf, so "outside the root" and "inside the
+        // root but not this package's directory" are the same failure.
+        await expect(service.ensure(owner)).rejects.toThrow(
+            /does not resolve to that package's own directory/u,
+        );
+    });
+
+    it('REFUSES a leaf symlinked to ANOTHER tenant’s directory', async () => {
+        // The gap a root-only containment check misses: every tenant's leaf
+        // lives under the same root, so "inside the root" says nothing about
+        // whose directory this is. Without the leaf-identity check, owner A
+        // gets owner B's data.
+        const victim = { userId: 'owner-b', packageName: 'acme.tools' };
+        const attacker = { userId: 'owner-a', packageName: 'acme.tools' };
+
+        const victimPath = await service.ensure(victim);
+        await writeFile(join(victimPath, 'secret.json'), '{"b":1}', 'utf8');
+
+        const attackerPath = service.pathFor(attacker);
+        await mkdir(join(attackerPath, '..'), { recursive: true });
+
+        let linked = false;
+        try {
+            await symlink(victimPath, attackerPath, 'dir');
+            linked = true;
+        } catch {
+            linked = false;
+        }
+
+        if (!linked) {
+            console.warn(
+                'SKIPPED: symlink creation unavailable; the cross-tenant case did not run.',
+            );
+            expect(linked).toBe(false);
+            return;
+        }
+
+        await expect(service.ensure(attacker)).rejects.toThrow(
+            /does not resolve to that package's own directory/u,
+        );
     });
 
     it('removes a package’s data', async () => {

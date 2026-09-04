@@ -93,14 +93,28 @@ describe('buildLaunchEnv', () => {
         expect(() => buildLaunchEnv({ PLUGIN_DATA: '/elsewhere' }, ctx)).toThrow(LaunchRefused);
     });
 
-    it('does not let a package override PATH to shadow the binary about to run', () => {
-        const env = buildLaunchEnv({ PATH: '/tmp/evil' }, ctx);
+    it('does NOT let a package override PATH', () => {
+        process.env.PATH = '/usr/local/bin:/usr/bin:/bin';
 
-        // A package CAN set PATH — it is not reserved — but the reserved keys
-        // are still written last, so the two values the client controls are
-        // never the package's.
+        const env = buildLaunchEnv({ PATH: '/tmp/its-own-bin' }, ctx);
+
+        // The guarantee for a bare command is that it "can only run something
+        // the operator installed". A package-chosen PATH makes that false: it
+        // would supply its own `node`, turning the safest command shape into
+        // the most dangerous one.
+        expect(env.PATH).toBe('/usr/local/bin:/usr/bin:/bin');
+        expect(env.PATH).not.toContain('its-own-bin');
         expect(env.PLUGIN_ROOT).toBe(pkg);
         expect(env.PLUGIN_DATA).toBe(data);
+    });
+
+    it('still lets a package set an ordinary variable', () => {
+        // A blanket refusal would be a different bug: packages legitimately
+        // configure themselves through env.
+        const env = buildLaunchEnv({ LOG_LEVEL: 'debug', API_BASE: 'https://x' }, ctx);
+
+        expect(env.LOG_LEVEL).toBe('debug');
+        expect(env.API_BASE).toBe('https://x');
     });
 });
 

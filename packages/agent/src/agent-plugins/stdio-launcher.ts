@@ -29,6 +29,22 @@ import { isWithin } from './package-data-dir.service';
 /** The base environment. Everything else must be earned. */
 const INHERITED_KEYS = ['PATH', 'HOME', 'TMPDIR', 'USERPROFILE', 'SystemRoot'] as const;
 
+/**
+ * Keys the CLIENT owns outright, reapplied after the package's own `env`.
+ *
+ * `PATH` is here because the whole guarantee of allowing a bare command is
+ * that it "can only run something the operator installed in the image" — and
+ * that is false if the package chooses `PATH`. A package declaring
+ * `PATH=/tmp/its-own-bin` alongside `command: "node"` would have the resolver
+ * pick ITS `node`, turning the safest command shape into the most dangerous
+ * one. AP-18 makes the base environment client-chosen, so refusing to let a
+ * package redirect it is exactly the client doing its job.
+ *
+ * `PLUGIN_ROOT` and `PLUGIN_DATA` are here because they are the client's
+ * statement of where the package lives, not the package's.
+ */
+const CLIENT_OWNED_KEYS = ['PATH', 'PLUGIN_ROOT', 'PLUGIN_DATA'] as const;
+
 export interface LaunchPlan {
     /** Absolute path to the executable, or a bare name to resolve through PATH. */
     readonly command: string;
@@ -101,6 +117,10 @@ export function buildLaunchEnv(
         pluginData: ctx.pluginData,
     };
 
+    // Kept so the client-owned values can be restored verbatim below, rather
+    // than recomputed and risk drifting from what was inherited.
+    const clientPath = env.PATH;
+
     for (const [key, value] of Object.entries(expandEnvValues(declared, expansion))) {
         // The library rejects a reserved key at validation time, so reaching
         // this is a bug rather than a hostile package — but the assignment
@@ -115,8 +135,11 @@ export function buildLaunchEnv(
         env[key] = value;
     }
 
-    // LAST, and unconditionally: these are the client's statement of where the
-    // package lives, not the package's.
+    // LAST, and unconditionally. A package may declare `PATH`, and the
+    // specification does not forbid it — but honouring it would break the
+    // guarantee that a bare command only runs what the operator installed, so
+    // the client's value is put back. See CLIENT_OWNED_KEYS.
+    env.PATH = clientPath;
     env[PLUGIN_ROOT_PLACEHOLDER.slice(2, -1)] = ctx.packageRoot;
     env[PLUGIN_DATA_PLACEHOLDER.slice(2, -1)] = ctx.pluginData;
 

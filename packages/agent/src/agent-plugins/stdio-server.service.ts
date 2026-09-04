@@ -55,6 +55,23 @@ export class AgentPluginStdioServerService {
     /** Every process this service has started, so teardown can be exhaustive. */
     private readonly running = new Set<{ close(): Promise<void> }>();
 
+    /**
+     * Bumped by every `shutdownAll`.
+     *
+     * `factory.create()` is asynchronous, so a shutdown can snapshot the
+     * running set while a launch is still in flight; the transport would then
+     * be added AFTER teardown and never closed, leaking a process for the
+     * lifetime of the pod.
+     *
+     * A COUNTER rather than a boolean, because a boolean has to be cleared at
+     * the end of `shutdownAll` for the service to stay reusable — and a launch
+     * whose `create()` resolves after that point would see it already false
+     * and register into a set that had been emptied. The generation a launch
+     * captured cannot be un-changed, so the comparison holds however the two
+     * interleave.
+     */
+    private shutdownGeneration = 0;
+
     constructor(private readonly dataDirs: AgentPluginPackageDataDirService) {}
 
     /** Test seam, mirroring the pacote and isomorphic-git injection points. */
@@ -63,6 +80,12 @@ export class AgentPluginStdioServerService {
     }
 
     async launch(request: StdioLaunchRequest): Promise<RunningStdioServer> {
+        // Captured FIRST, before any await. This is the generation the caller
+        // launched into; capturing it later would miss a shutdown that ran
+        // while the data directory or the launch plan was still being
+        // prepared, and those are awaits too.
+        const generation = this.shutdownGeneration;
+
         if (!config.agentPlugins.isStdioEnabled()) {
             throw new LaunchRefused(
                 'Stdio servers are disabled by policy on this deployment ' +
@@ -97,6 +120,17 @@ export class AgentPluginStdioServerService {
             stderr: 'pipe',
         });
 
+        if (this.shutdownGeneration !== generation) {
+            // A teardown ran while this process was starting. Close it here
+            // rather than registering it: that shutdown already took its
+            // snapshot and will never see this transport.
+            await transport.close().catch(() => undefined);
+            throw new LaunchRefused(
+                'Shutdown began while this server was starting; it was stopped again.',
+                'shutting-down',
+            );
+        }
+
         this.running.add(transport);
         this.logger.log(
             `Launched stdio server for package "${request.packageName}" ` +
@@ -127,6 +161,10 @@ export class AgentPluginStdioServerService {
      * than a noisy log line.
      */
     async shutdownAll(): Promise<{ stopped: number; failed: number }> {
+        // Bumped BEFORE the snapshot, so a launch that completes during
+        // teardown sees a different generation and closes itself rather than
+        // registering into a set nobody will read again.
+        this.shutdownGeneration += 1;
         const transports = [...this.running];
         this.running.clear();
 
@@ -136,6 +174,10 @@ export class AgentPluginStdioServerService {
         if (failed > 0) {
             this.logger.warn(`${failed} stdio server(s) did not shut down cleanly.`);
         }
+
+        // Nothing to reset: the next launch captures the NEW generation and
+        // matches it, so the service is reusable without a window in which a
+        // late transport can slip through.
         return { stopped: results.length - failed, failed };
     }
 

@@ -88,16 +88,34 @@ export class AgentPluginPackageDataDirService {
         const path = this.pathFor(owner);
         await mkdir(path, { recursive: true });
 
-        // Re-derive the real path and verify containment AFTER creation. The
-        // root may itself be a symlink (a mounted volume commonly is), and a
-        // pre-existing symlinked leaf placed by anything else would otherwise
-        // hand a package a writable directory outside the data root.
+        // Verify AFTER creation, against the EXPECTED LEAF rather than the
+        // shared root.
+        //
+        // Checking containment in the data root alone is not enough, and the
+        // gap is a cross-tenant one: a symlink at owner A's leaf pointing to
+        // owner B's leaf resolves to a path that IS inside the root, so a
+        // root-only check passes it and `ensure()` hands owner A owner B's
+        // data directory. Every tenant's leaf lives under the same root, so
+        // "inside the root" says nothing about WHOSE directory this is.
+        //
+        // Comparing real paths also covers the legitimate case the root check
+        // was written for: the root may itself be a symlink (a mounted volume
+        // commonly is), which is why the expectation is resolved too rather
+        // than compared against the lexical path.
         const realRoot = await resolveRealPath(resolve(config.agentPlugins.getDataDir()));
         const realPath = await resolveRealPath(path);
-        if (!isWithin(realRoot, realPath)) {
+        const expected = join(
+            realRoot,
+            dataDirSegment(owner.userId),
+            dataDirSegment(owner.packageName),
+        );
+
+        if (realPath !== expected) {
             throw new Error(
-                `Refusing to use "${realPath}" as package data: it resolves outside the ` +
-                    `configured data root "${realRoot}".`,
+                `Refusing to use "${realPath}" as package data for ` +
+                    `"${owner.packageName}": it does not resolve to that package's own ` +
+                    `directory under "${realRoot}". A symlink pointing at another ` +
+                    `tenant's data would otherwise be followed.`,
             );
         }
 

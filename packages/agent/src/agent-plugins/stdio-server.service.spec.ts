@@ -178,6 +178,53 @@ describe('AgentPluginStdioServerService', () => {
         expect(good).toBe(1);
     });
 
+    it('does not leak a process that finishes starting DURING shutdown', async () => {
+        // `factory.create()` is async, so a shutdown can snapshot the running
+        // set while a launch is still in flight. Without the guard the
+        // transport is added AFTER teardown and never closed — a process
+        // leaked for the lifetime of the pod.
+        let release!: () => void;
+        const pending = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        let closed = 0;
+
+        const transport = {
+            create: jest.fn(async () => {
+                await pending;
+                return {
+                    close: async () => {
+                        closed += 1;
+                    },
+                };
+            }),
+        };
+        service.setTransportFactory(transport);
+
+        const launching = service.launch({ ...request, packageRoot: pkg });
+        const shutdown = await service.shutdownAll();
+        release();
+
+        await expect(launching).rejects.toMatchObject({ code: 'shutting-down' });
+
+        // Nothing was registered, so shutdown legitimately saw nothing — and
+        // the late transport closed itself rather than surviving.
+        expect(shutdown).toEqual({ stopped: 0, failed: 0 });
+        expect(closed).toBe(1);
+    });
+
+    it('is usable again after a shutdown', async () => {
+        // The service is a singleton across runs: a latched shutdown flag
+        // would make every launch after the first teardown fail.
+        const transport = transportStub();
+        service.setTransportFactory(transport);
+
+        await service.shutdownAll();
+        const running = await service.launch({ ...request, packageRoot: pkg });
+
+        expect(running.plan.command).toBe('node');
+    });
+
     it('is idempotent at shutdown', async () => {
         const transport = transportStub();
         service.setTransportFactory(transport);
