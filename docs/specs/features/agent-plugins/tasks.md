@@ -63,7 +63,7 @@ appends, locale key appends) are expected and fine.
       description). Add fixtures path to `.prettierignore`.
 - [x] **T8**. `src/serialize.ts`: plugin.json + SKILL.md emitters; slug→name
       guard; round-trip property test (emit → parse → deep-equal).
-- [ ] **T9**. Optional CI oracle job: `skills-ref validate` (Python) over skill
+- [x] **T9**. Optional CI oracle job: `skills-ref validate` (Python) over skill
       fixtures, non-blocking.
 
 ## Phase 1 — Package registry + local-dir source + skills read-side (PR-2, PR-3)
@@ -215,7 +215,26 @@ resolveAllowedTools` as a new optional source (domain-tool-source
 
 ## Phase 5 — Sidecars + export (PR-8, PR-9)
 
-- [ ] **T33**. `skill_files` entity + migration + storage via `IStoragePlugin`
+> **2026-09-04 — T33 was ALREADY BUILT, and verified rather than rebuilt.**
+> `skill_files` exists (`entities/skill-file.entity.ts`), with
+> `SkillFileRepository`, `SkillFilesService`, the upload route on
+> `skills.controller.ts`, and account-transfer support for
+> `ExportedSkillFile`. `SkillFilesService.add` already caps size
+> (`MAX_SKILL_FILE_BYTES`), stores through the uploads spine with sha256
+> naming, coerces the MIME via the spine's own `acceptsSaveFileMime`
+> predicate, and calls the `assertNoSecrets` this task asks to wire — plus
+> `assertNoInjectionTokens`, which it does not.
+>
+> The remaining clause, "package service ingests sidecars", is satisfied
+> differently and deliberately: a package's `scripts/`, `references/` and
+> `assets/` are already ON DISK inside the package, so copying them into
+> `skill_files` would duplicate bytes the acquirer already validated and
+> contained. They are materialised straight from the package by
+> `planWorkspaceMaterialization` (T34) under the execution-gate split.
+> `skill_files` remains what it was: storage for PLATFORM-authored skills,
+> whose files arrive by upload and have nowhere else to live.
+
+- [x] **T33**. `skill_files` entity + migration + storage via `IStoragePlugin`
       (uploads-stack validation: sha256 naming, MIME sniff, per-file + per-skill
       size caps). NOTE: uploads stack does NOT secret-scan — wire
       `assertNoSecrets` (`packages/agent/src/utils/secret-scan.ts`) as a NEW
