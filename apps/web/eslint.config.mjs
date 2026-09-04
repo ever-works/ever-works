@@ -52,6 +52,28 @@ import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
  * service and DOES call `getOrganizationId`, so `ledger` and `usage-summary`
  * look like hits. The single call sits inside `usage/export`. They are
  * user-scoped.
+ *
+ * ### Tag legend
+ *
+ * The per-site disables are terse on purpose: an `eslint-disable-next-line`
+ * directive cannot be wrapped, so at 20+ columns of indentation a descriptive
+ * one blows past the 100-column guideline. The meaning lives here instead.
+ *
+ * - `EW-790 ok` — verified: the handler does not read the Organization.
+ * - `EW-790 fixed#2343` — genuinely broken; fixed in #2343.
+ * - `EW-790 work-scoped` — Work-scoped (`workId` + `userId`); no org involved.
+ * - `EW-788 blocked` — org-scoped and broken, but the paired route is a document
+ *   navigation that cannot carry a header. Blocked on the carrier decision.
+ *
+ * ## What these selectors deliberately cannot catch
+ *
+ * `fetch(url)` where `url` is a variable, and any call reached through an
+ * indirection (`const f = fetch; f('/api/x')`). Those are undecidable without
+ * type-aware analysis, which this rule does not do. The rule is a ratchet
+ * against the common shapes, not a proof — the `bffProxy` inversion is what
+ * would make the default safe. Covered shapes: string literal, template
+ * literal, `'/api/' + x` concatenation, bare and member-expression
+ * `XMLHttpRequest`.
  */
 const UNSCOPED_BFF_CALL =
     'Use browserApiFetch from @/lib/api/browser-api instead of a bare fetch to a /api/ route — it stamps the x-ever-workspace selector the BFF needs to resolve your Organization. Without it the call silently runs in the personal scope (empty results, HTTP 200) or fails closed. If this route genuinely must be scope-free, add an eslint-disable with a comment saying why.';
@@ -121,6 +143,20 @@ const eslintConfig = [
                     selector:
                         'CallExpression[callee.name="fetch"][arguments.0.quasis.0.value.raw=/^\\/api\\//]',
                     message: UNSCOPED_BFF_CALL,
+                },
+                // `fetch('/api/' + path)` — concatenation rather than a
+                // template literal.
+                {
+                    selector:
+                        'CallExpression[callee.name="fetch"][arguments.0.type="BinaryExpression"][arguments.0.left.value=/^\\/api\\//]',
+                    message: UNSCOPED_BFF_CALL,
+                },
+                // `new window.XMLHttpRequest()` / `new globalThis.XMLHttpRequest()`
+                // — the bare-identifier selector below does not match a member
+                // expression callee.
+                {
+                    selector: 'NewExpression[callee.property.name="XMLHttpRequest"]',
+                    message: UNSCOPED_XHR,
                 },
                 {
                     selector: 'NewExpression[callee.name="XMLHttpRequest"]',

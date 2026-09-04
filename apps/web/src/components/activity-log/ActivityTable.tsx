@@ -153,7 +153,7 @@ export function ActivityTable({ activities, loading, onStopRequested }: Activity
 
         const refreshActivity = async (id: string) => {
             try {
-                // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+                // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
                 const response = await fetch(`/api/activity-log/${id}`, {
                     method: 'GET',
                     cache: 'no-store',

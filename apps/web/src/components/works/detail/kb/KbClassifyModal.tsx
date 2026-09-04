@@ -100,7 +100,7 @@ export function KbClassifyModal({
     useEffect(() => {
         if (initialTags !== undefined) return;
         let cancelled = false;
-        // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
         fetch(`/api/works/${workId}/kb/tags`, { credentials: 'same-origin' })
             .then(async (res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);

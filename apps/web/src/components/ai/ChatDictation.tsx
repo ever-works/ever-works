@@ -76,7 +76,7 @@ export function ChatDictation({
                 // No `providerId`: selection is the server's job now, and
                 // sending one from here would PIN it, silently outranking the
                 // account's own Settings choice.
-                // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+                // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
                 const res = await fetch('/api/transcription', { method: 'POST', body: form });
                 if (res.status === 503) {
                     // No provider configured in this deployment — retire

@@ -102,7 +102,7 @@ export function uploadKbFile(opts: UploadKbFileOptions): Promise<KbUploadRespons
         }
 
         const url = `/api/works/${encodeURIComponent(workId)}/kb/uploads`;
-        // eslint-disable-next-line no-restricted-syntax -- EW-790: verified Work-scoped (workId + userId), never reads the Organization
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 work-scoped
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url, true);
         // Mirror `uploads.ts`: never send cookies on the bytes path — the
@@ -182,7 +182,7 @@ export async function listKbUploads(
     workId: string,
     opts?: { signal?: AbortSignal },
 ): Promise<{ items: KbUploadDto[]; total: number }> {
-    // eslint-disable-next-line no-restricted-syntax -- EW-790: verified Work-scoped (workId + userId), never reads the Organization
+    // eslint-disable-next-line no-restricted-syntax -- EW-790 work-scoped
     const res = await fetch(`/api/works/${workId}/kb/uploads`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
@@ -213,7 +213,7 @@ export async function retryKbUploadExtraction(
     workId: string,
     uploadId: string,
 ): Promise<KbUploadResponse> {
-    // eslint-disable-next-line no-restricted-syntax -- EW-790: verified Work-scoped (workId + userId), never reads the Organization
+    // eslint-disable-next-line no-restricted-syntax -- EW-790 work-scoped
     const res = await fetch(`/api/works/${workId}/kb/uploads/${uploadId}/retry-extraction`, {
         method: 'POST',
         headers: { Accept: 'application/json' },

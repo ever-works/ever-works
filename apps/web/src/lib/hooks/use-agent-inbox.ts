@@ -51,7 +51,7 @@ function emit(store: InboxStore): void {
 async function fetchInbox(agentId: string): Promise<void> {
     const store = getStore(agentId);
     try {
-        // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
         const res = await fetch(`/api/email/messages?agentId=${encodeURIComponent(agentId)}`, {
             cache: 'no-store',
         });

@@ -127,7 +127,7 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
             return;
         }
         let cancelled = false;
-        // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
         fetch(`/api/works/${workId}/import-items/settings`, { credentials: 'include' })
             .then((r) => r.json())
             .then((data: { import_max_rows?: number } | null) => {
@@ -151,7 +151,7 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
                 const formData = new FormData();
                 formData.append('file', chosenFile);
                 formData.append('mapping', JSON.stringify(stripSkippedFields(currentMapping)));
-                // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+                // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
                 const response = await fetch(`/api/works/${workId}/import-items/validate`, {
                     method: 'POST',
                     body: formData,
@@ -220,7 +220,7 @@ export function ItemImportWizard({ workId, isOpen, onClose }: ItemImportWizardPr
         setIsWorking(true);
         setError(null);
         try {
-            // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+            // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
             const response = await fetch(`/api/works/${workId}/import-items`, {
                 method: 'POST',
                 credentials: 'include',

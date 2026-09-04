@@ -118,7 +118,7 @@ export function KbSearchPalette({
             void (async () => {
                 try {
                     const params = new URLSearchParams({ q: trimmed, limit: String(MAX_RESULTS) });
-                    // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+                    // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
                     const response = await fetch(
                         `/api/works/${encodeURIComponent(workId)}/kb/search?${params.toString()}`,
                         { signal: controller.signal, cache: 'no-store' },

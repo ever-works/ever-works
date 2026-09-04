@@ -402,7 +402,7 @@ function uploadOne(args: {
             for (const tag of tags) form.append('tags', tag);
         }
 
-        // eslint-disable-next-line no-restricted-syntax -- EW-790: verified — the upstream handler does not read the Organization scope
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
         const xhr = new XMLHttpRequest();
         xhr.open('POST', `/api/works/${workId}/kb/uploads`);
         xhr.responseType = 'json';
