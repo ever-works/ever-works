@@ -90,10 +90,29 @@ export interface BffProxyOptions {
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-export function bffProxy<Ctx = unknown>(
+/**
+ * The returned signature depends on whether the route has params, and it has to.
+ *
+ * Next 16 validates route exports structurally. A DYNAMIC route's second
+ * argument must be exactly its context type — `RouteContext | undefined` is
+ * rejected with "Expected RouteContext, got RouteContext | undefined", so an
+ * optional parameter fails `next build`. A STATIC route has no context, and
+ * every route spec in this repo calls the handler directly as `await GET(req)`,
+ * so a required second parameter fails `tsc` with TS2554 at those call sites.
+ *
+ * Neither a required nor an optional parameter satisfies both. Keying the
+ * signature off `Ctx` does: omit the type argument for a static route and get a
+ * one-parameter handler; pass it for a dynamic route and get the exact
+ * two-parameter shape Next expects.
+ */
+type BffRouteHandler<Ctx> = [Ctx] extends [never]
+    ? (request: NextRequest) => Promise<Response>
+    : (request: NextRequest, context: Ctx) => Promise<Response>;
+
+export function bffProxy<Ctx = never>(
     handler: (scoped: ScopedBffRequest, context: Ctx) => Promise<Response> | Response,
     options: BffProxyOptions = {},
-): (request: NextRequest, context?: Ctx) => Promise<Response> {
+): BffRouteHandler<Ctx> {
     const { scope = 'workspace', reason, onUnauthorized = unauthorized } = options;
 
     if (scope === 'none' && !reason?.trim()) {
@@ -104,13 +123,10 @@ export function bffProxy<Ctx = unknown>(
         );
     }
 
-    // `context` is OPTIONAL so a STATIC route's handler can still be called
-    // with one argument. Next always passes two, but the route specs in this
-    // repo call the exported handler directly as `await GET(request)` — a
-    // required parameter turned every one of those into TS2554 and blocked
-    // the migration of every static route. An optional trailing parameter is
-    // still assignable to Next's two-parameter route-handler type.
-    return async (request: NextRequest, context?: Ctx): Promise<Response> => {
+    // Built with an optional parameter internally and cast to the public
+    // signature above: at runtime Next always passes a context, and a static
+    // route simply ignores it.
+    const route = async (request: NextRequest, context?: Ctx): Promise<Response> => {
         const token = await getAuthAccessCookie();
         if (!token) return onUnauthorized();
 
@@ -128,4 +144,6 @@ export function bffProxy<Ctx = unknown>(
 
         return handler({ request, headers, token }, context as Ctx);
     };
+
+    return route as BffRouteHandler<Ctx>;
 }
