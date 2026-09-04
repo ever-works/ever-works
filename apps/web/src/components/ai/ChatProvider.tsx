@@ -82,13 +82,31 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 // `browserApiFetch` does, so a second tab on another Organization cannot leak
 // its scope into this one.
 export function prepareChatRequest({
+    id,
+    messages,
+    trigger,
+    messageId,
     body,
     headers,
 }: {
+    id: string;
+    messages: UIMessage[];
+    trigger: 'submit-message' | 'regenerate-message';
+    messageId: string | undefined;
     body?: Record<string, unknown>;
     headers?: HeadersInit;
 }): { body: object; headers: Headers } {
-    return { body: body ?? {}, headers: applyBrowserWorkspaceScope(headers) };
+    // `body` is ONLY the extra fields — the transport's `body` merged with the
+    // per-call one. The SDK hands id/messages/trigger/messageId to this callback
+    // as SEPARATE arguments, and when the callback returns a `body` the SDK
+    // POSTs that object VERBATIM instead of re-adding them (it only re-adds them
+    // on the no-callback path). So returning `body` alone sends a request with
+    // no `messages`, and /api/chat's schema rejects it with 400 before any model
+    // is reached — i.e. every send fails. Restate the four fields here.
+    return {
+        body: { ...(body ?? {}), id, messages, trigger, messageId },
+        headers: applyBrowserWorkspaceScope(headers),
+    };
 }
 
 // Exported only so a unit spec can pin that the transport is actually WIRED to
