@@ -64,6 +64,83 @@ describe('versionPermitted', () => {
 });
 
 describe('AgentPluginNpmSource', () => {
+    // `pacote` resolves `<name>@<spec>` through `npm-package-arg`, which picks
+    // the TRANSPORT from the spec's shape. `npa('safe@git+https://host/x.git')`
+    // returns `type: 'git'` (verified against the installed 13.0.2), and
+    // pacote's git fetcher then runs `npm install` on the clone whenever its
+    // package.json declares prepare/install/postinstall — arbitrary code on the
+    // API pod.
+    //
+    // The allowlist only ever sees the package NAME, so an allowlist entry for
+    // a legitimate plugin was enough to carry this. These pin the grammar that
+    // closes it, in BOTH directions: a transport must be refused, and ordinary
+    // semver must keep working, because a regex that quietly rejects `^1.0.0`
+    // would be its own outage.
+    it.each([
+        ['git+https://attacker.example/evil.git', 'a git transport'],
+        ['git+ssh://attacker.example/evil.git', 'an ssh git transport'],
+        ['https://attacker.example/x.tgz', 'a remote tarball'],
+        ['file:/etc', 'a local directory'],
+        ['../../etc', 'a relative path'],
+        ['npm:other-package@1', 'an aliased package'],
+    ])('refuses %s (%s) before any network call', async (version) => {
+        const pacote = pacoteStub();
+        const source = new AgentPluginNpmSource(allowlistStub({ allowed: true }));
+        source.setPacote(pacote);
+
+        await expect(
+            source.acquire({ packageName: 'acme-skills', version, destDir: await scratch() }),
+        ).rejects.toMatchObject({ status: 409 });
+
+        // Nothing was fetched: the refusal happens on the shape, before the
+        // allowlist and before pacote is reached at all.
+        expect(pacote.manifest).not.toHaveBeenCalled();
+        expect(pacote.extract).not.toHaveBeenCalled();
+    });
+
+    it.each(['1.2.3', 'latest', '^1.0.0', '>=1.2 <2', '~1.2', '1.x', 'next', '*'])(
+        'still accepts the ordinary registry specifier %s',
+        async (version) => {
+            const pacote = pacoteStub({ version: '1.2.3' });
+            const source = new AgentPluginNpmSource(allowlistStub({ allowed: true }));
+            source.setPacote(pacote);
+
+            await source.acquire({
+                packageName: 'acme-skills',
+                version,
+                destDir: await scratch(),
+            });
+
+            expect(pacote.manifest).toHaveBeenCalled();
+        },
+    );
+
+    it('refuses a package NAME that could name a transport or a path', async () => {
+        const pacote = pacoteStub();
+        const source = new AgentPluginNpmSource(allowlistStub({ allowed: true }));
+        source.setPacote(pacote);
+
+        await expect(
+            source.acquire({ packageName: '../evil', destDir: await scratch() }),
+        ).rejects.toMatchObject({ status: 409 });
+        expect(pacote.manifest).not.toHaveBeenCalled();
+    });
+
+    it('tells pacote to ignore lifecycle scripts', async () => {
+        const pacote = pacoteStub({ version: '1.2.3' });
+        const source = new AgentPluginNpmSource(allowlistStub({ allowed: true }));
+        source.setPacote(pacote);
+
+        await source.acquire({ packageName: 'acme-skills', destDir: await scratch() });
+
+        // Defence in depth behind the grammar above, so a future change that
+        // lets a non-registry spec through cannot also run its scripts.
+        expect(pacote.manifest).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.objectContaining({ ignoreScripts: true }),
+        );
+    });
+
     it('refuses an unallowlisted package WITHOUT resolving a manifest', async () => {
         const pacote = pacoteStub();
         const source = new AgentPluginNpmSource(allowlistStub({ allowed: false }));
