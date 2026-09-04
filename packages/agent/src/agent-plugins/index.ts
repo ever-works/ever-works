@@ -107,3 +107,9 @@ export {
     type ResolvedMcpServer,
     type SkippedMcpServer,
 } from './mcp-server-config.service';
+
+export {
+    connectionNameFor,
+    PackageMcpReconcilerService,
+    type ReconcileResult,
+} from './package-mcp-reconciler.service';

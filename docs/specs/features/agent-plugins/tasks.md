@@ -131,7 +131,26 @@ appends, locale key appends) are expected and fine.
 
 ## Phase 3 — MCP client: remote transports + bindings (PR-5, PR-6)
 
-- [ ] **T23**. `McpServerConfigService` (plan §2.2) in
+> **2026-09-04 — T24-T27 were largely ALREADY BUILT.** PR #2082 ("MCP client —
+> external server connections with per-agent bindings") shipped
+> `mcp_server_connections`, `agent_mcp_server_bindings`, `McpClientService`,
+> `McpToolSource`, `McpConnectionsService`, the `@modelcontextprotocol/sdk`
+> dependency and the API controllers. `McpServerConnection.source` is typed
+> `'manual' | 'package'` with the comment "'package' reserved for the
+> agent-plugins package work" — the seam for this work was designed in advance.
+>
+> Following these task descriptions literally would have built a SECOND binding
+> table and duplicated a whole working subsystem. The real remaining gap was
+> narrow: nothing turned a package-declared server into something that machinery
+> could see. `PackageMcpReconcilerService` closes it by materialising package
+> servers as ordinary connection rows with `source: 'package'` — created
+> **disabled and unbound**, because a package arriving on disk must never grant
+> an agent network reach on its own.
+>
+> Re-verify T25-T28 against live code before starting them; they are likely
+> done or much smaller than written here.
+
+- [x] **T23**. `McpServerConfigService` (plan §2.2) in
       `packages/agent/src/agent-plugins/`: resolves bound servers → validated
       configs + provenance via the conformance lib. No plugin capability, no
       `facade-capabilities.ts` append. Barrel-export from
