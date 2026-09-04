@@ -175,8 +175,15 @@ export class McpToolSource implements AgentMcpToolSource {
                 const record =
                     args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
                 const result = await this.client.callTool(connection, tool.name, record);
+                // Started but NOT awaited. The helper swallows its own
+                // rejections, but `repository.save()` can still stall — and a
+                // stalled write would hold a successful tool response open,
+                // making accounting a latency and availability dependency of
+                // every tool call. It is an observation; it must not sit in
+                // the response path.
+                //
                 // After the call, so a failed tool is not counted as usage.
-                await this.recordInvocation(agent, connection);
+                void this.recordInvocation(agent, connection);
                 return result;
             },
         };

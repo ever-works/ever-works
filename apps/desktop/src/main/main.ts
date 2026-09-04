@@ -136,6 +136,15 @@ function bootstrap(): void {
 
 	let config: DesktopConfig = loadConfig(configPath);
 
+	// Agent Plugins package directory, created at BOOTSTRAP rather than only
+	// when the local stack starts. `envEntries()` runs inside `ensureServices`,
+	// so a user in client mode — or one who has not started the stack yet —
+	// would follow the docs to "put packages here" and find no such folder.
+	// Non-fatal: the scanner treats a missing directory as an empty registry.
+	withDefaultPackagesDir({}, userData, (dir) => {
+		fs.mkdirSync(dir, { recursive: true });
+	});
+
 	if (layout.kind === 'unavailable') {
 		// Loud, actionable degradation: local-stack mode cannot start anything.
 		// Client mode still works, which is exactly what the wizard offers next.

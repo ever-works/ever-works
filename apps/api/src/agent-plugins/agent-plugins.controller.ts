@@ -25,6 +25,7 @@ import {
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
+    DescriptorQueryDto,
     InstallAgentPluginPackageDto,
     ListAgentPluginPackagesQueryDto,
 } from './dto/agent-plugin.dto';
@@ -170,8 +171,13 @@ export class AgentPluginsController {
             'Returns the package files so any conforming client can consume this MCP server by installing a package rather than by hand-configuring it. Contains no credentials: the specification treats package headers as visible and non-secret, so the consuming client supplies its own authentication.',
     })
     @Throttle({ long: { limit: 20, ttl: 60_000 } })
-    async descriptor(@CurrentUser() _auth: AuthenticatedUser, @Query('url') url?: string) {
-        const built = await this.exporter.buildEverWorksMcpDescriptor(url ? { url } : {});
+    async descriptor(@CurrentUser() _auth: AuthenticatedUser, @Query() query: DescriptorQueryDto) {
+        // A DTO, not `@Query('url')`. The global pipe validates DTO CLASSES,
+        // so a bare string parameter is unvalidated — and this value is
+        // written verbatim into the mcp.json we hand out.
+        const built = await this.exporter.buildEverWorksMcpDescriptor(
+            query.url ? { url: query.url } : {},
+        );
         return { files: Object.fromEntries(built.files), findings: built.findings };
     }
 

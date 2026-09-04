@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+    IsBoolean,
+    IsIn,
+    IsOptional,
+    IsString,
+    IsUrl,
+    MaxLength,
+    MinLength,
+} from 'class-validator';
 
 /**
  * Remote sources that require an allowlist entry.
@@ -131,4 +139,26 @@ export class InstallAgentPluginPackageDto {
     @IsString()
     @MaxLength(256)
     version?: string;
+}
+
+export class DescriptorQueryDto {
+    /**
+     * Override the endpoint the descriptor points at, for a self-hosted
+     * deployment.
+     *
+     * Validated rather than taken raw. This value is written verbatim into the
+     * `mcp.json` we hand out, and a consuming client connects to whatever it
+     * finds there — so an unvalidated string here becomes somebody else's
+     * outbound request. A bare `@Query('url')` string bypasses the global
+     * pipe entirely, because the pipe validates DTO classes.
+     *
+     * https only, for the same reason the git acquirer requires it: package
+     * contents are read as agent instructions, and a plaintext hop is an
+     * injection point.
+     */
+    @ApiPropertyOptional({ description: 'Self-hosted MCP endpoint (https).' })
+    @IsOptional()
+    @IsUrl({ protocols: ['https'], require_protocol: true })
+    @MaxLength(2048)
+    url?: string;
 }

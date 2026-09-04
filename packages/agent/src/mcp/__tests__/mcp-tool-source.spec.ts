@@ -242,6 +242,13 @@ describe('McpToolSource', () => {
     });
 });
 
+/**
+ * Usage accounting is deliberately NOT awaited by `invoke`, so an assertion
+ * made immediately after would be racing a microtask. Flushing makes these
+ * tests deterministic rather than dependent on how fast the stub resolves.
+ */
+const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
 describe('usage accounting (T28)', () => {
     it('records one event per successful tool invocation', async () => {
         const usage = { record: jest.fn().mockResolvedValue({}) };
@@ -253,6 +260,7 @@ describe('usage accounting (T28)', () => {
 
         const tools = await source.buildTools(makeAgent({ workId: 'work-1' }));
         await tools[0].invoke({ q: 'x' });
+        await flush();
 
         expect(usage.record).toHaveBeenCalledTimes(1);
         expect(usage.record).toHaveBeenCalledWith(
@@ -276,6 +284,7 @@ describe('usage accounting (T28)', () => {
 
         const tools = await source.buildTools(makeAgent({ workId: 'work-1' }));
         await expect(tools[0].invoke({ q: 'x' })).rejects.toThrow('server down');
+        await flush();
 
         // Recording after the call is what makes this true: a failed
         // invocation consumed nothing, so counting it would overstate spend.
@@ -311,8 +320,35 @@ describe('usage accounting (T28)', () => {
         // counted, and the gap is stated rather than hidden.
         const tools = await source.buildTools(makeAgent({ workId: null }));
         await tools[0].invoke({ q: 'x' });
+        await flush();
 
         expect(usage.record).not.toHaveBeenCalled();
+    });
+
+    it('returns the tool result WITHOUT waiting for accounting to finish', async () => {
+        let settle!: () => void;
+        const usage = {
+            record: jest.fn(
+                () =>
+                    new Promise<void>((resolve) => {
+                        settle = resolve;
+                    }),
+            ),
+        };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }));
+
+        // The write never settles. If `invoke` awaited it, this would hang —
+        // a stalled accounting write would hold every successful tool
+        // response open, making the ledger a latency dependency of the run.
+        await expect(tools[0].invoke({ q: 'x' })).resolves.toEqual({ ok: true });
+
+        settle();
     });
 
     it('works with no usage repository bound at all', async () => {
