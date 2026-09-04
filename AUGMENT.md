@@ -6,14 +6,14 @@ To avoid duplication, this file is only a light entrypoint. For full project rul
 
 - **Primary project rules (all AI)**: [`CLAUDE.md`](./CLAUDE.md)
 - **Project-wide AI index**: [`AGENTS.md`](./AGENTS.md)
-- **Central docs (for humans)**: https://github.com/ever-works/ever-works-docs/tree/develop/website/docs
+- **Central docs (for humans)**: https://docs.ever.works (source: `apps/docs/` + `docs/`)
 
 Augment Code should read those files first and treat them as the source of truth.
 
 ## 🔗 Quick Links
 
 - **Repository**: https://github.com/ever-works/ever-works
-- **Documentation**: https://github.com/ever-works/ever-works-docs/tree/develop/website/docs
+- **Documentation**: https://docs.ever.works (source: `apps/docs/` + `docs/`)
 - **Website**: https://ever.works
 
 ## 🚀 Quick Start

@@ -42,6 +42,33 @@ pnpm --filter ever-works-docs spellcheck
 
 You can also `cd apps/docs` and run `pnpm dev`, `pnpm build`, etc. directly.
 
+## Routing (and the legacy `/docs/*` URLs)
+
+The documentation **is** the landing page: `presets.classic.docs.routeBasePath` is
+`'/'` and `docs/index.md` carries `slug: /`, so `https://docs.ever.works/` renders the
+docs home directly. There is no separate marketing homepage in front of it.
+
+Older links pointed at a `/docs` prefix (`https://docs.ever.works/docs/getting-started`).
+Those are still out there in issues, READMEs and bookmarks, and nginx used to answer
+them with a 404. `@docusaurus/plugin-client-redirects` is configured in
+`docusaurus.config.ts` to emit a client-side redirect page for `/docs` and for
+`/docs/<every doc route>`, so each of those legacy URLs lands on the current page. The
+plugin strips the baseUrl before calling `createRedirects`, so the same rule covers every
+locale build (`/fr/docs/...` included).
+
+Write **new** links without the prefix (`/getting-started`, or a relative
+`./getting-started` from a doc) — the redirects exist for backwards compatibility only.
+
+## Footer copyright
+
+The site renders the **swizzled** footer (`src/theme/Footer/index.tsx`), which reads
+`customFields.footerData.companyInfo.copyright` from `docusaurus.config.ts` — _not_
+`themeConfig.footer.copyright` (that one only feeds the stock Docusaurus footer and is
+kept as a fallback). Both are set to `Copyright © 2024-Present Ever Co. LTD. All Rights
+Reserved.`; change them together. The rendered string goes through `translate()` under
+the id `footer.companyInfo.copyright`, so a locale can override it in
+`i18n/<locale>/code.json`.
+
 ## Editing Docs
 
 To add or edit a documentation page:

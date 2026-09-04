@@ -29,7 +29,7 @@
 	},
 	"link.item.label.Stack Overflow": {
 		"message": "Stack Overflow",
-		"description": "The label of footer link with label=Stack Overflow linking to https://stackoverflow.com/questions/tagged/ever-works-website-template"
+		"description": "The label of footer link with label=Stack Overflow linking to https://stackoverflow.com/questions/tagged/ever-works"
 	},
 	"link.item.label.Discord Chat": {
 		"message": "Chat Discord",
@@ -44,7 +44,7 @@
 		"description": "The label of footer link with label=GitHub linking to https://github.com/ever-works/ever-works"
 	},
 	"copyright": {
-		"message": "Copyright © 2024-Présent <a href=\"https://ever.co/\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color: inherit; text-decoration: underline;\">Ever Co. LTD.</a>",
+		"message": "Copyright © 2024-Présent <a href=\"https://ever.co/\" target=\"_blank\" rel=\"noopener noreferrer\" style=\"color: inherit; text-decoration: underline;\">Ever Co. LTD.</a> Tous droits réservés.",
 		"description": "The footer copyright"
 	}
 }

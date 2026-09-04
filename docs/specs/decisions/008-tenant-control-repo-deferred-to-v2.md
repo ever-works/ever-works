@@ -113,5 +113,5 @@ Each of the three feature `tasks.md` files lists this extension as concrete Phas
 
 - [`features/agents/spec.md §3.6, §8 Q1`](../features/agents/spec.md)
 - [`architecture/agents-skills-tasks.md §4.5`](../architecture/agents-skills-tasks.md)
-- Constitution Principle III: [`.specify/memory/constitution.md`](../../../.specify/memory/constitution.md)
+- Constitution Principle III: [`.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)
 - ADR-006 (Agents are core, not plugins): [`./006-agents-skills-tasks-as-core-not-plugins.md`](./006-agents-skills-tasks-as-core-not-plugins.md)

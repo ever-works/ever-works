@@ -19,7 +19,7 @@
 
 > **Scope of this document:** the _creation UX_ for Agents — what the user sees and does when they create an Agent from the `/agents` page. It layers a prompt-first ("just describe it") entry point on top of the existing manual wizard, surfaces a community **template catalog** (CEO, CTO, Lead Engineer, Copywriter, Sales, Brand Specialist, …) as quick-pick chips, and fixes a wizard dead-end. It does **not** redefine what an Agent _is_, its runtime, scope cascade, budgets, or tabs — that lives in [`features/agents/spec.md`](../agents/spec.md). Implementation detail is in [plan.md](./plan.md); the task breakdown is in [tasks.md](./tasks.md).
 >
-> **Hard rule (additive only — [Workspace AGENTS.md NN #20](file:///C:/Coding/Workspace/AGENTS.md)):** Everything that ships today stays. The manual `NewAgentDialog` wizard is _kept_ and _improved_, never removed. The only thing that moves is the placement + label of one button (`+ New Agent` → `+ Create Agent Manually`), which the operator requested explicitly. The existing `/agents/templates` browser stays. New surfaces are added; nothing is renamed away.
+> **Hard rule (additive only — Workspace AGENTS.md NN #20):** Everything that ships today stays. The manual `NewAgentDialog` wizard is _kept_ and _improved_, never removed. The only thing that moves is the placement + label of one button (`+ New Agent` → `+ Create Agent Manually`), which the operator requested explicitly. The existing `/agents/templates` browser stays. New surfaces are added; nothing is renamed away.
 
 ---
 
