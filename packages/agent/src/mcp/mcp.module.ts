@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { McpServerConnection } from '../entities/mcp-server-connection.entity';
+import { PluginUsageEvent } from '../entities/plugin-usage-event.entity';
 import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
 import { Agent } from '../entities/agent.entity';
 import { McpServerConnectionRepository } from '../database/repositories/mcp-server-connection.repository';
+import { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 import { AgentMcpServerBindingRepository } from '../database/repositories/agent-mcp-server-binding.repository';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -28,11 +30,17 @@ import { McpToolSource } from './mcp-tool-source';
 @Module({
     imports: [
         DatabaseModule,
-        TypeOrmModule.forFeature([McpServerConnection, AgentMcpServerBinding, Agent]),
+        TypeOrmModule.forFeature([
+            McpServerConnection,
+            AgentMcpServerBinding,
+            Agent,
+            PluginUsageEvent,
+        ]),
         ActivityLogModule,
     ],
     providers: [
         McpServerConnectionRepository,
+        PluginUsageRepository,
         AgentMcpServerBindingRepository,
         AgentRepository,
         McpClientService,

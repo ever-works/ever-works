@@ -1238,6 +1238,7 @@
                     "dry-run": "Report only",
                     "propose": "Propose merges"
                 },
+                "saveFailed": "Could not save the schedule. Your change was not stored — try again.",
                 "subtitle": "Periodically merge near-duplicate Memory documents. Proposals go to the review queue — nothing is ever accepted or deleted automatically.",
                 "title": "Scheduled consolidation"
             }

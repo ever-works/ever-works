@@ -3,6 +3,7 @@
 import { DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertCircle, CheckCircle2, FileText, Loader2, Upload } from 'lucide-react';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import { cn } from '@/lib/utils/cn';
 
 /**
@@ -17,6 +18,16 @@ import { cn } from '@/lib/utils/cn';
  * Deliberately mirrors the per-Work workbench Originals panel rather than
  * inventing a second visual language for the same concept — Memory is the
  * org-wide counterpart of a Work's KB, not a different kind of thing.
+ *
+ * **Transport (EW-786).** Both calls go through `browserApiFetch`, never
+ * a raw `fetch()`. This panel is the most org-dependent surface in
+ * Memory — its whole subject is "the active Organization's originals" —
+ * and the BFF can only tell the API which Organization that is by
+ * turning the per-tab `x-ever-workspace` selector into `X-Scope-Slug`.
+ * With a raw `fetch()` the list came back `{ items: [], total: 0 }` at
+ * HTTP 200 (indistinguishable from a genuinely empty org) and every
+ * upload took the 422 branch below, so the panel rendered `noOrg` at a
+ * user who was looking straight at their Organization.
  */
 
 interface MemoryUpload {
@@ -55,7 +66,7 @@ export function MemoryUploadsPanel() {
 
     const refresh = useCallback(async () => {
         try {
-            const res = await fetch('/api/memory/uploads?limit=50', {
+            const res = await browserApiFetch('/api/memory/uploads?limit=50', {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store',
             });
@@ -88,7 +99,7 @@ export function MemoryUploadsPanel() {
                     // uploader rarely knows or cares which bucket it lands in.
                     form.append('autoClassify', 'true');
                     try {
-                        const res = await fetch('/api/memory/uploads', {
+                        const res = await browserApiFetch('/api/memory/uploads', {
                             method: 'POST',
                             body: form,
                         });

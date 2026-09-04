@@ -24,7 +24,7 @@ Connect the MCP server to Claude Desktop, Claude Code, or any MCP-compatible cli
 The MCP server is a standalone NestJS application in `apps/mcp/` that:
 
 1. **Fetches** the Ever Works API's OpenAPI spec at startup
-2. **Filters** endpoints through a curated whitelist of 123 operations
+2. **Filters** endpoints through a curated whitelist of 127 operations
 3. **Converts** OpenAPI schemas to MCP tool definitions automatically
 4. **Proxies** tool calls to the API using your API key
 
@@ -112,7 +112,7 @@ Add the MCP server to your project's `.mcp.json`:
 
 ## Available Tools
 
-The MCP server exposes 123 tools organized by domain. Each tool's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
+The MCP server exposes 127 tools organized by domain. Each tool's parameters and descriptions are auto-generated from the API's OpenAPI specification. The authoritative list is `apps/mcp/src/openapi-tools/whitelist.ts`; `apps/mcp/test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts on this page against it.
 
 ### Human-in-the-loop gates are not tools
 
@@ -283,6 +283,20 @@ Agents are the workers; runs are their executions.
 | `resume_agent`     | Resume a paused Agent          |
 | `get_agent_budget` | Budget and spend of an Agent   |
 
+### Agent Plugins (4 tools)
+
+Read-only by design. Installing an Agent Plugins package installs **skills** —
+instructions the agent then follows — and this server is reachable by agents
+processing scraped web content and community-PR text, so an install tool would
+let a prompt-injected run acquire its own future instructions. Install, resync
+and the allowlist routes stay available to a human through the API, web UI and
+CLI; only the tool surface excludes them.
+
+- `list_agent_plugin_packages` — installed packages
+- `list_agent_plugin_findings` — validation findings recorded at install
+- `list_agent_plugin_catalog_entries` — skills contributed by packages
+- `list_agent_plugin_updates` — packages with a newer version available
+
 ## Adding New Tools
 
 To expose a new API endpoint as an MCP tool:
@@ -312,8 +326,36 @@ The tool's description, parameters, and validation are derived automatically fro
 - **Scope selection, not widening** — `EVER_WORKS_SCOPE_SLUG` is forwarded as `x-scope-slug` and the API authorises the caller against it the same way it does for the web client
 - **Request timeout** — API calls time out after 2 minutes
 
+## Use it from any Agent Plugins client
+
+Ever Works publishes this server as an **Agent Plugins v1.0.0** package
+descriptor, so a client that supports the open standard can install it as an
+ordinary package instead of following the configuration steps above by hand.
+
+The descriptor declares one `streamable-http` server and nothing else — no
+skills, and deliberately **no credentials**. The specification treats
+package-configured headers as visible and non-secret, so a descriptor that
+embedded an API key would publish that key to everyone who installed it.
+Authentication stays where it belongs: your client supplies its own key,
+exactly as it does for the manual configuration above.
+
+Generate the descriptor with:
+
+```bash
+ever-works plugins agent-plugins descriptor
+```
+
+This writes a directory you can install directly, or archive if your client
+wants one. Point it at a self-hosted deployment by overriding the URL. Nothing in this
+page's manual configuration changes — the descriptor is an additional way to
+consume the same server, not a replacement for it.
+
+See the [conformance statement](/specs/features/agent-plugins/conformance) for
+what Ever Works implements of the standard, including what it does not.
+
 ## Related
 
 - [API Keys](./api-keys) — Generate API keys for MCP server authentication
 - [Authentication](/api/authentication) — Full API authentication reference
 - [Plugin System](/plugin-system/) — Plugins that power generation, search, and deployment
+- [Agent Plugins conformance](/specs/features/agent-plugins/conformance) — What Ever Works implements of the open Agent Plugins v1.0.0 standard

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { CalendarClock, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 /**
  * Scheduled Memory Consolidation — the settings that turn it on.
@@ -20,6 +21,12 @@ import { cn } from '@/lib/utils/cn';
  *              which appear in the review queue and are withheld from
  *              agent context until a human accepts them
  * Neither ever auto-accepts, and neither deletes anything.
+ *
+ * EW-786 — every call goes through `browserApiFetch`, which stamps the
+ * visible tab's `x-ever-workspace` selector; the BFF route translates it
+ * into the API's `X-Scope-Slug`. These settings live on the Organization,
+ * so with a plain `fetch()` the read returned the personal-scope defaults
+ * and the write was rejected 422 by the API — see the route's own note.
  */
 
 interface Settings {
@@ -37,12 +44,13 @@ export function MemoryConsolidationSettings() {
     const t = useTranslations('dashboard.memoryPage.schedule');
     const [settings, setSettings] = useState<Settings | null>(null);
     const [saving, setSaving] = useState(false);
+    const [saveFailed, setSaveFailed] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
         void (async () => {
             try {
-                const res = await fetch('/api/memory/consolidation/settings', {
+                const res = await browserApiFetch('/api/memory/consolidation/settings', {
                     headers: { Accept: 'application/json' },
                     cache: 'no-store',
                 });
@@ -61,6 +69,7 @@ export function MemoryConsolidationSettings() {
 
     const save = useCallback(async (patch: Partial<Settings>) => {
         setSaving(true);
+        setSaveFailed(false);
         // Optimistic so the control responds immediately — but a settings
         // form must never keep a value it failed to store. Both the error
         // and the non-ok paths roll back to what was actually saved,
@@ -72,19 +81,25 @@ export function MemoryConsolidationSettings() {
             return prev ? { ...prev, ...patch } : prev;
         });
         try {
-            const res = await fetch('/api/memory/consolidation/settings', {
+            const res = await browserApiFetch('/api/memory/consolidation/settings', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(patch),
             });
             if (!res.ok) {
+                // Rolling back is necessary but not sufficient. On its own
+                // the control just flicks back to its old value, which is
+                // indistinguishable from a mis-click — so the user retries
+                // the same failing write instead of learning it failed.
                 setSettings(previous);
+                setSaveFailed(true);
                 return;
             }
             const body = (await res.json()) as Settings;
             setSettings(body);
         } catch {
             setSettings(previous);
+            setSaveFailed(true);
         } finally {
             setSaving(false);
         }
@@ -112,6 +127,16 @@ export function MemoryConsolidationSettings() {
                 {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />}
             </div>
             <p className="text-sm text-text-muted dark:text-text-muted-dark">{t('subtitle')}</p>
+
+            {saveFailed && (
+                <p
+                    role="alert"
+                    data-testid="memory-schedule-error"
+                    className="rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-sm text-red-600 dark:text-red-400"
+                >
+                    {t('saveFailed')}
+                </p>
+            )}
 
             <div className="flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark">

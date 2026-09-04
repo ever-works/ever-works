@@ -82,7 +82,7 @@ cd apps/mcp && pnpm lint
 EVER_WORKS_API_KEY=ew_live_... npx @modelcontextprotocol/inspector node apps/mcp/dist/stdio.js
 ```
 
-## Available Tools (123)
+## Available Tools (127)
 
 The authoritative list is `src/openapi-tools/whitelist.ts`; the tables below cover the main domains, and `test/whitelist-tasks-inbox-goals-fleet.spec.ts` checks the counts here against it.
 
@@ -254,6 +254,18 @@ Agents are the workers; runs are their executions.
 | `pause_agent`      | Pause an Agent                 |
 | `resume_agent`     | Resume a paused Agent          |
 | `get_agent_budget` | Budget and spend of an Agent   |
+
+### Agent Plugins (4)
+
+Read-only by design. Installing an Agent Plugins package installs **skills** —
+instructions the agent then follows — so the install, resync and allowlist
+routes are deliberately absent from the tool surface and stay available to a
+human through the API, web UI and CLI. See `docs/specs/decisions/018-agent-plugins-standard-interop.md`.
+
+- `list_agent_plugin_packages` — installed packages
+- `list_agent_plugin_findings` — validation findings recorded at install
+- `list_agent_plugin_catalog_entries` — skills contributed by packages
+- `list_agent_plugin_updates` — packages with a newer version available
 
 ## Adding New Tools
 

@@ -66,7 +66,7 @@ export class ApiKeyGuard implements CanActivate {
 				throw new UnauthorizedException('Missing credentials (Authorization Bearer or x-ever-works-jwt)');
 			}
 			if (sharedKeyPresent) {
-				if (!sharedKeyMatches(sharedKeyHeader!, this.config.apiKey)) {
+				if (!sharedKeyMatches(sharedKeyHeader, this.config.apiKey)) {
 					throw new UnauthorizedException('Invalid shared API key');
 				}
 			} else if (sharedKeyRequired) {
@@ -102,7 +102,7 @@ export class ApiKeyGuard implements CanActivate {
 			this.callerContext.setCallerJwt(userJwtHeader);
 			// Kept for any consumer that does hold the real Express request
 			// (and so the stdio/None-transport shape is unchanged).
-			request.__callerJwt = userJwtHeader as string;
+			request.__callerJwt = userJwtHeader;
 		}
 
 		return true;

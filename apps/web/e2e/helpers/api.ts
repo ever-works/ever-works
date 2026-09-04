@@ -82,9 +82,30 @@ export async function loginViaAPI(
 
 /**
  * Authenticated GET request shortcut.
+ *
+ * This carries NO scope header, which since 8f28edca0 means the request runs in
+ * the PERSONAL scope — that is the contract for an unprefixed bare-Bearer call,
+ * not an oversight. Reads will not see Organization-stamped rows and writes land
+ * unstamped. When a request is meant to act inside an Organization, use
+ * {@link orgScopedHeaders} instead of adding a header at the call site.
  */
 export function authedHeaders(token: string): { Authorization: string } {
     return { Authorization: `Bearer ${token}` };
+}
+
+/**
+ * Authenticated request headers bound to an Organization scope.
+ *
+ * An Organization scope requires either this explicit `X-Scope-Slug` header or an
+ * `/api/<slug>/…` path; the API deliberately refuses to infer one from the user's
+ * last-active Organization, which is what keeps two tabs on different Orgs
+ * isolated. See `apps/api/src/scope/session-scope.guard.ts`.
+ */
+export function orgScopedHeaders(
+    token: string,
+    orgSlug: string,
+): { Authorization: string; 'X-Scope-Slug': string } {
+    return { ...authedHeaders(token), 'X-Scope-Slug': orgSlug };
 }
 
 /**

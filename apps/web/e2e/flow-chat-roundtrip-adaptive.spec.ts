@@ -39,11 +39,16 @@ import {
  *      "History". resetChat() → setMessages([]) + clears active conversation.
  *  ChatToolbar.tsx / ChatProviderSelector.tsx
  *    - "New chat" / "History" buttons (i18n newChat="New chat", history="History").
- *    - selector button shows the active provider name (or "Provider"); the
- *      dropdown header is the i18n `title` ("AI Assistant"); each provider row is
- *      a <button>; if `!provider.configured` it is `disabled` with a
- *      "Not configured" badge. Selection persists to localStorage
- *      key `chat-ai-provider`.
+ *    - the selector renders ONLY when 2+ AI providers are activated for the
+ *      account (`if (providers.length < 2) return null`) — a one-option dropdown
+ *      is not a choice. With a single provider there is no trigger and no
+ *      dropdown anywhere in the panel; the model chip beside the composer is
+ *      then the only picker.
+ *    - when it DOES render: the trigger shows the active provider name (or
+ *      "Provider"); the dropdown header is the i18n `title` ("AI Assistant");
+ *      each provider row is a <button>; if `!provider.configured` it is
+ *      `disabled` with a "Not configured" badge. Selection persists to
+ *      localStorage key `chat-ai-provider`.
  *  ChatProvider.tsx
  *    - providers + their `configured` flags come from getGlobalFormSchema()
  *      → GET /api/generator-form → providers.ai[] (ProviderOption:
@@ -300,6 +305,34 @@ test.describe('AI Chat — round-trip adaptive (composer + reset + selector)', (
             aiProviders[0]?.name;
         expect(activeName, 'an active provider name is derivable').toBeTruthy();
 
+        // CONTRACT: the selector is a CHOICE, so ChatProviderSelector renders
+        // NOTHING while fewer than two AI providers are activated — a lone provider
+        // chip is decoration, and beside the composer's model picker it read as a
+        // second, competing control. CI activates exactly ONE provider, so "no
+        // selector at all" is the real contract there; branch on the true provider
+        // count the way the assertions below branch on the true `configured` flags.
+        // The model chip is asserted first so the absence below is read against a
+        // composer whose controls have actually mounted. It is NOT a fetch gate:
+        // `selectedProvider` is seeded from localStorage with DEFAULT_AI_PROVIDER,
+        // so ChatModelSelector renders before providers.ai[] lands. The absence is
+        // sound anyway — with one provider the selector never renders at any point,
+        // so there is no later state for this to race against.
+        if (aiProviders.length < 2) {
+            await expect(
+                page.getByTestId('chat-model-selector'),
+                'the composer control row has mounted',
+            ).toBeVisible({ timeout: 30_000 });
+            await expect(
+                page.getByRole('button', { name: new RegExp(escapeRegExp(activeName!), 'i') }),
+                'a single-provider account gets no selector trigger',
+            ).toHaveCount(0);
+            await expect(
+                page.getByText('AI Assistant', { exact: true }),
+                'and no provider dropdown to open',
+            ).toHaveCount(0);
+            return;
+        }
+
         const selectorTrigger = page
             .getByRole('button', { name: new RegExp(escapeRegExp(activeName!), 'i') })
             .first();
@@ -330,14 +363,14 @@ test.describe('AI Chat — round-trip adaptive (composer + reset + selector)', (
                 page.getByText(PROVIDER_NOT_CONFIGURED_BADGE).first(),
                 'an unconfigured provider shows the Not-configured badge',
             ).toBeVisible({ timeout: 10_000 });
-            // Scope to the dropdown ROW, never the selector TRIGGER. In CI the only
-            // AI provider (openrouter) is BOTH unconfigured AND the active provider, so
-            // its name ("OpenRouter") labels two buttons: the trigger (DOM-first, only
-            // `pointer-events-none` while streaming — never the HTML `disabled` attr) and
-            // the disabled dropdown row. A bare `.first()` resolves to the enabled trigger,
-            // so `toBeDisabled()` fails ("unconfigured provider row is disabled"). Only the
-            // row carries the "Not configured" badge text inside the same <button>, so
-            // requiring that text uniquely targets the actual disabled row.
+            // Scope to the dropdown ROW, never the selector TRIGGER. When no provider is
+            // configured the ACTIVE provider is itself unconfigured, so its name labels two
+            // buttons: the trigger (DOM-first, only `pointer-events-none` while streaming —
+            // never the HTML `disabled` attr) and the disabled dropdown row. A bare
+            // `.first()` resolves to the enabled trigger, so `toBeDisabled()` fails
+            // ("unconfigured provider row is disabled"). Only the row carries the
+            // "Not configured" badge text inside the same <button>, so requiring that text
+            // uniquely targets the actual disabled row.
             const disabledRow = page
                 .getByRole('button', {
                     name: new RegExp(escapeRegExp(unconfiguredProviders[0].name), 'i'),

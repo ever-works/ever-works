@@ -199,6 +199,27 @@ export class AgentPluginNpmSource {
             // check. 424 (Failed Dependency) matches the code-plugin
             // installer's mapping for "the artefact is not what was promised".
             const pinned = allow.entry?.integrity?.trim();
+
+            // A pin with nothing to compare against is a pin that did not
+            // happen. If the registry response carries no `_integrity`, the
+            // old check simply skipped — and `extract` below then omitted the
+            // `integrity` option too, so the tarball was written with NO
+            // verification at all. The operator asked for exactly one
+            // artefact; silently accepting any is the opposite of that.
+            if (pinned && !manifest._integrity) {
+                throw new HttpException(
+                    {
+                        statusCode: HttpStatus.FAILED_DEPENDENCY,
+                        message:
+                            `The allowlist pins an integrity for "${packageName}", but the ` +
+                            `registry returned no integrity to check it against. Refusing ` +
+                            `rather than fetching an unverified artefact.`,
+                        packageName,
+                    },
+                    HttpStatus.FAILED_DEPENDENCY,
+                );
+            }
+
             if (pinned && manifest._integrity && pinned !== manifest._integrity) {
                 throw new HttpException(
                     {

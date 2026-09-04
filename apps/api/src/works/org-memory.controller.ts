@@ -249,10 +249,13 @@ export class ListMemoryUploadsDto {
  *
  * **Org resolution + security.** Unlike the per-Work KB routes, Memory
  * is session-scoped: the Organization comes from the request SCOPE
- * CONTEXT (`ScopeContextService.getOrganizationId()`), which the
- * `SessionScopeGuard` seeds from the authenticated user's validated
- * last-active Org on these legacy un-prefixed routes — never from a
- * query/body param. When no Organization is resolvable (bare-Tenant
+ * CONTEXT (`ScopeContextService.getOrganizationId()`) — never from a
+ * query/body param. That scope is resolved from the `/api/<slug>/…` path
+ * param or the `x-scope-slug` header, BOTH CALLER-SUPPLIED. It is NOT
+ * seeded from the user's last-active Org: commit 8f28edca0 (2026-08-23)
+ * retired that fallback so two tabs in different Orgs cannot race, and
+ * `SessionScopeGuard` now seeds `organizationId: null` on an unprefixed
+ * request. When no Organization is resolvable (bare-Tenant
  * "personal" surface, or an un-upgraded user) the endpoint returns an
  * EMPTY aggregation — there is no unscoped or cross-tenant scan (spec
  * §2.1 / §7). As defense-in-depth we also assert org membership via the
@@ -353,12 +356,28 @@ export class OrgMemoryController {
             };
         }
 
-        // Defense-in-depth: the caller must belong to the Tenant that owns
-        // the active org. The scope was seeded from the user's own
-        // validated last-active Org, so this is normally a formality — but
-        // it keeps the authorization explicit and consistent with the
-        // sibling org-KB routes. Throws NotFound (not Forbidden) on a
-        // cross-tenant mismatch, matching the existence-leak contract.
+        // Two DIFFERENT gates, and conflating them gets one of them wrong.
+        //
+        // `ScopeOwnershipGuard` (registered APP_GUARD in `api.module.ts`) already
+        // rejects a cross-TENANT slug: it compares `request.user.tenantId`
+        // against the resolved scope and throws 403. A caller cannot reach
+        // another tenant's Memory by naming its slug.
+        //
+        // That guard checks tenantId ONLY. Within a single tenant the scope is
+        // still built from a caller-supplied `x-scope-slug` (or `/api/<slug>/…`),
+        // so any member of this tenant can name any Organization inside it. What
+        // stops them reading an Org they do not belong to is THIS call, and only
+        // this call — a different rule from the ownership guard, not a restatement
+        // of it. It must not be weakened or reordered after the aggregation.
+        //
+        // (This comment previously said the check was "normally a formality"
+        // because the scope was "seeded from the user's own validated last-active
+        // Org" — 8f28edca0 retired that seeding. A later revision over-corrected
+        // the other way, claiming any authenticated user can name ANY
+        // Organization; the tenant guard above is why that is not so.)
+        //
+        // Throws NotFound (not Forbidden) on a mismatch, matching the
+        // existence-leak contract.
         await this.membership.ensureMember(organizationId, auth.userId);
 
         return this.kb.aggregateOrgMemory(organizationId, {

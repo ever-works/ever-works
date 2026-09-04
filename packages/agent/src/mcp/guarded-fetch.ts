@@ -1,4 +1,12 @@
-import { safeFetchWithDnsPin, SsrfBlockedError, type DnsResolver } from '../utils/ssrf-guard';
+import { isIP } from 'node:net';
+import { lookup as dnsLookup } from 'node:dns/promises';
+import {
+    isPrivateIPv4,
+    isPrivateIPv6,
+    isSafeWebhookUrl,
+    SsrfBlockedError,
+    type DnsResolver,
+} from '../utils/ssrf-guard';
 
 /**
  * SSRF- and redirect-hardened `fetch` for the MCP client (AP-15).
@@ -51,6 +59,149 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
  */
 const REWRITE_TO_GET = new Set([301, 302, 303]);
 
+/**
+ * Resolve a host, validate every address, and CONNECT TO THE ONE VALIDATED.
+ *
+ * `safeFetchWithDnsPin` does the first two steps correctly — it rejects the
+ * lookup if any returned address is private — and then calls
+ * `fetch(rawUrl, init)`, which resolves the hostname AGAIN. Its own docstring
+ * says as much: it "closes the obvious half of that race". The half left open
+ * is the one that matters: a name the attacker controls can answer publicly
+ * for the validation lookup and privately for the connection a moment later,
+ * and nothing in between notices.
+ *
+ * Pinning closes it by taking the address out of the connection's hands. The
+ * URL, and therefore the `Host` header and the TLS SNI, are untouched — so
+ * certificate validation still happens against the hostname, and a pinned
+ * connection to a host presenting the wrong certificate still fails.
+ *
+ * A literal-IP URL skips DNS entirely: there is no name to rebind, and the
+ * lexical guard has already judged the address.
+ */
+export async function pinnedFetch(
+    url: string,
+    init: RequestInit | undefined,
+    resolver: DnsResolver | undefined,
+): Promise<Response> {
+    if (!isSafeWebhookUrl(url)) {
+        throw new SsrfBlockedError('lexical_blocked', 'URL rejected by lexical SSRF guard');
+    }
+
+    const parsed = new URL(url);
+    let host = parsed.hostname.toLowerCase();
+    if (host.startsWith('[') && host.endsWith(']')) {
+        host = host.slice(1, -1);
+    }
+
+    // A literal address was already judged above and cannot be rebound.
+    if (isIP(host) !== 0) {
+        return fetch(url, init);
+    }
+
+    let addresses: { address: string; family: number }[];
+    try {
+        addresses = resolver
+            ? await resolver(host)
+            : await dnsLookup(host, { all: true, verbatim: true });
+    } catch (err) {
+        throw new SsrfBlockedError(
+            'dns_lookup_failed',
+            `DNS lookup failed for ${host}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+    }
+
+    if (!Array.isArray(addresses) || addresses.length === 0) {
+        throw new SsrfBlockedError(
+            'dns_no_results',
+            `DNS lookup returned no addresses for ${host}`,
+        );
+    }
+
+    // EVERY address, not the one we happen to pick. A response mixing a public
+    // and a private record would otherwise pass whenever the public one is
+    // chosen, which is a coin toss rather than a control.
+    for (const entry of addresses) {
+        if (entry.family === 4 && isPrivateIPv4(entry.address)) {
+            throw new SsrfBlockedError(
+                'dns_private_ip',
+                `${host} resolved to private IPv4 ${entry.address}`,
+            );
+        }
+        if (entry.family === 6 && isPrivateIPv6(entry.address)) {
+            throw new SsrfBlockedError(
+                'dns_private_ip',
+                `${host} resolved to private IPv6 ${entry.address}`,
+            );
+        }
+    }
+
+    return pinnedConnect(url, init, addresses[0]);
+}
+
+/**
+ * Connect with the socket pinned to one already-validated address.
+ *
+ * Split out from {@link pinnedFetch} so the dispatcher's lifetime is testable.
+ * `pinnedFetch` runs `isSafeWebhookUrl` first, which refuses loopback — so a
+ * test cannot drive the real function against a local server, and every test
+ * therefore injected `fetchImpl` and exercised none of this. That is exactly
+ * how the bug below survived.
+ *
+ * The caller is responsible for validating `pinned`; this function performs no
+ * SSRF checks of its own.
+ */
+export async function pinnedConnect(
+    url: string,
+    init: RequestInit | undefined,
+    pinned: { address: string; family: number },
+): Promise<Response> {
+    const { Agent } = await import('undici');
+    const dispatcher = new Agent({
+        connect: {
+            // Hand back only the address just validated. undici still uses the
+            // URL's hostname for SNI and the Host header, so TLS verification
+            // is unchanged.
+            lookup: (
+                _hostname: string,
+                _options: unknown,
+                callback: (err: Error | null, address: string, family: number) => void,
+            ) => callback(null, pinned.address, pinned.family),
+        },
+    });
+
+    let response: Response;
+    try {
+        response = await fetch(url, { ...init, dispatcher } as RequestInit);
+    } catch (err) {
+        // No response, so nothing can be streaming: tear the pool down now
+        // rather than waiting for a request that will never complete.
+        void dispatcher.destroy().catch(() => undefined);
+        throw err;
+    }
+
+    // Deliberately NOT awaited, and this is the whole point.
+    //
+    // `close()` resolves only once every in-flight request has finished, and a
+    // request is not finished until its response body has been consumed — which
+    // cannot happen until this function returns the Response to its caller.
+    // `await dispatcher.close()` in a `finally` therefore deadlocks: the close
+    // waits for the body, the body waits for the return, the return waits for
+    // the close.
+    //
+    // It hid beautifully. A small response fits the socket buffer and completes
+    // before `close()` is called, so it passes; a 200 KB body hangs forever, and
+    // an SSE stream — which never ends by design — hangs on connect. Every unit
+    // test injected `fetchImpl`, so none of them ran this line.
+    //
+    // Fire-and-forget is correct rather than merely convenient: `close()` is
+    // graceful, so the pool drains after the body is consumed and the socket is
+    // released then. Callers that discard a response must cancel its body, or
+    // the request stays pending and this never resolves — see the redirect path
+    // in `createGuardedFetch`.
+    void dispatcher.close().catch(() => undefined);
+    return response;
+}
+
 export interface GuardedFetchOptions {
     /** Injected in tests so no DNS or network is required. */
     dnsResolver?: DnsResolver;
@@ -75,12 +226,7 @@ function headerEntries(init: RequestInit | undefined): [string, string][] {
 export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFetch {
     const doFetch =
         options.fetchImpl ??
-        ((url: string, init?: RequestInit) =>
-            safeFetchWithDnsPin(
-                url,
-                init,
-                options.dnsResolver ? { dnsResolver: options.dnsResolver } : undefined,
-            ));
+        ((url: string, init?: RequestInit) => pinnedFetch(url, init, options.dnsResolver));
 
     return async function guardedFetch(input, init) {
         let currentUrl = typeof input === 'string' ? input : input.toString();
@@ -101,6 +247,13 @@ export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFe
                 return response;
             }
 
+            // Past this point the response is discarded in favour of the
+            // redirect target, so cancel its body. An unread body leaves the
+            // request pending, which keeps the pinned dispatcher's `close()`
+            // from ever resolving and holds the socket open for the life of
+            // the process — one leaked pool per redirect hop.
+            void response.body?.cancel().catch(() => undefined);
+
             if (hop === MAX_REDIRECTS) {
                 throw new SsrfBlockedError(
                     'lexical_blocked',
@@ -111,15 +264,18 @@ export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFe
             const target = new URL(location, currentUrl);
 
             if (target.origin !== origin) {
-                // Cross-origin: forward the method and nothing else. See the
+                // Cross-origin: forward nothing the caller supplied. See the
                 // class docstring — an allow-list cannot tell a secret header
                 // from a benign one by its name.
-                currentInit = {
-                    method: REWRITE_TO_GET.has(response.status)
-                        ? 'GET'
-                        : (currentInit.method ?? 'GET'),
-                    redirect: 'manual',
-                };
+                //
+                // The body goes too, and that forces the method. A 307/308
+                // preserves the method by definition, so keeping POST while
+                // dropping the body would send a bodyless POST to a host the
+                // caller never addressed — a request neither side asked for,
+                // and one a server may act on. Dropping to GET makes the hop
+                // a plain retrieval, which is the only thing that can be said
+                // to be safe without the caller's data.
+                currentInit = { method: 'GET', redirect: 'manual' };
             } else if (REWRITE_TO_GET.has(response.status)) {
                 currentInit = {
                     ...currentInit,

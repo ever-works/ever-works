@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { AgentPluginInstallService, sourceRefFor } from './install.service';
 import type { AgentPluginPackageRepository } from './package.repository';
 import type { AgentPluginRemoteAcquireService } from './remote-acquire.service';
+import type { PackageMcpReconcilerService } from './package-mcp-reconciler.service';
+import type { AgentPluginPackageDataDirService } from './package-data-dir.service';
 import type { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
 
 function row(over: Partial<AgentPluginPackage> = {}): AgentPluginPackage {
@@ -23,7 +25,9 @@ function row(over: Partial<AgentPluginPackage> = {}): AgentPluginPackage {
     } as AgentPluginPackage;
 }
 
-function build(over: { rows?: AgentPluginPackage | null; acquire?: jest.Mock } = {}) {
+function build(
+    over: { rows?: AgentPluginPackage | null; acquire?: jest.Mock; reconcile?: jest.Mock } = {},
+) {
     const repository = {
         findById: jest.fn().mockResolvedValue(over.rows === undefined ? row() : over.rows),
         deleteById: jest.fn().mockResolvedValue(undefined),
@@ -53,7 +57,28 @@ function build(over: { rows?: AgentPluginPackage | null; acquire?: jest.Mock } =
             }),
     } as unknown as AgentPluginRemoteAcquireService & { acquire: jest.Mock };
 
-    return { repository, acquirer, service: new AgentPluginInstallService(repository, acquirer) };
+    const reconciler = {
+        reconcile:
+            over.reconcile ??
+            jest.fn().mockResolvedValue({
+                created: [],
+                unchanged: [],
+                updated: [],
+                skipped: [],
+            }),
+    } as unknown as PackageMcpReconcilerService & { reconcile: jest.Mock };
+
+    const dataDirs = {
+        remove: jest.fn().mockResolvedValue(undefined),
+    } as unknown as AgentPluginPackageDataDirService & { remove: jest.Mock };
+
+    return {
+        repository,
+        acquirer,
+        reconciler,
+        dataDirs,
+        service: new AgentPluginInstallService(repository, acquirer, reconciler, dataDirs),
+    };
 }
 
 describe('sourceRefFor', () => {
@@ -130,6 +155,52 @@ describe('AgentPluginInstallService', () => {
         ).rejects.toThrow('rejected');
 
         expect(repository.upsertInstalled).not.toHaveBeenCalled();
+    });
+
+    it('reconciles MCP declarations after a successful install', async () => {
+        const { service, reconciler } = build();
+
+        await service.install({ kind: 'npm', packageName: 'acme-skills' }, { userId: 'owner' });
+
+        // This is the production caller the reconciler was missing. Without
+        // it, package MCP declarations never became connection rows outside
+        // tests — the same dead-seam shape as `checkForUpdates`.
+        // Scoped to the package JUST INSTALLED, and carrying the owner's
+        // tenancy. The packages root is shared across the deployment, so a
+        // reconcile of everything under it would mint rows for this owner
+        // pointing at other tenants' packages' servers.
+        expect(reconciler.reconcile).toHaveBeenCalledWith(
+            { userId: 'owner', tenantId: null, organizationId: null },
+            'acme.tools',
+        );
+    });
+
+    it('does NOT fail the install when reconciliation fails', async () => {
+        const { service, repository } = build({
+            reconcile: jest.fn().mockRejectedValue(new Error('db down')),
+        });
+
+        // The package and its skills are already on disk and valid, and
+        // connections can be reconciled again later. Losing a good install
+        // over a connection row would be the wrong trade.
+        await expect(
+            service.install({ kind: 'npm', packageName: 'acme-skills' }, { userId: 'owner' }),
+        ).resolves.toMatchObject({ name: 'acme.tools' });
+        expect(repository.upsertInstalled).toHaveBeenCalled();
+    });
+
+    it('removes the package data directory on uninstall', async () => {
+        const { service, dataDirs } = build();
+
+        await service.remove(row().id, 'owner');
+
+        // Leaving it behind would hand the next install of the same package
+        // a directory of state it never wrote, and would keep the bytes after
+        // a user believed they had removed the package.
+        expect(dataDirs.remove).toHaveBeenCalledWith({
+            userId: 'owner',
+            packageName: 'acme.tools',
+        });
     });
 
     describe('remove', () => {

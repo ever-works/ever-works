@@ -16,6 +16,9 @@ import { AgentPluginUpdateService } from './update.service';
 import { AgentPluginInstallService } from './install.service';
 import { McpServerConfigService } from './mcp-server-config.service';
 import { PackageMcpReconcilerService } from './package-mcp-reconciler.service';
+import { AgentPluginPackageDataDirService } from './package-data-dir.service';
+import { AgentPluginStdioServerService } from './stdio-server.service';
+import { AgentPluginExportService } from './export.service';
 import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 
 /**
@@ -56,6 +59,9 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
         AgentPluginInstallService,
         McpServerConfigService,
         PackageMcpReconcilerService,
+        AgentPluginPackageDataDirService,
+        AgentPluginStdioServerService,
+        AgentPluginExportService,
         // Provided locally rather than by importing `McpModule`, which would
         // pull ActivityLogModule and its transitive imports into what the
         // docstring above promises is a LEAF module. `McpModule` provides this
@@ -84,6 +90,9 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
         AgentPluginInstallService,
         McpServerConfigService,
         PackageMcpReconcilerService,
+        AgentPluginPackageDataDirService,
+        AgentPluginStdioServerService,
+        AgentPluginExportService,
         AGENT_PLUGIN_SKILL_SOURCE,
     ],
 })

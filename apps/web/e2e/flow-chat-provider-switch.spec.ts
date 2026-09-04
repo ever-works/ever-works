@@ -701,9 +701,22 @@ test.describe('Chat provider switch — configured gate, switch routing, record 
         // the confusion this gate removes. Most accounts activate exactly one
         // provider, so "hidden" is the common case and the assertions below
         // branch on the real count rather than assuming the chip is there.
+        // The dropdown header is the i18n `title` = exactly "AI Assistant". Match it
+        // EXACTLY: the panel also renders `welcomeTitle` ("Welcome to AI Assistant 👋"),
+        // so a substring match counts the welcome heading as a dropdown that is not there.
         if (seededProviders.length < 2) {
+            // The header only exists while the menu is OPEN, so its absence alone
+            // would also hold for a wrongly-rendered chip nobody clicked. Assert the
+            // TRIGGER is absent too — that is the control the gate removes (same
+            // pairing as flow-chat-roundtrip-adaptive.spec.ts).
             await expect(
-                page.getByText('AI Assistant', { exact: false }),
+                page.getByRole('button', {
+                    name: new RegExp(orForSeeded?.name ?? 'OpenRouter', 'i'),
+                }),
+                'a single-provider account gets no selector trigger',
+            ).toHaveCount(0);
+            await expect(
+                page.getByText('AI Assistant', { exact: true }),
                 'a single-provider account gets no provider dropdown at all',
             ).toHaveCount(0);
             return;
@@ -720,8 +733,10 @@ test.describe('Chat provider switch — configured gate, switch routing, record 
         await expect(triggerOrLabel.first()).toBeVisible({ timeout: 30_000 });
 
         // Open the dropdown (DEV hydration race: the first click can be swallowed
-        // pre-hydration — retry until the menu's section header is visible).
-        const menuHeader = page.getByText('AI Assistant', { exact: false }).first();
+        // pre-hydration — retry until the menu's section header is visible). Exact
+        // again: the always-visible "Welcome to AI Assistant 👋" heading would
+        // satisfy a substring match before the menu ever opened.
+        const menuHeader = page.getByText('AI Assistant', { exact: true }).first();
         await expect(async () => {
             await triggerOrLabel
                 .first()
