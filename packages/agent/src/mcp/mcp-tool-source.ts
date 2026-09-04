@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Agent } from '../entities/agent.entity';
 import type { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import type { AgentToolDescriptor, AgentToolParameterSchema } from '../agents/agent-tool.service';
 import type { AgentMcpToolSource } from '../agents/agent-mcp-tool-source';
+import { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
+import { PluginUsageCapability } from '../entities/plugin-usage-event.entity';
 import { McpClientService, type McpToolInfo } from './mcp-client.service';
 import { McpConnectionsService } from './mcp-connections.service';
 
@@ -35,7 +37,49 @@ export class McpToolSource implements AgentMcpToolSource {
     constructor(
         private readonly connections: McpConnectionsService,
         private readonly client: McpClientService,
+        // @Optional() so every existing construction of this class keeps
+        // working and so a context without a database still builds tools.
+        // Usage accounting is an observation, never a precondition for a tool
+        // being callable.
+        @Optional()
+        private readonly usage?: PluginUsageRepository,
     ) {}
+
+    /**
+     * Record one MCP tool invocation (T28).
+     *
+     * Best-effort in two distinct senses, both deliberate:
+     *
+     * - It NEVER throws into the tool call. An accounting failure that broke
+     *   a working tool would trade a complete ledger for a broken agent, which
+     *   is the wrong way round.
+     * - It records only when the agent has a `workId`. `plugin_usage_events`
+     *   requires one, and an agent scoped to a Mission or Idea has none.
+     *   Making that column nullable is a migration on a table five other
+     *   capabilities write to, which is a larger change than this feature
+     *   should make on its own — so unscoped agents are simply not counted,
+     *   and that is stated rather than hidden.
+     */
+    private async recordInvocation(agent: Agent, connection: McpServerConnection): Promise<void> {
+        if (!this.usage || !agent.workId) return;
+        try {
+            await this.usage.record({
+                workId: agent.workId,
+                userId: agent.userId,
+                pluginId: `mcp:${connection.name}`.slice(0, 128),
+                capability: PluginUsageCapability.MCP,
+                units: 1,
+                costCents: 0,
+                metadata: { connectionId: connection.id, source: connection.source },
+            });
+        } catch (err) {
+            this.logger.debug(
+                `Usage accounting failed for MCP tool call on "${connection.name}": ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+    }
 
     async buildTools(agent: Agent): Promise<AgentToolDescriptor[]> {
         if (!agent.permissions?.canCallExternalTools) return [];
@@ -69,7 +113,7 @@ export class McpToolSource implements AgentMcpToolSource {
                 continue;
             }
             for (const tool of tools) {
-                const descriptor = this.toDescriptor(connection, tool);
+                const descriptor = this.toDescriptor(agent, connection, tool);
                 if (!descriptor) continue;
                 if (seen.has(descriptor.name)) {
                     this.logger.warn(
@@ -87,6 +131,7 @@ export class McpToolSource implements AgentMcpToolSource {
     // ── internals ─────────────────────────────────────────────────
 
     private toDescriptor(
+        agent: Agent,
         connection: McpServerConnection,
         tool: McpToolInfo,
     ): AgentToolDescriptor | null {
@@ -129,7 +174,17 @@ export class McpToolSource implements AgentMcpToolSource {
             invoke: async (args: unknown) => {
                 const record =
                     args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
-                return this.client.callTool(connection, tool.name, record);
+                const result = await this.client.callTool(connection, tool.name, record);
+                // Started but NOT awaited. The helper swallows its own
+                // rejections, but `repository.save()` can still stall — and a
+                // stalled write would hold a successful tool response open,
+                // making accounting a latency and availability dependency of
+                // every tool call. It is an observation; it must not sit in
+                // the response path.
+                //
+                // After the call, so a failed tool is not counted as usage.
+                void this.recordInvocation(agent, connection);
+                return result;
             },
         };
     }

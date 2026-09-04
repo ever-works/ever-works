@@ -447,13 +447,13 @@ export class PluginUsageRepository {
             const occurredAt =
                 row.occurredAt instanceof Date ? row.occurredAt : new Date(row.occurredAt);
             const day = occurredAt.toISOString().slice(0, 10);
-            const key = `${day} ${row.agentId ?? ''}`;
+            const key = `${day}\0${row.agentId ?? ''}`;
             byDayAgent.set(key, (byDayAgent.get(key) ?? 0) + Number(row.costCents ?? 0));
         }
 
         return Array.from(byDayAgent.entries())
             .map(([key, costCents]) => {
-                const [day, agentId] = key.split(' ');
+                const [day, agentId] = key.split('\0');
                 return { day, agentId: agentId === '' ? null : agentId, costCents };
             })
             .sort((a, b) => a.day.localeCompare(b.day));

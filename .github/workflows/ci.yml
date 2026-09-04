@@ -123,6 +123,37 @@ jobs:
           echo "::error title=Dependency audit failed::pnpm audit reported HIGH/CRITICAL production vulnerabilities (or an unexpected error). See the output above."
           exit "$code"
 
+  # T9 — an ORACLE, not a gate. `skills-ref` is the reference library for
+  # Agent Skills; running it over our fixture corpus answers a question our own
+  # tests cannot: does our reading of the specification match somebody else's?
+  #
+  # `continue-on-error` is the whole point. The two tools do not answer the same
+  # question — ours validates a PACKAGE and reports per-skill findings without
+  # rejecting the package, theirs validates one skill — so a difference is
+  # information, not a defect. And `skills-ref` is at 0.1.1; pinning merges to a
+  # young external tool's opinion would hand it a veto.
+  skills-oracle:
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install the reference library
+        run: pip install --quiet skills-ref==0.1.1
+
+      - name: Cross-check the fixture corpus
+        run: python packages/agent-plugins/scripts/oracle-check.py packages/agent-plugins/fixtures
+
+
   lint-and-test:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 

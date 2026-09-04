@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
-import { mkdir, rename, rm } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { loadPluginPackage, type LoadPluginPackageResult } from '@ever-works/agent-plugins';
 import { AgentPluginGitSource, gitPackageDir } from './git-source';
 import { AgentPluginNpmSource, npmPackageDir } from './npm-source';
@@ -117,16 +117,30 @@ export class AgentPluginRemoteAcquireService {
             // which is not known until the clone completes. The staging
             // directory is derived from the ref so two concurrent acquisitions
             // of different refs cannot collide in it.
-            const staging = gitPackageDir(root, input.url, `staging-${stagingKey(input.ref)}`);
+            // A UNIQUE staging directory per operation. A deterministic one —
+            // keyed on url and ref — means two concurrent installs of the
+            // same source share a tree: each wipes the other's partial clone,
+            // and whichever renames second finds nothing to move. `mkdtemp`
+            // makes the collision impossible rather than unlikely.
+            const stagingParent = gitPackageDir(root, input.url, '.staging');
+            await mkdir(stagingParent, { recursive: true });
+            const staging = await mkdtemp(join(stagingParent, `${stagingKey(input.ref)}-`));
             const result = await this.gitSource.acquire({
                 url: input.url,
                 destDir: staging,
                 ...(input.ref ? { ref: input.ref } : {}),
             });
             const final = gitPackageDir(root, input.url, result.resolvedSha);
-            await rm(final, { recursive: true, force: true });
-            await mkdir(dirname(final), { recursive: true });
-            await rename(staging, final);
+            try {
+                await rm(final, { recursive: true, force: true });
+                await mkdir(dirname(final), { recursive: true });
+                await rename(staging, final);
+            } finally {
+                // If the rename never happened, the staging tree would sit in
+                // the packages root where the directory scanner would find and
+                // load it as if it were an installed package.
+                await rm(staging, { recursive: true, force: true }).catch(() => undefined);
+            }
             return { destDir: final, revision: result.resolvedSha, integrity: null };
         }
 

@@ -133,6 +133,28 @@ export function usesPluginData(config: McpServerConfig): boolean {
     return values.some((value) => value.includes(PLUGIN_DATA_PLACEHOLDER));
 }
 
+/**
+ * Work out how a package reached this deployment, from where it sits.
+ *
+ * The resolver scans DIRECTORIES and has no registry access, so it cannot ask
+ * the database — but it does not need to: the acquirers place remote packages
+ * at `<root>/git/<encoded-url>/<sha>` and `<root>/npm/<encoded-name>/<version>`,
+ * and nothing else writes there. Reporting every package as `local`, as this
+ * did, hands an audit or policy consumer false provenance — the one field
+ * whose whole job is to say where something came from.
+ *
+ * Falls back to `local`, which is right for a directory an operator populated
+ * themselves and is the safe answer when the shape is unrecognised.
+ */
+export function sourceKindFromPath(packagePath: string): 'local' | 'git' | 'npm' {
+    const segments = packagePath.split(/[\\/]/u);
+    // The marker is the grandparent of the package directory: `git/<url>/<sha>`.
+    const marker = segments[segments.length - 3];
+    if (marker === 'git') return 'git';
+    if (marker === 'npm') return 'npm';
+    return 'local';
+}
+
 @Injectable()
 export class McpServerConfigService {
     private readonly logger = new Logger(McpServerConfigService.name);
@@ -230,13 +252,27 @@ export class McpServerConfigService {
             };
         }
 
-        if (usesPluginData(entry.config)) {
+        // `${PLUGIN_DATA}` is per (owner, package), and this resolver has no
+        // owner — it answers "what does this package declare", not "what will
+        // this user run". So it cannot supply the value, and the right
+        // behaviour depends on who can:
+        //
+        // - a STDIO server is expanded by the launcher, which does know the
+        //   owner, so the placeholder is left INTACT here for it to resolve;
+        // - a REMOTE server has no launcher. A `${PLUGIN_DATA}` in a URL or a
+        //   header is unresolvable by anyone, so it is refused.
+        //
+        // This previously refused BOTH, with the reason "this deployment does
+        // not yet allocate a per-package data directory" — true when it was
+        // written and false once T29 landed, which would have rejected a
+        // perfectly good stdio package for a stale reason.
+        if (entry.transport !== 'stdio' && usesPluginData(entry.config)) {
             return {
                 name: entry.name,
                 packageName,
                 reason:
-                    'The server references ${PLUGIN_DATA}, and this deployment does not yet ' +
-                    'allocate a per-package data directory.',
+                    'A remote server references ${PLUGIN_DATA}, which only a launched ' +
+                    'subprocess can resolve — nothing can supply it for a URL or header.',
                 code: 'needs-plugin-data',
                 enableable: false,
             };
@@ -252,24 +288,30 @@ export class McpServerConfigService {
                 packageRoot: pkg.path,
                 packageVersion: pkg.version ?? null,
                 specVersion: pkg.specVersion ?? 'unknown',
-                // Only local packages are scanned from disk today; git and npm
-                // packages land in a scanned directory too, so this widens
-                // when the registry row is consulted here.
-                sourceKind: 'local',
+                sourceKind: sourceKindFromPath(pkg.path),
             },
         };
     }
 
     /**
-     * Substitute `${PLUGIN_ROOT}`.
+     * Substitute `${PLUGIN_ROOT}`, and deliberately leave `${PLUGIN_DATA}`
+     * alone.
      *
-     * `pluginData` is passed as an empty string, which is safe ONLY because
-     * `usesPluginData` has already refused any config that mentions it — the
-     * expansion helpers substitute unconditionally rather than reporting an
-     * unresolvable placeholder, so the guard has to come first.
+     * The expansion helpers substitute BOTH placeholders unconditionally —
+     * they have no notion of "leave this one". Passing the placeholder as its
+     * own replacement is what makes the substitution a no-op, so a stdio
+     * config reaches the launcher with `${PLUGIN_DATA}` still in it and the
+     * launcher resolves it against the real per-(owner, package) directory.
+     *
+     * Passing an empty string here, as this once did, silently turned
+     * `${PLUGIN_DATA}/db.sqlite` into `/db.sqlite` — an absolute path at the
+     * filesystem root.
      */
     private expand(config: McpServerConfig, packageRoot: string): McpServerConfig {
-        const context: ExpansionContext = { pluginRoot: packageRoot, pluginData: '' };
+        const context: ExpansionContext = {
+            pluginRoot: packageRoot,
+            pluginData: PLUGIN_DATA_PLACEHOLDER,
+        };
 
         if (config.type === 'stdio') {
             return {

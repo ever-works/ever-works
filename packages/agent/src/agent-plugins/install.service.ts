@@ -5,6 +5,8 @@ import { acquireInputFor } from './package-bootstrap.service';
 import { config } from '../config';
 import { AgentPluginPackageRepository } from './package.repository';
 import { AgentPluginRemoteAcquireService, type AcquireInput } from './remote-acquire.service';
+import { PackageMcpReconcilerService } from './package-mcp-reconciler.service';
+import { AgentPluginPackageDataDirService } from './package-data-dir.service';
 import type { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
 
 /**
@@ -32,6 +34,8 @@ export class AgentPluginInstallService {
     constructor(
         private readonly repository: AgentPluginPackageRepository,
         private readonly acquirer: AgentPluginRemoteAcquireService,
+        private readonly reconciler: PackageMcpReconcilerService,
+        private readonly dataDirs: AgentPluginPackageDataDirService,
     ) {}
 
     async install(
@@ -72,6 +76,41 @@ export class AgentPluginInstallService {
             skillNames: pkg.skills.map((skill) => skill.name),
             mcpServerNames: pkg.mcpServers.map((server) => server.name),
         });
+
+        // Reconcile the package's MCP declarations into connection rows.
+        //
+        // This is the caller `PackageMcpReconcilerService` was missing. A
+        // reconciler nothing invokes is a feature that exists only in its own
+        // tests — the same dead-seam shape as `checkForUpdates`, which sat on
+        // the plugin contract with no production caller until this programme
+        // wired it.
+        //
+        // Failure does NOT fail the install: the package and its skills are
+        // already on disk and valid, and connections can be reconciled again
+        // later. Losing a good install over a connection row is the wrong
+        // trade.
+        try {
+            const outcome = await this.reconciler.reconcile(
+                {
+                    userId: owner.userId,
+                    tenantId: owner.tenantId ?? null,
+                    organizationId: owner.organizationId ?? null,
+                },
+                pkg.manifest.name,
+            );
+            if (outcome.created.length > 0) {
+                this.logger.log(
+                    `Created ${outcome.created.length} package MCP connection(s), ` +
+                        `disabled and unbound pending explicit authorisation.`,
+                );
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Package installed, but MCP reconciliation failed: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
 
         this.logger.log(
             `Installed ${input.kind} package "${pkg.manifest.name}" for ${owner.userId}`,
@@ -115,6 +154,13 @@ export class AgentPluginInstallService {
         }
 
         await this.repository.deleteById(id);
+
+        // The package's writable data goes with it. Leaving it behind would
+        // hand the next install of the same package under the same owner a
+        // directory of state it never wrote — and would keep the bytes after
+        // a user believed they had removed the package.
+        await this.dataDirs.remove({ userId: row.userId, packageName: row.name });
+
         if (row.installPath) {
             await rm(row.installPath, { recursive: true, force: true }).catch((err: unknown) => {
                 // The row is already gone, so the package is no longer
