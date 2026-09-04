@@ -12,6 +12,7 @@ import type {
 	FleetAgentTaskStep,
 	FleetJobView,
 	FleetTaskWorkspaceDescriptor,
+	FleetTaskWorkspaceMountDescriptor,
 	FleetTaskWorkspaceSpec,
 	TaskCheckResult
 } from '@ever-works/contracts';
@@ -35,6 +36,7 @@ import {
 	type AgentTaskQuestionFs
 } from './agent-task-question';
 import {
+	assertMountGrantsInCommand,
 	buildModelCliCommand,
 	buildModelCliStep,
 	ModelCliCommandError,
@@ -283,7 +285,14 @@ export async function runAgentTaskJob(
 	const failures: string[] = [];
 	let model: FleetAgentTaskModelResult | null = null;
 	if (execution) {
-		model = await runModelStep(job.id, execution, workspaceResolution.path, io, signal);
+		model = await runModelStep(
+			job.id,
+			execution,
+			workspaceResolution.path,
+			workspaceResolution.descriptor?.mounts,
+			io,
+			signal
+		);
 		throwIfAgentTaskAborted(signal);
 		if (model.status !== 'succeeded') {
 			failures.push(describeModelFailure(model));
@@ -425,11 +434,20 @@ function resolveAcceptanceChecks(payload: FleetAgentTaskPayload): WireCheck[] {
  * through the shared command runner with stdin/stdout redirected onto
  * scratch files, parse what it wrote. Scratch is removed afterwards,
  * best-effort — the worktree itself is never touched by this function.
+ *
+ * `mounts` comes straight from the provisioned descriptor: the CLI is
+ * confined to its cwd, and a multi-repo Task's extra repositories live
+ * OUTSIDE that tree (only linked into it), so they have to be granted
+ * explicitly or every cross-repository edit fails silently. The built
+ * command is then checked to actually carry that grant before it is
+ * spawned — see {@link assertMountGrantsInCommand} for why the check
+ * cannot live at provision time.
  */
 async function runModelStep(
 	jobId: string,
 	execution: FleetAgentModelExecution,
 	workspacePath: string,
+	mounts: readonly FleetTaskWorkspaceMountDescriptor[] | undefined,
 	io: AgentTaskIo,
 	signal?: AbortSignal
 ): Promise<FleetAgentTaskModelResult> {
@@ -455,6 +473,17 @@ async function runModelStep(
 				executable,
 				workspacePath,
 				scratch,
+				...(mounts && mounts.length > 0 ? { mounts } : {}),
+				...(io.platform ? { platform: io.platform } : {})
+			});
+			// Last gate before the spawn: the grant has to be in the string
+			// that is actually run, not merely computed. Nothing downstream
+			// can tell a discarded cross-repository edit from a model that
+			// chose not to make one, so a missing grant fails the job here.
+			assertMountGrantsInCommand({
+				command,
+				execution,
+				...(mounts && mounts.length > 0 ? { mounts } : {}),
 				...(io.platform ? { platform: io.platform } : {})
 			});
 		} catch (error) {
