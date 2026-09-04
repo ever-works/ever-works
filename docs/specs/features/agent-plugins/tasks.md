@@ -243,7 +243,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
 - [x] **T37**. User-facing docs page `docs/features/agent-plugins.md` +
       sidebar entry in `apps/docs/sidebarsPlatform.ts`; internal docs stay
       off-nav.
-- [ ] **T38**. Desktop staging (`prepare-bundle.js` + `<userData>/agent-plugins`
+- [x] **T38**. Desktop staging (`prepare-bundle.js` + `<userData>/agent-plugins`
       default source) + headless-node XDG dir.
 - [x] **T39**. apps/mcp whitelist decision: expose `agent-plugins` management
       tools or document out-of-scope.
