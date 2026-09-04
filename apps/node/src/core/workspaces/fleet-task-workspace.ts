@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from '@ever-works/contracts';
 import { execFileWithVerifiedCancellation, LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
-import type { IWorkspacePlugin, WorkspaceHandle } from '@ever-works/plugin';
+import type { IWorkspacePlugin, WorkspaceHandle, WorkspacePublishFence } from '@ever-works/plugin';
 
 export type FleetTaskWorkspaceErrorCode =
 	| 'invalid-root'
@@ -39,6 +39,21 @@ export interface FleetTaskWorkspaceFinalizeResult {
 	headSha: string | null;
 	empty: boolean;
 	changedFiles?: number;
+	/** Set when the commit landed locally but the push was fenced off; names why. */
+	publishWithheld?: string;
+}
+
+/** Options for {@link FleetTaskWorkspaceProvisioner.finalize}. */
+export interface FleetTaskWorkspaceFinalizeOptions {
+	commitMessage: string;
+	push: boolean;
+	/**
+	 * The job lease this finalize is running under. Absent means "no claim
+	 * to check" and the publish proceeds as it always did; present, it is
+	 * the node's own answer to "may I still write to this branch?" when the
+	 * platform cannot be asked.
+	 */
+	publishFence?: WorkspacePublishFence;
 }
 
 export interface FleetTaskWorkspaceProvisionerOptions {
@@ -210,7 +225,7 @@ export class FleetTaskWorkspaceProvisioner {
 	async finalize(
 		taskId: string,
 		descriptor: FleetTaskWorkspaceDescriptor,
-		opts: { commitMessage: string; push: boolean },
+		opts: FleetTaskWorkspaceFinalizeOptions,
 		signal?: AbortSignal
 	): Promise<FleetTaskWorkspaceFinalizeResult> {
 		if (!this.plugin.finalize) {
@@ -261,14 +276,22 @@ export class FleetTaskWorkspaceProvisioner {
 				},
 				// The signal rides into every Git call the provider makes, so a
 				// lease lost mid-push cannot leave the branch pushed behind the
-				// cancelled run's back.
-				{ commitMessage, push: opts.push, ...(signal ? { signal } : {}) }
+				// cancelled run's back. The fence rides alongside it because an
+				// abort that arrives mid-push is already too late: the remote may
+				// have accepted the ref before the kill landed.
+				{
+					commitMessage,
+					push: opts.push,
+					...(signal ? { signal } : {}),
+					...(opts.publishFence ? { publishFence: opts.publishFence } : {})
+				}
 			);
 			return {
 				pushed: result.pushed,
 				headSha: result.headSha,
 				empty: result.empty,
-				...(result.changedFiles === undefined ? {} : { changedFiles: result.changedFiles })
+				...(result.changedFiles === undefined ? {} : { changedFiles: result.changedFiles }),
+				...(result.publishWithheld === undefined ? {} : { publishWithheld: result.publishWithheld })
 			};
 		} catch (error) {
 			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;

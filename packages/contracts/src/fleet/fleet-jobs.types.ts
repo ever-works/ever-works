@@ -602,6 +602,17 @@ export interface FleetAgentTaskGitResult {
 	changedFiles?: number;
 	/** Set when commit/push failed; the run is reported as failed. */
 	error?: string;
+	/**
+	 * Set when the commit landed on the local branch but the push was
+	 * deliberately withheld because the node's lease on this job had run
+	 * out (or was about to). Distinct from `error` on purpose: nothing is
+	 * broken in Git, the node simply refused to write to a task branch it
+	 * may no longer own, and `headSha` names the commit the next attempt
+	 * can resume from. The run is still reported as failed — the branch
+	 * did not reach the remote — but the operator is told why rather than
+	 * being sent after a phantom Git fault.
+	 */
+	publishWithheld?: string;
 }
 
 /**

@@ -14,6 +14,7 @@ import type {
 	FleetTaskWorkspaceSpec,
 	TaskCheckResult
 } from '@ever-works/contracts';
+import type { WorkspacePublishFence } from '@ever-works/plugin';
 import {
 	FLEET_AGENT_TASK_MAX_STEPS,
 	FleetAgentExecutionError,
@@ -125,9 +126,35 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	finalizeWorkspace?: (
 		taskId: string,
 		descriptor: FleetTaskWorkspaceDescriptor,
-		opts: { commitMessage: string; push: boolean },
+		opts: { commitMessage: string; push: boolean; publishFence?: WorkspacePublishFence },
 		signal?: AbortSignal
-	) => Promise<{ pushed: boolean; headSha: string | null; empty: boolean; changedFiles?: number }>;
+	) => Promise<{
+		pushed: boolean;
+		headSha: string | null;
+		empty: boolean;
+		changedFiles?: number;
+		publishWithheld?: string;
+	}>;
+	/**
+	 * The lease deadline this run is publishing under, resolved as LATE as
+	 * possible — right before the commit/push — because the keep-alive
+	 * advances it on every renewal and a model step outlives four or five
+	 * of those. Absent on callers that hold no lease, which is exactly the
+	 * shape the cloud runner has, and then the push is unfenced as before.
+	 *
+	 * Async because resolving it re-asks the platform whether this node
+	 * still holds the claim. That question needs the network, so its answer
+	 * is a bonus, not the guarantee: the deadline it returns is fenced
+	 * against locally either way.
+	 */
+	publishFence?: () => Promise<WorkspacePublishFence | null> | WorkspacePublishFence | null;
+	/**
+	 * Called when the provider declined to publish. The caller decides what
+	 * that means for the JOB — this executor only reports it — because a run
+	 * that produced no branch has not reached a verdict anyone should record
+	 * as terminal.
+	 */
+	onPublishWithheld?: (reason: string) => void;
 	/** Model CLIs this node may drive, resolved once at startup. */
 	modelCli?: ModelCliPaths;
 	/** Root for per-job scratch files (instructions / CLI output). */
@@ -220,6 +247,12 @@ export async function runAgentTaskJob(
 		git = await finalizeWorkspace(taskId, workspaceResolution.descriptor, payload, io, signal);
 		if (git.error) {
 			failures.push(`git finalize failed: ${git.error}`);
+		} else if (git.publishWithheld) {
+			// Named apart from a git failure on purpose: nothing is broken,
+			// the node declined to write a branch it may no longer own, and
+			// the operator needs to read that rather than debug Git.
+			failures.push(`publish withheld: ${git.publishWithheld}`);
+			io.onPublishWithheld?.(git.publishWithheld);
 		}
 	}
 	throwIfAgentTaskAborted(signal);
@@ -341,11 +374,23 @@ async function finalizeWorkspace(
 		typeof payload.git?.commitMessage === 'string' && payload.git.commitMessage.trim()
 			? payload.git.commitMessage.trim()
 			: defaultAgentTaskCommitMessage(taskId);
+	// Resolved here rather than at job start: the lease this run began on
+	// has been renewed several times over by the time a model step is done,
+	// and fencing against the stale value would refuse every long run.
+	const publishFence = (await io.publishFence?.()) ?? null;
+	// Resolving the fence can itself learn the claim is gone and cancel the
+	// run. Check before touching the repository rather than leaving it to
+	// the provider: an abort that arrives here means no commit is wanted.
+	throwIfAgentTaskAborted(signal);
 	try {
 		const finalized = await io.finalizeWorkspace(
 			taskId,
 			descriptor,
-			{ commitMessage, push: payload.git?.push !== false },
+			{
+				commitMessage,
+				push: payload.git?.push !== false,
+				...(publishFence ? { publishFence } : {})
+			},
 			signal
 		);
 		return {
@@ -353,7 +398,8 @@ async function finalizeWorkspace(
 			headSha: finalized.headSha,
 			empty: finalized.empty,
 			pushed: finalized.pushed,
-			...(finalized.changedFiles === undefined ? {} : { changedFiles: finalized.changedFiles })
+			...(finalized.changedFiles === undefined ? {} : { changedFiles: finalized.changedFiles }),
+			...(finalized.publishWithheld === undefined ? {} : { publishWithheld: finalized.publishWithheld })
 		};
 	} catch (error) {
 		if (error instanceof Error && error.name === 'AbortError') throw error;

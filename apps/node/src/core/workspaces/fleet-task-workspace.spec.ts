@@ -462,6 +462,82 @@ describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent executi
 		}
 	});
 
+	it('forwards the publish fence to the provider and surfaces a withheld publish verbatim', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
+		const worktree = join(root, 'repositories', 'r', 'worktrees', 'fenced');
+		mkdirSync(worktree, { recursive: true });
+		const withheld = 'the lease on this work expired 12s ago';
+		const finalize = vi.fn(async (_handle: unknown, _opts: Record<string, unknown>) => ({
+			pushed: false,
+			headSha: SHA,
+			empty: false,
+			changedFiles: 4,
+			publishWithheld: withheld
+		}));
+		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		const publishFence = { deadlineAt: Date.parse('2026-09-04T15:00:00.000Z'), marginMs: 60_000 };
+		try {
+			const result = await provisioner.finalize(
+				'task-0001',
+				{
+					path: worktree,
+					repositoryId: 'ever/repository',
+					baseRef: 'main',
+					branch: 'task/fenced',
+					baseSha: SHA,
+					headSha: SHA,
+					reused: false
+				},
+				{ commitMessage: 'agent: fenced', push: true, publishFence }
+			);
+			expect(finalize.mock.calls[0][1]).toMatchObject({ publishFence });
+			expect(result).toEqual({
+				pushed: false,
+				headSha: SHA,
+				empty: false,
+				changedFiles: 4,
+				publishWithheld: withheld
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('omits the publish fence entirely when the caller holds no lease', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
+		const worktree = join(root, 'repositories', 'r', 'worktrees', 'unfenced');
+		mkdirSync(worktree, { recursive: true });
+		const finalize = vi.fn(async (_handle: unknown, _opts: Record<string, unknown>) => ({
+			pushed: true,
+			headSha: SHA,
+			empty: false
+		}));
+		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		try {
+			const result = await provisioner.finalize(
+				'task-0001',
+				{
+					path: worktree,
+					repositoryId: 'ever/repository',
+					baseRef: 'main',
+					branch: 'task/unfenced',
+					baseSha: SHA,
+					headSha: SHA,
+					reused: false
+				},
+				{ commitMessage: 'agent: unfenced', push: true }
+			);
+			// No `publishFence` key at all, not an undefined one: the provider
+			// must take the same path a lease-free caller has always taken.
+			expect(Object.keys(finalize.mock.calls[0][1]).sort()).toEqual(['commitMessage', 'push']);
+			expect(result).toEqual({ pushed: true, headSha: SHA, empty: false });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
 	it('reports a provider without commit support instead of pretending to push', async () => {
 		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
 		try {

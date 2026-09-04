@@ -216,6 +216,77 @@ describe('runAgentTaskJob — model-cli execution', () => {
 		);
 	});
 
+	it('passes the lease fence into finalize and names a withheld publish in the run report', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		const fence = { deadlineAt: Date.parse('2026-09-04T13:00:00.000Z'), marginMs: 60_000 };
+		const withheld = 'the lease on this work expired 12s ago';
+		const onPublishWithheld = vi.fn();
+		const io = baseIo({
+			spawnFn,
+			// Async on purpose: resolving the fence re-asks the platform
+			// whether this node still holds the claim.
+			publishFence: async () => fence,
+			onPublishWithheld,
+			finalizeWorkspace: vi.fn(async () => ({
+				pushed: false,
+				headSha: 'c'.repeat(40),
+				empty: false,
+				changedFiles: 2,
+				publishWithheld: withheld
+			}))
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		expect(io.finalizeWorkspace).toHaveBeenCalledWith(
+			't1',
+			descriptor,
+			{ commitMessage: 'feat(task): t1 agent run output', push: true, publishFence: fence },
+			undefined
+		);
+		// The run FAILS — the branch never reached the remote — but the reason
+		// reads "publish withheld", not "git finalize failed": nothing is broken
+		// in Git, and headSha names the commit the next attempt resumes from.
+		expect(outcome.status).toBe('failed');
+		expect(outcome.failureReason).toBe(`publish withheld: ${withheld}`);
+		// And the caller is TOLD, so it can decide the job was never run to a
+		// verdict rather than settling it terminally with no branch pushed.
+		expect(onPublishWithheld).toHaveBeenCalledExactlyOnceWith(withheld);
+		expect(outcome.git).toEqual({
+			branch: 'task/t1-fix',
+			baseSha: 'a'.repeat(40),
+			headSha: 'c'.repeat(40),
+			empty: false,
+			pushed: false,
+			changedFiles: 2,
+			publishWithheld: withheld
+		});
+	});
+
+	it('reads the lease deadline AFTER the model step, not when the job was leased', async () => {
+		const { commands, spawnFn } = recordingSpawn([]);
+		const commandsAtFenceTime: string[] = [];
+		const publishFence = vi.fn(() => {
+			commandsAtFenceTime.push(...commands);
+			return { deadlineAt: Date.parse('2026-09-04T14:00:00.000Z'), marginMs: 60_000 };
+		});
+		const onPublishWithheld = vi.fn();
+		const io = baseIo({ spawnFn, publishFence, onPublishWithheld });
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		expect(publishFence).toHaveBeenCalledTimes(1);
+		// A push that LANDED is an ordinary success: nothing was withheld, so
+		// the job settles exactly as it did before the fence existed.
+		expect(onPublishWithheld).not.toHaveBeenCalled();
+		expect(outcome.status).toBe('succeeded');
+		// The model and the acceptance check had both already run, so the
+		// deadline read is the one the keep-alive has since renewed — reading
+		// it at job start would fence against a value four renewals stale.
+		expect(commandsAtFenceTime).toEqual(commands);
+		expect(commandsAtFenceTime).toHaveLength(2);
+	});
+
 	it('skips the commit entirely when the policy says so', async () => {
 		const { spawnFn } = recordingSpawn([]);
 		const io = baseIo({ spawnFn });

@@ -70,11 +70,79 @@ export interface WorkspaceHandle {
 	readonly bindingKey: string;
 }
 
+/**
+ * Optional lease fence for the PUBLISH step of a finalize.
+ *
+ * A fleet node holds a job on a lease, not a lock: the platform re-offers
+ * the work as soon as the lease lapses, and it can do that while the old
+ * node is still running — a closed lid, a dropped Wi-Fi link, a machine
+ * that woke up an hour late. Cancellation reaches the node's Git calls,
+ * but cancelling a `git push` cannot retract a ref the remote already
+ * accepted, so two nodes on the same task branch collide: one push lands,
+ * the other is rejected non-fast-forward, and the operator sees the
+ * failure on whichever run actually owned the lease.
+ *
+ * So the caller hands down the instant its claim expires, on its OWN
+ * clock, and the provider refuses to START a publish it cannot finish
+ * inside that claim. This is deliberately network-independent: during a
+ * partition the node cannot ask the platform who owns the job, which is
+ * exactly when it most needs to know.
+ *
+ * Callers with no lease (the cloud runner) omit this entirely and the
+ * publish path is byte-for-byte what it was.
+ */
+export interface WorkspacePublishFence {
+	/**
+	 * Epoch-ms instant, on the CALLER's clock, at which its claim on this
+	 * work expires and the work may be handed to someone else.
+	 *
+	 * Callers whose claim was issued by a SERVER own the translation: an
+	 * expiry minted on another machine's clock and compared against this
+	 * one's is only as good as the skew between them, and a clock that runs
+	 * slow makes every deadline look further away than it is. Cap it
+	 * against something the caller measured itself before passing it here.
+	 */
+	readonly deadlineAt: number;
+	/**
+	 * How much of the claim must still remain for a push to be allowed to
+	 * start — the push's own duration budget. A push is not instantaneous:
+	 * a first push of an agent's diff over a home uplink takes seconds to
+	 * minutes, and every one of those seconds is time the remote may accept
+	 * a ref this node no longer owns.
+	 *
+	 * This gates the START of a publish and cannot bound its completion: a
+	 * push that begins inside the margin and then runs long still straddles
+	 * the deadline. Size it from what a push of this repository actually
+	 * costs on this link, not from a number that felt safe.
+	 */
+	readonly marginMs: number;
+}
+
+/** Options for {@link IWorkspacePlugin.finalize}. */
+export interface WorkspaceFinalizeOptions {
+	commitMessage: string;
+	push: boolean;
+	auth?: WorkspaceProvisionSpec['auth'];
+	/** Cancels the Git operations in flight. */
+	signal?: AbortSignal;
+	/** Lease deadline the publish must fit inside; see {@link WorkspacePublishFence}. */
+	publishFence?: WorkspacePublishFence;
+}
+
 export interface WorkspaceFinalizeResult {
 	pushed: boolean;
 	headSha: string | null;
 	/** True when there was nothing to commit (clean tree). */
 	empty: boolean;
+	/**
+	 * Set ONLY when the commit succeeded but the push was deliberately
+	 * withheld because the caller's {@link WorkspacePublishFence} had run
+	 * out. Names the reason so the run report says "publish withheld"
+	 * rather than sending an operator hunting a phantom Git fault — the
+	 * commit and the branch are intact locally and the next attempt
+	 * resumes from them.
+	 */
+	publishWithheld?: string;
 	/**
 	 * How many distinct files the branch changed relative to the base it
 	 * was cut from (`git diff --name-only <baseSha>..HEAD`), i.e. the
@@ -121,11 +189,13 @@ export interface IWorkspacePlugin extends IPlugin {
 	 * `signal` (optional) aborts the Git operations in flight — a caller
 	 * that was cancelled mid-finalize must not have the branch pushed
 	 * behind its back. Providers that predate the field ignore it.
+	 *
+	 * `publishFence` (optional) is the stronger guarantee cancellation
+	 * cannot give: an abort races a push that the remote may already have
+	 * accepted, so a leased caller also states when its claim expires and
+	 * the provider declines to start a publish that would outlive it.
 	 */
-	finalize(
-		handle: WorkspaceHandle,
-		opts: { commitMessage: string; push: boolean; auth?: WorkspaceProvisionSpec['auth']; signal?: AbortSignal }
-	): Promise<WorkspaceFinalizeResult>;
+	finalize(handle: WorkspaceHandle, opts: WorkspaceFinalizeOptions): Promise<WorkspaceFinalizeResult>;
 
 	/**
 	 * In-memory merge of the branch against a FRESH targetRef. On

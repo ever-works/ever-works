@@ -272,6 +272,14 @@ export class FleetJobRepository {
      * sits idle for up to a full lease TTL per job. Requeuing them makes
      * the drain immediate. `attempts` is deliberately NOT incremented —
      * the operator withdrew the node, the job did not fail.
+     *
+     * Note what this does to a node that is still RUNNING the work: its
+     * claim is gone here while its own copy of `leaseExpiresAt` is still
+     * minutes in the future, so no deadline it holds locally can tell it
+     * to stop. Nothing on this side can fix that — the safety comes from
+     * the node re-asking (`heartbeat` → 401 → abort) immediately before
+     * any irreversible write, which is why `apps/node` confirms the claim
+     * at the moment it publishes rather than trusting its own deadline.
      */
     async releaseClaimsForNode(userId: string, nodeId: string): Promise<number> {
         const result = await this.repository.update(
