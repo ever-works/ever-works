@@ -12,6 +12,7 @@ import {
 	FLEET_AGENT_EXECUTION_MODES,
 	FLEET_AGENT_EXECUTION_PROVIDERS,
 	FleetAgentExecutionError,
+	fleetAgentExecutionProviderSupportsMountGrants,
 	isFleetAgentExecutionMode,
 	isFleetAgentExecutionProvider,
 	normalizeFleetAgentModelExecution
@@ -47,6 +48,19 @@ describe('fleet agent execution contract', () => {
 		expect(isFleetAgentExecutionProvider(undefined)).toBe(false);
 		expect(isFleetAgentExecutionMode('model-cli')).toBe(true);
 		expect(isFleetAgentExecutionMode('shell')).toBe(false);
+	});
+
+	it('states which providers can be granted an additional writable root', () => {
+		// Multi-repo Task workspaces (self-build slice C): a mount is only
+		// LINKED into the primary worktree, so a provider that cannot be
+		// handed the mount's real path can never write it. Both shipped CLIs
+		// spell the grant `--add-dir`; a provider added to the vocabulary
+		// without one must answer `false` here so the planner and the node
+		// refuse the Task instead of running a job that silently no-ops.
+		for (const provider of FLEET_AGENT_EXECUTION_PROVIDERS) {
+			expect(fleetAgentExecutionProviderSupportsMountGrants(provider)).toBe(true);
+		}
+		expect(fleetAgentExecutionProviderSupportsMountGrants('gemini' as never)).toBe(false);
 	});
 
 	describe('normalizeFleetAgentModelExecution', () => {

@@ -91,6 +91,7 @@ const AGENT_EXECUTION_EXPORTS = [
 	'FLEET_AGENT_EXECUTION_PROVIDERS',
 	'DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER',
 	'isFleetAgentExecutionProvider',
+	'fleetAgentExecutionProviderSupportsMountGrants',
 	'FLEET_AGENT_EXECUTION_MODES',
 	'DEFAULT_FLEET_AGENT_EXECUTION_MODE',
 	'isFleetAgentExecutionMode',
@@ -163,6 +164,7 @@ const FUNCTION_EXPORTS = [
 	'isFleetEnrollableNodeKind',
 	'summarizeRunnerStatus',
 	'isFleetAgentExecutionProvider',
+	'fleetAgentExecutionProviderSupportsMountGrants',
 	'isFleetAgentExecutionMode',
 	'isFleetAgentExecutionEffort',
 	'isFleetAgentExecutionPermissionMode',
@@ -186,12 +188,12 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 91 runtime symbols', () => {
+	it('exposes exactly these 92 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(91);
+		expect(Object.keys(fleet)).toHaveLength(92);
 	});
 
 	it.each([

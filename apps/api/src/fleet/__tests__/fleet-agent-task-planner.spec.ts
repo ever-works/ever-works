@@ -8,11 +8,33 @@ import {
 import type { Agent, Task } from '@ever-works/agent/entities';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import { TaskRepository, TaskStatus, TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
-import { FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES } from '@ever-works/contracts';
+import {
+    FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES,
+    fleetAgentExecutionProviderSupportsMountGrants,
+} from '@ever-works/contracts';
 import {
     FleetAgentTaskPlanError,
     FleetAgentTaskPlannerService,
 } from '../fleet-agent-task-planner.service';
+
+/**
+ * Both shipped providers CAN be granted an additional writable root
+ * (`--add-dir`), so the refusal path below is only reachable through the
+ * predicate itself. Mocked as a pass-through, then flipped for the one test
+ * that stands in for "a provider is added to the vocabulary without a way to
+ * grant a mount" — the case that must fail loudly instead of dispatching a
+ * run whose cross-repository edits are silently dropped.
+ */
+jest.mock('@ever-works/contracts', () => {
+    const actual = jest.requireActual('@ever-works/contracts');
+    return {
+        ...actual,
+        fleetAgentExecutionProviderSupportsMountGrants: jest.fn(
+            actual.fleetAgentExecutionProviderSupportsMountGrants,
+        ),
+    };
+});
+const supportsMountGrants = fleetAgentExecutionProviderSupportsMountGrants as unknown as jest.Mock;
 
 /**
  * Agent execution v2 — the planner.
@@ -603,6 +625,63 @@ describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow
         expect(text).toContain('which files (per repository)');
         // The single-repository wording is not used for a multi-repo workspace.
         expect(text).not.toContain('touch other repositories: when you finish');
+        // A supported provider is never refused for having mounts.
+        expect(supportsMountGrants).toHaveBeenCalledWith('claude-code');
+    });
+
+    it('refuses a multi-repo Task when the provider cannot be granted a writable root', async () => {
+        // A mount is provisioned OUTSIDE the primary worktree and only linked
+        // into it, so a provider that cannot be handed the mount's real path
+        // reads every repository and silently writes none of them. Refusing at
+        // plan time records the reason on the run row; dispatching would burn a
+        // model budget and open one pull request instead of one per repository.
+        process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        taskWorkspace.describeFleetWorkspace.mockResolvedValue({
+            ...workspace,
+            mounts: [
+                {
+                    repositoryId: 'ever-works/directory-web-template',
+                    repoUrl: 'https://github.com/ever-works/directory-web-template.git',
+                    baseRef: 'develop',
+                    branch: 'task/task-1-tsk-7',
+                    mountDir: 'template',
+                    writable: true,
+                },
+            ],
+        });
+        supportsMountGrants.mockImplementationOnce(() => false);
+
+        await expect(build().plan(payload)).rejects.toBeInstanceOf(FleetAgentTaskPlanError);
+        expect(supportsMountGrants).toHaveBeenCalledWith('claude-code');
+    });
+
+    it('plans a Task whose only extra repositories are read-only, whatever the provider can grant', async () => {
+        // `writable: false` is a reference checkout: nothing is ever written to
+        // it, so no grant is needed and the Task must not be refused.
+        process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        taskWorkspace.describeFleetWorkspace.mockResolvedValue({
+            ...workspace,
+            mounts: [
+                {
+                    repositoryId: 'ever-works/workspace',
+                    repoUrl: 'https://github.com/ever-works/workspace.git',
+                    baseRef: 'main',
+                    branch: 'task/task-1-tsk-7',
+                    mountDir: 'kb',
+                    writable: false,
+                },
+            ],
+        });
+        supportsMountGrants.mockImplementation(() => false);
+        try {
+            await expect(build().plan(payload)).resolves.not.toBeNull();
+        } finally {
+            supportsMountGrants.mockReset();
+            supportsMountGrants.mockImplementation(
+                jest.requireActual('@ever-works/contracts')
+                    .fleetAgentExecutionProviderSupportsMountGrants,
+            );
+        }
     });
 });
 
