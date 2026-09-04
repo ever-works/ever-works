@@ -420,7 +420,19 @@ describe('createNodeRuntime — agent-task publish fence', () => {
 			await runtime.worker?.drained();
 			await runtime.worker?.stop();
 		} finally {
-			vi.doUnmock('./executors/agent-task');
+			// NOT `vi.doUnmock` here. In vitest 4 both doMock and doUnmock are
+			// fire-and-forget: each queues a DIFFERENT RPC and applies its side
+			// effect in completion order, not call order. So this teardown's
+			// pending unmock could land AFTER the next test's doMock and delete
+			// the stub it had just registered — the dynamic import then bound the
+			// REAL runAgentTaskJob, which throws AgentTaskPayloadError on the
+			// harness's stepless payload, so the loop POSTed /complete and
+			// `completedBodies` was non-empty. Failed ~1 run in 4 locally, and
+			// reddened lint-and-test on stage, develop and main at random.
+			//
+			// Dropping it is safe: resetModules() below discards the module graph,
+			// and the next withStubbedExecutor call issues its own doMock for this
+			// same path, which replaces the registration outright.
 			vi.resetModules();
 		}
 		return harness;
