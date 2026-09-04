@@ -29,8 +29,40 @@ const UNSCOPED_BFF_CALL =
 const UNSCOPED_XHR =
     'XMLHttpRequest cannot carry the x-ever-workspace selector unless you set it explicitly. Prefer browserApiFetch; if you need XHR for upload progress, call applyBrowserWorkspaceScope and setRequestHeader for each entry, and say so in a comment.';
 
+/**
+ * Turning the lint gate ON at today's level.
+ *
+ * Nothing ran ESLint in CI — the job is called `lint-and-test` but only did
+ * `format:check`, `build` and `test`. That is why 42 errors accumulated on
+ * `develop` unnoticed, and it would have made the rule above decorative: a
+ * guardrail nobody enforces is a comment.
+ *
+ * `ci.yml` now runs `pnpm lint`. To make that possible today without a large
+ * speculative refactor, the four rules currently failing are demoted to
+ * warnings, with their counts recorded so the backlog is visible and finite.
+ * Everything else — including the BFF rule above — is enforced from now on.
+ *
+ * These are NOT dismissed. `set-state-in-effect` catches render loops and the
+ * other three are real (a component created during render loses its state on
+ * every parent render). They are tracked in EW-790; the right way to clear them
+ * is a few at a time, each verified, not one sweep.
+ */
+const LINT_BACKLOG = {
+    // 39 occurrences. Each needs the effect restructured or the state derived;
+    // mechanical rewrites here risk changing render behaviour.
+    'react-hooks/set-state-in-effect': 'warn',
+    // 1 — TiptapEditor.tsx calls Date.now() during render.
+    'react-hooks/purity': 'warn',
+    // 1 — OrgChartClient.tsx declares a component inside render, so its state
+    // resets on every parent render. The most likely to be a live bug.
+    'react-hooks/static-components': 'warn',
+    // 1 — an anonymous component in a spec file.
+    'react/display-name': 'warn',
+};
+
 const eslintConfig = [
     ...nextCoreWebVitals,
+    { files: ['src/**/*.{ts,tsx}'], rules: LINT_BACKLOG },
     {
         files: ['src/**/*.{ts,tsx}'],
         ignores: [

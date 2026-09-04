@@ -198,6 +198,21 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      # This job has been called `lint-and-test` since it was written and did
+      # not lint. Nothing in any workflow ran ESLint, which is how 42 errors
+      # accumulated on `develop` unnoticed — and it would have made the new
+      # rule banning unscoped BFF calls decorative, since a guardrail nobody
+      # enforces is a comment.
+      #
+      # Like `format:check` above, this runs on EVERY run: it needs only the
+      # install, and a lint error should not wait for a 10-minute build to be
+      # reported. The four rules with an existing backlog are demoted to
+      # warnings in `apps/web/eslint.config.mjs` (see EW-790) so the gate can
+      # be switched on today rather than behind a large refactor; everything
+      # else is enforced from now on.
+      - name: Lint
+        run: pnpm lint
+
       # Decide whether the expensive half of this job is needed.
       #
       # `lint-and-test` is the ONLY required status check on main/develop/stage,
