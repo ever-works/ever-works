@@ -161,9 +161,9 @@ describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { ti
 		const excludeLines = (await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8'))
 			.split(/\r?\n/)
 			.map((line) => line.trim());
-		expect(excludeLines).toContain('/.mounts/');
-		expect(excludeLines).toContain('/.ever-works/');
-		expect(excludeLines).toContain('.ever-works/');
+		expect(excludeLines).toContain('/.mounts');
+		expect(excludeLines).toContain('/.ever-works');
+		expect(excludeLines).toContain('.ever-works');
 		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
 			expect(excludeLines.filter((line) => line === rule)).toHaveLength(1);
 		}
@@ -175,6 +175,42 @@ describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { ti
 			.map((line) => line.trim());
 		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
 			expect(again.filter((line) => line === rule)).toHaveLength(1);
+		}
+	});
+
+	/**
+	 * CI 2026-09-04, `lint-and-test` on #2297: provisioning a workspace with
+	 * NO mounts failed on Linux because `.mounts` existed as a symlink left by
+	 * an earlier run. Git treats a symlink as a FILE, so the then
+	 * slash-terminated `/​.mounts/` rule did not ignore it, `git check-ignore`
+	 * reported the rule ineffective and the provision threw. It passed on
+	 * Windows only because a junction reports as a directory there.
+	 *
+	 * A plain file reproduces the same condition on every platform, which is
+	 * what this pins — no symlink privilege required.
+	 */
+	it('ignores the fleet paths when they exist as a file, not a directory', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const descriptor = await provisioner.provision('task-0007', workspace('task/fleet-0007'));
+
+		for (const name of ['.mounts', '.ever-works']) {
+			writeFileSync(join(descriptor.path, name), 'not a directory\n');
+		}
+
+		// The rules must cover the file form, or the finalize's `git add -A`
+		// would commit whatever was left behind.
+		expect(git(descriptor.path, 'status', '--porcelain')).toBe('');
+		// And a re-provision, which re-verifies the rules, must still succeed.
+		await expect(provisioner.provision('task-0007', workspace('task/fleet-0007'))).resolves.toMatchObject({
+			path: descriptor.path
+		});
+	});
+
+	it('never writes a slash-terminated exclude rule', () => {
+		// The probes keep their slashes; the rules must not have them, or the
+		// file/symlink form above stops being covered.
+		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
+			expect(rule.endsWith('/')).toBe(false);
 		}
 	});
 

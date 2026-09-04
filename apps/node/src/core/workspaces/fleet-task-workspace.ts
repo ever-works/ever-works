@@ -73,8 +73,24 @@ export const FLEET_TASK_WORKSPACE_MOUNTS_DIR = '.mounts';
  * Written to the shared `info/exclude` of each repository the workspace
  * touches — primary and mounts alike.
  *
- * `/.mounts/` is anchored at the worktree root on purpose: a nested
- * `.mounts` directory is the owner's own. The owner-question directory is
+ * `/.mounts` is anchored at the worktree root on purpose: a nested
+ * `.mounts` directory is the owner's own.
+ *
+ * None of these rules is slash-terminated, and that is deliberate. Git
+ * treats a SYMLINK as a file, not a directory, so a directory-only `dir/`
+ * rule does not ignore a `.mounts` that exists as a link — which is exactly
+ * the state a previous run (or anything else sharing the service account)
+ * can leave behind, and which the provisioner refuses to write through
+ * rather than deleting. With the slash, `git check-ignore` then reported
+ * the rule ineffective and failed provisioning of a workspace that has no
+ * mounts at all (CI 2026-09-04, `lint-and-test` on #2297; it passed on
+ * Windows only because a junction reports as a directory there). Without
+ * the slash the rule covers the directory, the link and a plain file of
+ * that name, which is what "never commit this" actually means. The probes
+ * below keep their slashes: a slash-terminated pathname is still matched
+ * by an unslashed rule.
+ *
+ * The owner-question directory is
  * listed twice — anchored, where the OUTPUT CONTRACT tells the model to
  * write it, and UNANCHORED (review SR-5): a model that `cd`-ed into a
  * package of a monorepo and wrote `.ever-works/QUESTION.md` relative to
@@ -85,16 +101,17 @@ export const FLEET_TASK_WORKSPACE_MOUNTS_DIR = '.mounts';
  * safety net the first one promises.
  */
 export const FLEET_TASK_WORKSPACE_EXCLUDE_RULES: readonly string[] = [
-	`/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`,
-	`/${FLEET_AGENT_TASK_META_DIR}/`,
-	`${FLEET_AGENT_TASK_META_DIR}/`
+	`/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}`,
+	`/${FLEET_AGENT_TASK_META_DIR}`,
+	`${FLEET_AGENT_TASK_META_DIR}`
 ];
 
 /**
  * One path per exclude rule, in rule order, proven ignored through Git
  * after the rules are written (`ensureFleetExcluded`). Slash-terminated so
  * Git evaluates each as a directory whether or not it exists yet; the
- * nested probe is what proves the unanchored rule.
+ * nested probe is what proves the unanchored rule. The RULES themselves
+ * carry no trailing slash on purpose — see the rule list above.
  */
 const FLEET_TASK_WORKSPACE_EXCLUDE_PROBES: readonly string[] = [
 	`${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`,
