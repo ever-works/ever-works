@@ -6063,6 +6063,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "रिपॉज़िटरी",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -6077,6 +6078,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "एक मौजूदा कोड रिपॉज़िटरी Work के रूप में — टास्क, गोल और फ़्लीट रन इससे जुड़ते हैं। कुछ भी जनरेट या डिप्लॉय नहीं होता।",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6226,6 +6228,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "नया Work — रिपॉज़िटरी",
+                "formSubtitle": "एक मौजूदा कोड रिपॉज़िटरी को Work के रूप में रजिस्टर करें। कुछ भी जनरेट या डिप्लॉय नहीं होता — टास्क, गोल और फ़्लीट रन बस उसी रिपॉज़िटरी में काम करते हैं।",
+                "urlLabel": "रिपॉज़िटरी URL",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "कोई GitHub रिपॉज़िटरी जिस तक आपकी पहुँच हो। यह जैसी है वैसी ही Work की डेटा रिपॉज़िटरी बन जाती है।",
+                "nameLabel": "Work का नाम",
+                "slugLabel": "Work स्लग",
+                "slugHelp": "URL-अनुकूल पहचानकर्ता। रिपॉज़िटरी के नाम से बना — बदलने के लिए संपादित करें।",
+                "descriptionLabel": "विवरण",
+                "submitButton": "रिपॉज़िटरी रजिस्टर करें",
+                "creatingButton": "रजिस्टर हो रहा है…",
+                "cancelButton": "रद्द करें",
+                "invalidUrl": "https://github.com/owner/repo जैसा रिपॉज़िटरी URL दर्ज करें",
+                "success": "रिपॉज़िटरी Work के रूप में रजिस्टर हो गई",
+                "createFailed": "रिपॉज़िटरी रजिस्टर नहीं हो सकी",
+                "noteTitle": "नोट:",
+                "noteText": "रिपॉज़िटरी Work के लिए कोई वेबसाइट टेम्प्लेट, प्रोवाइडर रिपॉज़िटरी या डिप्लॉयमेंट नहीं बनता। रिपॉज़िटरी होस्ट करने वाला Git प्रोवाइडर कनेक्ट करें ताकि एजेंट उसे क्लोन कर सकें।"
             },
             "manual": {
                 "title": "मैन्युअल रूप से बनाएँ",
@@ -6469,14 +6490,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "रिपॉज़िटरी"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "एक मौजूदा कोड रिपॉज़िटरी Work के रूप में — टास्क, गोल और फ़्लीट रन इससे जुड़ते हैं। कुछ भी जनरेट या डिप्लॉय नहीं होता।"
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7964,6 +7987,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "रिपॉज़िटरी",
             "company": "Company",
             "campaign": "अभियान",
             "default": "Work"

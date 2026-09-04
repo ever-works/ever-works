@@ -8,6 +8,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { getWorkOwner } from '../../utils/work.utils';
 import { WebsiteTemplateResolverService } from './website-template-resolver.service';
+import { assertRepositoryRole } from '../../works/repository-work-guard';
 
 @Injectable()
 export class WebsiteUpdateService {
@@ -68,6 +69,13 @@ export class WebsiteUpdateService {
         commitSha?: string;
         branchSync?: BranchSyncSummary;
     }> {
+        // Every caller (the API entry point, DeployService, the template
+        // auto-update poller) funnels through here, so this is where a kind
+        // that provisions no website repository is turned away — before
+        // `getWebsiteRepo()` derives `<slug>-website` under an owner that
+        // may not be ours and `repositoryExists` goes looking for it.
+        assertRepositoryRole(work, 'website');
+
         const workOwner = getWorkOwner(work);
         const websiteOwner = work.getRepoOwner('website');
         const websiteRepo = work.getWebsiteRepo();

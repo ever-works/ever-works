@@ -6063,6 +6063,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Repozytorium",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -6077,6 +6078,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Istniejące repozytorium kodu jako Work — zadania, cele i uruchomienia floty są do niego przypisane. Nic nie jest generowane ani wdrażane.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6226,6 +6228,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Nowy Work — Repozytorium",
+                "formSubtitle": "Zarejestruj istniejące repozytorium kodu jako Work. Nic nie jest generowane ani wdrażane — zadania, cele i uruchomienia floty po prostu pracują w tym repozytorium.",
+                "urlLabel": "URL repozytorium",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Repozytorium GitHub, do którego masz dostęp. Staje się bez zmian repozytorium danych Worka.",
+                "nameLabel": "Nazwa Worka",
+                "slugLabel": "Slug Worka",
+                "slugHelp": "Identyfikator przyjazny dla URL. Pochodzi z nazwy repozytorium — edytuj, aby nadpisać.",
+                "descriptionLabel": "Opis",
+                "submitButton": "Zarejestruj repozytorium",
+                "creatingButton": "Rejestrowanie…",
+                "cancelButton": "Anuluj",
+                "invalidUrl": "Podaj URL repozytorium, np. https://github.com/owner/repo",
+                "success": "Repozytorium zarejestrowano jako Work",
+                "createFailed": "Nie udało się zarejestrować repozytorium",
+                "noteTitle": "Uwaga:",
+                "noteText": "Dla Worka typu Repozytorium nie jest tworzony szablon strony, repozytorium dostawcy ani wdrożenie. Połącz dostawcę Git hostującego repozytorium, aby agenci mogli je sklonować."
             },
             "manual": {
                 "title": "Utwórz ręcznie",
@@ -6469,14 +6490,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Repozytorium"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Istniejące repozytorium kodu jako Work — zadania, cele i uruchomienia floty są do niego przypisane. Nic nie jest generowane ani wdrażane."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7964,6 +7987,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Repozytorium",
             "company": "Company",
             "campaign": "Kampania",
             "default": "Work"

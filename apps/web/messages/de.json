@@ -6133,6 +6133,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Repository",
                 "company": "Company"
             },
             "chipDescriptions": {
@@ -6145,6 +6146,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Ein bestehendes Code-Repository als Work — Tasks, Goals und Fleet-Läufe hängen daran. Nichts wird generiert oder deployt.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6189,14 +6191,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Verzeichnis",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Repository"
             },
             "kindDescriptions": {
                 "website": "Eine mehrseitige Website für ein Unternehmen, eine Dienstleistung oder eine Marke — generierte Inhalte + Code.",
                 "landing-page": "Eine fokussierte One-Page-Seite — Wartelisten, Produktstarts, Webanmeldungen, Lead-Erfassung.",
                 "blog": "Ein Blog mit Kategorien, RSS, Code-Highlighting und SEO-optimierten Inhalten.",
                 "directory": "Eine kuratierte Verzeichnis-Website mit Suche, Filtern und strukturierten Artikeldaten.",
-                "awesome-repo": "Ein awesome-list Repo — Markdown-Index, kategorisierte Links und aktualisierbare Metadaten."
+                "awesome-repo": "Ein awesome-list Repo — Markdown-Index, kategorisierte Links und aktualisierbare Metadaten.",
+                "repo": "Ein bestehendes Code-Repository als Work — Tasks, Goals und Fleet-Läufe hängen daran. Nichts wird generiert oder deployt."
             },
             "promptHints": {
                 "minLength": "Fügen Sie eine Beschreibung (mindestens 10 Zeichen) hinzu, um zu beginnen.",
@@ -6317,6 +6321,25 @@
                 "organizationNameLabel": "Organisationsname",
                 "organizationNamePlaceholder": "Organisationsname eingeben",
                 "websiteTemplateHelperText": "Wählen Sie die Werk-Vorlage aus, die beim ersten Erstellen des Werk-Repositorys verwendet werden soll."
+            },
+            "repo": {
+                "formTitle": "Neues Work — Repository",
+                "formSubtitle": "Registriere ein bestehendes Code-Repository als Work. Nichts wird generiert oder deployt — Tasks, Goals und Fleet-Läufe arbeiten einfach in diesem Repository.",
+                "urlLabel": "Repository-URL",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Ein GitHub-Repository, auf das du Zugriff hast. Es wird unverändert zum Daten-Repository des Works.",
+                "nameLabel": "Work-Name",
+                "slugLabel": "Work-Slug",
+                "slugHelp": "URL-freundliche Kennung. Aus dem Repository-Namen abgeleitet — zum Überschreiben bearbeiten.",
+                "descriptionLabel": "Beschreibung",
+                "submitButton": "Repository registrieren",
+                "creatingButton": "Wird registriert…",
+                "cancelButton": "Abbrechen",
+                "invalidUrl": "Gib eine Repository-URL wie https://github.com/owner/repo ein",
+                "success": "Repository als Work registriert",
+                "createFailed": "Repository konnte nicht registriert werden",
+                "noteTitle": "Hinweis:",
+                "noteText": "Für ein Repository-Work werden weder Website-Template noch Provider-Repository noch Deployment angelegt. Verbinde den Git-Provider, der das Repository hostet, damit Agents es klonen können."
             },
             "manual": {
                 "title": "Manuell erstellen",
@@ -7994,6 +8017,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Repository",
             "company": "Company",
             "campaign": "Kampagne",
             "default": "Work"

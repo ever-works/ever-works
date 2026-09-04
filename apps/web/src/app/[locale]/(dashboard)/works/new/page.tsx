@@ -36,7 +36,14 @@ interface NewWorkPageProps {
 
 const KUBERNETES_DEPLOY_PROVIDER_ID = 'k8s';
 const VALID_CREATION_MODES: CreationMode[] = ['ai', 'manual', 'import'];
-const VALID_WORK_KINDS = ['website', 'landing-page', 'blog', 'directory', 'awesome-repo'] as const;
+const VALID_WORK_KINDS = [
+    'website',
+    'landing-page',
+    'blog',
+    'directory',
+    'awesome-repo',
+    'repo',
+] as const;
 type InitialWorkKind = (typeof VALID_WORK_KINDS)[number];
 
 export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {

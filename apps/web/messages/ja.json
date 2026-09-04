@@ -6063,6 +6063,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "リポジトリ",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -6077,6 +6078,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "既存のコードリポジトリを Work として登録 — タスク、ゴール、フリート実行がそこに紐づきます。生成もデプロイも行われません。",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6226,6 +6228,25 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "新しい Work — リポジトリ",
+                "formSubtitle": "既存のコードリポジトリを Work として登録します。生成もデプロイも行われません — タスク、ゴール、フリート実行はそのリポジトリ内で作業するだけです。",
+                "urlLabel": "リポジトリ URL",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "アクセスできる GitHub のリポジトリ。そのまま Work のデータリポジトリになります。",
+                "nameLabel": "Work 名",
+                "slugLabel": "Work スラッグ",
+                "slugHelp": "URL 用の識別子。リポジトリ名から生成されます — 変更する場合は編集してください。",
+                "descriptionLabel": "説明",
+                "submitButton": "リポジトリを登録",
+                "creatingButton": "登録中…",
+                "cancelButton": "キャンセル",
+                "invalidUrl": "https://github.com/owner/repo のようなリポジトリ URL を入力してください",
+                "success": "リポジトリを Work として登録しました",
+                "createFailed": "リポジトリの登録に失敗しました",
+                "noteTitle": "注意:",
+                "noteText": "リポジトリ Work にはウェブサイトテンプレート、プロバイダーリポジトリ、デプロイは作成されません。エージェントがクローンできるよう、リポジトリをホストする Git プロバイダーを接続してください。"
             },
             "manual": {
                 "title": "手動で作成",
@@ -6469,14 +6490,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "リポジトリ"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "既存のコードリポジトリを Work として登録 — タスク、ゴール、フリート実行がそこに紐づきます。生成もデプロイも行われません。"
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7964,6 +7987,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "リポジトリ",
             "company": "Company",
             "campaign": "キャンペーン",
             "default": "Work"

@@ -16,6 +16,7 @@ describe('WorkKindBadge', () => {
         ['blog', 'blog'],
         ['directory', 'directory'],
         ['awesome-repo', 'awesome-repo'],
+        ['repo', 'repo'],
         ['company', 'company'],
         ['default', 'default'],
     ])('renders the %s kind', (kind, expected) => {

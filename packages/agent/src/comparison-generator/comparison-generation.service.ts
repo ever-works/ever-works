@@ -8,6 +8,7 @@ import { ContentExtractorFacadeService } from '../facades/content-extractor.faca
 import { GitFacadeService, type GitFacadeOptions } from '../facades/git.facade';
 import { PromptFacadeService } from '../facades/prompt.facade';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { assertNotRepositoryWork } from '../works/repository-work-guard';
 import { WorkGenerationHistoryRepository } from '../database/repositories/work-generation-history.repository';
 import { WorkPluginRepository } from '../plugins/repositories/work-plugin.repository';
 import { WorkOwnershipService } from '../services/work-ownership.service';
@@ -402,6 +403,9 @@ export class ComparisonGenerationService {
         // scheduler passes the work's own creator id, so it always passes.
         await this.workOwnershipService.ensureCanEdit(workId, userId);
         const work = await this.findWorkOrFail(workId);
+        // Comparisons are written into the data repository — a Repository
+        // Work's is a code repository with no items to compare.
+        assertNotRepositoryWork(work, 'comparison generation');
         const lockToken = await this.tryAcquireGenerationLock(workId);
 
         if (!lockToken) {
@@ -521,6 +525,7 @@ export class ComparisonGenerationService {
         // generateNextComparison for the full rationale.
         await this.workOwnershipService.ensureCanEdit(workId, userId);
         const work = await this.findWorkOrFail(workId);
+        assertNotRepositoryWork(work, 'comparison generation');
         const lockToken = await this.tryAcquireGenerationLock(workId);
 
         if (!lockToken) {

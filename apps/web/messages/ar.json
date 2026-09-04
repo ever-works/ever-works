@@ -6133,6 +6133,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "مستودع",
                 "company": "Company"
             },
             "chipDescriptions": {
@@ -6145,6 +6146,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "مستودع كود موجود كعمل — ترتبط به المهام والأهداف وعمليات الأسطول. لا يتم توليد أو نشر أي شيء.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6189,14 +6191,16 @@
                 "landing-page": "صفحة هبوط",
                 "blog": "مدونة",
                 "directory": "دليل",
-                "awesome-repo": "مستودع رائع"
+                "awesome-repo": "مستودع رائع",
+                "repo": "مستودع"
             },
             "kindDescriptions": {
                 "website": "موقع متعدد الصفحات للأعمال أو الخدمات أو العلامات التجارية — محتوى مولد + كود.",
                 "landing-page": "صفحة مركزة — قوائم الانتظار، إطلاق المنتجات، تسجيلات الندوات، التقاط العملاء.",
                 "blog": "مدونة مع فئات، RSS، تمييز الكود، ومحتوى جاهز لمحركات البحث.",
                 "directory": "موقع دليل مختار مع بحث، فلتر، وبيانات عنصر منظم.",
-                "awesome-repo": "مستودق قائمة رائع — فهرس ماركداون، روابط مصنفة، وبيانات قابلة للتحديث."
+                "awesome-repo": "مستودق قائمة رائع — فهرس ماركداون، روابط مصنفة، وبيانات قابلة للتحديث.",
+                "repo": "مستودع كود موجود كعمل — ترتبط به المهام والأهداف وعمليات الأسطول. لا يتم توليد أو نشر أي شيء."
             },
             "promptHints": {
                 "minLength": "أضف وصفًا (على الأقل 10 أحرف) للبدء.",
@@ -6317,6 +6321,25 @@
                 "organizationNameLabel": "اسم المنظمة",
                 "organizationNamePlaceholder": "أدخل اسم المنظمة",
                 "websiteTemplateHelperText": "اختر قالب العمل الذي سيُستَخدم عند إنشاء مستودع العمل لأول مرة."
+            },
+            "repo": {
+                "formTitle": "عمل جديد — مستودع",
+                "formSubtitle": "سجّل مستودع كود موجودًا كعمل. لا يتم توليد أو نشر أي شيء — المهام والأهداف وعمليات الأسطول تعمل ببساطة في ذلك المستودع.",
+                "urlLabel": "رابط المستودع",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "مستودع GitHub يمكنك الوصول إليه. يصبح مستودع بيانات العمل كما هو.",
+                "nameLabel": "اسم العمل",
+                "slugLabel": "معرّف العمل",
+                "slugHelp": "معرّف صالح للرابط. مشتق من اسم المستودع — عدّله للتجاوز.",
+                "descriptionLabel": "الوصف",
+                "submitButton": "تسجيل المستودع",
+                "creatingButton": "جارٍ التسجيل…",
+                "cancelButton": "إلغاء",
+                "invalidUrl": "أدخل رابط مستودع مثل https://github.com/owner/repo",
+                "success": "تم تسجيل المستودع كعمل",
+                "createFailed": "فشل تسجيل المستودع",
+                "noteTitle": "ملاحظة:",
+                "noteText": "لا يتم إنشاء قالب موقع أو مستودع مزوّد أو نشر لعمل من نوع مستودع. اربط مزوّد Git الذي يستضيف المستودع حتى يتمكن الوكلاء من استنساخه."
             },
             "manual": {
                 "title": "إنشاء يدويًا",
@@ -7994,6 +8017,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "مستودع",
             "company": "Company",
             "campaign": "حملة",
             "default": "Work"

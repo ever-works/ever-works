@@ -31,6 +31,7 @@ import { NotificationService } from '@src/notifications/notification.service';
 import type { ScheduleRunOutcome } from './types/trigger-context.types';
 import { WorksConfigSyncRequestedEvent, type WorksConfigSyncReason } from '@src/events';
 import { supportsWorkSourceSync } from '@src/import/source-sync-support';
+import { assertNotRepositoryWork } from '@src/works/repository-work-guard';
 
 type WorkScheduleReadiness = {
     featureEnabled: boolean;
@@ -100,6 +101,14 @@ export class WorkScheduleService {
         this.ensureSchedulingEnabled();
         // Require editor role to update schedule
         const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+        // A Repository Work has nothing to schedule: every tick would end in
+        // the generator's 400 for the kind and be recorded as a failed run,
+        // and the upsert itself (enable OR pause) asks WorksConfigWriter to
+        // commit `.works/works.yml` into the data repository — which for
+        // this kind is the wrapped code repository. The web hides the
+        // schedule page; this is the API / MCP boundary
+        // (`PUT /works/:id/schedule`, `update_schedule`).
+        assertNotRepositoryWork(work, 'scheduling updates');
         const subscriptionsEnabled = this.subscriptionService.isEnabled();
         const existing = await this.scheduleRepository.findByWorkId(work.id);
         const plan = await this.subscriptionService.resolvePlanForUser(user);

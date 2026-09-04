@@ -50,7 +50,15 @@ const CHIP_TYPE_ORDER = [
 ] as const;
 type ChipTypeName = (typeof CHIP_TYPE_ORDER)[number];
 
-/** Maps a Work-kind chip value to the manifest `chipType` facet. */
+/**
+ * Maps a Work-kind chip value to the manifest `chipType` facet.
+ *
+ * `repo` is intentionally absent: a Repository Work has no website template
+ * facet (`WORK_KIND_CAPABILITIES.repo.repos.website` is false), and
+ * `WorkAICreator` never mounts this picker for the kind. Should it ever be
+ * reached with `kind: 'repo'`, the lookup yields `undefined` and the picker
+ * renders no template list — which is the right answer, not a gap.
+ */
 const KIND_TO_CHIP_TYPE: Record<string, ChipTypeName> = {
     website: 'website',
     'landing-page': 'landing',
