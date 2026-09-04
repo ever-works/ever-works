@@ -1,5 +1,11 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
+import {
+    API_BASE,
+    authedHeaders,
+    createWorkViaAPI,
+    orgScopedHeaders,
+    registerUserViaAPI,
+} from './helpers/api';
 import { createOrganizationViaAPI, listOrganizationsViaAPI } from './helpers/organizations';
 import { createTaskViaAPI } from './helpers/agents-tasks';
 
@@ -74,6 +80,21 @@ import { createTaskViaAPI } from './helpers/agents-tasks';
  *    org). Every flow asserts a deterministic, driver-stable status
  *    (2xx/409/404/400/401).
  *
+ * ── SCOPE CONTRACT (since 8f28edca0): an unprefixed bare-Bearer request runs in
+ *    the PERSONAL scope. `SessionScopeGuard` deliberately refuses to infer an
+ *    Organization from the user's mutable last-Organization preference, so an
+ *    Organization scope needs an explicit `X-Scope-Slug: <org-slug>` header (or
+ *    an `/api/<slug>/…` path). `TasksService.getOne` then matches the row through
+ *    `ownershipScopeMatches`, which in personal scope requires
+ *    `organizationId IS NULL`. Consequences for the reads below:
+ *      - Pre-upgrade reads stay BARE on purpose: those rows really are personal
+ *        (tenantId stamped at most), and asserting that is the point.
+ *      - register-company (flow 2) stamps tenantId ONLY — organizationId stays
+ *        null — so its follow-up read is correctly bare too.
+ *      - The read AFTER `upgrade-from-account` (flow 5) is the one row that has
+ *        just been stamped `organizationId = org.id`, so it MUST carry the org
+ *        scope; a bare-Bearer GET there 404s ("Task … not found.").
+ *
  * Cross-spec isolation: every flow runs on a FRESH registerUserViaAPI() user
  * (Date.now()-unique) so the shared in-memory DB stays clean for sibling specs;
  * the seeded storageState user is never mutated. Counts use toContain, never
@@ -108,10 +129,22 @@ async function upgradeRaw(request: APIRequestContext, token: string | undefined,
     });
 }
 
-/** GET /api/tasks/:id (returns the bare task row; tenantId/organizationId are exposed). */
-async function getTask(request: APIRequestContext, token: string, taskId: string) {
+/**
+ * GET /api/tasks/:id (returns the bare task row; tenantId/organizationId are exposed).
+ *
+ * Pass `orgSlug` to read inside an Organization — required for any row whose
+ * `organizationId` is stamped, because a bare-Bearer GET runs in the personal
+ * scope and `TasksService.getOne` 404s such a row there. Omit it while the row
+ * is still unstamped: that bare read IS the personal contract, not an oversight.
+ */
+async function getTask(
+    request: APIRequestContext,
+    token: string,
+    taskId: string,
+    orgSlug?: string,
+) {
     const res = await request.get(`${API_BASE}/api/tasks/${taskId}`, {
-        headers: authedHeaders(token),
+        headers: orgSlug ? orgScopedHeaders(token, orgSlug) : authedHeaders(token),
     });
     expect(res.status(), `getTask body=${await res.text().catch(() => '')}`).toBe(200);
     return res.json();
@@ -200,7 +233,9 @@ test.describe('Organization register-company — registered Company path mints t
 
         // 3. The task's tenantId is now the company's tenantId; organizationId
         //    STAYS null (the backfill stamps tenantId only — pulling rows into the
-        //    org is a SEPARATE upgrade-from-account step, see flow 5/6).
+        //    org is a SEPARATE upgrade-from-account step, see flow 5/6). The read
+        //    is therefore BARE by design: the row is still personal, and the
+        //    personal scope is exactly where it has to remain visible.
         const afterTask = await getTask(request, token, task.id);
         expect(afterTask.tenantId, 'register-company backfilled the task tenantId').toBe(
             org.tenantId,
@@ -337,12 +372,16 @@ test.describe('Organization upgrade-from-account — first-org guard + driver-co
         //    "ready to upgrade" pre-state the endpoint expects.
         const org = await createOrganizationViaAPI(request, token, `Upgrade Org ${s}`);
         expect(org.tenantId).toMatch(UUID_RE);
+        // The post-upgrade read below resolves its scope through this slug.
+        expect(org.slug, 'the org must have a slug to scope reads with').toBeTruthy();
         const { id: workId } = await createWorkViaAPI(request, token, {
             name: `Upgrade Work ${s}`,
             slug: `upgrade-work-${s}`,
         });
         expect(workId).toMatch(UUID_RE);
 
+        // Deliberately a BARE read: createOrganization stamps tenantId only, so
+        // the row is still personal and must be visible in the personal scope.
         const preUpgradeTask = await getTask(request, token, task.id);
         expect(preUpgradeTask.tenantId, 'createOrg backfilled tenantId').toBe(org.tenantId);
         expect(preUpgradeTask.organizationId, 'but NOT yet pulled into the org').toBeNull();
@@ -369,7 +408,9 @@ test.describe('Organization upgrade-from-account — first-org guard + driver-co
 
         // The task is now pulled INTO the org (organizationId stamped) while its
         // tenantId is unchanged — the migration ran end-to-end under sqlite.
-        const afterTask = await getTask(request, token, task.id);
+        // This read carries the Organization scope: the row is no longer personal,
+        // and a bare-Bearer GET would 404 it rather than show the migrated stamp.
+        const afterTask = await getTask(request, token, task.id, org.slug);
         expect(afterTask.organizationId, 'upgrade pulled the task into the org').toBe(org.id);
         expect(afterTask.tenantId, 'tenantId unchanged by the upgrade').toBe(org.tenantId);
 

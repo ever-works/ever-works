@@ -52,7 +52,16 @@
  *   GET  /api/organizations/:id/teams | /:id/teams/:tid | /:id/teams/:tid/members
  *      | /:id/org-chart                           → 200 for the OWNER,
  *      404-not-leak for a non-owner (OrganizationOwnershipGuard).
- *   GET  /api/agents                              → 200 {data:[…]} tenant-wide.
+ *   GET  /api/agents                              → 200 {data:[…]} filtered by
+ *      the REQUEST scope, NOT tenant-wide. The importer materializes every
+ *      agent inside `ScopeContextService.runWith({tenantId, organizationId})`,
+ *      so the rows are Organization-stamped; an unprefixed bare-Bearer read is
+ *      the PERSONAL contract (`organizationId IS NULL`) and returns none of
+ *      them — 200 with an EMPTY `data`, never an error. The verification read
+ *      therefore carries `X-Scope-Slug: <imported-org-slug>` via
+ *      `orgScopedHeaders`. The org-NESTED endpoints above are unaffected: they
+ *      resolve off the `:orgId` path + OrganizationOwnershipGuard and never
+ *      consult the ambient scope.
  *
  * Env-adaptive: the catalog is fetched over the network from ever-works/orgs;
  * an env that can't reach it returns `[]` (wizard skips its step) and every
@@ -68,7 +77,7 @@
  * testMatch/testIgnore regexes; contends on no shared UI state.
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { API_BASE, authedHeaders, orgScopedHeaders, registerUserViaAPI } from './helpers/api';
 
 const ORGS_BASE = `${API_BASE}/api/organizations`;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -691,8 +700,16 @@ test.describe('Vision × Import chain — materialized structure asserted with t
 
         await patchOrgOk(request, token, orgId, { vision: `Agent-staffed vision ${s}` });
 
-        // This fresh user's tenant holds exactly this one import's agents.
-        const res = await request.get(`${API_BASE}/api/agents`, { headers: authedHeaders(token) });
+        // The importer materializes agents inside
+        // `ScopeContextService.runWith({tenantId, organizationId: <new org>})`,
+        // so every row is stamped with THIS org. `GET /api/agents` filters by
+        // the request scope, and an unprefixed bare-Bearer call is the PERSONAL
+        // contract (`organizationId IS NULL`) — it would 200 with an EMPTY list.
+        // Pin the read to the imported org, where this run's agents live and
+        // where this fresh user's tenant holds exactly this one import's agents.
+        const res = await request.get(`${API_BASE}/api/agents`, {
+            headers: orgScopedHeaders(token, report.organization.slug),
+        });
         expect(res.status()).toBe(200);
         const agents = (await res.json()).data as Array<{
             scope: string;
