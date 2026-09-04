@@ -6212,7 +6212,7 @@
                 "creatingButton": "Mendaftarkan…",
                 "cancelButton": "Batal",
                 "invalidUrl": "Masukkan URL repositori seperti https://github.com/owner/repo",
-                "invalidSlug": "Use lowercase letters, digits and hyphens only, for example my-repo",
+                "invalidSlug": "Gunakan hanya huruf kecil, angka, dan tanda hubung, misalnya my-repo",
                 "success": "Repositori terdaftar sebagai Work",
                 "createFailed": "Gagal mendaftarkan repositori",
                 "noteTitle": "Catatan:",

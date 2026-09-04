@@ -180,6 +180,12 @@ export function RepositoryWorkForm({ gitProvider, initialRepositoryUrl }: Reposi
                         setSlugDirty(true);
                     }}
                     pattern="[a-z0-9-]+"
+                    // Without this the submit button is simply disabled and
+                    // the field explains nothing: the `invalidSlug` toast in
+                    // `submit` is unreachable precisely because `canSubmit`
+                    // already blocked it. Say what is wrong where it is wrong,
+                    // the same way the URL field does.
+                    error={slugInvalid ? t('invalidSlug') : undefined}
                     helperText={t('slugHelp')}
                     variant="form"
                 />

@@ -313,10 +313,12 @@ export class WorkRepository {
                 return false;
             }
             // The `work.owner` column narrowed the query; the registered
-            // coordinates decide the match. Checking both means a row whose
-            // column ever drifted from what was registered cannot produce a
-            // false positive here (`updateWork` refuses to let it drift).
-            return typeof data.owner !== 'string' || data.owner.toLowerCase() === targetOwner;
+            // coordinates decide the match. Both must be present and agree:
+            // treating a row whose registered owner is missing or malformed
+            // as a match would let one broken row block every other account
+            // from registering that repository, and we cannot prove such a
+            // row wraps it. `updateWork` refuses to let the column drift.
+            return typeof data.owner === 'string' && data.owner.toLowerCase() === targetOwner;
         });
     }
 
