@@ -158,7 +158,7 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 		// The rule lives in the repository's shared exclude file, never in a tracked .gitignore.
 		const commonDir = git(descriptor.path, 'rev-parse', '--path-format=absolute', '--git-common-dir');
 		expect(await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8')).toContain(
-			`/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`
+			`/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}`
 		);
 		// While the mount itself does see the edit.
 		expect(git(mount.path, 'status', '--porcelain')).toContain('edited-through-the-link.txt');
@@ -200,9 +200,14 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 		await provisioner.provision('task-m13', spec('task/mounts-13'));
 		await provisioner.provision('task-m13', spec('task/mounts-13'));
 		const upgraded = await readExclude(mount.path);
+		// The legacy slice-C line is slash-terminated and is deliberately left
+		// alone: `info/exclude` also holds whatever the operator put there, so
+		// the fleet only ever APPENDS its own rules. `/.mounts/` and `/.mounts`
+		// coexist harmlessly — the unslashed rule is a superset of the other.
 		expect(countRule(upgraded, `/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`)).toBe(1);
-		expect(countRule(upgraded, '/.ever-works/')).toBe(1);
-		expect(countRule(upgraded, '.ever-works/')).toBe(1);
+		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
+			expect(countRule(upgraded, rule)).toBe(1);
+		}
 		expect(git(mount.path, 'status', '--porcelain')).toBe('');
 	});
 
@@ -420,7 +425,7 @@ describe.sequential('FleetTaskWorkspaceProvisioner — mounts (real Git)', { tim
 		]);
 		const commonDir = git(first.path, 'rev-parse', '--path-format=absolute', '--git-common-dir');
 		expect(git(second.path, 'rev-parse', '--path-format=absolute', '--git-common-dir')).toBe(commonDir);
-		const rule = `/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`;
+		const rule = `/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}`;
 		const exclude = await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8');
 		expect(exclude.split(/\r?\n/).filter((line) => line.trim() === rule)).toHaveLength(1);
 		// No temporary file is left next to it.
