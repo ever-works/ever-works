@@ -98,3 +98,12 @@ export {
 } from './update.service';
 
 export { AgentPluginInstallService, sourceRefFor } from './install.service';
+
+export {
+    McpServerConfigService,
+    usesPluginData,
+    type McpResolutionResult,
+    type McpServerProvenance,
+    type ResolvedMcpServer,
+    type SkippedMcpServer,
+} from './mcp-server-config.service';

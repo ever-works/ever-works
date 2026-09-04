@@ -12,6 +12,7 @@ import { AgentPluginPackageRepository } from './package.repository';
 import { AgentPluginPackageBootstrapService } from './package-bootstrap.service';
 import { AgentPluginUpdateService } from './update.service';
 import { AgentPluginInstallService } from './install.service';
+import { McpServerConfigService } from './mcp-server-config.service';
 import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 
 /**
@@ -60,6 +61,7 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
         AgentPluginPackageBootstrapService,
         AgentPluginUpdateService,
         AgentPluginInstallService,
+        McpServerConfigService,
         AGENT_PLUGIN_SKILL_SOURCE,
     ],
 })

@@ -68,7 +68,7 @@ appends, locale key appends) are expected and fine.
 
 ## Phase 1 — Package registry + local-dir source + skills read-side (PR-2, PR-3)
 
-- [ ] **T10**. Entities `agent_plugin_packages` (Tier A, incl. `dataManifest`) +
+- [x] **T10**. Entities `agent_plugin_packages` (Tier A, incl. `dataManifest`) +
       `agent_plugin_package_allowlist` (Tier D) per plan §2.5; append to
       `_entities-inventory.ts`; migration `CreateAgentPluginPackages`.
       **Read the generated SQL** before commit (NN #16). Account-transfer
@@ -76,14 +76,14 @@ appends, locale key appends) are expected and fine.
       literal + both import paths + SyncPushOptions) — reference-only export
       (name+version+source), never package content; deferring this to Phase 3
       would reopen the silent-no-round-trip bug class.
-- [ ] **T11**. `packages/agent/src/agent-plugins/` module:
+- [x] **T11**. `packages/agent/src/agent-plugins/` module:
       `AgentPluginPackageService` (register/validate/list/remove; findings
       persisted per package), local-dir acquirer (`AGENT_PLUGINS_DIR` scan,
       optional-with-default env per constants.ts pattern). Barrel export entry
       in `packages/agent/package.json` export map.
-- [ ] **T12**. Feature flag `FEATURE_AGENT_PLUGINS` default false in
+- [x] **T12**. Feature flag `FEATURE_AGENT_PLUGINS` default false in
       `apps/api/src/config/constants.ts` + `.env.example` + compose env files.
-- [ ] **T13**. `AgentPluginCatalogService` (plan §2.2) in
+- [x] **T13**. `AgentPluginCatalogService` (plan §2.2) in
       `packages/agent/src/agent-plugins/`: entries from registered package rows + conformance lib; version synthesis per AP-21; pre-flight findings by
       calling the existing gates directly (`MAX_BODY_BYTES`/`assertNoSecrets`/
       `assertNoInjectionTokens` — reachable because this is platform code, not
@@ -93,13 +93,13 @@ appends, locale key appends) are expected and fine.
       (`packageName?`/`packageVersion?`/`sourceKind?`) to `SkillCatalogEntry`
       (additive interface change). Barrel-export the new module in
       `packages/agent/package.json` export map.
-- [ ] **T14**. API controller `apps/api/src/agent-plugins/` (list/install
+- [x] **T14**. API controller `apps/api/src/agent-plugins/` (list/install
       local/uninstall/findings), throttled 5/min, admin allowlist CRUD parallel
       to `admin/plugins/allowlist`. DTO validation + validation-authz-matrix
       e2e specs for every new route.
-- [ ] **T15**. CLI verbs (`agent-plugins list/install/status/uninstall`)
+- [x] **T15**. CLI verbs (`agent-plugins list/install/status/uninstall`)
       following `dynamic.command.ts` pattern.
-- [ ] **T16**. Integration test (Jest, in `packages/agent` — the facade +
+- [x] **T16**. Integration test (Jest, in `packages/agent` — the facade +
       services live there; conformance-lib unit tests stay Vitest in
       `packages/agent-plugins`): fixture package on disk → register → catalog
       entries appear via `SkillsFacadeService` → `installFromCatalog` →
@@ -109,23 +109,23 @@ appends, locale key appends) are expected and fine.
 
 ## Phase 2 — git + npm sources + updates (PR-4)
 
-- [ ] **T17**. Git acquirer: URL-first shallow clone (isomorphic-git primitives
+- [x] **T17**. Git acquirer: URL-first shallow clone (isomorphic-git primitives
       per plan §2.3), ref-pin + resolved-SHA recording, containment validation
       post-clone, re-fetch/update path.
-- [ ] **T18**. npm acquirer: pacote manifest→allowlist→extract (no symlink, no
+- [x] **T18**. npm acquirer: pacote manifest→allowlist→extract (no symlink, no
       scripts, no dep install); registry config reuse; 409/424/502/504 error
       mapping parity with the code-plugin installer.
-- [ ] **T19**. Boot re-materialization (warmupFromDb pattern) for git/npm
+- [x] **T19**. Boot re-materialization (warmupFromDb pattern) for git/npm
       packages; startupProbe budget check.
-- [ ] **T20**. Update-available end-to-end: catalog service computes updates for
+- [x] **T20**. Update-available end-to-end: catalog service computes updates for
       git/npm packages; facade surfaces a badge + explicit re-sync action; the
       same facade wiring finally calls the existing provider `checkForUpdates`
       seam (zero non-test callers today) so `everworks-skills` updates surface
       too.
-- [ ] **T21**. Web UI: Sources + Packages pages under settings; install flow
+- [x] **T21**. Web UI: Sources + Packages pages under settings; install flow
       with per-component findings display; i18n keys in ALL
       `apps/web/messages/*.json`; PostHog events.
-- [ ] **T22**. Env wiring per 2026-06-12 checklist (k8s manifests dev/stage/
+- [x] **T22**. Env wiring per 2026-06-12 checklist (k8s manifests dev/stage/
       prod + deploy workflows + compose; defaults make it non-fatal) + explicit
       operator note re ArgoCD-managed live env (outside this repo).
 
