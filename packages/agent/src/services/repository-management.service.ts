@@ -3,6 +3,11 @@ import { GitFacadeService } from '../facades/git.facade';
 import { Work, RepoVisibility } from '../entities/work.entity';
 import { User } from '../entities/user.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
+import {
+    assertNotRepositoryWork,
+    assertRepositoryRole,
+    hasRepositoryRole,
+} from '../works/repository-work-guard';
 
 export type RepositoryType = 'data' | 'work' | 'website';
 
@@ -49,11 +54,17 @@ export class RepositoryManagementService {
     ) {}
 
     async getRepositoriesStatus(work: Work, user: User): Promise<RepositoryStatus[]> {
-        const repos: { type: RepositoryType; name: string }[] = [
+        // Only the roles this kind provisions are listed. The entity's
+        // fallbacks (`<slug>`, `<slug>-website`) name repositories a
+        // Repository / Company / Campaign Work never created — and for a
+        // Repository Work whose slug came from the wrapped repo, `<slug>` IS
+        // the wrapped repo, which would then show up twice under two roles.
+        const allRoles: { type: RepositoryType; name: string }[] = [
             { type: 'data', name: work.getDataRepo() },
             { type: 'work', name: work.getMainRepo() },
             { type: 'website', name: work.getWebsiteRepo() },
         ];
+        const repos = allRoles.filter((repo) => hasRepositoryRole(work, repo.type));
 
         const results = await Promise.all(
             repos.map(async (repo) => {
@@ -133,6 +144,16 @@ export class RepositoryManagementService {
             default:
                 throw new Error('Invalid repository type');
         }
+
+        // Flipping visibility rewrites repository settings on the provider.
+        // For a Repository Work every role resolves to a repository the
+        // platform did not create — the wrapped repo itself under `data`,
+        // and a derived name under the others — so none of them is ours to
+        // change. Other kinds are refused only for roles they never
+        // provision (a Company Work has no website repo to flip). Checked
+        // after the switch so an unknown role keeps its own error.
+        assertNotRepositoryWork(work, 'changing repository visibility');
+        assertRepositoryRole(work, repoType);
 
         const updated = await this.gitFacade.updateRepository(
             owner,

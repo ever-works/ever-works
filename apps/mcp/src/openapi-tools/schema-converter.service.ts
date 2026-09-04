@@ -17,6 +17,11 @@ export interface JsonSchema {
 	maximum?: number;
 	minLength?: number;
 	maxLength?: number;
+	/** OpenAPI 3.0 spelling of "may be null" (`@ApiProperty({ nullable: true })`). */
+	nullable?: boolean;
+	/** Array bounds (`@ArrayMinSize` / `@ArrayMaxSize`, `maxItems` on `@ApiProperty`). */
+	minItems?: number;
+	maxItems?: number;
 	[key: string]: unknown;
 }
 
@@ -58,6 +63,14 @@ export class SchemaConverterService {
 
 	convertToZod(schema: JsonSchema, required: boolean): z.ZodTypeAny {
 		let zodType = this.convertType(schema);
+
+		// Why: the API uses `null` as a first-class value on many fields ("detach
+		// this Task from its Work", "inherit the Work's gate budget"). Nest emits
+		// that as OpenAPI 3.0 `nullable: true`; without this the Zod schema would
+		// reject exactly the value the endpoint documents.
+		if (schema.nullable === true) {
+			zodType = zodType.nullable();
+		}
 
 		if (schema.description) {
 			zodType = zodType.describe(schema.description);
@@ -123,7 +136,12 @@ export class SchemaConverterService {
 				s = s.email();
 				break;
 			case 'date-time':
-				s = s.datetime();
+				// Why the options: the API validates these fields with
+				// `@IsDateString()`, which takes an offset ("+02:00") or a naive
+				// local timestamp as readily as a "Z" one. Zod's default is
+				// UTC-only, so without this the tool refused payloads the
+				// endpoint accepts. A bare date ("2026-09-04") stays rejected.
+				s = s.datetime({ offset: true, local: true });
 				break;
 		}
 		if (schema.minLength !== undefined) s = s.min(schema.minLength);
@@ -141,7 +159,17 @@ export class SchemaConverterService {
 
 	private convertArray(schema: JsonSchema): z.ZodArray<z.ZodTypeAny> {
 		const items = schema.items ? this.convertType(schema.items) : z.any();
-		return z.array(items);
+		let array = z.array(items);
+		// Why: the API refuses an over-long batch with a 400; carrying the
+		// bound into the tool schema lets the client refuse it before the
+		// round trip, and documents the limit where the tool is described.
+		if (typeof schema.minItems === 'number' && Number.isInteger(schema.minItems) && schema.minItems >= 0) {
+			array = array.min(schema.minItems);
+		}
+		if (typeof schema.maxItems === 'number' && Number.isInteger(schema.maxItems) && schema.maxItems >= 0) {
+			array = array.max(schema.maxItems);
+		}
+		return array;
 	}
 
 	private convertObject(schema: JsonSchema): z.ZodTypeAny {

@@ -83,8 +83,19 @@ function BranchPanel({ task }: { task: Task }) {
         });
     };
 
+    // Multi-repo Task workspaces (self-build slice C): the discard reaches
+    // EVERY repository the Task pushed, and deleting a branch closes the pull
+    // request on it. One click is therefore N+1 branch deletions and up to
+    // N+1 closed pull requests — the consent text has to name that, or the
+    // operator authorises one thing and gets another.
+    const linkedRepoCount = task.linkedPullRequests?.length ?? 0;
+
     const handleDiscard = () => {
-        if (!confirm(t('discardConfirm'))) return;
+        const confirmMessage =
+            linkedRepoCount > 0
+                ? t('discardConfirmMultiRepo', { count: linkedRepoCount + 1 })
+                : t('discardConfirm');
+        if (!confirm(confirmMessage)) return;
         setError(null);
         startDiscard(() => {
             void (async () => {
@@ -210,6 +221,53 @@ function BranchPanel({ task }: { task: Task }) {
                                 {task.prNumber != null ? `#${task.prNumber}` : t('openPr')}
                                 <ExternalLink className="w-3 h-3" />
                             </a>
+                        </dd>
+                    </div>
+                )}
+
+                {/* Multi-repo Task workspaces: pull requests in the OTHER repositories a fleet run pushed. */}
+                {task.linkedPullRequests && task.linkedPullRequests.length > 0 && (
+                    <div
+                        className="grid grid-cols-[5.5rem_1fr] items-start gap-3"
+                        data-testid="task-linked-prs"
+                    >
+                        <dt className="text-xs text-text-muted pt-0.5">
+                            {t('linkedPullRequests')}
+                        </dt>
+                        <dd className="min-w-0 space-y-1">
+                            {task.linkedPullRequests.map((linked) => (
+                                <div
+                                    key={linked.repositoryId}
+                                    className="flex items-center gap-2 text-xs min-w-0"
+                                    data-testid={`task-linked-pr-${linked.repositoryId}`}
+                                >
+                                    <span className="font-mono truncate text-text dark:text-text-dark">
+                                        {linked.repositoryId}
+                                    </span>
+                                    {linked.prUrl ? (
+                                        <a
+                                            href={linked.prUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-primary hover:underline shrink-0"
+                                        >
+                                            {linked.prNumber != null
+                                                ? `#${linked.prNumber}`
+                                                : t('openPr')}
+                                            <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    ) : (
+                                        <span
+                                            className={`shrink-0 ${linked.state === 'failed' ? 'text-danger' : 'text-text-muted'}`}
+                                            title={linked.error ?? undefined}
+                                        >
+                                            {linked.state === 'failed'
+                                                ? t('linkedPrFailed')
+                                                : t('linkedPrPushed')}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
                         </dd>
                     </div>
                 )}

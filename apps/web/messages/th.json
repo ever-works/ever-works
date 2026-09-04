@@ -666,6 +666,13 @@
                 "unarchive": "Move to Active",
                 "delete": "Delete"
             },
+            "fleet": {
+                "badge": "From your fleet",
+                "node": "Node",
+                "task": "Task",
+                "branch": "Branch",
+                "pullRequest": "Pull request"
+            },
             "detail": {
                 "none": "Select a message to read it.",
                 "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
@@ -1338,6 +1345,30 @@
                     "saved": "บันทึกสคริปต์เริ่มต้นแล้ว",
                     "bytes": "{used} / {max} KB",
                     "tooLong": "สคริปต์เริ่มต้นเกิน 16 KB"
+                },
+                "fleet": {
+                    "title": "Execution",
+                    "description": "Where this agent's work runs when machines are enrolled in your Fleet: pin the agent to one of your nodes, and see the routing rule in force for your account.",
+                    "manage": "Manage fleet",
+                    "nodeLabel": "Preferred node",
+                    "nodeHelper": "With a node chosen, this agent's jobs are leased only by that machine — pick the one that holds the checkout, the credentials or the hardware the work needs. Any node lets whichever of your machines is free take them.",
+                    "anyNode": "Any node",
+                    "missingNode": "A node that is no longer enrolled",
+                    "hintOffline": "{name} is offline. Jobs for this agent will wait until it reports in again.",
+                    "hintDraining": "{name} is drained (paused or disabled). Jobs for this agent will wait until it returns to service.",
+                    "hintMissing": "The preferred node was removed from your fleet. Jobs for this agent would wait for a machine that no longer exists — pick another node, or Any node.",
+                    "noNodes": "No machines are enrolled in your Fleet yet, so there is nothing to pin this agent to.",
+                    "noNodesLink": "Enroll a machine in Settings → Fleet",
+                    "affinityPersonalScope": "A preferred node can be set for Organization agents only. Switch to an Organization workspace to pin this agent to a machine.",
+                    "affinityUnavailable": "The preferred node could not be loaded right now. Reload the page to try again.",
+                    "saved": "Preferred node saved",
+                    "cleared": "Preferred node cleared — any of your nodes can take this agent's work",
+                    "routingLabel": "Execution routing",
+                    "routingAccountDefault": "Your account default.",
+                    "routingPlatformDefault": "Platform default — nothing is configured for your account yet.",
+                    "routingOverrides": "{count, plural, one {# Work or Goal override takes} other {# Work or Goal overrides take}} precedence for runs in their own scope.",
+                    "routingUnavailable": "Execution routing could not be loaded right now.",
+                    "routingChange": "Change in Settings → Fleet"
                 }
             }
         },
@@ -1447,7 +1478,9 @@
                 "stepApproval": "approval",
                 "featureName": "Feature name",
                 "featureDescription": "Feature description",
-                "createFromTemplate": "Create workflow"
+                "createFromTemplate": "Create workflow",
+                "extraRepos": "Also work in",
+                "extraReposHint": "Optional. Repositories checked here are checked out next to the Work's repository when the task runs on one of your machines; each one that changes gets its own pull request. The agent's attached repositories are included automatically."
             },
             "detail": {
                 "moveTo": "ย้ายไปยัง",
@@ -1501,6 +1534,9 @@
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
                     "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "waitingForAnswer": "The agent paused this run with a question for you.",
+                    "answerInInbox": "Answer it in the Inbox",
+                    "parkedHintQuestion": "Answer the question in the Inbox to continue on the same branch. Archive the question there if you want to drop this run.",
                     "steerPlaceholder": "Message the running agent…",
                     "resumePlaceholder": "Optional instruction to resume with…",
                     "steer": "Steer",
@@ -1529,7 +1565,9 @@
                 "openWork": "เปิด Work นี้",
                 "openMission": "เปิดภารกิจนี้",
                 "openIdea": "เปิดความคิดนี้",
-                "openAgent": "เปิดเอเจนต์นี้"
+                "openAgent": "เปิดเอเจนต์นี้",
+                "extraRepos": "Also in",
+                "extraReposUpdateError": "Failed to update the extra repositories"
             },
             "recurring": {
                 "section": "กำหนดการทำซ้ำ",
@@ -1603,13 +1641,17 @@
                 "resolveError": "Failed to resolve conflicts",
                 "discard": "Discard branch",
                 "discardConfirm": "Discard this Task's branch? All unmerged changes on the branch will be permanently lost. This cannot be undone.",
+                "discardConfirmMultiRepo": "Discard this Task's branches in {count} repositories? Every unmerged change is permanently lost, and any pull request still open on those branches is closed. This cannot be undone.",
                 "discardError": "Failed to discard branch",
                 "isolationLabel": "Task isolation",
                 "isolationDescription": "Override the Work-level isolation setting for this Task. When off, agents work directly against the Work's repositories.",
                 "isolationInherit": "Inherit from Work",
                 "isolationOn": "On — isolated branch",
                 "isolationOff": "Off — work directly",
-                "isolationSaveError": "Failed to update isolation override"
+                "isolationSaveError": "Failed to update isolation override",
+                "linkedPullRequests": "Also in",
+                "linkedPrPushed": "branch pushed, no pull request yet",
+                "linkedPrFailed": "branch pushed; opening the pull request failed"
             },
             "gateChip": {
                 "green": "Gate passed",
@@ -1713,6 +1755,12 @@
                 "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
                 "deleteError": "Failed to delete the template",
                 "requiresApproval": "Requires approval"
+            },
+            "extraRepos": {
+                "loading": "Loading repositories…",
+                "loadError": "Could not load your repositories.",
+                "empty": "No repositories in your registry yet.",
+                "emptyLink": "Add one in Settings → Repositories"
             }
         },
         "skillsPage": {
@@ -2525,7 +2573,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "ปลั๊กอินเอเจนต์"
             },
             "githubApp": {
                 "title": "การติดตั้ง GitHub App",
@@ -3100,7 +3149,8 @@
                     "enrolling": "Enrolling",
                     "online": "Online",
                     "offline": "Offline",
-                    "disabled": "Disabled"
+                    "disabled": "Disabled",
+                    "paused": "Paused"
                 },
                 "table": {
                     "name": "Name",
@@ -3230,10 +3280,7 @@
                     "downloadNode": "Headless node"
                 },
                 "history": {
-                    "failuresTitle": "Recent failures",
-                    "noFailures": "No failures in the recent history.",
                     "recentCount": "{count} recent jobs",
-                    "attempts": "{count} attempts",
                     "loading": "Loading history…",
                     "unavailable": "Job history is unavailable right now. The node itself is fine."
                 },
@@ -3264,6 +3311,40 @@
                             "label": "Cloud",
                             "helper": "Always uses the platform runtime, even when a local runner is free."
                         }
+                    }
+                },
+                "jobs": {
+                    "title": "Job history",
+                    "description": "The most recent jobs leased to this machine, newest first.",
+                    "filterAll": "All",
+                    "filterFailed": "Failed",
+                    "filterRunning": "Running",
+                    "emptyAll": "No jobs in the recent history.",
+                    "emptyFailed": "No failed jobs in the recent history.",
+                    "emptyRunning": "No job is running on this node right now.",
+                    "statuses": {
+                        "queued": "Queued",
+                        "leased": "Leased",
+                        "running": "Running",
+                        "done": "Done",
+                        "failed": "Failed"
+                    },
+                    "pinned": "Pinned to this node",
+                    "attempts": "Attempt {attempts} of {maxAttempts}",
+                    "queuedAt": "Queued",
+                    "queuedAtValue": "Queued {time}",
+                    "started": "Started",
+                    "startedValue": "Started {time}",
+                    "notStarted": "Not started",
+                    "completed": "Completed",
+                    "completedValue": "Completed {time}",
+                    "notCompleted": "Not completed",
+                    "duration": "Duration",
+                    "durationValue": "Took {duration}",
+                    "elapsedValue": "Running for {duration}",
+                    "queuedReason": "Waiting: {reason}",
+                    "queuedReasons": {
+                        "waitingForRunner": "no runner can take it yet"
                     }
                 }
             },
@@ -3553,6 +3634,7 @@
                 "agentCard": {
                     "title": "Repositories",
                     "subtitle": "Grant this agent access to repositories from your registry.",
+                    "fleetHint": "Attached repositories are mounted next to the Task's repository on fleet runs and get their own pull request when they change.",
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
@@ -3613,6 +3695,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "ปลั๊กอินเอเจนต์",
+                "description": "แพ็กเกจในรูปแบบเปิด Agent Plugins เพิ่มทักษะและเซิร์ฟเวอร์ MCP ให้กับเวิร์กสเปซนี้ ใช้งานได้กับไคลเอ็นต์ใดก็ตามที่รองรับมาตรฐานนี้",
+                "disabled": "การรองรับปลั๊กอินเอเจนต์ถูกปิดอยู่ในการปรับใช้นี้ ผู้ดูแลระบบเปิดใช้ได้โดยตั้งค่า:",
+                "loadFailed": "ไม่สามารถโหลดแพ็กเกจที่ติดตั้งไว้ นี่เป็นปัญหาการเชื่อมต่อ ไม่ได้แปลว่าไม่มีอะไรติดตั้งอยู่",
+                "scanning": "กำลังสแกน {roots}",
+                "searchPlaceholder": "ค้นหาแพ็กเกจและทักษะ",
+                "empty": "ยังไม่มีแพ็กเกจที่ติดตั้ง",
+                "noMatches": "ไม่มีแพ็กเกจที่ตรงกับการค้นหา",
+                "specVersion": "ข้อกำหนด {version}",
+                "skills": "{count, plural, =0 {ทักษะ} other {# ทักษะ}}",
+                "mcpServers": "{count, plural, =0 {เซิร์ฟเวอร์ MCP} other {เซิร์ฟเวอร์ MCP # รายการ}}",
+                "none": "ไม่มี",
+                "rejected": "ถูกปฏิเสธ",
+                "rejectedHelp": "แพ็กเกจนี้โหลดไม่สำเร็จ จึงไม่ได้เพิ่มอะไรเลย ที่แสดงไว้เพราะมีคนตั้งใจเพิ่มเข้ามา",
+                "rejectedHeading": "{count, plural, other {แพ็กเกจที่ถูกปฏิเสธ # รายการ}}",
+                "shadowedHeading": "แพ็กเกจที่ถูกบดบัง",
+                "shadowedHelp": "แพ็กเกจเหล่านี้ประกาศชื่อที่ไดเรกทอรีก่อนหน้าให้ไว้แล้ว จึงใช้เฉพาะรายการแรก",
+                "severity": {
+                    "fatal": "ร้ายแรง",
+                    "error": "ข้อผิดพลาด",
+                    "warning": "คำเตือน"
+                },
+                "scopes": {
+                    "package": "แพ็กเกจ",
+                    "manifest": "มานิเฟสต์",
+                    "skills": "ทักษะ",
+                    "mcp": "เซิร์ฟเวอร์ MCP"
                 }
             }
         },
@@ -5976,6 +6088,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "รีโพซิทอรี",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -5990,6 +6103,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "รีโพซิทอรีโค้ดที่มีอยู่แล้วในฐานะ Work — งาน เป้าหมาย และการรันของฟลีตจะผูกกับมัน ไม่มีการสร้างหรือดีพลอยใด ๆ",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6139,6 +6253,26 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Work ใหม่ — รีโพซิทอรี",
+                "formSubtitle": "ลงทะเบียนรีโพซิทอรีโค้ดที่มีอยู่แล้วเป็น Work ไม่มีการสร้างหรือดีพลอยใด ๆ — งาน เป้าหมาย และการรันของฟลีตจะทำงานในรีโพซิทอรีนั้นโดยตรง",
+                "urlLabel": "URL ของรีโพซิทอรี",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "รีโพซิทอรี GitHub ที่คุณเข้าถึงได้ จะกลายเป็นรีโพซิทอรีข้อมูลของ Work ตามเดิม",
+                "nameLabel": "ชื่อ Work",
+                "slugLabel": "สลักของ Work",
+                "slugHelp": "ตัวระบุที่ใช้ใน URL ได้ สร้างจากชื่อรีโพซิทอรี — แก้ไขเพื่อเปลี่ยน",
+                "descriptionLabel": "คำอธิบาย",
+                "submitButton": "ลงทะเบียนรีโพซิทอรี",
+                "creatingButton": "กำลังลงทะเบียน…",
+                "cancelButton": "ยกเลิก",
+                "invalidUrl": "กรอก URL ของรีโพซิทอรี เช่น https://github.com/owner/repo",
+                "invalidSlug": "ใช้ตัวพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น เช่น my-repo",
+                "success": "ลงทะเบียนรีโพซิทอรีเป็น Work แล้ว",
+                "createFailed": "ลงทะเบียนรีโพซิทอรีไม่สำเร็จ",
+                "noteTitle": "หมายเหตุ:",
+                "noteText": "Work แบบรีโพซิทอรีจะไม่มีการสร้างเทมเพลตเว็บไซต์ รีโพซิทอรีของผู้ให้บริการ หรือการดีพลอย เชื่อมต่อผู้ให้บริการ Git ที่โฮสต์รีโพซิทอรีเพื่อให้เอเจนต์โคลนได้"
             },
             "manual": {
                 "title": "สร้างด้วยตนเอง",
@@ -6382,14 +6516,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "รีโพซิทอรี"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "รีโพซิทอรีโค้ดที่มีอยู่แล้วในฐานะ Work — งาน เป้าหมาย และการรันของฟลีตจะผูกกับมัน ไม่มีการสร้างหรือดีพลอยใด ๆ"
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7877,6 +8013,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "รีโพซิทอรี",
             "company": "Company",
             "campaign": "แคมเปญ",
             "default": "Work"

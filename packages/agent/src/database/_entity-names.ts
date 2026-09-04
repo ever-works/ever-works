@@ -43,6 +43,8 @@
  */
 
 export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
+    'AgentPluginPackage',
+    'AgentPluginPackageAllowlist',
     'ActivityLog',
     // Agents/Skills/Tasks (PR #1019) ──
     'Agent',

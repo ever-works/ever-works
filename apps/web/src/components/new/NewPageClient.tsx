@@ -10,6 +10,7 @@ import {
     Globe,
     Lightbulb,
     ListChecks,
+    GitBranch,
     Star,
     Store,
     Target,
@@ -30,6 +31,7 @@ import { useChatPanel } from '@/lib/hooks/use-chat-panel';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import { attachUploadToMissionAction, createMissionAction } from '@/app/actions/dashboard/missions';
 import { RegisterCompanyDialog } from '@/components/organizations/RegisterCompanyDialog';
+import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
 
 /**
  * Unified `/new` page — single prompt input + chips for every
@@ -74,6 +76,7 @@ export type ChipType =
     | 'blog'
     | 'directory'
     | 'awesome-repo'
+    | 'repo'
     | 'company';
 
 // Spec §6.3 order:
@@ -94,6 +97,8 @@ const CHIP_ORDER: ChipType[] = [
     'blog',
     'directory',
     'awesome-repo',
+    // Self-build slice D (EW-766) — an existing code repository as a Work.
+    'repo',
     'company',
 ];
 
@@ -119,6 +124,7 @@ const CHIP_ICONS: Record<ChipType, LucideIcon> = {
     // makes the two chips visually indistinguishable in the chip row.
     directory: FolderOpen,
     'awesome-repo': Star,
+    repo: GitBranch,
     // EW-662 Phase 10 — same `Building2` icon the WorkspaceSwitcher
     // empty state uses for consistency.
     company: Building2,
@@ -186,6 +192,12 @@ const PLACEHOLDERS_BY_CHIP: Record<ChipType, ReadonlyArray<string>> = {
         'e.g. "Awesome list of agent frameworks (LangChain, AutoGen, CrewAI…) with pros/cons"',
         'e.g. "Awesome list of free design resources for indie founders — icons, illustrations, fonts"',
     ],
+    repo: [
+        'e.g. "https://github.com/ever-works/ever-works — the platform monorepo"',
+        'e.g. "https://github.com/ever-works/directory-web-template — the directory template"',
+        'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
+        'e.g. "https://github.com/my-org/.github — any GitHub repository you can access"',
+    ],
     // EW-662 Phase 10 — Company placeholders telegraph that this chip
     // ends in a registered Organization (manual-completion path for v1).
     // The prompt input is ignored on submit — the chip opens the
@@ -224,6 +236,7 @@ const CHIP_INTENT_LABEL: Record<ChipType, string> = {
     blog: 'blog',
     directory: 'directory',
     'awesome-repo': 'awesome list repo',
+    repo: 'code repository',
     company: 'Company',
 };
 
@@ -235,6 +248,7 @@ const CHIP_TO_CANVAS_ROUTE: Partial<Record<ChipType, string>> = {
     blog: ROUTES.DASHBOARD_WORKS_NEW,
     directory: ROUTES.DASHBOARD_WORKS_NEW,
     'awesome-repo': ROUTES.DASHBOARD_WORKS_NEW,
+    repo: ROUTES.DASHBOARD_WORKS_NEW,
 };
 
 const CHIP_TO_WORK_KIND: Partial<Record<ChipType, string>> = {
@@ -243,6 +257,7 @@ const CHIP_TO_WORK_KIND: Partial<Record<ChipType, string>> = {
     blog: 'blog',
     directory: 'directory',
     'awesome-repo': 'awesome-repo',
+    repo: 'repo',
 };
 
 export function NewPageClient({
@@ -396,6 +411,27 @@ export function NewPageClient({
                 } catch (err) {
                     toast.error(err instanceof Error ? err.message : t('toasts.submitError'));
                 }
+                return;
+            }
+
+            // A Repository Work has nothing to generate, so there is
+            // nothing for the chat AI to iterate on: hand the text (a repo
+            // URL, typically) straight to the Repository form on the Work
+            // canvas instead of opening a chat turn.
+            if (effectiveChip === 'repo') {
+                // Only canonical coordinates may ride in the query string:
+                // pasted remotes routinely carry a token in the user-info
+                // section, and a query parameter reaches browser history,
+                // the referrer of every later request and any proxy log.
+                // Anything that does not reduce to owner/repo routes with
+                // no seed at all, and the user types it into the form.
+                const canonical = canonicalRepositoryUrl(description);
+                const params = new URLSearchParams({
+                    mode: 'manual',
+                    kind: 'repo',
+                    ...(canonical ? { prompt: canonical } : {}),
+                });
+                router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
                 return;
             }
 

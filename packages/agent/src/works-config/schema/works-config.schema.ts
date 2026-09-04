@@ -203,6 +203,67 @@ const awesomeRepoSpec = z.looseObject({
     enrich: z.looseObject({ enabled: z.boolean().optional() }).optional(),
 });
 
+/**
+ * Bounds on `spec.tasks.checks` for a Repository Work. Generous for real
+ * use (a lint, a type-check, a test run, a build — a handful of commands
+ * well under a screen line each) and tight enough that a repository cannot
+ * hand a future consumer an unbounded script. See the field's doc comment.
+ */
+export const REPO_CHECKS_MAX = 20;
+export const REPO_CHECK_MAX_LENGTH = 500;
+
+/**
+ * A Repository Work (self-build slice D, EW-766) wraps an EXISTING code
+ * repository — the data repository IS that repository, nothing is
+ * generated. The spec therefore describes how agents should work IN the
+ * repo rather than what to build: where the code lives, which branch Task
+ * worktrees branch from, and how to check a change before proposing it.
+ */
+const repoSpec = z.looseObject({
+    kind: z.literal('repo'),
+    source: z
+        .looseObject({
+            repo: repoRef.optional(),
+            branch: z.string().optional(),
+        })
+        .optional(),
+    tasks: z
+        .looseObject({
+            /** Branch Task worktrees are cut from; the repo default when absent. */
+            base_branch: z.string().optional(),
+            /**
+             * Commands an agent runs before opening a pull request.
+             *
+             * TRUST BOUNDARY — these strings are authored by whoever can land
+             * a commit or a PR branch in the wrapped repository, which is a
+             * far wider set than the Work's owner. Nothing consumes the key
+             * yet; whatever does must treat it as advisory, untrusted input:
+             * run it only inside the isolated Task worktree sandbox, and
+             * match it against an operator / Work-level allowlist (or have
+             * the Work owner confirm it in Work settings) before executing.
+             * The bounds below exist so that consumer inherits a cap on how
+             * much a repository can push at it.
+             */
+            checks: z
+                .array(
+                    nonEmptyString
+                        .max(REPO_CHECK_MAX_LENGTH)
+                        // `nonEmptyString` trims before it counts, so "   "
+                        // is rejected at runtime — but `.trim()` cannot be
+                        // expressed in JSON Schema, so the emitted document
+                        // carried only `minLength: 1` and an editor happily
+                        // accepted a whitespace-only check that the loader
+                        // then refused. The explicit pattern is what makes
+                        // editor validation and `validateWorksConfig` agree.
+                        .regex(/\S/, 'must contain a non-whitespace character'),
+                )
+                .max(REPO_CHECKS_MAX)
+                .optional(),
+        })
+        .optional(),
+    branding: branding.optional(),
+});
+
 const companySpec = z.looseObject({
     kind: z.literal('company'),
     organization: z.string().optional(),
@@ -231,6 +292,7 @@ export const KIND_SPEC_SCHEMAS = {
     blog: blogSpec,
     directory: directorySpec,
     'awesome-repo': awesomeRepoSpec,
+    repo: repoSpec,
     company: companySpec,
 } as const;
 

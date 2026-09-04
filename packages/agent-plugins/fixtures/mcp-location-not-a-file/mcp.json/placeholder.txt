@@ -1,0 +1,1 @@
+mcp.json is a directory here

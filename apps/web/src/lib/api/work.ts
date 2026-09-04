@@ -98,9 +98,13 @@ export interface CreateWorkDto {
     storageProvider?: string;
     websiteTemplateId?: string;
     /** Work-kind chip value (website, landing-page, blog, directory,
-     *  awesome-repo). Drives the kind-aware default website template;
+     *  awesome-repo, repo). Drives the kind-aware default website template;
      *  the API coerces unknown values to 'default'. */
     kind?: string;
+    /** Repository Work (`kind: 'repo'`) only — the existing code repository
+     *  to register as the Work's data repository. Required for that kind;
+     *  ignored for every other kind. */
+    repositoryUrl?: string;
     readmeConfig?: MarkdownReadmeConfig;
 }
 
@@ -245,7 +249,7 @@ export interface Work {
     /**
      * Work "kind" discriminator — `default` | `company` | the chip the
      * user picked at creation (`website`, `landing-page`, `blog`,
-     * `directory`, `awesome-repo`). Modelled server-side as an open
+     * `directory`, `awesome-repo`, `repo`). Modelled server-side as an open
      * string union on a `varchar(32)` (see `WorkKind` in
      * `packages/agent/src/entities/work.entity.ts`) so new kinds can ship
      * without a web deploy — hence `string`, not a closed union here.

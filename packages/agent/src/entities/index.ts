@@ -179,5 +179,7 @@ export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
+export * from './agent-plugin-package.entity';
+export * from './agent-plugin-package-allowlist.entity';
 export * from './repo-connection.entity';
 export * from './agent-repo-attachment.entity';

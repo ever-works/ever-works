@@ -7,8 +7,10 @@ import type {
 	JsonSchema,
 	WorkspaceProvisionSpec,
 	WorkspaceHandle,
+	WorkspaceFinalizeOptions,
 	WorkspaceFinalizeResult,
-	WorkspaceMergeSimulation
+	WorkspaceMergeSimulation,
+	WorkspacePublishFence
 } from '@ever-works/plugin';
 import { WorkspaceNotProvisionedError } from '@ever-works/plugin';
 import { execFile, type ChildProcess } from 'node:child_process';
@@ -90,6 +92,12 @@ export interface LocalWorkspacePluginOptions {
 	readonly terminateProcessTree?: (child: ChildProcess) => Promise<void>;
 	/** Atomic same-directory replacement seam for crash-safety tests. */
 	readonly replaceFile?: (source: string, destination: string) => Promise<void>;
+	/**
+	 * Wall clock behind the publish fence. Injected so a lease-expiry
+	 * decision is arithmetic in tests instead of a real sleep; production
+	 * uses `Date.now`.
+	 */
+	readonly now?: () => number;
 }
 
 /**
@@ -169,6 +177,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	private readonly execFileFn: typeof execFile | undefined;
 	private readonly replaceFile: (source: string, destination: string) => Promise<void>;
 	private readonly terminateProcessTree: ((child: ChildProcess) => Promise<void>) | undefined;
+	private readonly now: () => number;
 
 	/** Per-repo promise-chain mutex — see class doc. */
 	private readonly repoLocks = new Map<string, Promise<void>>();
@@ -181,6 +190,7 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		this.execFileFn = options.execFile;
 		this.replaceFile = options.replaceFile ?? ((source, destination) => fs.rename(source, destination));
 		this.terminateProcessTree = options.terminateProcessTree;
+		this.now = options.now ?? (() => Date.now());
 	}
 
 	async onLoad(_context: PluginContext): Promise<void> {
@@ -386,15 +396,17 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		};
 	}
 
-	async finalize(
-		handle: WorkspaceHandle,
-		opts: { commitMessage: string; push: boolean; auth?: WorkspaceProvisionSpec['auth'] }
-	): Promise<WorkspaceFinalizeResult> {
-		await this.ensureGit();
+	async finalize(handle: WorkspaceHandle, opts: WorkspaceFinalizeOptions): Promise<WorkspaceFinalizeResult> {
+		// Cancellation rides every Git call below: a caller aborted mid-way
+		// (a fleet node whose lease was lost) must not end up with a branch
+		// pushed after it stopped. An already-aborted signal never spawns.
+		const signal = opts.signal;
+		throwIfFinalizeAborted(signal);
+		await this.ensureGit(signal);
 		const dir = handle.path;
-		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed');
+		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed', signal);
 
-		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed');
+		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed', signal);
 		const dirty = status.stdout.trim().length > 0;
 		if (dirty) {
 			await this.gitOrThrow(
@@ -409,11 +421,12 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 				],
 				dir,
 				opts.auth,
-				'git commit failed'
+				'git commit failed',
+				signal
 			);
 		}
 
-		const head = await this.git(['rev-parse', 'HEAD'], dir, opts.auth);
+		const head = await this.git(['rev-parse', 'HEAD'], dir, opts.auth, signal);
 		const headSha = head.code === 0 ? head.stdout.trim() : null;
 
 		// Empty run: no new commit AND the branch has nothing beyond the
@@ -426,18 +439,30 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// cut from. Best-effort: a failed diff omits the field entirely
 		// (the caller then leaves the run's counter untouched rather
 		// than stamping a wrong 0) and never fails the finalize.
-		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth);
+		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth, signal);
+		// A cancellation that landed during the diff is not "no telemetry":
+		// a push:false finalize must not report success after the caller
+		// abandoned the run.
+		throwIfFinalizeAborted(signal);
 
 		let pushed = false;
-		if (opts.push) {
+		// The last gate before the side effect leaves this machine. Every
+		// check above is a LEVEL check on the abort signal, and cancellation
+		// cannot retract a ref the remote has already accepted — so the
+		// publish gets a TIME check too, taken here rather than at the top of
+		// finalize so the seconds spent in add/commit/diff count against the
+		// caller's claim like every other second does.
+		const publishWithheld = opts.push ? this.publishFenceRefusal(opts.publishFence) : null;
+		if (opts.push && publishWithheld === null) {
 			const repoUrl = (
-				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing')
+				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing', signal)
 			).stdout.trim();
 			await this.gitOrThrow(
 				['push', this.authedUrl(repoUrl, opts.auth), `HEAD:refs/heads/${handle.branch}`],
 				dir,
 				opts.auth,
-				'git push failed'
+				'git push failed',
+				signal
 			);
 			pushed = true;
 		}
@@ -446,8 +471,43 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			pushed,
 			headSha,
 			empty: false,
-			...(changedFiles === null ? {} : { changedFiles })
+			...(changedFiles === null ? {} : { changedFiles }),
+			...(publishWithheld === null ? {} : { publishWithheld })
 		};
+	}
+
+	/**
+	 * Why this push must not start, or null when it may.
+	 *
+	 * Withholding is the conservative half of the trade: the commit stays
+	 * on the local branch and the run reports the refusal, so the operator
+	 * loses a push rather than getting two nodes writing one task branch.
+	 * A caller that supplied no fence (the cloud runner, which holds no
+	 * lease) never reaches the arithmetic.
+	 *
+	 * A fence that is present but unreadable fails CLOSED: a caller that
+	 * bothered to declare a deadline and then could not compute one does
+	 * not know whether it still owns the work, which is precisely the
+	 * state in which publishing is unsafe.
+	 *
+	 * What it does NOT do: bound a push already under way. Once the push is
+	 * spawned only the caller's signal can stop it, and killing the process
+	 * cannot retract a ref the remote has taken. The fence therefore shrinks
+	 * the double-write window to "the push ran longer than its caller's
+	 * margin" — it does not close it, and `marginMs` is the caller's honest
+	 * estimate of its own push, not a guarantee.
+	 */
+	private publishFenceRefusal(fence: WorkspacePublishFence | undefined): string | null {
+		if (!fence) return null;
+		if (!Number.isFinite(fence.deadlineAt)) {
+			return 'the lease deadline for this work is unknown, so a push could outlive the claim on it';
+		}
+		const marginMs = Number.isFinite(fence.marginMs) && fence.marginMs > 0 ? Math.floor(fence.marginMs) : 0;
+		const remainingMs = fence.deadlineAt - this.now();
+		if (remainingMs > marginMs) return null;
+		return remainingMs <= 0
+			? `the lease on this work expired ${formatSeconds(-remainingMs)} ago; the platform may already have re-offered it to another node`
+			: `only ${formatSeconds(remainingMs)} of the lease remains, below the ${formatSeconds(marginMs)} a push needs to finish inside it`;
 	}
 
 	/**
@@ -459,10 +519,11 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	private async countChangedFiles(
 		dir: string,
 		baseSha: string,
-		auth?: WorkspaceProvisionSpec['auth']
+		auth?: WorkspaceProvisionSpec['auth'],
+		signal?: AbortSignal
 	): Promise<number | null> {
 		try {
-			const diff = await this.git(['diff', '--name-only', `${baseSha}..HEAD`], dir, auth);
+			const diff = await this.git(['diff', '--name-only', `${baseSha}..HEAD`], dir, auth, signal);
 			if (diff.code !== 0) return null;
 			const files = diff.stdout
 				.split('\n')
@@ -470,6 +531,9 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 				.filter((line) => line.length > 0);
 			return new Set(files).size;
 		} catch {
+			// Best-effort stops at cancellation: the aborted diff must surface
+			// as the finalize's cancellation, never degrade to "no data".
+			if (signal?.aborted) throwIfFinalizeAborted(signal);
 			return null;
 		}
 	}
@@ -1382,3 +1446,18 @@ async function existsNoFollow(path: string): Promise<boolean> {
 }
 
 export default LocalWorkspacePlugin;
+
+/** Operator-facing duration for the publish-fence reason (one decimal under 10s). */
+function formatSeconds(ms: number): string {
+	const seconds = ms / 1000;
+	return `${seconds < 10 ? Math.round(seconds * 10) / 10 : Math.round(seconds)}s`;
+}
+
+/** Refuse to start a finalize the caller has already abandoned. */
+function throwIfFinalizeAborted(signal?: AbortSignal): void {
+	if (!signal?.aborted) return;
+	const reason = signal.reason;
+	const error = new Error(reason instanceof Error ? reason.message : 'Workspace finalize was cancelled');
+	error.name = 'AbortError';
+	throw error;
+}

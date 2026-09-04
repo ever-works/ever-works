@@ -5,6 +5,7 @@ import {
 } from '@/components/works/detail/schedule/WorkScheduleCard';
 import { WorkScheduleHeader } from '@/components/works/detail/schedule/WorkScheduleHeader';
 import { canManageSchedule } from '@/lib/permissions';
+import { isRepositoryWorkKind } from '@ever-works/contracts';
 import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import type { GeneratorFormSchema, ProviderOption } from '@/lib/api/types-only';
@@ -82,6 +83,13 @@ export default async function WorkSchedulePage({ params }: Params) {
     }
 
     if (!canManageSchedule(work.userRole)) {
+        notFound();
+    }
+
+    // A schedule on a Repository Work would record a failed run every tick:
+    // the API refuses generation for the kind. Not served (the Generator tab
+    // that links here is hidden too; this covers a typed URL).
+    if (isRepositoryWorkKind(work.kind)) {
         notFound();
     }
 

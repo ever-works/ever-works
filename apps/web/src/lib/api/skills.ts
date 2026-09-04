@@ -82,6 +82,21 @@ export interface SkillCatalogEntry {
     version: string;
     tags: string[];
     sourceUrl?: string;
+
+    /**
+     * Provenance for entries that came from an Agent Plugins package.
+     *
+     * This interface is a hand-maintained MIRROR of the one in
+     * `packages/plugin/src/contracts/capabilities/skills-provider.interface.ts`
+     * — the web app does not import that package's type. Adding a field there
+     * and not here is invisible: the API sends it, nothing strips it, and the
+     * UI simply never sees it. That failure shows up as "the source label
+     * never renders", not as a type error, so the two must be changed
+     * together.
+     */
+    packageName?: string;
+    packageVersion?: string;
+    sourceKind?: 'plugin' | 'local' | 'git' | 'npm';
 }
 
 export interface ListResponse<T> {

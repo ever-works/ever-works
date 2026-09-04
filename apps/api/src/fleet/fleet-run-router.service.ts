@@ -16,6 +16,7 @@ import type {
     NodeDispatcherFactory,
     NodeJobRuntimePlugin,
 } from '@ever-works/job-runtime-node-plugin';
+import type { FleetAgentTaskPlan } from './fleet-agent-task.dispatcher';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
     NODE_JOB_RUNTIME_DISPATCHER_FACTORY,
@@ -238,9 +239,18 @@ export class FleetRunRouterService {
          * condition it describes.
          */
         queuedReason?: string | null,
+        /**
+         * Agent execution v2 — the model-CLI plan. When present the job
+         * carries the assembled instructions, the token-free repository
+         * spec the node provisions itself, the acceptance checks and the
+         * git policy, and NOT the legacy command steps: the two modes
+         * are alternatives, and a node must never be asked to run both
+         * the agent and the operator's template for one Task.
+         */
+        plan?: FleetAgentTaskPlan | null,
     ): Promise<{ runId: string }> {
-        const steps = this.buildAgentTaskSteps(payload);
-        const workspacePath = config.fleetNode.getAgentTaskWorkspacePath();
+        const steps = plan ? [] : this.buildAgentTaskSteps(payload);
+        const workspacePath = plan ? undefined : config.fleetNode.getAgentTaskWorkspacePath();
 
         const jobPayload: FleetAgentTaskPayload = {
             taskId: payload.taskId,
@@ -256,6 +266,21 @@ export class FleetRunRouterService {
         if (steps.length > 0) {
             jobPayload.steps = steps;
         }
+        if (plan) {
+            jobPayload.execution = plan.execution;
+            jobPayload.workspace = plan.workspace;
+            jobPayload.acceptanceChecks = plan.acceptanceChecks;
+            jobPayload.git = plan.git;
+        }
+        // A model-CLI job may only be leased by a node that advertises the
+        // CLI it needs: the tag is backed by a resolved executable on the
+        // node, so requiring it here is what keeps a Claude job off a
+        // machine that only has Codex (and vice versa).
+        const requiredCapabilities = plan
+            ? Array.from(
+                  new Set([...config.fleetNode.getRequiredCapabilities(), plan.execution.provider]),
+              )
+            : config.fleetNode.getRequiredCapabilities();
 
         const leaseTtlSec = config.fleetNode.getLeaseTtlSeconds();
         const enqueueOptions: {
@@ -276,16 +301,16 @@ export class FleetRunRouterService {
                 userId: payload.userId,
                 organizationId: payload.organizationId ?? null,
                 payload: jobPayload as unknown as Record<string, unknown>,
-                requiredCapabilities: config.fleetNode.getRequiredCapabilities(),
+                requiredCapabilities,
                 ...(queuedReason ? { queuedReason } : {}),
             },
             enqueueOptions,
         );
 
         this.logger.log(
-            `Enqueued fleet job ${jobId} (agent-task) for task ${payload.taskId} run ${
-                payload.runId ?? 'unknown'
-            }${queuedReason ? ` [${queuedReason}]` : ''}`,
+            `Enqueued fleet job ${jobId} (agent-task${plan ? `, model-cli/${plan.execution.provider}` : ''}) for task ${
+                payload.taskId
+            } run ${payload.runId ?? 'unknown'}${queuedReason ? ` [${queuedReason}]` : ''}`,
         );
         return { runId: jobId };
     }

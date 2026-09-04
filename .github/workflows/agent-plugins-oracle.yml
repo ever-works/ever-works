@@ -1,0 +1,85 @@
+name: Agent Plugins conformance oracle
+
+# T9 of docs/specs/features/agent-plugins/tasks.md — an INDEPENDENT check of
+# our Agent Skills frontmatter validation against `skills-ref`, the Python
+# reference validator published by the Agent Skills project.
+#
+# Deliberately opt-in only: manual dispatch, plus a weekly run so upstream
+# drift surfaces on its own. It is NOT wired into pull requests. The reasons
+# are worth stating, because "add it to CI" is the obvious instinct:
+#
+#   * It is an oracle, not a gate. Our own suite already encodes the
+#     specification's constraint tables as fixtures; this only tells us
+#     whether a second implementation agrees.
+#   * It installs a third-party Python package from PyPI. On every PR that is
+#     a supply-chain touchpoint and a new way for an unrelated change to go
+#     red, which is exactly the "a broken gate masks the real signal" failure
+#     this repository has been bitten by before.
+#   * `skills-ref` is a reference implementation under active development.
+#     A disagreement is a question to investigate, not a reason to block a
+#     merge.
+#
+# Every step is `continue-on-error`, so a red run is a signal to read, never
+# a blocked branch.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays, 06:00 UTC.
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  skills-ref:
+    name: skills-ref validate over the skill fixtures
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install skills-ref
+        id: install
+        continue-on-error: true
+        run: pip install skills-ref
+
+      - name: Validate every skill directory in the fixture corpus
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set +e
+          FIXTURES=packages/agent-plugins/fixtures
+          status=0
+          # Every immediate child of a fixture's skills/ directory is one
+          # candidate skill — the same discovery rule the loader applies.
+          while IFS= read -r skill; do
+            echo "::group::$skill"
+            skills-ref validate "$skill"
+            rc=$?
+            if [ $rc -ne 0 ]; then
+              echo "skills-ref rejected $skill (exit $rc)"
+              status=1
+            fi
+            echo "::endgroup::"
+          done < <(find "$FIXTURES" -mindepth 3 -maxdepth 3 -type d -path '*/skills/*' | sort)
+          echo
+          echo "Fixture corpus deliberately contains INVALID skills, so a non-zero"
+          echo "aggregate is expected. What matters is whether skills-ref and this"
+          echo "library disagree about any INDIVIDUAL skill — compare the groups"
+          echo "above with the expectations in src/__tests__/skills.spec.ts."
+          exit 0
+
+      - name: Note when skills-ref could not be installed
+        if: steps.install.outcome != 'success'
+        run: |
+          echo "skills-ref could not be installed from PyPI; the oracle did not run."
+          echo "This is informational only and does not indicate a conformance problem."

@@ -50,6 +50,7 @@ import {
     RuntimeBindingStamperService,
 } from '@src/tasks';
 import { WorkScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
+import { assertNotRepositoryWork, assertRepositoryRole } from '@src/works/repository-work-guard';
 import { WorkOwnershipService } from './work-ownership.service';
 import { WorkMemoryService } from './work-memory.service';
 import { normalizeGeneratorError } from './utils/error.utils';
@@ -177,6 +178,7 @@ export class WorkGenerationService {
     ): Promise<ItemsGeneratorResponseDto> {
         // Require editor role to generate/update items
         const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+        this.ensureNotRepositoryWork(work);
         this.ensureNotAlreadyGenerating(work);
         const triggerContext = this.resolveContext(context);
 
@@ -222,6 +224,7 @@ export class WorkGenerationService {
 
         // Require editor role to generate/update items
         const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+        this.ensureNotRepositoryWork(work);
 
         // For scheduled runs, skip gracefully if work is busy (don't penalize the schedule)
         if (
@@ -433,6 +436,7 @@ export class WorkGenerationService {
         try {
             // Require editor role to generate/update items
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            this.ensureNotRepositoryWork(work, 'item submission');
 
             const result = await this.itemSubmissionService.submitItem(work, user, dto);
 
@@ -497,6 +501,7 @@ export class WorkGenerationService {
         try {
             // Require editor role to generate/update items
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            this.ensureNotRepositoryWork(work, 'item removal');
 
             const result = await this.itemSubmissionService.removeItem(work, user, dto);
 
@@ -554,6 +559,7 @@ export class WorkGenerationService {
         try {
             // Require editor role to generate/update items
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            this.ensureNotRepositoryWork(work, 'item update');
 
             const result = await this.itemSubmissionService.updateItem(work, user, dto);
 
@@ -617,7 +623,10 @@ export class WorkGenerationService {
         const facadeOptions = { userId: user.id, ...(workId && { workId }) };
 
         if (workId) {
-            await this.ownershipService.ensureCanEdit(workId, user.id);
+            const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            // Extraction is the first step of adding an item; a Repository
+            // Work has nowhere for that item to go.
+            this.ensureNotRepositoryWork(work, 'item detail extraction');
         }
 
         // Security (SSRF defense-in-depth): the content extractor's default
@@ -772,6 +781,9 @@ Only include image URLs that are absolute URLs (starting with http).`;
         try {
             // Require editor role to capture images
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            // Reads every item (a clone of the data repository) and writes
+            // screenshots back into it.
+            this.ensureNotRepositoryWork(work, 'bulk image capture');
 
             // Get all items from the work
             const items = await this.dataGenerator.getItems(work, user);
@@ -899,7 +911,10 @@ Only include image URLs that are absolute URLs (starting with http).`;
     ): Promise<{ status: string; domainType: string; domainTypeManuallySet: boolean }> {
         try {
             // Require editor role to update domain type
-            await this.ownershipService.ensureCanEdit(workId, user.id);
+            const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            // The domain type steers the directory content pipeline; a
+            // Repository Work has no content pipeline to steer.
+            this.ensureNotRepositoryWork(work, 'domain type update');
 
             // Update the work
             await this.workRepository.update(workId, {
@@ -930,6 +945,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
         try {
             // Require editor role to generate/update items
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            this.ensureNotRepositoryWork(work);
 
             await this.markdownGenerator.initialize(work, user, {
                 generation_method: GenerationMethod.RECREATE,
@@ -955,6 +971,7 @@ Only include image URLs that are absolute URLs (starting with http).`;
         try {
             // Require editor role to generate/update items
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            this.ensureNotRepositoryWork(work);
 
             const templateUpdate = await this.dataGenerator.updateMarkdownTemplate(work, user);
 
@@ -1006,6 +1023,10 @@ Only include image URLs that are absolute URLs (starting with http).`;
         try {
             // Require editor role to generate/update items
             const { work } = await this.ownershipService.ensureCanEdit(workId, user.id);
+            // Kinds without a website repository (Repository, Company,
+            // Campaign) have nothing to sync the template into; the derived
+            // `<slug>-website` name could even be somebody else's repo.
+            assertRepositoryRole(work, 'website');
 
             const result = await this.websiteUpdateService.updateRepository(work, user);
             const websiteOwner = work.getRepoOwner('website');
@@ -1793,6 +1814,25 @@ Only include image URLs that are absolute URLs (starting with http).`;
         if (work.generateStatus?.status === GenerateStatusType.GENERATING) {
             throw new ConflictException(`Work "${work.name}" already has a generation in progress`);
         }
+    }
+
+    /**
+     * Repository Work (self-build slice D, EW-766) — a `repo` Work's data
+     * repository is the user's own code repository (`ever-works/ever-works`,
+     * a template repo, …). Every pipeline behind this service clones that
+     * repository and writes into it: item generation lays down directory
+     * scaffolding and content, README regeneration rewrites `README.md`,
+     * item submission commits `items/<slug>.md` to the default branch.
+     * Run against a code repository that would push generated content into
+     * a human's source tree, so refuse up front — before a history row, a
+     * provider warm-up, a clone or a dispatch exists. The web app never
+     * offers these actions for the kind (`WORK_KIND_CAPABILITIES.repo`);
+     * this is the API boundary catching a direct call, an MCP tool or the
+     * Work chat's item tools. The rule itself lives in the shared guard so
+     * every other data-repository writer refuses the same way.
+     */
+    private ensureNotRepositoryWork(work: Work, action = 'content generation'): void {
+        assertNotRepositoryWork(work, action);
     }
 
     private resolveContext(context?: GenerationTriggerContext): GenerationTriggerContext {

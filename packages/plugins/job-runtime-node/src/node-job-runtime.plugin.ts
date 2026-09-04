@@ -146,6 +146,65 @@ export class NodeJobRuntimePlugin implements IJobRuntimeProvider {
 				description:
 					'Comma-separated environment variable NAMES an `agent-task` step may read from the node’s own environment. A node drops secret-shaped names unless granted, so without this a machine whose Claude or Codex credential lives in an environment variable authenticates with nothing. Only the NAME travels — the value is read on the node and never leaves it, which is why one list works for a fleet of differently-credentialled machines: granting a name a machine does not set is a no-op. Blank inherits the default (the four well-known Claude/Codex names); set it to a single space to grant none.',
 				'x-envVar': 'FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH'
+			},
+			// ── Agent execution v2 — model CLIs on the node ──────────
+			agentExecutionMode: {
+				type: 'string',
+				title: 'Agent execution mode',
+				description:
+					'`command` (default) runs the agent task command template above. `model-cli` has the platform assemble the agent’s instructions and the node run a local Claude Code / Codex on them inside an isolated worktree, then grade the acceptance checks and push the task branch — the node’s own CLI login does the model work.',
+				enum: ['command', 'model-cli'],
+				'x-envVar': 'FLEET_NODE_AGENT_EXECUTION_MODE'
+			},
+			agentExecutionProvider: {
+				type: 'string',
+				title: 'Model CLI',
+				description:
+					'Which local CLI a node drives in model-cli mode. The node must advertise the matching capability tag.',
+				enum: ['claude-code', 'codex'],
+				'x-envVar': 'FLEET_NODE_AGENT_EXECUTION_PROVIDER'
+			},
+			agentExecutionModel: {
+				type: 'string',
+				title: 'Model',
+				description:
+					'Model id handed to the CLI (`--model`), e.g. `claude-opus-5`. Blank uses the CLI’s default.',
+				'x-envVar': 'FLEET_NODE_AGENT_EXECUTION_MODEL'
+			},
+			agentExecutionEffort: {
+				type: 'string',
+				title: 'Effort',
+				description: 'Claude Code `--effort` level. Blank uses the CLI’s default.',
+				enum: ['low', 'medium', 'high', 'xhigh', 'max'],
+				'x-envVar': 'FLEET_NODE_AGENT_EXECUTION_EFFORT'
+			},
+			agentExecutionPermissionMode: {
+				type: 'string',
+				title: 'Permission mode',
+				description:
+					'What the CLI may do without asking (`acceptEdits` by default). Mapped onto Codex’s sandbox (`plan` → read-only).',
+				enum: ['acceptEdits', 'dontAsk', 'plan', 'default'],
+				'x-envVar': 'FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE'
+			},
+			agentExecutionTimeoutSeconds: {
+				type: 'number',
+				title: 'Model run timeout (seconds)',
+				description: 'Wall-clock budget for one model run on the node (60–1800; default 1200).',
+				'x-envVar': 'FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS'
+			},
+			agentExecutionMaxBudgetUsd: {
+				type: 'number',
+				title: 'Max spend per run (USD)',
+				description:
+					'Dollar cap handed to the CLI for one run (Claude Code `--max-budget-usd`). Blank = no cap.',
+				'x-envVar': 'FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD'
+			},
+			agentExecutionSkipPermissions: {
+				type: 'boolean',
+				title: 'Skip CLI permission prompts',
+				description:
+					'Let unattended runs bypass the CLI’s permission prompts (`--dangerously-skip-permissions`). Off by default; an explicit decision recorded on every job.',
+				'x-envVar': 'FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS'
 			}
 		}
 	};

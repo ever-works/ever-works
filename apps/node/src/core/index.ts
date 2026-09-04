@@ -29,3 +29,5 @@ export * from './worker-safety-store';
 export * from './executors/acceptance-checks';
 export * from './executors/agent-task';
 export * from './executors/browser-check';
+export * from './executors/model-cli';
+export * from './model-cli-probe';

@@ -117,9 +117,11 @@ export class QuickCreateWorkDto {
 
     @ApiPropertyOptional({
         description:
-            'Work kind the user picked at creation (website, landing-page, blog, directory, awesome-repo). ' +
+            'Work kind the user picked at creation (website, landing-page, blog, directory, awesome-repo, repo). ' +
             'Forwarded into CreateWorkDto so the kind-aware default website template applies. ' +
-            'Unknown values are coerced to "default"; omitted keeps the column default.',
+            'Unknown values are coerced to "default"; omitted keeps the column default. ' +
+            '`repo` needs a `repositoryUrl`, which quick-create does not carry, and has nothing to generate — ' +
+            'the request is rejected with 400; register a Repository Work through POST /api/works instead.',
         enum: [...USER_SELECTABLE_WORK_KINDS, 'default'],
     })
     @IsOptional()

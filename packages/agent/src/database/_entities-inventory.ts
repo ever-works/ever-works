@@ -152,6 +152,8 @@ import { WorkflowRun } from '../entities/workflow-run.entity';
 import { Environment } from '../entities/environment.entity';
 import { MemoryFolder } from '../entities/memory-folder.entity';
 // Repository registry (Feature G)
+import { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
+import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-allowlist.entity';
 import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 
@@ -381,6 +383,8 @@ export const ENTITIES = [
     MemoryFolder,
     // Repository registry (Feature G) — account-level repo records plus
     // the Agent → repo grant edge rows.
+    AgentPluginPackage,
+    AgentPluginPackageAllowlist,
     RepoConnection,
     AgentRepoAttachment,
 ];

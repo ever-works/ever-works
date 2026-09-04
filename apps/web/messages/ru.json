@@ -666,6 +666,13 @@
                 "unarchive": "Move to Active",
                 "delete": "Delete"
             },
+            "fleet": {
+                "badge": "From your fleet",
+                "node": "Node",
+                "task": "Task",
+                "branch": "Branch",
+                "pullRequest": "Pull request"
+            },
             "detail": {
                 "none": "Select a message to read it.",
                 "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
@@ -1338,6 +1345,30 @@
                     "saved": "Стартовый скрипт сохранён",
                     "bytes": "{used} / {max} КБ",
                     "tooLong": "Стартовый скрипт превышает 16 КБ."
+                },
+                "fleet": {
+                    "title": "Execution",
+                    "description": "Where this agent's work runs when machines are enrolled in your Fleet: pin the agent to one of your nodes, and see the routing rule in force for your account.",
+                    "manage": "Manage fleet",
+                    "nodeLabel": "Preferred node",
+                    "nodeHelper": "With a node chosen, this agent's jobs are leased only by that machine — pick the one that holds the checkout, the credentials or the hardware the work needs. Any node lets whichever of your machines is free take them.",
+                    "anyNode": "Any node",
+                    "missingNode": "A node that is no longer enrolled",
+                    "hintOffline": "{name} is offline. Jobs for this agent will wait until it reports in again.",
+                    "hintDraining": "{name} is drained (paused or disabled). Jobs for this agent will wait until it returns to service.",
+                    "hintMissing": "The preferred node was removed from your fleet. Jobs for this agent would wait for a machine that no longer exists — pick another node, or Any node.",
+                    "noNodes": "No machines are enrolled in your Fleet yet, so there is nothing to pin this agent to.",
+                    "noNodesLink": "Enroll a machine in Settings → Fleet",
+                    "affinityPersonalScope": "A preferred node can be set for Organization agents only. Switch to an Organization workspace to pin this agent to a machine.",
+                    "affinityUnavailable": "The preferred node could not be loaded right now. Reload the page to try again.",
+                    "saved": "Preferred node saved",
+                    "cleared": "Preferred node cleared — any of your nodes can take this agent's work",
+                    "routingLabel": "Execution routing",
+                    "routingAccountDefault": "Your account default.",
+                    "routingPlatformDefault": "Platform default — nothing is configured for your account yet.",
+                    "routingOverrides": "{count, plural, one {# Work or Goal override takes} other {# Work or Goal overrides take}} precedence for runs in their own scope.",
+                    "routingUnavailable": "Execution routing could not be loaded right now.",
+                    "routingChange": "Change in Settings → Fleet"
                 }
             }
         },
@@ -1447,7 +1478,9 @@
                 "stepApproval": "approval",
                 "featureName": "Feature name",
                 "featureDescription": "Feature description",
-                "createFromTemplate": "Create workflow"
+                "createFromTemplate": "Create workflow",
+                "extraRepos": "Also work in",
+                "extraReposHint": "Optional. Repositories checked here are checked out next to the Work's repository when the task runs on one of your machines; each one that changes gets its own pull request. The agent's attached repositories are included automatically."
             },
             "detail": {
                 "moveTo": "Переместить в",
@@ -1501,6 +1534,9 @@
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
                     "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "waitingForAnswer": "The agent paused this run with a question for you.",
+                    "answerInInbox": "Answer it in the Inbox",
+                    "parkedHintQuestion": "Answer the question in the Inbox to continue on the same branch. Archive the question there if you want to drop this run.",
                     "steerPlaceholder": "Message the running agent…",
                     "resumePlaceholder": "Optional instruction to resume with…",
                     "steer": "Steer",
@@ -1529,7 +1565,9 @@
                 "openWork": "Открыть этот Work",
                 "openMission": "Открыть эту Миссию",
                 "openIdea": "Открыть эту Идею",
-                "openAgent": "Открыть этого Агента"
+                "openAgent": "Открыть этого Агента",
+                "extraRepos": "Also in",
+                "extraReposUpdateError": "Failed to update the extra repositories"
             },
             "recurring": {
                 "section": "Повторяющееся расписание",
@@ -1603,13 +1641,17 @@
                 "resolveError": "Failed to resolve conflicts",
                 "discard": "Discard branch",
                 "discardConfirm": "Discard this Task's branch? All unmerged changes on the branch will be permanently lost. This cannot be undone.",
+                "discardConfirmMultiRepo": "Discard this Task's branches in {count} repositories? Every unmerged change is permanently lost, and any pull request still open on those branches is closed. This cannot be undone.",
                 "discardError": "Failed to discard branch",
                 "isolationLabel": "Task isolation",
                 "isolationDescription": "Override the Work-level isolation setting for this Task. When off, agents work directly against the Work's repositories.",
                 "isolationInherit": "Inherit from Work",
                 "isolationOn": "On — isolated branch",
                 "isolationOff": "Off — work directly",
-                "isolationSaveError": "Failed to update isolation override"
+                "isolationSaveError": "Failed to update isolation override",
+                "linkedPullRequests": "Also in",
+                "linkedPrPushed": "branch pushed, no pull request yet",
+                "linkedPrFailed": "branch pushed; opening the pull request failed"
             },
             "gateChip": {
                 "green": "Gate passed",
@@ -1713,6 +1755,12 @@
                 "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
                 "deleteError": "Failed to delete the template",
                 "requiresApproval": "Requires approval"
+            },
+            "extraRepos": {
+                "loading": "Loading repositories…",
+                "loadError": "Could not load your repositories.",
+                "empty": "No repositories in your registry yet.",
+                "emptyLink": "Add one in Settings → Repositories"
             }
         },
         "skillsPage": {
@@ -2525,7 +2573,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Плагины агента"
             },
             "githubApp": {
                 "title": "Установки GitHub App",
@@ -3100,7 +3149,8 @@
                     "enrolling": "Enrolling",
                     "online": "Online",
                     "offline": "Offline",
-                    "disabled": "Disabled"
+                    "disabled": "Disabled",
+                    "paused": "Paused"
                 },
                 "table": {
                     "name": "Name",
@@ -3230,10 +3280,7 @@
                     "downloadNode": "Headless node"
                 },
                 "history": {
-                    "failuresTitle": "Recent failures",
-                    "noFailures": "No failures in the recent history.",
                     "recentCount": "{count} recent jobs",
-                    "attempts": "{count} attempts",
                     "loading": "Loading history…",
                     "unavailable": "Job history is unavailable right now. The node itself is fine."
                 },
@@ -3264,6 +3311,40 @@
                             "label": "Cloud",
                             "helper": "Always uses the platform runtime, even when a local runner is free."
                         }
+                    }
+                },
+                "jobs": {
+                    "title": "Job history",
+                    "description": "The most recent jobs leased to this machine, newest first.",
+                    "filterAll": "All",
+                    "filterFailed": "Failed",
+                    "filterRunning": "Running",
+                    "emptyAll": "No jobs in the recent history.",
+                    "emptyFailed": "No failed jobs in the recent history.",
+                    "emptyRunning": "No job is running on this node right now.",
+                    "statuses": {
+                        "queued": "Queued",
+                        "leased": "Leased",
+                        "running": "Running",
+                        "done": "Done",
+                        "failed": "Failed"
+                    },
+                    "pinned": "Pinned to this node",
+                    "attempts": "Attempt {attempts} of {maxAttempts}",
+                    "queuedAt": "Queued",
+                    "queuedAtValue": "Queued {time}",
+                    "started": "Started",
+                    "startedValue": "Started {time}",
+                    "notStarted": "Not started",
+                    "completed": "Completed",
+                    "completedValue": "Completed {time}",
+                    "notCompleted": "Not completed",
+                    "duration": "Duration",
+                    "durationValue": "Took {duration}",
+                    "elapsedValue": "Running for {duration}",
+                    "queuedReason": "Waiting: {reason}",
+                    "queuedReasons": {
+                        "waitingForRunner": "no runner can take it yet"
                     }
                 }
             },
@@ -3553,6 +3634,7 @@
                 "agentCard": {
                     "title": "Repositories",
                     "subtitle": "Grant this agent access to repositories from your registry.",
+                    "fleetHint": "Attached repositories are mounted next to the Task's repository on fleet runs and get their own pull request when they change.",
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
@@ -3613,6 +3695,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Плагины агента",
+                "description": "Пакеты в открытом формате Agent Plugins добавляют в это рабочее пространство навыки и MCP-серверы. Они работают в любом клиенте, поддерживающем стандарт.",
+                "disabled": "Поддержка плагинов агента отключена в этом развёртывании. Оператор может включить её, задав:",
+                "loadFailed": "Не удалось загрузить установленные пакеты. Это проблема соединения, а не признак того, что ничего не установлено.",
+                "scanning": "Сканирование {roots}",
+                "searchPlaceholder": "Поиск пакетов и навыков",
+                "empty": "Пакеты ещё не установлены.",
+                "noMatches": "Ни один пакет не соответствует запросу.",
+                "specVersion": "специф. {version}",
+                "skills": "{count, plural, =0 {Навыки} one {# навык} few {# навыка} many {# навыков} other {# навыка}}",
+                "mcpServers": "{count, plural, =0 {MCP-серверы} one {# MCP-сервер} few {# MCP-сервера} many {# MCP-серверов} other {# MCP-сервера}}",
+                "none": "Нет",
+                "rejected": "отклонён",
+                "rejectedHelp": "Этот пакет не удалось загрузить, поэтому он ничего не добавляет. Он показан, потому что кто-то добавил его намеренно.",
+                "rejectedHeading": "{count, plural, one {# отклонённый пакет} few {# отклонённых пакета} many {# отклонённых пакетов} other {# отклонённого пакета}}",
+                "shadowedHeading": "Перекрытые пакеты",
+                "shadowedHelp": "Они объявляют имя, которое уже предоставил более ранний каталог, поэтому используется только первый.",
+                "severity": {
+                    "fatal": "Критическая",
+                    "error": "Ошибка",
+                    "warning": "Предупреждение"
+                },
+                "scopes": {
+                    "package": "Пакет",
+                    "manifest": "Манифест",
+                    "skills": "Навыки",
+                    "mcp": "MCP-серверы"
                 }
             }
         },
@@ -5976,6 +6088,7 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
+                "repo": "Репозиторий",
                 "company": "Company",
                 "agent": "Agent",
                 "task": "Task"
@@ -5990,6 +6103,7 @@
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
                 "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Существующий репозиторий кода как Work — к нему привязываются задачи, цели и запуски флота. Ничего не генерируется и не разворачивается.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
@@ -6139,6 +6253,26 @@
                 "slugLabel": "Work Slug",
                 "slugPlaceholder": "awesome-ai-tools",
                 "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
+            },
+            "repo": {
+                "formTitle": "Новый Work — Репозиторий",
+                "formSubtitle": "Зарегистрируйте существующий репозиторий кода как Work. Ничего не генерируется и не разворачивается — задачи, цели и запуски флота просто работают в этом репозитории.",
+                "urlLabel": "URL репозитория",
+                "urlPlaceholder": "https://github.com/ever-works/ever-works",
+                "urlHelp": "Репозиторий GitHub, к которому у вас есть доступ. Он без изменений становится репозиторием данных Work.",
+                "nameLabel": "Название Work",
+                "slugLabel": "Slug Work",
+                "slugHelp": "Идентификатор для URL. Формируется из названия репозитория — отредактируйте, чтобы изменить.",
+                "descriptionLabel": "Описание",
+                "submitButton": "Зарегистрировать репозиторий",
+                "creatingButton": "Регистрация…",
+                "cancelButton": "Отмена",
+                "invalidUrl": "Введите URL репозитория вида https://github.com/owner/repo",
+                "invalidSlug": "Только строчные буквы, цифры и дефисы, например my-repo",
+                "success": "Репозиторий зарегистрирован как Work",
+                "createFailed": "Не удалось зарегистрировать репозиторий",
+                "noteTitle": "Примечание:",
+                "noteText": "Для Work типа «Репозиторий» не создаются шаблон сайта, репозиторий провайдера и развёртывание. Подключите Git-провайдера, на котором размещён репозиторий, чтобы агенты могли его клонировать."
             },
             "manual": {
                 "title": "Создать вручную",
@@ -6382,14 +6516,16 @@
                 "landing-page": "Landing Page",
                 "blog": "Blog",
                 "directory": "Directory",
-                "awesome-repo": "Awesome Repo"
+                "awesome-repo": "Awesome Repo",
+                "repo": "Репозиторий"
             },
             "kindDescriptions": {
                 "website": "A multi-page site for a business, service, or brand — generated content + code.",
                 "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
                 "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
                 "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
+                "repo": "Существующий репозиторий кода как Work — к нему привязываются задачи, цели и запуски флота. Ничего не генерируется и не разворачивается."
             },
             "promptHints": {
                 "minLength": "Add a description (at least 10 characters) to start.",
@@ -7877,6 +8013,7 @@
             "blog": "Blog",
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
+            "repo": "Репозиторий",
             "company": "Company",
             "campaign": "Кампания",
             "default": "Work"

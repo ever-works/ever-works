@@ -15,6 +15,7 @@ import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
+import type { ModelCliPaths } from './executors/model-cli';
 import { defaultFleetTaskWorkspaceRoot, FleetTaskWorkspaceProvisioner } from './workspaces/fleet-task-workspace';
 import type { Logger } from './logger';
 import {
@@ -46,6 +47,12 @@ export interface NodeIo {
 	userAgent?: string;
 	scheduler?: Scheduler;
 	now?: () => number;
+	/**
+	 * Monotonic milliseconds, paired with `now`. The worker uses it to bound
+	 * a server-issued lease against a wall clock that may drift or be
+	 * stepped; absent, it reads the process clock directly.
+	 */
+	monotonicNow?: () => number;
 	/**
 	 * Free-disk probe for the node's workspace volume. Optional: without
 	 * it the node simply reports no disk figure, exactly as it did before
@@ -242,6 +249,12 @@ export interface CreateNodeRuntimeOptions {
 	leaseTtlSec?: number;
 	idlePollMs?: number;
 	/**
+	 * Lease an `agent-task` must have left before it may start pushing.
+	 * Absent uses the fleet default; raise it on a machine whose uplink
+	 * makes a first push of an agent's diff take longer than that.
+	 */
+	publishFenceMarginMs?: number;
+	/**
 	 * Directory `agent-task` steps run in when the job itself carries no
 	 * `workspacePath`. Absent lets the executor fall back to the node
 	 * service's own working directory.
@@ -250,7 +263,17 @@ export interface CreateNodeRuntimeOptions {
 	/** Persistent bare-cache/worktree root for repository-backed agent Tasks. */
 	agentTaskWorkspaceRoot?: string;
 	/** Test/embedding seam; ordinary runtimes use the local-workspace provider. */
-	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'>;
+	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'> &
+		Partial<Pick<FleetTaskWorkspaceProvisioner, 'finalize' | 'finalizeMounts'>>;
+	/**
+	 * Agent execution v2 — the model CLIs the `agent-task` executor may
+	 * spawn. Defaults to what `io.environment.modelCli` resolved at
+	 * startup; an explicit value (the `--claude-path` / `--codex-path`
+	 * flags) overrides it for this process only.
+	 */
+	modelCli?: ModelCliPaths;
+	/** Scratch root for the model step's instructions / output files. */
+	agentTaskScratchRoot?: string;
 	/** Persist a fail-closed worker quarantine into the node config. */
 	persistUnsafe?: (state: { since: string; reason: string }) => Promise<void> | void;
 	/** Durable write-ahead crash guard; acquired before the first job lease. */
@@ -323,12 +346,16 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(options.resourceProbe ? { resourceProbe: options.resourceProbe } : {}),
 			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
 			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
+			...(options.publishFenceMarginMs !== undefined
+				? { publishFenceMarginMs: options.publishFenceMarginMs }
+				: {}),
 			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
 			...(config.unsafe ? { startUnsafe: config.unsafe } : {}),
 			...(options.persistUnsafe ? { onUnsafe: options.persistUnsafe } : {}),
 			...(options.workerSafetyGate ? { safetyGate: options.workerSafetyGate } : {}),
 			...(io.scheduler ? { scheduler: io.scheduler } : {}),
-			...(io.now ? { now: io.now } : {})
+			...(io.now ? { now: io.now } : {}),
+			...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {})
 		});
 		const workspaceProvisioner =
 			options.workspaceProvisioner ??
@@ -342,12 +369,53 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// score a gate; with it a Task's run can actually EXECUTE here when
 		// the owner's resolved job runtime is the fleet. Same seam, same
 		// protocol, same credential — exactly as the header above promised.
-		worker.register('agent-task', (job, signal) =>
+		// Agent execution v2 — the model CLIs resolved at startup (or pinned
+		// by the operator for this process). Absent on a machine without
+		// either CLI: a job that asks for model execution then fails naming
+		// the missing CLI rather than pretending to have run it.
+		const modelCli = options.modelCli ?? io.environment.modelCli ?? {};
+		worker.register('agent-task', (job, signal, lease) =>
 			runAgentTaskJob(
 				job,
 				{
 					provisionWorkspace: (taskId, spec, provisionSignal) =>
 						workspaceProvisioner.provision(taskId, spec, provisionSignal),
+					...(workspaceProvisioner.finalize
+						? {
+								finalizeWorkspace: (taskId, descriptor, opts, finalizeSignal) =>
+									workspaceProvisioner.finalize!(taskId, descriptor, opts, finalizeSignal)
+							}
+						: {}),
+					...(workspaceProvisioner.finalizeMounts
+						? {
+								finalizeMounts: (taskId, descriptor, opts, finalizeSignal) =>
+									workspaceProvisioner.finalizeMounts!(taskId, descriptor, opts, finalizeSignal)
+							}
+						: {}),
+					// `agent-task` is the only kind that writes to a remote, so
+					// it is the only kind that has to know when this node stops
+					// being allowed to. Resolved through the handle, never
+					// captured: the deadline moves with every renewal, and
+					// `confirmDeadline` re-asks the platform at the moment of
+					// the write — which is the only way to see a claim that was
+					// taken away (an operator drained this node) while its
+					// deadline was still minutes in the future.
+					...(lease
+						? {
+								publishFence: async () => ({
+									deadlineAt: await lease.confirmDeadline(),
+									marginMs: lease.publishMarginMs
+								}),
+								// A withheld publish is not a verdict about the
+								// work — nothing ran to a conclusion — so the
+								// job goes back unsettled rather than terminal.
+								onPublishWithheld: (reason: string) => lease.defer(reason)
+							}
+						: {}),
+					modelCli,
+					...(options.agentTaskScratchRoot !== undefined
+						? { scratchRoot: options.agentTaskScratchRoot }
+						: {}),
 					...(options.agentTaskWorkspacePath !== undefined
 						? { defaultWorkspacePath: options.agentTaskWorkspacePath }
 						: {})

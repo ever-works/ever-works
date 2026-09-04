@@ -8,7 +8,7 @@ import { FLEET_NODE_KINDS } from '../fleet-node.types.js';
 import { FLEET_RUNNER_STATUS_REFRESH_SEC } from '../fleet-runner-status.types.js';
 
 /**
- * The fleet barrel declares nothing of its own (five `export *` lines), but
+ * The fleet barrel declares nothing of its own (six `export *` lines), but
  * it IS how `@ever-works/contracts` reaches every fleet symbol. A dropped or
  * mistyped re-export line still compiles here and only breaks at the call
  * site in another package — a build-time failure no test would otherwise
@@ -86,6 +86,30 @@ const NODE_EXPORTS = [
 	'FLEET_MIN_NODE_OFFLINE_AFTER_MS'
 ] as const;
 
+/** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
+const AGENT_EXECUTION_EXPORTS = [
+	'FLEET_AGENT_EXECUTION_PROVIDERS',
+	'DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER',
+	'isFleetAgentExecutionProvider',
+	'fleetAgentExecutionProviderSupportsMountGrants',
+	'FLEET_AGENT_EXECUTION_MODES',
+	'DEFAULT_FLEET_AGENT_EXECUTION_MODE',
+	'isFleetAgentExecutionMode',
+	'FLEET_AGENT_EXECUTION_EFFORTS',
+	'isFleetAgentExecutionEffort',
+	'FLEET_AGENT_EXECUTION_PERMISSION_MODES',
+	'DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE',
+	'isFleetAgentExecutionPermissionMode',
+	'FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES',
+	'FLEET_AGENT_EXECUTION_MAX_BUDGET_USD',
+	'FLEET_AGENT_EXECUTION_MODEL_PATTERN',
+	'FleetAgentExecutionError',
+	'normalizeFleetAgentModelExecution'
+] as const;
+
 const RUNNER_STATUS_EXPORTS = [
 	'FLEET_RUNNER_STATUS_REFRESH_SEC',
 	'FLEET_RUNNER_STATUS_MIN_REFRESH_SEC',
@@ -93,12 +117,35 @@ const RUNNER_STATUS_EXPORTS = [
 	'summarizeRunnerStatus'
 ] as const;
 
+/** Multi-repo Task workspaces (self-build slice C, `fleet-task-workspace.types.js`). */
+const WORKSPACE_EXPORTS = [
+	'FLEET_TASK_WORKSPACE_MAX_MOUNTS',
+	'FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN',
+	'FleetTaskWorkspaceMountError',
+	'normalizeFleetTaskWorkspaceMounts',
+	'isReservedMountDir'
+] as const;
+
+/** Owner question from a fleet run (self-build slice Q, `fleet-jobs.types.js`). */
+const QUESTION_EXPORTS = [
+	'FLEET_AGENT_TASK_META_DIR',
+	'FLEET_AGENT_TASK_QUESTION_FILE',
+	'FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES',
+	'FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS',
+	'FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES',
+	'parseFleetAgentTaskQuestionMarkdown',
+	'normalizeFleetAgentTaskQuestion'
+] as const;
+
 const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
 	...JOB_EXPORTS,
+	...AGENT_EXECUTION_EXPORTS,
 	...NODE_EXPORTS,
-	...RUNNER_STATUS_EXPORTS
+	...RUNNER_STATUS_EXPORTS,
+	...WORKSPACE_EXPORTS,
+	...QUESTION_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -115,7 +162,18 @@ const FUNCTION_EXPORTS = [
 	'nodeSatisfiesCapabilities',
 	'isNodeBusy',
 	'isFleetEnrollableNodeKind',
-	'summarizeRunnerStatus'
+	'summarizeRunnerStatus',
+	'isFleetAgentExecutionProvider',
+	'fleetAgentExecutionProviderSupportsMountGrants',
+	'isFleetAgentExecutionMode',
+	'isFleetAgentExecutionEffort',
+	'isFleetAgentExecutionPermissionMode',
+	'normalizeFleetAgentModelExecution',
+	'FleetTaskWorkspaceMountError',
+	'normalizeFleetTaskWorkspaceMounts',
+	'isReservedMountDir',
+	'parseFleetAgentTaskQuestionMarkdown',
+	'normalizeFleetAgentTaskQuestion'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -130,12 +188,12 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 60 runtime symbols', () => {
+	it('exposes exactly these 92 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(60);
+		expect(Object.keys(fleet)).toHaveLength(92);
 	});
 
 	it.each([
@@ -143,7 +201,8 @@ describe('fleet barrel', () => {
 		['fleet-execution-preference.types.js', 'FLEET_EXECUTION_MODES'],
 		['fleet-jobs.types.js', 'FLEET_JOB_STATUSES'],
 		['fleet-node.types.js', 'FLEET_NODE_KINDS'],
-		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC']
+		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
+		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

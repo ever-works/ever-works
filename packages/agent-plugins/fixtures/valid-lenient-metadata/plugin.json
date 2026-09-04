@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "lenient-metadata",
+  "version": "not-semver-at-all",
+  "homepage": "definitely not a url",
+  "repository": "???",
+  "license": "Free-For-All-2000",
+  "author": {
+    "name": "Nobody",
+    "email": "not-an-email",
+    "url": "nope"
+  }
+}

@@ -6,7 +6,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { FleetJobView } from '@ever-works/contracts';
 import { execFileWithVerifiedCancellation } from '@ever-works/local-workspace-plugin';
-import { nextBackoffMs, WorkerLoop, type JobLeaseCapableClient } from './worker-loop';
+import {
+	LEASE_TERMINATION_SAFETY_MS,
+	nextBackoffMs,
+	PUBLISH_FENCE_MARGIN_MS,
+	WorkerLoop,
+	type JobLeaseCapableClient,
+	type JobLeaseHandle
+} from './worker-loop';
 import type { Scheduler } from './heartbeat';
 import { runAgentTaskJob } from './executors/agent-task';
 import { terminateNodeProcessTree } from './executors/acceptance-checks';
@@ -381,6 +388,248 @@ describe('WorkerLoop', () => {
 		await vi.waitFor(() => expect(loop.getState().failed).toBe(1));
 		expect(loop.getState().completed).toBe(0);
 		await loop.stop();
+	});
+
+	it('hands the executor a lease deadline that tracks renewals rather than the value the job arrived with', async () => {
+		const startedAt = Date.parse('2026-09-04T12:00:00.000Z');
+		const scheduler = clockScheduler(startedAt);
+		const leasedJob = job({ leaseExpiresAt: new Date(startedAt + 30_000).toISOString() });
+		const client = scriptedClient([[leasedJob], []]);
+		// The platform grants exactly the TTL the node asked for, which is
+		// what `clampLeaseTtlSec` on both ends guarantees.
+		client.heartbeat.mockResolvedValue(
+			job({ status: 'running', leaseExpiresAt: new Date(startedAt + 40_000).toISOString() })
+		);
+		const executor = deferred<Record<string, unknown>>();
+		let lease: JobLeaseHandle | undefined;
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			leaseTtlSec: 30,
+			idlePollMs: 60_000,
+			now: scheduler.now,
+			monotonicNow: scheduler.now
+		});
+		loop.register('acceptance-checks', (_job, _signal, handle) => {
+			lease = handle;
+			return executor.promise;
+		});
+
+		await loop.start();
+		await vi.waitFor(() => expect(lease).toBeDefined());
+		// Straight off the wire before any renewal…
+		expect(lease?.deadlineAt()).toBe(startedAt + 30_000);
+		expect(lease?.publishMarginMs).toBe(10_000);
+
+		scheduler.advanceTo(startedAt + 10_000);
+		await vi.waitFor(() => expect(client.heartbeat).toHaveBeenCalledTimes(1));
+		// …and the renewal moves it. A publish fence wired to the value the
+		// job was LEASED with would refuse every long run: a 1200s model step
+		// outlives four renewals of a 300s lease before finalize is reached.
+		await vi.waitFor(() => expect(lease?.deadlineAt()).toBe(startedAt + 40_000));
+
+		executor.resolve({ ok: true });
+		await vi.waitFor(() => expect(loop.getState().completed).toBe(1));
+		await loop.stop();
+	});
+
+	it('caps the lease against a monotonic budget so a wall clock stepped backwards cannot extend it', async () => {
+		const startedAt = Date.parse('2026-09-04T15:00:00.000Z');
+		const scheduler = controllableScheduler();
+		// Two clocks that disagree: the wall clock is what a w32time resync
+		// steps after a wake-up, the monotonic one is what it cannot touch.
+		let wall = startedAt;
+		let monotonic = 0;
+		const leasedJob = job({ leaseExpiresAt: new Date(startedAt + 30_000).toISOString() });
+		const client = scriptedClient([[leasedJob], []]);
+		const executor = deferred<Record<string, unknown>>();
+		let lease: JobLeaseHandle | undefined;
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			leaseTtlSec: 30,
+			idlePollMs: 60_000,
+			now: () => wall,
+			monotonicNow: () => monotonic
+		});
+		loop.register('acceptance-checks', (_job, _signal, handle) => {
+			lease = handle;
+			return executor.promise;
+		});
+
+		await loop.start();
+		await vi.waitFor(() => expect(lease).toBeDefined());
+		expect(lease?.deadlineAt()).toBe(startedAt + 30_000);
+
+		// Twenty real seconds pass, and the wake-up resync then steps the wall
+		// clock a minute BACKWARDS. Read on the wall clock alone the claim has
+		// grown from 30s to 70s — the fence would wave through a publish the
+		// platform reclaimed 50 seconds ago.
+		monotonic += 20_000;
+		wall = startedAt + 20_000 - 60_000;
+		expect(lease?.deadlineAt()).toBe(wall + 10_000);
+
+		// And it still expires on time in monotonic terms.
+		monotonic += 10_000;
+		expect(lease?.deadlineAt()).toBe(wall);
+
+		executor.resolve({ ok: true });
+		await vi.waitFor(() => expect(loop.getState().completed).toBe(1));
+		await loop.stop();
+	});
+
+	it('stops a job whose claim lapsed while the machine slept, instead of re-arming at zero delay', async () => {
+		const startedAt = Date.parse('2026-09-04T16:00:00.000Z');
+		const scheduler = controllableScheduler();
+		let wall = startedAt;
+		const leasedJob = job({ leaseExpiresAt: new Date(startedAt + 30_000).toISOString() });
+		const client = scriptedClient([[leasedJob], []]);
+		const executor = deferred<Record<string, unknown>>();
+		let jobSignal: AbortSignal | undefined;
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			leaseTtlSec: 30,
+			idlePollMs: 60_000,
+			now: () => wall,
+			monotonicNow: () => wall
+		});
+		loop.register('acceptance-checks', (_job, signal) => {
+			jobSignal = signal;
+			return executor.promise;
+		});
+
+		await loop.start();
+		await vi.waitFor(() => expect(jobSignal).toBeDefined());
+		// The keep-alive armed at a third of the TTL, as always.
+		expect(scheduler.delays).toContain(10_000);
+
+		// The lid closes for an hour. `Date.now()` jumps across the suspend;
+		// the timer that was going to abort this job at +22s does not, because
+		// its base clock does not advance through S3/S4 — it is still counting
+		// down AWAKE seconds. So the wall clock has to be the authority.
+		wall = startedAt + 3_600_000;
+		const armedBeforeWake = scheduler.delays.length;
+		scheduler.runNext();
+
+		expect(client.heartbeat).not.toHaveBeenCalled();
+		expect(jobSignal?.aborted).toBe(true);
+		// And nothing re-armed. The old path computed `min(everyMs, remaining)`
+		// with `remaining` collapsed to 0 and beat a dead endpoint as fast as
+		// fetch could reject, for the whole rest of the run.
+		expect(scheduler.delays.slice(armedBeforeWake)).toEqual([]);
+
+		executor.resolve({ ok: true });
+		await vi.waitFor(() => expect(loop.getState().failed).toBe(1));
+		await loop.stop();
+	});
+
+	it('collapses the claim when a publish-time confirmation is refused', async () => {
+		const startedAt = Date.parse('2026-09-04T17:00:00.000Z');
+		const scheduler = controllableScheduler();
+		const leasedJob = job({ leaseExpiresAt: new Date(startedAt + 300_000).toISOString() });
+		const client = scriptedClient([[leasedJob], []]);
+		client.heartbeat.mockResolvedValue(null);
+		let confirmed: number | undefined;
+		let jobSignal: AbortSignal | undefined;
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			idlePollMs: 60_000,
+			now: () => startedAt,
+			monotonicNow: () => startedAt
+		});
+		loop.register('acceptance-checks', async (_job, signal, handle) => {
+			jobSignal = signal;
+			confirmed = await handle?.confirmDeadline();
+			return { ok: true };
+		});
+
+		await loop.start();
+		await vi.waitFor(() => expect(confirmed).toBeDefined());
+
+		// The deadline on the wire said five more minutes. The platform says
+		// the claim is not ours, which is what a drained or reassigned node
+		// hears while its own deadline still looks healthy — so the claim
+		// collapses to NOW and nothing may be published against it.
+		expect(confirmed).toBe(startedAt);
+		expect(jobSignal?.aborted).toBe(true);
+		expect(client.complete).not.toHaveBeenCalledWith('job-1', expect.objectContaining({ success: true }));
+		await loop.stop();
+	});
+
+	it('keeps the last confirmed claim when a publish-time confirmation cannot reach the platform', async () => {
+		const startedAt = Date.parse('2026-09-04T18:00:00.000Z');
+		const scheduler = controllableScheduler();
+		const leasedJob = job({ leaseExpiresAt: new Date(startedAt + 300_000).toISOString() });
+		const client = scriptedClient([[leasedJob], []]);
+		client.heartbeat.mockRejectedValue(new Error('transport offline'));
+		let confirmed: number | undefined;
+		let jobSignal: AbortSignal | undefined;
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			idlePollMs: 60_000,
+			now: () => startedAt,
+			monotonicNow: () => startedAt
+		});
+		loop.register('acceptance-checks', async (_job, signal, handle) => {
+			jobSignal = signal;
+			confirmed = await handle?.confirmDeadline();
+			return { ok: true };
+		});
+
+		await loop.start();
+		await vi.waitFor(() => expect(confirmed).toBeDefined());
+
+		// A partition proves nothing about ownership, so the run keeps the
+		// last deadline the platform actually confirmed and lets the local
+		// fence decide. Aborting here instead would throw away every run that
+		// happened to finalize during a ninety-second Wi-Fi drop.
+		expect(confirmed).toBe(startedAt + 300_000);
+		expect(jobSignal?.aborted).toBe(false);
+		await vi.waitFor(() => expect(loop.getState().completed).toBe(1));
+		await loop.stop();
+	});
+
+	it('reports nothing at all when an executor hands its job back unsettled', async () => {
+		const client = scriptedClient([[job()], []]);
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({ client, scheduler });
+		loop.register('acceptance-checks', async (_job, _signal, handle) => {
+			handle?.defer('publish withheld: the lease on this work expired 12s ago');
+			return { gateStatus: 'green' };
+		});
+
+		await loop.start();
+		await vi.waitFor(() => expect(loop.getState().failed).toBe(1));
+
+		// Neither `success: true` (which writes `done` and strands the
+		// agent's commit on this machine) nor `success: false` (which writes
+		// `failed` and never retries). The claim lapses and the platform
+		// re-offers the job inside its attempt budget.
+		expect(client.complete).not.toHaveBeenCalled();
+		expect(loop.getState().completed).toBe(0);
+		expect(loop.getState().lastError).toContain('publish withheld');
+		await loop.stop();
+	});
+
+	it('clamps the publish margin against the lease so a floor-length TTL can still publish at all', () => {
+		const client = scriptedClient([[]]);
+		// Default 300s lease: the full push budget fits comfortably.
+		expect(new WorkerLoop({ client }).publishFenceMargin).toBe(PUBLISH_FENCE_MARGIN_MS);
+		// 30s floor: a flat 60s margin would refuse every push forever, which
+		// trades a rare double-write for a permanent outage.
+		expect(new WorkerLoop({ client, leaseTtlSec: 30 }).publishFenceMargin).toBe(10_000);
+		// An operator on a slow uplink can buy a bigger push budget, still
+		// bounded by a third of the lease…
+		expect(new WorkerLoop({ client, publishFenceMarginMs: 90_000 }).publishFenceMargin).toBe(90_000);
+		expect(new WorkerLoop({ client, publishFenceMarginMs: 300_000 }).publishFenceMargin).toBe(100_000);
+		// …and cannot ask for less than the termination budget, below which
+		// the abort itself would land after the platform may reclaim.
+		expect(new WorkerLoop({ client, leaseTtlSec: 30, publishFenceMarginMs: 1_000 }).publishFenceMargin).toBe(
+			LEASE_TERMINATION_SAFETY_MS
+		);
 	});
 
 	it('counts one accepted success when a terminal heartbeat response races its completion response', async () => {

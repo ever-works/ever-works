@@ -53,6 +53,40 @@ describe('ApiClientService', () => {
 		);
 	});
 
+	describe('Organization scope (EVER_WORKS_SCOPE_SLUG)', () => {
+		it('sends no x-scope-slug header when no scope is configured (personal scope)', async () => {
+			mockResponse({ id: '1' });
+			await service.request('GET', '/fleet/agents/a1/node-affinity');
+			const headers = fetchSpy.mock.calls[0][1].headers as Record<string, string>;
+			expect(headers['x-scope-slug']).toBeUndefined();
+		});
+
+		it('forwards the configured Organization slug as x-scope-slug on every call', async () => {
+			const scoped = new ApiClientService(
+				{
+					apiUrl: 'http://localhost:3100/api',
+					apiKey: 'ew_test_key',
+					httpPort: 3200,
+					transport: 'stdio',
+					scopeSlug: 'ever'
+				} as McpConfigService,
+				new CallerContextService()
+			);
+			mockResponse({ agentId: 'a1', nodeId: 'n1' });
+			await scoped.request('PUT', '/fleet/agents/a1/node-affinity', { nodeId: 'n1' });
+			expect(fetchSpy).toHaveBeenCalledWith(
+				'http://localhost:3100/api/fleet/agents/a1/node-affinity',
+				expect.objectContaining({
+					headers: {
+						'Content-Type': 'application/json',
+						'x-api-key': 'ew_test_key',
+						'x-scope-slug': 'ever'
+					}
+				})
+			);
+		});
+	});
+
 	it('parses JSON responses', async () => {
 		mockResponse({ id: '1', name: 'Test' });
 		const result = await service.request('GET', '/works/1');
