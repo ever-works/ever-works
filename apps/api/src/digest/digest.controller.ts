@@ -37,10 +37,12 @@ import { UpdateDigestSettingsDto, type DigestSettingsResponse } from './dto/dige
  * ready-made cross-tenant activity oracle.
  *
  * The organization scope keeps the same posture. The org id is NEVER
- * read from the request; it comes from the request SCOPE CONTEXT
- * (`ScopeContextService.getOrganizationId()`), which `SessionScopeGuard`
- * seeds from the authenticated user's validated last-active Org on
- * these legacy un-prefixed routes. As defense in depth every org access
+ * read from the request BODY; it comes from the request SCOPE CONTEXT
+ * (`ScopeContextService.getOrganizationId()`), which since 8f28edca0 is
+ * populated only from an explicit `X-Scope-Slug` header or an
+ * `/api/<slug>/…` path — `SessionScopeGuard` deliberately does NOT fall
+ * back to the user's last-active Org, so an unprefixed call to this
+ * controller runs in the personal scope. As defense in depth every org access
  * is then re-authorized through the shared
  * `OrganizationMembershipService`, which 404s (never 403s) on a
  * cross-tenant mismatch so foreign org ids stay opaque. Mirrors

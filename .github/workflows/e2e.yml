@@ -453,6 +453,10 @@ jobs:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
 
       - name: Sanitize branch tag for artifact names
+        # Must run even when the test step failed: the upload steps below
+        # are `if: always()`, so without this the artifacts from a FAILING
+        # run — exactly the ones someone needs — are named with an empty tag.
+        if: always()
         # GitHub Actions expressions have no `replace()` function, and
         # actions/upload-artifact rejects `/` (and other path chars) in
         # artifact names. Branch names like `session/<id>-e2e-followup`
@@ -621,6 +625,10 @@ jobs:
           E2E_PROD_BUILD: '1'
 
       - name: Sanitize branch tag for artifact names
+        # Must run even when the test step failed: the upload steps below
+        # are `if: always()`, so without this the artifacts from a FAILING
+        # run — exactly the ones someone needs — are named with an empty tag.
+        if: always()
         # Same rationale as the sharded e2e job above â€” `github.ref_name`
         # is `<PR#>/merge` on pull_request events, which actions/upload-
         # artifact rejects.
