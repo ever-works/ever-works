@@ -209,7 +209,7 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       files + explicit operator note for the ArgoCD-managed live env (outside
       this repo). Defaults keep boot non-fatal; the wiring is still required
       for the values to be settable.
-- [ ] **T32**. Full-spec conformance run: fixture packages exercising every
+- [x] **T32**. Full-spec conformance run: fixture packages exercising every
       Appendix A checklist row against the live loader; publish the checklist result
       as a doc page.
 
