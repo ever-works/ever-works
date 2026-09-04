@@ -154,8 +154,8 @@ and the wizard renders the **Ever Works** deploy card as Planned.
 For context on the existing clusters we run today (which are explicitly
 **not** the target — the application cluster is busy and the CMS cluster
 hosts unrelated marketing sites), see
-[`EVER_WORKS_K8S.md`](../../../../../Workspace/knowledge/infrastructure/EVER_WORKS_K8S.md)
-in the operator workspace. Both `do-sfo2-k8s-gauzy` and
+`knowledge/infrastructure/EVER_WORKS_K8S.md`
+in the operator workspace (a separate repository, so it is not linked here). Both `do-sfo2-k8s-gauzy` and
 `do-sfo2-k8s-ever` were considered but ruled out so user Works workloads
 get their own isolation boundary.
 

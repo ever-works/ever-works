@@ -17,7 +17,7 @@
 >
 > - Added **§A. Decision Log** at the top — every architectural choice with the file/line that grounds it, so any AI agent picking up a phase knows what was decided vs. open.
 > - Added **§B. Pre-flight code-read checklist per phase** — exact files the implementing agent MUST read before touching anything. Removes guesswork at the start of every phase.
-> - Locked down the **build-from-Idea pipeline** (Phase 1 PR B): new endpoint creates a `WorkAgentGoal` with `maxWorksPerRun=1` + `ideaId`; on goal completion the existing accept-flow auto-runs and sets `acceptedWorkId`. The existing `POST /me/work-proposals/:id/accept` stays for user-created Works (additive, per [NN #20](file:///C:/Coding/Workspace/AGENTS.md)).
+> - Locked down the **build-from-Idea pipeline** (Phase 1 PR B): new endpoint creates a `WorkAgentGoal` with `maxWorksPerRun=1` + `ideaId`; on goal completion the existing accept-flow auto-runs and sets `acceptedWorkId`. The existing `POST /me/work-proposals/:id/accept` stays for user-created Works (additive, per NN #20).
 > - **Phase 9 split into PR Z1 (web-side AI tools) and PR Z2 (MCP whitelist)** — both surfaces ship, in parallel-mergeable PRs.
 > - Pulled concrete file paths and patterns into every phase: `workScheduleDispatcherTask` for cron pattern, `gitFacade.createRepository()` for Mission repos, `WorkProposalsSection.tsx` + `WorkProposalCard.tsx` for extraction sources, `new-work-client.tsx` line-range for the three creation blocks to extract, `DashboardSidebar.tsx:204` for the `+ New Work` button location, all 21 locale files listed, Vitest as the snapshot runner.
 > - Flagged **first-snapshot-test risk** in Phase 4 PR K — `apps/web/` has Vitest configured but no `*.snap` files yet; this PR creates the snapshot test infrastructure as well as the snapshots.
@@ -31,7 +31,7 @@
 >
 > - Phase 6 (Missions UI) loses the Mission quick-add component (PR Q's "quick-add" part) and gains a small `+ New Mission` button top-right of `/missions` instead.
 > - **New Phase 6.5** carves out the unified `+ New` page work as its own dedicated phase. (v4 correction above: distinct route, not in-place edit.)
-> - No existing path is removed. The `+ Add` on `/ideas`, the `+ New Mission` on `/missions`, the existing `/works/new` three creation blocks, and the chat verbs from Phase 9 ALL stay alongside the new `+ New` page. Enforced by [Workspace NN #20](file:///C:/Coding/Workspace/AGENTS.md).
+> - No existing path is removed. The `+ Add` on `/ideas`, the `+ New Mission` on `/missions`, the existing `/works/new` three creation blocks, and the chat verbs from Phase 9 ALL stay alongside the new `+ New` page. Enforced by Workspace NN #20.
 > - PR checklist (§15) updated: PR Q now ships only the `/missions` list + `+ New Mission` button (no quick-add). Two new PRs CC and DD ship the `+ New` page extensions + sidebar rename.
 
 ---
@@ -193,7 +193,7 @@ Each phase says "before opening any editor, read these files in full." Skim is n
 
 > **Hard rule (repeat from spec):** This is an **extension**. Nothing in production today is removed, rewritten, or significantly changed. Every phase below is additive. Where existing components are _extracted into shared modules_, the original call sites continue to work unchanged. Where the spec proposes a "rename", it's i18n string changes only — never a code path deletion.
 >
-> **Hard rule on workspace process:** Every PR landing this plan must follow the platform repo conventions in [`Ever Works/Code/platform/CLAUDE.md`](file:///C:/Coding/Ever%20Works/Code/platform/CLAUDE.md) and the workstation conventions in [`Workspace/AGENTS.md`](file:///C:/Coding/Workspace/AGENTS.md) — notably:
+> **Hard rule on workspace process:** Every PR landing this plan must follow the platform repo conventions in `Ever Works/Code/platform/CLAUDE.md` and the workstation conventions in `Workspace/AGENTS.md` — notably:
 >
 > - TypeORM entity changes ship with a migration in the same PR (NN #16).
 > - PR drives to clean review state (NN #14) and bot reviews are a pre-merge gate (NN #18).
@@ -237,7 +237,7 @@ Each phase below has: **What ships**, **Files touched (read-only orientation)**,
 
 ### 2.1 What ships
 
-All schema changes the rest of the plan depends on, in a single migration set. No app behavior changes. The migrations are forward-only; rollback is via revert if executed before any app code reads the new columns (after that, treat as forward-only — see [database-migrations spec](file:///C:/Coding/Ever%20Works/Code/platform/docs/specs/architecture/database-migrations.md)).
+All schema changes the rest of the plan depends on, in a single migration set. No app behavior changes. The migrations are forward-only; rollback is via revert if executed before any app code reads the new columns (after that, treat as forward-only — see database-migrations spec).
 
 ### 2.2 Migrations
 
@@ -276,7 +276,7 @@ pnpm typeorm migration:generate -d typeorm.config.ts src/migrations/<Name>
 ### 2.5 Risks & rollback
 
 - TypeORM diff sometimes proposes destructive enum recreation — read SQL, apply two-phase pattern if so.
-- Workstation rule: API auto-applies migrations on boot (`migrationsRun: true`). The deploy after this phase will run all four migrations on stage/prod. Verify against [`knowledge/runbooks/EVER_WORKS_DB_MIGRATIONS.md`](file:///C:/Coding/Workspace/knowledge/runbooks/EVER_WORKS_DB_MIGRATIONS.md) before merging.
+- Workstation rule: API auto-applies migrations on boot (`migrationsRun: true`). The deploy after this phase will run all four migrations on stage/prod. Verify against `knowledge/runbooks/EVER_WORKS_DB_MIGRATIONS.md` before merging.
 - Rollback: each migration's `down()` reverses cleanly _before_ any app code reads the new columns. After Phase 1+ code lands, treat as forward-only.
 
 ### 2.6 Definition of done
@@ -1034,7 +1034,7 @@ See [spec §11](spec.md#11-out-of-scope-v2) for what we are NOT doing in v2.
 - **(v3) Does not remove the `+ Add` button on `/ideas` page or the Dashboard Ideas block.** Stays inline as the fastest path for atomic Ideas. (Spec §3.4, §4.0.6.)
 - **(v3) Does not remove the `+ New Mission` button on `/missions` page.** Stays top-right as one of the additional paths to create a Mission. (Spec §4.1.)
 - **(v3, corrected v4) Does not change or remove the URL `/works/new`.** That route stays exactly as it is, rendering exactly what it does today. What changes: the sidebar `+ New Work` button is renamed `+ New` AND repointed to the NEW route `/new`. The old `/works/new` URL continues to resolve and render for anyone who navigates to it directly, via bookmark, or via any internal link that still uses it.
-- **(v3) Does not replace any existing path with the unified `+ New` page.** It is the one main path; every existing entry point coexists with it. Enforced by [NN #20](file:///C:/Coding/Workspace/AGENTS.md).
+- **(v3) Does not replace any existing path with the unified `+ New` page.** It is the one main path; every existing entry point coexists with it. Enforced by NN #20.
 - **(v6) Does not auto-delete the original Work when a DONE Idea is re-built.** PR FF's `/rebuild` endpoint creates a NEW Work and re-points `acceptedWorkId`. The original Work stays in the user's account — they decide whether to keep, repurpose, or manually delete it. (Decision A27.)
 - **(v6) Does not clone the source Mission's Works during Mission Clone.** Works remain owned by the source Mission only; the cloned Mission gets a `sourceMissionId` FK + a read-only "Related Works (inherited)" UI panel. The source Mission's Works are NOT duplicated as new Works. (Decision A25.)
 - **(v6) Does not expose the transient-error classifier to users.** `maxAutoRetries`/`backoffSeconds`/`exponentialBackoffFactor` are user-configurable; the list of error categories that count as "transient" is platform-maintained in code. Implementers MUST NOT add a "configure which errors to retry" UI without a separate spec. (Decision A23.)

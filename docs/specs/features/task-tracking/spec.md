@@ -467,4 +467,4 @@ Only explicit `@<user-slug>` or `@<agent-slug>` mentions trigger dispatches/noti
 - Agents: [`../agents/spec.md`](../agents/spec.md)
 - Existing Kanban: [`apps/web/src/components/works/WorksKanbanView.tsx`](../../../apps/web/src/components/works/WorksKanbanView.tsx)
 - KB editor reused for descriptions/chat: [`apps/web/src/components/works/detail/kb/KbEditor.tsx`](../../../apps/web/src/components/works/detail/kb/KbEditor.tsx)
-- Constitution: [`../../../.specify/memory/constitution.md`](../../../.specify/memory/constitution.md)
+- Constitution: [`../../../.specify/memory/constitution.md`](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md)
