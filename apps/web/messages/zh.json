@@ -2572,7 +2572,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "代理插件"
             },
             "githubApp": {
                 "title": "GitHub App 安装",
@@ -3693,6 +3694,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "代理插件",
+                "description": "采用开放 Agent Plugins 格式的软件包为此工作区提供技能和 MCP 服务器。它们可在任何支持该标准的客户端中使用。",
+                "disabled": "此部署已关闭代理插件支持。运维人员可通过设置以下项启用：",
+                "loadFailed": "无法加载已安装的软件包。这是连接问题，并不表示未安装任何内容。",
+                "scanning": "正在扫描 {roots}",
+                "searchPlaceholder": "搜索软件包和技能",
+                "empty": "尚未安装任何软件包。",
+                "noMatches": "没有与搜索匹配的软件包。",
+                "specVersion": "规范 {version}",
+                "skills": "{count, plural, =0 {技能} other {# 个技能}}",
+                "mcpServers": "{count, plural, =0 {MCP 服务器} other {# 个 MCP 服务器}}",
+                "none": "无",
+                "rejected": "已拒绝",
+                "rejectedHelp": "此软件包无法加载，因此不提供任何内容。列出它是因为有人有意添加了它。",
+                "rejectedHeading": "{count, plural, other {# 个被拒绝的软件包}}",
+                "shadowedHeading": "被遮蔽的软件包",
+                "shadowedHelp": "它们声明了前一个目录已提供的名称，因此仅使用第一个。",
+                "severity": {
+                    "fatal": "致命",
+                    "error": "错误",
+                    "warning": "警告"
+                },
+                "scopes": {
+                    "package": "软件包",
+                    "manifest": "清单",
+                    "skills": "技能",
+                    "mcp": "MCP 服务器"
                 }
             }
         },

@@ -1,4 +1,5 @@
 import type { McpServerConnection } from '../entities/mcp-server-connection.entity';
+import { createGuardedFetch } from './guarded-fetch';
 
 /**
  * Agent Plugins MCP slice (plan §2.4) — the thin seam between
@@ -61,14 +62,31 @@ export function createSdkMcpClientFactory(): McpClientFactory {
             );
             const target = new URL(url);
             const requestInit: RequestInit = { headers };
+
+            // AP-15. Without this the SDK uses the global `fetch`, which
+            // follows redirects itself — so a server answering
+            // `302 Location: http://127.0.0.1:6379/` gets followed, and the
+            // custom auth headers above go with it (the platform strips
+            // `Authorization` cross-origin, but not `X-API-Key` and friends).
+            // The guarded fetch re-checks every hop and forwards no
+            // caller-supplied header across an origin boundary. It also closes
+            // DNS rebinding, which `isSafeWebhookUrl` explicitly does not:
+            // that guard is lexical, so a hostname resolving to a private
+            // address passes it.
+            const fetchImpl = createGuardedFetch();
+
             if (transport === 'sse') {
                 const { SSEClientTransport } =
                     await import('@modelcontextprotocol/sdk/client/sse.js');
-                await client.connect(new SSEClientTransport(target, { requestInit }));
+                await client.connect(
+                    new SSEClientTransport(target, { requestInit, fetch: fetchImpl }),
+                );
             } else {
                 const { StreamableHTTPClientTransport } =
                     await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
-                await client.connect(new StreamableHTTPClientTransport(target, { requestInit }));
+                await client.connect(
+                    new StreamableHTTPClientTransport(target, { requestInit, fetch: fetchImpl }),
+                );
             }
             return client as unknown as McpSdkClient;
         },

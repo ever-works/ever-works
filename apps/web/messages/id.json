@@ -2572,7 +2572,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Plugin agen"
             },
             "githubApp": {
                 "title": "Instalasi GitHub App",
@@ -3693,6 +3694,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Plugin agen",
+                "description": "Paket dalam format terbuka Agent Plugins menambahkan keterampilan dan server MCP ke ruang kerja ini. Paket bekerja di klien mana pun yang mendukung standar tersebut.",
+                "disabled": "Dukungan plugin agen dimatikan pada penerapan ini. Operator dapat mengaktifkannya dengan menyetel:",
+                "loadFailed": "Tidak dapat memuat paket yang terpasang. Ini masalah koneksi, bukan tanda bahwa tidak ada yang terpasang.",
+                "scanning": "Memindai {roots}",
+                "searchPlaceholder": "Cari paket dan keterampilan",
+                "empty": "Belum ada paket yang terpasang.",
+                "noMatches": "Tidak ada paket yang cocok dengan pencarian Anda.",
+                "specVersion": "spek {version}",
+                "skills": "{count, plural, other {# keterampilan}}",
+                "mcpServers": "{count, plural, other {# server MCP}}",
+                "none": "Tidak ada",
+                "rejected": "ditolak",
+                "rejectedHelp": "Paket ini tidak dapat dimuat sehingga tidak menyumbang apa pun. Paket ditampilkan karena seseorang menambahkannya dengan sengaja.",
+                "rejectedHeading": "{count, plural, other {# paket ditolak}}",
+                "shadowedHeading": "Paket yang tertutup",
+                "shadowedHelp": "Paket ini mendeklarasikan nama yang sudah disediakan direktori sebelumnya, jadi hanya yang pertama dipakai.",
+                "severity": {
+                    "fatal": "Fatal",
+                    "error": "Kesalahan",
+                    "warning": "Peringatan"
+                },
+                "scopes": {
+                    "package": "Paket",
+                    "manifest": "Manifes",
+                    "skills": "Keterampilan",
+                    "mcp": "Server MCP"
                 }
             }
         },

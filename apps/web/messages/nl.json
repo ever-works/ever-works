@@ -2572,7 +2572,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Agent-plug-ins"
             },
             "githubApp": {
                 "title": "GitHub App-installaties",
@@ -3693,6 +3694,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Agent-plug-ins",
+                "description": "Pakketten in het open Agent Plugins-formaat leveren skills en MCP-servers aan deze workspace. Ze werken in elke client die de standaard ondersteunt.",
+                "disabled": "Ondersteuning voor agent-plug-ins staat uit op deze omgeving. Een beheerder kan die inschakelen met:",
+                "loadFailed": "Kon geïnstalleerde pakketten niet laden. Dit is een verbindingsprobleem, geen teken dat er niets is geïnstalleerd.",
+                "scanning": "{roots} wordt doorzocht",
+                "searchPlaceholder": "Pakketten en skills zoeken",
+                "empty": "Nog geen pakketten geïnstalleerd.",
+                "noMatches": "Geen pakketten komen overeen met je zoekopdracht.",
+                "specVersion": "spec {version}",
+                "skills": "{count, plural, =0 {Skills} one {# skill} other {# skills}}",
+                "mcpServers": "{count, plural, =0 {MCP-servers} one {# MCP-server} other {# MCP-servers}}",
+                "none": "Geen",
+                "rejected": "geweigerd",
+                "rejectedHelp": "Dit pakket kon niet worden geladen en levert dus niets. Het staat er omdat iemand het bewust heeft toegevoegd.",
+                "rejectedHeading": "{count, plural, one {# geweigerd pakket} other {# geweigerde pakketten}}",
+                "shadowedHeading": "Overschaduwde pakketten",
+                "shadowedHelp": "Deze claimen een naam die een eerdere map al levert, dus alleen de eerste wordt gebruikt.",
+                "severity": {
+                    "fatal": "Fataal",
+                    "error": "Fout",
+                    "warning": "Waarschuwing"
+                },
+                "scopes": {
+                    "package": "Pakket",
+                    "manifest": "Manifest",
+                    "skills": "Skills",
+                    "mcp": "MCP-servers"
                 }
             }
         },

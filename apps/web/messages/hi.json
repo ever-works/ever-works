@@ -2572,7 +2572,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "एजेंट प्लगइन"
             },
             "githubApp": {
                 "title": "GitHub ऐप इंस्टॉलेशन",
@@ -3693,6 +3694,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "एजेंट प्लगइन",
+                "description": "खुले Agent Plugins प्रारूप के पैकेज इस वर्कस्पेस में कौशल और MCP सर्वर जोड़ते हैं। ये मानक का समर्थन करने वाले किसी भी क्लायंट में काम करते हैं।",
+                "disabled": "इस परिनियोजन पर एजेंट प्लगइन समर्थन बंद है। संचालक इसे इस तरह सक्षम कर सकते हैं:",
+                "loadFailed": "स्थापित पैकेज लोड नहीं हो सके। यह कनेक्शन की समस्या है, इसका मतलब यह नहीं कि कुछ भी स्थापित नहीं है।",
+                "scanning": "{roots} स्कैन किया जा रहा है",
+                "searchPlaceholder": "पैकेज और कौशल खोजें",
+                "empty": "अभी तक कोई पैकेज स्थापित नहीं है।",
+                "noMatches": "आपकी खोज से कोई पैकेज मेल नहीं खाता।",
+                "specVersion": "विनिर्देश {version}",
+                "skills": "{count, plural, =0 {कौशल} one {# कौशल} other {# कौशल}}",
+                "mcpServers": "{count, plural, =0 {MCP सर्वर} one {# MCP सर्वर} other {# MCP सर्वर}}",
+                "none": "कोई नहीं",
+                "rejected": "अस्वीकृत",
+                "rejectedHelp": "यह पैकेज लोड नहीं हो सका, इसलिए यह कुछ नहीं जोड़ता। यह इसलिए सूचीबद्ध है क्योंकि किसी ने इसे जानबूझकर जोड़ा था।",
+                "rejectedHeading": "{count, plural, one {# अस्वीकृत पैकेज} other {# अस्वीकृत पैकेज}}",
+                "shadowedHeading": "ढके हुए पैकेज",
+                "shadowedHelp": "ये एक ऐसा नाम घोषित करते हैं जो पहले की डायरेक्टरी पहले ही दे चुकी है, इसलिए केवल पहला उपयोग होता है।",
+                "severity": {
+                    "fatal": "गंभीर",
+                    "error": "त्रुटि",
+                    "warning": "चेतावनी"
+                },
+                "scopes": {
+                    "package": "पैकेज",
+                    "manifest": "मैनिफ़ेस्ट",
+                    "skills": "कौशल",
+                    "mcp": "MCP सर्वर"
                 }
             }
         },

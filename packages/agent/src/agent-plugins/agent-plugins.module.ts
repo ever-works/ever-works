@@ -2,8 +2,20 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AgentPluginPackage } from '../entities/agent-plugin-package.entity';
 import { AgentPluginPackageAllowlist } from '../entities/agent-plugin-package-allowlist.entity';
+import { McpServerConnection } from '../entities/mcp-server-connection.entity';
+import { McpServerConnectionRepository } from '../database/repositories/mcp-server-connection.repository';
 import { DatabaseModule } from '../database/database.module';
 import { AgentPluginPackageCatalogService } from './package-catalog.service';
+import { AgentPluginAllowlistService } from './allowlist.service';
+import { AgentPluginGitSource } from './git-source';
+import { AgentPluginNpmSource } from './npm-source';
+import { AgentPluginRemoteAcquireService } from './remote-acquire.service';
+import { AgentPluginPackageRepository } from './package.repository';
+import { AgentPluginPackageBootstrapService } from './package-bootstrap.service';
+import { AgentPluginUpdateService } from './update.service';
+import { AgentPluginInstallService } from './install.service';
+import { McpServerConfigService } from './mcp-server-config.service';
+import { PackageMcpReconcilerService } from './package-mcp-reconciler.service';
 import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 
 /**
@@ -26,10 +38,32 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 @Module({
     imports: [
         DatabaseModule,
-        TypeOrmModule.forFeature([AgentPluginPackage, AgentPluginPackageAllowlist]),
+        TypeOrmModule.forFeature([
+            AgentPluginPackage,
+            AgentPluginPackageAllowlist,
+            McpServerConnection,
+        ]),
     ],
     providers: [
         AgentPluginPackageCatalogService,
+        AgentPluginAllowlistService,
+        AgentPluginGitSource,
+        AgentPluginNpmSource,
+        AgentPluginRemoteAcquireService,
+        AgentPluginPackageRepository,
+        AgentPluginPackageBootstrapService,
+        AgentPluginUpdateService,
+        AgentPluginInstallService,
+        McpServerConfigService,
+        PackageMcpReconcilerService,
+        // Provided locally rather than by importing `McpModule`, which would
+        // pull ActivityLogModule and its transitive imports into what the
+        // docstring above promises is a LEAF module. `McpModule` provides this
+        // same repository from its own `forFeature` for the same reason, so
+        // this follows the established pattern rather than inventing one. A
+        // second instance is harmless: the repository is a stateless wrapper
+        // over a TypeORM Repository, with no lifecycle and no cache.
+        McpServerConnectionRepository,
         {
             // The facade consumes this @Optional(), so a deployment that never
             // imports this module keeps behaving exactly as it did before the
@@ -38,6 +72,19 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
             useExisting: AgentPluginPackageCatalogService,
         },
     ],
-    exports: [AgentPluginPackageCatalogService, AGENT_PLUGIN_SKILL_SOURCE],
+    exports: [
+        AgentPluginPackageCatalogService,
+        AgentPluginAllowlistService,
+        AgentPluginGitSource,
+        AgentPluginNpmSource,
+        AgentPluginRemoteAcquireService,
+        AgentPluginPackageRepository,
+        AgentPluginPackageBootstrapService,
+        AgentPluginUpdateService,
+        AgentPluginInstallService,
+        McpServerConfigService,
+        PackageMcpReconcilerService,
+        AGENT_PLUGIN_SKILL_SOURCE,
+    ],
 })
 export class AgentPluginsModule {}

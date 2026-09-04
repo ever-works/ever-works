@@ -2640,7 +2640,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Плъгини за агенти"
             },
             "githubApp": {
                 "title": "Инсталации на GitHub App",
@@ -3761,6 +3762,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Плъгини за агенти",
+                "description": "Пакетите в отворения формат Agent Plugins добавят умения и MCP сървъри към това работно пространство. Работят във всеки клиент, който поддържа стандарта.",
+                "disabled": "Поддръжката на плъгини за агенти е изключена в тази среда. Операторът може да я включи, като зададе:",
+                "loadFailed": "Инсталираните пакети не можаха да се заредят. Това е проблем с връзката, а не знак, че нищо не е инсталирано.",
+                "scanning": "Сканиране на {roots}",
+                "searchPlaceholder": "Търсене на пакети и умения",
+                "empty": "Все още няма инсталирани пакети.",
+                "noMatches": "Няма пакети, отговарящи на търсенето.",
+                "specVersion": "спец. {version}",
+                "skills": "{count, plural, =0 {Умения} one {# умение} other {# умения}}",
+                "mcpServers": "{count, plural, =0 {MCP сървъри} one {# MCP сървър} other {# MCP сървъра}}",
+                "none": "Няма",
+                "rejected": "отхвърлен",
+                "rejectedHelp": "Този пакет не можа да бъде зареден и затова не допринася с нищо. Показан е, защото някой го е добавил умишлено.",
+                "rejectedHeading": "{count, plural, one {# отхвърлен пакет} other {# отхвърлени пакета}}",
+                "shadowedHeading": "Засенчени пакети",
+                "shadowedHelp": "Те обявяват име, което по-ранна директория вече предоставя, затова се използва само първият.",
+                "severity": {
+                    "fatal": "Фатална",
+                    "error": "Грешка",
+                    "warning": "Предупреждение"
+                },
+                "scopes": {
+                    "package": "Пакет",
+                    "manifest": "Манифест",
+                    "skills": "Умения",
+                    "mcp": "MCP сървъри"
                 }
             }
         },

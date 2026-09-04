@@ -343,3 +343,112 @@ describe('Agent Plugins → skills catalog (integration)', () => {
         ]);
     });
 });
+
+describe('Agent Plugins → skills catalog updates (integration)', () => {
+    /**
+     * `ISkillsProviderPlugin.checkForUpdates` was on the contract and
+     * implemented by two plugins with ZERO non-test callers. These tests exist
+     * to keep it called: a seam every provider implements and nothing invokes
+     * is indistinguishable from one that does not work.
+     */
+
+    function providerWithUpdates(
+        updated: Array<{ slug: string; oldVersion: string; newVersion: string }>,
+        implemented = true,
+    ): RegisteredPlugin {
+        const base = builtinProvider([builtinEntry('plan')]);
+        const plugin = base.plugin as unknown as Record<string, unknown>;
+        if (implemented) {
+            plugin.checkForUpdates = jest.fn().mockResolvedValue({ updated });
+        } else {
+            delete plugin.checkForUpdates;
+        }
+        return base;
+    }
+
+    it('calls the provider seam and returns what it reports', async () => {
+        const provider = providerWithUpdates([
+            { slug: 'plan', oldVersion: '1.0.0', newVersion: '1.1.0' },
+        ]);
+        const facade = facadeWith([provider]);
+
+        const result = await facade.checkForUpdates({ plan: '1.0.0' }, facadeOptions);
+
+        expect(result.updated).toEqual([
+            { slug: 'plan', oldVersion: '1.0.0', newVersion: '1.1.0' },
+        ]);
+        expect(
+            (provider.plugin as unknown as { checkForUpdates: jest.Mock }).checkForUpdates,
+        ).toHaveBeenCalledWith({ plan: '1.0.0' }, expect.anything());
+    });
+
+    it('skips a provider that does not implement the optional method', async () => {
+        const facade = facadeWith([providerWithUpdates([], false)]);
+
+        // Optional on the interface, so absence is normal rather than an error.
+        await expect(facade.checkForUpdates({ plan: '1.0.0' }, facadeOptions)).resolves.toEqual({
+            updated: [],
+        });
+    });
+
+    it('does not let one failing provider hide another provider’s updates', async () => {
+        const failing = builtinProvider([]);
+        (failing.plugin as unknown as Record<string, unknown>).checkForUpdates = jest
+            .fn()
+            .mockRejectedValue(new Error('provider down'));
+        (failing.plugin as unknown as Record<string, unknown>).id = 'failing-provider';
+
+        const working = providerWithUpdates([
+            { slug: 'plan', oldVersion: '1.0.0', newVersion: '2.0.0' },
+        ]);
+
+        const facade = facadeWith([failing, working]);
+
+        const result = await facade.checkForUpdates({ plan: '1.0.0' }, facadeOptions);
+
+        expect(result.updated).toHaveLength(1);
+    });
+
+    it('appends package updates after provider updates, never displacing them', async () => {
+        const provider = providerWithUpdates([
+            { slug: 'plan', oldVersion: '1.0.0', newVersion: '1.1.0' },
+        ]);
+        const packageSource = {
+            listEntries: jest.fn().mockResolvedValue([]),
+            getEntry: jest.fn().mockResolvedValue(null),
+            checkForUpdates: jest.fn().mockResolvedValue([
+                // Same slug as the provider's: must be dropped, matching the
+                // first-wins precedence `listEntries` establishes.
+                { slug: 'plan', oldVersion: '1.0.0', newVersion: '9.9.9' },
+                { slug: 'release-notes', oldVersion: '1.0.0', newVersion: '1.4.0' },
+            ]),
+        };
+
+        const facade = facadeWith([provider], packageSource as never);
+
+        const result = await facade.checkForUpdates({ plan: '1.0.0' }, facadeOptions);
+
+        expect(result.updated).toEqual([
+            { slug: 'plan', oldVersion: '1.0.0', newVersion: '1.1.0' },
+            { slug: 'release-notes', oldVersion: '1.0.0', newVersion: '1.4.0' },
+        ]);
+    });
+
+    it('works with no provider plugin enabled at all', async () => {
+        const packageSource = {
+            listEntries: jest.fn().mockResolvedValue([]),
+            getEntry: jest.fn().mockResolvedValue(null),
+            checkForUpdates: jest
+                .fn()
+                .mockResolvedValue([
+                    { slug: 'release-notes', oldVersion: '1.0.0', newVersion: '1.4.0' },
+                ]),
+        };
+
+        const facade = facadeWith([], packageSource as never);
+
+        const result = await facade.checkForUpdates({ 'release-notes': '1.0.0' }, facadeOptions);
+
+        expect(result.updated).toHaveLength(1);
+    });
+});

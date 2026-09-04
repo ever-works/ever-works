@@ -2572,7 +2572,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Плагіни агента"
             },
             "githubApp": {
                 "title": "Інсталяції GitHub App",
@@ -3693,6 +3694,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Плагіни агента",
+                "description": "Пакети у відкритому форматі Agent Plugins додають до цього робочого простору навички та MCP-сервери. Вони працюють у будь-якому клієнті, що підтримує стандарт.",
+                "disabled": "Підтримку плагінів агента вимкнено в цьому розгортанні. Оператор може увімкнути її, задавши:",
+                "loadFailed": "Не вдалося завантажити встановлені пакети. Це проблема зʼєднання, а не ознака того, що нічого не встановлено.",
+                "scanning": "Сканування {roots}",
+                "searchPlaceholder": "Пошук пакетів і навичок",
+                "empty": "Пакети ще не встановлено.",
+                "noMatches": "Жоден пакет не відповідає пошуку.",
+                "specVersion": "специф. {version}",
+                "skills": "{count, plural, =0 {Навички} one {# навичка} few {# навички} many {# навичок} other {# навички}}",
+                "mcpServers": "{count, plural, =0 {MCP-сервери} one {# MCP-сервер} few {# MCP-сервери} many {# MCP-серверів} other {# MCP-сервера}}",
+                "none": "Немає",
+                "rejected": "відхилено",
+                "rejectedHelp": "Цей пакет не вдалося завантажити, тож він нічого не додає. Його показано, бо хтось додав його навмисно.",
+                "rejectedHeading": "{count, plural, one {# відхилений пакет} few {# відхилені пакети} many {# відхилених пакетів} other {# відхиленого пакета}}",
+                "shadowedHeading": "Перекриті пакети",
+                "shadowedHelp": "Вони оголошують імʼя, яке вже надав попередній каталог, тому використовується лише перший.",
+                "severity": {
+                    "fatal": "Критична",
+                    "error": "Помилка",
+                    "warning": "Попередження"
+                },
+                "scopes": {
+                    "package": "Пакет",
+                    "manifest": "Маніфест",
+                    "skills": "Навички",
+                    "mcp": "MCP-сервери"
                 }
             }
         },

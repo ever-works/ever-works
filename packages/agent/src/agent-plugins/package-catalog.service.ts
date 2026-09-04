@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
-import type { SkillCatalogEntry, SkillFrontmatter } from '@ever-works/plugin';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import type { SkillCatalogEntry, SkillCatalogUpdate, SkillFrontmatter } from '@ever-works/plugin';
 import type { DiscoveredSkill } from '@ever-works/agent-plugins';
 import { discoverSkills } from '@ever-works/agent-plugins';
 import { loadedPackages, scanConfiguredPackages } from './configured-source';
@@ -10,6 +10,7 @@ import {
     type AgentPluginSkillSource,
     type AgentPluginSkillSourceOptions,
 } from './skill-source.token';
+import { AgentPluginUpdateService } from './update.service';
 
 /**
  * Turns installed Agent Plugins packages into skills-catalog entries.
@@ -37,6 +38,15 @@ export class AgentPluginPackageCatalogService implements AgentPluginSkillSource 
      * Not a style choice — exceeding it is a runtime INSERT failure.
      */
     static readonly MAX_VERSION_LENGTH = 16;
+
+    /**
+     * OPTIONAL on purpose. The update service needs a database; this service
+     * is also constructed in contexts that have none (the CLI's read-only
+     * paths, and every unit test that builds it bare). Making it required
+     * would break those call sites, so an absent update service simply means
+     * no package updates are reported — the catalog itself is unaffected.
+     */
+    constructor(@Optional() private readonly updates?: AgentPluginUpdateService) {}
 
     async listEntries(options: AgentPluginSkillSourceOptions): Promise<SkillCatalogEntry[]> {
         const scan = await scanConfiguredPackages();
@@ -178,5 +188,26 @@ export class AgentPluginPackageCatalogService implements AgentPluginSkillSource 
         }
 
         return result;
+    }
+
+    /**
+     * Package skills with a newer version available.
+     *
+     * Reports nothing rather than failing when there is no update service or
+     * the check fails: an unknown update state must not break the catalog.
+     */
+    async checkForUpdates(
+        installedVersions: Record<string, string>,
+        _options: AgentPluginSkillSourceOptions,
+    ): Promise<SkillCatalogUpdate[]> {
+        if (!this.updates) return [];
+        try {
+            return await this.updates.checkSkillUpdates(installedVersions);
+        } catch (err) {
+            this.logger.warn(
+                `Package update check failed: ${err instanceof Error ? err.message : err}`,
+            );
+            return [];
+        }
     }
 }

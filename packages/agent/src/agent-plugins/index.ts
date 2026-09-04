@@ -46,3 +46,70 @@ export {
     type LocalSourceScan,
     type ScanLocalPackagesOptions,
 } from './local-source';
+
+export { AgentPluginAllowlistService } from './allowlist.service';
+
+export {
+    AgentPluginGitSource,
+    gitPackageDir,
+    refMatchesPattern,
+    validateGitUrl,
+    type GitAcquireInput,
+    type GitAcquireResult,
+    type GitLike,
+    type GitUrlCheck,
+} from './git-source';
+
+export {
+    AgentPluginNpmSource,
+    DEFAULT_NPM_REGISTRY,
+    npmPackageDir,
+    versionPermitted,
+    type NpmAcquireInput,
+    type NpmAcquireResult,
+    type NpmManifest,
+    type PacoteLike,
+} from './npm-source';
+
+export {
+    AgentPluginRemoteAcquireService,
+    type AcquireGitInput,
+    type AcquireInput,
+    type AcquireNpmInput,
+    type AcquiredPackage,
+    type RemoteSourceKind,
+} from './remote-acquire.service';
+
+export { AgentPluginPackageRepository } from './package.repository';
+
+export {
+    AgentPluginPackageBootstrapService,
+    acquireInputFor,
+    BUDGET_MS,
+    CONCURRENCY,
+    type RematerializeResult,
+} from './package-bootstrap.service';
+
+export {
+    AgentPluginUpdateService,
+    MAX_REMOTE_CHECKS,
+    type PackageUpdate,
+    type UpdateCheckResult,
+} from './update.service';
+
+export { AgentPluginInstallService, sourceRefFor } from './install.service';
+
+export {
+    McpServerConfigService,
+    usesPluginData,
+    type McpResolutionResult,
+    type McpServerProvenance,
+    type ResolvedMcpServer,
+    type SkippedMcpServer,
+} from './mcp-server-config.service';
+
+export {
+    connectionNameFor,
+    PackageMcpReconcilerService,
+    type ReconcileResult,
+} from './package-mcp-reconciler.service';

@@ -1,4 +1,4 @@
-import type { FacadeOptions, SkillCatalogEntry } from '@ever-works/plugin';
+import type { FacadeOptions, SkillCatalogEntry, SkillCatalogUpdate } from '@ever-works/plugin';
 
 /**
  * The seam by which Agent Plugins packages contribute to the skills catalog.
@@ -45,6 +45,19 @@ export interface AgentPluginSkillSource {
         slug: string,
         options: AgentPluginSkillSourceOptions,
     ): Promise<{ entry: SkillCatalogEntry; providerId: string } | null>;
+
+    /**
+     * Skills from installed packages that have a newer version available.
+     *
+     * OPTIONAL, unlike the two above, so that a source which only surfaces a
+     * catalog stays valid. The facade checks for the method before calling
+     * it, mirroring how `ISkillsProviderPlugin.checkForUpdates` is optional
+     * on the plugin contract.
+     */
+    checkForUpdates?(
+        installedVersions: Record<string, string>,
+        options: AgentPluginSkillSourceOptions,
+    ): Promise<SkillCatalogUpdate[]>;
 }
 
 /** Scope and filters passed through from the facade call. */

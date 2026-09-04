@@ -2849,7 +2849,8 @@
                 "channels": "Channels",
                 "emails": "Email Addresses",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "Agent Plugins"
             },
             "githubApp": {
                 "title": "GitHub App Installations",
@@ -4026,6 +4027,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "Agent Plugins",
+                "description": "Packages in the open Agent Plugins format contribute skills and MCP servers to this workspace. They work across any client that supports the standard.",
+                "disabled": "Agent Plugins support is turned off on this deployment. An operator can enable it by setting:",
+                "loadFailed": "Could not load installed packages. This is a connection problem, not a sign that nothing is installed.",
+                "scanning": "Scanning {roots}",
+                "searchPlaceholder": "Search packages and skills",
+                "empty": "No packages installed yet.",
+                "noMatches": "No packages match your search.",
+                "specVersion": "spec {version}",
+                "skills": "{count, plural, =0 {Skills} one {# skill} other {# skills}}",
+                "mcpServers": "{count, plural, =0 {MCP servers} one {# MCP server} other {# MCP servers}}",
+                "none": "None",
+                "rejected": "rejected",
+                "rejectedHelp": "This package could not be loaded, so it contributes nothing. It is listed because somebody added it deliberately.",
+                "rejectedHeading": "{count, plural, one {# rejected package} other {# rejected packages}}",
+                "shadowedHeading": "Shadowed packages",
+                "shadowedHelp": "These declare a name an earlier directory already provided, so only the first is used.",
+                "severity": {
+                    "fatal": "Fatal",
+                    "error": "Error",
+                    "warning": "Warning"
+                },
+                "scopes": {
+                    "package": "Package",
+                    "manifest": "Manifest",
+                    "skills": "Skills",
+                    "mcp": "MCP servers"
                 }
             }
         },

@@ -2572,7 +2572,8 @@
                 "emails": "Email Addresses",
                 "environments": "Environments",
                 "connections": "Connections",
-                "repositories": "Repositories"
+                "repositories": "Repositories",
+                "agentPlugins": "에이전트 플러그인"
             },
             "githubApp": {
                 "title": "GitHub 앱 설치",
@@ -3693,6 +3694,36 @@
                 "byModel": {
                     "units": "{units} units",
                     "total": "{total} across all models in this window"
+                }
+            },
+            "agentPlugins": {
+                "title": "에이전트 플러그인",
+                "description": "개방형 Agent Plugins 형식의 패키지는 이 워크스페이스에 스킬과 MCP 서버를 추가합니다. 표준을 지원하는 모든 클라이언트에서 작동합니다.",
+                "disabled": "이 배포에서는 에이전트 플러그인 지원이 꺼져 있습니다. 운영자는 다음을 설정해 활성화할 수 있습니다:",
+                "loadFailed": "설치된 패키지를 불러오지 못했습니다. 연결 문제이며, 설치된 것이 없다는 뜻은 아닙니다.",
+                "scanning": "{roots} 검사 중",
+                "searchPlaceholder": "패키지 및 스킬 검색",
+                "empty": "아직 설치된 패키지가 없습니다.",
+                "noMatches": "검색과 일치하는 패키지가 없습니다.",
+                "specVersion": "사양 {version}",
+                "skills": "{count, plural, =0 {스킬} other {스킬 #개}}",
+                "mcpServers": "{count, plural, =0 {MCP 서버} other {MCP 서버 #개}}",
+                "none": "없음",
+                "rejected": "거부됨",
+                "rejectedHelp": "이 패키지는 불러올 수 없어 아무것도 제공하지 않습니다. 누군가 의도적으로 추가했기 때문에 목록에 표시됩니다.",
+                "rejectedHeading": "{count, plural, other {거부된 패키지 #개}}",
+                "shadowedHeading": "가려진 패키지",
+                "shadowedHelp": "앞선 디렉터리가 이미 제공한 이름을 선언하므로 첫 번째만 사용됩니다.",
+                "severity": {
+                    "fatal": "치명적",
+                    "error": "오류",
+                    "warning": "경고"
+                },
+                "scopes": {
+                    "package": "패키지",
+                    "manifest": "매니페스트",
+                    "skills": "스킬",
+                    "mcp": "MCP 서버"
                 }
             }
         },

@@ -5,6 +5,7 @@ import type {
     SkillCatalogEntry,
     SkillCatalogListOptions,
     SkillCatalogListResult,
+    SkillCatalogUpdate,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -198,5 +199,78 @@ export class SkillsFacadeService extends BaseFacadeService {
         }
 
         return null;
+    }
+
+    /**
+     * Which installed skills have a newer version available.
+     *
+     * ## This finally calls `ISkillsProviderPlugin.checkForUpdates`
+     *
+     * That method has been on the contract, and implemented by
+     * `everworks-skills` and `composio`, with **zero non-test callers** — a
+     * capability every provider was asked to implement and none was ever
+     * asked to perform. Wiring the package source's updates without also
+     * wiring this one would have left the same dead seam in place while
+     * appearing to add update support, so both are done here.
+     *
+     * `checkForUpdates` is optional on the interface, so a provider that does
+     * not implement it is skipped rather than treated as an error.
+     *
+     * @param installedVersions slug → installed version, from the caller's
+     *        own record of what the user has installed.
+     */
+    async checkForUpdates(
+        installedVersions: Record<string, string>,
+        facadeOptions: FacadeOptions,
+    ): Promise<{ updated: SkillCatalogUpdate[] }> {
+        const plugins = await this.getEnabledPlugins(facadeOptions.workId, facadeOptions.userId);
+        const seen = new Set<string>();
+        const updated: SkillCatalogUpdate[] = [];
+
+        for (const wrapped of plugins) {
+            const plugin = wrapped.plugin as ISkillsProviderPlugin;
+            if (typeof plugin.checkForUpdates !== 'function') continue;
+            try {
+                const settings = this.settingsService
+                    ? await this.settingsService
+                          .getResolvedSettings(plugin.id, facadeOptions)
+                          .catch(() => undefined)
+                    : undefined;
+                const result = await plugin.checkForUpdates(installedVersions, settings);
+                for (const update of result.updated) {
+                    if (seen.has(update.slug)) continue;
+                    seen.add(update.slug);
+                    updated.push(update);
+                }
+            } catch (err) {
+                // One provider's outage must not hide every other provider's
+                // updates.
+                this.logger.warn(
+                    `Skills provider ${plugin.id} failed to checkForUpdates: ${err instanceof Error ? err.message : err}`,
+                );
+            }
+        }
+
+        // Package updates are appended LAST, matching the precedence
+        // `listEntries` establishes: a package can never displace a provider
+        // plugin's entry, so it must not displace its update either.
+        if (this.packageSource?.checkForUpdates) {
+            try {
+                const packageUpdates = await this.packageSource.checkForUpdates(installedVersions, {
+                    facadeOptions,
+                });
+                for (const update of packageUpdates) {
+                    if (seen.has(update.slug)) continue;
+                    seen.add(update.slug);
+                    updated.push(update);
+                }
+            } catch (err) {
+                this.logger.warn(
+                    `Agent Plugins package source failed to checkForUpdates: ${err instanceof Error ? err.message : err}`,
+                );
+            }
+        }
+
+        return { updated };
     }
 }
