@@ -20,6 +20,7 @@ import {
     UpdateCollectionDto,
     UpdateTagDto,
 } from './taxonomy.dto';
+import { TaskExtraRepoDto } from './task-extra-repo.dto';
 import { UpdateSourceValidationDto } from './update-source-validation.dto';
 import { UpdateWorkDto } from './update-work.dto';
 import { UpdateWorkAdvancedPromptsDto } from './work-advanced-prompts.dto';
@@ -620,6 +621,77 @@ describe('agent/dto submodule', () => {
             const dto = plainToInstance(SettingsHomepageDto, { hero_enabled: 'yes' });
             const errs = await expectValidationErrors(dto);
             expect(errs).toContain('isBoolean');
+        });
+    });
+
+    describe('TaskExtraRepoDto (multi-repo Task workspaces, PR C2)', () => {
+        const connectionId = 'a0499a65-9b8c-4bf7-857e-895f52da30b3';
+
+        it('accepts a connection id alone, and with a well-formed mountDir and writable=false', async () => {
+            await expectValid(
+                plainToInstance(TaskExtraRepoDto, { repoConnectionId: connectionId }),
+            );
+            await expectValid(
+                plainToInstance(TaskExtraRepoDto, {
+                    repoConnectionId: connectionId,
+                    mountDir: 'directory-web.template_v2',
+                    writable: false,
+                }),
+            );
+        });
+
+        it('rejects a non-uuid repoConnectionId and a non-boolean writable', async () => {
+            const dto = plainToInstance(TaskExtraRepoDto, {
+                repoConnectionId: 'conn-1',
+                writable: 'yes',
+            });
+            const errs = await expectValidationErrors(dto);
+            expect(errs).toContain('isUuid');
+            expect(errs).toContain('isBoolean');
+        });
+
+        it.each([
+            ['a path', 'tools/template'],
+            ['a leading dot', '.hidden'],
+            // Windows strips trailing dots: `api.` and `api` would be one directory.
+            ['a trailing dot', 'api.'],
+            ['a space', 'my template'],
+        ])('rejects a mountDir that is %s through the shape pattern', async (_label, mountDir) => {
+            const dto = plainToInstance(TaskExtraRepoDto, {
+                repoConnectionId: connectionId,
+                mountDir,
+            });
+            const errs = await expectValidationErrors(dto);
+            expect(errs).toContain('matches');
+        });
+
+        // Well-formed names that can still never be a mount directory: the
+        // DTO must refuse them itself (shared `isReservedMountDir`) rather
+        // than leave them to the service one layer later.
+        it.each([
+            ['a Windows device name', 'NUL'],
+            ['a Windows device name in another case', 'com1'],
+            ['a Windows device name with an extension', 'com1.txt'],
+            ['node_modules', 'node_modules'],
+        ])(
+            'rejects a mountDir that is %s through the reserved-name rule',
+            async (_label, mountDir) => {
+                const dto = plainToInstance(TaskExtraRepoDto, {
+                    repoConnectionId: connectionId,
+                    mountDir,
+                });
+                const errs = await expectValidationErrors(dto);
+                expect(errs).toContain('isNotReservedMountDir');
+                expect(errs).not.toContain('matches');
+            },
+        );
+
+        it('leaves an ordinary name alone (the reserved-name rule is not a blocklist of substrings)', async () => {
+            for (const mountDir of ['nul-docs', 'console', 'lpt0', 'api']) {
+                await expectValid(
+                    plainToInstance(TaskExtraRepoDto, { repoConnectionId: connectionId, mountDir }),
+                );
+            }
         });
     });
 

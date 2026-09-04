@@ -7,6 +7,7 @@ import type {
     InboxEscalationRaisedInput,
     InboxNoticeInput,
     InboxProposalPendingInput,
+    InboxQuestionRaisedInput,
 } from '../inbox-producer.port';
 
 /**
@@ -25,6 +26,7 @@ function makeInbox() {
         escalationRaised: jest.fn(async (_input: InboxEscalationRaisedInput) => undefined),
         proposalPending: jest.fn(async (_input: InboxProposalPendingInput) => undefined),
         notice: jest.fn(async (_userId: string, _input: InboxNoticeInput) => undefined),
+        questionRaised: jest.fn(async (_input: InboxQuestionRaisedInput) => undefined),
     };
 }
 

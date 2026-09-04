@@ -3,6 +3,7 @@ import type { CapabilityEnvironment, CommandRunner } from './capabilities';
 import type { FetchLike } from './fleet-client';
 import { createLogger, type LogEntry } from './logger';
 import { clampHeartbeatInterval, createNodeRuntime, enrollNode, installShutdownHandlers } from './runtime';
+import { PUBLISH_FENCE_MARGIN_MS } from './worker-loop';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -291,6 +292,177 @@ describe('createNodeRuntime', () => {
 		expect(provisionWorkspace).toHaveBeenCalledWith('task-1', repositoryWorkspace, expect.any(AbortSignal));
 		expect(completedBodies).toHaveLength(1);
 		expect(completedBodies[0]).toMatchObject({ success: true, result: { workspace: descriptor } });
+	});
+});
+
+/**
+ * The join between the lease and the publish fence.
+ *
+ * This is the only place in production where a live `JobLeaseHandle`
+ * becomes the `WorkspacePublishFence` a Git provider fences a push
+ * against, and it is a closure — nothing downstream can prove it was
+ * built correctly. Swap its two fields and every other suite in the
+ * repository still passes while every publish on every node is withheld
+ * forever; freeze the deadline at job start and long runs refuse instead.
+ * So the closure is exercised here against a real worker loop, a real
+ * lease and a real HTTP transport, with only the executor stubbed.
+ */
+describe('createNodeRuntime — agent-task publish fence', () => {
+	const LEASED_AT = Date.parse('2026-09-04T09:00:00.000Z');
+
+	interface FenceHarness {
+		fetches: string[];
+		completedBodies: Record<string, unknown>[];
+		heartbeatExpiry: string;
+	}
+
+	/**
+	 * Runs ONE leased `agent-task` job through the real runtime with the
+	 * executor replaced, and hands `run` whatever io the runtime built.
+	 */
+	async function withStubbedExecutor(
+		run: (io: Record<string, unknown>, harness: FenceHarness) => Promise<void>
+	): Promise<FenceHarness> {
+		const harness: FenceHarness = {
+			fetches: [],
+			completedBodies: [],
+			heartbeatExpiry: new Date(LEASED_AT + 120_000).toISOString()
+		};
+		let leased = false;
+		const fetchFn: FetchLike = async (url, init) => {
+			harness.fetches.push(url);
+			if (url.endsWith('/api/fleet/jobs/lease')) {
+				const jobs = leased
+					? []
+					: [
+							{
+								id: 'job-fence-1',
+								kind: 'agent-task',
+								status: 'leased',
+								nodeId: NODE_ID,
+								requiredCapabilities: [],
+								payload: { taskId: 'task-fence', steps: [] },
+								leaseExpiresAt: new Date(LEASED_AT + 60_000).toISOString(),
+								attempts: 1,
+								maxAttempts: 3,
+								createdAt: null,
+								startedAt: null,
+								completedAt: null
+							}
+						];
+				leased = true;
+				return { ok: true, status: 200, text: async () => JSON.stringify({ jobs }) };
+			}
+			if (url.endsWith('/heartbeat')) {
+				return {
+					ok: true,
+					status: 200,
+					text: async () =>
+						JSON.stringify({
+							ok: true,
+							job: {
+								id: 'job-fence-1',
+								kind: 'agent-task',
+								status: 'running',
+								nodeId: NODE_ID,
+								requiredCapabilities: [],
+								payload: {},
+								leaseExpiresAt: harness.heartbeatExpiry,
+								attempts: 1,
+								maxAttempts: 3,
+								createdAt: null,
+								startedAt: null,
+								completedAt: null
+							}
+						})
+				};
+			}
+			if (url.endsWith('/complete')) {
+				harness.completedBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+				return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, job: {} }) };
+			}
+			throw new Error(`unexpected request: ${url}`);
+		};
+
+		vi.resetModules();
+		vi.doMock('./executors/agent-task', () => ({
+			runAgentTaskJob: async (_job: unknown, agentIo: Record<string, unknown>) => {
+				await run(agentIo, harness);
+				return {};
+			}
+		}));
+		try {
+			const { createNodeRuntime: create } = await import('./runtime');
+			const { io: deps } = io(fetchFn);
+			const config: NodeConfig = {
+				apiUrl: 'https://api.ever.works',
+				nodeId: NODE_ID,
+				secret: SECRET,
+				kind: 'node',
+				capabilities: ['os:linux'],
+				heartbeatIntervalMs: 30_000,
+				enrolledAt: '2026-07-25T10:00:00.000Z'
+			};
+			const runtime = create(
+				config,
+				{
+					...deps,
+					scheduler: { setTimeout: () => ({ scheduled: true }), clearTimeout: () => undefined },
+					// Both clocks frozen at the instant the job was leased, so
+					// the deadline the fence reports is exact rather than
+					// "whatever this machine took to get here".
+					now: () => LEASED_AT,
+					monotonicNow: () => LEASED_AT
+				},
+				{ workerEnabled: true, workspaceProvisioner: { provision: vi.fn() } }
+			);
+			await runtime.worker?.start();
+			await runtime.worker?.drained();
+			await runtime.worker?.stop();
+		} finally {
+			vi.doUnmock('./executors/agent-task');
+			vi.resetModules();
+		}
+		return harness;
+	}
+
+	it('resolves the fence from the LIVE claim, re-confirming it with the platform first', async () => {
+		let first: unknown;
+		let second: unknown;
+		let heartbeatsBeforeFirst = 0;
+		const harness = await withStubbedExecutor(async (agentIo, live) => {
+			const publishFence = agentIo.publishFence as () => Promise<{ deadlineAt: number; marginMs: number }>;
+			heartbeatsBeforeFirst = live.fetches.filter((url) => url.endsWith('/heartbeat')).length;
+			first = await publishFence();
+			// A second renewal, further out. A fence that captured the
+			// deadline once — at job start, say — would still report the old
+			// one and refuse every run longer than a lease.
+			live.heartbeatExpiry = new Date(LEASED_AT + 200_000).toISOString();
+			second = await publishFence();
+		});
+
+		// The deadline is the RENEWED expiry, not the one the job arrived
+		// with (LEASED_AT + 60_000), and the margin is the loop's clamped
+		// publish budget — not the deadline, and not the other way round.
+		expect(heartbeatsBeforeFirst).toBe(0);
+		expect(first).toEqual({ deadlineAt: LEASED_AT + 120_000, marginMs: PUBLISH_FENCE_MARGIN_MS });
+		expect(second).toEqual({ deadlineAt: LEASED_AT + 200_000, marginMs: PUBLISH_FENCE_MARGIN_MS });
+		expect(harness.fetches.filter((url) => url.endsWith('/heartbeat'))).toHaveLength(2);
+	});
+
+	it('reports nothing to the platform when the run withheld its publish', async () => {
+		const harness = await withStubbedExecutor(async (agentIo) => {
+			(agentIo.onPublishWithheld as (reason: string) => void)(
+				'the lease on this work expired 12s ago; the platform may already have re-offered it'
+			);
+		});
+
+		// NOT `success: true` with a failed result, and not `success: false`
+		// either: both are terminal on the platform, and the agent's commit is
+		// still only on this machine. Silence lets the claim lapse so
+		// `reclaimExpired` re-offers the job and the branch still gets pushed.
+		expect(harness.completedBodies).toEqual([]);
+		expect(harness.fetches.some((url) => url.endsWith('/complete'))).toBe(false);
 	});
 });
 

@@ -666,6 +666,13 @@
                 "unarchive": "Move to Active",
                 "delete": "Delete"
             },
+            "fleet": {
+                "badge": "From your fleet",
+                "node": "Node",
+                "task": "Task",
+                "branch": "Branch",
+                "pullRequest": "Pull request"
+            },
             "detail": {
                 "none": "Select a message to read it.",
                 "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
@@ -1502,7 +1509,9 @@
                 "stepApproval": "approval",
                 "featureName": "Feature name",
                 "featureDescription": "Feature description",
-                "createFromTemplate": "Create workflow"
+                "createFromTemplate": "Create workflow",
+                "extraRepos": "Also work in",
+                "extraReposHint": "Optional. Repositories checked here are checked out next to the Work's repository when the task runs on one of your machines; each one that changes gets its own pull request. The agent's attached repositories are included automatically."
             },
             "detail": {
                 "moveTo": "העבר אל",
@@ -1556,6 +1565,9 @@
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
                     "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "waitingForAnswer": "The agent paused this run with a question for you.",
+                    "answerInInbox": "Answer it in the Inbox",
+                    "parkedHintQuestion": "Answer the question in the Inbox to continue on the same branch. Archive the question there if you want to drop this run.",
                     "steerPlaceholder": "Message the running agent…",
                     "resumePlaceholder": "Optional instruction to resume with…",
                     "steer": "Steer",
@@ -1584,7 +1596,9 @@
                 "openWork": "פתח את ה-Work הזה",
                 "openMission": "פתח את המשימה הזו",
                 "openIdea": "פתח את הרעיון הזה",
-                "openAgent": "פתח את הסוכן הזה"
+                "openAgent": "פתח את הסוכן הזה",
+                "extraRepos": "Also in",
+                "extraReposUpdateError": "Failed to update the extra repositories"
             },
             "recurring": {
                 "section": "תדירות חוזרת",
@@ -1664,7 +1678,10 @@
                 "isolationInherit": "Inherit from Work",
                 "isolationOn": "On — isolated branch",
                 "isolationOff": "Off — work directly",
-                "isolationSaveError": "Failed to update isolation override"
+                "isolationSaveError": "Failed to update isolation override",
+                "linkedPullRequests": "Also in",
+                "linkedPrPushed": "branch pushed, no pull request yet",
+                "linkedPrFailed": "branch pushed; opening the pull request failed"
             },
             "gateChip": {
                 "green": "Gate passed",
@@ -1768,6 +1785,12 @@
                 "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
                 "deleteError": "Failed to delete the template",
                 "requiresApproval": "Requires approval"
+            },
+            "extraRepos": {
+                "loading": "Loading repositories…",
+                "loadError": "Could not load your repositories.",
+                "empty": "No repositories in your registry yet.",
+                "emptyLink": "Add one in Settings → Repositories"
             }
         },
         "skillsPage": {
@@ -3678,6 +3701,7 @@
                 "agentCard": {
                     "title": "Repositories",
                     "subtitle": "Grant this agent access to repositories from your registry.",
+                    "fleetHint": "Attached repositories are mounted next to the Task's repository on fleet runs and get their own pull request when they change.",
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
@@ -6336,6 +6360,7 @@
                 "creatingButton": "רושם…",
                 "cancelButton": "ביטול",
                 "invalidUrl": "הזינו כתובת מאגר כמו https://github.com/owner/repo",
+                "invalidSlug": "השתמשו רק באותיות קטנות, ספרות ומקפים, למשל my-repo",
                 "success": "המאגר נרשם כ-Work",
                 "createFailed": "רישום המאגר נכשל",
                 "noteTitle": "הערה:",

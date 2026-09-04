@@ -666,6 +666,13 @@
                 "unarchive": "Move to Active",
                 "delete": "Delete"
             },
+            "fleet": {
+                "badge": "From your fleet",
+                "node": "Node",
+                "task": "Task",
+                "branch": "Branch",
+                "pullRequest": "Pull request"
+            },
             "detail": {
                 "none": "Select a message to read it.",
                 "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
@@ -1502,7 +1509,9 @@
                 "stepApproval": "approval",
                 "featureName": "Feature name",
                 "featureDescription": "Feature description",
-                "createFromTemplate": "Create workflow"
+                "createFromTemplate": "Create workflow",
+                "extraRepos": "Also work in",
+                "extraReposHint": "Optional. Repositories checked here are checked out next to the Work's repository when the task runs on one of your machines; each one that changes gets its own pull request. The agent's attached repositories are included automatically."
             },
             "detail": {
                 "moveTo": "Verschieben nach",
@@ -1556,6 +1565,9 @@
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
                     "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "waitingForAnswer": "The agent paused this run with a question for you.",
+                    "answerInInbox": "Answer it in the Inbox",
+                    "parkedHintQuestion": "Answer the question in the Inbox to continue on the same branch. Archive the question there if you want to drop this run.",
                     "steerPlaceholder": "Message the running agent…",
                     "resumePlaceholder": "Optional instruction to resume with…",
                     "steer": "Steer",
@@ -1584,7 +1596,9 @@
                 "openWork": "Dieses Work öffnen",
                 "openMission": "Diese Mission öffnen",
                 "openIdea": "Diese Idee öffnen",
-                "openAgent": "Diesen Agent öffnen"
+                "openAgent": "Diesen Agent öffnen",
+                "extraRepos": "Also in",
+                "extraReposUpdateError": "Failed to update the extra repositories"
             },
             "recurring": {
                 "section": "Wiederkehrender Zeitplan",
@@ -1664,7 +1678,10 @@
                 "isolationInherit": "Inherit from Work",
                 "isolationOn": "On — isolated branch",
                 "isolationOff": "Off — work directly",
-                "isolationSaveError": "Failed to update isolation override"
+                "isolationSaveError": "Failed to update isolation override",
+                "linkedPullRequests": "Also in",
+                "linkedPrPushed": "branch pushed, no pull request yet",
+                "linkedPrFailed": "branch pushed; opening the pull request failed"
             },
             "gateChip": {
                 "green": "Gate passed",
@@ -1768,6 +1785,12 @@
                 "deleteConfirm": "Delete the workflow template “{name}”? Tasks already created from it are kept.",
                 "deleteError": "Failed to delete the template",
                 "requiresApproval": "Requires approval"
+            },
+            "extraRepos": {
+                "loading": "Loading repositories…",
+                "loadError": "Could not load your repositories.",
+                "empty": "No repositories in your registry yet.",
+                "emptyLink": "Add one in Settings → Repositories"
             }
         },
         "skillsPage": {
@@ -3678,6 +3701,7 @@
                 "agentCard": {
                     "title": "Repositories",
                     "subtitle": "Grant this agent access to repositories from your registry.",
+                    "fleetHint": "Attached repositories are mounted next to the Task's repository on fleet runs and get their own pull request when they change.",
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
@@ -6324,10 +6348,10 @@
             },
             "repo": {
                 "formTitle": "Neues Work — Repository",
-                "formSubtitle": "Registriere ein bestehendes Code-Repository als Work. Nichts wird generiert oder deployt — Tasks, Goals und Fleet-Läufe arbeiten einfach in diesem Repository.",
+                "formSubtitle": "Registrieren Sie ein bestehendes Code-Repository als Work. Nichts wird generiert oder deployt — Tasks, Goals und Fleet-Läufe arbeiten einfach in diesem Repository.",
                 "urlLabel": "Repository-URL",
                 "urlPlaceholder": "https://github.com/ever-works/ever-works",
-                "urlHelp": "Ein GitHub-Repository, auf das du Zugriff hast. Es wird unverändert zum Daten-Repository des Works.",
+                "urlHelp": "Ein GitHub-Repository, auf das Sie Zugriff haben. Es wird unverändert zum Daten-Repository des Works.",
                 "nameLabel": "Work-Name",
                 "slugLabel": "Work-Slug",
                 "slugHelp": "URL-freundliche Kennung. Aus dem Repository-Namen abgeleitet — zum Überschreiben bearbeiten.",
@@ -6336,10 +6360,11 @@
                 "creatingButton": "Wird registriert…",
                 "cancelButton": "Abbrechen",
                 "invalidUrl": "Gib eine Repository-URL wie https://github.com/owner/repo ein",
+                "invalidSlug": "Nur Kleinbuchstaben, Ziffern und Bindestriche, zum Beispiel my-repo",
                 "success": "Repository als Work registriert",
                 "createFailed": "Repository konnte nicht registriert werden",
                 "noteTitle": "Hinweis:",
-                "noteText": "Für ein Repository-Work werden weder Website-Template noch Provider-Repository noch Deployment angelegt. Verbinde den Git-Provider, der das Repository hostet, damit Agents es klonen können."
+                "noteText": "Für ein Repository-Work werden weder Website-Template noch Provider-Repository noch Deployment angelegt. Verbinden Sie GitHub als Git-Provider, damit Agents es klonen können."
             },
             "manual": {
                 "title": "Manuell erstellen",

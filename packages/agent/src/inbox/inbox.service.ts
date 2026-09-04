@@ -12,6 +12,7 @@ import {
     normalizeInboxOptions,
     type InboxItemDto,
     type InboxItemOption,
+    type InboxItemSourceMeta,
     type InboxItemStatus,
 } from '@ever-works/contracts';
 import { InboxItemRepository } from '../database/repositories/inbox-item.repository';
@@ -28,6 +29,7 @@ import type {
     InboxNoticeInput,
     InboxProducer,
     InboxProposalPendingInput,
+    InboxQuestionRaisedInput,
 } from './inbox-producer.port';
 import { toInboxItemDto, type InboxReplyOutcome, type InboxReplyRouted } from './inbox.types';
 
@@ -46,29 +48,55 @@ export interface AskHumanSource {
 
 export interface ListInboxOptions {
     status?: InboxItemStatus;
+    /** Only items linked to this Task (the Task page's open-question lookup, slice Q). */
+    taskId?: string;
     limit?: number;
     offset?: number;
+}
+
+/**
+ * Self-build slice Q — the message a resumed FLEET run receives for an
+ * Inbox reply. Exported because the wording is the contract with the
+ * planner (`# OWNER ANSWER` renders the new run's `pendingInput`
+ * verbatim) and with the model that reads it: the question is restated
+ * because the node that executes the answer has no CLI session that
+ * remembers asking it — the file the model wrote is gone, the process
+ * is gone, and the run may land on another machine.
+ */
+export function composeFleetAnswerMessage(questionTitle: string, answer: string): string {
+    return `Your question from the previous run: ${questionTitle}\n\nOwner's answer: ${answer}`;
 }
 
 /**
  * Inbox (operator message center) — the ONE place agent/work/system
  * messages for the human are written, listed and ANSWERED.
  *
- * Three producer entry points (`askHuman`, `escalationRaised` /
- * `proposalPending` via the {@link InboxProducer} port, and `notice`)
- * write additively ALONGSIDE the existing records — the escalation /
- * proposal / run rows stay the system of record for their own
- * lifecycle; the inbox row is the message about them.
+ * Four producer entry points (`askHuman`, `escalationRaised` /
+ * `proposalPending` / `questionRaised` via the {@link InboxProducer}
+ * port, and `notice`) write additively ALONGSIDE the existing records —
+ * the escalation / proposal / run rows stay the system of record for
+ * their own lifecycle; the inbox row is the message about them.
  *
  * `reply` is the answer router:
  *
  *   question   → live run: steer (message injected between iterations);
  *                parked/ended run: resume (new run seeded with the
  *                reply). Either way `awaitingInput` clears.
+ *                `fleet-run` (slice Q): always the resume branch — the
+ *                reconciler parks the run terminal BEFORE filing the
+ *                row — and the reply travels with the question folded
+ *                in (`composeFleetAnswerMessage`), because the next
+ *                fleet run has no session that remembers the question.
  *   approval   → proxy to `AgentApprovalsService.decide` by option id.
  *   escalation → `AgentEscalationService.resolve` with the reply as the
  *                note; a parked linked run is additionally resumed.
  *   notice     → just marked answered.
+ *
+ * Archiving or deleting an OPEN `fleet-run` question un-parks its run
+ * (un-archiving re-parks it): a run parked on a fleet question has no
+ * other exit — cancel refuses terminal rows and the sweeper never reaps
+ * an awaiting row — so dismissing the question IS "drop this run".
+ * Cloud (`agent-run`) items keep today's behaviour byte for byte.
  *
  * Everything is owner-scoped inside the repository (foreign = missing
  * = 404), and downstream routers are all `@Optional()` so unit tests
@@ -122,14 +150,41 @@ export class InboxService implements InboxProducer {
     }
 
     async setArchived(id: string, userId: string, archived: boolean): Promise<InboxItemDto> {
+        // Read BEFORE the write: the dismissal rule needs the state the
+        // row is LEAVING (an open fleet question), and the store may
+        // mutate the same instance.
+        const before = await this.items.findOwned(id, userId);
+        if (!before) throw new NotFoundException(`Inbox item ${id} not found.`);
+        const dismissesParkedRun = isOpenFleetQuestion(before);
+        const parkedRunId = before.agentRunId ?? null;
+
         const row = await this.items.setArchived(id, userId, archived);
         if (!row) throw new NotFoundException(`Inbox item ${id} not found.`);
+
+        if (parkedRunId) {
+            if (archived && dismissesParkedRun) {
+                await this.setFleetRunParked(parkedRunId, false, `archive of item ${id}`);
+            } else if (!archived && isOpenFleetQuestion(row)) {
+                // Restored to `open` (it was never answered): the question
+                // is live again, so the run waits for it again.
+                await this.setFleetRunParked(parkedRunId, true, `unarchive of item ${id}`);
+            }
+        }
         return toInboxItemDto(row);
     }
 
     async delete(id: string, userId: string): Promise<void> {
+        const row = await this.items.findOwned(id, userId);
+        if (!row) throw new NotFoundException(`Inbox item ${id} not found.`);
+        const dismissesParkedRun = isOpenFleetQuestion(row);
+        const parkedRunId = row.agentRunId ?? null;
+
         const deleted = await this.items.deleteOwned(id, userId);
         if (!deleted) throw new NotFoundException(`Inbox item ${id} not found.`);
+
+        if (dismissesParkedRun && parkedRunId) {
+            await this.setFleetRunParked(parkedRunId, false, `delete of item ${id}`);
+        }
     }
 
     // ── producers ─────────────────────────────────────────────────
@@ -158,50 +213,50 @@ export class InboxService implements InboxProducer {
         if (!question) {
             throw new BadRequestException('askHuman: question must not be empty.');
         }
-
-        // The run row carries the task/work/org links — resolved here so
-        // the model never supplies them (they route the reply, so a
-        // model-supplied id would let a prompt-injected agent point the
-        // human's answer at someone else's run).
-        const run = source.agentRunId ? await this.runs.findById(source.agentRunId) : null;
-        // A run that is not the asking user's is treated as absent — the
-        // item is still filed, just without run links.
-        const ownedRun = run && run.userId === userId ? run : null;
-
-        const title = firstLine(question);
-        const body = input.context?.trim()
-            ? `${question}\n\n${input.context.trim()}`.slice(0, INBOX_MAX_BODY_CHARS)
-            : question;
-
-        const row = await this.items.create({
+        const { row, parked } = await this.fileQuestion({
             userId,
-            kind: 'question',
-            title,
-            body,
-            options: normalizeInboxOptions(input.options),
+            question,
+            context: input.context ?? null,
+            options: input.options,
             sourceType: 'agent-run',
             agentId: source.agentId,
-            agentRunId: ownedRun?.id ?? null,
-            taskId: ownedRun?.taskId ?? null,
-            workId: ownedRun?.workId ?? null,
-            organizationId: ownedRun?.organizationId ?? null,
+            agentRunId: source.agentRunId ?? null,
         });
-
-        let parked = false;
-        if (ownedRun) {
-            try {
-                await this.runs.setAwaitingInput(ownedRun.id, true);
-                parked = true;
-            } catch (err) {
-                this.logger.warn(
-                    `askHuman: failed to park run ${ownedRun.id} (item ${row.id} still filed): ${err}`,
-                );
-            }
-        }
-
-        await this.notifyCreated(row);
-        this.logCreated(row);
         return { item: toInboxItemDto(row), parked };
+    }
+
+    /**
+     * {@link InboxProducer.questionRaised} — a FLEET run asked the owner
+     * (self-build slice Q); idempotent per run.
+     *
+     * The fleet twin of `askHuman`: same filing routine, `sourceType`
+     * `fleet-run`, the node / branch / Task provenance in `sourceMeta`.
+     * Best-effort by the port contract — an empty question is logged
+     * and dropped, never thrown — and the reconciler has ALREADY parked
+     * the run terminal before calling this (see the port's ordering
+     * note), so the parking write here is a harmless repeat that keeps
+     * the two producers' behaviour identical.
+     */
+    async questionRaised(input: InboxQuestionRaisedInput): Promise<void> {
+        const question = (input.question ?? '').trim();
+        if (!question) {
+            this.logger.warn(
+                `questionRaised: run ${input.agentRunId} reported an empty question — nothing filed.`,
+            );
+            return;
+        }
+        // One parked run, one question: a replayed completion event or a
+        // second node report for the same job must not stack a duplicate.
+        if (await this.items.findOpenQuestionByRunId(input.agentRunId)) return;
+        await this.fileQuestion({
+            userId: input.userId,
+            question,
+            context: input.context ?? null,
+            sourceType: 'fleet-run',
+            agentId: input.agentId ?? null,
+            agentRunId: input.agentRunId,
+            sourceMeta: input.sourceMeta ?? null,
+        });
     }
 
     /** {@link InboxProducer.escalationRaised} — idempotent per escalation. */
@@ -394,12 +449,126 @@ export class InboxService implements InboxProducer {
     // ── internals ─────────────────────────────────────────────────
 
     /**
+     * The one filing routine behind `askHuman` (cloud, `agent-run`) and
+     * `questionRaised` (fleet, `fleet-run`): persist the question, PARK
+     * the run (`agent_runs.awaitingInput = true` — the lifecycle signal
+     * `RunSteeringService.isResumable` and the sweeper's reap-exemption
+     * read), and notify. The reply resumes or steers the run.
+     *
+     * The run row carries the task/work/org links — resolved HERE so
+     * the model (cloud) or the node's result (fleet) never supplies
+     * them: they route the reply, so a caller-supplied id would let a
+     * prompt-injected agent point the human's answer at someone else's
+     * run. A run that is not the asking user's is treated as absent —
+     * the item is still filed, just without run links, and not parked.
+     *
+     * Parking writes the run row DIRECTLY rather than threading an
+     * outcome through the tool loop: `finalize()` only ever SETS the
+     * flag (`outcome.awaitingInput === true`), never clears it, and
+     * `setAwaitingInput` is deliberately not status-guarded — so a flag
+     * written mid-loop survives the run's own completion. This is the
+     * parking path the executor actually supports for a domain tool
+     * (the capture-callback channel is reserved for the built-in
+     * `transitionTask`).
+     */
+    private async fileQuestion(args: {
+        userId: string;
+        /** Already trimmed and non-empty. */
+        question: string;
+        context?: string | null;
+        options?: unknown;
+        sourceType: 'agent-run' | 'fleet-run';
+        agentId: string | null;
+        agentRunId: string | null;
+        sourceMeta?: InboxItemSourceMeta | null;
+    }): Promise<{ row: InboxItem; parked: boolean }> {
+        const { userId, question } = args;
+        const run = args.agentRunId ? await this.runs.findById(args.agentRunId) : null;
+        const ownedRun = run && run.userId === userId ? run : null;
+
+        const title = firstLine(question);
+        const body = args.context?.trim()
+            ? `${question}\n\n${args.context.trim()}`.slice(0, INBOX_MAX_BODY_CHARS)
+            : question;
+
+        const row = await this.items.create({
+            userId,
+            kind: 'question',
+            title,
+            body,
+            options: normalizeInboxOptions(args.options),
+            sourceType: args.sourceType,
+            agentId: args.agentId ?? ownedRun?.agentId ?? null,
+            agentRunId: ownedRun?.id ?? null,
+            taskId: ownedRun?.taskId ?? null,
+            workId: ownedRun?.workId ?? null,
+            organizationId: ownedRun?.organizationId ?? null,
+            ...(args.sourceMeta !== undefined ? { sourceMeta: args.sourceMeta } : {}),
+        });
+
+        let parked = false;
+        if (ownedRun) {
+            try {
+                await this.runs.setAwaitingInput(ownedRun.id, true);
+                parked = true;
+            } catch (err) {
+                this.logger.warn(
+                    `${args.sourceType === 'fleet-run' ? 'questionRaised' : 'askHuman'}: failed to park run ${ownedRun.id} (item ${row.id} still filed): ${err}`,
+                );
+            }
+        }
+
+        await this.notifyCreated(row);
+        this.logCreated(row);
+        return { row, parked };
+    }
+
+    /**
+     * Dismissal of a parked FLEET run (self-build slice Q). A run parked
+     * on a `fleet-run` question has no other exit: `AgentRunRepository.cancel`
+     * refuses terminal rows and the sweeper never reaps an awaiting row.
+     * Archiving or deleting the OPEN question is therefore the owner's
+     * "drop this run" — the parked flag clears so the run leaves the
+     * attention filter; un-archiving re-parks it. Best-effort: the
+     * archive / delete already happened and must not be undone by a
+     * run-row hiccup.
+     */
+    private async setFleetRunParked(
+        runId: string,
+        awaitingInput: boolean,
+        why: string,
+    ): Promise<void> {
+        try {
+            await this.runs.setAwaitingInput(runId, awaitingInput);
+        } catch (err) {
+            this.logger.warn(
+                `Inbox: could not ${awaitingInput ? 're-park' : 'un-park'} fleet run ${runId} on ${why}: ${err}`,
+            );
+        }
+    }
+
+    /**
      * Question reply → the run. Live run: steer (injected between model
      * round-trips, clears `awaitingInput`). Parked / ended-but-resumable
      * run: resume (new run seeded with the reply; the source run's
      * `awaitingInput` clears inside `resume`). No run, no steering
      * service, or a heartbeat run with no Task: the answer is still
      * recorded on the item — nothing is lost, just not auto-routed.
+     *
+     * Self-build slice Q — a `fleet-run` question. The run has no CLI
+     * session that remembers its own question (the file the model wrote
+     * is gone and the next job may run on another machine), and the
+     * planner renders the new run's `pendingInput` verbatim under
+     * `# OWNER ANSWER`; so the outbound message carries the question
+     * folded in (`composeFleetAnswerMessage`). Two invariants keep this
+     * honest: (1) the reconciler files a fleet question only AFTER the
+     * run is terminal + `awaitingInput`, so this branch is always the
+     * resume path — a steer would append to `pendingInput` nobody on a
+     * node reads; (2) a resume that throws (planner refusal for a
+     * done / cancelled Task, no repository, runtime off) leaves the item
+     * reopened by `reply`'s catch AND the run still parked, because
+     * `RunSteeringService.resume` clears the flag only once the
+     * successor is enqueued — the owner can answer again or archive.
      */
     private async routeQuestionReply(
         row: InboxItem,
@@ -414,15 +583,19 @@ export class InboxService implements InboxProducer {
         if (!run) {
             return { routed: 'none' };
         }
+        const outbound =
+            row.sourceType === 'fleet-run'
+                ? composeFleetAnswerMessage(row.title, message)
+                : message;
         if (RunSteeringService.isLive(run)) {
-            const outcome = await this.steering.steer({ runId: run.id, userId, message });
+            const outcome = await this.steering.steer({ runId: run.id, userId, message: outbound });
             if (outcome.dispatched === 'injected') {
                 return { routed: 'steered', runId: run.id };
             }
             // Terminal race — fall through to the resume branch below.
         }
         if (RunSteeringService.isResumable(run) && run.taskId) {
-            const outcome = await this.steering.resume(run.id, userId, message);
+            const outcome = await this.steering.resume(run.id, userId, outbound);
             return { routed: 'resumed', runId: outcome.runId };
         }
         // Not resumable (no Task, or ended for good). Clear the parked
@@ -557,4 +730,9 @@ export class InboxService implements InboxProducer {
 function firstLine(text: string): string {
     const line = text.split('\n').find((candidate) => candidate.trim().length > 0) ?? text;
     return line.trim().slice(0, 300);
+}
+
+/** An unanswered question a FLEET run is parked on (slice Q dismissal rule). */
+function isOpenFleetQuestion(row: InboxItem): boolean {
+    return row.kind === 'question' && row.status === 'open' && row.sourceType === 'fleet-run';
 }

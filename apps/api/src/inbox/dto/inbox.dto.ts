@@ -1,5 +1,15 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+    IsBoolean,
+    IsIn,
+    IsInt,
+    IsOptional,
+    IsString,
+    IsUUID,
+    Max,
+    MaxLength,
+    Min,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import {
     INBOX_ITEM_STATUSES,
@@ -22,6 +32,23 @@ export class ListInboxQueryDto {
     @IsOptional()
     @IsIn(INBOX_ITEM_STATUSES as readonly string[])
     status?: InboxItemStatus;
+
+    /**
+     * Only items linked to this Task — the Task page's lookup of the open
+     * question a parked fleet run is waiting on (self-build slice Q).
+     * Owner-scoped inside the repository, so a guessed id sees nothing.
+     * A UUID like every other id filter on the API (review SR-4): the
+     * column is `uuid`, and Postgres answers a non-UUID comparison with
+     * `22P02`, which would surface as a 500 instead of this 400.
+     */
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description: 'Only items linked to this Task.',
+    })
+    @IsOptional()
+    @IsUUID()
+    taskId?: string;
 
     @ApiProperty({
         required: false,

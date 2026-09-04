@@ -140,10 +140,10 @@ export function DeleteComponent({ work }: { work: Work }) {
                                         <Checkbox
                                             checked={deleteOptions.delete_data_repository || false}
                                             onChange={(e) =>
-                                                setDeleteOptions({
-                                                    ...deleteOptions,
+                                                setDeleteOptions((current) => ({
+                                                    ...current,
                                                     delete_data_repository: e.target.checked,
-                                                })
+                                                }))
                                             }
                                             label={t('deleteDataRepository')}
                                             description={t('deleteDataRepositoryDescription')}
@@ -158,10 +158,10 @@ export function DeleteComponent({ work }: { work: Work }) {
                                                 deleteOptions.delete_markdown_repository || false
                                             }
                                             onChange={(e) =>
-                                                setDeleteOptions({
-                                                    ...deleteOptions,
+                                                setDeleteOptions((current) => ({
+                                                    ...current,
                                                     delete_markdown_repository: e.target.checked,
-                                                })
+                                                }))
                                             }
                                             label={t('deleteMarkdownRepository')}
                                             description={t('deleteMarkdownRepositoryDescription')}
@@ -176,10 +176,10 @@ export function DeleteComponent({ work }: { work: Work }) {
                                                 deleteOptions.delete_website_repository || false
                                             }
                                             onChange={(e) =>
-                                                setDeleteOptions({
-                                                    ...deleteOptions,
+                                                setDeleteOptions((current) => ({
+                                                    ...current,
                                                     delete_website_repository: e.target.checked,
-                                                })
+                                                }))
                                             }
                                             label={t('deleteWebsiteRepository')}
                                             description={t('deleteWebsiteRepositoryDescription')}

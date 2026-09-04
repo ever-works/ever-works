@@ -306,9 +306,19 @@ export class WorkRepository {
             .getMany();
 
         const target = repo.toLowerCase();
+        const targetOwner = owner.toLowerCase();
         return candidates.filter((work) => {
             const data = work.sourceRepository?.relatedRepositories?.data;
-            return typeof data?.repo === 'string' && data.repo.toLowerCase() === target;
+            if (typeof data?.repo !== 'string' || data.repo.toLowerCase() !== target) {
+                return false;
+            }
+            // The `work.owner` column narrowed the query; the registered
+            // coordinates decide the match. Both must be present and agree:
+            // treating a row whose registered owner is missing or malformed
+            // as a match would let one broken row block every other account
+            // from registering that repository, and we cannot prove such a
+            // row wraps it. `updateWork` refuses to let the column drift.
+            return typeof data.owner === 'string' && data.owner.toLowerCase() === targetOwner;
         });
     }
 

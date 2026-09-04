@@ -1,4 +1,5 @@
 import { RepositoryManagementService } from '../repository-management.service';
+import type { RepositoryType } from '../repository-management.service';
 import type { Work, RepoVisibility } from '@src/entities/work.entity';
 import type { User } from '@src/entities/user.entity';
 
@@ -378,7 +379,15 @@ describe('RepositoryManagementService', () => {
             const work = buildWork({ kind: 'repo' } as Partial<Work>);
 
             await expect(
-                service.updateRepositoryVisibility(work, buildUser(), 'bogus' as any, true),
+                // A value the type system forbids on purpose: `unknown` is the
+                // honest intermediate for "this cannot happen in TypeScript,
+                // prove the runtime still refuses it".
+                service.updateRepositoryVisibility(
+                    work,
+                    buildUser(),
+                    'bogus' as unknown as RepositoryType,
+                    true,
+                ),
             ).rejects.toThrow('Invalid repository type');
         });
     });

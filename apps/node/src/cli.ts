@@ -9,6 +9,7 @@ import {
 	createResourceProbe,
 	currentEnvironment,
 	defaultConfigPath,
+	isExecutableFile,
 	systemFetch
 } from './node-io';
 import { NODE_APP_VERSION } from './version';
@@ -44,6 +45,9 @@ function buildDeps(): CliDeps {
 		// Backs the CPU/memory admission gate. Harmless when no ceilings are
 		// configured — the worker loop skips sampling entirely in that case.
 		resourceProbe: createResourceProbe(),
+		// Validates `--claude-path` / `--codex-path` pins before a job can
+		// ever try to spawn them.
+		fileExists: isExecutableFile,
 		out: (line) => process.stdout.write(`${line}\n`),
 		signals: {
 			on: (signal, handler) => {

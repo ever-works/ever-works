@@ -245,7 +245,18 @@ const repoSpec = z.looseObject({
              * much a repository can push at it.
              */
             checks: z
-                .array(nonEmptyString.max(REPO_CHECK_MAX_LENGTH))
+                .array(
+                    nonEmptyString
+                        .max(REPO_CHECK_MAX_LENGTH)
+                        // `nonEmptyString` trims before it counts, so "   "
+                        // is rejected at runtime — but `.trim()` cannot be
+                        // expressed in JSON Schema, so the emitted document
+                        // carried only `minLength: 1` and an editor happily
+                        // accepted a whitespace-only check that the loader
+                        // then refused. The explicit pattern is what makes
+                        // editor validation and `validateWorksConfig` agree.
+                        .regex(/\S/, 'must contain a non-whitespace character'),
+                )
                 .max(REPO_CHECKS_MAX)
                 .optional(),
         })

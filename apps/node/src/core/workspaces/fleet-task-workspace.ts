@@ -1,10 +1,17 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, parse, posix, relative, resolve, win32 } from 'node:path';
-import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from '@ever-works/contracts';
+import {
+	FLEET_AGENT_TASK_META_DIR,
+	normalizeFleetTaskWorkspaceMounts,
+	type FleetTaskWorkspaceDescriptor,
+	type FleetTaskWorkspaceMountDescriptor,
+	type FleetTaskWorkspaceMountSpec,
+	type FleetTaskWorkspaceSpec
+} from '@ever-works/contracts';
 import { execFileWithVerifiedCancellation, LocalWorkspacePlugin } from '@ever-works/local-workspace-plugin';
-import type { IWorkspacePlugin, WorkspaceHandle } from '@ever-works/plugin';
+import type { IWorkspacePlugin, WorkspaceHandle, WorkspacePublishFence } from '@ever-works/plugin';
 
 export type FleetTaskWorkspaceErrorCode =
 	| 'invalid-root'
@@ -25,8 +32,116 @@ export class FleetTaskWorkspaceError extends Error {
 	}
 }
 
-/** Narrow structural seam used by focused tests and alternative local providers. */
-export type FleetWorkspacePlugin = Pick<IWorkspacePlugin, 'provision'>;
+/**
+ * Narrow structural seam used by focused tests and alternative local
+ * providers. `finalize` is optional so every existing provision-only
+ * double keeps compiling; a node whose provider lacks it cannot commit
+ * (and says so in the job result) rather than failing to construct.
+ */
+export type FleetWorkspacePlugin = Pick<IWorkspacePlugin, 'provision'> & Partial<Pick<IWorkspacePlugin, 'finalize'>>;
+
+/** What {@link FleetTaskWorkspaceProvisioner.finalize} reports back to the executor. */
+export interface FleetTaskWorkspaceFinalizeResult {
+	pushed: boolean;
+	headSha: string | null;
+	empty: boolean;
+	changedFiles?: number;
+	/** Set when the commit landed locally but the push was fenced off; names why. */
+	publishWithheld?: string;
+}
+
+/** Options for {@link FleetTaskWorkspaceProvisioner.finalize}. */
+export interface FleetTaskWorkspaceFinalizeOptions {
+	commitMessage: string;
+	push: boolean;
+	/**
+	 * The job lease this finalize is running under. Absent means "no claim
+	 * to check" and the publish proceeds as it always did; present, it is
+	 * the node's own answer to "may I still write to this branch?" when the
+	 * platform cannot be asked.
+	 */
+	publishFence?: WorkspacePublishFence;
+}
+
+/**
+ * Multi-repo Task workspaces (self-build slice C): the verdict of one
+ * writable mount's commit + push. `error` is set instead of thrown so the
+ * remaining mounts (and the primary) still get their turn.
+ */
+export interface FleetTaskWorkspaceMountFinalizeResult extends Partial<FleetTaskWorkspaceFinalizeResult> {
+	repositoryId: string;
+	mountDir: string;
+	branch: string;
+	baseSha: string;
+	pushed: boolean;
+	headSha: string | null;
+	empty: boolean;
+	error?: string;
+}
+
+/** Directory under the primary worktree the mounts are linked into. */
+export const FLEET_TASK_WORKSPACE_MOUNTS_DIR = '.mounts';
+
+/**
+ * Paths the fleet keeps out of EVERY Task repository's Git view: the mounts
+ * link directory (slice C) and the owner-question directory (slice Q).
+ * Written to the shared `info/exclude` of each repository the workspace
+ * touches — primary and mounts alike.
+ *
+ * `/.mounts` is anchored at the worktree root on purpose: a nested
+ * `.mounts` directory is the owner's own.
+ *
+ * None of these rules is slash-terminated, and that is deliberate. Git
+ * treats a SYMLINK as a file, not a directory, so a directory-only `dir/`
+ * rule does not ignore a `.mounts` that exists as a link — which is exactly
+ * the state a previous run (or anything else sharing the service account)
+ * can leave behind, and which the provisioner refuses to write through
+ * rather than deleting. With the slash, `git check-ignore` then reported
+ * the rule ineffective and failed provisioning of a workspace that has no
+ * mounts at all (CI 2026-09-04, `lint-and-test` on #2297; it passed on
+ * Windows only because a junction reports as a directory there). Without
+ * the slash the rule covers the directory, the link and a plain file of
+ * that name, which is what "never commit this" actually means. The probes
+ * below keep their slashes: a slash-terminated pathname is still matched
+ * by an unslashed rule.
+ *
+ * The owner-question directory is
+ * listed twice — anchored, where the OUTPUT CONTRACT tells the model to
+ * write it, and UNANCHORED (review SR-5): a model that `cd`-ed into a
+ * package of a monorepo and wrote `.ever-works/QUESTION.md` relative to
+ * its cwd would otherwise hand the finalize's `git add -A` a
+ * `packages/api/.ever-works/QUESTION.md` that is committed, pushed into
+ * the pull request, and never reported as a question. Git matches an
+ * unanchored `dir/` pattern at any depth, so the second rule is the
+ * safety net the first one promises.
+ */
+export const FLEET_TASK_WORKSPACE_EXCLUDE_RULES: readonly string[] = [
+	`/${FLEET_TASK_WORKSPACE_MOUNTS_DIR}`,
+	`/${FLEET_AGENT_TASK_META_DIR}`,
+	`${FLEET_AGENT_TASK_META_DIR}`
+];
+
+/**
+ * One path per exclude rule, in rule order, proven ignored through Git
+ * after the rules are written (`ensureFleetExcluded`). Slash-terminated so
+ * Git evaluates each as a directory whether or not it exists yet; the
+ * nested probe is what proves the unanchored rule. The RULES themselves
+ * carry no trailing slash on purpose — see the rule list above.
+ */
+const FLEET_TASK_WORKSPACE_EXCLUDE_PROBES: readonly string[] = [
+	`${FLEET_TASK_WORKSPACE_MOUNTS_DIR}/`,
+	`${FLEET_AGENT_TASK_META_DIR}/`,
+	`nested/${FLEET_AGENT_TASK_META_DIR}/`
+];
+
+/**
+ * File name {@link FleetTaskWorkspaceProvisioner} creates and removes inside
+ * every WRITABLE mount, through the mount's link, to prove the model can
+ * actually write there. Named rather than random so a leftover after a hard
+ * kill is instantly recognisable (and greppable) instead of looking like
+ * something the model produced.
+ */
+export const FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE = '.ever-works-mount-write-probe';
 
 export interface FleetTaskWorkspaceProvisionerOptions {
 	/** Persistent cache/worktree root owned by the node service account. */
@@ -80,6 +195,81 @@ export class FleetTaskWorkspaceProvisioner {
 	): Promise<FleetTaskWorkspaceDescriptor> {
 		const normalizedTaskId = validateTaskId(taskId);
 		const spec = validateWorkspaceSpec(rawSpec);
+		const primary = await this.provisionOne(normalizedTaskId, spec, signal);
+		const mountSpecs = spec.mounts ?? [];
+		throwIfCancelled(signal);
+		// The primary worktree persists across runs, so `.mounts/` is
+		// reconciled on EVERY provision — a run without mounts included: a
+		// link left behind by an earlier spec would otherwise keep a repository
+		// the operator has since removed reachable (and editable) by the model.
+		const mountsDir = await reconcileMountsDir(primary.path, mountSpecs);
+		if (mountSpecs.length === 0) {
+			// Unconditional since slice Q: even a single-repository workspace
+			// may receive an owner-question file, and a forgotten one must
+			// never reach the finalize's `git add -A`.
+			await ensureFleetExcluded(primary.path, signal);
+			return primary;
+		}
+
+		// Multi-repo Task workspaces (self-build slice C). Every mount is an
+		// ordinary binding of its OWN repository under the fleet root — same
+		// pool, same reuse, same ownership proof as the primary — and is then
+		// linked into the primary worktree at `.mounts/<mountDir>` so the model
+		// reaches it by a relative path from its cwd. `.mounts/` is excluded
+		// from the primary's Git so the link never shows up as an untracked
+		// entry, is never committed, and never confuses the primary's diff.
+		const mounts: FleetTaskWorkspaceMountDescriptor[] = [];
+		for (const mount of mountSpecs) {
+			throwIfCancelled(signal);
+			// Re-validated with the NODE's stricter URL / ref rules, exactly like
+			// the primary (the contracts normalizer only checks shape).
+			const mountSpec = validateWorkspaceSpec({
+				repositoryId: mount.repositoryId,
+				repoUrl: mount.repoUrl,
+				baseRef: mount.baseRef,
+				branch: mount.branch,
+				...(mount.depth === undefined ? {} : { depth: mount.depth })
+			});
+			let provisioned: FleetTaskWorkspaceDescriptor;
+			try {
+				provisioned = await this.provisionOne(normalizedTaskId, mountSpec, signal);
+				// A read-only mount is a pristine reference by contract. The
+				// binding is reused in place without a reset, so whatever a
+				// model left in it would survive into the next run — and be
+				// committed by the first run after `writable` flips to true.
+				if (!mount.writable && provisioned.reused) {
+					await resetReadOnlyMount(provisioned.path, signal);
+				}
+			} catch (error) {
+				if (error instanceof FleetTaskWorkspaceError && error.code !== 'cancelled') {
+					throw new FleetTaskWorkspaceError(
+						error.code,
+						`mount '${mount.mountDir}' (${mount.repositoryId}): ${error.message}`
+					);
+				}
+				throw error;
+			}
+			// The mount is a repository of its own: a question file the model
+			// writes while working under `.mounts/<dir>` must stay out of THAT
+			// repository's Git too (the node scans writable mounts for it).
+			await ensureFleetExcluded(provisioned.path, signal);
+			const linkPath = await linkMountIntoPrimary(mountsDir, mount.mountDir, provisioned.path);
+			if (mount.writable) {
+				await assertMountWritableThroughLink(mount.mountDir, mount.repositoryId, linkPath, provisioned.path);
+			}
+			mounts.push({ ...provisioned, mountDir: mount.mountDir, linkPath, writable: mount.writable });
+		}
+		throwIfCancelled(signal);
+		await ensureFleetExcluded(primary.path, signal);
+		return { ...primary, mounts };
+	}
+
+	/** One repository binding — the slice A/B provision, unchanged. */
+	private async provisionOne(
+		normalizedTaskId: string,
+		spec: FleetTaskWorkspaceSpec,
+		signal?: AbortSignal
+	): Promise<FleetTaskWorkspaceDescriptor> {
 		throwIfCancelled(signal);
 
 		// A hash keeps Windows paths short and prevents two repositories with
@@ -179,6 +369,149 @@ export class FleetTaskWorkspaceProvisioner {
 			reused: handle.reused
 		};
 	}
+
+	/**
+	 * Commit whatever the model left in the task worktree and push the
+	 * task branch (agent execution v2).
+	 *
+	 * Delegates to the local-workspace provider's own `finalize` — the
+	 * same `git add -A` / commit / `push HEAD:refs/heads/<branch>` the
+	 * cloud worker runs — so a node-pushed branch is indistinguishable
+	 * from a cloud-pushed one. The push is token-free: the node's own Git
+	 * credential helper authenticates, exactly as the fetch did.
+	 *
+	 * The descriptor is re-validated against the configured root before
+	 * any Git command runs, so a job cannot point this at a directory the
+	 * provisioner did not create.
+	 */
+	async finalize(
+		taskId: string,
+		descriptor: FleetTaskWorkspaceDescriptor,
+		opts: FleetTaskWorkspaceFinalizeOptions,
+		signal?: AbortSignal
+	): Promise<FleetTaskWorkspaceFinalizeResult> {
+		if (!this.plugin.finalize) {
+			throw new FleetTaskWorkspaceError(
+				'git-failed',
+				'Workspace provider cannot finalize (no commit/push support)'
+			);
+		}
+		throwIfCancelled(signal);
+		const normalizedTaskId = validateTaskId(taskId);
+		const repositoryId = typeof descriptor?.repositoryId === 'string' ? descriptor.repositoryId.trim() : '';
+		if (!IDENTITY_PATTERN.test(repositoryId)) {
+			throw new FleetTaskWorkspaceError('invalid-spec', 'Fleet workspace repository identity is invalid');
+		}
+		const branch = validateBranchRef(descriptor.branch, 'branch');
+		if (!SHA_PATTERN.test(descriptor.baseSha)) {
+			throw new FleetTaskWorkspaceError('invalid-spec', 'Fleet workspace base commit is invalid');
+		}
+		const commitMessage = typeof opts.commitMessage === 'string' ? opts.commitMessage.trim() : '';
+		if (!commitMessage || /[\0\r]/.test(commitMessage) || commitMessage.length > 1000) {
+			throw new FleetTaskWorkspaceError('invalid-spec', 'Commit message is missing or invalid');
+		}
+
+		let canonicalRoot: string;
+		let canonicalPath: string;
+		try {
+			[canonicalRoot, canonicalPath] = await Promise.all([
+				fs.realpath(this.rootPath),
+				fs.realpath(descriptor.path)
+			]);
+		} catch {
+			throw new FleetTaskWorkspaceError('path-collision', 'Task workspace no longer resolves to a directory');
+		}
+		if (!isStrictDescendant(canonicalRoot, canonicalPath)) {
+			throw new FleetTaskWorkspaceError('path-collision', 'Task workspace escapes the configured root');
+		}
+		throwIfCancelled(signal);
+
+		const bindingKey = taskBindingKey(normalizedTaskId, repositoryId);
+		try {
+			const result = await this.plugin.finalize(
+				{
+					path: canonicalPath,
+					baseSha: descriptor.baseSha,
+					reused: descriptor.reused,
+					branch,
+					bindingKey
+				},
+				// The signal rides into every Git call the provider makes, so a
+				// lease lost mid-push cannot leave the branch pushed behind the
+				// cancelled run's back. The fence rides alongside it because an
+				// abort that arrives mid-push is already too late: the remote may
+				// have accepted the ref before the kill landed.
+				{
+					commitMessage,
+					push: opts.push,
+					...(signal ? { signal } : {}),
+					...(opts.publishFence ? { publishFence: opts.publishFence } : {})
+				}
+			);
+			return {
+				pushed: result.pushed,
+				headSha: result.headSha,
+				empty: result.empty,
+				...(result.changedFiles === undefined ? {} : { changedFiles: result.changedFiles }),
+				...(result.publishWithheld === undefined ? {} : { publishWithheld: result.publishWithheld })
+			};
+		} catch (error) {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+			if (signal?.aborted) throw cancelledError();
+			throw new FleetTaskWorkspaceError(
+				'git-failed',
+				`Commit or push failed for branch '${branch}': ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+	/**
+	 * Multi-repo Task workspaces (self-build slice C): commit + push every
+	 * WRITABLE mount the model may have changed, one verdict per mount.
+	 *
+	 * A failure in one mount is recorded on its entry and does not stop the
+	 * others: they are independent branches in independent repositories, and
+	 * a branch already pushed is never rolled back. Cancellation is the one
+	 * exception — it propagates, exactly as for the primary.
+	 *
+	 * `opts.publishFence` rides into each mount's finalize unchanged, so a
+	 * lapsed claim withholds every mount publish for the same reason and by
+	 * the same arithmetic as the primary branch. Each mount is checked as it
+	 * comes: the fence is a wall-clock test, so a claim that runs out partway
+	 * through a long multi-repo finalize stops the mounts that follow.
+	 */
+	async finalizeMounts(
+		taskId: string,
+		descriptor: FleetTaskWorkspaceDescriptor,
+		opts: FleetTaskWorkspaceFinalizeOptions,
+		signal?: AbortSignal
+	): Promise<FleetTaskWorkspaceMountFinalizeResult[]> {
+		const results: FleetTaskWorkspaceMountFinalizeResult[] = [];
+		for (const mount of descriptor.mounts ?? []) {
+			if (!mount.writable) continue;
+			throwIfCancelled(signal);
+			const base = {
+				repositoryId: mount.repositoryId,
+				mountDir: mount.mountDir,
+				branch: mount.branch,
+				baseSha: mount.baseSha
+			};
+			try {
+				const finalized = await this.finalize(taskId, mount, opts, signal);
+				results.push({ ...base, ...finalized });
+			} catch (error) {
+				if (error instanceof FleetTaskWorkspaceError && error.code === 'cancelled') throw error;
+				if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+				results.push({
+					...base,
+					pushed: false,
+					headSha: null,
+					empty: false,
+					error: error instanceof Error ? error.message : String(error)
+				});
+			}
+		}
+		return results;
+	}
 }
 
 function validateRootPath(raw: string): string {
@@ -221,7 +554,20 @@ function validateWorkspaceSpec(raw: FleetTaskWorkspaceSpec): FleetTaskWorkspaceS
 	if (depth !== undefined && (!Number.isInteger(depth) || depth < 1 || depth > 1000)) {
 		throw new FleetTaskWorkspaceError('invalid-spec', 'Fleet workspace depth must be an integer from 1 to 1000');
 	}
-	return { repositoryId, repoUrl, baseRef, branch, ...(depth === undefined ? {} : { depth }) };
+	let mounts: FleetTaskWorkspaceMountSpec[];
+	try {
+		mounts = normalizeFleetTaskWorkspaceMounts(raw.mounts, repositoryId);
+	} catch (error) {
+		throw new FleetTaskWorkspaceError('invalid-spec', error instanceof Error ? error.message : String(error));
+	}
+	return {
+		repositoryId,
+		repoUrl,
+		baseRef,
+		branch,
+		...(depth === undefined ? {} : { depth }),
+		...(mounts.length > 0 ? { mounts } : {})
+	};
 }
 
 function validateRemoteUrl(raw: string): string {
@@ -558,4 +904,341 @@ function runGitOutput(args: string[], workspacePath: string, signal?: AbortSigna
 		if (error) throw error;
 		return String(stdout ?? '').trim();
 	});
+}
+
+/**
+ * Prove `<primary>/.mounts` is a plain directory directly under the primary
+ * worktree — creating it when the spec has mounts — and drop every link in
+ * it that the current spec no longer names.
+ *
+ * The primary worktree is reused across runs and the model runs in it as
+ * the node service account, so `.mounts` is untrusted input on the next
+ * provision: left as a symlink or junction to another Task's worktree (or
+ * anywhere the account can write), every `lstat` / `unlink` / `symlink` on
+ * `.mounts/<dir>` would resolve THROUGH it — a write-through-link by the
+ * privileged provisioner, exactly what the cache-root checks refuse for
+ * every other path. A link or file at `.mounts` is therefore a
+ * `path-collision` when mounts are needed (and left alone when none are,
+ * since nothing would be written through it). Real directories and files
+ * inside `.mounts/` are never touched: they surface as collisions naming
+ * the path so an operator can clean them.
+ */
+async function reconcileMountsDir(
+	primaryPath: string,
+	mountSpecs: readonly FleetTaskWorkspaceMountSpec[]
+): Promise<string> {
+	const mountsDir = resolve(primaryPath, FLEET_TASK_WORKSPACE_MOUNTS_DIR);
+	let stats: Awaited<ReturnType<typeof fs.lstat>> | null = null;
+	try {
+		stats = await fs.lstat(mountsDir);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+			throw new FleetTaskWorkspaceError('path-collision', `'${mountsDir}' could not be inspected safely`);
+		}
+	}
+	if (stats && (stats.isSymbolicLink() || !stats.isDirectory())) {
+		if (mountSpecs.length === 0) return mountsDir;
+		throw new FleetTaskWorkspaceError(
+			'path-collision',
+			`'${FLEET_TASK_WORKSPACE_MOUNTS_DIR}' in the task workspace (${mountsDir}) is a link or file and was preserved`
+		);
+	}
+	if (!stats) {
+		if (mountSpecs.length === 0) return mountsDir;
+		await fs.mkdir(mountsDir);
+	}
+	// `mkdir` cannot race a link into place unnoticed: re-read without
+	// following, then require the canonical path to be exactly the plain
+	// child of the (already canonical) primary.
+	const created = await fs.lstat(mountsDir);
+	if (created.isSymbolicLink() || !created.isDirectory()) {
+		throw new FleetTaskWorkspaceError(
+			'path-collision',
+			`'${FLEET_TASK_WORKSPACE_MOUNTS_DIR}' in the task workspace (${mountsDir}) is a link or file and was preserved`
+		);
+	}
+	let canonicalPrimary: string;
+	let canonicalMounts: string;
+	try {
+		[canonicalPrimary, canonicalMounts] = await Promise.all([fs.realpath(primaryPath), fs.realpath(mountsDir)]);
+	} catch {
+		throw new FleetTaskWorkspaceError('path-collision', `'${mountsDir}' did not resolve to a directory`);
+	}
+	if (
+		!isStrictDescendant(canonicalPrimary, canonicalMounts) ||
+		!samePath(canonicalMounts, resolve(canonicalPrimary, FLEET_TASK_WORKSPACE_MOUNTS_DIR))
+	) {
+		throw new FleetTaskWorkspaceError(
+			'path-collision',
+			`'${mountsDir}' resolves through a link or reparse-point alias and was preserved`
+		);
+	}
+	// Case-insensitive like the contracts normalizer: Windows and macOS
+	// would otherwise keep `Template` next to `template`.
+	const wanted = new Set(mountSpecs.map((mount) => mount.mountDir.toLowerCase()));
+	for (const name of await fs.readdir(mountsDir)) {
+		if (wanted.has(name.toLowerCase())) continue;
+		const entryPath = join(mountsDir, name);
+		if (!(await fs.lstat(entryPath)).isSymbolicLink()) continue;
+		await removeMountLink(entryPath);
+	}
+	return mountsDir;
+}
+
+/**
+ * Remove a mount link WITHOUT touching its target. `unlink` handles
+ * symlinks everywhere and junctions on current Node; `rmdir` is the
+ * documented fallback for a directory reparse point, and removes only the
+ * reparse point itself. The caller has already proven the path is a link.
+ */
+async function removeMountLink(linkPath: string): Promise<void> {
+	try {
+		await fs.unlink(linkPath);
+	} catch (error) {
+		const code = (error as NodeJS.ErrnoException).code;
+		if (code !== 'EPERM' && code !== 'EISDIR') throw error;
+		await fs.rmdir(linkPath);
+	}
+}
+
+/**
+ * Put a reused READ-ONLY mount back to exactly its checked-out commit:
+ * tracked edits reverted, untracked files removed (ignored files — caches,
+ * dependencies — are kept, they are not content). Both commands run inside
+ * the mount's own canonical worktree, never through the primary's link.
+ */
+async function resetReadOnlyMount(mountPath: string, signal?: AbortSignal): Promise<void> {
+	try {
+		await runGitOutput(['reset', '--hard', '--quiet', 'HEAD'], mountPath, signal);
+		await runGitOutput(['clean', '-fdq'], mountPath, signal);
+	} catch (error) {
+		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+		if (signal?.aborted) throw cancelledError();
+		throw new FleetTaskWorkspaceError('git-failed', 'Read-only mount could not be reset to its base commit');
+	}
+}
+
+/**
+ * Link one provisioned mount into the primary worktree at
+ * `<mountsDir>/<mountDir>` (`mountsDir` is the `.mounts` directory
+ * {@link reconcileMountsDir} has already proven plain). A directory
+ * junction on Windows (no privilege needed) and a directory symlink
+ * elsewhere. An existing link to the same target is kept; a link elsewhere
+ * is replaced; a real directory or file at that path is a collision and is
+ * never touched — the message names it so an operator can clean it.
+ */
+async function linkMountIntoPrimary(mountsDir: string, mountDir: string, targetPath: string): Promise<string> {
+	const linkPath = resolve(mountsDir, mountDir);
+	if (!isStrictDescendant(mountsDir, linkPath) || dirname(linkPath) !== mountsDir) {
+		throw new FleetTaskWorkspaceError('invalid-spec', `Mount directory '${mountDir}' escapes the mounts directory`);
+	}
+	let existing: Awaited<ReturnType<typeof fs.lstat>> | null = null;
+	try {
+		existing = await fs.lstat(linkPath);
+	} catch {
+		existing = null;
+	}
+	if (existing) {
+		if (!existing.isSymbolicLink()) {
+			throw new FleetTaskWorkspaceError(
+				'path-collision',
+				`Mount path '${mountDir}' already exists in the task workspace (${linkPath}) and is not a mount link; remove it to provision this Task again`
+			);
+		}
+		let current: string | null = null;
+		try {
+			current = await fs.realpath(linkPath);
+		} catch {
+			current = null;
+		}
+		if (current && samePath(current, targetPath)) return linkPath;
+		await removeMountLink(linkPath);
+	}
+	await fs.symlink(targetPath, linkPath, process.platform === 'win32' ? 'junction' : 'dir');
+	return linkPath;
+}
+
+/**
+ * Prove a WRITABLE mount is reachable and writable the way the model will
+ * reach it: create and delete a file at `<primary>/.mounts/<dir>/…`,
+ * THROUGH the link, never through the mount's own canonical path.
+ *
+ * What this proves, exactly: the `.mounts/<dir>` link exists, resolves to
+ * THIS mount's own worktree, and the filesystem and its ACLs accept a write
+ * there. A broken, stale or retargeted junction fails here instead of
+ * quietly diverting the run's edits into another directory, and an
+ * unwritable checkout fails before the model burns a budget on edits that
+ * cannot land. The probe goes through the link because that is the only
+ * path the model ever uses: a probe against `mount.path` would pass while
+ * the link is broken, certifying exactly the state it exists to catch.
+ *
+ * What this does NOT prove, and must not be read as proving: that the model
+ * CLI was granted the mount as an additional directory. This runs in the
+ * node process, which no CLI sandboxes, so its verdict is identical whether
+ * or not `--add-dir` was emitted. That half lives in argv and is checked in
+ * argv — `assertMountGrantsInCommand` in `executors/model-cli.ts`, run
+ * immediately before the spawn.
+ *
+ * A probe file left behind would be committed into the owner's repository
+ * by `finalizeMounts`, so a removal that does not succeed fails the
+ * provision naming the path rather than being swallowed.
+ */
+async function assertMountWritableThroughLink(
+	mountDir: string,
+	repositoryId: string,
+	linkPath: string,
+	mountPath: string
+): Promise<void> {
+	const probeThroughLink = join(linkPath, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE);
+	const probeInWorktree = join(mountPath, FLEET_TASK_WORKSPACE_MOUNT_WRITE_PROBE);
+	const label = `Writable mount '${mountDir}' (${repositoryId})`;
+	try {
+		// `wx` (O_CREAT|O_EXCL), never the default `w`. The probe path sits
+		// inside a directory an autonomous model was just granted write
+		// access to, and a writable mount is never reset between runs, so
+		// whatever the last run left at this name is still there. `w`
+		// follows a final symlink: an entry planted here — by a model, or
+		// committed into the mount's own repository — would make this
+		// UNSANDBOXED node process truncate and overwrite whatever it points
+		// at, anywhere the service account can write. O_EXCL refuses instead.
+		await fs.writeFile(probeThroughLink, `${process.pid} ${randomBytes(8).toString('hex')}\n`, {
+			encoding: 'utf8',
+			flag: 'wx'
+		});
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException | null)?.code === 'EEXIST') {
+			throw new FleetTaskWorkspaceError(
+				'provision-failed',
+				`${label} already has an entry at '${probeThroughLink}'; a previous run was killed mid-probe, or the mount's repository carries that name. Inspect it and remove it before running this Task again`
+			);
+		}
+		throw new FleetTaskWorkspaceError(
+			'provision-failed',
+			`${label} is not writable through its link at '${linkPath}': ${
+				error instanceof Error ? error.message : String(error)
+			}`
+		);
+	}
+	try {
+		const stats = await fs.lstat(probeInWorktree);
+		if (!stats.isFile()) throw new Error('not a regular file');
+	} catch (error) {
+		await fs.rm(probeThroughLink, { force: true, maxRetries: 3, retryDelay: 50 }).catch(() => undefined);
+		throw new FleetTaskWorkspaceError(
+			'provision-failed',
+			`${label} does not resolve to its own worktree ('${mountPath}') through '${linkPath}': ${
+				error instanceof Error ? error.message : String(error)
+			}`
+		);
+	}
+	try {
+		// Retries: on Windows an antivirus or indexer can hold a just-written
+		// file open for a few milliseconds.
+		await fs.rm(probeThroughLink, { force: true, maxRetries: 3, retryDelay: 50 });
+	} catch (error) {
+		throw new FleetTaskWorkspaceError(
+			'provision-failed',
+			`${label} kept the write probe at '${probeThroughLink}'; remove it before running this Task again: ${
+				error instanceof Error ? error.message : String(error)
+			}`
+		);
+	}
+}
+
+/**
+ * Keep the fleet's own paths (`FLEET_TASK_WORKSPACE_EXCLUDE_RULES`) out of
+ * one repository's view: `git status`, `git add -A` (the finalize) and
+ * every diff ignore them. Written to the repository's `info/exclude`
+ * (shared by all worktrees of the pool) rather than a tracked
+ * `.gitignore`, so nothing about the fleet layout is ever committed to
+ * the owner's repository.
+ *
+ * The file is shared by every worktree of the pool, and another Task's
+ * finalize (`git add -A`) may be reading it at this very moment: a torn
+ * rule would let that finalize commit `.mounts` — a symlink entry on POSIX,
+ * an embedded-repository gitlink on Windows — or a forgotten
+ * `.ever-works/QUESTION.md` silently, into the owner's pushed branch. The
+ * merged content is therefore written to a sibling temporary file and
+ * renamed over the exclude file (atomic on both platforms), and every rule
+ * is verified through Git itself before the workspace is considered ready.
+ *
+ * Per-rule idempotent: a node upgraded from slice C, whose exclude file
+ * already carries `/.mounts/`, gains the `.ever-works/` rules exactly once
+ * and never a second copy of any. Called for the primary of EVERY
+ * workspace and for every mount, because the owner-question file
+ * (slice Q) can appear in any of them.
+ */
+async function ensureFleetExcluded(repoPath: string, signal?: AbortSignal): Promise<void> {
+	let commonDir: string;
+	try {
+		commonDir = (await runGitOutput(['rev-parse', '--git-common-dir'], repoPath, signal)).trim();
+	} catch (error) {
+		if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+		if (signal?.aborted) throw cancelledError();
+		throw new FleetTaskWorkspaceError('git-failed', 'Task workspace Git directory could not be resolved');
+	}
+	const excludePath = resolve(isAbsolute(commonDir) ? commonDir : resolve(repoPath, commonDir), 'info', 'exclude');
+	let current = '';
+	try {
+		current = await fs.readFile(excludePath, 'utf8');
+	} catch {
+		current = '';
+	}
+	const lines = current.split(/\r?\n/).map((line) => line.trim());
+	const missing = FLEET_TASK_WORKSPACE_EXCLUDE_RULES.filter((rule) => !lines.includes(rule));
+	if (missing.length > 0) {
+		await fs.mkdir(dirname(excludePath), { recursive: true });
+		const separator = current.length === 0 || current.endsWith('\n') ? '' : '\n';
+		const merged = `${current}${separator}# ever-works fleet: mounted repositories and the owner-question file of Task workspaces\n${missing.join('\n')}\n`;
+		const temporaryPath = `${excludePath}.tmp-${process.pid}-${randomBytes(4).toString('hex')}`;
+		try {
+			await fs.writeFile(temporaryPath, merged, 'utf8');
+			await fs.rename(temporaryPath, excludePath);
+		} catch (error) {
+			await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+			throw new FleetTaskWorkspaceError(
+				'git-failed',
+				`Task workspace exclude rule could not be written: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+	throwIfCancelled(signal);
+	// `check-ignore -q` exits 0 only when the path IS ignored; anything else
+	// (rule not effective, Git error) surfaces as a thrown call. The probes
+	// are slash-terminated: a `dir/` rule matches directories only, and Git
+	// evaluates a slash-terminated pathname as a directory even before it
+	// exists — `.ever-works` never exists at provision time and `.mounts`
+	// only in a multi-repo workspace.
+	for (const probe of FLEET_TASK_WORKSPACE_EXCLUDE_PROBES) {
+		// A probe path that exists as a LINK or a FILE cannot be verified this
+		// way, and does not need to be.
+		//
+		// `dir/` matches directories only, so Git answers "not ignored" for a
+		// symlink named `.mounts` — correctly. That is a POSIX-only outcome: on
+		// Windows a junction reads as a directory and the probe passes, which is
+		// why this surfaced first on Linux CI.
+		//
+		// Only the ASSERTION is skipped. The rule itself is still written above,
+		// and nothing is written through such a path anyway: `reconcileMountsDir`
+		// preserves a leftover link and refuses to use it, so there is no content
+		// for the rule to have to cover. Without this, one stale `.mounts` link
+		// left by an earlier run made the workspace unprovisionable forever —
+		// including for Tasks that use no mounts at all, which is exactly the
+		// case `fleet-task-workspace-mounts.spec.ts` pins as "not blocked by it".
+		const probePath = join(repoPath, probe.replace(/\/$/, ''));
+		const probeEntry = await fs.lstat(probePath).catch(() => null);
+		if (probeEntry && !probeEntry.isDirectory()) {
+			continue;
+		}
+		try {
+			await runGitOutput(['check-ignore', '-q', probe], repoPath, signal);
+		} catch (error) {
+			if (error instanceof Error && error.name === 'ProcessTreeTerminationError') throw error;
+			if (signal?.aborted) throw cancelledError();
+			throw new FleetTaskWorkspaceError(
+				'git-failed',
+				`Task workspace exclude rule for '${probe}' did not take effect`
+			);
+		}
+	}
 }

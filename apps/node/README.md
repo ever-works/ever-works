@@ -8,11 +8,43 @@ This app also **owns the shared node core** (`src/core/`) — enrollment, heartb
 detection and config persistence are written once here and imported by `apps/desktop-node`, so the
 headless and desktop shells can never drift apart (PRD §3.3).
 
+## Install
+
+The node ships on npm as the public package **`ever-works-node`** — one command per machine, no
+monorepo checkout:
+
+```bash
+npm install -g ever-works-node     # Node.js >= 22
+ever-works-node --version
+ever-works-node capabilities       # what this machine would advertise, before enrolling
+```
+
+The published package is a single bundled `cli.js` (see `build.js`); the only runtime dependency is
+the optional `@napi-rs/keyring` native addon for the OS keychain — where its prebuilt binary is
+unavailable the install still works, with the credential in the owner-locked config file instead.
+
+The unattended-run scripts ship inside the package. After a global install the Windows installer is
+at:
+
+```powershell
+& "$(npm root -g)\ever-works-node\packaging\windows\install-service.ps1" -Work
+```
+
+(Windows: [NSSM](https://nssm.cc) is optional — with it the script registers a real Windows service,
+without it a boot-time Scheduled Task. Either way it registers `node.exe` running the package's
+`cli.js` directly — never npm's `.ps1`/`.cmd` shims, which service managers cannot launch — and
+re-running it re-applies the current flags. From a source checkout pass
+`-CliPath <checkout>\apps\node\dist\cli.js`. The systemd unit for Linux is under `packaging/systemd/`.)
+
+**From source** instead — in the monorepo, `pnpm build:node` builds the node and its workspace
+dependencies into `apps/node/dist/`, and `cd apps/node && npm link` puts `ever-works-node` on `PATH`
+pointing at that checkout.
+
 ## Commands
 
 ```bash
 ever-works-node enroll --api-url <url> --token <one-time-token> [--name <label>] [-i <seconds>]
-ever-works-node start [-i <seconds>] [--work] [--concurrency <count>]
+ever-works-node start [-i <seconds>] [--work] [--concurrency <count>] [--claude-path <file>] [--codex-path <file>] [--workspace-root <dir>]
 ever-works-node pause [--local-only]
 ever-works-node resume [--local-only]
 ever-works-node unenroll [--local-only]
@@ -27,7 +59,10 @@ ever-works-node capabilities
   exponential backoff on failure, refreshing capability tags on every beat, until SIGINT/SIGTERM.
   With **`--work`** it also runs the worker host: lease → execute → report against
   `POST /api/fleet/jobs/*`. This is opt-in on purpose — enrolling a machine and letting it run the
-  owner's commands are two different consents.
+  owner's commands are two different consents. `--claude-path` / `--codex-path` pin the model CLIs
+  for this process and `--workspace-root <dir>` sets the **absolute** directory the per-Task
+  worktrees of agent tasks live under (default `EVER_WORKS_NODE_WORKSPACE_ROOT`, then
+  `~/.ever-works/fleet-workspaces`); a relative path is a usage error.
 - **`pause` / `resume`** drain and undrain this machine. Pausing stops leasing **immediately** and
   lets in-flight jobs finish and report — it is not a kill. It tells the platform
   (`POST /api/fleet/pause`, so the scheduler stops offering work) _and_ records the intent locally,
@@ -132,9 +167,18 @@ engine than the one an operator chose is how a check passes for the wrong reason
 ## Commands (development)
 
 ```bash
-pnpm --filter ever-works-node build   # tsc type-check + CommonJS emit to dist/
-pnpm --filter ever-works-node test    # vitest unit tests (no network, no disk, no real timers)
+pnpm --filter ever-works-node build         # tsc type-check + CommonJS emit to dist/
+pnpm --filter ever-works-node test          # vitest unit tests (no network, no disk, no real timers)
+pnpm --filter ever-works-node build:bundle  # stage the publishable npm package under dist-bundle/
 ```
+
+`build:bundle` (`build.js`) inlines the `workspace:*` packages with esbuild into one `cli.js`,
+writes the public manifest beside it and copies `packaging/`. The workspace package itself stays
+`private`; `.github/workflows/publish-node.yml` publishes `dist-bundle/` on a `node-v<version>` tag, with an
+npm provenance attestation. Release flow: bump `package.json` and `src/version.ts` together in a PR
+(`src/version.spec.ts` pins them to each other), merge, then tag the merge commit `node-v<version>` —
+the tag must equal the package version, so every published version maps to one commit. Running the
+workflow by hand is a dry run only (build, smoke test, `npm publish --dry-run`).
 
 ## Notes
 
@@ -146,12 +190,41 @@ pnpm --filter ever-works-node test    # vitest unit tests (no network, no disk, 
 
 ## What a node can and cannot run
 
-The worker host resolves an executor by `job.kind`. Today exactly one kind is registered:
+The worker host resolves an executor by `job.kind`:
 
-| Kind                | Status                                                                                                                                                                                                                                                                 |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `acceptance-checks` | **Working end to end.** Runs a Task's dispatch-frozen acceptance checks in a workspace directory on this machine and reports each exit code, with verdict rules identical to the platform's `TaskGateRunnerService`.                                                   |
-| `browser-check`     | **Working end to end, on a node that resolved a browser.** Drives the machine's real browser against a URL in a throwaway profile and reports what it rendered (DOM bytes, `<title>`, an optional `expectText`). Registered only when the `browser` tag is advertised. |
+| Kind                | Status                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `acceptance-checks` | **Working end to end.** Runs a Task's dispatch-frozen acceptance checks in a workspace directory on this machine and reports each exit code, with verdict rules identical to the platform's `TaskGateRunnerService`.                                                                                                                                                                         |
+| `agent-task`        | **Working end to end.** The general kind. In the platform's `command` mode it runs the operator's command template; in `model-cli` mode it provisions an isolated worktree of the Task's repository, runs a **local Claude Code / Codex** on the instructions the platform assembled, grades the acceptance checks, then commits and pushes the task branch. See "Agent execution v2" below. |
+| `browser-check`     | **Working end to end, on a node that resolved a browser.** Drives the machine's real browser against a URL in a throwaway profile and reports what it rendered (DOM bytes, `<title>`, an optional `expectText`). Registered only when the `browser` tag is advertised.                                                                                                                       |
+
+## Agent execution v2 — model CLIs on this machine
+
+A node advertises `claude-code` and/or `codex` when it resolved the executable at startup:
+
+1. `EVER_WORKS_NODE_CLAUDE_PATH` / `EVER_WORKS_NODE_CODEX_PATH` (or `start --claude-path` /
+   `--codex-path`) pin an executable. A pin that does not resolve **disables** that CLI rather than
+   falling back to PATH — a run must never succeed on a binary the operator did not choose.
+2. Otherwise the first `claude` / `codex` on PATH (on Windows, the `.cmd` / `.exe` form).
+
+A `model-cli` job is only offered to nodes advertising the CLI it needs. On such a job the node:
+
+- provisions the Task worktree (bare cache + `git worktree`, per-Task binding, root-confined);
+- writes the platform's instructions to a scratch file and runs the CLI **through the same command
+  runner every check uses** — env scrub, timeout, cancellation, whole-tree kill — with the
+  instructions on stdin (`claude -p --output-format json …` / `codex exec --json … -`) and the CLI's
+  structured output captured to a scratch file. Nothing free-form ever reaches argv;
+- runs the acceptance checks in the worktree;
+- `git add -A && git commit && git push HEAD:refs/heads/<task-branch>` via the node's own Git
+  credential helper (token-free, like the fetch);
+- reports one `FleetAgentTaskResult`: model summary / cost / turns / session id, check verdicts,
+  gate status, branch + head SHA + changed-file count, and a one-sentence `failureReason` when any
+  required part did not pass.
+
+The CLI runs with the machine's own login (`~/.claude`, `~/.codex`) or the credential names the
+platform granted (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`, `CODEX_ACCESS_TOKEN`,
+`OPENAI_API_KEY` — one per family, subscription-backed first). Scratch files live under the OS temp
+dir (`ever-works-node/agent-tasks/<job id>`) and are removed after every run.
 
 `browser-check` runs headless by default (`--headless=new --dump-dom`), which is what makes its
 verdict a real observation rather than "the process did not crash". `headed: true` opens a visible
@@ -161,6 +234,17 @@ headed job that asks for `expectText` is **refused** rather than quietly downgra
 A leased job of any other kind is completed as a **failure naming the kind** — never silently
 dropped, which would leave it to expire and retry forever on the same incapable node.
 
+### Multi-repo Task workspaces
+
+A job's workspace spec may carry `mounts`: additional repositories checked out on the same Task branch.
+Each mount is its own binding under the workspace root (same pool, reuse and ownership proof as the
+primary) and is linked into the primary worktree at `.mounts/<dir>` — a directory junction on Windows,
+a symlink elsewhere — with `/.mounts/` written to the repository's shared `info/exclude`, so the
+primary's Git never sees it. After the model step the node commits and pushes every writable mount
+(one verdict each, reported as `mountGit`) and then the primary. A mount that cannot be provisioned
+fails the job naming it; a mount whose push fails is reported on its own entry while the others still
+complete.
+
 ## Follow-ups
 
 - Further job kinds behind the same executor seam: full agent execution, `pty-local`
@@ -169,5 +253,6 @@ dropped, which would leave it to expire and retry forever on the same incapable 
 - Workspace **provisioning** on the node: today `acceptance-checks` requires the workspace to
   already exist on this machine (it refuses a path it cannot resolve), so the end-to-end cloud
   path still wants a checkout step.
-- **Publishing to npm.** The package is still `private`, and the packaging scripts therefore refuse
-  to install a service unless `ever-works-node` is already on `PATH`.
+- **Auto-update.** The npm package carries an npm provenance attestation, but a node does not
+  update itself — `npm install -g ever-works-node@latest` plus a service restart
+  is the upgrade path.
