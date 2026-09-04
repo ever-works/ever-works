@@ -6212,6 +6212,7 @@
                 "creatingButton": "กำลังลงทะเบียน…",
                 "cancelButton": "ยกเลิก",
                 "invalidUrl": "กรอก URL ของรีโพซิทอรี เช่น https://github.com/owner/repo",
+                "invalidSlug": "ใช้ตัวพิมพ์เล็ก ตัวเลข และขีดกลางเท่านั้น เช่น my-repo",
                 "success": "ลงทะเบียนรีโพซิทอรีเป็น Work แล้ว",
                 "createFailed": "ลงทะเบียนรีโพซิทอรีไม่สำเร็จ",
                 "noteTitle": "หมายเหตุ:",

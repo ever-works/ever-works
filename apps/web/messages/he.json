@@ -6305,6 +6305,7 @@
                 "creatingButton": "רושם…",
                 "cancelButton": "ביטול",
                 "invalidUrl": "הזינו כתובת מאגר כמו https://github.com/owner/repo",
+                "invalidSlug": "השתמשו רק באותיות קטנות, ספרות ומקפים, למשל my-repo",
                 "success": "המאגר נרשם כ-Work",
                 "createFailed": "רישום המאגר נכשל",
                 "noteTitle": "הערה:",

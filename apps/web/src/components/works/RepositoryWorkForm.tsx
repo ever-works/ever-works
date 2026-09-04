@@ -11,6 +11,12 @@ import { cn } from '@/lib/utils/cn';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    canonicalRepositoryUrl,
+    isCanonicalWorkSlug,
+    parseRepositoryUrl,
+    slugifyForWork,
+} from '@/lib/work-kinds/repository-url';
 
 /**
  * Create form for the `repo` Work kind (self-build slice D, EW-766).
@@ -28,38 +34,12 @@ import { Textarea } from '@/components/ui/textarea';
  * Work's data repository (`POST /api/works`).
  */
 
-/**
- * Mirrors `parseRepositoryWorkSource` on the API closely enough to derive
- * defaults and to catch an obviously wrong URL before the round-trip. The
- * API remains the authority — it re-parses and rejects anything it cannot
- * register.
- *
- * GitHub only, like the API: only the GitHub git-provider plugin exists, so
- * a GitLab / Bitbucket URL would produce a Work no Task can clone. Flagging
- * it here means the form says so instead of a 400 after the round-trip.
- * Repository names may start with a dot (`.github`, `.dotfiles`); owners
- * may not — same rule as GitHub itself.
- */
-const REPOSITORY_URL_PATTERN =
-    /^(?:https?:\/\/)?(?:www\.)?github\.com\/([A-Za-z0-9][A-Za-z0-9._-]*)\/([A-Za-z0-9._-]*?)(?:\.git)?\/?$/i;
-
-export function parseRepositoryUrl(value: string): { owner: string; repo: string } | null {
-    const match = REPOSITORY_URL_PATTERN.exec(value.trim());
-    if (!match) return null;
-    const [, owner, repo] = match;
-    // `.` / `..` are path components, not repository names.
-    if (!repo || repo === '.' || repo === '..') return null;
-    return { owner, repo };
-}
-
-/** Same rules as the API slug regex: lowercase letters, digits, hyphens. */
-function slugifyForWork(value: string): string {
-    return value
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-}
+// The parser, the slugifier and the canonicaliser live in
+// `@/lib/work-kinds/repository-url` because the composers that route into
+// this form need them too — whatever the user typed has to be reduced to
+// canonical coordinates before it can go near a URL. Re-exported here so
+// callers that already import it from the form keep working.
+export { parseRepositoryUrl };
 
 export interface RepositoryWorkFormProps {
     /** Git provider plugin id selected in the sidebar (connection gate on the action). */
@@ -105,12 +85,21 @@ export function RepositoryWorkForm({ gitProvider, initialRepositoryUrl }: Reposi
         if (!descriptionDirty) setDescription(`${coords.owner}/${coords.repo}`);
     };
 
+    // The slug input carries a `pattern`, but this form submits from a
+    // button handler rather than a native <form>, so nothing enforces it:
+    // `My_Repo` would sail through to the server action and come back a
+    // 400. Check it the same way the URL field is checked.
+    const slugInvalid = slug.trim().length > 0 && !isCanonicalWorkSlug(slug);
     const canSubmit =
-        !isPending && Boolean(parsed) && name.trim().length > 0 && slug.trim().length > 0;
+        !isPending && Boolean(parsed) && name.trim().length > 0 && isCanonicalWorkSlug(slug);
 
     const submit = () => {
         if (!parsed) {
             toast.error(t('invalidUrl'));
+            return;
+        }
+        if (!isCanonicalWorkSlug(slug)) {
+            toast.error(t('invalidSlug'));
             return;
         }
         startTransition(async () => {
@@ -123,7 +112,9 @@ export function RepositoryWorkForm({ gitProvider, initialRepositoryUrl }: Reposi
                 organization: false,
                 gitProvider,
                 kind: 'repo',
-                repositoryUrl: repositoryUrl.trim(),
+                // Canonical, never the raw field: `parsed` already proved it
+                // reduces to owner/repo, and the API stores what we send.
+                repositoryUrl: canonicalRepositoryUrl(repositoryUrl) ?? repositoryUrl.trim(),
             });
             if (result.success && result.work) {
                 toast.success(t('success'));
@@ -189,6 +180,12 @@ export function RepositoryWorkForm({ gitProvider, initialRepositoryUrl }: Reposi
                         setSlugDirty(true);
                     }}
                     pattern="[a-z0-9-]+"
+                    // Without this the submit button is simply disabled and
+                    // the field explains nothing: the `invalidSlug` toast in
+                    // `submit` is unreachable precisely because `canSubmit`
+                    // already blocked it. Say what is wrong where it is wrong,
+                    // the same way the URL field does.
+                    error={slugInvalid ? t('invalidSlug') : undefined}
                     helperText={t('slugHelp')}
                     variant="form"
                 />

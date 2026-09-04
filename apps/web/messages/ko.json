@@ -6212,6 +6212,7 @@
                 "creatingButton": "등록 중…",
                 "cancelButton": "취소",
                 "invalidUrl": "https://github.com/owner/repo 같은 리포지토리 URL을 입력하세요",
+                "invalidSlug": "소문자, 숫자, 하이픈만 사용하세요. 예: my-repo",
                 "success": "리포지토리가 Work로 등록되었습니다",
                 "createFailed": "리포지토리 등록에 실패했습니다",
                 "noteTitle": "참고:",

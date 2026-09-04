@@ -6212,6 +6212,7 @@
                 "creatingButton": "Registreren…",
                 "cancelButton": "Annuleren",
                 "invalidUrl": "Voer een repository-URL in zoals https://github.com/owner/repo",
+                "invalidSlug": "Gebruik alleen kleine letters, cijfers en koppeltekens, bijvoorbeeld my-repo",
                 "success": "Repository geregistreerd als Work",
                 "createFailed": "Repository registreren mislukt",
                 "noteTitle": "Let op:",

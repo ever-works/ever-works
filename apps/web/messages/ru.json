@@ -6212,6 +6212,7 @@
                 "creatingButton": "Регистрация…",
                 "cancelButton": "Отмена",
                 "invalidUrl": "Введите URL репозитория вида https://github.com/owner/repo",
+                "invalidSlug": "Только строчные буквы, цифры и дефисы, например my-repo",
                 "success": "Репозиторий зарегистрирован как Work",
                 "createFailed": "Не удалось зарегистрировать репозиторий",
                 "noteTitle": "Примечание:",

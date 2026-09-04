@@ -62,6 +62,19 @@ import { getWorkCapabilities } from '@ever-works/contracts';
 
 type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo' | 'repo';
 
+/**
+ * `repo` never reaches the AI creator: registering a repository needs a
+ * `repositoryUrl` this path neither collects nor can invent, so a Work
+ * created here with that kind could not satisfy the API's registration
+ * contract. The composers route the Repository chip to the manual form
+ * instead; this drops it defensively for any caller that does not.
+ */
+type AiCreatableWorkKind = Exclude<InitialWorkKind, 'repo'>;
+
+function aiCreatableKind(kind?: InitialWorkKind): AiCreatableWorkKind | undefined {
+    return kind && kind !== 'repo' ? kind : undefined;
+}
+
 interface WorkAICreatorProps {
     gitProvider?: string;
     gitConnected?: boolean;
@@ -278,7 +291,7 @@ export function WorkAICreator({
                 pluginConfig: Object.keys(pluginConfig).length > 0 ? pluginConfig : undefined,
                 websiteTemplateId: websiteTemplateId || undefined,
                 proposalId: proposal?.id,
-                workKind: initialKind,
+                workKind: aiCreatableKind(initialKind),
             });
 
             if (result.success) {

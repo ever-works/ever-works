@@ -59,7 +59,7 @@ const readmeConfigSchema = z.object({
 // works/new/new-work-client.tsx). Persisted on `work.kind` by the API so
 // the kind-aware default website template applies (general-purpose kinds
 // → the `web` template). The API whitelists again server-side.
-const aiWorkKindSchema = z.enum([
+const workKindSchema = z.enum([
     'website',
     'landing-page',
     'blog',
@@ -67,6 +67,12 @@ const aiWorkKindSchema = z.enum([
     'awesome-repo',
     'repo',
 ]);
+
+// `repo` is manual-only: registering one means naming an existing repository,
+// and the AI creation path neither collects nor constructs `repositoryUrl`, so
+// a Work created there with `kind: 'repo'` could never satisfy the API's
+// registration contract. Excluded at the schema so it cannot arrive at all.
+const aiWorkKindSchema = workKindSchema.exclude(['repo']);
 type AIWorkKind = z.infer<typeof aiWorkKindSchema>;
 
 const getCreateWorkSchema = async () => {
@@ -102,8 +108,10 @@ const getCreateWorkSchema = async () => {
         storageProvider: z.string().optional(),
         websiteTemplateId: z.string().optional(),
         // Optional work-kind chip value — kept in the parsed output so it
-        // reaches the API's CreateWorkDto (zod strips unknown keys).
-        kind: aiWorkKindSchema.optional(),
+        // reaches the API's CreateWorkDto (zod strips unknown keys). This is
+        // the MANUAL create path, which does collect `repositoryUrl`, so the
+        // full vocabulary applies here.
+        kind: workKindSchema.optional(),
         // Repository Work (`kind: 'repo'`) — the existing repository the
         // Work wraps. Declared so zod keeps it; the API parses + validates.
         repositoryUrl: z
@@ -321,7 +329,6 @@ const AI_WORK_KIND_PROMPT_LABELS: Record<AIWorkKind, string> = {
     blog: 'blog',
     directory: 'directory',
     'awesome-repo': 'awesome repository list',
-    repo: 'code repository',
 };
 
 interface AIWorkOptions {
