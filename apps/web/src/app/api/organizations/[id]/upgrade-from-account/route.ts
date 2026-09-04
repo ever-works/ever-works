@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
+
+type RouteContext = { params: Promise<{ id: string }> };
 
 /**
  * EW-661 (Tenants & Organizations Phase 9) — web BFF proxy for
@@ -12,27 +13,19 @@ import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
  * service enforces the first-Org guard (spec §5.2) and may return 409
  * with `UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS` — we pass that body
  * through verbatim so the dialog can surface the right copy.
+ *
+ * Auth and workspace scope come from {@link bffProxy}: no auth cookie is
+ * `401 Unauthorized`, a missing or malformed per-tab selector is
+ * `400 Invalid workspace scope`, and the handler is handed headers that
+ * already carry the bearer and the Organization scope.
  */
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export const POST = bffProxy<RouteContext>(async ({ headers }, { params }) => {
     const { id } = await params;
     if (!id) {
         return NextResponse.json({ error: 'Missing organization id' }, { status: 400 });
     }
 
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
+    headers.set('Content-Type', 'application/json');
 
     try {
         const upstream = await fetch(
@@ -55,7 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         console.error('Failed to proxy POST /api/organizations/:id/upgrade-from-account:', error);
         return NextResponse.json({ error: 'Failed to upgrade from account' }, { status: 500 });
     }
-}
+});
 
 function safeParse(text: string): unknown {
     try {
