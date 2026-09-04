@@ -113,3 +113,20 @@ export {
     PackageMcpReconcilerService,
     type ReconcileResult,
 } from './package-mcp-reconciler.service';
+
+export {
+    AgentPluginPackageDataDirService,
+    dataDirSegment,
+    isWithin,
+    type PackageDataDirOwner,
+} from './package-data-dir.service';
+
+export {
+    buildLaunchEnv,
+    buildLaunchPlan,
+    LaunchRefused,
+    resolveCommand,
+    resolveCwd,
+    type LaunchContext,
+    type LaunchPlan,
+} from './stdio-launcher';

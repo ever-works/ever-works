@@ -191,11 +191,11 @@ resolveAllowedTools` as a new optional source (domain-tool-source
 
 ## Phase 4 — stdio transport + PLUGIN_DATA (PR-7)
 
-- [ ] **T29**. `AGENT_PLUGINS_DATA_DIR` (default `/app/agent-plugins-data`);
+- [x] **T29**. `AGENT_PLUGINS_DATA_DIR` (default `/app/agent-plugins-data`);
       per-(tenant, package) data dirs; create-before-launch; delete on
       uninstall; SaaS write-through sync via boot-selected `IStoragePlugin`
       with DB-side key manifest.
-- [ ] **T30**. Stdio launcher: from-scratch env (`buildSubprocessEnv` pattern) +
+- [x] **T30**. Stdio launcher: from-scratch env (`buildSubprocessEnv` pattern) +
       expanded package env overlay + `PLUGIN_ROOT`/`PLUGIN_DATA` last; single-
       token command resolution (bare vs `./`-relative) with containment; cwd
       rules per AP-13; process supervision + teardown at run end.
