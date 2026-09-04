@@ -42,6 +42,15 @@ const MAX_SUMMARY_CHARS = 4000;
 const MAX_TAIL_CHARS = 1500;
 /** A node-reported identifier as far as it is ever quoted back to a human. */
 const MAX_QUOTED_CHARS = 120;
+/**
+ * A node-reported VERDICT sentence — a git error, a withheld-publish
+ * reason — as far as it is quoted back to a human. Wider than an
+ * identifier because the sentences the node writes are whole
+ * explanations ("the lease on this work expired 40s ago; the platform may
+ * already have re-offered it to another node"), and a reason cut at 120
+ * characters is a reason the operator has to go and look up anyway.
+ */
+const MAX_VERDICT_CHARS = 300;
 const SHA_PATTERN = /^[0-9a-f]{40,64}$/i;
 
 /** The planned mounts of a job, keyed by lower-cased repository identity. */
@@ -373,13 +382,7 @@ export class FleetAgentTaskReconcilerService {
                     continue;
                 }
                 if (!entry.pushed) {
-                    mountNotes.push(
-                        `\`${mount.repositoryId}\`: committed on \`${mount.branch}\` but not pushed${
-                            entry.error
-                                ? ` (${truncate(entry.error, MAX_QUOTED_CHARS)})`
-                                : ' (git policy)'
-                        }.`,
-                    );
+                    mountNotes.push(describeUnpushedMount(mount, entry));
                     continue;
                 }
                 // The primary path is guarded the same way: an unexpected
@@ -563,7 +566,19 @@ export class FleetAgentTaskReconcilerService {
         // planned-mount gate as the success and failure paths: the wire is
         // untrusted, so repository, branch and base come from the planner's
         // spec on the job and the node only says what it pushed.
-        if (task && result.mountGit && result.mountGit.length > 0) {
+        //
+        // A mount that did NOT push is not dropped in silence (review LC-2 /
+        // BD-6). The question branch is taken for ANY status, BEFORE the
+        // success / failure split, so it is the ONLY place a multi-repo run
+        // that asked a question can report the repository that failed to
+        // land: the failure path — whose whole message is `failureReason` —
+        // never runs for it. Nothing is RECORDED for such a mount (the Task
+        // has no state for an un-pushed branch, on any path), but the verdict
+        // travels with the question the way the success path already reports
+        // it, so the owner answers knowing one repository is still on the
+        // node.
+        const mountNotes: string[] = [];
+        if (result.mountGit && result.mountGit.length > 0) {
             const planned = this.plannedMounts(event.job, ctx.runId);
             for (const entry of result.mountGit) {
                 const refusal = refuseMountEntry(entry, planned);
@@ -571,8 +586,26 @@ export class FleetAgentTaskReconcilerService {
                     this.logger.warn(`Run ${ctx.runId}: mount result ignored — ${refusal}`);
                     continue;
                 }
-                if (!entry.pushed || entry.empty) continue;
                 const mount = planned.get(entry.repositoryId!.trim().toLowerCase())!;
+                if (entry.empty) continue;
+                if (!entry.pushed) {
+                    // Redacted here too: a failed push quotes the remote URL
+                    // with the credential in it, and the server log is not a
+                    // place to keep the owner's token either (review SR-2).
+                    this.logger.warn(
+                        `Run ${ctx.runId}: mount ${mount.repositoryId} was not pushed on a parked run: ${truncate(
+                            redactSecrets(entry.error ?? entry.publishWithheld ?? 'git policy')
+                                .cleaned,
+                            MAX_VERDICT_CHARS,
+                        )}`,
+                    );
+                    mountNotes.push(describeUnpushedMount(mount, entry));
+                    continue;
+                }
+                // The Task row can be gone (deleted while the job ran); the
+                // question is still filed, and the notes above still travel
+                // with it — only the branch bookkeeping needs the row.
+                if (!task) continue;
                 await this.bestEffort(`record pushed mount ${mount.repositoryId}`, () =>
                     this.taskWorkspace.finalizeMountPush({
                         task,
@@ -596,7 +629,7 @@ export class FleetAgentTaskReconcilerService {
                 agentRunId: ctx.runId,
                 agentId,
                 question: question.text,
-                context: composeQuestionContext(question, result),
+                context: composeQuestionContext(question, result, mountNotes),
                 sourceMeta: {
                     nodeId: event.nodeId ?? event.job.nodeId ?? null,
                     nodeName: node?.name ?? null,
@@ -607,7 +640,12 @@ export class FleetAgentTaskReconcilerService {
                 },
             });
         });
-        await this.postChat(task, event.userId, agentId, composeQuestionMessage(question, result));
+        await this.postChat(
+            task,
+            event.userId,
+            agentId,
+            composeQuestionMessage(question, result, mountNotes),
+        );
         await this.drain(task?.workId ?? run.workId ?? null);
     }
 
@@ -790,6 +828,28 @@ function refuseMountEntry(entry: FleetAgentTaskGitResult, planned: PlannedMounts
     return null;
 }
 
+/**
+ * Why a mounted repository that HAS work did not reach its remote, in one
+ * line. Shared by the success and the question paths (review LC-2 / BD-6)
+ * so a mount that failed to push reads the same wherever the run ended up
+ * being reported.
+ *
+ * Repository and branch are the PLANNER's — the node only supplies the
+ * reason, which is redacted (a failed push routinely quotes the remote URL
+ * with the credential embedded, and this line reaches the Inbox body —
+ * review SR-2) and bounded before a human ever sees it.
+ */
+function describeUnpushedMount(
+    mount: FleetTaskWorkspaceMountSpec,
+    entry: FleetAgentTaskGitResult,
+): string {
+    const reason = entry.error ?? entry.publishWithheld ?? null;
+    const quoted = reason
+        ? truncate(redactSecrets(reason).cleaned, MAX_VERDICT_CHARS)
+        : 'git policy';
+    return `\`${mount.repositoryId}\`: committed on \`${mount.branch}\` but not pushed (${quoted}).`;
+}
+
 function describeMountOutcome(outcome: TaskMountPushOutcome, branch: string): string {
     switch (outcome.outcome) {
         case 'pr-opened':
@@ -865,10 +925,15 @@ function composeSuccessMessage(
  * where the partial work is, and whether the run also reported a model
  * or check failure (both are true AND the run is parked, not failed).
  * Prose only; every id the reply routes on lives on the Inbox row.
+ *
+ * `mountNotes` are the caller's, already gated against the planner's spec
+ * (review LC-2 / BD-6): a node report may not name a repository the plan
+ * never mounted, not even in prose the owner reads.
  */
 function describeQuestionNotes(
     question: FleetAgentTaskQuestion,
     result: FleetAgentTaskResult,
+    mountNotes: string[] = [],
 ): string[] {
     const notes: string[] = [];
     const git = result.git;
@@ -881,11 +946,31 @@ function describeQuestionNotes(
             notes.push(`Work so far: pushed on branch \`${git.branch}\`.`);
         } else if (git.empty) {
             notes.push('Work so far: no file changes.');
+        } else if (git.publishWithheld) {
+            // Slice B's lease fence, NOT the Work's git policy: the node
+            // committed and deliberately declined to push a branch it may
+            // no longer own. Said apart from the policy line below so the
+            // operator is not sent after a phantom Git fault, and so the
+            // deliberate refusal is not read as a settled choice to keep
+            // the work local.
+            notes.push(
+                `Work so far: committed on \`${git.branch}\` but the push was withheld: ${truncate(
+                    redactSecrets(git.publishWithheld).cleaned,
+                    MAX_VERDICT_CHARS,
+                )}`,
+            );
         } else {
             notes.push(
                 `Work so far: committed on \`${git.branch}\` but not pushed (git policy) — the answer run may land on another node and start from the base ref.`,
             );
         }
+    }
+    // Multi-repo (slice C1) — the mounts that did not land, in the same
+    // shape the success path uses for them. Without this the owner reads a
+    // tidy question and never learns a second repository is still sitting
+    // uncommitted-to-the-remote on the node.
+    if (mountNotes.length > 0) {
+        notes.push('Mounted repositories:', ...mountNotes.map((note) => `- ${note}`));
     }
     if (result.model && result.model.status !== 'succeeded') {
         notes.push(`The run also reported a model failure (status ${result.model.status}).`);
@@ -898,6 +983,19 @@ function describeQuestionNotes(
             `Required acceptance checks did not pass${failing.length > 0 ? `: ${failing.join(', ')}` : '.'}`,
         );
     }
+    // The node's own one-sentence verdict, LAST because it usually repeats
+    // in summary form what the notes above say in detail — but it is the
+    // only line that carries a failure with no git or check of its own
+    // (review LC-2). Bounded and redacted exactly like the failure path's
+    // `reason`, which is the message this run will never get.
+    if (result.status === 'failed' && result.failureReason) {
+        notes.push(
+            `The run also reported a failure: ${truncate(
+                redactSecrets(result.failureReason).cleaned,
+                MAX_SUMMARY_CHARS,
+            )}`,
+        );
+    }
     if (question.mountDir) {
         notes.push(`Asked from the mounted repository \`.mounts/${question.mountDir}\`.`);
     }
@@ -908,8 +1006,9 @@ function describeQuestionNotes(
 function composeQuestionContext(
     question: FleetAgentTaskQuestion,
     result: FleetAgentTaskResult,
+    mountNotes: string[] = [],
 ): string | null {
-    const notes = describeQuestionNotes(question, result);
+    const notes = describeQuestionNotes(question, result, mountNotes);
     const parts = [question.context, notes.length > 0 ? notes.join('\n') : null].filter(
         (part): part is string => Boolean(part && part.trim()),
     );
@@ -920,6 +1019,7 @@ function composeQuestionContext(
 function composeQuestionMessage(
     question: FleetAgentTaskQuestion,
     result: FleetAgentTaskResult,
+    mountNotes: string[] = [],
 ): string {
     const lines = [
         '**Fleet run paused — waiting for your answer** (executed on one of your own machines).',
@@ -929,7 +1029,7 @@ function composeQuestionMessage(
     if (question.context) {
         lines.push('', truncate(question.context, MAX_TAIL_CHARS));
     }
-    const notes = describeQuestionNotes(question, result);
+    const notes = describeQuestionNotes(question, result, mountNotes);
     if (notes.length > 0) lines.push('', ...notes);
     lines.push('', 'Answer it in the Inbox to resume this Task on the same branch.');
     return lines.join('\n');
