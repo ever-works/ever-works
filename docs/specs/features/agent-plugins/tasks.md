@@ -245,9 +245,9 @@ resolveAllowedTools` as a new optional source (domain-tool-source
       off-nav.
 - [ ] **T38**. Desktop staging (`prepare-bundle.js` + `<userData>/agent-plugins`
       default source) + headless-node XDG dir.
-- [ ] **T39**. apps/mcp whitelist decision: expose `agent-plugins` management
+- [x] **T39**. apps/mcp whitelist decision: expose `agent-plugins` management
       tools or document out-of-scope.
-- [ ] **T40**. Security review pass (stdio gate, SSRF policy, containment
+- [x] **T40**. Security review pass (stdio gate, SSRF policy, containment
       fuzzing over fixture escapes); Sentry tags; rate-limit re-check.
 - [x] **T41**. Conformance statement doc: map every Appendix A row + AP-1…AP-23 to
       test evidence; announce "Agent Plugins v1.0.0 compatible (client: skills + MCP; producer: skills packages, plus the Ever Works MCP-server package
