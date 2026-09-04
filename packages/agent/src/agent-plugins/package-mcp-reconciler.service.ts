@@ -10,6 +10,7 @@ import {
     type SkippedMcpReason,
     type SkippedMcpServer,
 } from './mcp-server-config.service';
+import { createHash } from 'node:crypto';
 import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 
 /**
@@ -40,6 +41,9 @@ import { isSafeWebhookUrl } from '../utils/ssrf-guard';
  * to enable it and bind it, exactly as they would for a server they had never
  * seen before, which is what a package server is.
  */
+
+/** `mcp_server_connections.name` is varchar(80) and the pattern caps at 80. */
+const MAX_CONNECTION_NAME = 80;
 
 /** Only remote transports can become a connection; the row is URL-shaped. */
 const REMOTE_TRANSPORTS = new Set(['streamable-http', 'sse']);
@@ -75,14 +79,29 @@ export interface ReconcileResult {
  * would silently point at the wrong server.
  */
 export function connectionNameFor(packageName: string, serverName: string): string | null {
-    const slug = `${packageName}-${serverName}`
+    const source = `${packageName}-${serverName}`;
+    const slug = source
         .toLowerCase()
         .replace(/[^a-z0-9]+/gu, '-')
-        .replace(/^-+|-+$/gu, '')
-        .slice(0, 80)
-        .replace(/-+$/gu, '');
+        .replace(/^-+|-+$/gu, '');
 
-    return MCP_CONNECTION_NAME_PATTERN.test(slug) ? slug : null;
+    // Truncation alone collides. Two servers under one package whose names
+    // share their first 80 normalised characters produce the same slug, and
+    // reconciliation then finds the FIRST one's row for the second and
+    // overwrites its URL — one server silently pointed at another's address.
+    //
+    // A digest of the full input is appended, and the readable part trimmed
+    // to make room, so a name stays recognisable while distinct inputs stay
+    // distinct. Same shape as `dataDirSegment`, for the same reason.
+    if (slug.length <= MAX_CONNECTION_NAME) {
+        return MCP_CONNECTION_NAME_PATTERN.test(slug) ? slug : null;
+    }
+
+    const digest = createHash('sha256').update(source).digest('hex').slice(0, 8);
+    const head = slug.slice(0, MAX_CONNECTION_NAME - digest.length - 1).replace(/-+$/gu, '');
+    const truncated = `${head}-${digest}`;
+
+    return MCP_CONNECTION_NAME_PATTERN.test(truncated) ? truncated : null;
 }
 
 @Injectable()

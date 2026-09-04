@@ -1,7 +1,11 @@
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { McpServerConfigService, usesPluginData } from './mcp-server-config.service';
+import {
+    McpServerConfigService,
+    sourceKindFromPath,
+    usesPluginData,
+} from './mcp-server-config.service';
 
 /**
  * Runs against the REAL conformance library and REAL files: what a package
@@ -56,6 +60,29 @@ describe('usesPluginData', () => {
             true,
         );
         expect(usesPluginData({ type: 'streamable-http', url: 'https://x/mcp' })).toBe(false);
+    });
+});
+
+describe('sourceKindFromPath', () => {
+    it('recognises where each acquirer places a package', () => {
+        // Reporting every package as `local` handed an audit or policy
+        // consumer false provenance — the one field whose whole job is to say
+        // where something came from.
+        expect(
+            sourceKindFromPath('/app/agent-plugins/git/https%3A%2F%2Fx.com%2Fa.git/abc123'),
+        ).toBe('git');
+        expect(sourceKindFromPath('/app/agent-plugins/npm/acme-skills/1.2.0')).toBe('npm');
+    });
+
+    it('handles Windows separators', () => {
+        expect(sourceKindFromPath('C:\\packages\\npm\\acme-skills\\1.2.0')).toBe('npm');
+    });
+
+    it('falls back to local for an operator-populated directory', () => {
+        // The safe answer when the shape is unrecognised, and the right one
+        // for a directory somebody filled themselves.
+        expect(sourceKindFromPath('/app/agent-plugins/acme-tools')).toBe('local');
+        expect(sourceKindFromPath('/srv/whatever')).toBe('local');
     });
 });
 

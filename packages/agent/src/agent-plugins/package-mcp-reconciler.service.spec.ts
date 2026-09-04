@@ -60,6 +60,26 @@ describe('connectionNameFor', () => {
         expect(connectionNameFor('Acme_Tools', 'My_Server')).toBe('acme-tools-my-server');
     });
 
+    it('gives two long names that share a prefix DIFFERENT connection names', () => {
+        // Truncation alone collides, and the consequence is not cosmetic:
+        // reconciliation finds the first server's row for the second and
+        // overwrites its URL, silently pointing one server at another's
+        // address.
+        const long = 'x'.repeat(70);
+        const a = connectionNameFor('acme.tools', `${long}-alpha`);
+        const b = connectionNameFor('acme.tools', `${long}-beta`);
+
+        expect(a).not.toBe(b);
+        expect(a!.length).toBeLessThanOrEqual(80);
+        expect(b!.length).toBeLessThanOrEqual(80);
+    });
+
+    it('leaves a short name untouched, with no digest appended', () => {
+        // A digest on every name would make the common case unreadable for no
+        // benefit.
+        expect(connectionNameFor('acme.tools', 'api')).toBe('acme-tools-api');
+    });
+
     it('never returns a name the connection entity would reject', () => {
         // The pattern is anchored and allows only [a-z0-9-] starting
         // alphanumeric, so anything else must come back null rather than be

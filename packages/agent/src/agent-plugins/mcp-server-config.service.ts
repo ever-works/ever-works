@@ -133,6 +133,28 @@ export function usesPluginData(config: McpServerConfig): boolean {
     return values.some((value) => value.includes(PLUGIN_DATA_PLACEHOLDER));
 }
 
+/**
+ * Work out how a package reached this deployment, from where it sits.
+ *
+ * The resolver scans DIRECTORIES and has no registry access, so it cannot ask
+ * the database — but it does not need to: the acquirers place remote packages
+ * at `<root>/git/<encoded-url>/<sha>` and `<root>/npm/<encoded-name>/<version>`,
+ * and nothing else writes there. Reporting every package as `local`, as this
+ * did, hands an audit or policy consumer false provenance — the one field
+ * whose whole job is to say where something came from.
+ *
+ * Falls back to `local`, which is right for a directory an operator populated
+ * themselves and is the safe answer when the shape is unrecognised.
+ */
+export function sourceKindFromPath(packagePath: string): 'local' | 'git' | 'npm' {
+    const segments = packagePath.split(/[\\/]/u);
+    // The marker is the grandparent of the package directory: `git/<url>/<sha>`.
+    const marker = segments[segments.length - 3];
+    if (marker === 'git') return 'git';
+    if (marker === 'npm') return 'npm';
+    return 'local';
+}
+
 @Injectable()
 export class McpServerConfigService {
     private readonly logger = new Logger(McpServerConfigService.name);
@@ -266,10 +288,7 @@ export class McpServerConfigService {
                 packageRoot: pkg.path,
                 packageVersion: pkg.version ?? null,
                 specVersion: pkg.specVersion ?? 'unknown',
-                // Only local packages are scanned from disk today; git and npm
-                // packages land in a scanned directory too, so this widens
-                // when the registry row is consulted here.
-                sourceKind: 'local',
+                sourceKind: sourceKindFromPath(pkg.path),
             },
         };
     }
