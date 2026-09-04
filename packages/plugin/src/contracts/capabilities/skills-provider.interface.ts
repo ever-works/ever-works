@@ -31,7 +31,31 @@ export interface SkillCatalogEntry {
 	version: string;
 	tags: string[];
 	sourceUrl?: string;
+
+	/**
+	 * Provenance, for entries that came from an Agent Plugins package rather
+	 * than from a provider plugin. All optional and all additive: an entry
+	 * without them is exactly what it was before these existed.
+	 *
+	 * Deliberately NOT carried inside `frontmatter`, even though that has an
+	 * index signature and would accept them. `installFromCatalog` writes
+	 * `frontmatter` verbatim into the stored Skill row, and that JSON is what
+	 * gets injected into the model's context — provenance is information for
+	 * the operator looking at a catalog card, not for the model reading a
+	 * skill.
+	 */
+	packageName?: string;
+	packageVersion?: string;
+	sourceKind?: SkillCatalogSourceKind;
 }
+
+/**
+ * Where a catalog entry came from.
+ *
+ * `plugin` is every entry that existed before Agent Plugins support; the
+ * others name the package source an entry was discovered through.
+ */
+export type SkillCatalogSourceKind = 'plugin' | 'local' | 'git' | 'npm';
 
 export interface SkillCatalogListOptions {
 	limit: number;
