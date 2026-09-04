@@ -135,7 +135,26 @@ export async function pinnedFetch(
         }
     }
 
-    const pinned = addresses[0];
+    return pinnedConnect(url, init, addresses[0]);
+}
+
+/**
+ * Connect with the socket pinned to one already-validated address.
+ *
+ * Split out from {@link pinnedFetch} so the dispatcher's lifetime is testable.
+ * `pinnedFetch` runs `isSafeWebhookUrl` first, which refuses loopback — so a
+ * test cannot drive the real function against a local server, and every test
+ * therefore injected `fetchImpl` and exercised none of this. That is exactly
+ * how the bug below survived.
+ *
+ * The caller is responsible for validating `pinned`; this function performs no
+ * SSRF checks of its own.
+ */
+export async function pinnedConnect(
+    url: string,
+    init: RequestInit | undefined,
+    pinned: { address: string; family: number },
+): Promise<Response> {
     const { Agent } = await import('undici');
     const dispatcher = new Agent({
         connect: {
@@ -150,11 +169,37 @@ export async function pinnedFetch(
         },
     });
 
+    let response: Response;
     try {
-        return await fetch(url, { ...init, dispatcher } as RequestInit);
-    } finally {
-        await dispatcher.close().catch(() => undefined);
+        response = await fetch(url, { ...init, dispatcher } as RequestInit);
+    } catch (err) {
+        // No response, so nothing can be streaming: tear the pool down now
+        // rather than waiting for a request that will never complete.
+        void dispatcher.destroy().catch(() => undefined);
+        throw err;
     }
+
+    // Deliberately NOT awaited, and this is the whole point.
+    //
+    // `close()` resolves only once every in-flight request has finished, and a
+    // request is not finished until its response body has been consumed — which
+    // cannot happen until this function returns the Response to its caller.
+    // `await dispatcher.close()` in a `finally` therefore deadlocks: the close
+    // waits for the body, the body waits for the return, the return waits for
+    // the close.
+    //
+    // It hid beautifully. A small response fits the socket buffer and completes
+    // before `close()` is called, so it passes; a 200 KB body hangs forever, and
+    // an SSE stream — which never ends by design — hangs on connect. Every unit
+    // test injected `fetchImpl`, so none of them ran this line.
+    //
+    // Fire-and-forget is correct rather than merely convenient: `close()` is
+    // graceful, so the pool drains after the body is consumed and the socket is
+    // released then. Callers that discard a response must cancel its body, or
+    // the request stays pending and this never resolves — see the redirect path
+    // in `createGuardedFetch`.
+    void dispatcher.close().catch(() => undefined);
+    return response;
 }
 
 export interface GuardedFetchOptions {
@@ -201,6 +246,13 @@ export function createGuardedFetch(options: GuardedFetchOptions = {}): GuardedFe
                 // problem; hand it back rather than inventing a target.
                 return response;
             }
+
+            // Past this point the response is discarded in favour of the
+            // redirect target, so cancel its body. An unread body leaves the
+            // request pending, which keeps the pinned dispatcher's `close()`
+            // from ever resolving and holds the socket open for the life of
+            // the process — one leaked pool per redirect hop.
+            void response.body?.cancel().catch(() => undefined);
 
             if (hop === MAX_REDIRECTS) {
                 throw new SsrfBlockedError(

@@ -1,4 +1,4 @@
-import { createGuardedFetch, MAX_REDIRECTS, pinnedFetch } from './guarded-fetch';
+import { createGuardedFetch, MAX_REDIRECTS, pinnedConnect, pinnedFetch } from './guarded-fetch';
 
 /**
  * The property under test is what CROSSES a redirect, not whether fetch works.
@@ -294,3 +294,93 @@ describe('pinnedFetch — DNS rebinding', () => {
         expect(resolver).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * The real connection path, against a real server.
+ *
+ * Everything above injects `fetchImpl`, which is right for testing what crosses
+ * a redirect but means `pinnedConnect` — the code that actually opens the
+ * socket — ran in no test at all. `pinnedFetch` cannot be pointed at a local
+ * server because `isSafeWebhookUrl` refuses loopback, so the untestable shape
+ * was structural rather than an oversight.
+ *
+ * It hid a deadlock: `await dispatcher.close()` before returning the Response
+ * waits for a body the caller has not been given the chance to read yet.
+ */
+describe('pinnedConnect against a live server', () => {
+    let server: import('node:http').Server;
+    let origin: string;
+
+    beforeAll(async () => {
+        const http = await import('node:http');
+        server = http.createServer((req, res) => {
+            const size = Number(new URL(req.url ?? '/', 'http://x').searchParams.get('n') ?? 10);
+            res.writeHead(200, { 'content-type': 'text/plain' });
+            res.end('x'.repeat(size));
+        });
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        const address = server.address();
+        origin = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
+    });
+
+    afterAll(async () => {
+        // `close()` only stops the server ACCEPTING; it then waits for every
+        // open connection to end. undici keeps its sockets alive by default, so
+        // `close()` alone never settles and the server stays an open handle —
+        // which is what "a worker process has failed to exit gracefully"
+        // actually meant here. Dropping the live sockets first is the fix; a
+        // `setImmediate` yield was not, and confirmed it by not helping.
+        server.closeAllConnections();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+    });
+
+    const loopback = { address: '127.0.0.1', family: 4 };
+
+    it('returns a small body', async () => {
+        const response = await pinnedConnect(`${origin}/?n=10`, undefined, loopback);
+        await expect(response.text()).resolves.toHaveLength(10);
+    });
+
+    /**
+     * The regression. A body larger than the socket buffer cannot complete
+     * before the Response is handed back, so awaiting `close()` first hung
+     * forever. 10 bytes passed; 200 KB never returned — and an SSE stream,
+     * which never ends, hung on connect.
+     *
+     * The timeout is the assertion: without it a failure hangs the suite
+     * instead of reporting.
+     */
+    it('returns a body larger than the socket buffer without hanging', async () => {
+        const size = 200_000;
+
+        const response = await withTimeout(
+            pinnedConnect(`${origin}/?n=${size}`, undefined, loopback),
+            5000,
+            'pinnedConnect did not return',
+        );
+        const body = await withTimeout(response.text(), 5000, 'body never finished');
+
+        expect(body).toHaveLength(size);
+    }, 20000);
+
+    it('rejects, rather than hanging, when the connection fails', async () => {
+        // Port 1 is reserved and nothing listens on it.
+        await expect(
+            withTimeout(
+                pinnedConnect('http://127.0.0.1:1/', undefined, loopback),
+                5000,
+                'pinnedConnect neither resolved nor rejected',
+            ),
+        ).rejects.toBeDefined();
+    }, 20000);
+});
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    let timer: NodeJS.Timeout;
+    return Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(message)), ms);
+        }),
+    ]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
