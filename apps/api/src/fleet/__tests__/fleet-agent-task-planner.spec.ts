@@ -109,7 +109,7 @@ describe('FleetAgentTaskPlannerService', () => {
     let tasks: { findById: jest.Mock };
     let agents: { findByIdAndUser: jest.Mock };
     let works: { findById: jest.Mock };
-    let taskWorkspace: { describeFleetWorkspace: jest.Mock };
+    let taskWorkspace: { describeFleetWorkspace: jest.Mock; resolveFleetRunEnvGrants: jest.Mock };
     let skills: { resolveActiveForAgent: jest.Mock };
     let pluginSettings: { getResolvedSettings: jest.Mock };
     let runs: { findById: jest.Mock };
@@ -155,7 +155,13 @@ describe('FleetAgentTaskPlannerService', () => {
                 ],
             }),
         };
-        taskWorkspace = { describeFleetWorkspace: jest.fn().mockResolvedValue(workspace) };
+        taskWorkspace = {
+            describeFleetWorkspace: jest.fn().mockResolvedValue(workspace),
+            // Run secrets (slice Y): the planner asks for the run's env
+            // GRANTS beside the workspace. Empty is the default posture —
+            // every platform-owned name stays refused on the node.
+            resolveFleetRunEnvGrants: jest.fn().mockResolvedValue([]),
+        };
         skills = {
             resolveActiveForAgent: jest.fn().mockResolvedValue([
                 {
@@ -264,6 +270,10 @@ describe('FleetAgentTaskPlannerService', () => {
             'CODEX_ACCESS_TOKEN',
             'OPENAI_API_KEY',
         ]);
+        // Run secrets (slice Y): no repository of this run granted anything,
+        // so the key is ABSENT rather than empty — the node then refuses
+        // every platform-owned name exactly as it did before the slice.
+        expect(execution).not.toHaveProperty('envGrants');
 
         // Instructions: identity + skills from the assembler, the Task
         // brief in the cloud executor's shape, then the fleet sections.
@@ -285,6 +295,22 @@ describe('FleetAgentTaskPlannerService', () => {
         // Order: identity before task before workspace.
         expect(text.indexOf('# IDENTITY')).toBeLessThan(text.indexOf('# TASK'));
         expect(text.indexOf('# TASK')).toBeLessThan(text.indexOf('# WORKSPACE'));
+    });
+
+    it('carries the run env GRANTS as names, read fresh for every plan', async () => {
+        // Run secrets (slice Y). Names, never values — that is what makes a
+        // grant safe on a job payload and an env file not. Read at PLAN time,
+        // which is what makes a revoked grant stop applying on the next run.
+        process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+        taskWorkspace.resolveFleetRunEnvGrants.mockResolvedValue(['DATABASE_URL', 'GH_TOKEN']);
+        const plan = await build().plan(payload);
+        expect(taskWorkspace.resolveFleetRunEnvGrants).toHaveBeenCalledWith({
+            task: expect.objectContaining({ id: 'task-1' }),
+            userId: 'user-1',
+            agentId: 'agent-1',
+        });
+        expect(plan!.execution.envGrants).toEqual(['DATABASE_URL', 'GH_TOKEN']);
+        expect(JSON.stringify(plan)).not.toContain('postgres://');
     });
 
     it('strips chat-template control markers from user-authored Task fields', async () => {
@@ -675,7 +701,7 @@ describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow
     let tasks: { findById: jest.Mock };
     let agents: { findByIdAndUser: jest.Mock };
     let works: { findById: jest.Mock };
-    let taskWorkspace: { describeFleetWorkspace: jest.Mock };
+    let taskWorkspace: { describeFleetWorkspace: jest.Mock; resolveFleetRunEnvGrants: jest.Mock };
     let pluginSettings: { getResolvedSettings: jest.Mock };
 
     const build = () =>
@@ -695,7 +721,13 @@ describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow
         tasks = { findById: jest.fn().mockResolvedValue(task()) };
         agents = { findByIdAndUser: jest.fn().mockResolvedValue(agent()) };
         works = { findById: jest.fn().mockResolvedValue({ id: 'work-1', checkDefaults: [] }) };
-        taskWorkspace = { describeFleetWorkspace: jest.fn().mockResolvedValue(workspace) };
+        taskWorkspace = {
+            describeFleetWorkspace: jest.fn().mockResolvedValue(workspace),
+            // Run secrets (slice Y): the planner asks for the run's env
+            // GRANTS beside the workspace. Empty is the default posture —
+            // every platform-owned name stays refused on the node.
+            resolveFleetRunEnvGrants: jest.fn().mockResolvedValue([]),
+        };
         pluginSettings = { getResolvedSettings: jest.fn().mockResolvedValue({}) };
     });
 
@@ -832,7 +864,10 @@ describe('FleetAgentTaskPlannerService — Nest wiring (review follow-up)', () =
         { provide: TaskRepository, useValue: { findById: jest.fn() } },
         { provide: AgentRepository, useValue: { findByIdAndUser: jest.fn() } },
         { provide: WorkRepository, useValue: { findById: jest.fn() } },
-        { provide: TaskWorkspaceService, useValue: { describeFleetWorkspace: jest.fn() } },
+        {
+            provide: TaskWorkspaceService,
+            useValue: { describeFleetWorkspace: jest.fn(), resolveFleetRunEnvGrants: jest.fn() },
+        },
     ];
 
     beforeEach(() => {

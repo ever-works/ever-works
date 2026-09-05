@@ -251,7 +251,21 @@ export interface NodeRuntime {
 
 /** The provisioner surface the runtime composes over; the real one and every test double satisfy it. */
 export type FleetWorkspaceProvisionerLike = Pick<FleetTaskWorkspaceProvisioner, 'provision'> &
-	Partial<Pick<FleetTaskWorkspaceProvisioner, 'finalize' | 'finalizeMounts' | 'release' | 'activeBindingKeys'>>;
+	Partial<
+		Pick<
+			FleetTaskWorkspaceProvisioner,
+			| 'finalize'
+			| 'finalizeMounts'
+			| 'release'
+			| 'activeBindingKeys'
+			// Run secrets (self-build slice Y). Optional like the rest, so a
+			// test double or an embedder that predates the feature still
+			// satisfies this type; a job that needs env files and finds the
+			// seam missing fails naming the gap rather than starting without.
+			| 'writeRunEnvFiles'
+			| 'removeRunEnvFiles'
+		>
+	>;
 
 export interface CreateNodeRuntimeOptions {
 	/**
@@ -447,6 +461,25 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 									workspaceProvisioner.release!(taskId, descriptor)
 							}
 						: {}),
+					// Run secrets (self-build slice Y). The WRITE and the
+					// DELETE are the provisioner's — it owns the worktree, its
+					// canonical-path checks and its Git exclude rules — while
+					// the FETCH hangs off the lease below, because "may this
+					// node still be trusted with this job?" is the same
+					// question the publish fence asks and must have the same
+					// answer.
+					...(workspaceProvisioner.writeRunEnvFiles
+						? {
+								writeRunEnvFiles: (taskId, descriptor, files) =>
+									workspaceProvisioner.writeRunEnvFiles!(taskId, descriptor, files)
+							}
+						: {}),
+					...(workspaceProvisioner.removeRunEnvFiles
+						? {
+								removeRunEnvFiles: (_taskId, descriptor) =>
+									workspaceProvisioner.removeRunEnvFiles!(descriptor)
+							}
+						: {}),
 					// `agent-task` is the only kind that writes to a remote, so
 					// it is the only kind that has to know when this node stops
 					// being allowed to. Resolved through the handle, never
@@ -469,7 +502,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 								// (below the disk floor, or the reaper mid-removal of
 								// that very worktree) is about this machine, not the
 								// work: hand the job back so a node with room takes it.
-								onProvisionDeclined: (reason: string) => lease.defer(reason)
+								onProvisionDeclined: (reason: string) => lease.defer(reason),
+								// Run secrets: fetched THROUGH the lease, so the
+								// platform proves this node still holds an active
+								// claim on this job before a decrypted `.env`
+								// leaves it. A node with no lease (the cloud
+								// runner) has no seam here, and a job that needs
+								// env files fails naming the gap rather than
+								// running against an environment nobody set up.
+								fetchRunEnvFiles: (refs) => lease.fetchRunEnvFiles(refs)
 							}
 						: {}),
 					modelCli,

@@ -1,5 +1,10 @@
 import { performance } from 'node:perf_hooks';
-import type { FleetJobKind, FleetJobView } from '@ever-works/contracts';
+import type {
+	FleetJobKind,
+	FleetJobView,
+	FleetRunEnvFileContent,
+	FleetRunEnvFileRequestRef
+} from '@ever-works/contracts';
 import {
 	clampLeaseTtlSec,
 	FLEET_JOB_DEFAULT_LEASE_TTL_SEC,
@@ -217,6 +222,17 @@ export interface JobLeaseCapableClient {
 		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null },
 		leaseGeneration?: number
 	): Promise<boolean>;
+	/**
+	 * Run secrets (self-build slice Y). Optional so an embedder with an
+	 * older client still satisfies this interface; a run that NEEDS env
+	 * files and finds it absent fails naming the gap rather than starting
+	 * without them.
+	 */
+	fetchRunEnvFiles?(
+		jobId: string,
+		refs: readonly FleetRunEnvFileRequestRef[],
+		leaseGeneration?: number
+	): Promise<FleetRunEnvFileContent[]>;
 }
 
 /**
@@ -279,6 +295,22 @@ export interface JobLeaseHandle {
 	 * lapse so `reclaimExpired` re-offers the job inside its attempt budget.
 	 */
 	defer(reason: string): void;
+	/**
+	 * Fetch the decrypted seed `.env` files this run's repositories
+	 * declared (run secrets, self-build slice Y).
+	 *
+	 * On the LEASE handle rather than on a client the executor holds,
+	 * because it is exactly the same question the handle already answers
+	 * for a publish: "may this node still be trusted with this job right
+	 * now?". The platform proves it with the same four checks it uses for
+	 * complete (credential, recorded holder, active status, current lease
+	 * generation), so a claim that lapsed while the machine slept gets no
+	 * secrets — and gets them refused with `stale-lease`, not silently.
+	 *
+	 * Rejects rather than resolving empty on any failure: a run that starts
+	 * with part of its environment is worse than one that does not start.
+	 */
+	fetchRunEnvFiles(refs: readonly FleetRunEnvFileRequestRef[]): Promise<FleetRunEnvFileContent[]>;
 }
 
 /** The keep-alive as the LOOP sees it: the executor's half, plus control. */
@@ -1376,6 +1408,18 @@ export class WorkerLoop {
 				// publish, and a later one would only describe the fallout.
 				defer: (reason: string) => {
 					if (deferral === null) deferral = reason;
+				},
+				// Run secrets: the generation is captured from THIS run, the
+				// same value the beats echo, so a fetch can never be made
+				// against a claim this handle does not represent.
+				fetchRunEnvFiles: async (refs: readonly FleetRunEnvFileRequestRef[]) => {
+					const fetchFn = this.options.client.fetchRunEnvFiles;
+					if (!fetchFn) {
+						throw new Error(
+							'This node cannot fetch run env files (the job client predates the run-secrets protocol)'
+						);
+					}
+					return fetchFn.call(this.options.client, jobId, refs, generation);
 				}
 			}
 		};

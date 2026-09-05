@@ -1,3 +1,5 @@
+import type { FleetRunEnvFileRef } from './fleet-run-secrets.types.js';
+
 /**
  * Repository metadata a Fleet node needs to provision one Task-owned Git
  * workspace. Clone URLs are deliberately token-free: node-local Git
@@ -23,6 +25,20 @@ export interface FleetTaskWorkspaceSpec {
 	 * absent or empty means the single-repository workspace of slices A/B.
 	 */
 	readonly mounts?: readonly FleetTaskWorkspaceMountSpec[];
+	/**
+	 * Run secrets (self-build slice Y). Which repositories' seed `.env`
+	 * files this run needs, BY REFERENCE — registry row ids and
+	 * repository-relative PATHS, never contents. The node fetches the
+	 * decrypted content over the node-authenticated job channel while it
+	 * holds the lease, writes it 0600 inside the checkout, keeps it out of
+	 * Git, and deletes it when the run ends.
+	 *
+	 * A ref whose `mountDir` is absent targets the primary worktree; a ref
+	 * that names a `mountDir` targets that mount of THIS spec. Validated by
+	 * `normalizeFleetRunEnvFileRefs`; absent or empty means the run needs no
+	 * env files, which is every workspace before this slice.
+	 */
+	readonly envFilesRef?: readonly FleetRunEnvFileRef[];
 }
 
 /**

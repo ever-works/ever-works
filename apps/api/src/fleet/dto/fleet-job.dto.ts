@@ -1,6 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
     ArrayMaxSize,
+    ArrayMinSize,
     IsArray,
     IsBoolean,
     IsInt,
@@ -8,16 +10,20 @@ import {
     IsOptional,
     IsString,
     IsUUID,
+    Matches,
     Max,
     MaxLength,
     Min,
     MinLength,
+    ValidateNested,
 } from 'class-validator';
 import {
     FLEET_JOB_MAX_ERROR_LENGTH,
     FLEET_JOB_MAX_LEASE_BATCH,
     FLEET_JOB_MAX_LEASE_TTL_SEC,
     FLEET_JOB_MIN_LEASE_TTL_SEC,
+    FLEET_RUN_ENV_FILE_MAX_COUNT,
+    FLEET_RUN_ENV_FILE_REFS_MAX_COUNT,
 } from '@ever-works/contracts';
 
 /**
@@ -148,4 +154,64 @@ export class CompleteFleetJobDto extends FleetJobNodeCredentialDto {
     @IsString()
     @MaxLength(FLEET_JOB_MAX_ERROR_LENGTH)
     error?: string;
+}
+
+/**
+ * One repository's env-file request (self-build slice Y). PATHS only —
+ * there is no content field on the way in, and the response is the only
+ * place a value ever appears.
+ */
+export class FleetJobEnvFileRefDto {
+    @ApiProperty({ format: 'uuid', description: 'Repository registry row the files belong to.' })
+    @IsUUID()
+    repoConnectionId: string;
+
+    @ApiProperty({
+        type: [String],
+        maxItems: FLEET_RUN_ENV_FILE_MAX_COUNT,
+        description: 'Repository-relative env file paths, e.g. "apps/api/.env".',
+    })
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(FLEET_RUN_ENV_FILE_MAX_COUNT)
+    @IsString({ each: true })
+    @MaxLength(200, { each: true })
+    // Repository-relative (never leading `/`), traversal-free (no `.` or
+    // `..` segment anywhere), and restricted to the registry's own path
+    // alphabet. `FleetRunSecretsService` re-checks with
+    // `isValidFleetRunEnvFilePath`; this is the edge half of that pair.
+    @Matches(/^(?!.*(?:^|\/)\.\.?(?:\/|$))[A-Za-z0-9._-][A-Za-z0-9._/-]*$/, {
+        each: true,
+        message: 'each env file path must be repository-relative and free of traversal',
+    })
+    paths: string[];
+}
+
+/**
+ * Request body for the PUBLIC `POST /api/fleet/jobs/:id/env-files`
+ * (self-build slice Y, EW-781).
+ *
+ * Same credential posture as its three siblings — the `(nodeId, secret)`
+ * pair IS the credential — plus the `leaseGeneration` the claim was handed
+ * out with, because delivering a decrypted `.env` to a machine is at least
+ * as consequential as letting it settle the job: a node whose claim lapsed
+ * while it slept must be refused here exactly as it is on complete.
+ */
+export class FleetJobEnvFilesDto extends FleetJobNodeCredentialDto {
+    @ApiProperty({
+        minimum: 1,
+        description:
+            'Lease generation returned with the claim. A generation that is not the current one is refused with 409 stale-lease and delivers nothing.',
+    })
+    @IsInt()
+    @Min(1)
+    leaseGeneration: number;
+
+    @ApiProperty({ type: [FleetJobEnvFileRefDto], maxItems: FLEET_RUN_ENV_FILE_REFS_MAX_COUNT })
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(FLEET_RUN_ENV_FILE_REFS_MAX_COUNT)
+    @ValidateNested({ each: true })
+    @Type(() => FleetJobEnvFileRefDto)
+    refs: FleetJobEnvFileRefDto[];
 }

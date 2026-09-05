@@ -7,8 +7,14 @@ import {
     Optional,
 } from '@nestjs/common';
 import {
+    FLEET_RUN_ENV_UNGRANTABLE_PATTERN,
+    isGrantableFleetRunEnvName,
+    normalizeFleetRunEnvGrants,
+} from '@ever-works/contracts';
+import {
     REPO_CONNECTION_ENV_FILE_MAX_CONTENT_BYTES,
     REPO_CONNECTION_ENV_FILE_MAX_COUNT,
+    REPO_CONNECTION_ENV_GRANT_MAX_COUNT,
     RepoConnection,
     isSafeMountDir,
     resolveMountDir,
@@ -59,6 +65,13 @@ export interface RepoConnectionView {
     credentialMode: RepoConnectionCredentialMode;
     credentialRef: string | null;
     envFiles: RepoConnectionEnvFileMeta[];
+    /**
+     * Env var names this repository's runs may read from the runner's own
+     * environment (self-build slice Y). Returned UNMASKED, unlike env-file
+     * contents: a grant is a permission, not a secret, and the whole point
+     * of binding it per repository is that it can be reviewed.
+     */
+    envGrants: string[];
     availableInAllProjects: boolean;
     sourceType: RepoConnectionSourceType;
     sourceWorkId: string | null;
@@ -83,6 +96,14 @@ export interface ResolvedAgentRepo {
     branch: string | null;
     mountDir: string;
     envFiles: RepoConnectionEnvFile[];
+    /**
+     * The env-file PATHS alone (self-build slice Y). The fleet planner
+     * describes a workspace with these and never touches `envFiles`, so a
+     * refactor cannot accidentally put a decrypted `.env` on a job payload.
+     */
+    envFilePaths: string[];
+    /** Env var names this repository grants to the runner (names only). */
+    envGrants: string[];
     /** Which git-provider family the connection belongs to (fleet mounts open PRs through it). */
     provider: RepoConnectionProvider;
 }
@@ -97,6 +118,7 @@ export interface CreateRepoConnectionInput {
     credentialMode?: RepoConnectionCredentialMode;
     credentialRef?: string | null;
     envFiles?: RepoConnectionEnvFile[];
+    envGrants?: string[];
     availableInAllProjects?: boolean;
     enabled?: boolean;
 }
@@ -176,6 +198,63 @@ export function assertValidEnvFiles(files: RepoConnectionEnvFile[]): void {
     }
 }
 
+/**
+ * Validate an operator's env-grant list (self-build slice Y).
+ *
+ * LOUD here (BadRequestException naming the offending entry) and silent on
+ * the runner, which re-normalizes whatever arrived: the operator gets told
+ * their grant was refused at the moment they write it, and a run never
+ * fails over a name it was going to ignore anyway.
+ *
+ * Three refusals, in order of how badly they would bite:
+ *   - the un-grantable core — `FLEET_`, `EVER_WORKS_`, `PLUGIN_`, `AUTH_`,
+ *     `BETTER_AUTH_`, `PLATFORM_` — is what leases work on the runner,
+ *     decrypts every other tenant's env files and signs platform sessions.
+ *     No grant may open it, however explicitly asked.
+ *   - wildcards and prefixes. There is no `DATABASE_*`. A grant is one
+ *     EXACT name, so an operator can never accidentally hand over a family.
+ *   - shape and cap, matching the runner's own so a list the registry
+ *     accepts can never be silently truncated on the machine applying it.
+ */
+export function assertValidEnvGrants(names: string[]): void {
+    if (!Array.isArray(names)) {
+        throw new BadRequestException('Env grants must be a list of environment variable names.');
+    }
+    if (names.length > REPO_CONNECTION_ENV_GRANT_MAX_COUNT) {
+        throw new BadRequestException(
+            `At most ${REPO_CONNECTION_ENV_GRANT_MAX_COUNT} env grants are allowed per repository.`,
+        );
+    }
+    const seen = new Set<string>();
+    for (const raw of names) {
+        if (typeof raw !== 'string') {
+            throw new BadRequestException('Each env grant must be an environment variable name.');
+        }
+        const name = raw.trim();
+        if (FLEET_RUN_ENV_UNGRANTABLE_PATTERN.test(name)) {
+            throw new BadRequestException(
+                `Env grant "${name}" names a platform-internal variable that can never be granted ` +
+                    '(FLEET_, EVER_WORKS_, PLUGIN_, AUTH_, BETTER_AUTH_ and PLATFORM_ are reserved).',
+            );
+        }
+        if (name.includes('*') || name.includes('?')) {
+            throw new BadRequestException(
+                `Env grant "${name}" is a wildcard. Grants name ONE variable each; there is no prefix form.`,
+            );
+        }
+        if (!isGrantableFleetRunEnvName(name)) {
+            throw new BadRequestException(
+                `Env grant "${name}" is not a valid environment variable name.`,
+            );
+        }
+        const upper = name.toUpperCase();
+        if (seen.has(upper)) {
+            throw new BadRequestException(`Duplicate env grant: "${name}".`);
+        }
+        seen.add(upper);
+    }
+}
+
 function envFilesToRecord(files: RepoConnectionEnvFile[]): Record<string, string> {
     const record: Record<string, string> = {};
     for (const file of files) {
@@ -231,6 +310,7 @@ export function mapAttachmentEdgesToRepos(
     for (const edge of edges) {
         const repo = edge.repoConnection;
         if (!repo || !repo.enabled) continue;
+        const env = envFilesFromRecord(repo.envFiles);
         resolved.push({
             repoConnectionId: repo.id,
             url: repo.url,
@@ -239,7 +319,14 @@ export function mapAttachmentEdgesToRepos(
             // unsanitized fallback would let `../../etc` escape
             // `/workspace/<dir>` in every path-building consumer.
             mountDir: resolveMountDir(repo.mountPath, repo.name),
-            envFiles: envFilesFromRecord(repo.envFiles).files,
+            envFiles: env.files,
+            // Paths beside the contents so the fleet planner has a field it
+            // can describe a workspace from WITHOUT reaching for `envFiles`.
+            envFilePaths: env.meta.map((entry) => entry.path),
+            // Re-normalized on read as well as on write: a row that predates
+            // the validator, or one edited straight in the database, must not
+            // be able to hand the runner a name the operator could not save.
+            envGrants: normalizeFleetRunEnvGrants(repo.envGrants),
             provider: repo.provider,
         });
     }
@@ -323,6 +410,8 @@ export class RepoRegistryService {
         this.assertValidCore(input);
         const envFiles = input.envFiles ?? [];
         assertValidEnvFiles(envFiles);
+        const envGrants = input.envGrants ?? [];
+        assertValidEnvGrants(envGrants);
 
         const name = input.name.trim();
         const existing = await this.repoConnections.findByUserAndName(userId, name);
@@ -343,6 +432,7 @@ export class RepoRegistryService {
             credentialMode: input.credentialMode ?? 'inherit',
             credentialRef: input.credentialRef?.trim() || null,
             envFiles: envFiles.length > 0 ? envFilesToRecord(envFiles) : null,
+            envGrants: envGrants.length > 0 ? envGrants : null,
             availableInAllProjects: input.availableInAllProjects ?? true,
             sourceType: 'manual',
             enabled: input.enabled ?? true,
@@ -402,6 +492,15 @@ export class RepoRegistryService {
         if (input.envFiles !== undefined) {
             assertValidEnvFiles(input.envFiles);
             row.envFiles = input.envFiles.length > 0 ? envFilesToRecord(input.envFiles) : null;
+        }
+        // Revocation is an ordinary update: clearing the list (or dropping a
+        // name from it) takes effect on the NEXT run, because the planner
+        // reads the row when it builds the job. Nothing has to reach the
+        // machines — a run already in flight keeps the grant it was planned
+        // with, and the one after it does not.
+        if (input.envGrants !== undefined) {
+            assertValidEnvGrants(input.envGrants);
+            row.envGrants = input.envGrants.length > 0 ? [...input.envGrants] : null;
         }
 
         const saved = await this.repoConnections.save(row);
@@ -617,6 +716,9 @@ export class RepoRegistryService {
             credentialMode: 'inherit',
             credentialRef: null,
             envFiles: [],
+            // A derived Work row has no registry record to hang a grant on:
+            // an operator who wants one adds the repository to the registry.
+            envGrants: [],
             availableInAllProjects: false,
             sourceType: 'work',
             sourceWorkId: workId,
@@ -710,6 +812,7 @@ export class RepoRegistryService {
             credentialMode: row.credentialMode,
             credentialRef: row.credentialRef ?? null,
             envFiles: envFilesFromRecord(row.envFiles).meta,
+            envGrants: normalizeFleetRunEnvGrants(row.envGrants),
             availableInAllProjects: row.availableInAllProjects,
             sourceType: row.sourceType,
             sourceWorkId: row.sourceWorkId ?? null,
