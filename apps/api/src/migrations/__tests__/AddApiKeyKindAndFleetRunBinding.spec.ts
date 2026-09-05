@@ -139,7 +139,19 @@ describe('AddApiKeyKindAndFleetRunBinding1788800000000', () => {
 
     it('a fleet-run row only inserts AFTER up()', async () => {
         await createApiKeysTable();
-        await expect(insertRunRow('r0')).rejects.toThrow();
+
+        // The four columns genuinely are not there yet — asserted against the
+        // PHYSICAL schema rather than by watching an INSERT fail. The insert
+        // form was flaky under a loaded worker (it went red in CI and once
+        // locally in a 75-suite run, and passed every time in isolation), and
+        // it also proves the weaker thing: an insert naming a missing column
+        // fails for a reason sqlite chooses, whereas this asserts exactly the
+        // property the test is named for. A failure here now says WHICH column
+        // appeared early instead of a bare "did not throw".
+        const beforeUp = await columnNames();
+        for (const column of ['kind', 'boundJobId', 'boundNodeId', 'boundRunId']) {
+            expect(beforeUp).not.toContain(column);
+        }
 
         const runner = dataSource.createQueryRunner();
         await migration.up(runner);
