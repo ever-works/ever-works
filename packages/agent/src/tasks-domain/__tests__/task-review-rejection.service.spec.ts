@@ -168,6 +168,30 @@ describe('TaskReviewRejectionService (M9)', () => {
             ).resolves.toBeNull();
             expect(works.findByUser).not.toHaveBeenCalled();
         });
+
+        it('persists the reviewer kind and severity of a trusted-bot finding (R16)', async () => {
+            await makeSvc().recordPullRequestRejection({
+                ...input,
+                reviewerLabel: 'coderabbitai[bot]',
+                reviewerKind: 'bot',
+                severity: 'major',
+            });
+            expect(rejections.record).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    source: 'pull-request',
+                    reviewerLabel: 'coderabbitai[bot]',
+                    reviewerKind: 'bot',
+                    severity: 'major',
+                }),
+            );
+        });
+
+        it('stores NULL kind and severity when the caller states none', async () => {
+            await makeSvc().recordPullRequestRejection(input);
+            expect(rejections.record).toHaveBeenCalledWith(
+                expect.objectContaining({ reviewerKind: null, severity: null }),
+            );
+        });
     });
 
     describe('recordGateRejection', () => {

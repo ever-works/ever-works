@@ -4,7 +4,11 @@ import { TaskReviewRejectionRepository } from '../database/repositories/task-rev
 import { TaskReviewerRepository } from '../database/repositories/task-side.repositories';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { matchWorkByRepo } from '../works/work-repo-match';
-import type { TaskReviewRejection } from '../entities/task-review-rejection.entity';
+import type {
+    TaskReviewRejection,
+    TaskReviewRejectionReviewerKind,
+    TaskReviewRejectionSeverity,
+} from '../entities/task-review-rejection.entity';
 
 /**
  * Orchestration M9 — the write half of the rejection loop.
@@ -95,13 +99,18 @@ export class TaskReviewRejectionService {
     }
 
     /**
-     * A human rejected the agent's PULL REQUEST on the git provider.
+     * A human — or a trusted reviewer bot (R16) — rejected the agent's
+     * PULL REQUEST on the git provider.
      *
      * Best-effort by contract and returns `null` on every miss: the caller
      * is a webhook handler that must answer 200 quickly, and "we could not
      * map this PR to a Task" is an ordinary outcome (the PR may belong to
      * a repo that is not a Work, or to a Task that was deleted). It is
      * never an error the delivery should fail on.
+     *
+     * `reviewerKind` and `severity` are the bridge's classification of the
+     * author and of the bot's own marker; they are stored verbatim so the
+     * resumed run can tell a CodeRabbit "Major" from a nit.
      */
     async recordPullRequestRejection(input: {
         userId: string;
@@ -111,6 +120,8 @@ export class TaskReviewRejectionService {
         feedback: string;
         reviewerLabel?: string | null;
         prUrl?: string | null;
+        reviewerKind?: TaskReviewRejectionReviewerKind | null;
+        severity?: TaskReviewRejectionSeverity | null;
     }): Promise<TaskReviewRejection | null> {
         const trimmed = (input.feedback ?? '').trim();
         if (trimmed.length === 0) return null;
@@ -128,6 +139,8 @@ export class TaskReviewRejectionService {
                 reviewerLabel: input.reviewerLabel ?? null,
                 prNumber: input.prNumber,
                 prUrl: input.prUrl ?? null,
+                reviewerKind: input.reviewerKind ?? null,
+                severity: input.severity ?? null,
                 organizationId: task.organizationId ?? null,
             });
             if (row) {
