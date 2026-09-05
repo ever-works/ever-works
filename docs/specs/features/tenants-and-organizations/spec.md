@@ -391,7 +391,7 @@ The most recently active scope is persisted on the User row as `users.lastScopeO
 
 ### 6.3 `+ New` page — Company chip
 
-Add **Company** to the chips on the unified `+ New` page (§4.0 of the [Missions/Ideas/Works spec](../../../../../../Workspace/knowledge/notes/2026-05-24-missions-ideas-works-spec.md)). Order: `Mission · Idea · Website · Landing Page · Store · Blog · Directory · Awesome Repo · Knowledge Base · Company`. Picking the Company chip routes the submit into the Register-Company flow (§5.4).
+Add **Company** to the chips on the unified `+ New` page (§4.0 of the [Missions/Ideas/Works spec](../missions-ideas-works/spec.md)). Order: `Mission · Idea · Website · Landing Page · Store · Blog · Directory · Awesome Repo · Knowledge Base · Company`. Picking the Company chip routes the submit into the Register-Company flow (§5.4).
 
 > The user-facing chip is labeled "Company", but downstream entities are Organization rows. The wording-vs-DB split (§1.3) holds.
 
@@ -431,8 +431,8 @@ Per NN #20, no existing UI string changes. The only UI additions are:
 - Implementation plan: [plan.md](plan.md)
 - Task checklist: [tasks.md](tasks.md)
 - Acceptance criteria: [acceptance.md](acceptance.md)
-- Companion Workspace note: [`Workspace/knowledge/notes/2026-05-27-tenants-and-organizations-spec.md`](../../../../../../Workspace/knowledge/notes/2026-05-27-tenants-and-organizations-spec.md)
-- Related product spec: [Missions → Ideas → Works](../../../../../../Workspace/knowledge/notes/2026-05-24-missions-ideas-works-spec.md)
+- Companion Workspace note: `knowledge/notes/2026-05-27-tenants-and-organizations-spec.md` (operator workspace repository)
+- Related product spec: [Missions → Ideas → Works](../missions-ideas-works/spec.md)
 - Existing forward-looking columns: [`work.entity.ts`](../../../../packages/agent/src/entities/work.entity.ts) `organizationId`, [`work-knowledge-document.entity.ts`](../../../../packages/agent/src/entities/work-knowledge-document.entity.ts) `organizationId`
 - Existing username pattern: [`github-app-onboarding.service.ts`](../../../../apps/api/src/integrations/github-app/github-app-onboarding.service.ts) lines 223-229
 - shadcn switcher reference: <https://ui.shadcn.com/blocks#sidebar-07>

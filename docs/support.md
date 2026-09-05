@@ -16,7 +16,7 @@ Welcome to the Ever Works support center. We're here to help you get the most ou
 
 - **[GitHub Issues](https://github.com/ever-works/ever-works/issues)** - Report bugs, request features, or ask technical questions
 - **[Discord Community](https://discord.gg/ever)** - Join our active Discord server for real-time support
-- **[Stack Overflow](https://stackoverflow.com/questions/tagged/ever-works-website-template)** - Ask technical questions with the `ever-works` tag
+- **[Stack Overflow](https://stackoverflow.com/questions/tagged/ever-works)** - Ask technical questions with the `ever-works` tag
 
 ### Professional Support
 

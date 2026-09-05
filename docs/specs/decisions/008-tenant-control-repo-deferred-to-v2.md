@@ -32,7 +32,7 @@ Operator instruction (round 7):
 
 > "I agree for now to have it that way, but let's make sure that existing Import / Export / Sync to repo capabilities support all that in v1! I.e. we have in UI now Export / Import / Sync to GitHub repo etc, and there we can add exporting / sync of those Agents / Skills and any other tenants related records from DB into Git and back etc."
 
-The platform already has a full account-transfer surface in [`packages/agent/src/account-transfer/`](../../packages/agent/src/account-transfer/):
+The platform already has a full account-transfer surface in [`packages/agent/src/account-transfer/`](https://github.com/ever-works/ever-works/tree/develop/packages/agent/src/account-transfer):
 
 - `AccountExportService.exportAccountData(userId)` → dumps the user's account state into an `AccountExportPayload`.
 - `AccountImportService.executeImport(...)` → applies a payload back to a user.

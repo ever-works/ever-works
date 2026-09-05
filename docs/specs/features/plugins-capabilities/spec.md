@@ -499,7 +499,7 @@ redirects users to the work-specific endpoint?]` — see OQ-1.
 
 ## 10. References
 
-- Implementation: [`apps/api/src/plugins-capabilities/`](../../../../apps/api/src/plugins-capabilities/)
+- Implementation: [`apps/api/src/plugins-capabilities/`](https://github.com/ever-works/ever-works/tree/develop/apps/api/src/plugins-capabilities)
 - Related feature: [`plugin-system`](../plugin-system/spec.md) (registry, discovery, settings cascade)
 - Related feature: [`auth-jwt-oauth`](../auth-jwt-oauth/spec.md) (`AuthSessionGuard`, `AuthAccountRepository`)
 - Related feature: [`activity-log`](../activity-log/spec.md) (`ActivityLogListener` for deploy events)

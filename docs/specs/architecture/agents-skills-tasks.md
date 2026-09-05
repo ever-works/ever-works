@@ -18,7 +18,7 @@ Three new first-class concepts are added to the platform **in addition to** the 
 
 These three concepts are **core domain concepts**, not plugins. They **use** the existing plugin system (AI providers, Git providers, search providers, etc.) but are not themselves implemented as plugins. This is recorded as a design decision in [ADR-006](../decisions/006-agents-skills-tasks-as-core-not-plugins.md).
 
-The current platform already has a **platform-managed** "Work Agent" — `WorkAgentGoal` / `WorkAgentRun` / `WorkAgentRunLog` / `WorkAgentPreference` ([`packages/agent/src/entities/work-agent-goal.entity.ts`](../../../packages/agent/src/entities/work-agent-goal.entity.ts)) — which autonomously generates Ideas from a user goal and drives the Mission tick worker. That feature is **untouched** by this work. The new `Agent` entity introduced here is **user-defined**, named, persistent, and runs alongside the existing Work Agent without replacing it. See §11 for the exact distinction.
+The current platform already has a **platform-managed** "Work Agent" — `WorkAgentGoal` / `WorkAgentRun` / `WorkAgentRunLog` / `WorkAgentPreference` ([`packages/agent/src/entities/work-build-request.entity.ts`](../../../packages/agent/src/entities/work-build-request.entity.ts)) — which autonomously generates Ideas from a user goal and drives the Mission tick worker. That feature is **untouched** by this work. The new `Agent` entity introduced here is **user-defined**, named, persistent, and runs alongside the existing Work Agent without replacing it. See §11 for the exact distinction.
 
 ## 2. Cross-cutting goals
 
@@ -304,7 +304,7 @@ The `details` JSON column carries event-specific payloads. Live activity feed (p
 
 ## 11. Relationship to the existing "Work Agent"
 
-The platform already has a `WorkAgentGoal`/`WorkAgentRun` system that **autonomously generates Ideas** from a user-provided Goal ([`packages/agent/src/entities/work-agent-goal.entity.ts`](../../../packages/agent/src/entities/work-agent-goal.entity.ts), `apps/api/src/work-agent/`). Mission ticks also use this engine to spawn child Ideas. Crucially:
+The platform already has a `WorkAgentGoal`/`WorkAgentRun` system that **autonomously generates Ideas** from a user-provided Goal ([`packages/agent/src/entities/work-build-request.entity.ts`](../../../packages/agent/src/entities/work-build-request.entity.ts), `apps/api/src/work-agent/`). Mission ticks also use this engine to spawn child Ideas. Crucially:
 
 | Aspect                     | Existing "Work Agent" (platform-managed)                     | New "Agent" (user-defined)                                                          |
 | -------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------- |

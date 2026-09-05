@@ -380,7 +380,7 @@ The bar: existing 26 agent test suites + 719 tests all keep passing. New phases 
 
 ### CI / release gates
 
-Refer to [`CI_RELEASE_GATES.md`](../../../../../../Workspace/knowledge/runbooks/CI_RELEASE_GATES.md):
+Refer to `knowledge/runbooks/CI_RELEASE_GATES.md` (operator workspace repository):
 
 - Lightweight CI runs on every PR + release-branch push (typecheck, lint, agent test suite).
 - Medium/heavy CI runs on `stage`/`main` pushes only.
