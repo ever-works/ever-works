@@ -75,6 +75,11 @@ A Mission can be configured to **auto-build Works** from every Idea it spawns. T
 
 Auto-build still respects your per-Mission and account-wide [budget caps](./budgets-and-usage). When a cap is hit, the build is skipped (not retried automatically).
 
+:::caution Auto-build alone does not build anything
+
+The toggle above is the second of two switches. The first is account-level: **Enable Work agent** on `/settings/work-agent` is unchecked on every new account, and it gates both build paths — the **Build** button on an Idea and a Mission's auto-build alike. While it is off, a Mission with auto-build on still ticks and still queues Ideas, but none of them become Works and the API answers `400 "Work agent is disabled."` See [Autonomous Operation](./autonomous-operation.md) for all three gates.
+:::
+
 ## Outstanding-Ideas cap
 
 To keep a runaway Mission from filling your queue, each tick checks the count of un-built Ideas (PENDING + QUEUED + BUILDING) attached to the Mission. If that count is at or above the cap, the tick skips generation.

@@ -130,28 +130,30 @@ A Work's **kind** is chosen once, at creation, and decides what that Work has. T
 
 The pages above are reference — what each capability is and every option it takes. The guides below are the walkthroughs: start to finish, in order, with the real routes and commands.
 
-| Guide                                                                        | What you have at the end                                                                               |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| [The Founder Journey](../guides/founder-journey)                             | The Start → Build → Sell → Scale playbook that ties every feature above into one path                  |
-| [Platform Tour](../guides/platform-tour)                                     | A walk through every dashboard screen, its route, and the feature page that covers it in depth         |
-| [Quickstart: Directory](../guides/quickstart-directory)                      | A directory Work generated, curated, compared, deployed and on a refresh schedule                      |
-| [Quickstart: Blog](../guides/quickstart-blog)                                | A Blog Work with your brand voice in Memory, a refresh cadence, a domain, and its own Agent            |
-| [Quickstart: Landing Page](../guides/quickstart-landing-page)                | A Landing Page Work, AI-restyled from a template and deployed to a live address                        |
-| [Quickstart: Website](../guides/quickstart-website)                          | A multi-page marketing site with a seeded KB, quality gates, reviewed pull requests and a domain       |
-| [Quickstart: Awesome List](../guides/quickstart-awesome-repo)                | An awesome-list repo with a generated index, structured data you own, and community PR intake          |
-| [Do Everything From Chat](../guides/do-everything-from-chat)                 | Ten worked prompts that drive the platform from the chat rail, each mapped to the tool it calls        |
-| [Autonomous: Build from a Template](../guides/autonomous-site-from-template) | A template, a Mission with auto-build, budgets and schedules running as one standing loop              |
-| [Run Your Business 24/7](../guides/run-your-business-24-7)                   | A standing AI organization — Goals, Agents, Teams, heartbeats, the Inbox and a daily digest            |
-| [Budgets & Guardrails](../guides/budgets-and-guardrails)                     | Every ceiling set — spend caps, guardrail modes, approvals, tool grants, merge policy, gates           |
-| [Teams & Organizations](../guides/teams-and-organizations)                   | An Organization with people invited, nested Teams, an org chart, and per-Work roles                    |
-| [Connect Integrations](../guides/connect-integrations)                       | Slack, the GitHub App, connector plugins and notification channels wired up and test-fired             |
-| [Bring Your Own AI Provider](../guides/bring-your-own-ai-provider)           | Your own model API or local server wired into the simple / medium / complex tiers                      |
-| [Import an Existing Repo](../guides/import-an-existing-repo)                 | A repository you already own running as a Work — syncing, generating and deploying                     |
-| [Domains & Deploy Targets](../guides/custom-domains-and-deploy-targets)      | A Work published where you want it, on your own domain, with its DNS verified                          |
-| [MCP Client Setup](../guides/mcp-server-setup)                               | An MCP client driving your Works, Missions, Ideas and Knowledge Base as tools                          |
-| [CLI Quickstart](../guides/cli-quickstart)                                   | The CLI installed and signed in, driving Works, plugins and the Knowledge Base from a terminal         |
-| [Desktop App](../guides/desktop-app)                                         | The desktop shell running the whole platform locally, or acting as a client for a remote instance      |
-| [Self-host: Docker & K8s](../guides/self-host-docker-kubernetes)             | The platform running on your own infrastructure, from the Compose files to the `.deploy/k8s` manifests |
+| Guide                                                                        | What you have at the end                                                                                |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| [The Founder Journey](../guides/founder-journey)                             | The Start → Build → Sell → Scale playbook that ties every feature above into one path                   |
+| [Platform Tour](../guides/platform-tour)                                     | A walk through every dashboard screen, its route, and the feature page that covers it in depth          |
+| [Quickstart: Directory](../guides/quickstart-directory)                      | A directory Work generated, curated, compared, deployed and on a refresh schedule                       |
+| [Quickstart: Blog](../guides/quickstart-blog)                                | A Blog Work with your brand voice in Memory, a refresh cadence, a domain, and its own Agent             |
+| [Quickstart: Landing Page](../guides/quickstart-landing-page)                | A Landing Page Work, AI-restyled from a template and deployed to a live address                         |
+| [Quickstart: Website](../guides/quickstart-website)                          | A multi-page marketing site with a seeded KB, quality gates, reviewed pull requests and a domain        |
+| [Quickstart: Awesome List](../guides/quickstart-awesome-repo)                | An awesome-list repo with a generated index, structured data you own, and community PR intake           |
+| [Do Everything From Chat](../guides/do-everything-from-chat)                 | Ten worked prompts that drive the platform from the chat rail, each mapped to the tool it calls         |
+| [Autonomous: Build from a Template](../guides/autonomous-site-from-template) | A template, a Mission with auto-build, budgets and schedules running as one standing loop               |
+| [Run Your Business 24/7](../guides/run-your-business-24-7)                   | A standing AI organization — Goals, Agents, Teams, heartbeats, the Inbox and a daily digest             |
+| [Templates & Catalogs](../guides/templates-catalogs)                         | Every template catalog — website, Work, Mission, Agent, Skill, company — with your own entries in them  |
+| [Knowledge Base & Memory](../guides/knowledge-base-and-memory)               | A Work's Knowledge Base seeded from your files, what the agents wrote reviewed, and a Memory kept clean |
+| [Budgets & Guardrails](../guides/budgets-and-guardrails)                     | Every ceiling set — spend caps, guardrail modes, approvals, tool grants, merge policy, gates            |
+| [Teams & Organizations](../guides/teams-and-organizations)                   | An Organization with people invited, nested Teams, an org chart, and per-Work roles                     |
+| [Connect Integrations](../guides/connect-integrations)                       | Slack, the GitHub App, connector plugins and notification channels wired up and test-fired              |
+| [Bring Your Own AI Provider](../guides/bring-your-own-ai-provider)           | Your own model API or local server wired into the simple / medium / complex tiers                       |
+| [Import an Existing Repo](../guides/import-an-existing-repo)                 | A repository you already own running as a Work — syncing, generating and deploying                      |
+| [Domains & Deploy Targets](../guides/custom-domains-and-deploy-targets)      | A Work published where you want it, on your own domain, with its DNS verified                           |
+| [MCP Client Setup](../guides/mcp-server-setup)                               | An MCP client driving your Works, Missions, Ideas and Knowledge Base as tools                           |
+| [CLI Quickstart](../guides/cli-quickstart)                                   | The CLI installed and signed in, driving Works, plugins and the Knowledge Base from a terminal          |
+| [Desktop App](../guides/desktop-app)                                         | The desktop shell running the whole platform locally, or acting as a client for a remote instance       |
+| [Self-host: Docker & K8s](../guides/self-host-docker-kubernetes)             | The platform running on your own infrastructure, from the Compose files to the `.deploy/k8s` manifests  |
 
 ## Related
 
