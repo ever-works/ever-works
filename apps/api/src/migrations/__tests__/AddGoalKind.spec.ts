@@ -203,8 +203,29 @@ describe('AddGoalKind1788700000000', () => {
         }
         const rows = await dataSource.query(`SELECT "id" FROM "goals" ORDER BY "id"`);
         expect(rows).toEqual([{ id: 'g-metric' }]);
-        // The NOT NULL really is back: the delivery shape is refused again.
-        await expect(insertDeliveryRow('g-again')).rejects.toThrow();
+
+        // The column is gone from the PHYSICAL schema, not merely from the
+        // query runner's cached table metadata (which is what
+        // `findColumnByName` reads and can lag a sqlite table recreate).
+        const columns: Array<{ name: string; notnull: number }> = await dataSource.query(
+            `PRAGMA table_info("goals")`,
+        );
+        expect(columns.map((c) => c.name)).not.toContain('goalKind');
+        for (const name of METRIC_COLUMNS) {
+            expect(columns.find((c) => c.name === name)?.notnull).toBe(1);
+        }
+
+        // And the NOT NULL really is back: the delivery SHAPE — NULL in all
+        // four metric columns — is refused again. Asserted WITHOUT naming
+        // `goalKind`, so a passing test can only mean the constraint was
+        // restored; the previous form named the dropped column and would
+        // also have passed on "no such column".
+        await expect(
+            dataSource.query(
+                `INSERT INTO "goals" ("id","userId","title","metricSource","comparator","targetValue","unit","window","status")
+                 VALUES ('g-again','u1','Ship feature X',NULL,NULL,NULL,NULL,'total','draft')`,
+            ),
+        ).rejects.toThrow();
 
         await runner.release();
     });

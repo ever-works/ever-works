@@ -83,9 +83,15 @@ export class AddGoalKind1788700000000 implements MigrationInterface {
             await queryRunner.changeColumn('goals', column, updated);
         }
 
+        // TypeORM's own primitive rather than a raw `ALTER TABLE ... DROP
+        // COLUMN`: sqlite only learned that statement in 3.35, and on sqlite
+        // TypeORM drops a column by recreating the table — which also keeps
+        // the query runner's table metadata in step with the physical schema
+        // for anything that runs after this migration in the same runner.
         const refreshed = await queryRunner.getTable('goals');
-        if (refreshed?.findColumnByName('goalKind')) {
-            await queryRunner.query(`ALTER TABLE "goals" DROP COLUMN "goalKind"`);
+        const goalKind = refreshed?.findColumnByName('goalKind');
+        if (goalKind) {
+            await queryRunner.dropColumn('goals', goalKind);
         }
     }
 }
