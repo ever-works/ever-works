@@ -223,6 +223,15 @@ jobs:
       - name: Platform side — the DTOs still accept what a deployed node sends
         run: pnpm --filter ever-works-api exec jest --testPathPattern="fleet/__tests__/node-contract"
 
+      # `apps/node` is the ONE exception to the note above. Its vitest resolves
+      # `@ever-works/contracts` through the package ENTRY, not through source,
+      # so the spec below cannot even load without a dist — it reports
+      # "Failed to resolve entry for package" and zero tests. It passed once on
+      # a warm self-hosted runner that still had a dist lying about from another
+      # job, which is exactly the accident a gate must never depend on.
+      - name: Build contracts for the node side
+        run: pnpm --filter @ever-works/contracts build
+
       - name: Node side — the client still sends what the contract pins
         run: pnpm --filter ever-works-node exec vitest run src/core/node-contract.conformance.spec.ts src/core/api-base.spec.ts
 
