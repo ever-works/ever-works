@@ -67,11 +67,65 @@ POST   /api/fleet/nodes/:id/rotate   re-key the node; the replacement token is r
 DELETE /api/fleet/nodes/:id          remove the registration
 ```
 
-The **node drawer** on the Fleet page (the details action on a row) renders the same job history: each job's kind, status, attempt count, queued reason, queued / started / completed times and duration, filterable by **All / Failed / Running**.
+The **node drawer** on the Fleet page (the details action on a row) renders the same job history: each job's kind, status, **reconciled outcome and its reason**, attempt count, queued reason, queued / started / completed times and duration, filterable by **All / Failed / Running**. It also shows the node's **worker state** (see [Health signals](#health-signals)). It never renders a job's `payload` — the endpoint sends it as `null` and hands the drawer the task / run / agent ids instead.
 
 **Disabling drains.** A disabled node's heartbeats stop being accepted, so it goes quiet immediately rather than at the next sweep. Re-enabling puts it back to `offline` until its next accepted heartbeat proves it alive. Disabling a node that is still `enrolling` revokes its unused token.
 
 Everything here is owner-scoped: another account's node id is indistinguishable from one that does not exist.
+
+## Health signals
+
+`status` is what the platform can INFER from heartbeats. It cannot answer "will this machine actually take my job" — a node that has self-quarantined keeps heartbeating (that is what makes a quarantine observable instead of a blackout), so it reads `online` while refusing every lease. Before these signals, that machine looked healthy and idle, its owner was told nothing, and under the recommended `local-wait` routing there was no cloud fallback to quietly cover for it.
+
+### Worker state
+
+Every heartbeat now carries what the node's **worker** is doing, alongside the registry status:
+
+| Worker state  | The node reports it when                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `idle`        | polling, ready to take work                                                               |
+| `working`     | at least one job in flight                                                                |
+| `paused`      | drained on purpose — an operator pause, or draining the last in-flight jobs before a stop |
+| `quarantined` | the fail-closed stop the node imposed on ITSELF; only clearable at that machine           |
+| `throttled`   | over a resource ceiling (CPU / memory, disk floor): keeps its jobs, leases no more        |
+
+`workerStateReason` carries the sentence that explains it — the quarantine's own message, the ceiling that was crossed — and `workerStateChangedAt` moves only on a TRANSITION, so "quarantined since 03:14" survives the hundreds of beats that follow. A node that has never reported one shows **unknown**, never `idle`: a fabricated readiness for a machine nobody has heard from is the thing these signals exist to end.
+
+Two properties are load-bearing and deliberately awkward:
+
+- **The field is a string on the wire, not an enum.** The heartbeat DTO runs under `whitelist + forbidNonWhitelisted`, so a value an older API rejects fails the whole request — and a failed heartbeat is a node that sweeps to `offline`. A node newer than the platform must be able to report a state this build has never heard of and stay alive; the server normalizes anything unrecognised to "unknown" rather than trusting it.
+- **The node tolerates an older platform.** If a heartbeat carrying the worker state comes back `400`, the daemon retries once immediately without those two fields; if that succeeds it logs once, keeps reporting liveness, and stops sending them until it restarts.
+
+The drawer judges a job FAILED on the reconciled run outcome — the badge, the **Failed** filter chip and the endpoint’s `failures` subset all use the same rule, so a job the node called `done` whose run failed appears in all three.
+
+Availability counts a node as **free** only when its worker state is not `quarantined`, `throttled` or `paused`. It stays counted as ONLINE — the operator must keep seeing it — but the run router no longer places work on a machine that will refuse it.
+
+### Inbox notices
+
+Three notices, each filed **exactly once per event** and re-armed when the node recovers:
+
+| Notice                     | Fired by                                                             | Re-armed by                            |
+| -------------------------- | -------------------------------------------------------------------- | -------------------------------------- |
+| `Fleet node offline`       | the heartbeat-expiry sweep, on the flip to offline                   | the next accepted heartbeat            |
+| `Fleet node still offline` | the sweep, once the node has been gone longer than the notice window | the next accepted heartbeat            |
+| `Fleet node quarantined`   | the first heartbeat reporting `quarantined`                          | the first beat reporting anything else |
+
+Each names the node, its kind, the reason where there is one, and when it was last seen. The dedup markers live on the `fleet_nodes` row (`offlineNoticedAt`, `offlineLongNoticedAt`, `quarantineNoticedAt`) and are claimed by a conditional UPDATE, so two API replicas sweeping the same owner produce one notice rather than two.
+
+The sweep is piggybacked on owner-scoped list reads (there is no cron): the runner pill polls it every 30 seconds while a dashboard is open, and a dispatch triggers it too. An owner with no open page and no dispatch gets the notice on their next visit rather than at the moment of the outage.
+
+### Knobs
+
+| Env                                  | Default | Meaning                                                        |
+| ------------------------------------ | ------- | -------------------------------------------------------------- |
+| `FLEET_NODE_OFFLINE_AFTER_MS`        | 5 min   | silence after which an `online` node sweeps to `offline`       |
+| `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` | 30 min  | how long a node stays offline before the second, louder notice |
+
+The notice window is floored at the sweep window: an escalation that could fire before the node is even considered offline would be two notices for one event.
+
+### Removing a node takes its pins with it
+
+Deleting a node deletes its `fleet_agent_node_affinities` rows — the durable "run this Agent on THAT machine" pins — in the same transaction. Left behind, they kept resolving: `FleetJobService.enqueue` stamped `targetNodeId` with a machine that no longer existed and the job sat queued forever, pinned to a ghost. Historical `fleet_jobs` rows are untouched; deleting a machine must not delete the record of what it did.
 
 ## Panic controls
 

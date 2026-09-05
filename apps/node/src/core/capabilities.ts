@@ -2,6 +2,7 @@ import { FLEET_BROWSER_CAPABILITY, FLEET_GPU_CAPABILITY } from '@ever-works/cont
 import type { BrowserProbeIo } from './browser-probe';
 import type { ModelCliPaths } from './executors/model-cli';
 import { detectGpu } from './gpu-probe';
+import type { WorkerHealth } from './worker-health';
 import {
 	MAX_CAPABILITY_TAG_LENGTH,
 	MAX_CAPABILITY_TAGS,
@@ -292,6 +293,17 @@ export interface SelfDescriptionTelemetry {
 	 * display label, never a credential.
 	 */
 	modelIdentity?: () => Promise<string | null> | string | null;
+	/**
+	 * What the worker loop is doing (fleet health signals, EW-776), via
+	 * `describeWorkerHealth(worker.getState())`.
+	 *
+	 * A probe like the others — absent on a visibility-only node that has
+	 * no worker at all, and a null return is an ABSENT field rather than a
+	 * reported "unknown". That matters: the server treats an absent field
+	 * as "leave the stored value alone", so a probe that momentarily fails
+	 * does not wipe the quarantine an operator is currently reading.
+	 */
+	workerHealth?: () => Promise<WorkerHealth | null> | WorkerHealth | null;
 }
 
 /**
@@ -332,6 +344,17 @@ export async function describeSelf(
 	const modelIdentity = await resolveTelemetry(telemetry.modelIdentity);
 	if (typeof modelIdentity === 'string' && modelIdentity) {
 		description.modelIdentity = modelIdentity;
+	}
+	// Fleet health signals (EW-776). Both halves land together or neither
+	// does: a reason without a state has nothing to caption, and a state
+	// the probe could not produce must stay ABSENT so the server keeps the
+	// last one it was told.
+	const workerHealth = await resolveTelemetry(telemetry.workerHealth);
+	if (workerHealth && typeof workerHealth.workerState === 'string') {
+		description.workerState = workerHealth.workerState;
+		if (workerHealth.workerStateReason) {
+			description.workerStateReason = workerHealth.workerStateReason;
+		}
 	}
 	return description;
 }

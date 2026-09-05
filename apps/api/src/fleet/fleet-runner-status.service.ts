@@ -8,6 +8,7 @@ import {
 import type {
     FleetNodeLoadView,
     FleetNodeView,
+    FleetNodeWorkerState,
     FleetRunnerAvailability,
     FleetRunnerNodeView,
     FleetRunnerStatusView,
@@ -144,6 +145,7 @@ export class FleetRunnerStatusService {
                 : online.filter(
                       (node) =>
                           !FLEET_NODE_NON_LEASABLE_STATUSES.includes(node.status) &&
+                          !isRefusingWork(node) &&
                           (load[node.id]?.activeJobCount ?? 0) <= 0,
                   );
             const result: FleetRunnerAvailability = {
@@ -203,6 +205,41 @@ export class FleetRunnerStatusService {
     }
 }
 
+/**
+ * Worker states in which a node will REFUSE the next job, whatever its
+ * registry status says (fleet health signals, EW-776).
+ *
+ * This is the honest half of the availability question. A machine that
+ * has self-quarantined keeps heartbeating — that is what makes the
+ * quarantine observable rather than a blackout — so it reads `online`
+ * while its worker loop refuses every lease. Counting it as FREE is how a
+ * `local-fallback` run got "placed" on a machine that would never take
+ * it, and how a `local-wait` run sat queued forever behind one.
+ *
+ * `paused` and `throttled` join `quarantined` for the same reason: all
+ * three are the node saying "not right now". The registry-level
+ * {@link FLEET_NODE_NON_LEASABLE_STATUSES} check above stays — it answers
+ * the operator's intent, this answers the machine's own condition, and
+ * they can disagree.
+ */
+const REFUSING_WORKER_STATES: readonly FleetNodeWorkerState[] = [
+    'quarantined',
+    'throttled',
+    'paused',
+];
+
+/**
+ * True when the node's own worker says it will not take work.
+ *
+ * A node that has never reported a state (`null` / absent — an older
+ * daemon) is NOT treated as refusing: unknown is not a refusal, and
+ * assuming otherwise would empty the fleet of every machine running a
+ * build that predates this field.
+ */
+function isRefusingWork(node: FleetNodeView): boolean {
+    return node.workerState != null && REFUSING_WORKER_STATES.includes(node.workerState);
+}
+
 /** The lease scan's two skip conditions, as a predicate over the registry row. */
 function isEligible(node: FleetNodeView, eligibility: FleetRunnerEligibility): boolean {
     if (eligibility.targetNodeId && node.id !== eligibility.targetNodeId) {
@@ -232,5 +269,9 @@ function toRunnerView(node: FleetNodeView, load: FleetNodeLoadView | null): Flee
         busy: activeJobCount > 0,
         activeJobCount,
         currentJobKind: load?.currentJobKind ?? null,
+        // Fleet health signals (EW-776): what the machine says about
+        // itself, next to what the platform infers about it.
+        workerState: node.workerState ?? null,
+        workerStateReason: node.workerStateReason ?? null,
     };
 }

@@ -99,6 +99,11 @@ describe('FleetRunnerStatusService', () => {
                 busy: true,
                 activeJobCount: 1,
                 currentJobKind: 'agent-task',
+                // Fleet health signals (EW-776): what the MACHINE says
+                // about itself, alongside what the platform infers. Null
+                // here because this fixture's daemon reports neither.
+                workerState: null,
+                workerStateReason: null,
             });
         });
 
@@ -357,6 +362,111 @@ describe('FleetRunnerStatusService', () => {
                 fleetTotal: 0,
                 pinnedNodeId: 'b',
             });
+        });
+    });
+
+    /**
+     * Fleet health signals (EW-776, finding OPS-02) — the defect this
+     * whole slice exists for, seen from the router's side.
+     *
+     * A self-quarantined machine keeps heartbeating (that is what makes
+     * the quarantine observable instead of a blackout), so it reads
+     * `online` with no live claim: idle, healthy, free. It was refusing
+     * every lease. The pill said "1 of 1 online", `local-fallback` runs
+     * were "placed" on it, and `local-wait` runs queued behind it forever.
+     */
+    describe('worker state', () => {
+        it('projects the worker state and its reason onto the pill row', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue([
+                node({
+                    id: 'a',
+                    workerState: 'quarantined',
+                    workerStateReason: 'process tree could not be proven terminated',
+                }),
+            ]);
+
+            const snapshot = await build().snapshot('user-1');
+
+            expect(snapshot.nodes[0].workerState).toBe('quarantined');
+            expect(snapshot.nodes[0].workerStateReason).toBe(
+                'process tree could not be proven terminated',
+            );
+        });
+
+        it('reports null for a daemon that has never said what it is doing', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue([node({ id: 'a' })]);
+
+            const snapshot = await build().snapshot('user-1');
+
+            expect(snapshot.nodes[0].workerState).toBeNull();
+            expect(snapshot.nodes[0].workerStateReason).toBeNull();
+        });
+
+        it.each([['quarantined'], ['throttled'], ['paused']] as const)(
+            'still counts a %s node as ONLINE but never as free',
+            async (workerState) => {
+                // Online is the truth — the machine is reachable and the
+                // operator must keep seeing it. Free is the lie.
+                fleet.listEnrolledForUser.mockResolvedValue([node({ id: 'a', workerState })]);
+
+                await expect(build().availability('user-1')).resolves.toEqual({
+                    total: 1,
+                    online: 1,
+                    free: 0,
+                });
+            },
+        );
+
+        it.each([['idle'], ['working']] as const)(
+            'leaves a %s node counted as free when it holds no claim',
+            async (workerState) => {
+                fleet.listEnrolledForUser.mockResolvedValue([node({ id: 'a', workerState })]);
+
+                await expect(build().availability('user-1')).resolves.toEqual({
+                    total: 1,
+                    online: 1,
+                    free: 1,
+                });
+            },
+        );
+
+        it('leaves a node that reports nothing counted as free', async () => {
+            // Unknown is not a refusal. Treating it as one would empty the
+            // fleet of every machine running a build older than this field.
+            fleet.listEnrolledForUser.mockResolvedValue([node({ id: 'a' })]);
+
+            await expect(build().availability('user-1')).resolves.toEqual({
+                total: 1,
+                online: 1,
+                free: 1,
+            });
+        });
+
+        it('leaves the free count intact when only ONE of two nodes is quarantined', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue([
+                node({ id: 'a', workerState: 'quarantined' }),
+                node({ id: 'b', workerState: 'idle' }),
+            ]);
+
+            await expect(build().availability('user-1')).resolves.toEqual({
+                total: 2,
+                online: 2,
+                free: 1,
+            });
+        });
+
+        it('does not hide a quarantined node from the pill counts', async () => {
+            // Routing must not send work to it; the operator must still see
+            // it, and see WHY. Those are different questions.
+            fleet.listEnrolledForUser.mockResolvedValue([
+                node({ id: 'a', workerState: 'quarantined' }),
+            ]);
+
+            const snapshot = await build().snapshot('user-1');
+
+            expect(snapshot.total).toBe(1);
+            expect(snapshot.online).toBe(1);
+            expect(snapshot.offline).toBe(0);
         });
     });
 });

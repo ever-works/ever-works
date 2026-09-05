@@ -43,6 +43,18 @@ export interface ClaimJobPatch {
      * the same row matches zero rows instead of minting a duplicate.
      */
     leaseGeneration: number;
+    /**
+     * Always cleared by the claim: a claim IS an attempt boundary, and
+     * `startedAt` measures THIS attempt. It is re-stamped by the first job
+     * heartbeat of the new claim (`extendLease`).
+     *
+     * Before this, `startedAt` was stamped once and preserved across
+     * re-leases, so the drawer's "running for 4h 12m" on a job that had
+     * lapsed and been re-leased three times was the age of the FIRST
+     * attempt on a machine that might not even be the one holding it now
+     * — a number that looked like a stuck job and was not one.
+     */
+    startedAt: null;
 }
 
 /** Exact claim snapshot observed by an expiry scan. */

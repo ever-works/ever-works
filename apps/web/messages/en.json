@@ -3257,7 +3257,8 @@
                     "diskFree": "Disk free",
                     "cliNotInstalled": "Not installed",
                     "billingIdentity": "Billing identity",
-                    "identityUnknown": "Not reported"
+                    "identityUnknown": "Not reported",
+                    "worker": "Worker"
                 },
                 "costCeiling": {
                     "title": "Daily cost ceiling",
@@ -3437,7 +3438,20 @@
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
                         "waitingForRunner": "no runner can take it yet"
-                    }
+                    },
+                    "outcomes": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled",
+                        "unknown": "Unknown"
+                    },
+                    "outcome": "Outcome",
+                    "outcomeText": "{text}",
+                    "summaryTask": "Task {id}",
+                    "summaryRun": "Run {id}",
+                    "summaryAgent": "Agent {id}"
                 },
                 "routing": {
                     "title": "Execution routing",
@@ -3502,7 +3516,17 @@
                         "done": "Cancel requested for {cancelled} of {requested} jobs ({runs} runs)."
                     },
                     "auditFailed": "The action succeeded, but its audit row could not be written — tell an operator."
-                }
+                },
+                "workerStates": {
+                    "idle": "Idle",
+                    "working": "Working",
+                    "paused": "Paused",
+                    "quarantined": "Quarantined",
+                    "throttled": "Throttled",
+                    "unknown": "Unknown"
+                },
+                "workerStateReason": "Reason: {reason}",
+                "workerStateSince": "Since {time}"
             },
             "jobRuntime": {
                 "title": "Job Runtime",

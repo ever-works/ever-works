@@ -237,6 +237,9 @@ function makeRepos(stores: Stores): {
         findByUser: jest.fn(async (userId: string, limit: number) =>
             stores.jobs.filter((j) => j.userId === userId).slice(0, limit),
         ),
+        findByNodeForUser: jest.fn(async (userId: string, nodeId: string, limit: number) =>
+            stores.jobs.filter((j) => j.userId === userId && j.nodeId === nodeId).slice(0, limit),
+        ),
         // Queue SLA + heartbeat promotion (self-build slice S). Mirrored
         // here so the inline expiry on the lease path is EXERCISED by
         // this suite rather than swallowed as a missing method.
@@ -755,6 +758,88 @@ describe('FleetJobService', () => {
             await expect(
                 service.heartbeatJob(NODE_A, secretA, queued.id, undefined, 1),
             ).resolves.toBeNull();
+        });
+
+        it('resets startedAt on a RE-lease so the clock measures this attempt', async () => {
+            // Fleet health signals (EW-776). `startedAt` used to be stamped
+            // once and preserved across re-leases, so the drawer's "running
+            // for 4h 12m" on a job that had lapsed twice was the age of an
+            // attempt that had ended hours earlier — a number that looked
+            // like a stuck job and was not one.
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+            const first = await service.lease({ nodeId: NODE_A, secret: secretA });
+            await service.heartbeatJob(
+                NODE_A,
+                secretA,
+                first![0].id,
+                undefined,
+                first![0].leaseGeneration,
+            );
+            const firstStart = stores.jobs[0].startedAt;
+            expect(firstStart).toBeInstanceOf(Date);
+
+            // The claim lapses and the job goes back to the pool.
+            stores.jobs[0].leaseExpiresAt = new Date(Date.now() - 60_000);
+            await service.reclaimExpired();
+            expect(stores.jobs[0].status).toBe('queued');
+
+            const second = await service.lease({ nodeId: NODE_A, secret: secretA });
+            // The claim itself clears it — before any heartbeat arrives the
+            // row reports "not started", which is exactly true.
+            expect(stores.jobs[0].startedAt).toBeNull();
+            expect(second![0].startedAt).toBeNull();
+            expect(second![0].attempts).toBe(2);
+
+            const beat = await service.heartbeatJob(
+                NODE_A,
+                secretA,
+                second![0].id,
+                undefined,
+                second![0].leaseGeneration,
+            );
+            // ...and the new attempt's first beat re-stamps it, later than
+            // the first attempt's stamp.
+            expect(beat?.startedAt).not.toBeNull();
+            expect(new Date(beat!.startedAt!).getTime()).toBeGreaterThanOrEqual(
+                (firstStart as Date).getTime(),
+            );
+        });
+    });
+
+    describe('historyForNode', () => {
+        beforeEach(() => {
+            stores.nodes.push(enrolledNode(NODE_A, secretA));
+        });
+
+        it('carries the error text the drawer needs to explain a failure', async () => {
+            // The verdict was on the row all along and never left the
+            // server: the drawer showed a red badge and no way to find out
+            // why, so the operator's next step was to open a database.
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+            const leased = await service.lease({ nodeId: NODE_A, secret: secretA });
+            await service.completeJob({
+                nodeId: NODE_A,
+                secret: secretA,
+                jobId: leased![0].id,
+                success: false,
+                error: 'pnpm install exploded',
+                leaseGeneration: leased![0].leaseGeneration,
+            });
+
+            const history = await service.historyForNode('owner-1', NODE_A);
+
+            expect(history).toHaveLength(1);
+            expect(history[0].status).toBe('failed');
+            expect(history[0].error).toBe('pnpm install exploded');
+        });
+
+        it('reports a null error for a job that has not failed', async () => {
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+            await service.lease({ nodeId: NODE_A, secret: secretA });
+
+            const history = await service.historyForNode('owner-1', NODE_A);
+
+            expect(history[0].error).toBeNull();
         });
     });
 

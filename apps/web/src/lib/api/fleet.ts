@@ -61,6 +61,12 @@ export type {
     FleetExecutionScopeType,
     FleetRunnerNodeView,
     FleetRunnerStatusView,
+    // Fleet health signals (EW-776) — the worker-state vocabulary and the
+    // richer node-drawer history row.
+    FleetNodeWorkerState,
+    FleetNodeJobHistoryEntry,
+    FleetJobHistorySummary,
+    FleetJobReconciledOutcome,
 } from '@ever-works/contracts';
 
 /** Body of `POST /api/fleet/cancel-in-flight`. */

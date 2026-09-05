@@ -22,6 +22,7 @@ import {
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+    FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
     FLEET_MAX_DAILY_COST_CEILING_CENTS,
@@ -470,6 +471,25 @@ export const config = {
                 process.env.FLEET_NODE_OFFLINE_AFTER_MS,
                 FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
                 FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Fleet health signals (EW-776) — how long an already-offline node
+         * stays gone before its owner gets a SECOND, louder Inbox notice.
+         * Default 30 minutes (`FLEET_NODE_OFFLINE_NOTICE_AFTER_MS`).
+         *
+         * Floored at {@link getNodeOfflineAfterMs}, not at a constant: a
+         * window shorter than the sweep window would fire the escalation
+         * before the node is even considered offline, i.e. two notices for
+         * one event. The floor is read live so lowering it below a raised
+         * `FLEET_NODE_OFFLINE_AFTER_MS` still cannot invert the pair.
+         */
+        getNodeOfflineNoticeAfterMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS,
+                FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
+                this.getNodeOfflineAfterMs(),
                 Number.MAX_SAFE_INTEGER,
             );
         },

@@ -230,4 +230,138 @@ describe('HeartbeatLoop', () => {
 		expect(text).toContain(REDACTED);
 		expect(loop.getState().lastError).not.toContain(SECRET);
 	});
+
+	/**
+	 * Fleet health signals (EW-776) — the node's half of the additive-wire
+	 * contract.
+	 *
+	 * The API validates heartbeats with `whitelist + forbidNonWhitelisted`,
+	 * so a field an older platform does not know 400s the whole request.
+	 * That makes the OBVIOUS implementation of this feature — just add the
+	 * field — one whose failure mode is "every node in a mixed-version
+	 * fleet stops beating and sweeps to offline": the exact class of
+	 * silent outage the slice was written to end. So the loop drops the
+	 * fields and retries once, and only for a literal 400.
+	 */
+	describe('worker state against an older platform', () => {
+		const workerBeat = (responses: Array<HeartbeatResponse | Error>) => {
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient(responses);
+			const entries: LogEntry[] = [];
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({
+					platform: 'linux/x64',
+					capabilities: ['os:linux'],
+					workerState: 'quarantined',
+					workerStateReason: 'process tree unproven'
+				}),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler,
+				logger: createLogger({ sink: (entry) => entries.push(entry) })
+			});
+			return { loop, scheduler, scripted, entries };
+		};
+
+		const rejected = () => new FleetClientError('invalid-request', 'Request rejected by the API (HTTP 400)', 400);
+
+		it('sends the worker state to a platform that accepts it', async () => {
+			const { loop, scripted } = workerBeat([ok]);
+
+			await loop.start();
+
+			expect(scripted.requests[0]).toMatchObject({
+				workerState: 'quarantined',
+				workerStateReason: 'process tree unproven'
+			});
+			expect(scripted.sent()).toBe(1);
+		});
+
+		it('retries once WITHOUT the fields when the platform 400s them', async () => {
+			const { loop, scripted, entries } = workerBeat([rejected(), ok]);
+
+			await loop.start();
+
+			// Two requests, one beat: the first carried the fields, the
+			// second did not, and the beat SUCCEEDED.
+			expect(scripted.sent()).toBe(2);
+			expect(scripted.requests[0]).toHaveProperty('workerState');
+			expect(scripted.requests[1]).not.toHaveProperty('workerState');
+			expect(scripted.requests[1]).not.toHaveProperty('workerStateReason');
+			// Everything else still goes.
+			expect(scripted.requests[1]).toMatchObject({ nodeId: NODE_ID, secret: SECRET, platform: 'linux/x64' });
+			// And it is a SUCCESS: connected, no failure counted, no backoff.
+			expect(loop.getState().state).toBe('connected');
+			expect(loop.getState().consecutiveFailures).toBe(0);
+			expect(entries.some((entry) => entry.message.includes('predates them'))).toBe(true);
+		});
+
+		it('latches, so it costs one extra request per process and not per beat', async () => {
+			const { loop, scripted } = workerBeat([rejected(), ok]);
+
+			await loop.start();
+			await loop.tick();
+			await loop.tick();
+
+			// 2 for the first beat (probe + retry), then 1 each.
+			expect(scripted.sent()).toBe(4);
+			expect(scripted.requests[2]).not.toHaveProperty('workerState');
+			expect(scripted.requests[3]).not.toHaveProperty('workerState');
+			expect(loop.getState().state).toBe('connected');
+		});
+
+		it('does not retry a 400 on a beat that carried no worker state', async () => {
+			// Preserves the old behaviour exactly for a description with
+			// nothing droppable: a 400 is a failure, and it backs off.
+			const scheduler = fakeScheduler();
+			const scripted = scriptedClient([rejected(), ok]);
+			const loop = new HeartbeatLoop({
+				client: scripted.client,
+				nodeId: NODE_ID,
+				secret: SECRET,
+				describe: async () => ({ platform: 'linux/x64' }),
+				intervalMs: INTERVAL,
+				scheduler: scheduler.scheduler
+			});
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(1);
+			expect(loop.getState().state).toBe('retrying');
+			expect(loop.getState().consecutiveFailures).toBe(1);
+		});
+
+		it.each([
+			['a 401', new FleetClientError('unauthorized', 'Node credential was rejected', 401)],
+			['a 403', new FleetClientError('forbidden', 'Refused by the API edge', 403)],
+			['a 429', new FleetClientError('rate-limited', 'Rate limited', 429)],
+			['a 5xx', new FleetClientError('server', 'API error (HTTP 503)', 503)],
+			['a network error', new Error('ECONNREFUSED')]
+		])('does not strip or latch on %s', async (_label, error) => {
+			// Latching on a blip would silence this node's health reporting
+			// until it restarts, for a platform that supports it perfectly.
+			const { loop, scripted } = workerBeat([error, ok]);
+
+			await loop.start();
+			expect(scripted.sent()).toBe(1);
+			expect(loop.getState().state).not.toBe('connected');
+
+			await loop.tick();
+			expect(scripted.requests[1]).toHaveProperty('workerState');
+		});
+
+		it('keeps beating when even the stripped retry fails', async () => {
+			// Both attempts refused: this is a real failure, counted once
+			// and backed off like any other.
+			const { loop, scripted } = workerBeat([rejected(), rejected()]);
+
+			await loop.start();
+
+			expect(scripted.sent()).toBe(2);
+			expect(loop.getState().state).toBe('retrying');
+			expect(loop.getState().consecutiveFailures).toBe(1);
+		});
+	});
 });

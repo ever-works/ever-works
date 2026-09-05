@@ -59,6 +59,7 @@ describe('fleet job lease generation — repository integration (better-sqlite3)
             attempts: 1,
             queuedReason: null,
             leaseGeneration: 1,
+            startedAt: null,
         });
         expect(won).toBe(true);
         return read(created.id);
@@ -94,6 +95,7 @@ describe('fleet job lease generation — repository integration (better-sqlite3)
                     attempts: 2,
                     queuedReason: null,
                     leaseGeneration: 1,
+                    startedAt: null,
                 }),
             ).toBe(false);
             expect(await read(job.id)).toMatchObject({ status: 'queued', leaseGeneration: 1 });
@@ -107,6 +109,7 @@ describe('fleet job lease generation — repository integration (better-sqlite3)
                     attempts: 2,
                     queuedReason: null,
                     leaseGeneration: 2,
+                    startedAt: null,
                 }),
             ).toBe(true);
             expect(await read(job.id)).toMatchObject({
@@ -152,6 +155,7 @@ describe('fleet job lease generation — repository integration (better-sqlite3)
                 attempts: 2,
                 queuedReason: null,
                 leaseGeneration: 2,
+                startedAt: null,
             });
             const current = await read(job.id);
 
@@ -179,6 +183,7 @@ describe('fleet job lease generation — repository integration (better-sqlite3)
                 attempts: 2,
                 queuedReason: null,
                 leaseGeneration: 2,
+                startedAt: null,
             });
             const current = await read(job.id);
 

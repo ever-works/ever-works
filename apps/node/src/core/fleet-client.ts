@@ -358,6 +358,15 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	if (source.modelIdentity !== undefined) {
 		out.modelIdentity = source.modelIdentity;
 	}
+	// Fleet health signals (EW-776). Named here for exactly the reason the
+	// header above gives: a field this whitelist does not list is a field
+	// the machine computes, logs and then silently never sends.
+	if (source.workerState !== undefined) {
+		out.workerState = source.workerState;
+	}
+	if (source.workerStateReason !== undefined) {
+		out.workerStateReason = source.workerStateReason;
+	}
 	return out;
 }
 

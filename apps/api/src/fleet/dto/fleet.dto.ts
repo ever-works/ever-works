@@ -26,7 +26,9 @@ import {
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
+    FLEET_MAX_WORKER_STATE_REASON_LENGTH,
     FLEET_MIN_NODE_NAME_LENGTH,
+    FLEET_NODE_WORKER_STATES,
 } from '@ever-works/contracts';
 import type {
     FleetEnrollableNodeKind,
@@ -264,6 +266,48 @@ export class FleetNodeSelfDescriptionDto {
     @IsString()
     @MaxLength(FLEET_MAX_MODEL_IDENTITY_LENGTH)
     modelIdentity?: string;
+
+    /**
+     * Fleet health signals (EW-776) — what the node's WORKER is doing.
+     *
+     * Bounded as a plain `@IsString()` and NOT `@IsIn(FLEET_NODE_WORKER_STATES)`,
+     * deliberately. The global pipe runs `whitelist + forbidNonWhitelisted`,
+     * so a value this build rejects does not merely get dropped — it fails
+     * the whole request, and a failed heartbeat is a node that goes
+     * offline. A daemon newer than the API it is talking to must be able
+     * to report a state we have never heard of and still stay alive; the
+     * service normalizes it to "unknown" rather than trusting it. The
+     * `enum` on the Swagger property documents the vocabulary without
+     * enforcing it.
+     */
+    @ApiProperty({
+        required: false,
+        enum: FLEET_NODE_WORKER_STATES,
+        maxLength: 32,
+        description:
+            "What the node's worker is doing (idle | working | paused | quarantined | throttled). Any other value is recorded as unknown rather than rejected, so a newer node never loses its heartbeat to an older API.",
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(32)
+    workerState?: string;
+
+    /**
+     * Why the worker is in that state — the quarantine message, the
+     * resource ceiling. Sanitized and re-capped in `FleetService`, which
+     * is the source of truth; this bound just refuses an oversized body
+     * at the edge.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_MAX_WORKER_STATE_REASON_LENGTH,
+        description:
+            'Why the worker is in that state (quarantine reason, resource ceiling). Never a credential — the server redacts and caps it anyway.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_MAX_WORKER_STATE_REASON_LENGTH)
+    workerStateReason?: string;
 }
 
 /**

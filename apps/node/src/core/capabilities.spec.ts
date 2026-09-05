@@ -261,4 +261,62 @@ describe('describeSelf', () => {
 		const long = await describeSelf(runnerWith([]), environment(), 'v'.repeat(80));
 		expect(long.version).toHaveLength(32);
 	});
+
+	/**
+	 * Fleet health signals (EW-776) — the worker state joins the
+	 * description through the same optional-probe seam as the telemetry,
+	 * and inherits its whole contract: a probe that returns null or throws
+	 * is an ABSENT field, never a failed beat and never a `null` on the
+	 * wire (the server reads absent as "leave the stored value alone", so
+	 * a momentary probe failure must not wipe a quarantine an operator is
+	 * reading right now).
+	 */
+	describe('worker health', () => {
+		it('carries the worker state and its reason', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				workerHealth: () => ({ workerState: 'quarantined', workerStateReason: 'process tree unproven' })
+			});
+
+			expect(description.workerState).toBe('quarantined');
+			expect(description.workerStateReason).toBe('process tree unproven');
+		});
+
+		it('omits the reason when the state carries none', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				workerHealth: () => ({ workerState: 'idle' })
+			});
+
+			expect(description.workerState).toBe('idle');
+			expect('workerStateReason' in description).toBe(false);
+		});
+
+		it('omits BOTH fields when there is no worker at all', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				workerHealth: () => null
+			});
+
+			expect('workerState' in description).toBe(false);
+			expect('workerStateReason' in description).toBe(false);
+		});
+
+		it('omits them when the probe throws, rather than failing the beat', async () => {
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0', null, {
+				workerHealth: () => {
+					throw new Error('worker loop is mid-restart');
+				}
+			});
+
+			expect('workerState' in description).toBe(false);
+			// Everything else still lands — one broken probe never costs the
+			// node its whole description.
+			expect(description.platform).toBe('linux/x64');
+		});
+
+		it('omits them when no probe is supplied at all', async () => {
+			// Every existing caller, and every older build of this app.
+			const description = await describeSelf(runnerWith([]), environment(), '0.1.0');
+
+			expect('workerState' in description).toBe(false);
+		});
+	});
 });
