@@ -102,9 +102,10 @@ Sentry signs with one platform-level secret, so a verified delivery proves it ca
 | `GET /api/ingest/sentry/bindings`                      | Your claims.                                                                                                                                 |
 | `DELETE /api/ingest/sentry/bindings/:installationUuid` | Release one.                                                                                                                                 |
 
-Deliveries for an installation nobody has claimed are a 200 no-op that files nothing; a signed `installation.deleted` removes the claim.
+Deliveries for an installation nobody has claimed are a 200 no-op that files nothing — including `installation.deleted`, which only ever removes a claim that exists and is looked up before it acts.
 
 - `issue` (`created`, `resolved`, `unresolved`, `assigned`, `ignored`, `archived`, `unarchived`) and `event_alert` deliveries become `incident` events with `payload.provider: sentry`, identity = the Sentry **issue id**, and the issue link, `culprit`, `title`, `level`, last-seen `release`, `environment` and `project` on the payload. `error`, `comment` and `metric_alert` resources are acknowledged and dropped.
+- Repeated `event_alert` deliveries for the **same issue** collapse into **one event per five minutes**. A Sentry issue is one fingerprint, so alerts inside a window are one revision of it: a flapping issue lands ~12 events an hour instead of one per occurrence, which is what keeps it out of everyone else's ingest queue. A genuinely later alert still lands as a new revision, and the newest facts (release, level, culprit) travel with whichever delivery opens a window.
 - Work routing: claim the Sentry **project slug** under **Tracker team** on the Work; `event_alert` deliveries carry only the numeric project id, so claim that too if you route alert-rule fires. Raw bodies are never logged — event alerts carry stack frames and user context.
 
 ### The `incident` kind
@@ -117,12 +118,32 @@ The **triage filer** consumes `github.issue`, `jira.issue` and `incident` events
 
 - First sight files a Task in that Work (under its tenant / organization) titled `[<key>] <title>` with the `triage` and `source:<source>` labels, a priority from the vendor severity (`fatal`/`critical`/`Highest` → P1, `error`/`high` → P2, `low`/`info` → P4, else P3), and a body carrying the link, culprit, level, last-seen release, environment, project, status, labels and assignees, plus the original text inside a neutralized `<source_content>` block (data, never instructions).
 - The dedup key is persisted as an `external_issue_links` row (`UNIQUE (user, source, externalIssueId)`) pointing at the Task. A re-fired webhook, a re-label, a transition or a repeated Sentry alert finds that row and posts **one comment** with the delta on the existing Task — it never files a second one. An exact redelivery dedupes in the spine and produces nothing at all.
-- Events that routed to no Work are left alone (a trigger may still act on them); a Work the owner does not hold is refused. Filing happens in the ingest drain (`event-ingest-tick`), so a Task appears seconds to a minute after the webhook.
+- Comments are coalesced too. Anything that **changed** — a transition, a regression, a new title — comments immediately; a repeated alert for an unchanged issue comments at most **once every fifteen minutes**. A comment is not free (a chat message row, an activity row and a Memory write each), so a flapping issue would otherwise move the pager off the board and into one Task's comment stream. A Sentry issue that alerts two thousand times is one Task with a readable history, not two thousand Tasks and not two thousand comments.
+- Events that routed to no Work are left alone (a trigger may still act on them); a Work the owner does not hold is refused. Filing happens in the ingest drain (`event-ingest-tick`), which runs **every five minutes**, so a Task appears within a few minutes of the webhook — not instantly. The drain shares its batch between the owners that have work waiting, ranked by whoever's oldest event has waited longest, so one customer's chatty source cannot put another customer's newly filed issue behind it.
 - The filer matches on the event **kind**, not on how the event arrived. The jira-connector's poll sweep emits the same `jira.issue` kind, so issues it picks up are triaged too — which is the point, but it means turning on the connector's optional `backfillDays` window files a Task for every issue updated inside it whose project is claimed on a Work. Leave the backfill at its default (`0`, off) unless you want that history as Tasks.
+
+#### Regressions re-open work
+
+Dedup that never yields would be amnesia: an issue that was fixed, closed and then came back would only add a comment to a Task nobody looks at any more. So the filer files a **new** Task when — and only when — **both** of these hold:
+
+1. the vendor said it came back: a GitHub `issues.reopened`, a Sentry issue `unresolved` or `unarchived`, a Dependabot `reopened` / `reintroduced` / `auto_reopened`, or a Jira transition **out of** a done-named status (`Done`, `Closed`, `Resolved`, `Complete`, `Cancelled`, `Released`, `Shipped`, `Fixed`, `Won't Do`, `Won't Fix`, `Duplicate`) into one that is not; **and**
+2. the Task the dedup key points at is already **closed** (`done` or `cancelled`).
+
+Both halves matter. Without (1) a chatty vendor re-files forever — a repeated Sentry `event_alert` is a rule firing, not a regression signal, **while the Task is open**. Without (2) a reopen while the work is still in flight would fork the board.
+
+There is one more, weaker signal: an alert that keeps arriving after somebody marked the Task **done**. The fix did not hold, so the work re-opens. That is still exactly one Task — the re-file leaves an open Task, so the next alert is an ordinary comment — and it is what makes a regression _recoverable_: the vendor's explicit signal rides a single event, so if the filer cannot act on the one delivery that carried it (the Work claim had just been removed, the body was refused) nothing would ever re-carry it and the closed Task could never be superseded. A **cancelled** Task is deliberately excluded: that is a human saying "do not act on this", and a repeated alert must not overrule it.
+
+The new Task is titled `[<key>] Regression: <title>` and carries a `regression` label alongside `triage` and `source:<source>`. The dedup key itself never changes: the same `external_issue_links` row is re-pointed at the new Task, its `regressionCount` is incremented (so "why are there three Tasks for this issue?" is answerable from the row), and the superseded Task gets one comment naming its replacement. If the new Task cannot be filed — the event routed to no Work, the Work is gone, the body was refused — the filer falls back to commenting on the existing Task, and the still-active signal above brings the regression back on the next alert once the Work is available again.
+
+A Jira workflow whose done status is named something else simply never re-files; the revision still lands as a comment on the existing Task. The check is deliberately two-sided (out of a done name **and** into one that is not), so it cannot mis-fire on `Done → Closed`.
 
 ### Matching intake in triggers
 
 Any event-sourced Task Trigger sees these kinds with no extra wiring — for example `{ "source": "github", "kind": "github.issue" }` to hand new issues to an agent, `{ "kind": "incident" }` for every vendor's incidents, or `{ "source": "sentry", "kind": "incident" }` for Sentry only.
+
+A trigger fires **once per subject inside its replay window** (`replayWindowSec`, five minutes by default). Many events about one issue or one incident are one fire, so `{ "kind": "incident" }` pointed at an agent cannot turn a flapping Sentry project into a Task storm and an agent-run storm — which is what it did while the event path deduped only against re-processing the same row. Events with no stable subject (a push, a chat message) still fire per event. Raise `replayWindowSec` to coalesce harder; lower it if you genuinely want a fire per revision.
+
+The triage filer's issue-level dedup is still separate and stronger: it keeps **one Task per issue forever** and updates it. Prefer the filer when you want a single living Task; use a trigger when you want an agent dispatched on new activity.
 
 ## Native connectors
 

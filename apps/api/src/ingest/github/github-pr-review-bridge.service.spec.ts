@@ -87,6 +87,7 @@ describe('GitHubPrReviewBridgeService', () => {
         const installBindings = {
             findByWorkspace: jest.fn().mockResolvedValue(null),
             record: jest.fn().mockResolvedValue(null),
+            recordIfAbsent: jest.fn().mockResolvedValue(null),
         };
         // Orchestration M9 - the durable rejection recorder.
         const rejections = {
@@ -252,7 +253,19 @@ describe('GitHubPrReviewBridgeService', () => {
     });
 
     describe('recordBinding', () => {
-        it('persists the installation→user binding after a fallback match', async () => {
+        /**
+         * This used to assert `record` — the RE-POINTING write. It must
+         * not be: on the `single-install` / `signature` paths the HMAC
+         * proves the sender knows THEIR OWN webhook secret, while the
+         * workspace key beside it (`owner:<login>`) was read out of the
+         * still-unverified body. Any tenant with an enabled `github`
+         * install can sign a body naming another org, and `record` would
+         * hand them that org's binding — after which app-signed
+         * deliveries for the real owner's installation were attributed to
+         * the squatter. Insert-only is the write these paths have
+         * evidence for.
+         */
+        it('CLAIMS the installation→user binding insert-only after a fallback match', async () => {
             const { service, installBindings } = createService();
             await service.recordBinding({
                 userId: 'u-older',
@@ -260,13 +273,46 @@ describe('GitHubPrReviewBridgeService', () => {
                 matchedBy: 'single-install',
                 workspace: { keys: ['owner:octo'], label: 'octo' },
             });
-            expect(installBindings.record).toHaveBeenCalledWith({
+            expect(installBindings.recordIfAbsent).toHaveBeenCalledWith({
                 provider: 'github',
                 externalWorkspaceId: 'owner:octo',
                 userId: 'u-older',
                 pluginId: 'github',
                 externalWorkspaceName: 'octo',
             });
+            expect(installBindings.record).not.toHaveBeenCalled();
+        });
+
+        it('never takes a workspace key away from the account that already holds it', async () => {
+            const { service, installBindings } = createService();
+            installBindings.recordIfAbsent.mockResolvedValue({
+                userId: 'victim',
+                externalWorkspaceId: 'owner:victim-org',
+            });
+
+            await service.recordBinding({
+                userId: 'squatter',
+                webhookSecret: 'squatter-secret',
+                matchedBy: 'signature',
+                workspace: { keys: ['owner:victim-org'], label: 'victim-org' },
+            });
+
+            // Insert-only, and the holder came back — nothing re-pointed.
+            expect(installBindings.record).not.toHaveBeenCalled();
+        });
+
+        it('RE-POINTS only for an app-install match, whose owner came from platform state', async () => {
+            const { service, installBindings } = createService();
+            await service.recordBinding({
+                userId: 'u-app',
+                webhookSecret: 'app-secret',
+                matchedBy: 'app-install',
+                workspace: { keys: ['installation:4242'], label: 'octo' },
+            });
+            expect(installBindings.record).toHaveBeenCalledWith(
+                expect.objectContaining({ externalWorkspaceId: 'installation:4242' }),
+            );
+            expect(installBindings.recordIfAbsent).not.toHaveBeenCalled();
         });
 
         it('is a no-op when the binding already came from the table', async () => {
@@ -282,7 +328,7 @@ describe('GitHubPrReviewBridgeService', () => {
 
         it('swallows a repository failure (a verified webhook must not 500)', async () => {
             const { service, installBindings } = createService();
-            installBindings.record.mockRejectedValue(new Error('db down'));
+            installBindings.recordIfAbsent.mockRejectedValue(new Error('db down'));
             await expect(
                 service.recordBinding({
                     userId: 'u-a',
@@ -320,6 +366,98 @@ describe('GitHubPrReviewBridgeService', () => {
         it('returns undefined when the delivery names no installation at all', () => {
             expect(extractGitHubWorkspaceRef({ zen: 'x' } as any)).toBeUndefined();
             expect(extractGitHubWorkspaceRef(undefined)).toBeUndefined();
+        });
+
+        /**
+         * The body is attacker-shaped until the signature verifies.
+         * A type-narrow `typeof id === 'number'` check found no id in
+         * `{"installation":{"id":"4242"}}` and returned a ref WITHOUT the
+         * installation key, so the exact-binding step had nothing to look
+         * up — while `GitHubAppSyncService.handleWebhook` `String()`s the
+         * very same field and acts on it. That divergence is a way to
+         * blind the ownership check to the id the delivery is about to
+         * act on, so both JSON forms must normalize to one key.
+         */
+        it('normalizes a STRING installation id to the same key as the number', () => {
+            expect(extractGitHubWorkspaceRef({ installation: { id: '4242' } } as any)).toEqual(
+                extractGitHubWorkspaceRef({ installation: { id: 4242 } } as any),
+            );
+            expect(extractGitHubWorkspaceRef({ installation: { id: ' 004242 ' } } as any)).toEqual({
+                keys: ['installation:4242'],
+            });
+        });
+
+        it('ignores an installation id that is not a positive integer', () => {
+            for (const id of ['', 'abc', '4242abc', '-1', '0', 0, -5, 1.5, NaN, {}, []]) {
+                expect(extractGitHubWorkspaceRef({ installation: { id } } as any)).toBeUndefined();
+            }
+        });
+    });
+
+    /**
+     * A stored binding is a much weaker claim than a live HMAC. On the
+     * install-secret path `owner:<login>` keys are written from an
+     * unverified body, so one tenant can squat a workspace key they do
+     * not hold — and a squatted row used to resolve every delivery for
+     * that key to the squatter, whose secret then failed verification,
+     * 401ing the real owner's webhook forever with no way to evict it.
+     */
+    describe('resolveBinding: the signature outranks a stored binding', () => {
+        it('falls through to the signature proof when the bound install cannot verify', async () => {
+            const { service, installBindings, userPluginRepository, pluginSettingsService } =
+                createService();
+            userPluginRepository.findByPlugin.mockResolvedValue([
+                { userId: 'squatter', enabled: true, createdAt: new Date('2026-01-01') },
+                { userId: 'victim', enabled: true, createdAt: new Date('2026-02-01') },
+            ]);
+            pluginSettingsService.getSettings.mockImplementation(
+                async (_id: string, opts: { userId: string }) => ({
+                    webhookSecret: `${opts.userId}-secret`,
+                }),
+            );
+            installBindings.findByWorkspace.mockResolvedValue({
+                userId: 'squatter',
+                externalWorkspaceId: 'owner:victim-org',
+            });
+
+            const resolution = await service.resolveBinding({
+                workspace: { keys: ['owner:victim-org'] },
+                // Only the victim's real secret verifies this delivery.
+                verifySignature: (secret: string) => secret === 'victim-secret',
+            });
+
+            expect(resolution).toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'victim', matchedBy: 'signature' },
+            });
+        });
+
+        it('still trusts the binding when it DOES verify the delivery', async () => {
+            const { service, installBindings, userPluginRepository, pluginSettingsService } =
+                createService();
+            userPluginRepository.findByPlugin.mockResolvedValue([
+                { userId: 'owner-a', enabled: true, createdAt: new Date('2026-01-01') },
+                { userId: 'owner-b', enabled: true, createdAt: new Date('2026-02-01') },
+            ]);
+            pluginSettingsService.getSettings.mockImplementation(
+                async (_id: string, opts: { userId: string }) => ({
+                    webhookSecret: `${opts.userId}-secret`,
+                }),
+            );
+            installBindings.findByWorkspace.mockResolvedValue({
+                userId: 'owner-a',
+                externalWorkspaceId: 'owner:acme',
+            });
+
+            const resolution = await service.resolveBinding({
+                workspace: { keys: ['owner:acme'] },
+                verifySignature: (secret: string) => secret === 'owner-a-secret',
+            });
+
+            expect(resolution).toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'owner-a', matchedBy: 'binding' },
+            });
         });
     });
 

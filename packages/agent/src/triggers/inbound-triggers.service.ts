@@ -82,6 +82,26 @@ export class FireRefusedError extends BadRequestException {}
 /** Shape check for `eventMatcher.workId` (any RFC-4122 version). */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Fire-log reason for a fire the subject window swallowed. */
+export const SUBJECT_COALESCED_REASON =
+    'Coalesced: this trigger already fired for the same subject inside its replay window';
+
+/** Cap on the subject dedupe key, so a hostile external id cannot bloat the ledger column. */
+const SUBJECT_DEDUPE_KEY_MAX_CHARS = 180;
+
+/**
+ * The coalescing identity of an ingested event: its SUBJECT.
+ *
+ * `null` for an event with no stable subject (a chat message, a push) —
+ * those have nothing to coalesce on and fire per event, unchanged.
+ * See the block comment in `fireForEvent` for why this exists.
+ */
+export function eventSubjectDedupeKey(event: IngestedEvent): string | null {
+    const externalId = event.subjectExternalId?.trim();
+    if (!externalId) return null;
+    return `subject:${event.source}:${externalId}`.slice(0, SUBJECT_DEDUPE_KEY_MAX_CHARS);
+}
+
 function toIso(value: Date | null | undefined): string | null {
     if (!value) return null;
     const time = value instanceof Date ? value : new Date(value);
@@ -460,6 +480,11 @@ export class InboundTriggersService {
      *     event, enforced by the `inbound_trigger_fires` UNIQUE claim —
      *     a retried batch re-offers the event and every trigger that
      *     already fired is a silent dedupe.
+     *   - COALESCED per (trigger, subject) inside the trigger's
+     *     `replayWindowSec`: many rows about ONE issue / incident are one
+     *     fire, so a flapping source cannot turn into a Task storm and an
+     *     agent-run storm. Events with no `subjectExternalId` are
+     *     unaffected. See the block comment at the claim site.
      *   - NEVER throws for a single bad trigger: per-trigger failures
      *     are logged and counted, the remaining triggers still fire,
      *     and the ingest row is never blocked by one broken rule.
@@ -492,6 +517,8 @@ export class InboundTriggersService {
             },
         });
 
+        const subjectKey = eventSubjectDedupeKey(event);
+
         for (const row of rows) {
             if (!matchesEvent(row.eventMatcher, event)) continue;
             try {
@@ -502,6 +529,49 @@ export class InboundTriggersService {
                     result.deduped += 1;
                     continue;
                 }
+
+                // SUBJECT COALESCING. The permanent claim above dedupes
+                // RETRIES of one row; it says nothing about a source that
+                // emits many rows for one subject. A `{kind:'incident'}`
+                // trigger — the configuration the integrations doc itself
+                // recommends — therefore used to file one Task AND, when
+                // `targetAgentId` is set with the default
+                // `autoStart: 'always'`, dispatch one agent RUN per Sentry
+                // alert: a flapping issue is a Task storm and an agent-run
+                // storm from one incident.
+                //
+                // The trigger already carries the knob for this and the
+                // event path simply never applied it: `replayWindowSec` is
+                // "how long the same delivery identity is considered the
+                // same fire". For an ingested event the delivery identity
+                // that matters to a human is the SUBJECT (the issue, the
+                // incident), not the row. So a second claim is taken on
+                // `subject:<source>:<externalId>` inside that window; the
+                // row's own claim is closed as refused with a reason the
+                // fire log renders, so the coalescing is visible rather
+                // than silent. Events with no subject (a raw message, a
+                // push) are unaffected and fire per event as before.
+                if (subjectKey) {
+                    const coalesced = await this.fires.claim(
+                        row.id,
+                        subjectKey,
+                        'event',
+                        this.replayWindowMs(row),
+                    );
+                    if (!coalesced.won) {
+                        await this.closeFire(claim.fire, 'refused', {
+                            reason: SUBJECT_COALESCED_REASON,
+                        });
+                        result.deduped += 1;
+                        continue;
+                    }
+                    // The subject row is a coalescing marker, not a fire:
+                    // settle it immediately so it never shows as running,
+                    // and so it is not re-claimable as a "produced no
+                    // Task" row inside its own window.
+                    await this.closeFire(coalesced.fire, 'done', { taskId: null });
+                }
+
                 const templateEvent = this.toTemplateEvent(event);
                 await this.executeFire(row, {
                     fire: claim.fire,

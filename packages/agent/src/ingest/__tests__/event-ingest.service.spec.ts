@@ -308,6 +308,119 @@ describe('EventIngestService', () => {
             await build().processBatch();
             expect(repository.findUnprocessed).toHaveBeenCalledWith(50);
         });
+
+        /**
+         * `findUnprocessed` takes no row lock and `markProcessed` is the
+         * LAST step of the fan-out, so two overlapping drains select the
+         * SAME head rows and hand them to the same processors. The kind
+         * processors' idempotency contract covers a RETRY (sequential),
+         * not a concurrent twin: two simultaneous triage filings both
+         * miss the dedup row and both create a Task, and the loser is
+         * orphaned — nothing points at it, so it is never updated and
+         * never deduped away.
+         */
+        it('is SINGLE-FLIGHT: an overlapping call joins the drain in flight', async () => {
+            const event = storedEvent();
+            repository.findUnprocessed.mockResolvedValue([event]);
+            let release: () => void = () => undefined;
+            const gate = new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            const processor = jest.fn(async () => {
+                await gate;
+            });
+
+            const service = build();
+            service.registerKindProcessor({ kinds: ['*'], process: processor });
+
+            const first = service.processBatch(10);
+            const second = service.processBatch(10);
+            release();
+            const [a, b] = await Promise.all([first, second]);
+
+            expect(repository.findUnprocessed).toHaveBeenCalledTimes(1);
+            expect(processor).toHaveBeenCalledTimes(1);
+            expect(a).toBe(b);
+
+            // ...and the guard clears, so the NEXT tick really drains.
+            await service.processBatch(10);
+            expect(repository.findUnprocessed).toHaveBeenCalledTimes(2);
+        });
+
+        /**
+         * A row whose processor fails permanently is never marked
+         * processed and always sorts to the head of its owner's
+         * oldest-first queue, so without a backoff it is re-selected
+         * every tick for the life of the deployment and permanently
+         * consumes one of the batch's fifty slots. Fifty of them wedge
+         * the drain for every tenant.
+         */
+        describe('a row that keeps failing yields its slot', () => {
+            it('retries immediately after ONE failure (the transient case)', async () => {
+                const bad = storedEvent({ id: 'row-bad' });
+                repository.findUnprocessed.mockResolvedValue([bad]);
+                const processor = jest.fn(async () => {
+                    throw new Error('boom');
+                });
+                const service = build();
+                service.registerKindProcessor({ kinds: ['*'], process: processor });
+
+                await service.processBatch(10);
+                await service.processBatch(10);
+
+                expect(processor).toHaveBeenCalledTimes(2);
+            });
+
+            it('backs a repeatedly failing row off and keeps draining healthy rows', async () => {
+                const bad = storedEvent({ id: 'row-bad' });
+                const good = storedEvent({ id: 'row-good' });
+                repository.findUnprocessed.mockResolvedValue([bad, good]);
+                const processor = jest.fn(async (event: { id: string }) => {
+                    if (event.id === 'row-bad') throw new Error('poison');
+                });
+                const service = build();
+                service.registerKindProcessor({
+                    kinds: ['*'],
+                    process: processor as never,
+                });
+
+                // Ticks 1 and 2 both attempt the poison row (one failure
+                // costs no skipped ticks); from tick 3 it is backed off.
+                await service.processBatch(10);
+                await service.processBatch(10);
+                const attemptsBeforeBackoff = processor.mock.calls.filter(
+                    ([event]) => (event as { id: string }).id === 'row-bad',
+                ).length;
+                await service.processBatch(10);
+                const attemptsAfter = processor.mock.calls.filter(
+                    ([event]) => (event as { id: string }).id === 'row-bad',
+                ).length;
+
+                expect(attemptsBeforeBackoff).toBe(2);
+                expect(attemptsAfter).toBe(2);
+                // The healthy row is never held up by it.
+                expect(repository.markProcessed).toHaveBeenCalledWith('row-good');
+            });
+
+            it('over-fetches by the backed-off count so a wedged row costs no slot', async () => {
+                const bad = storedEvent({ id: 'row-bad' });
+                repository.findUnprocessed.mockResolvedValue([bad]);
+                const service = build();
+                service.registerKindProcessor({
+                    kinds: ['*'],
+                    process: async () => {
+                        throw new Error('poison');
+                    },
+                });
+
+                await service.processBatch(10);
+                await service.processBatch(10);
+                repository.findUnprocessed.mockClear();
+                await service.processBatch(10);
+
+                expect(repository.findUnprocessed).toHaveBeenCalledWith(11);
+            });
+        });
     });
 
     // Wave 8 (Meetings v1) — kind-bound domain processors on the drain.

@@ -472,4 +472,170 @@ describe('GitHubWebhookDispatcherService', () => {
             expect(healthy.handle).toHaveBeenCalled();
         });
     });
+
+    /**
+     * The App-sync leg writes PLATFORM state off identifiers taken
+     * straight out of the body: `installation` upserts / soft-deletes a
+     * `github_app_installations` row (and can overwrite the
+     * `createdByGithubUserId` that decides who owns an installation's
+     * deliveries), `installation_repositories` re-pulls that
+     * installation's private repository list, and `push` stamps
+     * `pendingSyncRequestedAt` on whichever Work claims the named repo.
+     *
+     * None of that has any relation to the verified sender. An ordinary
+     * tenant with an enabled `github` plugin picks their OWN
+     * `webhookSecret`, so they could sign
+     * `{"action":"deleted","installation":{"id":<victim>}}` with it, pass
+     * verification as themselves, and soft-delete a stranger's App
+     * installation — killing that account's issue intake, PR review and
+     * repo sync. Installation ids are small non-secret integers, so the
+     * whole deployment was enumerable.
+     *
+     * Only GitHub, signing with the PLATFORM App webhook secret, is an
+     * authority on platform App state.
+     */
+    describe('the App-sync leg requires the platform App credential', () => {
+        const INSTALL_EVENT_BODY = {
+            action: 'deleted',
+            installation: { id: 4242 },
+        };
+
+        it.each(['installation', 'installation_repositories', 'push'])(
+            'refuses to run App sync for a %s delivery verified with a per-install secret',
+            async (eventName) => {
+                const { dispatcher, appSync } = createDispatcher();
+
+                const result = await dispatcher.dispatch(
+                    signed(INSTALL_EVENT_BODY, INSTALL_SECRET, eventName),
+                );
+
+                expect(appSync.handleWebhook).not.toHaveBeenCalled();
+                expect(result.handled.sync).toBe(false);
+                // The delivery is still verified and still 200s — only the
+                // privileged leg is withheld.
+                expect(result.credential).toBe('install-secret');
+            },
+        );
+
+        it('runs App sync for the SAME delivery when GitHub signed it with the app secret', async () => {
+            const { dispatcher, appSync } = createDispatcher({
+                appSecret: APP_SECRET,
+                installation: { createdByUserId: 'user-app' },
+            });
+
+            const result = await dispatcher.dispatch(
+                signed(INSTALL_EVENT_BODY, APP_SECRET, 'installation'),
+            );
+
+            expect(appSync.handleWebhook).toHaveBeenCalledWith('installation', INSTALL_EVENT_BODY);
+            expect(result.handled.sync).toBe(true);
+        });
+
+        it('leaves every non-state-writing event flowing to the sync leg as before', async () => {
+            const { dispatcher, appSync } = createDispatcher();
+
+            await dispatcher.dispatch(signed(PR_BODY, INSTALL_SECRET, 'pull_request'));
+
+            expect(appSync.handleWebhook).toHaveBeenCalledWith('pull_request', PR_BODY);
+        });
+
+        // A string id was the way to make the ownership check blind to the
+        // id the sync leg was about to act on (`extractGitHubWorkspaceRef`
+        // normalizes both forms now — pinned in the bridge's own spec).
+        // The gate holds for that shape too.
+        it('blocks a STRING-id installation delivery on the same gate', async () => {
+            const { dispatcher, appSync } = createDispatcher();
+
+            await dispatcher.dispatch(
+                signed(
+                    { action: 'deleted', installation: { id: '4242' } },
+                    INSTALL_SECRET,
+                    'installation',
+                ),
+            );
+
+            expect(appSync.handleWebhook).not.toHaveBeenCalled();
+        });
+    });
+
+    /**
+     * `ingest_install_bindings` rows on the install-secret path are
+     * written from an UNVERIFIED body, so a tenant can squat
+     * `owner:<somebody-else>` by signing a body naming it with their own
+     * webhook secret. Consulting that row BEFORE
+     * `github_app_installations` meant the squatted row outranked
+     * platform state, and every genuinely app-signed delivery for the
+     * victim's installation — their issues included — was attributed to
+     * the squatter.
+     */
+    describe('app-secret ownership comes from platform state first', () => {
+        it('prefers github_app_installations over a squatted binding row', async () => {
+            const { dispatcher, bridge } = createDispatcher({
+                appSecret: APP_SECRET,
+                installation: { createdByUserId: 'victim' },
+                boundUserId: 'squatter',
+            });
+
+            await dispatcher.dispatch(signed(PR_BODY, APP_SECRET));
+
+            expect(bridge.handleEvent).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 'victim', matchedBy: 'app-install' }),
+                'pull_request',
+                PR_BODY,
+            );
+        });
+
+        it('falls back to the binding row only when platform state does not answer', async () => {
+            const { dispatcher, bridge } = createDispatcher({
+                appSecret: APP_SECRET,
+                installation: null,
+                boundUserId: 'bound-user',
+            });
+
+            await dispatcher.dispatch(signed(PR_BODY, APP_SECRET));
+
+            expect(bridge.handleEvent).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 'bound-user', matchedBy: 'binding' }),
+                'pull_request',
+                PR_BODY,
+            );
+        });
+
+        it('resolves through the GitHub user link when only createdByGithubUserId is known', async () => {
+            const { dispatcher, bridge } = createDispatcher({
+                appSecret: APP_SECRET,
+                installation: { createdByGithubUserId: '987' },
+                userLink: { userId: 'linked-user' },
+            });
+
+            await dispatcher.dispatch(signed(PR_BODY, APP_SECRET));
+
+            expect(bridge.handleEvent).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 'linked-user', matchedBy: 'app-install' }),
+                'pull_request',
+                PR_BODY,
+            );
+        });
+    });
+
+    /**
+     * Two textually distinct 401s told an unauthenticated prober whether
+     * ANY account on the deployment has an enabled `github` install with
+     * a webhook secret — a per-deployment tenant oracle, free, before
+     * they hold any credential.
+     */
+    it('answers "nothing configured" and "bad signature" with the SAME 401 body', async () => {
+        const notConfigured = createDispatcher();
+        notConfigured.bridge.resolveBinding.mockResolvedValue({ status: 'not-configured' });
+        const unconfiguredMessage = await notConfigured.dispatcher
+            .dispatch(signed(PR_BODY, INSTALL_SECRET))
+            .catch((error: Error) => error.message);
+
+        const badSignature = createDispatcher();
+        const badSignatureMessage = await badSignature.dispatcher
+            .dispatch(signed(PR_BODY, 'someone-elses-secret'))
+            .catch((error: Error) => error.message);
+
+        expect(unconfiguredMessage).toBe(badSignatureMessage);
+    });
 });
