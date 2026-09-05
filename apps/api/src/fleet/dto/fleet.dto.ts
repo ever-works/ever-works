@@ -386,6 +386,17 @@ export class FleetNodePauseDto extends FleetNodeCredentialDto {
 export class FleetUnenrollDto extends FleetNodeCredentialDto {}
 
 /**
+ * Request body for the PUBLIC `POST /api/fleet/rotate-credential` — a
+ * node re-keying ITSELF with the credential it is already using
+ * (EW-799).
+ *
+ * No extra field: the credential pair IS the request. `secret` must be
+ * the node's CURRENT secret — a previous-window one is a replay and is
+ * refused with the same undifferentiated 401 as a wrong one.
+ */
+export class RotateFleetNodeCredentialDto extends FleetNodeCredentialDto {}
+
+/**
  * Request body for `PUT /api/fleet/execution-preference` — set (or
  * change) where runs in one scope should execute.
  *

@@ -1,11 +1,12 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { FleetKillSwitchService } from '@ever-works/agent/fleet';
+import { FleetKillSwitchService, FleetService } from '@ever-works/agent/fleet';
 import type {
     FleetCancelInFlightResult,
     FleetDrainAllResult,
     FleetKillSwitchState,
+    FleetRotateAllResult,
 } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -20,6 +21,8 @@ import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
  *                                        requeue their in-flight claims
  *   POST   /api/fleet/cancel-in-flight   { includeQueued? } — cancel my
  *                                        running fleet jobs + their runs
+ *   POST   /api/fleet/rotate-all         QUEUE a credential rotation on
+ *                                        every node I own
  *   GET    /api/fleet/kill-switch        is the global stop flag set?
  *                                        (any session; actor not leaked)
  *
@@ -39,6 +42,9 @@ export class FleetPanicController {
     constructor(
         private readonly panic: FleetPanicService,
         private readonly killSwitch: FleetKillSwitchService,
+        // EW-799 — rotate-all lives here, beside drain-all, because both
+        // are whole-fleet owner verbs rather than per-node edits.
+        private readonly fleet: FleetService,
     ) {}
 
     @Post('drain-all')
@@ -66,6 +72,17 @@ export class FleetPanicController {
         return this.panic.cancelInFlightForUser(auth.userId, {
             includeQueued: body.includeQueued === true,
         });
+    }
+
+    @Post('rotate-all')
+    @ApiOperation({
+        summary:
+            'QUEUE a credential rotation on every node I own. Nothing is rotated here and no credential is minted: each machine re-keys itself on its next heartbeat, keeping BOTH credentials valid for a bounded overlap so it never goes dark. Nodes still enrolling are skipped — revoke their unused token instead.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async rotateAll(@CurrentUser() auth: AuthenticatedUser): Promise<FleetRotateAllResult> {
+        return this.fleet.queueRotationForUser(auth.userId);
     }
 
     @Get('kill-switch')

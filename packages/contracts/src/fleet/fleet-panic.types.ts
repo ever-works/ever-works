@@ -35,16 +35,87 @@ export const FLEET_AUDIT_MAX_LIMIT = 200;
 
 /**
  * Actions recorded in `fleet_audit`. Stored as `varchar(64)` rather than
- * an enum so slice AQ can extend the log without a type-altering
- * migration.
+ * an enum so the log can be extended without a type-altering migration —
+ * which is exactly what slice AQ (EW-799) does below.
+ *
+ * Two conventions, both deliberate and both already present:
+ *
+ *   - a DOTTED namespace for anything scoped to one subject
+ *     (`kill-switch.*`, `node.*`, `affinity.*`, `execution-preference.*`);
+ *   - a BARE verb for the whole-fleet, owner-level actions (`drain-all`,
+ *     `rotate-all`), which name a decision rather than a subject.
+ *
+ * DIRECTION is not encoded in the verb. There is no `node.undrain` or
+ * `node.resume`: pause/disable/drain each record one action and carry the
+ * transition in `details.before` / `details.after`, following
+ * `tenant_job_runtime_audit`, whose whole vocabulary is likewise
+ * six verbs plus a before/after delta. Paired verbs would double the list
+ * and still not answer "what changed".
+ *
+ * `heartbeat` is deliberately absent: one row per node per 30s is not an
+ * audit trail, it is a firehose that buries the rows an operator came to
+ * read. So are the two housekeeping CASes (`sweepOffline`,
+ * `casTripDailyCeiling`) — a clock and an idempotency key, not decisions.
  */
-export type FleetAuditAction = 'kill-switch.stop' | 'kill-switch.clear' | 'drain-all' | 'cancel-in-flight';
+export type FleetAuditAction =
+	| 'kill-switch.stop'
+	| 'kill-switch.clear'
+	| 'drain-all'
+	| 'cancel-in-flight'
+	/** Owner minted a one-time enrollment token (a node row is created). */
+	| 'node.create'
+	/** A machine consumed a token and became `online` (actor: the node). */
+	| 'node.enroll'
+	/** Owner revoked an outstanding, never-used enrollment token. */
+	| 'node.token-revoke'
+	/** Owner re-keyed a node: new one-time token, old secret dead at once. */
+	| 'node.rotate'
+	/** The node rotated ITSELF with its current credential (dual-accept window). */
+	| 'node.rotate-self'
+	/** Owner queued a rotation on every node of the fleet. */
+	| 'rotate-all'
+	| 'node.rename'
+	| 'node.capabilities'
+	/** Per-node daily model-spend ceiling set or cleared. */
+	| 'node.cost-ceiling'
+	/** Pause / resume — by the owner, or by the node itself. */
+	| 'node.pause'
+	/** Disable / re-enable (the owner's harder stop). */
+	| 'node.disable'
+	/** Drain: disable AND requeue the node's in-flight claims. */
+	| 'node.drain'
+	/** Owner deleted the registration. */
+	| 'node.delete'
+	/** The node retired its own registration (actor: the node). */
+	| 'node.unenroll'
+	| 'affinity.set'
+	| 'affinity.clear'
+	| 'execution-preference.set'
+	| 'execution-preference.clear';
 
 export const FLEET_AUDIT_ACTIONS: readonly FleetAuditAction[] = [
 	'kill-switch.stop',
 	'kill-switch.clear',
 	'drain-all',
-	'cancel-in-flight'
+	'cancel-in-flight',
+	'node.create',
+	'node.enroll',
+	'node.token-revoke',
+	'node.rotate',
+	'node.rotate-self',
+	'rotate-all',
+	'node.rename',
+	'node.capabilities',
+	'node.cost-ceiling',
+	'node.pause',
+	'node.disable',
+	'node.drain',
+	'node.delete',
+	'node.unenroll',
+	'affinity.set',
+	'affinity.clear',
+	'execution-preference.set',
+	'execution-preference.clear'
 ];
 
 /**
@@ -99,6 +170,27 @@ export interface FleetDrainAllResult {
 	/** The caller's enrolled nodes after the drain. */
 	nodes: FleetNodeView[];
 	/** The drain happened but the audit row could not be written (logged). */
+	auditFailed: boolean;
+}
+
+/**
+ * `POST /api/fleet/rotate-all` result — credential rotation QUEUED across
+ * the owner's fleet.
+ *
+ * Nothing is rotated here and no credential is minted: the call marks
+ * every eligible node, and each machine rotates ITSELF on its next beat
+ * through `POST /api/fleet/rotate-credential`. That is the whole point —
+ * an operator with six machines on six desks cannot be at six keyboards,
+ * and a rotation that requires them to be simply never happens.
+ */
+export interface FleetRotateAllResult {
+	/** Nodes marked for rotation by this call. */
+	queuedNodes: number;
+	/** Nodes left alone: still `enrolling` (no secret to rotate yet). */
+	skippedNodes: number;
+	/** The caller's enrolled nodes after the marking. */
+	nodes: FleetNodeView[];
+	/** The marking happened but the audit row could not be written (logged). */
 	auditFailed: boolean;
 }
 

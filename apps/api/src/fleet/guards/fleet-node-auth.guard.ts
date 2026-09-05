@@ -1,5 +1,9 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { FleetNodeRepository, verifyNodeSecret } from '@ever-works/agent/fleet';
+import {
+    FleetNodeRepository,
+    matchNodeCredential,
+    verifyNodeSecret,
+} from '@ever-works/agent/fleet';
 
 /** The ONE message every refused node credential gets, on every route. */
 export const FLEET_NODE_UNAUTHORIZED_MESSAGE = 'Invalid node credential';
@@ -83,7 +87,12 @@ export class FleetNodeAuthGuard implements CanActivate {
         if (node.status === 'disabled' || node.status === 'enrolling') {
             throw new UnauthorizedException(FLEET_NODE_UNAUTHORIZED_MESSAGE);
         }
-        if (!verified.matches(node.enrollmentTokenHash)) {
+        // Dual-accept (EW-799): a node inside its bounded rotation window
+        // authenticates with EITHER credential, through the ONE shared
+        // matcher every other verification site uses. The edge must not
+        // hold a stricter rule than the service behind it, or a rotated
+        // node is refused here and accepted there.
+        if (matchNodeCredential(verified, node) === null) {
             throw new UnauthorizedException(FLEET_NODE_UNAUTHORIZED_MESSAGE);
         }
 

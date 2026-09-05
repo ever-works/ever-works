@@ -33,7 +33,7 @@ import { FleetJob } from '../entities/fleet-job.entity';
 import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '../events/fleet-job.events';
 import { FleetJobRepository } from './fleet-job.repository';
 import { FleetNodeRepository } from './fleet-node.repository';
-import { verifyNodeSecret } from './fleet-node-credential';
+import { matchNodeCredential, verifyNodeSecret } from './fleet-node-credential';
 import { FleetAgentNodeAffinityRepository } from './fleet-agent-node-affinity.repository';
 import { FleetKillSwitchService } from './fleet-kill-switch.service';
 
@@ -1017,7 +1017,12 @@ export class FleetJobService {
         if (intent === 'lease' && (node.status === 'disabled' || node.status === 'paused')) {
             return null;
         }
-        if (!verified.matches(node.enrollmentTokenHash)) return null;
+        // Dual-accept (EW-799): inside its rotation window a node may
+        // present EITHER credential. This is the LEASE/REPORT channel —
+        // if it alone refused the old secret, a node that rotated
+        // mid-job would keep heartbeating (so it looks healthy) while
+        // every lease poll 401s, i.e. a machine that quietly does no work.
+        if (matchNodeCredential(verified, node) === null) return null;
 
         return {
             id: node.id,

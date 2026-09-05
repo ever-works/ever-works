@@ -18,6 +18,7 @@ import {
     type FleetAgentExecutionPermissionMode,
     type FleetAgentExecutionProvider,
     type FleetJobKind,
+    FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
@@ -25,7 +26,9 @@ import {
     FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
+    FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_MAX_DAILY_COST_CEILING_CENTS,
+    FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_MIN_NODE_OFFLINE_AFTER_MS,
 } from '@ever-works/contracts';
@@ -456,6 +459,27 @@ export const config = {
                 FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
                 FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
                 Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Credential lifecycle (EW-799) — how long BOTH credentials are
+         * accepted after a node rotates itself
+         * (`FLEET_CREDENTIAL_ROTATION_OVERLAP_MS`, default 15 minutes,
+         * floor 30s, ceiling 24h).
+         *
+         * The window exists so a machine can finish the job it is holding
+         * and persist its new secret before the old one dies. It closes on
+         * a clock, never on a callback: a node that never comes back still
+         * loses its old credential on time. Long enough to survive a
+         * restart; the 24h ceiling is where a handover window would stop
+         * being a handover and become a second permanent credential.
+         */
+        getCredentialRotationOverlapMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
             );
         },
         /**

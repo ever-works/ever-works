@@ -33,7 +33,7 @@ Enrollment is outbound-only: the node calls the platform, never the other way ro
     → { node, token, expiresInSec }
     ```
 
-    The token is shown **exactly once** and only its SHA-256 is stored. It is single-use and expires in 15 minutes.
+    The token is shown **exactly once** and only its SHA-256 is stored. It is single-use and expires after `FLEET_ENROLLMENT_TOKEN_TTL_MS` (default 15 minutes, floor 30s). That one setting is the _only_ source of the expiry: the number the mint route reports, the number the outstanding-token list shows and the number `enroll` validates against are all read from it, so an operator can never be shown an expiry the validator does not use.
 
 2. **Hand it to the node** — the node app calls the public route with the token as its credential:
 
@@ -64,10 +64,16 @@ GET    /api/fleet/nodes/:id          one node + its recent job history (and the 
 PATCH  /api/fleet/nodes/:id          { name?, disabled?, paused?, capabilities?, capabilitiesPinned? }
 POST   /api/fleet/nodes/:id/drain    { drain } — drain / return to service, requeuing in-flight claims
 POST   /api/fleet/nodes/:id/rotate   re-key the node; the replacement token is returned exactly once
+GET    /api/fleet/nodes/:id/audit    ?limit — this node's lifecycle trail (actor, time, before/after)
 DELETE /api/fleet/nodes/:id          remove the registration
 ```
 
 The **node drawer** on the Fleet page (the details action on a row) renders the same job history: each job's kind, status, **reconciled outcome and its reason**, attempt count, queued reason, queued / started / completed times and duration, filterable by **All / Failed / Running**. It also shows the node's **worker state** (see [Health signals](#health-signals)). It never renders a job's `payload` — the endpoint sends it as `null` and hands the drawer the task / run / agent ids instead.
+**Every lifecycle write is audited.** Enroll, rotate, revoke, rename, capability edits, cost ceilings, pause, disable, drain, delete, unenroll, execution-preference writes and agent-node affinity writes each record one `fleet_audit` row carrying the actor, the time, the node and a before/after of what changed. The actor is the OWNER for an operator action, `null` for a system one (a cost-ceiling drain is the system's decision, not the sleeping owner's) and `null` for anything the machine did to itself (enroll, self-pause, self-unenroll, self-rotate). Heartbeats are deliberately not audited — one row per node per 30s buries the rows an operator came to read.
+
+**No audit row ever contains a credential.** The scrub lives in the single writer, not at the call sites: any key naming a secret, token, credential or hash loses its value, and every surviving string goes through the same secret scanner node-reported text does. Act first, then audit — a failed audit row is logged and reported, never a reason to undo the action it was recording.
+
+The **node drawer** on the Fleet page (the details action on a row) renders the same job history: each job's kind, status, attempt count, queued reason, queued / started / completed times and duration, filterable by **All / Failed / Running**.
 
 **Disabling drains.** A disabled node's heartbeats stop being accepted, so it goes quiet immediately rather than at the next sweep. Re-enabling puts it back to `offline` until its next accepted heartbeat proves it alive. Disabling a node that is still `enrolling` revokes its unused token.
 
@@ -134,6 +140,7 @@ Every control above is per node. Stopping six autonomous machines at 2am must no
 ```
 POST   /api/fleet/drain-all           owner: disable EVERY node I own, requeue their in-flight claims
 POST   /api/fleet/cancel-in-flight    owner: { includeQueued? } cancel my running fleet jobs + their agent runs
+POST   /api/fleet/rotate-all          owner: QUEUE a credential rotation on every node I own
 GET    /api/fleet/kill-switch         any session: is the platform-wide stop flag set?
 POST   /api/fleet/kill-switch/stop    platform admin: { reason? } set the stop flag
 POST   /api/fleet/kill-switch/clear   platform admin: clear it and resume the runs it parked
@@ -147,6 +154,34 @@ GET    /api/fleet/kill-switch/audit   platform admin: ?limit — recent audit ro
 **The global stop flag** is a DB-backed switch (`fleet_kill_switch`, one row) checked at three points before any new unit of work can start: the run dispatch gate (every new agent run is parked with `queuedReason: kill-switch`), the fleet run router (a run that reaches routing is refused, never sent to the cloud instead) and every lease request (a node polling for work gets an empty batch). Running work keeps running and keeps reporting; heartbeats and completions are not gated, so a stopped fleet can still settle. **Reads fail closed**: a flag that cannot be read — missing row, unreachable database — counts as set, and the Fleet page banner says so distinctly (`unverified`) so nobody goes looking for who threw the switch. Clearing the flag resumes the parked runs (bounded, best effort; runs without a Work wait for their schedule's next tick), and runs parked by the flag are exempt from the stuck-run sweeper for as long as it is set. Every set and clear, every drain-all and every cancel-in-flight writes one `fleet_audit` row with the actor and the time.
 
 Setting and clearing the flag is a platform-admin operation (`User.isPlatformAdmin`); there is no button for it on the owner's Fleet page, only the banner. `FLEET_NODE_RUNTIME_ENABLED` is **not** a panic control: it is a routing selector, and work it turns away from the fleet runs in the cloud instead.
+
+## Rotating credentials without visiting the machine
+
+The operator re-key (`POST /api/fleet/nodes/:id/rotate`) kills the old secret the instant it replaces the hash. That is the right behaviour when a credential is believed **compromised** — but it also puts the node back to `enrolling` and requires a human at that keyboard to type a token that expires in 15 minutes. Across six machines on six desks, that is a ceremony nobody performs, which is why credentials never rotated.
+
+The routine path is the node rotating **itself**:
+
+```
+POST /api/fleet/rotate-credential   { "nodeId": "…", "secret": "<the current secret>" }
+→ { ok: true, nodeId, secret, previousCredentialExpiresAt, overlapSec, node }
+```
+
+- The node presents the credential it is **already using** and gets a new one back, exactly once.
+- Its status is untouched — it stays `online` (or `paused`/`disabled`) straight through the rotation, so nothing goes dark.
+- For `FLEET_CREDENTIAL_ROTATION_OVERLAP_MS` (default 15 minutes, floor 30s, ceiling 24h) **both** credentials authenticate, everywhere: heartbeat, self-pause/unenroll, the job lease/report channel and the `/api/fleet/jobs/*` edge guard all consult one shared matcher. That window is what lets a daemon finish the job it is holding, write the new secret to disk and restart before the old one dies.
+- The window closes on a **clock**, not a callback. A node that never comes back still loses its old credential on time; there is no confirmation step and no sweeper to fail.
+
+Rotation fails closed. The request must present the **current** credential — a rotate offered the previous-window one is a replay and is refused, or a captured old secret could renew itself forever. A node still `enrolling` is refused (its hash column holds a token, not a secret), a second rotation while a window is open is refused, and the write is a compare-and-set on the presented hash so the loser of two simultaneous rotations is refused rather than left holding a secret the row no longer knows. Every refusal is the same undifferentiated `401`.
+
+**Fleet-wide, without six keyboards:**
+
+```
+POST /api/fleet/rotate-all   → { queuedNodes, skippedNodes, nodes, auditFailed }
+```
+
+This **queues**: it marks every enrolled node of the account (those still `enrolling` are skipped — revoke their unused token instead) and mints nothing. Each machine learns of it from `rotationRequested: true` on its next heartbeat response and calls `/api/fleet/rotate-credential` itself. The field is additive, so a daemon built before it existed simply ignores it and keeps working; its owner can still re-key it the old way. One `fleet_audit` row records the decision — `rotate-all`, with the actor, the count and the node ids — and each machine's own rotation records a `node.rotate-self` row when it happens.
+
+The plaintext secret exists in exactly three places and never a fourth: in the response body (once), in the node's own storage, and as a SHA-256 in `fleet_nodes`. It is not logged, and the audit row carries only timestamps, ids and the overlap duration — the writer additionally drops the value of any field whose name mentions a secret, token, credential or hash, so a call site that passed one by accident still could not store it.
 
 ## Capabilities
 

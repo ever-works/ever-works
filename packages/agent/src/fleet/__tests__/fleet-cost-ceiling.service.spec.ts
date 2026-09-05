@@ -44,6 +44,14 @@ const node = (overrides: Partial<FleetNode> = {}): FleetNode =>
         modelIdentity: 'claude-code: ops@example.com (Acme, max)',
         dailyCostCeilingCents: null,
         dailyCostTrippedOn: null,
+        // Credential lifecycle (EW-799): the dual-accept columns are
+        // spelled out because `as FleetNode` silences their absence — a
+        // rotation test built on an unwidened fixture reads `undefined`,
+        // takes the fail-closed branch, and passes for the wrong reason.
+        previousCredentialHash: null,
+        previousCredentialExpiresAt: null,
+        rotationRequestedAt: null,
+        rotationRequestedByUserId: null,
         createdAt: new Date(),
         ...overrides,
     }) as FleetNode;
@@ -162,7 +170,16 @@ describe('FleetCostCeilingService', () => {
             expect(verdict.noticesFiled).toBe(1);
             // The drain endpoint's exact pair, in its order: disable FIRST,
             // so a requeued claim cannot be re-claimed by the drained node.
-            expect(fleet.setDisabledForUser).toHaveBeenCalledWith(USER, NODE, true);
+            // EW-799: the same call, plus the audit context that says the
+            // SYSTEM drained this node rather than its (probably asleep)
+            // owner. Asserted rather than loosened to `expect.anything()`
+            // — the actor is the whole point of the row.
+            expect(fleet.setDisabledForUser).toHaveBeenCalledWith(
+                USER,
+                NODE,
+                true,
+                expect.objectContaining({ actorUserId: null, via: 'cost-ceiling' }),
+            );
             expect(jobService.releaseClaimsForNode).toHaveBeenCalledWith(USER, NODE);
             expect(fleet.setDisabledForUser.mock.invocationCallOrder[0]).toBeLessThan(
                 jobService.releaseClaimsForNode.mock.invocationCallOrder[0],
@@ -284,7 +301,16 @@ describe('FleetCostCeilingService', () => {
 
             expect(verdict.node.outcome).toBe('unevaluable');
             expect(verdict.node.reason).toContain('ceiling lookup failed');
-            expect(fleet.setDisabledForUser).toHaveBeenCalledWith(USER, NODE, true);
+            // EW-799: the same call, plus the audit context that says the
+            // SYSTEM drained this node rather than its (probably asleep)
+            // owner. Asserted rather than loosened to `expect.anything()`
+            // — the actor is the whole point of the row.
+            expect(fleet.setDisabledForUser).toHaveBeenCalledWith(
+                USER,
+                NODE,
+                true,
+                expect.objectContaining({ actorUserId: null, via: 'cost-ceiling' }),
+            );
             expect(inbox!.notice).toHaveBeenCalledTimes(1);
         });
 

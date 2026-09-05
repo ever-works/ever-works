@@ -24,7 +24,12 @@ import {
     FLEET_MIN_NODE_NAME_LENGTH,
     normalizeFleetNodeWorkerState,
 } from '@ever-works/contracts';
-import type { FleetNodeView, FleetNodeLoadView, FleetNodeWorkerState } from '@ever-works/contracts';
+import type {
+    FleetAuditAction,
+    FleetNodeView,
+    FleetNodeLoadView,
+    FleetNodeWorkerState,
+} from '@ever-works/contracts';
 import { config } from '../config';
 import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import {
@@ -37,13 +42,15 @@ import { PluginRegistryService } from '../plugins/services/plugin-registry.servi
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { redactSecrets } from '../utils/secret-scan';
 import { FleetNodeRepository } from './fleet-node.repository';
+import { FleetAuditService } from './fleet-audit.service';
 import { normalizeDailyCeilingCents } from './fleet-cost-ceiling.shared';
 import {
     CREDENTIAL_MAX_LENGTH,
     CREDENTIAL_MIN_LENGTH,
     constantTimeEquals,
+    matchNodeCredential,
     sha256Hex,
-    UUID_RE,
+    verifyNodeSecret,
 } from './fleet-node-credential';
 
 /**
@@ -168,6 +175,51 @@ export interface EnrollResult {
     node: FleetNodeView;
 }
 
+/**
+ * Who is behind a lifecycle write, and whether THIS method should be the
+ * one that records it (EW-799).
+ *
+ * Two problems it solves, both of which produce a factually wrong log if
+ * it is skipped:
+ *
+ *   1. `setDisabledForUser` has three callers — the PATCH route, the
+ *      per-node drain (and drain-all through it) and the cost-ceiling
+ *      trip. Auditing unconditionally inside it writes N per-node rows
+ *      PLUS the aggregate `drain-all` row on one panic. `suppress` is how
+ *      an outer caller says "I own this decision and will record the
+ *      richer row myself".
+ *   2. The cost-ceiling drain calls the same owner-scoped method with the
+ *      OWNER's id, but the actor is the SYSTEM. `actorUserId: null` is how
+ *      the row says so, instead of accusing the owner of a drain they did
+ *      not perform.
+ */
+export interface FleetNodeAuditContext {
+    /** Who acted. `null` = the system; omitted = the owner in scope. */
+    actorUserId?: string | null;
+    /** What produced the write (`drain-all`, `cost-ceiling`, `node`). */
+    via?: string;
+    /** Extra facts worth recording. Scrubbed by the audit writer. */
+    details?: Record<string, unknown>;
+    /** True when the caller records the richer row itself. */
+    suppress?: boolean;
+}
+
+/**
+ * Result of a NODE-INITIATED credential rotation. The secret is returned
+ * exactly once and, like every other Fleet credential, only its sha256 is
+ * ever stored.
+ */
+export interface RotateNodeCredentialResult {
+    nodeId: string;
+    /** The NEW node secret. Returned once; never logged, never audited. */
+    secret: string;
+    /** When the credential the node presented stops being accepted. */
+    previousCredentialExpiresAt: Date;
+    /** The same instant as a duration, for a daemon that cannot parse dates. */
+    overlapSec: number;
+    node: FleetNodeView;
+}
+
 /** Structural shape of the cluster-node summaries the k8s plugin returns. */
 interface ClusterNodeSummary {
     name?: string;
@@ -211,6 +263,11 @@ export class FleetService {
         // bound by the api-side @Global() InboxModule, so unit tests and
         // the worker's RPC context simply file no notices.
         @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
+        // APPENDED and @Optional() on purpose: several existing
+        // constructions pass only the repository. A dependency inserted
+        // anywhere but last, or made required, would break them — and an
+        // audit trail is not worth making the registry unbootable for.
+        @Optional() private readonly audit?: FleetAuditService,
     ) {}
 
     /** Issue a one-time enrollment token for a new node (owner-scoped). */
@@ -242,10 +299,22 @@ export class FleetService {
             capabilities: [],
         });
 
+        const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
+        // Act first, then audit. The token has already been minted and
+        // handed back; a failed audit row must not un-mint it.
+        await this.tryAuditNode({
+            action: 'node.create',
+            ownerUserId: userId,
+            nodeId: node.id,
+            before: null,
+            after: { status: node.status, name: node.name, kind: node.kind },
+            // The TTL, never the token and never its hash.
+            extra: { ttlMs },
+        });
         return {
             node: this.toView(node),
             token,
-            expiresInSec: Math.floor(config.fleet.getEnrollmentTokenTtlMs() / 1000),
+            expiresInSec: Math.floor(ttlMs / 1000),
         };
     }
 
@@ -316,6 +385,15 @@ export class FleetService {
             workerStateReason:
                 enrolledWorkerState === null ? null : sanitizeWorkerStateReason(input),
             workerStateChangedAt: now,
+            // Credential lifecycle (EW-799) — belt. Today the only path
+            // back to `enrolling` is the operator re-key, which already
+            // clears these; stamping them here makes "a node that has
+            // just enrolled accepts exactly one credential" true by
+            // construction rather than by an argument about which call
+            // sites exist. A stale window surviving an enroll would be a
+            // credential from a previous life still authenticating.
+            previousCredentialHash: null,
+            previousCredentialExpiresAt: null,
         };
         // CAS: single-use by construction — a raced duplicate enroll
         // matches zero rows and gets the same null as a bad token.
@@ -324,6 +402,22 @@ export class FleetService {
             return null;
         }
 
+        // Actor is NULL: the machine enrolled itself, presenting a token
+        // the owner minted. Attributing it to the owner would make the log
+        // claim a person was at that keyboard.
+        await this.tryAuditNode({
+            action: 'node.enroll',
+            actorUserId: null,
+            ownerUserId: node.userId,
+            nodeId: node.id,
+            before: { status: node.status },
+            after: {
+                status: patch.status,
+                platform: patch.platform,
+                version: patch.version,
+                capabilities: patch.capabilities,
+            },
+        });
         return {
             nodeId: node.id,
             secret,
@@ -343,29 +437,29 @@ export class FleetService {
      * moment its owner most needs to see it. The beat therefore stamps
      * `lastHeartbeatAt` but PRESERVES the sticky status, so a heartbeat
      * can never silently un-pause or re-enable a node.
+     *
+     * A beat is NOT audited, deliberately: one row per node per 30s is not
+     * a trail, it is a firehose that buries the rows an operator came to
+     * read. What it does carry is `rotationRequested` — the flag a queued
+     * `rotate-all` sets, which is how a machine learns to re-key itself.
      */
     async heartbeat(
         nodeId: unknown,
         secret: unknown,
         refresh: EnrollInput = {},
-    ): Promise<{ node: FleetNodeView } | null> {
-        if (typeof nodeId !== 'string' || !UUID_RE.test(nodeId)) {
-            return null;
-        }
-        if (
-            typeof secret !== 'string' ||
-            secret.length < CREDENTIAL_MIN_LENGTH ||
-            secret.length > CREDENTIAL_MAX_LENGTH
-        ) {
-            return null;
-        }
+    ): Promise<{ node: FleetNodeView; rotationRequested: boolean } | null> {
+        const verified = verifyNodeSecret(nodeId, secret);
+        if (!verified) return null;
 
-        const node = await this.repository.findById(nodeId);
+        const node = await this.repository.findById(verified.nodeId);
         if (!node) return null;
         // An enrolling node has no secret yet (the hash column still
         // holds the token hash), so it can never authenticate here.
         if (node.status === 'enrolling') return null;
-        if (!constantTimeEquals(node.enrollmentTokenHash, sha256Hex(secret))) {
+        // Dual-accept (EW-799): a node inside its rotation window may beat
+        // with EITHER credential. Without this, a node that rotated
+        // mid-beat would go dark until it restarted.
+        if (matchNodeCredential(verified, node) === null) {
             return null;
         }
 
@@ -423,7 +517,10 @@ export class FleetService {
         // Inbox call then fails we log it rather than re-arming, exactly
         // as the daily-ceiling notice does.
         await this.announceWorkerTransition(node, patch, workerState);
-        return { node: this.toView({ ...node, ...patch }) };
+        return {
+            node: this.toView({ ...node, ...patch }),
+            rotationRequested: Boolean(node.rotationRequestedAt),
+        };
     }
 
     /**
@@ -619,6 +716,7 @@ export class FleetService {
         userId: string,
         nodeId: string,
         dailyCostCeilingCents: unknown,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<FleetNodeView> {
         const ceiling = normalizeDailyCeilingCents(dailyCostCeilingCents);
         const node = await this.getOwnedNode(userId, nodeId);
@@ -627,6 +725,13 @@ export class FleetService {
             dailyCostTrippedOn: null,
         };
         await this.repository.update(node.id, patch);
+        await this.auditLifecycle('node.cost-ceiling', userId, node, ctx, {
+            before: {
+                dailyCostCeilingCents: node.dailyCostCeilingCents ?? null,
+                dailyCostTrippedOn: node.dailyCostTrippedOn ?? null,
+            },
+            after: { dailyCostCeilingCents: ceiling, dailyCostTrippedOn: null },
+        });
         return this.toView({ ...node, ...patch } as FleetNode);
     }
 
@@ -691,12 +796,19 @@ export class FleetService {
     async listOutstandingTokensForUser(userId: string): Promise<FleetEnrollmentTokenView[]> {
         const rows = await this.repository.findByUser(userId);
         const now = Date.now();
+        const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
         return rows
             .filter((row) => row.status === 'enrolling')
             .map((row) => {
                 const issuedAtMs = credentialIssuedAtMs(row);
                 const hasIssuedAt = Number.isFinite(issuedAtMs);
-                const expiresAtMs = issuedAtMs + FLEET_ENROLLMENT_TOKEN_TTL_MS;
+                // The LIVE TTL, not the exported default: this list is the
+                // expiry an operator is SHOWN, and `enroll` validates
+                // against `config.fleet.getEnrollmentTokenTtlMs()`. Reading
+                // the constant here made the two disagree the moment
+                // `FLEET_ENROLLMENT_TOKEN_TTL_MS` was set — a token listed
+                // as live that enroll refuses, or the reverse.
+                const expiresAtMs = issuedAtMs + ttlMs;
                 return {
                     nodeId: row.id,
                     name: row.name,
@@ -726,7 +838,11 @@ export class FleetService {
      * Revoking a never-enrolled row deletes it, because the row exists
      * only to carry the token: there is no machine behind it yet.
      */
-    async revokeEnrollmentTokenForUser(userId: string, nodeId: string): Promise<void> {
+    async revokeEnrollmentTokenForUser(
+        userId: string,
+        nodeId: string,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<void> {
         const node = await this.getOwnedNode(userId, nodeId);
         if (node.status !== 'enrolling') {
             throw new BadRequestException(
@@ -734,6 +850,13 @@ export class FleetService {
             );
         }
         await this.repository.delete(node.id);
+        // The row is gone, so the audit row is the only surviving record
+        // that this machine was ever half-registered. `nodeId` carries no
+        // FK precisely so this outlives the deletion.
+        await this.auditLifecycle('node.token-revoke', userId, node, ctx, {
+            before: { status: node.status, name: node.name, kind: node.kind },
+            after: null,
+        });
     }
 
     /**
@@ -745,10 +868,17 @@ export class FleetService {
      * well as a re-key: the machine stops being able to report or lease
      * until it re-enrolls with the new token. Returned exactly once,
      * like every other Fleet credential.
+     *
+     * This is the OPERATOR's re-key, and it requires a human at the
+     * machine. {@link rotateCredentialByCredential} is the routine one —
+     * the node re-keys itself with a bounded overlap and never goes dark.
+     * Reach for this one when the credential is believed COMPROMISED,
+     * because zero overlap is exactly what you want then.
      */
     async rotateCredentialForUser(
         userId: string,
         nodeId: string,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<CreateEnrollmentTokenResult> {
         const node = await this.getOwnedNode(userId, nodeId);
         const token = randomBytes(32).toString('base64url');
@@ -756,12 +886,185 @@ export class FleetService {
             enrollmentTokenHash: sha256Hex(token),
             credentialIssuedAt: new Date(),
             status: 'enrolling',
+            // A hard re-key ends any dual-accept window that was open:
+            // the point of this path is that the old credential dies NOW.
+            previousCredentialHash: null,
+            previousCredentialExpiresAt: null,
+            rotationRequestedAt: null,
+            rotationRequestedByUserId: null,
         };
         await this.repository.update(node.id, patch);
+        const ttlMs = config.fleet.getEnrollmentTokenTtlMs();
+        await this.auditLifecycle('node.rotate', userId, node, ctx, {
+            before: { status: node.status },
+            after: { status: patch.status },
+            // Timestamps and durations only — never the token or its hash.
+            extra: { ttlMs, overlapMs: 0 },
+        });
         return {
             node: this.toView({ ...node, ...patch } as FleetNode),
             token,
-            expiresInSec: Math.floor(FLEET_ENROLLMENT_TOKEN_TTL_MS / 1000),
+            // The LIVE TTL. Reading the exported DEFAULT here made this
+            // route report 900s no matter what the operator configured,
+            // while the mint route reported the real number.
+            expiresInSec: Math.floor(ttlMs / 1000),
+        };
+    }
+
+    /**
+     * NODE-INITIATED credential rotation with a bounded DUAL-ACCEPT
+     * window (EW-799) — the rotation that can actually happen.
+     *
+     * The machine presents the credential it is ALREADY using and gets a
+     * new one back. Its status is untouched (unlike the operator re-key),
+     * and the credential it presented keeps working until
+     * `previousCredentialExpiresAt` — long enough to finish the job it is
+     * holding, write the new secret to disk and restart.
+     *
+     * Fail closed, four ways, each of which is a real attack or a real
+     * race rather than a hypothetical:
+     *   - the presented credential must be the CURRENT one. Accepting the
+     *     previous one would let a captured old secret renew itself
+     *     forever, which is the opposite of rotating;
+     *   - a node still `enrolling` is refused: its hash column holds a
+     *     token, not a secret;
+     *   - a second rotation while a window is already open is refused, so
+     *     a node cannot chain windows into a permanent overlap;
+     *   - the write is a CAS on the presented hash, so two simultaneous
+     *     rotations cannot both "succeed" and leave the machine holding a
+     *     secret the row no longer knows.
+     *
+     * A `paused` or `disabled` node MAY rotate — same reasoning as
+     * `heartbeat` accepting one: a drained machine must stay observable
+     * and must not be locked out of re-keying itself.
+     *
+     * Returns null on every refusal, so the edge answers one
+     * undifferentiated 401.
+     */
+    async rotateCredentialByCredential(
+        nodeId: unknown,
+        secret: unknown,
+    ): Promise<RotateNodeCredentialResult | null> {
+        const verified = verifyNodeSecret(nodeId, secret);
+        if (!verified) return null;
+
+        const node = await this.repository.findById(verified.nodeId);
+        if (!node) return null;
+        if (node.status === 'enrolling') return null;
+        // 'current' SPECIFICALLY — a rotate presented with the previous
+        // credential is a replay.
+        if (matchNodeCredential(verified, node) !== 'current') return null;
+
+        const now = Date.now();
+        const openUntil = toEpochMsOrNaN(node.previousCredentialExpiresAt);
+        // A window still open means a rotation is already in flight.
+        if (openUntil > now) return null;
+
+        const overlapMs = config.fleet.getCredentialRotationOverlapMs();
+        const previousCredentialExpiresAt = new Date(now + overlapMs);
+        const newSecret = randomBytes(32).toString('base64url');
+        // Non-null by construction: a row with no credential hash cannot
+        // have matched 'current' above (`constantTimeEquals` refuses a
+        // null stored hash), so this is the value the node just proved it
+        // holds — and it is what the CAS predicate below keys on.
+        const currentHash = node.enrollmentTokenHash as string;
+        const rotated = await this.repository.casRotateCredential(node.id, currentHash, {
+            enrollmentTokenHash: sha256Hex(newSecret),
+            previousCredentialHash: currentHash,
+            previousCredentialExpiresAt,
+            credentialIssuedAt: new Date(now),
+            rotationRequestedAt: null,
+            rotationRequestedByUserId: null,
+        });
+        // Zero rows affected = a raced rotation. Same null as a bad
+        // credential: the loser must not learn that it lost.
+        if (!rotated) return null;
+
+        await this.tryAuditNode({
+            action: 'node.rotate-self',
+            actorUserId: null,
+            ownerUserId: node.userId,
+            nodeId: node.id,
+            before: { status: node.status, rotationRequested: Boolean(node.rotationRequestedAt) },
+            after: { status: node.status, rotationRequested: false },
+            extra: {
+                via: 'node',
+                overlapMs,
+                // `overlapExpiresAt`, NOT `previousCredentialExpiresAt`:
+                // the writer's redaction belt drops the value of any key
+                // whose NAME contains "credential", so the column name
+                // would have stored `[redacted]` here and silently thrown
+                // away the one fact this row exists to record — when the
+                // old credential dies. The belt is right to be blunt; the
+                // key is what has to move.
+                overlapExpiresAt: previousCredentialExpiresAt.toISOString(),
+                queuedByUserId: node.rotationRequestedByUserId ?? null,
+            },
+        });
+
+        return {
+            nodeId: node.id,
+            secret: newSecret,
+            previousCredentialExpiresAt,
+            overlapSec: Math.floor(overlapMs / 1000),
+            node: this.toView({
+                ...node,
+                credentialIssuedAt: new Date(now),
+                previousCredentialExpiresAt,
+                rotationRequestedAt: null,
+                rotationRequestedByUserId: null,
+            } as FleetNode),
+        };
+    }
+
+    /**
+     * QUEUE a credential rotation on every node this owner has enrolled.
+     *
+     * Nothing is rotated here and no credential is minted: each machine
+     * rotates ITSELF on its next beat. That indirection is the whole
+     * feature — only the node can store the new secret, so a rotate-all
+     * that tried to do the rotating would just be six re-keys nobody is
+     * standing next to.
+     *
+     * Nodes still `enrolling` are skipped: they have no secret to rotate,
+     * only an unconsumed token, and the remedy for one of those is revoke.
+     */
+    async queueRotationForUser(userId: string): Promise<{
+        queuedNodes: number;
+        skippedNodes: number;
+        nodes: FleetNodeView[];
+        auditFailed: boolean;
+    }> {
+        const before = await this.repository.findByUser(userId);
+        const eligible = before.filter((node) => node.status !== 'enrolling');
+        const queuedNodes = await this.repository.markRotationRequestedForUser(
+            userId,
+            userId,
+            new Date(),
+        );
+        const skippedNodes = before.length - eligible.length;
+        this.logger.warn(
+            `rotate-all by ${userId}: queued ${queuedNodes} node(s), skipped ${skippedNodes}`,
+        );
+        // ONE row for the decision, mirroring `drain-all` — not N rows for
+        // a marking no machine has acted on yet.
+        const audited = await this.tryAuditNode({
+            action: 'rotate-all',
+            actorUserId: userId,
+            ownerUserId: userId,
+            nodeId: null,
+            extra: {
+                queuedNodes,
+                skippedNodes,
+                nodeIds: eligible.map((node) => node.id),
+            },
+        });
+        const after = await this.repository.findByUser(userId);
+        return {
+            queuedNodes,
+            skippedNodes,
+            nodes: after.map((node) => this.toView(node)),
+            auditFailed: !audited,
         };
     }
 
@@ -779,6 +1082,7 @@ export class FleetService {
         nodeId: string,
         capabilities: unknown,
         pinned = true,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<FleetNodeView> {
         if (!Array.isArray(capabilities)) {
             throw new BadRequestException('Capabilities must be an array of tags');
@@ -789,11 +1093,23 @@ export class FleetService {
             capabilitiesPinned: pinned,
         };
         await this.repository.update(node.id, patch);
+        await this.auditLifecycle('node.capabilities', userId, node, ctx, {
+            before: {
+                capabilities: node.capabilities ?? [],
+                capabilitiesPinned: Boolean(node.capabilitiesPinned),
+            },
+            after: { capabilities: patch.capabilities, capabilitiesPinned: pinned },
+        });
         return this.toView({ ...node, ...patch } as FleetNode);
     }
 
     /** Rename an enrolled node (owner-scoped, no existence leak). */
-    async renameForUser(userId: string, nodeId: string, name: string): Promise<FleetNodeView> {
+    async renameForUser(
+        userId: string,
+        nodeId: string,
+        name: string,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<FleetNodeView> {
         const trimmed = typeof name === 'string' ? name.trim() : '';
         if (
             trimmed.length < FLEET_MIN_NODE_NAME_LENGTH ||
@@ -805,6 +1121,10 @@ export class FleetService {
         }
         const node = await this.getOwnedNode(userId, nodeId);
         await this.repository.update(node.id, { name: trimmed });
+        await this.auditLifecycle('node.rename', userId, node, ctx, {
+            before: { name: node.name },
+            after: { name: trimmed },
+        });
         return this.toView({ ...node, name: trimmed });
     }
 
@@ -824,10 +1144,19 @@ export class FleetService {
         userId: string,
         nodeId: string,
         disabled: boolean,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<FleetNodeView> {
         const node = await this.getOwnedNode(userId, nodeId);
         const status: FleetNodeStatus = disabled ? 'disabled' : 'offline';
         await this.repository.update(node.id, { status });
+        // Three callers (PATCH, per-node drain / drain-all, the
+        // cost-ceiling trip) — `ctx` is what keeps the log from claiming
+        // the owner drained a node the system drained, and what stops a
+        // drain-all writing N rows plus its own aggregate one.
+        await this.auditLifecycle('node.disable', userId, node, ctx, {
+            before: { status: node.status },
+            after: { status },
+        });
         return this.toView({ ...node, status });
     }
 
@@ -846,15 +1175,22 @@ export class FleetService {
         userId: string,
         nodeId: string,
         paused: boolean,
+        ctx: FleetNodeAuditContext = {},
     ): Promise<FleetNodeView> {
         const node = await this.getOwnedNode(userId, nodeId);
         // Never let "resume" silently undo a disable: a disabled node
-        // has to be re-enabled explicitly.
+        // has to be re-enabled explicitly. Nothing was written, so
+        // nothing is audited — an audit row for a no-op would be a claim
+        // the fleet changed when it did not.
         if (!paused && node.status === 'disabled') {
             return this.toView(node);
         }
         const status: FleetNodeStatus = paused ? 'paused' : 'offline';
         await this.repository.update(node.id, { status });
+        await this.auditLifecycle('node.pause', userId, node, ctx, {
+            before: { status: node.status },
+            after: { status },
+        });
         return this.toView({ ...node, status });
     }
 
@@ -883,6 +1219,16 @@ export class FleetService {
         }
         const status: FleetNodeStatus = paused ? 'paused' : 'offline';
         await this.repository.update(node.id, { status });
+        // Actor NULL: the machine did this, not its owner.
+        await this.tryAuditNode({
+            action: 'node.pause',
+            actorUserId: null,
+            ownerUserId: node.userId,
+            nodeId: node.id,
+            before: { status: node.status },
+            after: { status },
+            extra: { via: 'node' },
+        });
         return { node: this.toView({ ...node, status }) };
     }
 
@@ -900,13 +1246,33 @@ export class FleetService {
         const node = await this.authenticateNodeByCredential(nodeId, secret);
         if (!node) return false;
         await this.repository.delete(node.id);
+        // The registration is gone; this row is the only record that the
+        // machine ever existed, and `fleet_audit.nodeId` carries no FK so
+        // it survives the deletion.
+        await this.tryAuditNode({
+            action: 'node.unenroll',
+            actorUserId: null,
+            ownerUserId: node.userId,
+            nodeId: node.id,
+            before: { status: node.status, name: node.name, kind: node.kind },
+            after: null,
+            extra: { via: 'node' },
+        });
         return true;
     }
 
     /** Delete a node registration (owner-scoped, no existence leak). */
-    async deleteForUser(userId: string, nodeId: string): Promise<void> {
+    async deleteForUser(
+        userId: string,
+        nodeId: string,
+        ctx: FleetNodeAuditContext = {},
+    ): Promise<void> {
         const node = await this.getOwnedNode(userId, nodeId);
         await this.repository.delete(node.id);
+        await this.auditLifecycle('node.delete', userId, node, ctx, {
+            before: { status: node.status, name: node.name, kind: node.kind },
+            after: null,
+        });
     }
 
     /**
@@ -918,19 +1284,99 @@ export class FleetService {
         nodeId: unknown,
         secret: unknown,
     ): Promise<FleetNode | null> {
-        if (typeof nodeId !== 'string' || !UUID_RE.test(nodeId)) return null;
-        if (
-            typeof secret !== 'string' ||
-            secret.length < CREDENTIAL_MIN_LENGTH ||
-            secret.length > CREDENTIAL_MAX_LENGTH
-        ) {
-            return null;
-        }
-        const node = await this.repository.findById(nodeId);
+        const verified = verifyNodeSecret(nodeId, secret);
+        if (!verified) return null;
+        const node = await this.repository.findById(verified.nodeId);
         if (!node) return null;
         if (node.status === 'enrolling') return null;
-        if (!constantTimeEquals(node.enrollmentTokenHash, sha256Hex(secret))) return null;
+        // Dual-accept (EW-799) — the same window heartbeat and the lease
+        // channel honour. One matcher, four call sites: three of four
+        // updated would give a node that beats but cannot pause itself.
+        if (matchNodeCredential(verified, node) === null) return null;
         return node;
+    }
+
+    /**
+     * Audit one OWNER-SCOPED lifecycle write, honouring `ctx`.
+     *
+     * Act first, then audit: this runs AFTER the repository write in
+     * every caller, and a failure is logged (inside the writer) and
+     * swallowed. `ctx.suppress` is the outer caller saying it will record
+     * the richer row itself; `ctx.actorUserId` overrides the owner as
+     * actor (null = the system).
+     */
+    private async auditLifecycle(
+        action: FleetAuditAction,
+        ownerUserId: string,
+        node: FleetNode,
+        ctx: FleetNodeAuditContext,
+        payload: {
+            before?: Record<string, unknown> | null;
+            after?: Record<string, unknown> | null;
+            extra?: Record<string, unknown>;
+        },
+    ): Promise<boolean> {
+        if (ctx.suppress) return true;
+        const extra = { ...(payload.extra ?? {}), ...(ctx.details ?? {}) } as Record<
+            string,
+            unknown
+        >;
+        if (ctx.via) extra.via = ctx.via;
+        return this.tryAuditNode({
+            action,
+            actorUserId: ctx.actorUserId === undefined ? ownerUserId : ctx.actorUserId,
+            ownerUserId,
+            nodeId: node.id,
+            before: payload.before,
+            after: payload.after,
+            extra: Object.keys(extra).length > 0 ? extra : null,
+        });
+    }
+
+    /**
+     * Write one lifecycle row, if an audit writer is bound at all.
+     *
+     * The dependency is `@Optional()`, so a `FleetService` constructed
+     * without one (several specs, and any context without the audit
+     * repository) simply records nothing rather than throwing. That is
+     * the same trade the whole surface makes: bookkeeping never breaks
+     * the action.
+     */
+    private async tryAuditNode(input: {
+        action: FleetAuditAction;
+        actorUserId?: string | null;
+        ownerUserId: string;
+        nodeId: string | null;
+        before?: Record<string, unknown> | null;
+        after?: Record<string, unknown> | null;
+        extra?: Record<string, unknown> | null;
+    }): Promise<boolean> {
+        if (!this.audit) return false;
+        try {
+            return await this.audit.recordNodeAction({
+                action: input.action,
+                actorUserId:
+                    input.actorUserId === undefined ? input.ownerUserId : input.actorUserId,
+                ownerUserId: input.ownerUserId,
+                nodeId: input.nodeId,
+                before: input.before,
+                after: input.after,
+                extra: input.extra,
+            });
+        } catch (error) {
+            // `recordNodeAction` does not throw by contract; this guard is
+            // the belt. The action has ALREADY landed by the time we get
+            // here, so letting an exception out would answer 500 to a
+            // caller whose rename/drain/rotation actually succeeded —
+            // which is precisely the "bookkeeping undid the action"
+            // failure the whole posture exists to prevent.
+            this.logger.error(
+                `fleet audit row for ${input.action} on node ${input.nodeId ?? '-'} could not be written: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return false;
+        }
     }
 
     private async getOwnedNode(userId: string, nodeId: string): Promise<FleetNode> {
@@ -1049,8 +1495,19 @@ export class FleetService {
             workerStateChangedAt: node.workerStateChangedAt
                 ? toIso(node.workerStateChangedAt)
                 : null,
+            // Credential lifecycle (EW-799). The two hash columns and the
+            // window expiry stay OUT of the view: a wire shape that can
+            // carry a credential artefact eventually does.
+            rotationRequestedAt: node.rotationRequestedAt ? toIso(node.rotationRequestedAt) : null,
         };
     }
+}
+
+/** `Date | string` → epoch ms, `NaN` when it is not a usable date. */
+function toEpochMsOrNaN(value: Date | string | null | undefined): number {
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === 'string') return new Date(value).getTime();
+    return NaN;
 }
 
 /**

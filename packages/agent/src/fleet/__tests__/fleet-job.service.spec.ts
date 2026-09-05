@@ -338,6 +338,14 @@ function enrolledNode(id: string, secret: string, overrides: Partial<FleetNode> 
         status: 'online',
         enrollmentTokenHash: sha256Hex(secret),
         capabilities: ['workspace', 'git'],
+        // Credential lifecycle (EW-799): the dual-accept columns are
+        // spelled out because `as FleetNode` silences their absence — a
+        // rotation test built on an unwidened fixture reads `undefined`,
+        // takes the fail-closed branch, and passes for the wrong reason.
+        previousCredentialHash: null,
+        previousCredentialExpiresAt: null,
+        rotationRequestedAt: null,
+        rotationRequestedByUserId: null,
         createdAt: new Date(),
         ...overrides,
     } as FleetNode;
