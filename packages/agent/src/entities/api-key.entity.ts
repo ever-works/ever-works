@@ -55,7 +55,7 @@ export class ApiKey {
     // What the discriminator buys: `findByUserId` / `countByUserId` filter
     // to `personal`, so a run token never appears in Settings > API Keys
     // and never consumes one of the owner's ten slots. Existing rows read
-    // as `personal` through the column DEFAULT (migration 1788800000000).
+    // as `personal` through the column DEFAULT (migration 1789400000000).
     @Column({ type: 'varchar', length: 32, default: PERSONAL_API_KEY_KIND })
     kind: ApiKeyKind;
 

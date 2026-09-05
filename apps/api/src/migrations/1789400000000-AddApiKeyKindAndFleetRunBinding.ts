@@ -43,8 +43,8 @@ import { MigrationInterface, QueryRunner, TableIndex } from 'typeorm';
  * on for `api_keys.tenantId` / `organizationId`. Every step is guarded
  * by `findColumnByName` / `indices`, so re-running is a no-op.
  */
-export class AddApiKeyKindAndFleetRunBinding1788800000000 implements MigrationInterface {
-    name = 'AddApiKeyKindAndFleetRunBinding1788800000000';
+export class AddApiKeyKindAndFleetRunBinding1789400000000 implements MigrationInterface {
+    name = 'AddApiKeyKindAndFleetRunBinding1789400000000';
 
     private static readonly TABLE = 'api_keys';
     private static readonly BOUND_JOB_INDEX = 'idx_api_keys_bound_job';
@@ -53,7 +53,7 @@ export class AddApiKeyKindAndFleetRunBinding1788800000000 implements MigrationIn
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const table = await queryRunner.getTable(
-            AddApiKeyKindAndFleetRunBinding1788800000000.TABLE,
+            AddApiKeyKindAndFleetRunBinding1789400000000.TABLE,
         );
         if (!table) return;
 
@@ -63,30 +63,30 @@ export class AddApiKeyKindAndFleetRunBinding1788800000000 implements MigrationIn
             );
         }
 
-        for (const name of AddApiKeyKindAndFleetRunBinding1788800000000.BINDING_COLUMNS) {
+        for (const name of AddApiKeyKindAndFleetRunBinding1789400000000.BINDING_COLUMNS) {
             // Re-read on every step: adding a column can recreate the table
             // on the sqlite driver, so a descriptor captured before it is
             // stale (same reason 1788700000000 re-reads).
             const refreshed = await queryRunner.getTable(
-                AddApiKeyKindAndFleetRunBinding1788800000000.TABLE,
+                AddApiKeyKindAndFleetRunBinding1789400000000.TABLE,
             );
             if (refreshed?.findColumnByName(name)) continue;
             await queryRunner.query(`ALTER TABLE "api_keys" ADD COLUMN "${name}" uuid`);
         }
 
         const withColumns = await queryRunner.getTable(
-            AddApiKeyKindAndFleetRunBinding1788800000000.TABLE,
+            AddApiKeyKindAndFleetRunBinding1789400000000.TABLE,
         );
         const hasIndex = withColumns?.indices.some(
             (index) =>
-                index.name === AddApiKeyKindAndFleetRunBinding1788800000000.BOUND_JOB_INDEX ||
+                index.name === AddApiKeyKindAndFleetRunBinding1789400000000.BOUND_JOB_INDEX ||
                 (index.columnNames.length === 1 && index.columnNames[0] === 'boundJobId'),
         );
         if (withColumns && !hasIndex) {
             await queryRunner.createIndex(
-                AddApiKeyKindAndFleetRunBinding1788800000000.TABLE,
+                AddApiKeyKindAndFleetRunBinding1789400000000.TABLE,
                 new TableIndex({
-                    name: AddApiKeyKindAndFleetRunBinding1788800000000.BOUND_JOB_INDEX,
+                    name: AddApiKeyKindAndFleetRunBinding1789400000000.BOUND_JOB_INDEX,
                     columnNames: ['boundJobId'],
                 }),
             );
@@ -95,7 +95,7 @@ export class AddApiKeyKindAndFleetRunBinding1788800000000 implements MigrationIn
 
     public async down(queryRunner: QueryRunner): Promise<void> {
         const table = await queryRunner.getTable(
-            AddApiKeyKindAndFleetRunBinding1788800000000.TABLE,
+            AddApiKeyKindAndFleetRunBinding1789400000000.TABLE,
         );
         if (!table) return;
 
@@ -110,18 +110,18 @@ export class AddApiKeyKindAndFleetRunBinding1788800000000 implements MigrationIn
 
         const hasIndex = table.indices.find(
             (index) =>
-                index.name === AddApiKeyKindAndFleetRunBinding1788800000000.BOUND_JOB_INDEX ||
+                index.name === AddApiKeyKindAndFleetRunBinding1789400000000.BOUND_JOB_INDEX ||
                 (index.columnNames.length === 1 && index.columnNames[0] === 'boundJobId'),
         );
         if (hasIndex) {
             await queryRunner.dropIndex(
-                AddApiKeyKindAndFleetRunBinding1788800000000.TABLE,
+                AddApiKeyKindAndFleetRunBinding1789400000000.TABLE,
                 hasIndex,
             );
         }
 
         for (const name of [
-            ...AddApiKeyKindAndFleetRunBinding1788800000000.BINDING_COLUMNS,
+            ...AddApiKeyKindAndFleetRunBinding1789400000000.BINDING_COLUMNS,
             'kind',
         ]) {
             // TypeORM's own primitive rather than a raw DROP COLUMN: sqlite
@@ -129,12 +129,12 @@ export class AddApiKeyKindAndFleetRunBinding1788800000000 implements MigrationIn
             // column there by recreating the table — which also keeps the
             // runner's metadata in step for anything that runs after this.
             const refreshed = await queryRunner.getTable(
-                AddApiKeyKindAndFleetRunBinding1788800000000.TABLE,
+                AddApiKeyKindAndFleetRunBinding1789400000000.TABLE,
             );
             const column = refreshed?.findColumnByName(name);
             if (!column) continue;
             await queryRunner.dropColumn(
-                AddApiKeyKindAndFleetRunBinding1788800000000.TABLE,
+                AddApiKeyKindAndFleetRunBinding1789400000000.TABLE,
                 column,
             );
         }
