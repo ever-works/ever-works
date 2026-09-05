@@ -46,7 +46,7 @@ interface NodeContractBaseline {
 			emptyResponse?: Record<string, unknown>;
 		}
 	>;
-	selfDescription: { nodeEmits: string[] };
+	selfDescription: { nodeEmits: string[]; nodeEmitsOptional: string[] };
 	nodeStatusBranches: { fleet: Record<string, string>; job: Record<string, string> };
 	killSwitch: { leaseWhenStopped: { status: number; body: Record<string, unknown> } };
 }
@@ -121,6 +121,7 @@ describe('what the node actually puts on the wire', () => {
 			expect(Object.keys(baseline.routes[route].requests).sort()).toEqual([...variants].sort());
 		}
 		expect(baseline.selfDescription.nodeEmits).toHaveLength(6);
+		expect(baseline.selfDescription.nodeEmitsOptional).toHaveLength(2);
 	});
 
 	it('enroll sends exactly the pinned body, to the pinned path', async () => {
@@ -182,6 +183,36 @@ describe('what the node actually puts on the wire', () => {
 		});
 		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
 		expect(emitted.sort()).toEqual([...baseline.selfDescription.nodeEmits].sort());
+	});
+
+	it('adds the optional health fields only when the node has a worker state', async () => {
+		// Slice T's two fields are CONDITIONAL, and that is the compatibility
+		// property worth pinning in both directions: a node with nothing to say
+		// about its worker must not start sending nulls at a platform that
+		// predates the fields (the test above), and a node that HAS a state must
+		// actually put it on the wire rather than computing it and dropping it in
+		// the projection (this one). Folding them into `nodeEmits` would have
+		// asserted they are always sent, which is false — and this gate caught
+		// exactly that when its own baseline was rebased over slice T.
+		const { fetchFn, sent } = recorder(200, baseline.routes.heartbeat.response);
+		await fleetClient(fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			platform: 'linux/x64',
+			version: '1.0.0',
+			capabilities: [],
+			cliVersion: '1.4.2',
+			diskFreeBytes: 1,
+			modelIdentity: 'x',
+			workerState: 'quarantined',
+			workerStateReason: 'helper trust check failed'
+		});
+		const emitted = Object.keys(bodyOf(sent)).filter((key) => key !== 'nodeId' && key !== 'secret');
+		expect(emitted.sort()).toEqual(
+			[...baseline.selfDescription.nodeEmits, ...baseline.selfDescription.nodeEmitsOptional].sort()
+		);
+		expect(bodyOf(sent).workerState).toBe('quarantined');
+		expect(bodyOf(sent).workerStateReason).toBe('helper trust check failed');
 	});
 
 	it('pause and unenroll send exactly the pinned bodies', async () => {

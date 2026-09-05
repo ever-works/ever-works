@@ -307,7 +307,16 @@ describe('the self-description key set (slice T / EW-777)', () => {
         // wired at the probe end only. The node-side half of this equality is
         // asserted against the real projection in
         // apps/node/src/core/node-contract.conformance.spec.ts.
-        expect([...baseline.selfDescription.nodeEmits].sort()).toEqual(declared);
+        // Union of the always-emitted set and the conditional one: slice T's
+        // two health fields ride the same DTO but are sent only when the node
+        // HAS a worker state, so pinning them as always-emitted asserts
+        // something false. The node-side spec drives both cases separately.
+        expect(
+            [
+                ...baseline.selfDescription.nodeEmits,
+                ...baseline.selfDescription.nodeEmitsOptional,
+            ].sort(),
+        ).toEqual(declared);
     });
 
     it.each(['enroll', 'heartbeat'])(
