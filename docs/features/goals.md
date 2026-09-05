@@ -6,32 +6,45 @@ sidebar_label: Goals
 
 # Goals
 
-A **Goal** is a number you want to move, checked on a schedule. Where a [Mission](./missions.md) keeps
-producing work on a topic, a Goal watches a single metric and tells you whether it is heading the right
-way.
+A **Goal** is something you want to be true, checked on a schedule. Where a [Mission](./missions.md)
+keeps producing work on a topic, a Goal watches one finish line and tells you whether you are there.
 
-A Goal does not build anything by itself. It reads a metric from a provider plugin, records what it
-saw, and reports progress toward a target.
+Goals come in two **kinds**:
+
+- A **metric Goal** — the original kind, and what every Goal created before kinds existed is — watches
+  a single number and tells you whether it is heading the right way. It reads a metric from a provider
+  plugin, records what it saw, and reports progress toward a target.
+- A **delivery Goal** has no metric at all. "Ship feature X across three repos" is a delivery Goal: it
+  completes when every approved item of its Definition of Done is done or waived. See
+  [Delivery goals](#delivery-goals).
+
+A Goal does not build anything by itself. Its execution loop (the orchestrator) hands iterations to
+agents; the Goal is the finish line they work toward.
 
 ## When to use a Goal
 
-| You want to…                                                    | Use a…      |
-| --------------------------------------------------------------- | ----------- |
-| Keep producing new Works and Ideas on a theme                   | **Mission** |
-| Track "monthly revenue reaches $1,000" and know when it happens | **Goal**    |
-| Track "support tickets stay below 20 a week"                    | **Goal**    |
-| Build one site from one prompt                                  | **Work**    |
+| You want to…                                                    | Use a…              |
+| --------------------------------------------------------------- | ------------------- |
+| Keep producing new Works and Ideas on a theme                   | **Mission**         |
+| Track "monthly revenue reaches $1,000" and know when it happens | **Goal** (metric)   |
+| Track "support tickets stay below 20 a week"                    | **Goal** (metric)   |
+| Drive "ship feature X across three repos" to done               | **Goal** (delivery) |
+| Build one site from one prompt                                  | **Work**            |
 
 Goals and Missions are independent — you can run either without the other.
 
 ## Creating a Goal
 
-From `/goals`, choose **New Goal**. The form at `/goals/new` collects:
+From `/goals`, choose **New Goal**. The form at `/goals/new` starts as a **metric** Goal; the
+**Goal kind** selector in the first card switches it to a delivery Goal, which hides the metric source
+and target fields and shows a Definition of Done instead (see [Delivery goals](#delivery-goals)). For a
+metric Goal the form collects:
 
 | Field                  | Required | Notes                                                                            |
 | ---------------------- | -------- | -------------------------------------------------------------------------------- |
 | **Title**              | yes      | Up to 200 characters. Shown on the catalog and the detail page.                  |
 | **Description**        | no       | Free context for whoever reads the Goal later.                                   |
+| **Goal kind**          | yes      | _Metric target_ (default) or _Delivery_. Fixed once the Goal exists.             |
 | **Provider plugin ID** | yes      | The metrics plugin that supplies the number — see below.                         |
 | **Metric ID**          | yes      | Which metric to read from that plugin.                                           |
 | **Parameters (JSON)**  | no       | Passed to the provider, e.g. `{ "currency": "usd" }`. Must be a JSON **object**. |
@@ -51,6 +64,45 @@ An **explicit** `0` is still perfectly valid. "Keep failures at most 0" is a rea
 :::
 
 New Goals are created in **draft**. Nothing is evaluated until you activate them.
+
+## Delivery goals
+
+A **delivery Goal** is for outcomes that are not a number — "ship feature X across three repos",
+"migrate the docs site", "close out the launch checklist". Choose **Delivery** under **Goal kind** on
+`/goals/new`.
+
+What changes compared with a metric Goal:
+
+- **No provider, no metric, no target.** The Provider plugin ID, Metric ID, Direction, Target value,
+  Unit and Window fields disappear, and the API refuses a delivery Goal that carries any of them. There
+  is nothing to read on a schedule and no comparator to satisfy.
+- **The Definition of Done is required.** The form takes one criterion per line and needs at least one.
+  Every criterion you enter is already approved (a delivery Goal cannot be born with only proposed
+  criteria), and the checklist can never be emptied later — a delivery Goal with no finish line would be
+  unfinishable, not open-ended. Refine, add, waive and mark criteria done on the Goal page's
+  **Definition of Done** tab as usual.
+- **Completion is the approved checklist alone.** The Goal completes with outcome **achieved** the
+  moment every _approved_ criterion is done or waived — whether the execution loop notices first or the
+  scheduled check does. Criteria a planning run _proposed_ never count until you approve them, so an
+  agent cannot finish a Goal by proposing that it is finished.
+- **Deadline and cadence still apply.** Activating a delivery Goal schedules the same checks as a metric
+  Goal; each check re-reads the Definition of Done and the deadline without calling any plugin, so a
+  passed deadline still ends the Goal as **missed**. **Evaluate now** does the same on demand.
+- **The execution loop, budgets and limits are unchanged.** Spend cap, wall-clock limit, stuck
+  threshold, pinning and nudging work exactly as for a metric Goal; the routed agent's brief says
+  explicitly that the checklist is the whole definition of done.
+
+Metric Goals behave exactly as before. Existing Goals are metric Goals; the kind is shown as a badge on
+the catalog card and the detail header.
+
+### Who runs a brand-new Goal
+
+The loop routes each iteration to the Goal's **pinned agent** if one is set, otherwise round-robin over
+the agents that have already worked the Goal. A brand-new Goal has neither — so, when no agent is
+pinned and none has worked it yet, the router falls back to the **eligible agents in the Goal's own
+scope** (the same Organization / tenant ownership rule the rest of the platform applies) and
+round-robins over them, oldest first. It never picks an agent outside the Goal's scope, and a scope
+with no agent still leaves the loop **stuck** with `no-candidate-agent` until you create or assign one.
 
 ## The metric source
 
@@ -94,9 +146,11 @@ you will see the failure.
 ## What a Goal does not do
 
 - It does **not** create Works or Ideas. That is a [Mission](./missions.md).
-- It does **not** change anything in your account when a target is hit — it records the outcome.
-- It cannot be edited after creation. Title, metric source, target, unit, window and cadence are fixed
-  once the Goal exists; to change any of them, create a new Goal.
+- It does **not** change anything in your account when a target is hit or a checklist is completed — it
+  records the outcome.
+- Its **kind** cannot change after creation, and a metric Goal's metric source, target, unit and window
+  cannot be given to a delivery Goal (the API refuses them). To change the kind, create a new Goal.
+- A delivery Goal cannot lose its Definition of Done: the checklist can be edited but never emptied.
 
 ## Related
 

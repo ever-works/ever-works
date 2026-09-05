@@ -8,8 +8,14 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { GOAL_KINDS, type GoalKind } from '@ever-works/contracts';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
+
+// The kind vocabulary lives in `@ever-works/contracts` (like `WorkKind`)
+// because the web app must render it without depending on this package.
+// Re-exported so the goals barrel keeps its single-import idiom.
+export { GOAL_KINDS, type GoalKind };
 
 /**
  * Goal lifecycle states (Goals & Metrics spec §3.2, PR-8).
@@ -276,21 +282,36 @@ export type GoalExecutionTarget = 'cloud' | 'local-runner';
 export const GOAL_EXECUTION_TARGETS: readonly GoalExecutionTarget[] = ['cloud', 'local-runner'];
 
 /**
- * A measurable target — "income >= $1000/month via Stripe" — evaluated
- * automatically against real business metrics (Goals & Metrics spec
- * FR-9..FR-14; domain-model review §23.4).
+ * A Goal comes in two KINDS (`goalKind`, self-build slice AG / EW-795):
+ *
+ *   - **metric** (the default, and every row that predates the column) —
+ *     a measurable target, "income >= $1000/month via Stripe", evaluated
+ *     automatically against real business metrics (Goals & Metrics spec
+ *     FR-9..FR-14; domain-model review §23.4). `metricSource`,
+ *     `comparator`, `targetValue` and `unit` are all REQUIRED (enforced
+ *     by the DTO and the service; the columns themselves are nullable
+ *     only so the delivery kind can share the table).
+ *   - **delivery** — "ship feature X across three repos". There is NO
+ *     metric: the four metric columns are NULL, no provider is ever read,
+ *     and the Goal completes on its approved Definition of Done alone
+ *     (`dodCriteria`, every approved criterion done or waived). A delivery
+ *     Goal is born with at least one approved criterion and can never be
+ *     emptied. Its iteration loop, budgets and deadline work exactly as
+ *     for a metric Goal.
  *
  * Goals are created standalone (owned by `userId`) and attached to
  * Missions via the `mission_goals` join table (spec §8 open-question
  * default: standalone-first). Evaluation:
  *   - the per-minute `goal-evaluate-dispatcher` cron claims due ACTIVE
- *     Goals (`nextCheckAt <= now`) with an atomic CAS update, reads the
- *     metric through `MetricsFacadeService.getMetricValue` (budget-
- *     guarded + metered), appends a `goal_metric_samples` row and
- *     updates `currentValue`.
- *   - when the comparator is satisfied → status COMPLETED + outcome
- *     ACHIEVED; when `deadline` passes unmet → COMPLETED + MISSED.
- *     Both auto-outcomes are human-overridable (FR-13).
+ *     Goals (`nextCheckAt <= now`) with an atomic CAS update. For a
+ *     metric Goal it reads the metric through
+ *     `MetricsFacadeService.getMetricValue` (budget-guarded + metered),
+ *     appends a `goal_metric_samples` row and updates `currentValue`; for
+ *     a delivery Goal it only re-checks the DoD rollup and the deadline.
+ *   - when the comparator is satisfied (metric) or the DoD is complete
+ *     (delivery) → status COMPLETED + outcome ACHIEVED; when `deadline`
+ *     passes unmet → COMPLETED + MISSED. Both auto-outcomes are
+ *     human-overridable (FR-13).
  *
  * **Invariant I-4 (FR-14): Goal evaluation NEVER touches Missions.**
  * A Mission is completed only by an explicit human action, even when
@@ -321,24 +342,43 @@ export class Goal {
     description?: string | null;
 
     /**
+     * `'metric'` (default — every pre-existing row) | `'delivery'`. Decides
+     * which completion rule applies and whether the four metric columns
+     * below are required (metric) or must be NULL (delivery). Immutable
+     * after create. Vocabulary: {@link GOAL_KINDS} in `@ever-works/contracts`.
+     */
+    @Column({ type: 'varchar', length: 16, default: 'metric' })
+    goalKind: GoalKind;
+
+    // ── Metric fields — REQUIRED on a metric Goal, NULL on a delivery Goal.
+    // Nullable at the column level only so both kinds share one table;
+    // the DTO and `GoalsService` refuse a metric Goal that lacks any of
+    // them, so a metric row with a NULL here is a corrupted row, not a
+    // valid state (evaluation fails closed on it).
+
+    /**
      * Which provider + metric to read. Stored as `simple-json` to
      * match how sibling entities persist small structured shapes
      * (`Mission.guardrailsOverride`).
      */
-    @Column('simple-json')
-    metricSource: GoalMetricSource;
+    @Column({ type: 'simple-json', nullable: true })
+    metricSource?: GoalMetricSource | null;
 
-    @Column({ type: 'varchar', length: 8 })
-    comparator: GoalComparator;
+    @Column({ type: 'varchar', length: 8, nullable: true })
+    comparator?: GoalComparator | null;
 
-    @Column({ type: 'float' })
-    targetValue: number;
+    @Column({ type: 'float', nullable: true })
+    targetValue?: number | null;
 
     /** Unit of `targetValue` / samples (e.g. `'usd'`, `'count'`). */
-    @Column({ type: 'varchar', length: 32 })
-    unit: string;
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    unit?: string | null;
 
-    /** Aggregation window the metric is read over on every evaluation. */
+    /**
+     * Aggregation window the metric is read over on every evaluation.
+     * Not one of the four metric fields — stays NOT NULL; a delivery Goal
+     * stores `'total'` and never reads it.
+     */
     @Column({ type: 'varchar', length: 16 })
     window: GoalWindow;
 

@@ -24,6 +24,7 @@ export {
     GOAL_DOD_STATUSES,
     GOAL_LOOP_STATUSES,
     GOAL_EXECUTION_TARGETS,
+    GOAL_KINDS,
     MAX_GOAL_DOD_CRITERIA,
     MAX_DOD_TEXT_CHARS,
     MAX_DOD_EVIDENCE_CHARS,
@@ -32,6 +33,7 @@ export {
     type GoalStatus,
     type GoalOutcome,
     type GoalComparator,
+    type GoalKind,
     type GoalWindow,
     type GoalDoDStatus,
     type GoalDoDSource,
@@ -43,6 +45,7 @@ import type {
     GoalStatus,
     GoalOutcome,
     GoalComparator,
+    GoalKind,
     GoalWindow,
     GoalDoDStatus,
     GoalDoDSource,
@@ -85,10 +88,17 @@ export interface Goal {
     id: string;
     title: string;
     description: string | null;
-    metricSource: GoalMetricSource;
-    comparator: GoalComparator;
-    targetValue: number;
-    unit: string;
+    /**
+     * `metric` (the default, every pre-existing Goal) | `delivery`. Decides
+     * which completion rule applies and whether the four metric fields
+     * below are set (metric) or `null` (delivery — nothing is measured, the
+     * approved Definition of Done is the whole finish line).
+     */
+    goalKind: GoalKind;
+    metricSource: GoalMetricSource | null;
+    comparator: GoalComparator | null;
+    targetValue: number | null;
+    unit: string | null;
     window: GoalWindow;
     baselineValue: number | null;
     currentValue: number | null;
@@ -210,17 +220,27 @@ export interface EvaluateGoalNowResult {
     goal: Goal;
 }
 
+/**
+ * `POST /me/goals` body. Omitted `goalKind` = `metric`, for which every
+ * metric field is REQUIRED by the API exactly as before kinds existed. A
+ * `delivery` body must carry NONE of the metric fields and at least one
+ * `dodCriteria` entry — `buildCreateGoalPayload` (components/goals) is the
+ * one place that assembles either shape.
+ */
 export interface CreateGoalInput {
     title: string;
     description?: string | null;
-    metricSource: GoalMetricSource;
-    comparator: GoalComparator;
-    targetValue: number;
-    unit: string;
-    window: GoalWindow;
+    goalKind?: GoalKind;
+    metricSource?: GoalMetricSource;
+    comparator?: GoalComparator;
+    targetValue?: number;
+    unit?: string;
+    window?: GoalWindow;
     baselineValue?: number | null;
     deadline?: string | null;
     checkFrequencyMinutes?: number;
+    /** Required for a delivery Goal; an optional seed checklist for a metric one. */
+    dodCriteria?: GoalDoDCriterion[];
 }
 
 export interface UpdateGoalInput {

@@ -119,7 +119,10 @@ export class GoalsController {
     }
 
     @Post()
-    @ApiOperation({ summary: 'Create a goal (status=draft; activate to start evaluation)' })
+    @ApiOperation({
+        summary:
+            "Create a goal (status=draft; activate to start evaluation). goalKind 'metric' (default) needs metricSource + comparator + targetValue + unit + window; 'delivery' needs dodCriteria instead and carries no metric.",
+    })
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async create(
@@ -131,6 +134,11 @@ export class GoalsController {
             {
                 title: body.title,
                 description: body.description ?? null,
+                // Omitted = metric; the service refuses anything unknown.
+                goalKind: body.goalKind,
+                // Metric fields pass through possibly-undefined: the service
+                // requires all of them for a metric Goal and refuses every one
+                // of them for a delivery Goal.
                 metricSource: body.metricSource,
                 comparator: body.comparator,
                 targetValue: body.targetValue,
@@ -143,6 +151,8 @@ export class GoalsController {
                 // the service persists as NULL: the single-metric Goal.
                 criteria: body.criteria,
                 constraints: body.constraints,
+                // Required for a delivery Goal, optional seed for a metric one.
+                dodCriteria: body.dodCriteria,
             },
             this.scopeContext?.getScope(),
         );
@@ -224,7 +234,7 @@ export class GoalsController {
     @Post(':id/activate')
     @ApiOperation({
         summary:
-            'Activate a goal ((draft|paused|completed) → active). Requires metricSource pluginId + metricId; reactivating a completed goal clears its outcome.',
+            'Activate a goal ((draft|paused|completed) → active). Metric goals require metricSource pluginId + metricId; delivery goals require at least one approved Definition-of-Done criterion. Reactivating a completed goal clears its outcome.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
@@ -249,7 +259,7 @@ export class GoalsController {
     @Post(':id/evaluate-now')
     @ApiOperation({
         summary:
-            'Evaluate immediately (manual tick). Bypasses the nextCheckAt schedule but NOT the plugin budget guard.',
+            'Evaluate immediately (manual tick). Bypasses the nextCheckAt schedule but NOT the plugin budget guard. Metric goals read the provider; delivery goals re-check the Definition of Done and the deadline without any plugin call.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })

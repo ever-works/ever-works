@@ -57,13 +57,18 @@ export function isHardConstraint(constraint: Pick<GoalConstraint, 'hard'>): bool
  * The metric a criterion/constraint reads: its own override, else the
  * Goal's. Inheritance is what keeps the common "same metric, several
  * thresholds" Goal free of repetition.
+ *
+ * `source` is `null` when neither the node nor the Goal names one — a
+ * delivery Goal has no `metricSource` (and refuses criteria/constraints on
+ * write), but the type must be honest so a caller cannot dereference a
+ * source that is not there.
  */
 export function resolveSourceFor(
     goal: Pick<Goal, 'metricSource' | 'window'>,
     node: { metricSource?: GoalMetricSource; window?: GoalWindow },
-): { source: GoalMetricSource; window: GoalWindow } {
+): { source: GoalMetricSource | null; window: GoalWindow } {
     return {
-        source: node.metricSource ?? goal.metricSource,
+        source: node.metricSource ?? goal.metricSource ?? null,
         window: node.window ?? goal.window,
     };
 }

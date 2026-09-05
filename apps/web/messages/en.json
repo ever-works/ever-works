@@ -7153,6 +7153,10 @@
                 "missed": "Missed",
                 "abandoned": "Abandoned"
             },
+            "kinds": {
+                "metric": "Metric",
+                "delivery": "Delivery"
+            },
             "filterBar": {
                 "status": "Status",
                 "anyStatus": "Any status",
@@ -7199,12 +7203,13 @@
         },
         "goalNew": {
             "title": "New Goal",
-            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "subtitle": "Define what done looks like: a measurable metric target, or a delivery checklist with no metric at all. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
             "backToGoals": "Back to Goals",
             "created": "Goal created",
             "sections": {
                 "metricSource": "Metric source",
                 "target": "Target",
+                "definitionOfDone": "Definition of Done",
                 "cadence": "Evaluation cadence"
             },
             "fields": {
@@ -7212,6 +7217,7 @@
                 "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
                 "description": "Description",
                 "descriptionPlaceholder": "Optional context for this Goal",
+                "goalKind": "Goal kind",
                 "pluginId": "Provider plugin ID",
                 "metricId": "Metric ID",
                 "params": "Parameters (JSON)",
@@ -7222,9 +7228,20 @@
                 "targetValue": "Target value",
                 "unit": "Unit",
                 "window": "Window",
+                "dodCriteria": "Criteria (one per line)",
+                "dodCriteriaPlaceholder": "API endpoint merged\nWeb form merged\nDocs updated",
+                "dodCriteriaHint": "Each line becomes one approved criterion. At least one is required; refine the list on the Goal page after creation.",
                 "deadline": "Deadline (optional)",
                 "checkFrequency": "Check frequency (minutes)",
                 "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "kinds": {
+                "metric": "Metric target",
+                "delivery": "Delivery"
+            },
+            "kindHints": {
+                "metric": "Reads a number from a metrics provider on a schedule and completes when the target is reached.",
+                "delivery": "No metric. Completes when every approved Definition-of-Done criterion is done or waived — for outcomes like \"ship feature X across three repos\"."
             },
             "comparators": {
                 "gte": "At least (grow to target)",
@@ -7242,6 +7259,7 @@
                 "metricSourceRequired": "Provider plugin ID and metric ID are required.",
                 "targetInvalid": "Target value must be a number.",
                 "unitRequired": "Unit is required.",
+                "dodRequired": "A delivery Goal needs at least one Definition-of-Done criterion.",
                 "deadlineInvalid": "Deadline is not a valid date.",
                 "createFailed": "Couldn't create the Goal. Please try again."
             },
@@ -7270,6 +7288,7 @@
                 "current": "Current",
                 "target": "Target",
                 "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "deliveryHint": "This is a delivery Goal — there is no metric to chart. Progress is the Definition of Done: the Goal completes when every approved criterion is done or waived.",
                 "sampleCount": "{count} observations"
             },
             "comparator": {
@@ -7284,6 +7303,7 @@
                 "point": "Point-in-time"
             },
             "details": {
+                "kind": "Kind",
                 "plugin": "Provider",
                 "metric": "Metric",
                 "window": "Window",
@@ -7432,7 +7452,7 @@
                     "workerModelHelp": "Free text; passed through to iteration runs.",
                     "assignedAgent": "Pinned agent",
                     "assignedAgentNone": "No pin (round-robin)",
-                    "assignedAgentHelp": "Routing always picks this agent. Without a pin the router round-robins over the agents that have already worked this Goal — so a brand-new Goal needs one before the loop can start work."
+                    "assignedAgentHelp": "Routing always picks this agent. Without a pin the router round-robins over the agents that have already worked this Goal — and, for a brand-new Goal, over the eligible agents in its scope — so the loop can start without one."
                 },
                 "executionTargets": {
                     "cloud": "Cloud",

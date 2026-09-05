@@ -11,6 +11,8 @@ import { In, IsNull, Repository } from 'typeorm';
 import {
     GOAL_EXECUTION_TARGETS,
     Goal,
+    GoalOutcome,
+    GoalStatus,
     type GoalDoDCriterion,
     type GoalExecutionTarget,
     type GoalLoopStatus,
@@ -37,10 +39,12 @@ import {
 } from '../database/ownership-scope';
 import {
     dodProgressSignature,
+    hasDefinitionOfDone,
     normalizeDoDCriteria,
     summarizeDoD,
     validateDoDCriteria,
 } from './goal-dod';
+import { isDeliveryGoal } from './goal-kind';
 import {
     decideGoalLoop,
     formatUsd,
@@ -75,6 +79,12 @@ export const MAX_NUDGE_CHARS = 2000;
 
 /** How many iteration Tasks one rollup will ever consider. */
 const MAX_GOAL_TASKS = 500;
+
+/**
+ * Cold-start pool bound: how many in-scope agents a fresh unpinned Goal
+ * round-robins over. Mirrors the default page `findByUserIdScoped` uses.
+ */
+const MAX_SCOPE_CANDIDATES = 50;
 
 const ACTIVE_RUN_STATUSES = ['queued', 'running'];
 
@@ -232,7 +242,13 @@ export class GoalOrchestratorService {
 
     // ─── Definition of Done ─────────────────────────────────────────
 
-    /** Replace the whole checklist (operator-authored, already approved). */
+    /**
+     * Replace the whole checklist (operator-authored, already approved).
+     *
+     * A DELIVERY Goal's checklist is its entire completion rule, so it can
+     * never be cleared or reduced to nothing approved — a delivery Goal
+     * with no finish line would be unfinishable, not "open-ended".
+     */
     async setDodCriteria(
         userId: string,
         goalId: string,
@@ -240,6 +256,14 @@ export class GoalOrchestratorService {
     ): Promise<GoalDto> {
         const goal = await this.findOrThrow(userId, goalId);
         this.assertDod(criteria);
+        if (
+            isDeliveryGoal(goal) &&
+            (criteria === null || !hasDefinitionOfDone({ dodCriteria: criteria }))
+        ) {
+            throw new BadRequestException(
+                'A delivery Goal must keep at least one approved Definition-of-Done criterion.',
+            );
+        }
         const beforeSignature = dodProgressSignature(goal.dodCriteria);
         goal.dodCriteria = criteria === null ? null : normalizeDoDCriteria(criteria);
         this.markProgressIfChanged(goal, beforeSignature);
@@ -408,6 +432,13 @@ export class GoalOrchestratorService {
         const goal = await this.findOrThrow(userId, goalId);
         if (goal.archivedAt) {
             throw new BadRequestException('Archived Goals cannot run an execution loop.');
+        }
+        if (isDeliveryGoal(goal) && !hasDefinitionOfDone(goal)) {
+            // Defensive: create + setDodCriteria already guarantee this, but a
+            // loop with no finish line would run until a budget stops it.
+            throw new BadRequestException(
+                'A delivery Goal needs at least one approved Definition-of-Done criterion before its loop can start.',
+            );
         }
         const resuming = goal.loopStatus === 'paused' || goal.loopStatus === 'stuck';
         goal.loopStatus = 'running';
@@ -884,7 +915,21 @@ export class GoalOrchestratorService {
         };
     }
 
-    /** Apply a terminal decision (done / paused / stuck) + log it. */
+    /**
+     * Apply a terminal decision (done / paused / stuck) + log it.
+     *
+     * For a DELIVERY Goal, `done` also completes the Goal itself
+     * (COMPLETED + ACHIEVED, schedule cleared): the approved DoD is its
+     * only completion rule, so whichever path observes it first — this
+     * loop or the evaluation tick — records the same terminal state, and
+     * both writes are idempotent on an already-completed row. A row that
+     * is ALREADY COMPLETED is left alone: a human outcome override
+     * (`abandoned`, FR-13) or a deadline `missed` recorded by the evaluation
+     * tick is never overwritten by the loop finishing late — the same way a
+     * metric Goal stops being evaluated once it is COMPLETED. A metric
+     * Goal's `status`/`outcome` stay untouched here: its loop finishing is
+     * not the same fact as its metric being reached.
+     */
     private async applyTerminal(
         goal: Goal,
         decision: GoalLoopDecision,
@@ -892,6 +937,11 @@ export class GoalOrchestratorService {
     ): Promise<GoalAdvanceResult> {
         goal.loopStatus = loopStatus;
         goal.activeAgentId = null;
+        if (loopStatus === 'done' && isDeliveryGoal(goal) && goal.status !== GoalStatus.COMPLETED) {
+            goal.status = GoalStatus.COMPLETED;
+            goal.outcome = GoalOutcome.ACHIEVED;
+            goal.nextCheckAt = null;
+        }
         const saved = await this.goals.save(goal);
 
         const kind: GoalEventKind = loopStatus === 'done' ? 'complete' : 'limit';
@@ -1037,6 +1087,20 @@ export class GoalOrchestratorService {
      * data alone. An agent that has been deleted (or belongs to someone
      * else) is dropped: routing must never offer what dispatch would
      * reject.
+     *
+     * **Cold start** (self-build slice AG, finding R1): a fresh unpinned
+     * Goal has no history, and until now that meant an EMPTY pool and
+     * `stuck / no-candidate-agent` on iteration 1 — the loop could only
+     * ever start after an operator pinned an agent. So when there is no
+     * pin and no history the pool falls back to the eligible agents of the
+     * Goal's own scope, through `AgentRepository.findByUserIdScoped` with
+     * `ownershipRelationScopeOf(goal)` — the same Organization / tenant
+     * rule `findByIdAndUser` applies to the pin and the dispatch path
+     * re-validates. An agent outside the Goal's scope is therefore never
+     * offered; an empty scope still yields `[]` and the honest `stuck`.
+     * The fallback is deliberately NOT taken when a pin exists but failed
+     * its scope check: an unhonoured explicit pin is the operator's to
+     * fix, not something to route around silently.
      */
     private async resolveCandidates(goal: Goal): Promise<GoalRoutingCandidate[]> {
         if (goal.assignedAgentId) {
@@ -1077,7 +1141,48 @@ export class GoalOrchestratorService {
                 source: 'history',
             });
         }
-        return [...out.values()];
+        if (out.size > 0 || goal.assignedAgentId || !this.agents) {
+            return [...out.values()];
+        }
+        return this.resolveScopeCandidates(goal);
+    }
+
+    /**
+     * The cold-start pool: every agent the Goal's owner may run inside the
+     * Goal's scope, oldest first.
+     *
+     * Ordered by `createdAt` then `id` IN MEMORY because the repository
+     * orders by `updatedAt DESC` — under which the iteration-keyed
+     * round-robin would pick a different agent every time any agent was
+     * edited, and the log line "round-robins over N agents" would stop
+     * being reproducible from the persisted counter. No status filter,
+     * matching `TasksService.listRunCandidates`: agents are created DRAFT
+     * and the whole point of this pool is that a freshly created agent
+     * can be picked. Archived agents are excluded by the repository.
+     */
+    private async resolveScopeCandidates(goal: Goal): Promise<GoalRoutingCandidate[]> {
+        if (!this.agents) return [];
+        // A repository failure PROPAGATES: `advanceDue` counts a throwing
+        // Goal as `failed` and retries it next tick, whereas swallowing it
+        // into `[]` would mark the loop `stuck` — a terminal state a human
+        // has to resume — over what was an infrastructure hiccup.
+        const { rows } = await this.agents.findByUserIdScoped(
+            goal.userId,
+            { limit: MAX_SCOPE_CANDIDATES },
+            ownershipRelationScopeOf(goal),
+        );
+        return [...rows]
+            .sort((a, b) => {
+                const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                if (aTime !== bTime) return aTime - bTime;
+                return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+            })
+            .map((agent) => ({
+                agentId: agent.id,
+                name: agent.name ?? agent.slug ?? null,
+                source: 'scope' as const,
+            }));
     }
 
     /**
@@ -1096,6 +1201,12 @@ export class GoalOrchestratorService {
             `Iteration ${iteration} of the Goal "${goal.title}".`,
             '',
             goal.description ? `${goal.description}\n` : '',
+            ...(isDeliveryGoal(goal)
+                ? [
+                      'Delivery Goal — there is no metric; the checklist below is the whole definition of done.',
+                      '',
+                  ]
+                : []),
             `Definition of Done — ${summary.done} done, ${summary.waived} waived, ${summary.open} open:`,
             open.length > 0 ? open.join('\n') : '- (no open criteria recorded)',
             '',
