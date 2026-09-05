@@ -1708,7 +1708,7 @@ self-recovers when it appears.
 | `catalogBranch`   | string | `main`              | Branch to read from.                     |
 | `cacheTtlSeconds` | number | `3600`              | How long to cache the cloned catalog.    |
 
-See [Skills feature](/features/skills) for the platform-side
+See [Skills feature](/features/skills-catalog) for the platform-side
 data model + resolver + injection pipeline.
 
 ### Ever Works Task Tracker
@@ -1732,7 +1732,7 @@ in by implementing the same `ITaskTrackerPlugin` contract.
 **Settings:** none — the plugin binds to the platform's DB-backed
 service at boot via a runtime `setPlatformTaskBackend()` delegate.
 
-See [Task tracking feature](/features/task-tracking) for the full
+See [Task tracking feature](/features/tasks) for the full
 data model + state machine + chat thread + recurrence pipeline.
 
 ### Agent Memory

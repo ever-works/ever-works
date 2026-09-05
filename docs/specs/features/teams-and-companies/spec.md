@@ -95,7 +95,7 @@ Explicitly **not** a Team: Work Members (per-Work RBAC, untouched), `agent_membe
 by the org chart and by `AGENTS.md` `reportsTo:` on import. Rules:
 
 - Same Organization only; cycle-guarded in the service (walk-up with max 50, mirroring
-  Paperclip's chain-of-command guard); dangling manager ⇒ treated as root.
+  the usual chain-of-command guard); dangling manager ⇒ treated as root.
 - Purely descriptive in v1: it does **not** change task-assignment authz, the
   `createSubAgent` scope-narrowing cascade, or heartbeat behavior. (Delegation-aware
   behavior is a future spec.)
@@ -249,7 +249,7 @@ registration) is untouched.
 ```
 
 Rendering (client, **no new dependency** — hand-rolled tidy-tree like the KB workbench
-tree; Paperclip proves custom SVG is enough): root node = Organization; children =
+tree; hand-written SVG is enough at this size): root node = Organization; children =
 top-level Teams and team-less Agents. Inside a Team subtree, agents order by
 `reportsToAgentId` chains (manager first), humans last. SVG elbow connectors + absolutely
 positioned cards, pan (drag) + zoom (wheel/buttons), click-through to agent/team pages.
@@ -307,15 +307,15 @@ ever-works/orgs
 
 ### 6.2 Import mapping (`CompanyImportService`)
 
-| Package file                            | Creates                                             | Notes                                                                                                                                                                                                                                         |
-| --------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `COMPANY.md`                            | **Organization**                                    | name/slug (user may override name in the wizard); goals → org `metadata`; lazy Tenant as usual                                                                                                                                                |
-| `teams/*/TEAM.md`                       | **Team** rows                                       | `manager:` path → `managerAgentId`; `includes:` agent paths → roster rows; nested team includes → `parentTeamId`                                                                                                                              |
-| `agents/*/AGENTS.md`                    | **Agent** rows                                      | scope `tenant`, org-stamped; markdown body → DB-inline `agentsMd` (the tenant-scope E9 path); `reportsTo` slug → `reportsToAgentId` (second pass after all slugs resolve, Paperclip-style); **heartbeat disabled + status paused** on arrival |
-| `AGENTS.md skills:` shortnames          | **Skill** rows + `SkillBinding(targetType='agent')` | resolved against the package's `skills/` dir; unknown shortnames skipped with a warning in the import report                                                                                                                                  |
-| `projects/*/PROJECT.md`                 | **draft Work**                                      | new `createDraftWork` sibling of `createCompanyWork` (bare row, `kind:'default'`, `status:'draft'`, no repo/generation side-effects); body → Work description                                                                                 |
-| `projects/*/tasks/*/TASK.md`, `tasks/*` | **Task** rows                                       | `assignee:` slug → `TaskAssignee(actorType='agent')`; `project:` → the created Work's `workId`                                                                                                                                                |
-| `.works/company.yml`                    | hints                                               | §6.3; unknown vendor files (e.g. `.paperclip.yaml`) are **ignored silently** — required for cross-vendor compat                                                                                                                               |
+| Package file                            | Creates                                             | Notes                                                                                                                                                                                                                        |
+| --------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `COMPANY.md`                            | **Organization**                                    | name/slug (user may override name in the wizard); goals → org `metadata`; lazy Tenant as usual                                                                                                                               |
+| `teams/*/TEAM.md`                       | **Team** rows                                       | `manager:` path → `managerAgentId`; `includes:` agent paths → roster rows; nested team includes → `parentTeamId`                                                                                                             |
+| `agents/*/AGENTS.md`                    | **Agent** rows                                      | scope `tenant`, org-stamped; markdown body → DB-inline `agentsMd` (the tenant-scope E9 path); `reportsTo` slug → `reportsToAgentId` (second pass after all slugs resolve); **heartbeat disabled + status paused** on arrival |
+| `AGENTS.md skills:` shortnames          | **Skill** rows + `SkillBinding(targetType='agent')` | resolved against the package's `skills/` dir; unknown shortnames skipped with a warning in the import report                                                                                                                 |
+| `projects/*/PROJECT.md`                 | **draft Work**                                      | new `createDraftWork` sibling of `createCompanyWork` (bare row, `kind:'default'`, `status:'draft'`, no repo/generation side-effects); body → Work description                                                                |
+| `projects/*/tasks/*/TASK.md`, `tasks/*` | **Task** rows                                       | `assignee:` slug → `TaskAssignee(actorType='agent')`; `project:` → the created Work's `workId`                                                                                                                               |
+| `.works/company.yml`                    | hints                                               | §6.3; unknown vendor files (e.g. `.paperclip.yaml`) are **ignored silently** — required for cross-vendor compat                                                                                                              |
 
 Fetching uses the existing `GitFacadeService.getFileContent` path with the platform
 GitHub App / `EVER_WORKS_ORGS_TOKEN` / `GITHUB_TOKEN` fallback chain (tokenless →
@@ -330,7 +330,7 @@ in a hand-built package is truncated AND reported in `skipped[]`, never silent.
 
 Failure model: Organization creation is the pivot. If it succeeds and a later entity
 fails validation, the import **continues** and returns a per-entity report
-(`created[] / skipped[{path, reason}]`) — the Paperclip preview/report pattern without
+(`created[] / skipped[{path, reason}]`) — the usual preview/report pattern without
 the preview round-trip in v1 (Q2 covers adding a preview step).
 
 ### 6.3 `.works/company.yml` (vendor extension, `schema: everworks/v1`)
@@ -391,11 +391,11 @@ Company equivalence stays exactly as documented in the tenants-and-orgs spec.
 ## 10. Open questions
 
 - **Q1** Tenant-level (org-less) Teams? v1: no — Teams require an Organization.
-- **Q2** Import preview step (Paperclip-style checkbox tree) before applying a template?
+- **Q2** Import preview step (a checkbox tree of what would be created) before applying a template?
   v1 imports whole packages (small, curated); preview lands with arbitrary-repo import.
 - **Q3** Arbitrary GitHub repo import (`owner/repo/path`, SSRF-guarded like
   `missionTemplateRepo`) — v1.1 candidate; unlocks installing any agentcompanies/v1
-  package, including Paperclip's catalog.
+  package, whoever published it.
 - **Q4** Company **export** (Organization → agentcompanies/v1 package) — natural sequel;
   requires the secrets-scrubbing rules from the spec's exporter section.
 - **Q5** Registering Ever Works as a `companies.sh` provider (PR to

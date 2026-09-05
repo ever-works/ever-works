@@ -7,6 +7,10 @@ sidebar_position: 5
 
 # Event & Notification System
 
+:::info Looking for outbound webhooks?
+Despite this page's id (`webhook-system`), it documents the **internal** event bus — the in-process `EventEmitter2` that platform services and plugins subscribe to. If you want to register a URL of your own and receive signed HTTPS `POST`s when a Work is created, generated or deployed, read [Outbound Webhooks](/features/webhooks) instead. For the reverse direction — an outside system calling the platform to spawn a Task — see [Inbound Triggers](/features/inbound-triggers).
+:::
+
 Ever Works uses an internal event-driven architecture powered by NestJS `EventEmitter2`. Events flow through the platform to coordinate plugin lifecycle, pipeline execution, work generation, and system-level notifications. Plugins can subscribe to and emit events through the `PluginContext` interface.
 
 **Key sources:**

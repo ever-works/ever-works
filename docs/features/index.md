@@ -30,32 +30,35 @@ A few features share a sidebar entry rather than owning one. **Teams** is the hu
 
 ## The core loop
 
-| Feature                                                | Description                                                                                                 |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| [Missions](./missions)                                 | Long-running goals that spawn Ideas and optionally auto-build Works on a schedule                           |
-| [Ideas](./ideas)                                       | Proposed Works in the queue between "topic" and "finished website" — build, retry, dismiss, accept          |
-| [Goals](./goals)                                       | A number you want to move — read from a metrics provider on a schedule and checked against a target         |
-| [Creating a Work](./creating-a-work)                   | The buildable unit — websites, blogs, directories, landing pages — created with AI, manually, or by import  |
-| [Tasks](./tasks)                                       | One trackable unit of work — status, priority, labels, and optionally the Agent that executes it            |
-| [Agents (AI Employees)](./agents)                      | Named, persistent AI workers you create, scope, schedule, and budget — your standing team                   |
-| [Agents Catalog](./agents-catalog)                     | Pre-built specialists (PM, Coder, Researcher, …) with a role prompt, default Skills and a starter KB        |
-| [Agent Capabilities](./agent-capabilities)             | Per-tool grants, Skills, MCP connections, repositories, environment, init script and the Collaborators list |
-| [Skills Catalog](./skills-catalog)                     | Reusable `SKILL.md` instruction blocks an Agent pulls in when they are relevant                             |
-| [Teams](./teams)                                       | Nested groups of Agents and people inside an organization, plus the Works and Agents they own               |
-| [Agent Scorecards](./agent-scorecards)                 | Target, current, floor and stretch per metric, so an AI worker's output is measurable                       |
-| [Agent Email & Inboxes](./agent-email)                 | Inbound + outbound mailboxes per Agent / Mission / Idea / Work — your AI team's email                       |
-| [Inbox](./inbox)                                       | The operator message center at `/inbox` — blocking questions, approval requests, escalations and notices    |
-| [Approvals & Escalations](./approvals-and-escalations) | The three moments a human stays in the loop — action proposals, escalations, and guardrail modes            |
-| [Agent Terminals](./agent-terminals)                   | Attach a real terminal to a live agent run — take the keyboard, watch read-only, replay the transcript      |
-| [Knowledge Base & Memory](./knowledge-base)            | Per-Work, typed, Git-backed institutional context and long-term memory every run reads from                 |
-| [Memory (Org-Wide)](./memory)                          | Every Work's KB plus org-level documents in one place — files, agent memory, review queue, consolidation    |
-| [Meetings](./meetings)                                 | Meeting records with transcripts — entered by hand or synced from Zoom and Google Meet, then summarized     |
-| [Notifications](./notifications)                       | The in-app bell, the Slack / Discord / Telegram / WhatsApp / Novu channels, and event subscriptions         |
-| [Digests](./digests)                                   | Daily and weekly briefings composed from real runs, tasks, pull requests, escalations and goal progress     |
-| [Inbound Triggers](./inbound-triggers)                 | Signed HTTPS endpoints and platform-event rules that spawn a Task — and start an Agent — from outside       |
-| [Campaigns](./campaigns)                               | The `campaign` Work kind — one brief provisions the Goal, the go-to-market Agents and the first Tasks       |
-| [Autonomous Operation](./autonomous-operation)         | How the platform keeps working 24/7 — the half one-shot builders don't have                                 |
-| [Workers](./workers)                                   | The background-execution engine that runs Agents, pipelines, and schedules in parallel                      |
+| Feature                                                | Description                                                                                                        |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| [Missions](./missions)                                 | Long-running goals that spawn Ideas and optionally auto-build Works on a schedule                                  |
+| [Ideas](./ideas)                                       | Proposed Works in the queue between "topic" and "finished website" — build, retry, dismiss, accept                 |
+| [Goals](./goals)                                       | A number you want to move — read from a metrics provider on a schedule and checked against a target                |
+| [Analytics & Metrics](/features/analytics)             | The four `metrics-provider` plugins a Goal reads from — Stripe, PostHog, Google Analytics, your own HTTP endpoints |
+| [Creating a Work](./creating-a-work)                   | The buildable unit — websites, blogs, directories, landing pages — created with AI, manually, or by import         |
+| [Tasks](./tasks)                                       | One trackable unit of work — status, priority, labels, and optionally the Agent that executes it                   |
+| [Agents (AI Employees)](./agents)                      | Named, persistent AI workers you create, scope, schedule, and budget — your standing team                          |
+| [Agents Catalog](./agents-catalog)                     | Pre-built specialists (PM, Coder, Researcher, …) with a role prompt, default Skills and a starter KB               |
+| [Agent Capabilities](./agent-capabilities)             | Per-tool grants, Skills, MCP connections, repositories, environment, init script and the Collaborators list        |
+| [Browser Automation](/features/browser-automation)     | A headless Chromium an agent can read a JavaScript-rendered page with, behind a default-deny host allowlist        |
+| [Skills Catalog](./skills-catalog)                     | Reusable `SKILL.md` instruction blocks an Agent pulls in when they are relevant                                    |
+| [Teams](./teams)                                       | Nested groups of Agents and people inside an organization, plus the Works and Agents they own                      |
+| [Agent Scorecards](./agent-scorecards)                 | Target, current, floor and stretch per metric, so an AI worker's output is measurable                              |
+| [Agent Email & Inboxes](./agent-email)                 | Inbound + outbound mailboxes per Agent / Mission / Idea / Work — your AI team's email                              |
+| [Inbox](./inbox)                                       | The operator message center at `/inbox` — blocking questions, approval requests, escalations and notices           |
+| [Approvals & Escalations](./approvals-and-escalations) | The three moments a human stays in the loop — action proposals, escalations, and guardrail modes                   |
+| [Agent Terminals](./agent-terminals)                   | Attach a real terminal to a live agent run — take the keyboard, watch read-only, replay the transcript             |
+| [Knowledge Base & Memory](./knowledge-base)            | Per-Work, typed, Git-backed institutional context and long-term memory every run reads from                        |
+| [Memory (Org-Wide)](./memory)                          | Every Work's KB plus org-level documents in one place — files, agent memory, review queue, consolidation           |
+| [Meetings](./meetings)                                 | Meeting records with transcripts — entered by hand or synced from Zoom and Google Meet, then summarized            |
+| [Notifications](./notifications)                       | The in-app bell, the Slack / Discord / Telegram / WhatsApp / Novu channels, and event subscriptions                |
+| [Digests](./digests)                                   | Daily and weekly briefings composed from real runs, tasks, pull requests, escalations and goal progress            |
+| [Inbound Triggers](./inbound-triggers)                 | Signed HTTPS endpoints and platform-event rules that spawn a Task — and start an Agent — from outside              |
+| [Outbound Webhooks](/features/webhooks)                | The other direction — HMAC-signed POSTs to an endpoint you own when a Work is created, generated or deployed       |
+| [Campaigns](./campaigns)                               | The `campaign` Work kind — one brief provisions the Goal, the go-to-market Agents and the first Tasks              |
+| [Autonomous Operation](./autonomous-operation)         | How the platform keeps working 24/7 — the half one-shot builders don't have                                        |
+| [Workers](./workers)                                   | The background-execution engine that runs Agents, pipelines, and schedules in parallel                             |
 
 ## Work types & templates
 

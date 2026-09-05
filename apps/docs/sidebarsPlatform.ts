@@ -74,6 +74,12 @@ const sidebars: SidebarsConfig = {
 				'features/missions',
 				'features/ideas',
 				'features/goals',
+				// The metric SOURCE a Goal reads from: the four
+				// `metrics-provider` plugins (Stripe, PostHog, Google
+				// Analytics, your own HTTP endpoints). Sits directly
+				// after Goals because it is only ever reached through
+				// one.
+				'features/analytics',
 				// A campaign Work is a Goal with a go-to-market pipeline and
 				// a seeded agent bench behind it, so it reads straight after
 				// Goals rather than with the other Work kinds.
@@ -104,6 +110,11 @@ const sidebars: SidebarsConfig = {
 				// Policy's sibling matrix (same four-scope lattice,
 				// opposite default), so it is listed next to it.
 				'features/agent-capabilities',
+				// The headless-browser tool that permission actually
+				// unlocks — `canCallExternalTools` is what puts
+				// `browse_url` in an agent's tool list — so it reads
+				// immediately after the grant that gates it.
+				'features/browser-automation',
 				'features/sessions-and-steering',
 				// The human-in-the-loop layer above a session (guardrails,
 				// the approval queue, escalations), then the two per-Agent
@@ -122,7 +133,7 @@ const sidebars: SidebarsConfig = {
 				'features/knowledge-base',
 				// The org-wide layer above a single Work's KB: shared
 				// documents, the review queue, consolidation and recall.
-				// Reads straight after the KB it generalises; its two
+				// Reads straight after the KB it generalizes; its two
 				// sources, Decisions and Meetings, are listed above.
 				'features/memory',
 				'features/autonomous-operation',
@@ -173,6 +184,11 @@ const sidebars: SidebarsConfig = {
 				// channels, then the scheduled briefing built on the same stack.
 				'features/notifications',
 				'features/digests',
+				// The third delivery surface, and the only machine-facing
+				// one: outbound HMAC-signed POSTs to an endpoint you own.
+				// The inbound half of the same wire is
+				// features/inbound-triggers, listed with Tasks.
+				'features/webhooks',
 				'features/generation-cancellation',
 				'features/works-config',
 				'features/work-import',
