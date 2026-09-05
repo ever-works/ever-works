@@ -4,6 +4,8 @@
  * `task-templates.ts`).
  */
 
+import type { TaskExtraRepo } from '@ever-works/contracts';
+
 export interface TaskTemplateStepRow {
     id: string;
     templateId: string;
@@ -14,6 +16,13 @@ export interface TaskTemplateStepRow {
     agentTemplateSlug: string | null;
     requiresApproval: boolean;
     dependsOn: number[] | null;
+    /**
+     * Multi-repo decomposition (slice AH): the Work THIS step files its
+     * sub-task against, and the extra repositories that sub-task mounts.
+     * `null` on both = inherit the tree's Work, mount nothing extra.
+     */
+    workId: string | null;
+    extraRepos: TaskExtraRepo[] | null;
     createdAt: string;
 }
 

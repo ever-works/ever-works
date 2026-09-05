@@ -103,6 +103,8 @@ function mkGoal(overrides: Partial<Goal> = {}): Goal {
         spentCents: 0,
         wallClockLimitHours: null,
         stuckThresholdIterations: null,
+        // Concurrent iterations (slice AH): null = the serial loop.
+        maxConcurrentIterations: null,
         sessionBudgetMinutes: null,
         gracePeriodMinutes: null,
         executionTarget: null,

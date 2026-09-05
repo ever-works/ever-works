@@ -45,6 +45,7 @@ import { TaskChatService } from './task-chat.service';
 import { TaskGateRunnerService } from './task-gate-runner.service';
 import { TaskGateJudgeService } from './task-gate-judge.service';
 import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
+import { TaskGraphFanoutService } from './task-graph-fanout.service';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
 import { TaskReviewRejectionService } from './task-review-rejection.service';
@@ -141,6 +142,10 @@ import { DatabaseModule } from '../database/database.module';
         TaskTemplatesService,
         TaskChatService,
         TaskRecurrenceDispatcherService,
+        // Task-graph fan-out (slice AH) — starts TODO Tasks whose blockers
+        // have cleared, through the same gated dispatch path everything
+        // else uses. Off unless TASK_FANOUT_MAX_STARTS_PER_OWNER > 0.
+        TaskGraphFanoutService,
         TaskNotificationService,
         TaskRunDenormService,
         TaskWorkspaceService,
@@ -188,6 +193,7 @@ import { DatabaseModule } from '../database/database.module';
         TaskTemplatesService,
         TaskChatService,
         TaskRecurrenceDispatcherService,
+        TaskGraphFanoutService,
         TaskNotificationService,
         TaskRunDenormService,
         TaskWorkspaceService,

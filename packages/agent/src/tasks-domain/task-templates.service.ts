@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { EntityManager, Repository } from 'typeorm';
+import type { TaskExtraRepo } from '@ever-works/contracts';
 import { Task, TaskPriority, TaskStatus } from '../entities/task.entity';
 import { Mission } from '../entities/mission.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
@@ -19,7 +20,9 @@ import { TaskTemplateRepository } from '../database/repositories/task-template.r
 import { UserTaskCounterRepository } from '../database/repositories/task-side.repositories';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
+import { normalizeTaskExtraRepos } from './task-extra-repos';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 
@@ -31,6 +34,20 @@ export interface TaskTemplateStepInput {
     requiresApproval?: boolean;
     /** 0-based positions of steps this one depends on. */
     dependsOn?: number[];
+    /**
+     * Multi-repo decomposition (slice AH) — file THIS step's sub-task
+     * against a different Work than the rest of the tree. Omitted / null
+     * inherits the instantiation input's `workId`, which is what every
+     * pre-AH template does.
+     */
+    workId?: string | null;
+    /**
+     * Multi-repo decomposition (slice AH) — repositories this step's
+     * sub-task mounts beyond its Work's. Validated by THE Task validator
+     * (`normalizeTaskExtraRepos`); the NORMALIZED value is what gets
+     * stored, so mount dirs are canonicalised once at write time.
+     */
+    extraRepos?: TaskExtraRepo[] | null;
 }
 
 export interface CreateTaskTemplateInput {
@@ -143,6 +160,14 @@ const DEFAULT_TEMPLATE_STEPS: TaskTemplateStepInput[] = [
  * Owner-scoped throughout: cross-user template ids 404 (no existence
  * leak), and agent bindings are validated against the acting user before
  * a single row is written.
+ *
+ * Multi-repo decomposition (slice AH): a step may carry its OWN `workId`
+ * and `extraRepos`, so one template can span repositories. Both are
+ * owner-checked against the acting user — the Work by the same rule
+ * {@link assertOwnersReachable} applies to the tree, the repositories by
+ * THE Task validator (`normalizeTaskExtraRepos`) — at write time AND
+ * again at instantiation, and a stale one refuses rather than falling
+ * back to the tree's Work.
  */
 @Injectable()
 export class TaskTemplatesService {
@@ -163,6 +188,13 @@ export class TaskTemplatesService {
         @InjectRepository(Mission)
         private readonly missions?: Repository<Mission>,
         @Optional() private readonly ideas?: WorkProposalRepository,
+        // Multi-repo decomposition (slice AH): a step may carry its own
+        // `extraRepos`, validated by THE Task validator, which needs the
+        // owner's repository registry. Appended LAST + @Optional() so
+        // every positional construction in the specs keeps compiling;
+        // absent means a step WITH extraRepos is refused (never silently
+        // accepted unchecked), exactly like the Task path.
+        @Optional() private readonly repoConnections?: RepoConnectionRepository,
     ) {}
 
     /**
@@ -189,6 +221,7 @@ export class TaskTemplatesService {
         this.assertName(input.name);
         const steps = this.normalizeSteps(input.steps);
         await this.assertStepAgentsReachable(userId, steps);
+        await this.assertStepScopesReachable(userId, steps);
         const slug = this.slugify(input.slug || input.name);
         const existing = await this.templates.findBySlugAndUser(slug, userId);
         if (existing) {
@@ -226,6 +259,7 @@ export class TaskTemplatesService {
         if (input.steps !== undefined) {
             const steps = this.normalizeSteps(input.steps);
             await this.assertStepAgentsReachable(userId, steps);
+            await this.assertStepScopesReachable(userId, steps);
             await this.templates.replaceSteps(id, steps);
         }
         return this.getOne(userId, id);
@@ -258,6 +292,18 @@ export class TaskTemplatesService {
             throw new BadRequestException('Template has no steps to instantiate.');
         }
         await this.assertOwnersReachable(userId, input);
+        // Multi-repo decomposition (slice AH) — RE-validate every per-step
+        // Work + extraRepos HERE, not only at write time: a Work may have
+        // been deleted and a repository connection disabled since the
+        // template was saved.
+        //
+        // Unlike the agent binding below (a stale id silently skips the
+        // assignment), a stale step scope REFUSES with a 400 naming the
+        // step. The tree is ONE transaction, and a sub-task silently
+        // re-homed onto the parent's Work would file work — and push
+        // branches — against the wrong repository, which is strictly worse
+        // than a refusal the operator can fix.
+        const stepExtraRepos = await this.assertStepScopesReachable(userId, template.steps);
         // Validate agent bindings BEFORE allocating slugs / opening the
         // transaction, and remember which are assignable.
         const reachableAgentIds = new Set<string>();
@@ -317,6 +363,14 @@ export class TaskTemplatesService {
                         priority: input.priority ?? TaskPriority.P2,
                         labels: template.labels ?? null,
                         ...owners,
+                        // Multi-repo decomposition (slice AH): the step's
+                        // own Work wins over the tree's, so "step 1 in the
+                        // platform, step 2 in the template repo" is
+                        // expressible. `missionId` / `ideaId` stay the
+                        // tree's — a step re-homes a repository, not the
+                        // initiative that raised the work.
+                        workId: step.workId ?? owners.workId,
+                        extraRepos: stepExtraRepos.get(step.position) ?? null,
                         parentTaskId: parent.id,
                         createdByType: 'user' as const,
                         createdById: userId,
@@ -423,6 +477,10 @@ export class TaskTemplatesService {
                     throw new BadRequestException(`Step ${position} cannot depend on itself.`);
                 }
             }
+            const workId =
+                typeof step.workId === 'string'
+                    ? step.workId.trim() || null
+                    : (step.workId ?? null);
             return {
                 position,
                 title: step.title.trim(),
@@ -431,6 +489,12 @@ export class TaskTemplatesService {
                 agentTemplateSlug: step.agentTemplateSlug ?? null,
                 requiresApproval: step.requiresApproval ?? false,
                 dependsOn: dependsOn.length > 0 ? dependsOn : null,
+                // Multi-repo decomposition (slice AH). Carried through
+                // as-supplied here; `assertStepScopesReachable` is what
+                // proves the Work is the caller's and replaces
+                // `extraRepos` with its normalized form.
+                workId,
+                extraRepos: step.extraRepos ?? null,
             };
         });
         this.assertAcyclic(steps);
@@ -478,13 +542,7 @@ export class TaskTemplatesService {
         input: InstantiateTemplateInput,
     ): Promise<void> {
         if (input.workId) {
-            if (!this.works) {
-                throw new BadRequestException('Work repository not wired in this context.');
-            }
-            const work = await this.works.findById(input.workId);
-            if (!work || work.userId !== userId) {
-                throw new BadRequestException(`Work ${input.workId} not found.`);
-            }
+            await this.assertWorkReachable(userId, input.workId, `Work ${input.workId} not found.`);
         }
         if (input.missionId) {
             if (!this.missions) {
@@ -523,6 +581,90 @@ export class TaskTemplatesService {
                 );
             }
         }
+    }
+
+    /**
+     * The Work half of {@link assertOwnersReachable}, extracted because
+     * slice AH added a SECOND place a Work id is stamped on a Task the
+     * caller does not necessarily own (a template step's `workId`). One
+     * implementation, one rule: the Work must exist AND belong to the
+     * acting user, and a foreign id is reported exactly like a missing
+     * one so the endpoint is not an existence oracle.
+     */
+    private async assertWorkReachable(
+        userId: string,
+        workId: string,
+        notFoundMessage: string,
+    ): Promise<void> {
+        if (!this.works) {
+            throw new BadRequestException('Work repository not wired in this context.');
+        }
+        const work = await this.works.findById(workId);
+        if (!work || work.userId !== userId) {
+            throw new BadRequestException(notFoundMessage);
+        }
+    }
+
+    /**
+     * Multi-repo decomposition (slice AH) — the per-STEP scope guard.
+     *
+     * Security: a step's `workId` is stamped onto the sub-task it
+     * produces, so it needs the SAME ownership check
+     * {@link assertOwnersReachable} applies to the tree-level owners —
+     * otherwise a caller could file half a task tree against another
+     * user's Work. A step's `extraRepos` goes through THE Task validator
+     * (`normalizeTaskExtraRepos`), owner AND editor being the acting
+     * user, so a template step can never mount a connection its author
+     * cannot mount on a Task.
+     *
+     * Called on BOTH sides: at write time (create / update) so a bad step
+     * is refused before it is stored, and again at instantiation so a
+     * Work deleted (or a connection disabled) in between refuses instead
+     * of silently producing a differently-scoped tree.
+     *
+     * Returns the NORMALIZED `extraRepos` per step position, and writes
+     * the same value back onto the step objects so the write path stores
+     * the canonical form (mount dirs resolved once, at write time).
+     */
+    private async assertStepScopesReachable(
+        userId: string,
+        steps: Array<{
+            position?: number;
+            workId?: string | null;
+            extraRepos?: TaskExtraRepo[] | null;
+        }>,
+    ): Promise<Map<number, TaskExtraRepo[] | null>> {
+        const byPosition = new Map<number, TaskExtraRepo[] | null>();
+        for (const step of steps) {
+            const position = step.position ?? 0;
+            if (step.workId) {
+                await this.assertWorkReachable(
+                    userId,
+                    step.workId,
+                    `Work ${step.workId} on step ${position} is not reachable for this user.`,
+                );
+            }
+            let normalized: TaskExtraRepo[] | null = null;
+            if (step.extraRepos !== undefined && step.extraRepos !== null) {
+                try {
+                    normalized = await normalizeTaskExtraRepos(
+                        { repoConnections: this.repoConnections },
+                        userId,
+                        step.extraRepos,
+                        userId,
+                    );
+                } catch (err) {
+                    // Name the step: a template can have 30 of them, and
+                    // "Repository connection X is disabled" alone does not
+                    // say which one to fix.
+                    const message = err instanceof Error ? err.message : String(err);
+                    throw new BadRequestException(`Step ${position}: ${message}`);
+                }
+            }
+            step.extraRepos = normalized;
+            byPosition.set(position, normalized);
+        }
+        return byPosition;
     }
 
     private buildParentDescription(

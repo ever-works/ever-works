@@ -347,3 +347,157 @@ describe('formatUsd', () => {
         expect(formatUsd(100_000)).toBe('$1000.00');
     });
 });
+
+/**
+ * Concurrent iterations (self-build slice AH).
+ *
+ * The whole table ABOVE is the N=1 identity proof: it passes untouched,
+ * with no `maxConcurrentIterations` anywhere in it. These cases cover
+ * what changes only when a Goal opts in.
+ */
+describe('decideGoalLoop — concurrent iterations', () => {
+    it('is byte-identical at N=1, however the ceiling is spelled', () => {
+        const baseline = decideGoalLoop(input({ iteration: 4 }));
+        for (const maxConcurrentIterations of [undefined, null, 0, 1, -3, Number.NaN]) {
+            expect(decideGoalLoop(input({ iteration: 4, maxConcurrentIterations }))).toEqual(
+                baseline,
+            );
+        }
+        expect(baseline).toMatchObject({
+            action: 'dispatch',
+            agentIds: ['agent-1'],
+            iterations: [5],
+            nextIteration: 5,
+        });
+    });
+
+    it('still waits at N=1 with a run in flight, with the same reasoning string', () => {
+        const decision = decideGoalLoop(
+            input({ iteration: 7, hasRunInFlight: true, maxConcurrentIterations: 1 }),
+        );
+        expect(decision).toMatchObject({ action: 'wait', reasonCode: 'run-in-flight' });
+        expect(decision.reasoning).toBe('Iteration 7 is still running — router waiting.');
+    });
+
+    it('dispatches the free slots only — N minus what is in flight', () => {
+        const decision = decideGoalLoop(
+            input({
+                iteration: 10,
+                hasRunInFlight: true,
+                runsInFlight: 3,
+                maxConcurrentIterations: 4,
+                candidates: [candidate({ agentId: 'a1' }), candidate({ agentId: 'a2' })],
+            }),
+        );
+        expect(decision.action).toBe('dispatch');
+        expect(decision.iterations).toEqual([11]);
+        expect(decision.agentIds).toHaveLength(1);
+    });
+
+    it('dispatches consecutive iterations across the free slots', () => {
+        const decision = decideGoalLoop(
+            input({
+                iteration: 10,
+                runsInFlight: 0,
+                maxConcurrentIterations: 3,
+                candidates: [candidate({ agentId: 'a1' }), candidate({ agentId: 'a2' })],
+            }),
+        );
+        expect(decision.action).toBe('dispatch');
+        expect(decision.reasonCode).toBe('routed-round-robin');
+        expect(decision.iterations).toEqual([11, 12, 13]);
+        // Round-robin keyed on the iteration about to run, so the sequence
+        // is reproducible from the persisted counter alone.
+        expect(decision.agentIds).toEqual(['a2', 'a1', 'a2']);
+        // Scalars stay the first slot for every pre-AH reader.
+        expect(decision.agentId).toBe('a2');
+        expect(decision.nextIteration).toBe(11);
+        expect(decision.reasoning).toContain('11, 12 and 13');
+    });
+
+    it('gives every free slot to a pinned agent', () => {
+        const decision = decideGoalLoop(
+            input({
+                iteration: 2,
+                maxConcurrentIterations: 3,
+                candidates: [
+                    candidate({ agentId: 'pinned', source: 'assigned' }),
+                    candidate({ agentId: 'other' }),
+                ],
+            }),
+        );
+        expect(decision.reasonCode).toBe('routed-assigned-agent');
+        expect(decision.agentIds).toEqual(['pinned', 'pinned', 'pinned']);
+        expect(decision.iterations).toEqual([3, 4, 5]);
+        expect(decision.reasoning).toContain('3, 4 and 5');
+    });
+
+    it('waits once the ceiling is saturated, naming the count', () => {
+        const decision = decideGoalLoop(
+            input({
+                iteration: 9,
+                hasRunInFlight: true,
+                runsInFlight: 4,
+                maxConcurrentIterations: 4,
+            }),
+        );
+        expect(decision).toMatchObject({ action: 'wait', reasonCode: 'run-in-flight' });
+        expect(decision.reasoning).toBe(
+            '4 of 4 concurrent iterations are still running — router waiting for a slot.',
+        );
+    });
+
+    it('never lets a raised ceiling outrank a budget, a clock or the DoD', () => {
+        const wide = { maxConcurrentIterations: 5, runsInFlight: 0 } as const;
+        expect(
+            decideGoalLoop(input({ ...wide, spendCapCents: 500, spentCents: 500 })).reasonCode,
+        ).toBe('spend-cap-exceeded');
+        expect(
+            decideGoalLoop(
+                input({
+                    ...wide,
+                    wallClockLimitHours: 1,
+                    loopStartedAt: new Date(NOW.getTime() - 7_200_000),
+                }),
+            ).reasonCode,
+        ).toBe('wall-clock-exceeded');
+        expect(
+            decideGoalLoop(
+                input({
+                    ...wide,
+                    iteration: 9,
+                    lastProgressIteration: 1,
+                    stuckThresholdIterations: 3,
+                }),
+            ).reasonCode,
+        ).toBe('no-progress');
+        expect(decideGoalLoop(input({ ...wide, candidates: [] })).reasonCode).toBe(
+            'no-candidate-agent',
+        );
+    });
+
+    it('leaves the grace-period branch reading the BOOLEAN, not the count', () => {
+        // Grace exists so a session mid-write can land; it is about there
+        // being work in flight at all, not about how many slots are used.
+        const decision = decideGoalLoop(
+            input({
+                wallClockLimitHours: 1,
+                loopStartedAt: new Date(NOW.getTime() - 3_660_000),
+                gracePeriodMinutes: 30,
+                hasRunInFlight: true,
+                runsInFlight: 1,
+                maxConcurrentIterations: 4,
+            }),
+        );
+        expect(decision).toMatchObject({ action: 'wait', reasonCode: 'grace-period' });
+    });
+
+    it('falls back to the boolean when the caller counted nothing', () => {
+        expect(
+            decideGoalLoop(input({ hasRunInFlight: true, maxConcurrentIterations: 2 })).action,
+        ).toBe('dispatch');
+        expect(
+            decideGoalLoop(input({ hasRunInFlight: true, maxConcurrentIterations: 1 })).action,
+        ).toBe('wait');
+    });
+});

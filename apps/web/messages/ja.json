@@ -7150,6 +7150,8 @@
                     "wallClockHelp": "Measured from when the loop first started.",
                     "stuckThreshold": "Stuck after (iterations)",
                     "stuckThresholdHelp": "Iterations with no Definition-of-Done progress before the loop stops.",
+                    "maxConcurrentIterations": "Concurrent iterations",
+                    "maxConcurrentIterationsHelp": "How many iterations run at once (1-10). Leave empty for one at a time. Raise it only for a Goal whose iterations do not share a branch.",
                     "sessionBudget": "Session budget (minutes)",
                     "sessionBudgetHelp": "Advisory runtime budget handed to the routed agent.",
                     "gracePeriod": "Grace period (minutes)",

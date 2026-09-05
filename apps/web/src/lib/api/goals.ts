@@ -115,6 +115,8 @@ export interface Goal {
     spentCents: number;
     wallClockLimitHours: number | null;
     stuckThresholdIterations: number | null;
+    /** Concurrent iterations (slice AH). `null` = one at a time. */
+    maxConcurrentIterations: number | null;
     sessionBudgetMinutes: number | null;
     gracePeriodMinutes: number | null;
     executionTarget: GoalExecutionTarget | null;
@@ -183,6 +185,7 @@ export interface UpdateGoalLimitsInput {
     spendCapCents?: number | null;
     wallClockLimitHours?: number | null;
     stuckThresholdIterations?: number | null;
+    maxConcurrentIterations?: number | null;
     sessionBudgetMinutes?: number | null;
     gracePeriodMinutes?: number | null;
     executionTarget?: GoalExecutionTarget | null;

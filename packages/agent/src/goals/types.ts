@@ -73,6 +73,7 @@ export interface GoalDto {
     spentCents: number;
     wallClockLimitHours: number | null;
     stuckThresholdIterations: number | null;
+    maxConcurrentIterations: number | null;
     sessionBudgetMinutes: number | null;
     gracePeriodMinutes: number | null;
     executionTarget: GoalExecutionTarget | null;
@@ -121,6 +122,7 @@ export function toGoalDto(goal: Goal): GoalDto {
         spentCents: goal.spentCents ?? 0,
         wallClockLimitHours: goal.wallClockLimitHours ?? null,
         stuckThresholdIterations: goal.stuckThresholdIterations ?? null,
+        maxConcurrentIterations: goal.maxConcurrentIterations ?? null,
         sessionBudgetMinutes: goal.sessionBudgetMinutes ?? null,
         gracePeriodMinutes: goal.gracePeriodMinutes ?? null,
         executionTarget: goal.executionTarget ?? null,
@@ -267,6 +269,7 @@ export interface UpdateGoalLimitsInput {
     spendCapCents?: number | null;
     wallClockLimitHours?: number | null;
     stuckThresholdIterations?: number | null;
+    maxConcurrentIterations?: number | null;
     sessionBudgetMinutes?: number | null;
     gracePeriodMinutes?: number | null;
     executionTarget?: GoalExecutionTarget | null;
@@ -345,6 +348,17 @@ export interface GoalAdvanceResult {
     taskId?: string;
     runId?: string | null;
     iteration: number;
+    /**
+     * Concurrent iterations (slice AH) — one entry per iteration this
+     * advance dispatched. Length 1 unless the Goal raised
+     * `maxConcurrentIterations`, and the FIRST entry is always the same
+     * value `agentId` / `taskId` / `runId` / `iteration` above carry, so
+     * every pre-AH reader is unaffected.
+     */
+    agentIds?: string[];
+    taskIds?: string[];
+    runIds?: (string | null)[];
+    iterations?: number[];
 }
 
 /** Structured summary returned by `GoalOrchestratorService.advanceDue`. */
