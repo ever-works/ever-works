@@ -75,7 +75,9 @@
 				"minimal": {
 					"expect": "accept",
 					"note": "Token only — the enroll-replay probe in apps/web/e2e/flow-fleet-enrollment-contract.spec.ts.",
-					"body": { "token": "3nr0ll-t0k3n-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB" }
+					"body": {
+						"token": "3nr0ll-t0k3n-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+					}
 				}
 			},
 			"response": {
@@ -94,9 +96,21 @@
 				}
 			},
 			"nodeReadsResponseFields": [
-				{ "path": "nodeId", "type": "string", "reader": "fleet-client.ts readString(payload, 'nodeId')" },
-				{ "path": "secret", "type": "string", "reader": "fleet-client.ts readString(payload, 'secret')" },
-				{ "path": "node.id", "type": "string", "reader": "fleet-client.ts readNode()" }
+				{
+					"path": "nodeId",
+					"type": "string",
+					"reader": "fleet-client.ts readString(payload, 'nodeId')"
+				},
+				{
+					"path": "secret",
+					"type": "string",
+					"reader": "fleet-client.ts readString(payload, 'secret')"
+				},
+				{
+					"path": "node.id",
+					"type": "string",
+					"reader": "fleet-client.ts readNode()"
+				}
 			]
 		},
 		"heartbeat": {
@@ -153,7 +167,11 @@
 				}
 			},
 			"nodeReadsResponseFields": [
-				{ "path": "node.id", "type": "string", "reader": "fleet-client.ts readNode()" }
+				{
+					"path": "node.id",
+					"type": "string",
+					"reader": "fleet-client.ts readNode()"
+				}
 			],
 			"nodeIgnoresResponseFields": [
 				{
@@ -200,7 +218,13 @@
 					"createdAt": "2026-09-05T09:00:00.000Z"
 				}
 			},
-			"nodeReadsResponseFields": [{ "path": "node.id", "type": "string", "reader": "fleet-client.ts readNode()" }]
+			"nodeReadsResponseFields": [
+				{
+					"path": "node.id",
+					"type": "string",
+					"reader": "fleet-client.ts readNode()"
+				}
+			]
 		},
 		"unenroll": {
 			"method": "POST",
@@ -217,7 +241,9 @@
 					}
 				}
 			},
-			"response": { "ok": true },
+			"response": {
+				"ok": true
+			},
 			"nodeReadsResponseFields": [],
 			"nodeIgnoresResponseFields": [
 				{
@@ -261,7 +287,9 @@
 						"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
 						"targetNodeId": null,
 						"requiredCapabilities": ["workspace"],
-						"payload": { "runId": "9c8b7a6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d" },
+						"payload": {
+							"runId": "9c8b7a6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d"
+						},
 						"leaseExpiresAt": "2026-09-05T09:03:00.000Z",
 						"attempts": 1,
 						"maxAttempts": 3,
@@ -275,21 +303,35 @@
 					}
 				]
 			},
-			"emptyResponse": { "jobs": [] },
+			"emptyResponse": {
+				"jobs": []
+			},
 			"nodeReadsResponseFields": [
 				{
 					"path": "jobs",
 					"type": "array",
 					"reader": "job-client.ts Array.isArray(payload.jobs) — hard `malformed` throw otherwise"
 				},
-				{ "path": "jobs[].id", "type": "string", "reader": "worker-loop.ts" },
-				{ "path": "jobs[].kind", "type": "string", "reader": "worker-loop.ts executor selection" },
+				{
+					"path": "jobs[].id",
+					"type": "string",
+					"reader": "worker-loop.ts"
+				},
+				{
+					"path": "jobs[].kind",
+					"type": "string",
+					"reader": "worker-loop.ts executor selection"
+				},
 				{
 					"path": "jobs[].payload",
 					"type": "object|null",
 					"reader": "executors/{acceptance-checks,agent-task,browser-check}.ts"
 				},
-				{ "path": "jobs[].leaseExpiresAt", "type": "string|null", "reader": "worker-loop.ts lease bound" },
+				{
+					"path": "jobs[].leaseExpiresAt",
+					"type": "string|null",
+					"reader": "worker-loop.ts lease bound"
+				},
 				{
 					"path": "jobs[].leaseGeneration",
 					"type": "number",
@@ -348,7 +390,9 @@
 					"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
 					"targetNodeId": null,
 					"requiredCapabilities": ["workspace"],
-					"payload": { "runId": "9c8b7a6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d" },
+					"payload": {
+						"runId": "9c8b7a6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d"
+					},
 					"leaseExpiresAt": "2026-09-05T09:05:00.000Z",
 					"attempts": 1,
 					"maxAttempts": 3,
@@ -362,13 +406,21 @@
 				}
 			},
 			"nodeReadsResponseFields": [
-				{ "path": "ok", "type": "true", "reader": "job-client.ts !payload?.ok → `malformed`" },
+				{
+					"path": "ok",
+					"type": "true",
+					"reader": "job-client.ts !payload?.ok → `malformed`"
+				},
 				{
 					"path": "job",
 					"type": "object",
 					"reader": "job-client.ts typeof payload.job !== 'object' → `malformed`"
 				},
-				{ "path": "job.leaseExpiresAt", "type": "string|null", "reader": "worker-loop.ts renewed lease bound" }
+				{
+					"path": "job.leaseExpiresAt",
+					"type": "string|null",
+					"reader": "worker-loop.ts renewed lease bound"
+				}
 			]
 		},
 		"jobs-complete": {
@@ -386,7 +438,10 @@
 						"secret": "n0d3-s3cr3t-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 						"success": true,
 						"leaseGeneration": 1,
-						"result": { "exitCode": 0, "summary": "3 checks passed" }
+						"result": {
+							"exitCode": 0,
+							"summary": "3 checks passed"
+						}
 					}
 				},
 				"currentFailure": {
@@ -408,7 +463,9 @@
 						"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
 						"secret": "n0d3-s3cr3t-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 						"success": true,
-						"result": { "exitCode": 0 }
+						"result": {
+							"exitCode": 0
+						}
 					}
 				}
 			},
@@ -421,7 +478,9 @@
 					"nodeId": "3f7f5b3a-6c1d-4a0e-9d7c-1b2e5a8f4c31",
 					"targetNodeId": null,
 					"requiredCapabilities": ["workspace"],
-					"payload": { "runId": "9c8b7a6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d" },
+					"payload": {
+						"runId": "9c8b7a6d-5e4f-4a3b-2c1d-0e9f8a7b6c5d"
+					},
 					"leaseExpiresAt": null,
 					"attempts": 1,
 					"maxAttempts": 3,
@@ -445,11 +504,47 @@
 	},
 	"selfDescription": {
 		"note": "Set equality across three places. A field added to the DTO but forgotten in the controller's explicit mapping, or in the node's selfDescription() projection, is computed, logged and then silently never stored — exactly how cliVersion and diskFreeBytes were first wired at the probe end only.",
-		"dtoOptionalKeys": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
-		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
+		"dtoOptionalKeys": [
+			"platform",
+			"version",
+			"capabilities",
+			"cliVersion",
+			"diskFreeBytes",
+			"modelIdentity",
+			"workerState",
+			"workerStateReason"
+		],
+		"nodeEmits": [
+			"platform",
+			"version",
+			"capabilities",
+			"cliVersion",
+			"diskFreeBytes",
+			"modelIdentity",
+			"workerState",
+			"workerStateReason"
+		],
 		"controllerForwards": {
-			"enroll": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
-			"heartbeat": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"]
+			"enroll": [
+				"platform",
+				"version",
+				"capabilities",
+				"cliVersion",
+				"diskFreeBytes",
+				"modelIdentity",
+				"workerState",
+				"workerStateReason"
+			],
+			"heartbeat": [
+				"platform",
+				"version",
+				"capabilities",
+				"cliVersion",
+				"diskFreeBytes",
+				"modelIdentity",
+				"workerState",
+				"workerStateReason"
+			]
 		}
 	},
 	"platformStatusCodes": {
@@ -459,12 +554,29 @@
 			"guard": "FleetEnabledGuard",
 			"note": "Deliberately 404, not 403 — a disabled deployment must look like a route that was never mounted. The node has no 404 branch, so it collapses this to `invalid-request`: indistinguishable from a typo in the API URL. Documented in docs/runbooks/FLEET_BREAK_GLASS.md rather than changed."
 		},
-		"badNodeCredential": { "status": 401, "message": "Invalid node credential" },
-		"badEnrollmentToken": { "status": 401, "message": "Invalid or expired enrollment token" },
-		"staleLease": { "status": 409, "reason": "stale-lease" },
-		"nonUuidJobId": { "status": 400, "note": "ParseUUIDPipe rejects before any handler runs." },
-		"unknownRequestField": { "status": 400, "messagePattern": "property {field} should not exist" },
-		"throttled": { "status": 429 }
+		"badNodeCredential": {
+			"status": 401,
+			"message": "Invalid node credential"
+		},
+		"badEnrollmentToken": {
+			"status": 401,
+			"message": "Invalid or expired enrollment token"
+		},
+		"staleLease": {
+			"status": 409,
+			"reason": "stale-lease"
+		},
+		"nonUuidJobId": {
+			"status": 400,
+			"note": "ParseUUIDPipe rejects before any handler runs."
+		},
+		"unknownRequestField": {
+			"status": 400,
+			"messagePattern": "property {field} should not exist"
+		},
+		"throttled": {
+			"status": 429
+		}
 	},
 	"nodeStatusBranches": {
 		"note": "status → FleetClientError kind. Two DIFFERENT tables: the job channel has a 409 branch and the enroll/heartbeat channel does not.",
@@ -493,7 +605,12 @@
 	},
 	"killSwitch": {
 		"note": "Slice V / EW-778. The global stop flag is consulted inside lease, AFTER auth and BEFORE anything is claimed, and answers with an EMPTY LIST — not a 401, not a 403, not a 503. A 401 here would be read by every node as a revoked credential (job-client.ts maps lease-401 to `unauthorized`, which heartbeat.ts makes sticky and operator-visible), turning a reversible stop into a fleet-wide re-enrollment.",
-		"leaseWhenStopped": { "status": 200, "body": { "jobs": [] } },
+		"leaseWhenStopped": {
+			"status": 200,
+			"body": {
+				"jobs": []
+			}
+		},
 		"gatedVerbs": ["jobs-lease"],
 		"ungatedVerbs": ["jobs-heartbeat", "jobs-complete"],
 		"ungatedReason": "A stopped fleet must still settle the work it already holds, or a cancel-in-flight could never resolve."
