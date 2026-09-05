@@ -22,6 +22,32 @@ export const BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS = [
     'node',
 ] as const;
 
+/**
+ * Trusted review bots (self-build fleet, finding R16) — the GitHub logins
+ * whose pull-request reviews, inline findings and summary comments the
+ * webhook bridge records as Task rejection feedback (the loop the house
+ * rules mandate: poll the bot reviewers, fix P2+, repeat until clean).
+ *
+ * Every login was read off this repository's own PR history with
+ * `gh api`, not guessed. Copilot is two identities: its reviews are
+ * authored by `copilot-pull-request-reviewer[bot]` while the inline
+ * comments inside them carry the login `Copilot` (same user id), so both
+ * are listed. `github-actions[bot]` is deliberately ABSENT: it never
+ * reviews, and any workflow in the repository can post under it, which
+ * would make the allow-list only as trusted as the least-reviewed
+ * workflow file.
+ *
+ * All lower-case: GitHub logins are case-insensitive and the bridge
+ * compares canonical forms.
+ */
+export const DEFAULT_TRUSTED_REVIEW_BOTS = [
+    'coderabbitai[bot]',
+    'copilot-pull-request-reviewer[bot]',
+    'copilot',
+    'chatgpt-codex-connector[bot]',
+    'greptile-apps[bot]',
+] as const;
+
 export enum AuthProvider {
     LOCAL = 'local',
     GITHUB = 'github',
@@ -189,6 +215,60 @@ export const config = {
         callbackUrl: () => {
             const webUrl = config.webAppUrl();
             return process.env.GITHUB_APP_CALLBACK_URL || `${webUrl}/api/github-app/callback`;
+        },
+    },
+
+    /**
+     * Trusted review bots (self-build fleet, finding R16).
+     *
+     * `trustedLogins()` — `GITHUB_TRUSTED_REVIEW_BOTS`, comma separated.
+     * Unset / blank → {@link DEFAULT_TRUSTED_REVIEW_BOTS}. The literal
+     * `none` → an empty list (operator opt-out: every bot is dropped
+     * again, the pre-R16 posture). Otherwise the entries are trimmed,
+     * `@`-stripped, lower-cased and de-duplicated in operator order; there
+     * is no "known ids" filter because an operator may trust a reviewer
+     * bot this codebase has never met. A list that parses to nothing
+     * (`,,`) is treated as blank rather than as an opt-out — `none` is the
+     * only way to say "nobody", so a typo cannot silently mute every
+     * reviewer.
+     *
+     * `selfLogins()` — the platform's OWN reviewer identity, derived from
+     * `GITHUB_APP_SLUG` (GitHub renders an App's actions as
+     * `<slug>[bot]`). The bridge checks this set BEFORE the trusted one,
+     * so listing the app's own login under `GITHUB_TRUSTED_REVIEW_BOTS`
+     * changes nothing: the loop can never read its own output as
+     * reviewer feedback. That ordering is the security property; keep it.
+     * A slug pasted as `@ever-works` or `ever-works[bot]` is canonicalised
+     * first — a doubled `[bot][bot]` would leave the REAL login outside
+     * this set, and an allow-list entry could then let it in.
+     */
+    githubReviewBots: {
+        trustedLogins: (): string[] => {
+            const raw = (process.env.GITHUB_TRUSTED_REVIEW_BOTS ?? '').trim();
+            if (raw === '') {
+                return [...DEFAULT_TRUSTED_REVIEW_BOTS];
+            }
+            if (raw.toLowerCase() === 'none') {
+                return [];
+            }
+            const parsed = raw
+                .split(',')
+                .map((value) => value.trim().replace(/^@/, '').toLowerCase())
+                .filter((value) => value.length > 0);
+            const deduped = Array.from(new Set(parsed));
+            if (deduped.length === 0) {
+                return [...DEFAULT_TRUSTED_REVIEW_BOTS];
+            }
+            return deduped;
+        },
+        selfLogins: (): string[] => {
+            const slug = config.githubApp
+                .slug()
+                .trim()
+                .replace(/^@/, '')
+                .replace(/\[bot\]$/i, '')
+                .toLowerCase();
+            return [`${slug}[bot]`];
         },
     },
     facebook: {
