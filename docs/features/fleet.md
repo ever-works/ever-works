@@ -148,6 +148,8 @@ GET    /api/fleet/kill-switch/audit   platform admin: ?limit — recent audit ro
 
 Setting and clearing the flag is a platform-admin operation (`User.isPlatformAdmin`); there is no button for it on the owner's Fleet page, only the banner. `FLEET_NODE_RUNTIME_ENABLED` is **not** a panic control: it is a routing selector, and work it turns away from the fleet runs in the cloud instead.
 
+None of these help when the break is in the protocol itself — when the platform the nodes talk to is the thing that stopped working. That case has its own runbook, written to be followed with no working fleet at all: [Fleet break-glass](../runbooks/FLEET_BREAK_GLASS.md).
+
 ## Capabilities
 
 A node advertises capability tags (up to 16) such as `terminal`, `workspace` or `docker`. These describe what the node can host.
@@ -188,6 +190,36 @@ node apps/node/dist/cli.js start --work
 `start` alone only heartbeats; **`--work`** is the separate consent that lets the machine lease and execute platform jobs. `pause` / `resume` drain and undrain it, `unenroll` retires it, `status` and `capabilities` inspect it. Until the package is published, the binary is `apps/node/dist/cli.js` — the unattended-install scripts (systemd unit, Windows service, container image, in `apps/node/packaging/README.md`) expect a command named `ever-works-node` on `PATH`. The full command reference, the config-file and keychain layout, and the capability tags a node reports are in `apps/node/README.md`.
 
 A node also looks after its own disk. It refuses to lease (and to provision) while the volume holding its workspace root has less than a **disk floor** free — 2 GiB by default, `--min-free-disk <mb>` to change it — and shows up as `throttled` with the reason, so a full machine stops taking work before a job fails halfway through a fetch. With `--work` it also runs a **workspace reaper** that removes Task worktrees it can prove are safe to remove (owned, not in use, clean, fully pushed, and with a branch that is gone from the remote or merged) once they are older than `--workspace-max-age` (14 days by default); anything it cannot prove stays. `ever-works-node doctor` prints the free space against the floor and what the reaper would do, `ever-works-node gc [--dry-run]` runs it by hand. Details and the exact rules: `apps/node/README.md`, "Disk floor and workspace GC".
+
+#### Pinning the control plane
+
+A node's API origin is fixed at `enroll` and stored in its config file, which means a bad build on
+the origin every machine points at can take the whole fleet out at once — and the fix then has to
+travel develop → stage → main before the machines can come back. `EVER_WORKS_NODE_API_URL` is the
+way out: set it, restart the node, and **every** later call (heartbeat, lease, job heartbeat,
+complete, pause, unenroll) goes to that origin instead.
+
+```bash
+EVER_WORKS_NODE_API_URL=https://apistage.ever.works   # stage
+EVER_WORKS_NODE_API_URL=https://api.ever.works        # prod
+```
+
+It is an operator override, in the same family as `EVER_WORKS_NODE_CONFIG`, and it is deliberately
+narrow:
+
+- it does **not** apply to `enroll` — that mints a credential against the origin you name with
+  `--api-url`, and silently redirecting it would store a secret as belonging to a platform that
+  never issued it;
+- it is **never written back** to the config file, so unsetting the variable is a complete undo;
+- an empty or whitespace value counts as unset, so `EVER_WORKS_NODE_API_URL=` in a unit file turns
+  the override off rather than bricking the node;
+- a malformed value stops the node at startup with a URL error instead of becoming a mystifying
+  403/404 at the first request.
+
+`ever-works-node status` and `ever-works-node doctor` both print the effective origin and where it
+came from, and say so explicitly when a pin points somewhere the node is **not** enrolled — that
+combination authenticates against a platform that has never seen this machine, so every call is
+refused with 401. Full procedure: [Fleet break-glass](../runbooks/FLEET_BREAK_GLASS.md).
 
 ### Pin an agent to a node
 
@@ -307,3 +339,4 @@ but is not reported as a question.
 ## Related
 
 - [Desktop App](./desktop-app.md) · [Workers](./workers.md) · [Kubernetes Deployment](./k8s-deployment.md)
+- [Fleet break-glass runbook](../runbooks/FLEET_BREAK_GLASS.md) — shipping a fix when the fleet itself is down

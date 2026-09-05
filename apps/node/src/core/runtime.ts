@@ -1,3 +1,4 @@
+import { describeApiBase, resolveApiBase } from './api-base';
 import { PlatformAuthClient } from './auth-client';
 import {
 	describeSelf,
@@ -138,6 +139,11 @@ export async function enrollNode(options: EnrollNodeOptions): Promise<NodeConfig
 	const { logger } = options;
 	logger.protect(options.token);
 
+	// DELIBERATELY not `resolveApiBase`. Enrollment mints a credential against
+	// a SPECIFIC platform, and the origin it was minted against is what gets
+	// stored — so the operator's `--api-url` is authoritative here and the
+	// `EVER_WORKS_NODE_API_URL` pin must not silently redirect it. Pinning
+	// applies to every LATER call (see `createNodeRuntime`), never to this one.
 	const client = new FleetClient({
 		apiUrl: options.apiUrl,
 		fetchFn: options.fetchFn,
@@ -310,6 +316,14 @@ export interface CreateNodeRuntimeOptions {
 	 * how `ever-works-node pause` survives a service restart.
 	 */
 	startPaused?: boolean;
+
+	/**
+	 * Environment the control-plane pin (`EVER_WORKS_NODE_API_URL`) is read
+	 * from. Defaults to `process.env`; a parameter because both shells — the
+	 * CLI and the Electron main process — and every test need to supply
+	 * their own. See `api-base.ts`.
+	 */
+	env?: Record<string, string | undefined>;
 }
 
 /**
@@ -321,8 +335,21 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	io.logger.protect(config.secret);
 
 	const userAgent = io.userAgent ?? `ever-works-node/${io.version}`;
+	// Self-hosting safety (EW-779): an operator can pin the control plane to a
+	// stable origin so a broken `develop` cannot orphan the machine. Resolved
+	// ONCE here and shared by the heartbeat and job clients, so the two can
+	// never end up talking to different platforms.
+	const apiBase = resolveApiBase(config, options.env ?? process.env);
+	io.logger.info(`Control plane: ${describeApiBase(apiBase)}`);
+	if (apiBase.mismatch) {
+		io.logger.warn(
+			`The pinned control plane (${apiBase.url}) is not the origin this node enrolled against ` +
+				`(${apiBase.configuredUrl}). Every call will be refused with 401 until the pin is ` +
+				'corrected or the node is re-enrolled.'
+		);
+	}
 	const client = new FleetClient({
-		apiUrl: config.apiUrl,
+		apiUrl: apiBase.url,
 		fetchFn: io.fetchFn,
 		logger: io.logger,
 		userAgent
@@ -354,7 +381,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 
 	if (options.workerEnabled) {
 		const jobClient = new FleetJobClient({
-			apiUrl: config.apiUrl,
+			apiUrl: apiBase.url,
 			nodeId: config.nodeId,
 			secret: config.secret,
 			fetchFn: io.fetchFn,
@@ -516,7 +543,7 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 export async function pauseNode(config: NodeConfig, io: NodeIo, paused: boolean): Promise<FleetNodeView> {
 	io.logger.protect(config.secret);
 	const client = new FleetClient({
-		apiUrl: config.apiUrl,
+		apiUrl: resolveApiBase(config).url,
 		fetchFn: io.fetchFn,
 		logger: io.logger,
 		userAgent: io.userAgent ?? `ever-works-node/${io.version}`
@@ -536,7 +563,7 @@ export async function pauseNode(config: NodeConfig, io: NodeIo, paused: boolean)
 export async function unenrollNode(config: NodeConfig, io: NodeIo): Promise<void> {
 	io.logger.protect(config.secret);
 	const client = new FleetClient({
-		apiUrl: config.apiUrl,
+		apiUrl: resolveApiBase(config).url,
 		fetchFn: io.fetchFn,
 		logger: io.logger,
 		userAgent: io.userAgent ?? `ever-works-node/${io.version}`

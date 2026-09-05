@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CapabilityEnvironment, CommandRunner } from '../core/capabilities';
 import { parseConfig, type ConfigFileSystem } from '../core/config-store';
 import type { FetchLike } from '../core/fleet-client';
@@ -447,6 +447,60 @@ describe('ever-works-node doctor', () => {
 	it('rejects a relative --workspace-root as a usage error', async () => {
 		const h = harness();
 		expect(await runCli(['doctor', '--workspace-root', 'relative/dir'], h.deps)).toBe(EXIT_FAILURE);
+	});
+
+	// EW-779 — `doctor` printed nothing at all about the control plane, which
+	// made "the fleet cannot reach the platform" undiagnosable from the one
+	// command an operator is told to run. It is also the surface the
+	// break-glass runbook uses to confirm a pin took effect.
+	describe('the control plane', () => {
+		afterEach(() => {
+			vi.unstubAllEnvs();
+		});
+
+		it('names the enrolled origin when nothing is pinned', async () => {
+			const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+			expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], h.deps)).toBe(EXIT_OK);
+			expect(h.output()).toContain('api          https://api.ever.works (from the enrolled config)');
+		});
+
+		it('reports a pin, and warns when it is not the enrolled origin', async () => {
+			vi.stubEnv('EVER_WORKS_NODE_API_URL', 'https://apistage.ever.works');
+			const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+			expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], h.deps)).toBe(EXIT_OK);
+			expect(h.output()).toContain('PINNED via EVER_WORKS_NODE_API_URL');
+			expect(h.output()).toContain('enrolled against https://api.ever.works');
+		});
+
+		it('reports a pin set before enrollment, so a machine can be provisioned against stage', async () => {
+			vi.stubEnv('EVER_WORKS_NODE_API_URL', 'https://apistage.ever.works');
+			const h = harness();
+			expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], h.deps)).toBe(EXIT_OK);
+			expect(h.output()).toContain('this machine is not enrolled yet');
+		});
+
+		it('--json carries the pin, its source and the mismatch flag', async () => {
+			vi.stubEnv('EVER_WORKS_NODE_API_URL', 'https://apistage.ever.works');
+			const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+			expect(await runCli(['doctor', '--workspace-root', '/srv/fleet', '--json'], h.deps)).toBe(EXIT_OK);
+			expect(JSON.parse(h.output()) as Record<string, unknown>).toMatchObject({
+				apiUrl: 'https://apistage.ever.works',
+				apiUrlSource: 'pin',
+				enrolledApiUrl: 'https://api.ever.works',
+				apiUrlPinMismatch: true
+			});
+		});
+
+		it('stays exit-0 and still prints the plan when the pin is malformed', async () => {
+			// `doctor` is read-only and exits 0 even when it finds something
+			// wrong — the finding IS the output. A broken pin is a finding, not
+			// a reason to produce nothing.
+			vi.stubEnv('EVER_WORKS_NODE_API_URL', 'nope://bad');
+			const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+			expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], h.deps)).toBe(EXIT_OK);
+			expect(h.output()).toContain('EVER_WORKS_NODE_API_URL is set to an invalid URL');
+			expect(h.output()).toContain('workspace    /srv/fleet');
+		});
 	});
 });
 
