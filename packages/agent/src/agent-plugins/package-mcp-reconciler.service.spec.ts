@@ -283,10 +283,15 @@ describe('PackageMcpReconcilerService', () => {
         expect(repo.create).not.toHaveBeenCalled();
     });
 
-    it('skips a stdio server as UNSUPPORTED-TRANSPORT once the gate is open', async () => {
-        // With stdio allowed the resolver hands it over, and the reconciler
-        // refuses it for its own reason: a connection row is URL-shaped, and a
-        // stdio server is launched rather than connected to.
+    /**
+     * AP-14. A stdio server becomes a connection row like any other package
+     * server — DISABLED and unbound — so it inherits the whole authorisation
+     * story rather than needing a second one built for the transport that
+     * runs local code. Its `url` is the opaque `stdio:<package>/<server>`
+     * pointer; nothing dials it, `McpToolSource` reads it back to know which
+     * package server to launch.
+     */
+    it('creates a stdio server as a DISABLED connection once the gate is open', async () => {
         process.env.AGENT_PLUGINS_STDIO = 'true';
         await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
             local: { type: 'stdio', command: './bin/server' },
@@ -295,9 +300,33 @@ describe('PackageMcpReconcilerService', () => {
 
         const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
 
-        expect(result.created).toEqual([]);
-        expect(result.skipped[0]?.code).toBe('unsupported-transport');
-        expect(repo.create).not.toHaveBeenCalled();
+        expect(result.skipped).toEqual([]);
+        expect(result.created).toHaveLength(1);
+        expect(repo.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                transport: 'stdio',
+                url: 'stdio:acme.tools/local',
+                source: 'package',
+                // The gate that makes putting it in this table safe.
+                enabled: false,
+                authHeaders: null,
+            }),
+        );
+    });
+
+    it('does not apply the public-address guard to a stdio pointer', async () => {
+        // `stdio:` is not an http(s) URL and would fail isSafeWebhookUrl. The
+        // guard is for addresses something dials; this is a pointer.
+        process.env.AGENT_PLUGINS_STDIO = 'true';
+        await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
+            local: { type: 'stdio', command: './bin/server' },
+        });
+        const { service, repo } = build();
+
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
+
+        expect(result.skipped.map((entry) => entry.code)).not.toContain('unsafe-url');
+        expect(repo.create).toHaveBeenCalled();
     });
 
     it('carries forward what the resolver already refused, in one report', async () => {

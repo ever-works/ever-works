@@ -309,3 +309,101 @@ describe('createStdioTransportFactory', () => {
         await expect(spawnWriting(200_000)).resolves.toBe(true);
     }, 30000);
 });
+
+/**
+ * `launchClient` — the AP-14 sibling of `launch()`.
+ *
+ * Same gate, same plan, same shutdown-generation race guard; the difference
+ * is that the SDK client starts the transport. `connect` is `protected`
+ * precisely so these can drive the lifecycle without spawning: the real
+ * connect path has its own spec against a real child process
+ * (`mcp/__tests__/mcp-sdk-stdio.spec.ts`), because a seam every test stubs is
+ * a seam nothing runs.
+ */
+describe('AgentPluginStdioServerService.launchClient', () => {
+    class TestableService extends AgentPluginStdioServerService {
+        public readonly connects: Array<Record<string, unknown>> = [];
+        public readonly closes: string[] = [];
+        public connectImpl: (() => Promise<void>) | null = null;
+
+        protected override async connect(params: {
+            command: string;
+            args: string[];
+            env: Record<string, string>;
+            cwd: string;
+        }) {
+            this.connects.push(params);
+            if (this.connectImpl) await this.connectImpl();
+            return {
+                client: { id: 'client' } as never,
+                close: async () => {
+                    this.closes.push('closed');
+                },
+            };
+        }
+    }
+
+    let svc: TestableService;
+
+    beforeEach(() => {
+        process.env.AGENT_PLUGINS_STDIO = 'true';
+        svc = new TestableService(new AgentPluginPackageDataDirService());
+    });
+
+    const req = () => ({
+        server: { type: 'stdio' as const, command: 'node', args: ['${PLUGIN_ROOT}/index.js'] },
+        packageRoot: pkg,
+        userId: 'user-1',
+        packageName: 'acme.tools',
+    });
+
+    it('REFUSES while the gate is closed, without connecting anything', async () => {
+        process.env.AGENT_PLUGINS_STDIO = 'false';
+
+        await expect(svc.launchClient(req())).rejects.toThrow('disabled by policy');
+        expect(svc.connects).toHaveLength(0);
+    });
+
+    it('hands the connection the planned command, args and cwd', async () => {
+        const running = await svc.launchClient(req());
+
+        expect(svc.connects[0]).toEqual(
+            expect.objectContaining({ command: 'node', cwd: expect.any(String) }),
+        );
+        expect(running.client).toEqual({ id: 'client' });
+    });
+
+    it('registers with the service, so shutdownAll stops a client-launched server too', async () => {
+        await svc.launchClient(req());
+
+        const result = await svc.shutdownAll();
+
+        expect(result.stopped).toBe(1);
+        expect(svc.closes).toEqual(['closed']);
+    });
+
+    it('closing the handle forgets it, so a later shutdownAll does not double-close', async () => {
+        const running = await svc.launchClient(req());
+        await running.close();
+
+        const result = await svc.shutdownAll();
+
+        expect(svc.closes).toEqual(['closed']);
+        expect(result.stopped).toBe(0);
+    });
+
+    /**
+     * The race the generation counter exists for: a shutdown that snapshots
+     * the running set while this launch is still connecting would never see
+     * the new server. It must stop itself rather than register into a set
+     * nothing will drain again.
+     */
+    it('stops itself when a shutdown began while it was connecting', async () => {
+        svc.connectImpl = async () => {
+            await svc.shutdownAll();
+        };
+
+        await expect(svc.launchClient(req())).rejects.toThrow('Shutdown began');
+        expect(svc.closes).toEqual(['closed']);
+    });
+});

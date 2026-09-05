@@ -75,6 +75,17 @@ export function createSdkMcpClientFactory(): McpClientFactory {
             // address passes it.
             const fetchImpl = createGuardedFetch();
 
+            if (transport === 'stdio') {
+                // Unreachable through this factory by construction: a stdio
+                // connection is launched by `McpStdioLauncher`, never dialled.
+                // Stated rather than assumed, because `new URL('stdio:a/b')`
+                // parses happily and the HTTP branch below would then fail
+                // with something misleading about the transport instead.
+                throw new Error(
+                    'A stdio MCP server is launched as a subprocess, not connected to by URL.',
+                );
+            }
+
             if (transport === 'sse') {
                 const { SSEClientTransport } =
                     await import('@modelcontextprotocol/sdk/client/sse.js');
@@ -89,6 +100,60 @@ export function createSdkMcpClientFactory(): McpClientFactory {
                 );
             }
             return client as unknown as McpSdkClient;
+        },
+    };
+}
+
+/**
+ * Spawn a stdio MCP server and return a CONNECTED client for it (AP-14).
+ *
+ * Two orderings here are load-bearing, and both are why this could not reuse
+ * `AgentPluginStdioServerService.launch`:
+ *
+ *  1. `Client.connect(transport)` calls `transport.start()` itself, and
+ *     `StdioClientTransport.start()` THROWS if the transport was already
+ *     started. So the transport is handed over unstarted — the sibling
+ *     `launch()` starts it standalone, which is right for a server nothing
+ *     talks to and wrong for one a client owns.
+ *  2. The stderr drain is attached BEFORE connect, not after. With
+ *     `stderr: 'pipe'` the SDK creates the PassThrough in the transport's
+ *     CONSTRUCTOR and returns it from `.stderr` immediately, precisely so a
+ *     caller can listen before the child exists. Draining after connect
+ *     deadlocks: a server that logs on startup fills the 16 KB PassThrough
+ *     plus the ~64 KB OS pipe and blocks mid-write, so it never reads the
+ *     `initialize` request, so connect never resolves, so the drain is never
+ *     attached. Measured with a 200 KB flood; a token-sized one passes either
+ *     way. `'pipe'` itself is deliberate: `'inherit'` would let a package
+ *     forge lines into the platform log.
+ */
+export async function createStdioSdkClient(params: {
+    command: string;
+    args: string[];
+    env: Record<string, string>;
+    cwd: string;
+}): Promise<{ client: McpSdkClient; close(): Promise<void> }> {
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
+    const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
+
+    const transport = new StdioClientTransport({ ...params, stderr: 'pipe' });
+    const client = new Client({ name: 'ever-works-agent', version: '1.0.0' }, { capabilities: {} });
+
+    // Before connect. See (2) above — after is a deadlock, not a style choice.
+    transport.stderr?.on('data', () => undefined);
+
+    try {
+        await client.connect(transport);
+    } catch (err) {
+        // The child may already be running even though initialization failed.
+        await transport.close().catch(() => undefined);
+        throw err;
+    }
+
+    return {
+        client: client as unknown as McpSdkClient,
+        close: async () => {
+            await client.close().catch(() => undefined);
+            await transport.close().catch(() => undefined);
         },
     };
 }

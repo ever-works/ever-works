@@ -59,6 +59,57 @@ export class McpClientService {
      * stamp + rethrow — callers decide whether a dead server is fatal
      * (the test endpoint) or isolated (run assembly).
      */
+    /**
+     * List tools over a client the CALLER owns and keeps (AP-14).
+     *
+     * The dial-per-call shape of `listTools`/`callTool` is right for an HTTP
+     * server and wrong for a stdio one, where "connect" means "spawn": a
+     * reconnect per tool call would respawn the subprocess every time. The
+     * run-scoped path therefore opens one client, hands it here, and closes
+     * it at run end — while timeouts, error classification, the result cap
+     * and status stamping stay in this one place rather than being
+     * reimplemented alongside.
+     */
+    async listToolsOver(
+        client: McpSdkClient,
+        connection: McpServerConnection,
+    ): Promise<McpToolInfo[]> {
+        try {
+            const result = await client.listTools(undefined, { timeout: MCP_LIST_TIMEOUT_MS });
+            const tools = (result.tools ?? []).map((tool) => this.normalizeTool(tool));
+            await this.stamp(connection, { ok: true });
+            return tools;
+        } catch (err) {
+            const message = this.classifyError(err, connection);
+            await this.stamp(connection, { ok: false, error: message });
+            throw new Error(message);
+        }
+    }
+
+    /** Call one tool over a caller-owned client. See {@link listToolsOver}. */
+    async callToolOver(
+        client: McpSdkClient,
+        connection: McpServerConnection,
+        toolName: string,
+        args: Record<string, unknown>,
+        options: { timeoutMs?: number } = {},
+    ): Promise<unknown | { error: string }> {
+        const timeout = options.timeoutMs ?? MCP_CALL_TIMEOUT_MS;
+        try {
+            const result = await this.withTimeout(
+                client.callTool({ name: toolName, arguments: args }, undefined, { timeout }),
+                timeout,
+                `MCP tool "${toolName}" timed out after ${timeout}ms.`,
+            );
+            await this.stamp(connection, { ok: true });
+            return this.capResultSize(result);
+        } catch (err) {
+            const message = this.classifyError(err, connection);
+            await this.stamp(connection, { ok: false, error: message });
+            return { error: `MCP server "${connection.name}": ${message}` };
+        }
+    }
+
     async listTools(
         connection: McpServerConnection,
         options: { bypassCache?: boolean } = {},
