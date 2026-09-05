@@ -23,6 +23,11 @@ import { serverFetch, serverMutation } from './server-api';
 import type {
     FleetAgentNodeAffinityView,
     FleetCostCeilingView,
+    FleetAuditView,
+    FleetCancelInFlightResult,
+    FleetDrainAllResult,
+    FleetKillSwitchChangeResult,
+    FleetKillSwitchState,
     FleetNodeDetailView,
     FleetNodeDrainResult,
     FleetEnrollmentTokenView,
@@ -35,9 +40,14 @@ import type {
 export type {
     FleetAgentNodeAffinityView,
     FleetCostCeilingView,
+    FleetAuditView,
+    FleetCancelInFlightResult,
+    FleetDrainAllResult,
     FleetJobKind,
     FleetJobStatus,
     FleetJobView,
+    FleetKillSwitchChangeResult,
+    FleetKillSwitchState,
     FleetNodeKind,
     FleetNodeStatus,
     FleetNodeView,
@@ -52,6 +62,12 @@ export type {
     FleetRunnerNodeView,
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
+
+/** Body of `POST /api/fleet/cancel-in-flight`. */
+export interface CancelFleetInFlightPayload {
+    /** Also fail queued jobs nothing has started. Default false. */
+    includeQueued?: boolean;
+}
 
 export interface CreateFleetEnrollmentTokenPayload {
     name: string;
@@ -226,6 +242,58 @@ export const fleetAPI = {
             method: 'PUT',
             wrapInData: false,
         });
+    },
+
+    /**
+     * Panic controls (EW-778). Draining and cancelling are two routes on
+     * purpose — stopping new work is not killing running work — and the
+     * stop flag is READ here by any session while SET/CLEAR are platform-
+     * admin routes (the API answers 403 for everyone else).
+     */
+    drainAll: async () => {
+        return serverMutation<FleetDrainAllResult>({
+            endpoint: `${BASE}/drain-all`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    cancelInFlight: async (payload: CancelFleetInFlightPayload = {}) => {
+        return serverMutation<FleetCancelInFlightResult>({
+            endpoint: `${BASE}/cancel-in-flight`,
+            data: { includeQueued: payload.includeQueued === true },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Polled by the fleet page banner; a read, so no cache invalidation. */
+    killSwitchState: async () => {
+        return serverFetch<FleetKillSwitchState>(`${BASE}/kill-switch`);
+    },
+
+    stopKillSwitch: async (reason?: string | null) => {
+        return serverMutation<FleetKillSwitchChangeResult>({
+            endpoint: `${BASE}/kill-switch/stop`,
+            data: reason ? { reason } : {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    clearKillSwitch: async () => {
+        return serverMutation<FleetKillSwitchChangeResult>({
+            endpoint: `${BASE}/kill-switch/clear`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    killSwitchAudit: async (limit?: number) => {
+        const query = typeof limit === 'number' && limit > 0 ? `?limit=${Math.trunc(limit)}` : '';
+        return serverFetch<FleetAuditView[]>(`${BASE}/kill-switch/audit${query}`);
     },
 
     /**

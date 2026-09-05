@@ -1,4 +1,5 @@
 import type { RunCreditsPrecheck } from './run-credits-precheck';
+import type { RunKillSwitch } from './run-kill-switch';
 import type { RunPlanLimits } from './run-plan-limits';
 
 /**
@@ -16,8 +17,9 @@ import type { RunPlanLimits } from './run-plan-limits';
  * order is data (`DEFAULT_RUN_ADMISSION_CHAIN`) rather than control flow.
  *
  * The refactor that introduced this file was a STRUCTURAL change only.
- * The shipped order today is: Work valve, org/user valve, then the
- * (kill-switched, fail-open) credits precheck.
+ * The shipped order today is: the global stop flag (EW-778, fail-CLOSED),
+ * then the Work valve, the org/user valve, and the (env-gated, fail-open)
+ * credits precheck.
  *
  * The org valve additionally folds in the plan's `max-concurrent-runs`
  * entitlement as a RAISE-ONLY adjustment — see its docblock for why it
@@ -29,6 +31,14 @@ export const QUEUED_REASON_CONCURRENCY = 'concurrency-limit' as const;
 
 /** Stamped when the soft credits precheck parks a run. Re-exported by the gate service. */
 export const QUEUED_REASON_INSUFFICIENT_CREDITS = 'insufficient-credits' as const;
+
+/**
+ * Panic controls (EW-778) — stamped when the GLOBAL STOP FLAG parks a
+ * run. Re-exported by the gate service. Promoted by
+ * `RunDispatchGateService.promoteParked` once the flag is cleared, and
+ * exempt from the stuck-run sweeper for as long as it is set.
+ */
+export const QUEUED_REASON_KILL_SWITCH = 'kill-switch' as const;
 
 export interface RunAdmissionInput {
     userId: string;
@@ -70,6 +80,8 @@ export interface RunAdmissionContext {
     readonly creditsPrecheck?: RunCreditsPrecheck;
     readonly isPlanConcurrencyEnabled: () => boolean;
     readonly planLimits?: RunPlanLimits;
+    /** EW-778 — the global stop flag port. Absent = no fleet stack bound. */
+    readonly killSwitch?: RunKillSwitch;
 }
 
 export type RunAdmissionNext = () => Promise<RunAdmissionVerdict>;
@@ -105,6 +117,39 @@ export function composeRunAdmission(
         return dispatch(0);
     };
 }
+
+/**
+ * Panic controls (EW-778) — the GLOBAL STOP FLAG, first in the chain.
+ *
+ * When the flag is set, EVERY new run is parked with `kill-switch`
+ * before any counter is consulted — a stopped platform must not spend a
+ * count query, and a parked run must carry the reason an operator will
+ * look for. Absent port ⇒ pass-through (no fleet stack bound).
+ *
+ * 🛑 FAIL CLOSED, and NEVER THROW. `RunDispatchGateService.admit()`
+ * swallows a throwing chain and admits the run (the concurrency valves
+ * are fail-open by design, and that catch protects them). A stop flag
+ * that could not be read must therefore be converted into a PARK verdict
+ * right here, or the very failure it exists to survive would let work
+ * through.
+ */
+export const killSwitchAdmission: RunAdmissionMiddleware = async (context, next) => {
+    const { input, logger, killSwitch } = context;
+    if (!killSwitch) return next();
+    let halted: boolean;
+    try {
+        halted = await killSwitch.shouldHaltDispatch();
+    } catch (err) {
+        logger.warn(
+            `Dispatch gate: global stop flag could not be read for user ${input.userId} ` +
+                `— queueing (fail-closed): ${err}`,
+        );
+        halted = true;
+    }
+    if (!halted) return next();
+    logger.log(`Dispatch gate: global stop flag is set — queueing run for user ${input.userId}.`);
+    return { admitted: false, queuedReason: QUEUED_REASON_KILL_SWITCH };
+};
 
 /**
  * Per-Work concurrency valve. A limit of `<= 0` disables it entirely —
@@ -265,11 +310,14 @@ export const creditsAdmission: RunAdmissionMiddleware = async (context, next) =>
 };
 
 /**
- * The shipped order. Concurrency wins over credits by construction —
- * a saturated Work parks with `concurrency-limit` and never spends a
- * billing query, which is exactly what the pre-refactor ladder did.
+ * The shipped order. The stop flag outranks everything (a stopped
+ * platform parks with `kill-switch` and spends no count query at all);
+ * below it, concurrency wins over credits by construction — a saturated
+ * Work parks with `concurrency-limit` and never spends a billing query,
+ * which is exactly what the pre-refactor ladder did.
  */
 export const DEFAULT_RUN_ADMISSION_CHAIN: readonly RunAdmissionMiddleware[] = [
+    killSwitchAdmission,
     workConcurrencyAdmission,
     orgConcurrencyAdmission,
     creditsAdmission,

@@ -14,6 +14,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_MCP_TOOL_SOURCE,
     SKILL_FILE_CONTENT_READER,
+    RUN_KILL_SWITCH,
     AgentEscalationService,
     RunSteeringService,
     WorkflowGraphExecutorService,
@@ -77,7 +78,12 @@ import {
 import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/ingest';
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
-import { FleetJobService, FleetModule, FleetService } from '@ever-works/agent/fleet';
+import {
+    FleetJobService,
+    FleetKillSwitchService,
+    FleetModule,
+    FleetService,
+} from '@ever-works/agent/fleet';
 import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import {
@@ -264,6 +270,15 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // TasksDomainModule, and neither package gains a runtime import of
         // the other.
         { provide: RUN_STEERING_PORT, useExisting: RunSteeringService },
+        // Panic controls (EW-778) — bind the GLOBAL STOP FLAG port the
+        // dispatch gate consults. Same @Global() reasoning as
+        // RUN_CREDITS_PRECHECK in SubscriptionsModule: the gate lives in
+        // the agent-side AgentsModule and reads this token through an
+        // @Optional() @Inject(), which would silently resolve to undefined
+        // — and leave the stop flag dark for every new run — if this
+        // binding were not global AND exported. `FleetModule` (imported
+        // above) exports FleetKillSwitchService.
+        { provide: RUN_KILL_SWITCH, useExisting: FleetKillSwitchService },
         // Streaming terminal — the two halves of the session dispatch.
         //
         // TERMINAL_SESSION_DISPATCHER is the job-runtime producer for the
@@ -938,6 +953,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         RUN_STEERING_PORT,
         TERMINAL_SESSION_DISPATCHER,
         TERMINAL_SESSION_STARTER,
+        RUN_KILL_SWITCH,
     ],
 })
 export class AgentsModule {}

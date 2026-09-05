@@ -143,6 +143,8 @@ import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.en
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
 import { FleetJob } from '../entities/fleet-job.entity';
+import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
+import { FleetAudit } from '../entities/fleet-audit.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
@@ -358,6 +360,11 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Panic controls (EW-778) — the single-row global stop flag read by
+    // the dispatch gate, the run router and every lease request, and the
+    // append-only audit trail every panic action writes to.
+    FleetKillSwitch,
+    FleetAudit,
     // Inbox (operator message center) — messages addressed to the human:
     // blocking questions, approval requests, escalation mirrors, notices.
     InboxItem,

@@ -71,6 +71,7 @@ describe('FleetController runner status + execution preferences', () => {
                 describeForUser: jest.fn(async () => null),
                 setFleetCeilingForUser: jest.fn(async () => null),
             } as never,
+            { drainNodeForUser: jest.fn(async () => null) } as never,
         );
     });
 

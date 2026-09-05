@@ -73,6 +73,27 @@ The **node drawer** on the Fleet page (the details action on a row) renders the 
 
 Everything here is owner-scoped: another account's node id is indistinguishable from one that does not exist.
 
+## Panic controls
+
+Every control above is per node. Stopping six autonomous machines at 2am must not mean six drain calls or an ArgoCD sync, so three controls exist that act on the whole fleet — and they are three **different decisions**, kept on three different routes on purpose.
+
+```
+POST   /api/fleet/drain-all           owner: disable EVERY node I own, requeue their in-flight claims
+POST   /api/fleet/cancel-in-flight    owner: { includeQueued? } cancel my running fleet jobs + their agent runs
+GET    /api/fleet/kill-switch         any session: is the platform-wide stop flag set?
+POST   /api/fleet/kill-switch/stop    platform admin: { reason? } set the stop flag
+POST   /api/fleet/kill-switch/clear   platform admin: clear it and resume the runs it parked
+GET    /api/fleet/kill-switch/audit   platform admin: ?limit — recent audit rows (actor + time)
+```
+
+**Drain all** is the per-node drain applied to every enrolled node you own (nodes still enrolling or already disabled are skipped). Nothing is cancelled: the work goes back to the queue and waits for a node that may take it. The Fleet page carries it under **Panic controls**.
+
+**Cancel in-flight** is the explicit second step. It cancels every leased / running fleet job you own and the agent run behind each (run row first, then the job, the same order the per-run cancel uses). A node learns of it through its next refused heartbeat, so this is "cancel requested", not an instant kill — a job that is about to finish may still report. `includeQueued: true` extends it to queued jobs nothing has started. It is never implied by draining, and never by the stop flag.
+
+**The global stop flag** is a DB-backed switch (`fleet_kill_switch`, one row) checked at three points before any new unit of work can start: the run dispatch gate (every new agent run is parked with `queuedReason: kill-switch`), the fleet run router (a run that reaches routing is refused, never sent to the cloud instead) and every lease request (a node polling for work gets an empty batch). Running work keeps running and keeps reporting; heartbeats and completions are not gated, so a stopped fleet can still settle. **Reads fail closed**: a flag that cannot be read — missing row, unreachable database — counts as set, and the Fleet page banner says so distinctly (`unverified`) so nobody goes looking for who threw the switch. Clearing the flag resumes the parked runs (bounded, best effort; runs without a Work wait for their schedule's next tick), and runs parked by the flag are exempt from the stuck-run sweeper for as long as it is set. Every set and clear, every drain-all and every cancel-in-flight writes one `fleet_audit` row with the actor and the time.
+
+Setting and clearing the flag is a platform-admin operation (`User.isPlatformAdmin`); there is no button for it on the owner's Fleet page, only the banner. `FLEET_NODE_RUNTIME_ENABLED` is **not** a panic control: it is a routing selector, and work it turns away from the fleet runs in the cloud instead.
+
 ## Capabilities
 
 A node advertises capability tags (up to 16) such as `terminal`, `workspace` or `docker`. These describe what the node can host.
@@ -128,7 +149,7 @@ With a node chosen, every `agent-task` job dispatched for that agent is stamped 
 | `local-fallback` _(default)_ | Runs on your fleet | Runs on the platform runtime instead, and you get a fallback notification        |
 | `cloud`                      | Platform runtime   | Platform runtime — an explicit opt-out for work you do not want on your machines |
 
-`local-wait` is for work that is only correct on that machine; `local-fallback` is the default because its failure mode is "slower, elsewhere" rather than "nothing ran". The preference chooses fleet-vs-cloud only for an account whose resolved job runtime is the fleet, and it never overrides the `FLEET_NODE_RUNTIME_ENABLED` kill switch. The agent's **Capabilities → Execution** section shows the account-wide rule in force, read-only, with a link back to Settings → Fleet to change it.
+`local-wait` is for work that is only correct on that machine; `local-fallback` is the default because its failure mode is "slower, elsewhere" rather than "nothing ran". The preference chooses fleet-vs-cloud only for an account whose resolved job runtime is the fleet, and it never overrides the `FLEET_NODE_RUNTIME_ENABLED` routing selector (which sends work to the cloud, not nowhere — the control that stops work is the global stop flag under **Panic controls** above). The agent's **Capabilities → Execution** section shows the account-wide rule in force, read-only, with a link back to Settings → Fleet to change it.
 
 ## Running agents on your machines
 

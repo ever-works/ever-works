@@ -27,6 +27,10 @@ import { FleetJobRepository } from './fleet-job.repository';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { verifyNodeSecret } from './fleet-node-credential';
 import { FleetAgentNodeAffinityRepository } from './fleet-agent-node-affinity.repository';
+import { FleetKillSwitchService } from './fleet-kill-switch.service';
+
+/** Upper bound on the queued rows `queuedForUser` returns (cancel-in-flight with `includeQueued`). */
+export const FLEET_JOB_QUEUED_SCAN_LIMIT = 500;
 
 /** Batch ceiling on one reclaim pass, so a huge backlog can't stall a poll. */
 export const FLEET_JOB_RECLAIM_BATCH = 200;
@@ -145,6 +149,12 @@ export class FleetJobService {
         // positionally keeps compiling; absent, the lease protocol is
         // byte-for-byte what it was (no consumer, no event).
         @Optional() private readonly events?: EventEmitter2,
+        // Panic controls (EW-778) — the GLOBAL STOP FLAG. Same appended-
+        // LAST + @Optional() posture. Absent (unit tests built
+        // positionally), the lease protocol is byte-for-byte what it was;
+        // present, `lease()` answers `[]` while the flag is set OR cannot
+        // be read — the service folds read failures into "stopped".
+        @Optional() private readonly killSwitch?: FleetKillSwitchService,
     ) {}
 
     /**
@@ -233,6 +243,34 @@ export class FleetJobService {
         const node = await this.authenticateNode(input.nodeId, input.secret);
         if (!node) {
             return null;
+        }
+
+        // Panic controls (EW-778) — EVERY lease consults the global stop
+        // flag, after auth (a bad credential is still a 401, never "no
+        // work") and before anything is claimed. `[]` is the honest
+        // node-side answer: the fleet has nothing for you right now.
+        // Heartbeat and complete are deliberately NOT gated — a stopped
+        // fleet must still settle the work it already holds, or a later
+        // cancel-in-flight could never resolve.
+        if (this.killSwitch) {
+            let stopped: boolean;
+            try {
+                stopped = await this.killSwitch.isStopped();
+            } catch (error) {
+                // The service folds read failures into `true` itself; this
+                // catch covers a stub or a future implementation that
+                // throws. A switch that cannot be consulted counts as SET.
+                this.logger.error(
+                    `fleet lease refused for node ${node.id}: global stop flag could not be read (fail-closed): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                stopped = true;
+            }
+            if (stopped) {
+                this.logger.log(`fleet lease refused for node ${node.id}: global stop flag is set`);
+                return [];
+            }
         }
 
         // Inline reclaim before the scan: a job whose holder died is
@@ -779,6 +817,30 @@ export class FleetJobService {
             };
         }
         return byNode;
+    }
+
+    /**
+     * Every live claim (`leased` / `running`) held by any of this owner's
+     * nodes, oldest first — the cancel-in-flight candidate set.
+     */
+    async activeForUser(userId: string): Promise<FleetJobView[]> {
+        const rows = await this.jobs.findActiveForUser(userId);
+        return rows.map(toJobView);
+    }
+
+    /**
+     * This owner's `queued` rows, oldest first, bounded — the optional
+     * second half of cancel-in-flight (`includeQueued`).
+     */
+    async queuedForUser(
+        userId: string,
+        limit = FLEET_JOB_QUEUED_SCAN_LIMIT,
+    ): Promise<FleetJobView[]> {
+        const rows = await this.jobs.findQueuedForUser(
+            userId,
+            Math.min(Math.max(limit, 1), FLEET_JOB_QUEUED_SCAN_LIMIT),
+        );
+        return rows.map(toJobView);
     }
 
     /** Owner-scoped job listing (chat tool / future job history UI). */

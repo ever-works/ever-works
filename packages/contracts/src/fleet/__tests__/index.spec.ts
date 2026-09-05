@@ -152,7 +152,15 @@ const QUESTION_EXPORTS = [
 	'FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS',
 	'FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES',
 	'parseFleetAgentTaskQuestionMarkdown',
-	'normalizeFleetAgentTaskQuestion'
+	'normalizeFleetAgentTaskQuestion',
+	// Panic controls (EW-778) — fleet-panic.types.ts
+	'FLEET_AUDIT_ACTIONS',
+	'FLEET_AUDIT_DEFAULT_LIMIT',
+	'FLEET_AUDIT_MAX_LIMIT',
+	'FLEET_CANCEL_IN_FLIGHT_MAX_IDS',
+	'FLEET_JOB_CANCEL_STATES',
+	'FLEET_KILL_SWITCH_ID',
+	'FLEET_KILL_SWITCH_REASON_MAX_LENGTH'
 ] as const;
 
 const ALL_EXPORTS = [
@@ -211,14 +219,14 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 105 runtime symbols', () => {
+	it('exposes exactly these 112 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		// 92 → 98 with fleet cost accounting (EW-777): two node bounds and
 		// four cost-accounting helpers, each pinned in its own spec.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(105);
+		expect(Object.keys(fleet)).toHaveLength(112);
 	});
 
 	it.each([
@@ -226,6 +234,7 @@ describe('fleet barrel', () => {
 		['fleet-execution-preference.types.js', 'FLEET_EXECUTION_MODES'],
 		['fleet-jobs.types.js', 'FLEET_JOB_STATUSES'],
 		['fleet-node.types.js', 'FLEET_NODE_KINDS'],
+		['fleet-panic.types.js', 'FLEET_KILL_SWITCH_ID'],
 		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
 		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {

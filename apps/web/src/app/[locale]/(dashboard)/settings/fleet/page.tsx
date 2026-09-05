@@ -5,6 +5,7 @@ import {
     fleetAPI,
     type FleetEnrollmentTokenView,
     type FleetExecutionPreferenceView,
+    type FleetKillSwitchState,
     type FleetNodeView,
 } from '@/lib/api/fleet';
 import { FleetSettings } from '@/components/settings/FleetSettings';
@@ -46,16 +47,31 @@ export default async function FleetSettingsPage() {
     let tokensError: string | null = null;
     let initialPreferences: FleetExecutionPreferenceView[] = [];
     let preferencesError: string | null = null;
+    let initialKillSwitch: FleetKillSwitchState | null = null;
+    let killSwitchError: string | null = null;
 
     // `allSettled`, not `all`: each read fails INDEPENDENTLY and the page
     // still renders with a per-section banner. A routing-preference
     // hiccup must not take down the node list, which is the page's whole
     // reason to exist.
-    const [nodesResult, tokensResult, preferencesResult] = await Promise.allSettled([
-        fleetAPI.listNodes(),
-        fleetAPI.listOutstandingTokens(),
-        fleetAPI.listExecutionPreferences(),
-    ]);
+    const [nodesResult, tokensResult, preferencesResult, killSwitchResult] =
+        await Promise.allSettled([
+            fleetAPI.listNodes(),
+            fleetAPI.listOutstandingTokens(),
+            fleetAPI.listExecutionPreferences(),
+            // Panic controls (EW-778) — the banner's first paint; the
+            // client keeps polling it afterwards.
+            fleetAPI.killSwitchState(),
+        ]);
+
+    if (killSwitchResult.status === 'fulfilled') {
+        initialKillSwitch = killSwitchResult.value;
+    } else {
+        killSwitchError =
+            killSwitchResult.reason instanceof Error
+                ? killSwitchResult.reason.message
+                : 'Failed to read the stop flag';
+    }
 
     if (nodesResult.status === 'fulfilled') {
         initialNodes = nodesResult.value;
@@ -97,6 +113,8 @@ export default async function FleetSettingsPage() {
             nodeDownloadUrl={downloads.node}
             initialPreferences={initialPreferences}
             preferencesError={preferencesError}
+            initialKillSwitch={initialKillSwitch}
+            killSwitchError={killSwitchError}
         />
     );
 }

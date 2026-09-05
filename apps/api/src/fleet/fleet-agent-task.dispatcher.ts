@@ -12,6 +12,11 @@ import type {
     FleetTaskWorkspaceSpec,
     TaskAcceptanceCheck,
 } from '@ever-works/contracts';
+import type { FleetKillSwitchService } from '@ever-works/agent/fleet';
+import {
+    FleetKillSwitchActiveError,
+    isFleetKillSwitchActiveError,
+} from './fleet-kill-switch.error';
 import type { FleetRunRouterService } from './fleet-run-router.service';
 
 /**
@@ -85,6 +90,13 @@ export interface FleetAwareDispatcherDeps {
      * run. Absent = every fleet run is the legacy command job.
      */
     planner?: FleetAgentTaskPlanner;
+    /**
+     * Panic controls (EW-778) — the GLOBAL STOP FLAG. Consulted BEFORE
+     * routing, and its refusal is the one error the routing catch below
+     * must never turn into a cloud fallback. Absent = not gated here
+     * (the dispatch gate upstream still parks every run).
+     */
+    killSwitch?: Pick<FleetKillSwitchService, 'isStopped'>;
 }
 
 /**
@@ -129,6 +141,16 @@ export interface FleetAwareDispatcherDeps {
  * infrastructure hiccup must not cost the user a run. An enqueue that
  * throws after the decision is a real failure and propagates, so the
  * transition service records it on the run row where a human can see it.
+ *
+ * ONE exception to that fallback (EW-778): the GLOBAL STOP FLAG. A stop
+ * is not an infrastructure hiccup, it is an operator's decision, and
+ * "send it to the cloud instead" is precisely the outcome it forbids. So
+ * the flag is checked BEFORE routing, its refusal is a typed error, and
+ * that error is rethrown out of the routing catch — never swallowed. It
+ * then lands on the run row as `dispatch-failed: …` through the callers'
+ * existing loud-degradation path. (The dispatch gate upstream parks every
+ * run first; this seam is defence in depth for a gate that is absent or
+ * mis-wired.)
  */
 export function createFleetAwareAgentTaskExecuteDispatcher(
     delegate: AgentTaskExecuteDispatcher,
@@ -138,6 +160,28 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
     // (deps.planner is read per dispatch below — see FleetAgentTaskPlanner.)
     return {
         async enqueue(payload: AgentTaskExecuteDispatchPayload): Promise<{ runId: string }> {
+            // EW-778 — refuse BEFORE routing, outside the fallback try.
+            // Fail closed: a switch that cannot be read counts as set
+            // (the service already folds read errors into `true`; the
+            // catch here covers a stub or a future implementation that
+            // throws instead).
+            if (deps.killSwitch) {
+                let stopped: boolean;
+                try {
+                    stopped = await deps.killSwitch.isStopped();
+                } catch (err) {
+                    logger.error(
+                        `Global stop flag could not be read for task ${payload.taskId} — refusing dispatch (fail-closed): ${
+                            err instanceof Error ? err.message : String(err)
+                        }`,
+                    );
+                    stopped = true;
+                }
+                if (stopped) {
+                    throw new FleetKillSwitchActiveError(payload.taskId);
+                }
+            }
+
             let decision: FleetRunRoutingDecision = { target: 'cloud', mode: 'cloud' };
             try {
                 const scope = await resolveScope(deps.scopeResolver, payload.taskId);
@@ -148,6 +192,11 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
                     requirements ? { requiredCapabilities: requirements.requiredCapabilities } : {},
                 );
             } catch (err) {
+                if (isFleetKillSwitchActiveError(err)) {
+                    // The router read the flag itself. A stop is never a
+                    // reason to run in the cloud instead.
+                    throw err;
+                }
                 logger.warn(
                     `Fleet routing check failed for task ${payload.taskId} — using the platform dispatcher: ${
                         err instanceof Error ? err.message : String(err)

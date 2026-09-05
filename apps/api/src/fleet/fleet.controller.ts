@@ -36,6 +36,7 @@ import type {
     FleetNodeView,
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
+import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
@@ -87,6 +88,15 @@ const NODE_HISTORY_LIMIT = 25;
  *                                             ceiling + today's spend
  *   PUT    /api/fleet/cost-ceiling            set / clear that ceiling
  *
+ * Panic controls (EW-778), on their own controllers:
+ *   POST   /api/fleet/drain-all               drain EVERY node I own
+ *   POST   /api/fleet/cancel-in-flight        cancel my running fleet work
+ *                                             (explicit second step)
+ *   GET    /api/fleet/kill-switch             is the global stop flag set?
+ *   POST   /api/fleet/kill-switch/stop        platform admin: set it
+ *   POST   /api/fleet/kill-switch/clear       platform admin: clear it
+ *   GET    /api/fleet/kill-switch/audit       platform admin: audit trail
+ *
  * Public, self-authenticating (called by the node apps — throttled,
  * fail-closed: any invalid credential path is one undifferentiated
  * 401, mirroring the terminal internal endpoints' posture):
@@ -118,6 +128,8 @@ export class FleetController {
         private readonly runners: FleetRunnerStatusService,
         private readonly preferences: FleetExecutionPreferenceService,
         private readonly costCeiling: FleetCostCeilingService,
+        // EW-778 — owns the per-node drain so that drain-all reuses it.
+        private readonly panic: FleetPanicService,
     ) {}
 
     @Get('cost-ceiling')
@@ -316,12 +328,10 @@ export class FleetController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: DrainFleetNodeDto,
     ): Promise<FleetNodeDrainResult> {
-        // Order matters: disable FIRST. The node stops being able to
-        // lease the instant its status flips, so a claim requeued after
-        // that cannot be re-claimed by the machine being drained.
-        const node = await this.service.setDisabledForUser(auth.userId, id, body.drain);
-        const releasedJobs = body.drain ? await this.jobs.releaseClaimsForNode(auth.userId, id) : 0;
-        return { node, releasedJobs };
+        // The drain itself (disable FIRST, then requeue — the order is
+        // load-bearing) lives in FleetPanicService so that drain-all
+        // (EW-778) performs exactly this, once per node.
+        return this.panic.drainNodeForUser(auth.userId, id, body.drain);
     }
 
     @Post('nodes/enrollment-token')
