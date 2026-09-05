@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
-import { withUploadServeScope } from '@/lib/api/uploads';
+import { withUploadServeScope } from '@/lib/api/upload-serve-url';
 import {
     AlertCircle,
     Download,

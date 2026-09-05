@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
-import { withUploadServeScope } from '@/lib/api/uploads';
+import { withUploadServeScope } from '@/lib/api/upload-serve-url';
 import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import {

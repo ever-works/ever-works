@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from 'react';
 import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
+import { withUploadServeScope } from '@/lib/api/upload-serve-url';
 import Image from 'next/image';
 import {
     File as FileIcon,
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
-import { withUploadServeScope, uploadFile, UploadError } from '@/lib/api/uploads';
+import { uploadFile, UploadError } from '@/lib/api/uploads';
 
 /**
  * Generic per-entity attachment panel — shared by the Mission, Idea,
