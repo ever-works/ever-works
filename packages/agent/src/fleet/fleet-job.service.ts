@@ -1,10 +1,17 @@
-import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    Logger,
+    Optional,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { isUUID } from 'class-validator';
 import type {
     FleetJobKind,
     FleetJobStatus,
     FleetJobView,
+    FleetNodeJobHistoryEntry,
     FleetNodeLoadView,
 } from '@ever-works/contracts';
 import {
@@ -17,6 +24,7 @@ import {
     FLEET_JOB_MAX_REQUIRED_CAPABILITIES,
     FLEET_JOB_MAX_RESULT_BYTES,
     FLEET_JOB_QUEUE_EXPIRED_REASON,
+    FLEET_JOB_STALE_LEASE_REASON,
     isFleetJobKind,
     nodeSatisfiesCapabilities,
 } from '@ever-works/contracts';
@@ -67,6 +75,12 @@ export interface CompleteFleetJobInput {
     success: boolean;
     result?: Record<string, unknown> | null;
     error?: string | null;
+    /**
+     * The `leaseGeneration` the node was handed with the lease. Typed
+     * `unknown` like the credential: the service validates the shape and
+     * refuses anything that is not exactly the job's current generation.
+     */
+    leaseGeneration?: unknown;
 }
 
 export interface ReclaimSummary {
@@ -109,6 +123,31 @@ export interface CancelFleetJobOutcome {
 }
 
 /**
+ * Suspend-safe leases (self-build finding R7) — the ONE differentiated
+ * refusal in the node work channel.
+ *
+ * Thrown by `heartbeatJob` / `completeJob` when the caller IS the
+ * recorded holder of an active job but the generation it echoes is not
+ * the job's current one: its claim lapsed and was re-issued (to another
+ * node, or to this same node on a later poll) while its run kept going.
+ * Surfaces at the edge as `409 { statusCode, reason: 'stale-lease',
+ * message }`, which the node keys its abort on.
+ *
+ * Deliberately reachable ONLY after the credential, `nodeId` and status
+ * checks have passed, so it reveals nothing to a node that is not the
+ * recorded holder: every other refusal stays the undifferentiated 401.
+ */
+export class FleetJobStaleLeaseError extends ConflictException {
+    constructor() {
+        super({
+            statusCode: 409,
+            reason: FLEET_JOB_STALE_LEASE_REASON,
+            message: 'The lease this node holds on the job is no longer current',
+        });
+    }
+}
+
+/**
  * Fleet job runtime (Desktop PRD §6.2 / M4) — the lease protocol.
  *
  * This is the server half of `job-runtime-node`: the provider's "queue"
@@ -120,6 +159,11 @@ export interface CancelFleetJobOutcome {
  *     (`FleetJobRepository.claim` pins `status:'queued'`);
  *   - a node can only heartbeat/complete a job it still holds
  *     (both pin `nodeId` AND the active statuses);
+ *   - a node can only heartbeat/complete the CLAIM it was handed: every
+ *     lease mints a `leaseGeneration`, both calls carry it, and a stale
+ *     one is refused with `409 stale-lease` and never touches the row —
+ *     so a machine that slept through its lease cannot overwrite the
+ *     current holder, even when that is itself on a later claim;
  *   - a lapsed claim is reclaimable without the node's cooperation
  *     (the lease is a deadline, never a lock).
  *
@@ -315,6 +359,10 @@ export class FleetJobService {
             }
             const leaseExpiresAt = new Date(Date.now() + ttlSec * 1000);
             const attempts = (candidate.attempts ?? 0) + 1;
+            // Every claim — a first lease or a re-lease after a lapse —
+            // mints a new generation. The CAS pins the one observed here,
+            // so this value is issued at most once for this job.
+            const leaseGeneration = (candidate.leaseGeneration ?? 0) + 1;
             const won = await this.jobs.claim(candidate.id, {
                 nodeId: node.id,
                 status: 'leased',
@@ -323,6 +371,12 @@ export class FleetJobService {
                 // The claim IS the moment "waiting for a runner" stops
                 // being true, so it is the claim that clears the token.
                 queuedReason: null,
+                leaseGeneration,
+                // ...and the moment the PREVIOUS attempt's clock stops
+                // being meaningful. The next job heartbeat re-stamps it, so
+                // the drawer's duration is "how long this attempt has run"
+                // rather than the age of an attempt that ended hours ago.
+                startedAt: null,
             });
             if (!won) {
                 // Another node won the race. Not an error — just skip it.
@@ -335,6 +389,8 @@ export class FleetJobService {
                 leaseExpiresAt,
                 attempts,
                 queuedReason: null,
+                leaseGeneration,
+                startedAt: null,
             } as FleetJob);
             leased.push(view);
             this.emit(
@@ -449,12 +505,19 @@ export class FleetJobService {
      * first beat `leased` → `running` (the node acknowledged the work).
      * Null on any invalid path — bad credential, foreign job, terminal
      * job — so the edge cannot leak which.
+     *
+     * `leaseGeneration` (suspend-safe leases) must be exactly the value
+     * the node was handed with the lease. Checked AFTER the holder and
+     * status checks, so only the recorded holder of an active job can
+     * ever see the differentiated {@link FleetJobStaleLeaseError}; a
+     * missing, malformed, older or newer generation all fail closed.
      */
     async heartbeatJob(
         nodeId: unknown,
         secret: unknown,
         jobId: string,
         leaseTtlSec?: number,
+        leaseGeneration?: unknown,
     ): Promise<FleetJobView | null> {
         // 'report': a draining (paused/disabled) node must keep the
         // claim on work it is already running.
@@ -464,6 +527,12 @@ export class FleetJobService {
         const job = await this.jobs.findById(jobId);
         if (!job || job.nodeId !== node.id) return null;
         if (job.status !== 'leased' && job.status !== 'running') return null;
+        if (!isCurrentLeaseGeneration(job, leaseGeneration)) {
+            this.logger.log(
+                `Fleet job ${job.id}: heartbeat refused — stale lease generation from node ${node.id}`,
+            );
+            throw new FleetJobStaleLeaseError();
+        }
         // Agent execution v2 (slice B) — an operator cancel is delivered
         // as a REFUSED heartbeat: the node reads it as "lease lost" and
         // aborts the job, exactly as it would for a dead server. Its
@@ -477,7 +546,13 @@ export class FleetJobService {
         const ttlSec = clampLeaseTtlSec(leaseTtlSec);
         const leaseExpiresAt = new Date(Date.now() + ttlSec * 1000);
         const startedAt = job.startedAt ?? new Date();
-        const extended = await this.jobs.extendLease(job.id, node.id, leaseExpiresAt, startedAt);
+        const extended = await this.jobs.extendLease(
+            job.id,
+            node.id,
+            leaseExpiresAt,
+            startedAt,
+            job.leaseGeneration,
+        );
         if (!extended) return null;
 
         return toJobView({
@@ -494,6 +569,13 @@ export class FleetJobService {
      * node reported a real verdict, and silently re-running a check that
      * legitimately went red would be worse than surfacing it. Only
      * LAPSED claims (no verdict at all) are retried, by the reclaim path.
+     *
+     * A report carrying a stale `leaseGeneration` is refused with
+     * {@link FleetJobStaleLeaseError} BEFORE anything is written and
+     * BEFORE any completion event is emitted, so a holder that lost its
+     * claim during a suspend can neither flip the status, nor land a
+     * result/error, nor cause the reconciler to open a pull request for
+     * a branch it was never entitled to push.
      */
     async completeJob(input: CompleteFleetJobInput): Promise<FleetJobView | null> {
         // 'report': the whole point of a drain is that in-flight work
@@ -504,6 +586,12 @@ export class FleetJobService {
         const job = await this.jobs.findById(input.jobId);
         if (!job || job.nodeId !== node.id) return null;
         if (job.status !== 'leased' && job.status !== 'running') return null;
+        if (!isCurrentLeaseGeneration(job, input.leaseGeneration)) {
+            this.logger.log(
+                `Fleet job ${job.id}: completion refused — stale lease generation from node ${node.id}`,
+            );
+            throw new FleetJobStaleLeaseError();
+        }
 
         const completedAt = new Date();
         const status: Extract<FleetJobStatus, 'done' | 'failed'> = input.success
@@ -514,12 +602,17 @@ export class FleetJobService {
             : null;
         const error = input.success ? null : truncate(input.error, FLEET_JOB_MAX_ERROR_LENGTH);
 
-        const applied = await this.jobs.complete(job.id, node.id, {
-            status,
-            result,
-            error,
-            completedAt,
-        });
+        const applied = await this.jobs.complete(
+            job.id,
+            node.id,
+            {
+                status,
+                result,
+                error,
+                completedAt,
+            },
+            job.leaseGeneration,
+        );
         if (!applied) return null;
 
         const view = toJobView({
@@ -556,6 +649,7 @@ export class FleetJobService {
                     status: job.status,
                     nodeId: job.nodeId,
                     leaseExpiresAt: job.leaseExpiresAt,
+                    leaseGeneration: job.leaseGeneration ?? 0,
                 };
                 // A cancelled job must never go back in the pool.
                 //
@@ -854,13 +948,17 @@ export class FleetJobService {
      * Owner-scoped in the query itself, not just by convention at the
      * edge — a node id is a travelling value.
      */
-    async historyForNode(userId: string, nodeId: string, limit = 20): Promise<FleetJobView[]> {
+    async historyForNode(
+        userId: string,
+        nodeId: string,
+        limit = 20,
+    ): Promise<FleetNodeJobHistoryEntry[]> {
         const rows = await this.jobs.findByNodeForUser(
             userId,
             nodeId,
             Math.min(Math.max(limit, 1), 100),
         );
-        return rows.map(toJobView);
+        return rows.map(toJobHistoryView);
     }
 
     /**
@@ -948,6 +1046,25 @@ export function toJobView(job: FleetJob): FleetJobView {
         queuedAt: job.queuedAt ? toIso(job.queuedAt) : null,
         queuedReason: job.queuedReason ?? null,
         cancelRequestedAt: job.cancelRequestedAt ? toIso(job.cancelRequestedAt) : null,
+        leaseGeneration: job.leaseGeneration ?? 0,
+    };
+}
+
+/**
+ * Entity → node-drawer history row (fleet health signals, EW-776).
+ *
+ * The only difference from {@link toJobView} is `error`: the verdict text
+ * the node reported was on the row all along and never left the server,
+ * so the drawer showed a red "failed" badge with no way to find out why —
+ * the operator's next step was to open a database. Deliberately a
+ * SEPARATE projection rather than a field added to `toJobView`, because
+ * that view is also the LEASE payload handed to nodes, and a node has no
+ * business being told the error text of a job it is only now picking up.
+ */
+export function toJobHistoryView(job: FleetJob): FleetNodeJobHistoryEntry {
+    return {
+        ...toJobView(job),
+        error: job.error ?? null,
     };
 }
 
@@ -974,6 +1091,26 @@ function formatDuration(seconds: number): string {
     if (seconds % 3600 === 0) return `${seconds / 3600}h`;
     if (seconds % 60 === 0) return `${seconds / 60}m`;
     return `${seconds}s`;
+}
+
+/**
+ * Is `supplied` exactly the generation of the claim `job` currently
+ * carries? Fail-closed on every other shape: missing (a node built before
+ * generations existed), non-integer, older (a run that slept through its
+ * lease), newer (cannot legitimately happen), and — deliberately — 0.
+ *
+ * 0 is what every row backfilled by the migration carries, and what a
+ * row still holds if it was leased before this protocol shipped. Never
+ * accepting it means such an in-flight job is refused on its next beat,
+ * aborts on the node, and is re-offered by reclaim under generation 1:
+ * one lost attempt, in exchange for never having a claim the protocol
+ * cannot tell apart from its successor.
+ */
+function isCurrentLeaseGeneration(job: FleetJob, supplied: unknown): boolean {
+    if (typeof supplied !== 'number' || !Number.isInteger(supplied) || supplied < 1) {
+        return false;
+    }
+    return supplied === (job.leaseGeneration ?? 0);
 }
 
 /**

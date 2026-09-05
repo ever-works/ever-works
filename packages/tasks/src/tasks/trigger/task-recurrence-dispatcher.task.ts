@@ -25,13 +25,20 @@ export const taskRecurrenceDispatcherTask = schedules.task({
 
         try {
             const dispatcher = appContext.get(TaskRecurrenceDispatcherService);
-            // Two due-scans per tick: recurring templates spawn+dispatch
-            // instances, and one-shot `scheduledAt` Tasks dispatch
-            // themselves. Sequential on purpose — they share the tasks
+            // Three scans per tick: recurring templates spawn+dispatch
+            // instances, one-shot `scheduledAt` Tasks dispatch themselves,
+            // and the task-graph fan-out starts TODO Tasks whose blockers
+            // have cleared. Sequential on purpose — they share the tasks
             // table and one summary keeps the operator dashboard whole.
+            //
+            // The fan-out runs LAST so a Task the recurrence or schedule
+            // scan just moved into `todo` is considered by the scan that
+            // sees the freshest rows, and it is a no-op unless an operator
+            // set TASK_FANOUT_MAX_STARTS_PER_OWNER.
             const recurrence = await dispatcher.dispatchDue();
             const scheduled = await dispatcher.dispatchDueScheduled();
-            return { recurrence, scheduled };
+            const fanout = await dispatcher.dispatchUnblockedTodo();
+            return { recurrence, scheduled, fanout };
         } finally {
             await appContext.close();
         }

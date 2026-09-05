@@ -14,6 +14,8 @@ import {
     ValidateNested,
 } from 'class-validator';
 import { MAX_TEMPLATE_STEPS, TaskPriority } from '@ever-works/agent/tasks-domain';
+import { TaskExtraRepoDto } from '@ever-works/agent/dto';
+import { TASK_MAX_EXTRA_REPOS } from '@ever-works/contracts';
 
 export class TaskTemplateStepDto {
     @IsString()
@@ -45,6 +47,29 @@ export class TaskTemplateStepDto {
     @IsInt({ each: true })
     @Min(0, { each: true })
     dependsOn?: number[];
+
+    /**
+     * Multi-repo decomposition (slice AH): file THIS step's sub-task
+     * against a different Work than the rest of the tree. Omitted
+     * inherits the instantiation input's `workId`. The Work must belong
+     * to the acting user — checked at write AND instantiate time.
+     */
+    @IsOptional()
+    @IsUUID()
+    workId?: string | null;
+
+    /**
+     * Multi-repo decomposition (slice AH): repositories this step's
+     * sub-task mounts beyond its Work's, by repository-registry
+     * connection — validated by the same rules a Task's own `extraRepos`
+     * goes through.
+     */
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(TASK_MAX_EXTRA_REPOS)
+    @ValidateNested({ each: true })
+    @Type(() => TaskExtraRepoDto)
+    extraRepos?: TaskExtraRepoDto[] | null;
 }
 
 export class CreateTaskTemplateDto {

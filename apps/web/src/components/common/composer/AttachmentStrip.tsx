@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
+import { withUploadServeScope } from '@/lib/api/upload-serve-url';
 import {
     AlertCircle,
     Download,
@@ -216,7 +218,12 @@ function FileTile({
           : `${label} · ${formatBytes(file.size)}`;
     const tileClass = cn(TILE_BASE, error ? TILE_ERROR : TILE_QUIET, onOpen && TILE_INTERACTIVE);
     // Only once the upload resolves — before that there is no URL to point at.
-    const downloadHref = !onOpen && !error && !uploading ? attachment.url : undefined;
+    // The download anchor is a navigation, so the tab's workspace rides on the href.
+    const workspace = useWorkspaceScope();
+    const downloadHref =
+        !onOpen && !error && !uploading
+            ? withUploadServeScope(attachment.url, workspace)
+            : undefined;
 
     return (
         <li

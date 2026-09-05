@@ -37,8 +37,14 @@ describe('FleetController', () => {
         deleteForUser: jest.Mock;
         enroll: jest.Mock;
         heartbeat: jest.Mock;
+        getForUser: jest.Mock;
     };
-    let jobs: { loadByNodeForUser: jest.Mock; promoteWaitingForNode: jest.Mock };
+    let jobs: {
+        loadByNodeForUser: jest.Mock;
+        promoteWaitingForNode: jest.Mock;
+        historyForNode: jest.Mock;
+    };
+    let runs: { findByIds: jest.Mock };
     let controller: FleetController;
 
     // Appended constructor deps (runner status + execution preferences).
@@ -81,11 +87,14 @@ describe('FleetController', () => {
             deleteForUser: jest.fn(async () => undefined),
             enroll: jest.fn(async () => null),
             heartbeat: jest.fn(async () => null),
+            getForUser: jest.fn(async () => nodeView),
         };
         jobs = {
             loadByNodeForUser: jest.fn(async () => ({})),
             promoteWaitingForNode: jest.fn(async () => 0),
+            historyForNode: jest.fn(async () => []),
         };
+        runs = { findByIds: jest.fn(async () => []) };
         ceilingStub.describeForUser.mockClear();
         ceilingStub.setFleetCeilingForUser.mockClear();
         controller = new FleetController(
@@ -97,6 +106,8 @@ describe('FleetController', () => {
             // EW-778 — the per-node drain now lives in FleetPanicService
             // (shared with drain-all); its own spec covers it.
             { drainNodeForUser: jest.fn(async () => null) } as never,
+            // EW-776 — the reconciled run outcome behind each history row.
+            runs as never,
         );
     });
 
@@ -233,6 +244,117 @@ describe('FleetController', () => {
         expect(service.deleteForUser).toHaveBeenCalledWith('user-1', nodeView.id);
     });
 
+    describe('detail — the node drawer payload (EW-776)', () => {
+        const RUN_ID = '99999999-9999-4999-8999-999999999999';
+        const TASK_ID = '88888888-8888-4888-8888-888888888888';
+
+        const historyJob = (over: Record<string, unknown> = {}) => ({
+            id: 'job-1',
+            kind: 'agent-task',
+            status: 'done',
+            nodeId: nodeView.id,
+            targetNodeId: null,
+            requiredCapabilities: [],
+            payload: { runId: RUN_ID, taskId: TASK_ID, secret: 'PAYLOAD-SENTINEL' },
+            leaseExpiresAt: null,
+            attempts: 1,
+            maxAttempts: 3,
+            createdAt: null,
+            startedAt: null,
+            completedAt: null,
+            leaseGeneration: 1,
+            error: null,
+            ...over,
+        });
+
+        it('never ships the job payload to the drawer', async () => {
+            jobs.historyForNode.mockResolvedValue([historyJob()]);
+
+            const detail = await controller.detail(auth, nodeView.id);
+
+            expect(detail.recentJobs[0].payload).toBeNull();
+            expect(JSON.stringify(detail)).not.toContain('PAYLOAD-SENTINEL');
+        });
+
+        it('shows the RECONCILED run outcome behind a job the node called done', async () => {
+            jobs.historyForNode.mockResolvedValue([historyJob()]);
+            runs.findByIds.mockResolvedValue([
+                { id: RUN_ID, status: 'failed', summary: null, errorMessage: 'model gave up' },
+            ]);
+
+            const detail = await controller.detail(auth, nodeView.id);
+
+            expect(runs.findByIds).toHaveBeenCalledWith([RUN_ID], 'user-1');
+            expect(detail.recentJobs[0].reconciled).toEqual({
+                runId: RUN_ID,
+                status: 'failed',
+                summary: null,
+                error: 'model gave up',
+            });
+        });
+
+        it('degrades to job outcomes only when the run read fails', async () => {
+            // "Not known" is honest; a fabricated outcome is not, and a
+            // drawer that 500s on a node whose runs are unreadable is worse
+            // than one that shows a little less.
+            jobs.historyForNode.mockResolvedValue([historyJob()]);
+            runs.findByIds.mockRejectedValue(new Error('agent_runs unreachable'));
+
+            const detail = await controller.detail(auth, nodeView.id);
+
+            expect(detail.recentJobs[0].reconciled).toBeNull();
+            expect(detail.historyUnavailable).toBe(false);
+        });
+
+        it('does not read runs at all for a history with no agent-task jobs', async () => {
+            jobs.historyForNode.mockResolvedValue([
+                historyJob({ kind: 'acceptance-checks', payload: null }),
+            ]);
+
+            await controller.detail(auth, nodeView.id);
+
+            expect(runs.findByIds).not.toHaveBeenCalled();
+        });
+
+        it('still renders the node when the job history is unavailable', async () => {
+            jobs.historyForNode.mockRejectedValue(new Error('fleet_jobs unreachable'));
+
+            const detail = await controller.detail(auth, nodeView.id);
+
+            expect(detail.node).toEqual(nodeView);
+            expect(detail.recentJobs).toEqual([]);
+            expect(detail.historyUnavailable).toBe(true);
+        });
+
+        it('keeps the failed subset in sync with the composed rows', async () => {
+            jobs.historyForNode.mockResolvedValue([
+                historyJob({ id: 'ok' }),
+                historyJob({ id: 'bad', status: 'failed', error: 'pnpm install exploded' }),
+            ]);
+
+            const detail = await controller.detail(auth, nodeView.id);
+
+            expect(detail.failures).toHaveLength(1);
+            expect(detail.failures[0].id).toBe('bad');
+            expect(detail.failures[0].error).toBe('pnpm install exploded');
+            expect(detail.failures[0].payload).toBeNull();
+        });
+
+        it('judges the failed subset on the RECONCILED outcome too', async () => {
+            // Or the endpoint ships the original defect one layer up: a row
+            // rendering a red "Failed" badge in the full list and missing
+            // from the failed list sitting right beside it.
+            jobs.historyForNode.mockResolvedValue([historyJob({ id: 'done-run-failed' })]);
+            runs.findByIds.mockResolvedValue([
+                { id: RUN_ID, status: 'failed', summary: null, errorMessage: 'model gave up' },
+            ]);
+
+            const detail = await controller.detail(auth, nodeView.id);
+
+            expect(detail.failures.map((entry) => entry.id)).toEqual(['done-run-failed']);
+        });
+    });
+
     describe('public enroll/heartbeat (fail-closed)', () => {
         it('enroll maps every invalid path to one undifferentiated 401', async () => {
             await expect(
@@ -254,8 +376,52 @@ describe('FleetController', () => {
                 platform: 'linux/x64',
                 version: undefined,
                 capabilities: undefined,
+                cliVersion: undefined,
+                diskFreeBytes: undefined,
+                modelIdentity: undefined,
+                workerState: undefined,
+                workerStateReason: undefined,
             });
             expect(result.secret).toBe('node-secret');
+        });
+
+        it('forwards the worker state on BOTH enroll and heartbeat (EW-776)', async () => {
+            // The explicit body maps are the failure mode this suite exists
+            // for: a field added to the DTO and forgotten in the map is
+            // accepted at the edge and silently dropped before the service.
+            service.enroll.mockResolvedValue({
+                nodeId: nodeView.id,
+                secret: 'node-secret',
+                node: nodeView,
+            });
+            await controller.enroll({
+                token: 'x'.repeat(43),
+                workerState: 'quarantined',
+                workerStateReason: 'process tree unproven',
+            } as EnrollFleetNodeDto);
+            expect(service.enroll).toHaveBeenCalledWith(
+                'x'.repeat(43),
+                expect.objectContaining({
+                    workerState: 'quarantined',
+                    workerStateReason: 'process tree unproven',
+                }),
+            );
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+                workerState: 'throttled',
+                workerStateReason: 'cpu ceiling',
+            } as FleetHeartbeatDto);
+            expect(service.heartbeat).toHaveBeenCalledWith(
+                nodeView.id,
+                'x'.repeat(43),
+                expect.objectContaining({
+                    workerState: 'throttled',
+                    workerStateReason: 'cpu ceiling',
+                }),
+            );
         });
 
         it('heartbeat maps a rejected credential to 401 and success to ok', async () => {

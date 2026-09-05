@@ -13,6 +13,7 @@ import { DatabaseModule } from '../database/database.module';
 import { McpClientService } from './mcp-client.service';
 import { McpConnectionsService } from './mcp-connections.service';
 import { McpToolSource } from './mcp-tool-source';
+import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
 
 /**
  * Agent Plugins MCP slice (docs/specs/features/agent-plugins plan §2.4)
@@ -37,6 +38,19 @@ import { McpToolSource } from './mcp-tool-source';
             PluginUsageEvent,
         ]),
         ActivityLogModule,
+        // AP-14. AgentPluginsModule is a leaf (two entities, DatabaseModule,
+        // and it deliberately provides McpServerConnectionRepository locally
+        // rather than importing THIS module), so importing it here cannot
+        // cycle — the same argument FacadesModule already makes for the
+        // AGENT_PLUGIN_SKILL_SOURCE seam. It binds MCP_STDIO_LAUNCHER, which
+        // McpToolSource consumes @Optional() to launch a package's stdio
+        // server for the duration of a run.
+        //
+        // Without this import the token is simply absent from McpToolSource's
+        // injector and the @Optional() dependency arrives `undefined` — the
+        // failure this repo has already shipped once, where a seam looked
+        // wired because the provider existed SOMEWHERE in the app.
+        AgentPluginsModule,
     ],
     providers: [
         McpServerConnectionRepository,

@@ -16,6 +16,7 @@ import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
 import type { ResourceProbe } from './resource-limits';
+import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
@@ -390,6 +391,16 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(io.now ? { now: io.now } : {}),
 			...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {})
 		});
+		// Fleet health signals (EW-776). Wired onto the SAME telemetry
+		// object `describe` already closed over above, so the heartbeat
+		// starts reporting worker state without the loop having to be
+		// constructed before the beat — the two are built in this order for
+		// good reasons and this must not change that.
+		//
+		// Only when the worker exists: a visibility-only node has nothing
+		// to report, and the platform shows "unknown" rather than a
+		// fabricated `idle`.
+		telemetry.workerHealth = () => describeWorkerHealth(worker.getState());
 		const workspaceProvisioner: FleetWorkspaceProvisionerLike =
 			options.workspaceProvisioner ??
 			new FleetTaskWorkspaceProvisioner({

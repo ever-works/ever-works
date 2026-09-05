@@ -70,6 +70,14 @@ export const GOAL_ITERATION_LABEL = 'goal-iteration';
 export const MAX_SPEND_CAP_CENTS = 100_000_000; // $1,000,000
 export const MAX_WALL_CLOCK_LIMIT_HOURS = 24 * 365;
 export const MAX_STUCK_THRESHOLD_ITERATIONS = 1000;
+/**
+ * Concurrent iterations (slice AH) — upper bound on
+ * `goals.maxConcurrentIterations`. Deliberately small: this multiplies
+ * how much work ONE Goal starts at once, and every iteration still has
+ * to pass the run admission chain, so a large number here would only
+ * manufacture parked runs.
+ */
+export const MAX_CONCURRENT_ITERATIONS = 10;
 export const MAX_SESSION_BUDGET_MINUTES = 24 * 60;
 export const MAX_GRACE_PERIOD_MINUTES = 24 * 60;
 export const MAX_MODEL_HINT_CHARS = 120;
@@ -195,6 +203,14 @@ export class GoalOrchestratorService {
                 'stuckThresholdIterations',
                 1,
                 MAX_STUCK_THRESHOLD_ITERATIONS,
+            );
+        }
+        if (input.maxConcurrentIterations !== undefined) {
+            goal.maxConcurrentIterations = this.assertBoundedInt(
+                input.maxConcurrentIterations,
+                'maxConcurrentIterations',
+                1,
+                MAX_CONCURRENT_ITERATIONS,
             );
         }
         if (input.sessionBudgetMinutes !== undefined) {
@@ -769,7 +785,8 @@ export class GoalOrchestratorService {
             await this.goals.save(goal);
         }
 
-        const activeRun = await this.findActiveRun(goal.id);
+        const activeRuns = await this.findActiveRuns(goal.id);
+        const activeRun = activeRuns[0] ?? null;
         const candidates = await this.resolveCandidates(goal);
         const decision = decideGoalLoop({
             loopStatus: opts.force ? 'running' : (goal.loopStatus ?? null),
@@ -783,6 +800,20 @@ export class GoalOrchestratorService {
             loopStartedAt: goal.loopStartedAt ?? null,
             gracePeriodMinutes: goal.gracePeriodMinutes ?? null,
             hasRunInFlight: activeRun !== null,
+            // Concurrent iterations (slice AH). Both derive from the SAME
+            // active-run list, so at the default ceiling of 1 the count
+            // and the boolean can never disagree.
+            runsInFlight: activeRuns.length,
+            // 🛑 Re-clamp on READ, not only on write. `assertBoundedInt`
+            // caps the column at MAX_CONCURRENT_ITERATIONS when someone
+            // sets it, but `decideGoalLoop` is a pure function with no
+            // ceiling of its own: a row carrying a larger value (a direct
+            // DB write, a restored backup, a future raise of the write
+            // cap) would otherwise make ONE tick create that many Tasks.
+            maxConcurrentIterations:
+                typeof goal.maxConcurrentIterations === 'number'
+                    ? Math.min(goal.maxConcurrentIterations, MAX_CONCURRENT_ITERATIONS)
+                    : null,
             candidates,
             now: new Date(),
         });
@@ -811,13 +842,34 @@ export class GoalOrchestratorService {
         }
     }
 
-    /** Create the iteration Task, dispatch it, and log both halves. */
+    /**
+     * Create the iteration Task(s), dispatch them, and log both halves.
+     *
+     * Concurrent iterations (slice AH): the decision carries one SLOT per
+     * iteration it wants started (`agentIds` / `iterations`), already
+     * bounded by the Goal's ceiling minus what is in flight. A Goal that
+     * never raised `maxConcurrentIterations` always has exactly one slot,
+     * and this method then does precisely what it did before — same
+     * order, same events, same dedup key.
+     *
+     * Every slot goes through `dispatchAgentRun` with the SAME
+     * iteration-keyed dedup key as before, so overlapping cron ticks
+     * still cannot fire one iteration twice.
+     */
     private async applyDispatch(
         goal: Goal,
         decision: GoalLoopDecision,
     ): Promise<GoalAdvanceResult> {
-        const agentId = decision.agentId as string;
-        const iteration = decision.nextIteration ?? (goal.iteration ?? 0) + 1;
+        const agentIds =
+            decision.agentIds && decision.agentIds.length > 0
+                ? decision.agentIds
+                : [decision.agentId as string];
+        const iterations =
+            decision.iterations && decision.iterations.length > 0
+                ? decision.iterations
+                : [decision.nextIteration ?? (goal.iteration ?? 0) + 1];
+        const agentId = agentIds[0];
+        const iteration = iterations[0];
 
         if (!this.tasksService || !this.transitions) {
             // Loud degradation: report the refusal rather than counting a
@@ -839,79 +891,133 @@ export class GoalOrchestratorService {
         }
 
         // The routing decision is logged BEFORE the dispatch, so a
-        // dispatch that then fails still leaves the reasoning behind.
+        // dispatch that then fails still leaves the reasoning behind. ONE
+        // route line per decision: its reasoning already names every slot.
         await this.recordEvent(goal, {
             kind: 'route',
             message: decision.reasoning,
             agentId,
             iteration,
-            metadata: { reasonCode: decision.reasonCode },
-        });
-
-        const task = await this.tasksService.create(
-            goal.userId,
-            {
-                title: `[Goal] ${goal.title} — iteration ${iteration}`,
-                description: this.buildIterationBrief(goal, iteration),
-                status: TaskStatus.TODO,
-                priority: TaskPriority.P2,
-                labels: [GOAL_ITERATION_LABEL],
-                goalId: goal.id,
-                agentId,
-                createdByType: 'user',
-                createdById: goal.userId,
+            metadata: {
+                reasonCode: decision.reasonCode,
+                ...(iterations.length > 1 ? { iterations, agentIds } : {}),
             },
-            ownershipScopeOf(goal),
-        );
-
-        const dispatch = await this.transitions.dispatchAgentRun(task, agentId, {
-            // Keyed on the iteration, so a double tick of the cron cannot
-            // fire the same iteration twice.
-            dedupKey: `goal:${goal.id}:${iteration}`,
         });
 
-        goal.iteration = iteration;
-        goal.activeAgentId = agentId;
+        const slots: Array<{
+            iteration: number;
+            agentId: string;
+            task: Awaited<ReturnType<TasksService['create']>>;
+            dispatch: Awaited<ReturnType<TaskTransitionService['dispatchAgentRun']>>;
+        }> = [];
+        for (let index = 0; index < iterations.length; index++) {
+            const slotIteration = iterations[index];
+            const slotAgentId = agentIds[index] ?? agentIds[agentIds.length - 1];
+            try {
+                const task = await this.tasksService.create(
+                    goal.userId,
+                    {
+                        title: `[Goal] ${goal.title} — iteration ${slotIteration}`,
+                        description: this.buildIterationBrief(goal, slotIteration),
+                        status: TaskStatus.TODO,
+                        priority: TaskPriority.P2,
+                        labels: [GOAL_ITERATION_LABEL],
+                        goalId: goal.id,
+                        agentId: slotAgentId,
+                        createdByType: 'user',
+                        createdById: goal.userId,
+                    },
+                    ownershipScopeOf(goal),
+                );
+
+                const dispatch = await this.transitions.dispatchAgentRun(task, slotAgentId, {
+                    // Keyed on the iteration, so a double tick of the cron cannot
+                    // fire the same iteration twice.
+                    dedupKey: `goal:${goal.id}:${slotIteration}`,
+                });
+                slots.push({ iteration: slotIteration, agentId: slotAgentId, task, dispatch });
+            } catch (err) {
+                // 🛑 A failure PART WAY through a multi-slot dispatch must
+                // not discard the slots that already landed. `goal.iteration`
+                // is what the next tick derives its iteration numbers from,
+                // so throwing here would leave iteration N dispatched while
+                // the counter still said N-1 — and the next tick would create
+                // a SECOND Task numbered N. Keep the slots that succeeded,
+                // let the counter advance to cover them, and let the next
+                // tick fill the slot that failed.
+                //
+                // The FIRST slot is different: nothing landed, so the caller
+                // sees exactly the failure it saw before concurrent
+                // iterations existed (serial Goals are byte-for-byte
+                // unchanged).
+                if (slots.length === 0) throw err;
+                this.logger.warn(
+                    `Goal ${goal.id}: iteration ${slotIteration} could not be dispatched ` +
+                        `(${slots.length} of ${iterations.length} slot(s) started): ${
+                            err instanceof Error ? err.message : String(err)
+                        }`,
+                );
+                break;
+            }
+        }
+
+        const last = slots[slots.length - 1];
+        goal.iteration = last.iteration;
+        goal.activeAgentId = last.agentId;
         const saved = await this.goals.save(goal);
 
-        await this.recordEvent(saved, {
-            kind: 'dispatch',
-            message:
-                `Dispatched iteration ${iteration} — session task ${task.slug} created for agent ` +
-                `${agentId}${dispatch.dispatched ? '' : ' (queued — the runtime has not started it yet)'}.`,
-            agentId,
-            taskId: task.id,
-            iteration,
-            metadata: {
-                runId: dispatch.runId,
-                dispatched: dispatch.dispatched,
-                parked: dispatch.parked,
-                executionTarget: saved.executionTarget ?? null,
-                ...(dispatch.error ? { error: dispatch.error } : {}),
-            },
-        });
-        await this.recordActivity(
-            saved,
-            ActivityActionType.GOAL_ITERATION_DISPATCHED,
-            'iteration',
-            {
-                iteration,
-                agentId,
-                taskId: task.id,
-                runId: dispatch.runId,
-                reasonCode: decision.reasonCode,
-            },
-        );
+        for (const slot of slots) {
+            await this.recordEvent(saved, {
+                kind: 'dispatch',
+                message:
+                    `Dispatched iteration ${slot.iteration} — session task ${slot.task.slug} created for agent ` +
+                    `${slot.agentId}${slot.dispatch.dispatched ? '' : ' (queued — the runtime has not started it yet)'}.`,
+                agentId: slot.agentId,
+                taskId: slot.task.id,
+                iteration: slot.iteration,
+                metadata: {
+                    runId: slot.dispatch.runId,
+                    dispatched: slot.dispatch.dispatched,
+                    parked: slot.dispatch.parked,
+                    executionTarget: saved.executionTarget ?? null,
+                    ...(slot.dispatch.error ? { error: slot.dispatch.error } : {}),
+                },
+            });
+            await this.recordActivity(
+                saved,
+                ActivityActionType.GOAL_ITERATION_DISPATCHED,
+                'iteration',
+                {
+                    iteration: slot.iteration,
+                    agentId: slot.agentId,
+                    taskId: slot.task.id,
+                    runId: slot.dispatch.runId,
+                    reasonCode: decision.reasonCode,
+                },
+            );
+        }
 
+        const first = slots[0];
         return {
             goalId: saved.id,
             action: 'dispatch',
             reasonCode: decision.reasonCode,
             reasoning: decision.reasoning,
-            agentId,
-            taskId: task.id,
-            runId: dispatch.runId,
-            iteration,
+            // Scalars stay the FIRST slot so every pre-AH reader — the
+            // advanceDue counters, the API response, the specs — sees
+            // exactly what it saw before.
+            agentId: first.agentId,
+            taskId: first.task.id,
+            runId: first.dispatch.runId,
+            iteration: first.iteration,
+            ...(slots.length > 1
+                ? {
+                      agentIds: slots.map((slot) => slot.agentId),
+                      taskIds: slots.map((slot) => slot.task.id),
+                      runIds: slots.map((slot) => slot.dispatch.runId),
+                      iterations: slots.map((slot) => slot.iteration),
+                  }
+                : {}),
         };
     }
 
@@ -1016,8 +1122,21 @@ export class GoalOrchestratorService {
     }
 
     private async findActiveRun(goalId: string): Promise<AgentRun | null> {
+        return (await this.findActiveRuns(goalId))[0] ?? null;
+    }
+
+    /**
+     * EVERY in-flight run of this Goal's iterations, not just the first.
+     *
+     * Concurrent iterations (slice AH) need the COUNT — "3 of 4 slots
+     * used" — and `findActiveRun` now reads the head of this list, so the
+     * boolean the decision function sees and the number it sees can never
+     * come from two different reads. No extra query: `loadGoalWork`
+     * already fetched the runs.
+     */
+    private async findActiveRuns(goalId: string): Promise<AgentRun[]> {
         const { runs } = await this.loadGoalWork(goalId);
-        return runs.find((run) => ACTIVE_RUN_STATUSES.includes(run.status)) ?? null;
+        return runs.filter((run) => ACTIVE_RUN_STATUSES.includes(run.status));
     }
 
     /**
@@ -1306,6 +1425,7 @@ export class GoalOrchestratorService {
             spendCapCents: goal.spendCapCents ?? null,
             wallClockLimitHours: goal.wallClockLimitHours ?? null,
             stuckThresholdIterations: goal.stuckThresholdIterations ?? null,
+            maxConcurrentIterations: goal.maxConcurrentIterations ?? null,
             sessionBudgetMinutes: goal.sessionBudgetMinutes ?? null,
             gracePeriodMinutes: goal.gracePeriodMinutes ?? null,
             executionTarget: goal.executionTarget ?? null,

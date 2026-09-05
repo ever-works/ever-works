@@ -20,6 +20,10 @@ export * from './task-pr-status.service';
 export * from './agent-task-tools';
 export * from './recurrence';
 export * from './task-recurrence-dispatcher.service';
+// Task-graph fan-out (slice AH) — the bounded TODO-with-no-open-blockers driver.
+export * from './task-graph-fanout.service';
+// THE extraRepos validator, shared by Tasks and Task Template steps.
+export * from './task-extra-repos';
 export * from './task-notification.service';
 export * from './task-templates.service';
 export { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';

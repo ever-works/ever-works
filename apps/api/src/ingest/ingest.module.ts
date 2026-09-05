@@ -13,6 +13,15 @@ import { GitHubEventsController } from './github/github-events.controller';
 import { GitHubAppWebhookController } from './github/github-app-webhook.controller';
 import { GitHubPrReviewBridgeService } from './github/github-pr-review-bridge.service';
 import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatcher.service';
+import { GitHubIssueIntakeService } from './github/github-issue-intake.service';
+import { DependabotIncidentSource } from './incidents/dependabot-incident.source';
+import { JiraEventsController } from './jira/jira-events.controller';
+import { JiraIssueBridgeService } from './jira/jira-issue-bridge.service';
+import { SentryBindingsController } from './sentry/sentry-bindings.controller';
+import { SentryIncidentSource } from './sentry/sentry-incident.source';
+import { SentryInstallBindingService } from './sentry/sentry-install-binding.service';
+import { SentryWebhookController } from './sentry/sentry-webhook.controller';
+import { TriageTaskFilerService } from './triage/triage-task-filer.service';
 
 /**
  * Event-ingest spine (Wave 6) — thin API module exposing
@@ -59,6 +68,31 @@ import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatch
  * chat surface) comes from `AiConversationModule`; the Work-aware
  * reviewer comes from the agent-side `PrReviewModule`; the durable
  * rejection recorder (orchestration M9) comes from `TasksDomainModule`.
+ *
+ * ## Issue and incident intake (self-build program note §6, R2/R23)
+ *
+ * Four inbound sources feed the same spine, each verified with its
+ * VENDOR'S OWN signature scheme and attributed through the one
+ * `ingest_install_bindings` table — never from the payload:
+ *
+ *   * GitHub `issues` + `dependabot_alert` — `GitHubIssueIntakeService`
+ *     registers itself on the dispatcher above (`registerConsumer`), so
+ *     both GitHub routes feed it after the same verification;
+ *   * Jira Cloud — `JiraEventsController` → `POST /api/ingest/jira/events`
+ *     over `JiraIssueBridgeService` (per-site install binding, the
+ *     connector's `webhookSecret`);
+ *   * Sentry — `SentryWebhookController` → `POST /api/ingest/sentry/events`
+ *     (platform client secret) with owners written ONLY by the
+ *     authenticated `SentryBindingsController`
+ *     (`/api/ingest/sentry/bindings`).
+ *
+ * `TriageTaskFilerService` is a kind processor on the spine
+ * (`github.issue`, `jira.issue`, `incident`): one Task per
+ * `(source, external id)` in the bound Work, dedup key persisted in
+ * `external_issue_links`, later revisions become comments. It needs the
+ * Tasks domain (`TasksService`, `TaskChatService`, `TaskRepository`)
+ * from `TasksDomainModule` and the link service + `WorkRepository`
+ * from `EventIngestModule` — both already imported.
  */
 @Module({
     imports: [
@@ -75,11 +109,21 @@ import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatch
         SlackCommandsController,
         GitHubEventsController,
         GitHubAppWebhookController,
+        JiraEventsController,
+        SentryWebhookController,
+        SentryBindingsController,
     ],
     providers: [
         SlackChatBridgeService,
         GitHubPrReviewBridgeService,
         GitHubWebhookDispatcherService,
+        // Issue + incident intake (§6, R2/R23).
+        DependabotIncidentSource,
+        GitHubIssueIntakeService,
+        JiraIssueBridgeService,
+        SentryIncidentSource,
+        SentryInstallBindingService,
+        TriageTaskFilerService,
     ],
     exports: [EventIngestModule],
 })

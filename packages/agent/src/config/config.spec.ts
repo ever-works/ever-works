@@ -232,6 +232,33 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet.getNodeOfflineNoticeAfterMs (health signals, EW-776)', () => {
+        it('defaults to 30 minutes', () => {
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(30 * 60_000);
+        });
+
+        it('honours an operator override', () => {
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = String(2 * 3600_000);
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(2 * 3600_000);
+        });
+
+        it('is floored at the offline sweep window it escalates', () => {
+            // A "still offline after N" notice that could fire before the
+            // node is even considered offline would be two notices for one
+            // event — so the floor is the sweep window, not a constant.
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = '1000';
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(
+                config.fleet.getNodeOfflineAfterMs(),
+            );
+        });
+
+        it('tracks a RAISED offline window, so the pair can never invert', () => {
+            process.env.FLEET_NODE_OFFLINE_AFTER_MS = String(45 * 60_000);
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = String(10 * 60_000);
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(45 * 60_000);
+        });
+    });
+
     describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {
         describe('getApiUrl', () => {
             it('returns undefined when unset', () => {
@@ -1156,6 +1183,59 @@ describe('agent/config', () => {
                 process.env.AGENT_PLUGINS_DIR = '';
                 expect(config.agentPlugins.getPackageDirs()).toBe('/app/agent-plugins');
             });
+        });
+    });
+
+    /**
+     * Task-graph fan-out (self-build slice AH). These two knobs govern
+     * the ONE driver on the platform that starts work nobody clicked, and
+     * the zero on the first one reads the OPPOSITE way round from the
+     * concurrency valves next to it — which is exactly the kind of thing
+     * an operator gets backwards, so it is pinned here.
+     */
+    describe('agents — task-graph fan-out', () => {
+        describe('getTaskFanoutMaxStartsPerOwner', () => {
+            it('defaults to 0, which means the driver is OFF', () => {
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+            });
+
+            it('returns an explicitly configured bound', () => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = '3';
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(3);
+            });
+
+            it.each(['', '  ', 'lots'])('falls back to OFF for %j', (value) => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = value;
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+            });
+
+            it('reads 0 as "no starts", NOT as "no ceiling" like the concurrency valves', () => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = '0';
+                process.env.AGENT_MAX_CONCURRENT_RUNS_PER_WORK = '0';
+                // Same literal, opposite meanings — the driver stops, the
+                // valve stops bounding.
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+                expect(config.agents.getMaxConcurrentRunsPerWork()).toBe(0);
+            });
+        });
+
+        describe('getTaskFanoutScanLimit', () => {
+            it('defaults to 50', () => {
+                expect(config.agents.getTaskFanoutScanLimit()).toBe(50);
+            });
+
+            it('returns an explicitly configured limit', () => {
+                process.env.TASK_FANOUT_SCAN_LIMIT = '120';
+                expect(config.agents.getTaskFanoutScanLimit()).toBe(120);
+            });
+
+            it.each(['0', '-5', 'many', ''])(
+                'refuses %j and keeps the default — a scan of nothing is a broken tick, not a valve',
+                (value) => {
+                    process.env.TASK_FANOUT_SCAN_LIMIT = value;
+                    expect(config.agents.getTaskFanoutScanLimit()).toBe(50);
+                },
+            );
         });
     });
 });

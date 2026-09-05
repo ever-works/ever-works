@@ -66,7 +66,10 @@ const JOB_EXPORTS = [
 	'FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC',
 	'clampQueuedMaxAgeSec',
 	'FLEET_JOB_QUEUE_EXPIRED_REASON',
-	'isQueueExpiredError'
+	'isQueueExpiredError',
+	// Suspend-safe leases (self-build finding R7).
+	'FLEET_JOB_STALE_LEASE_REASON',
+	'FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON'
 ] as const;
 
 const NODE_EXPORTS = [
@@ -94,7 +97,14 @@ const NODE_EXPORTS = [
 	'FLEET_MAX_CAPABILITY_TAGS_CEILING',
 	'FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING',
 	'FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS',
-	'FLEET_MIN_NODE_OFFLINE_AFTER_MS'
+	'FLEET_MIN_NODE_OFFLINE_AFTER_MS',
+	// Health signals (EW-776): the worker-state vocabulary, its
+	// normaliser, the reason cap and the long-offline notice window.
+	// Covered in `fleet-node.spec.ts`.
+	'FLEET_NODE_WORKER_STATES',
+	'normalizeFleetNodeWorkerState',
+	'FLEET_MAX_WORKER_STATE_REASON_LENGTH',
+	'FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS'
 ] as const;
 
 /** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
@@ -204,7 +214,8 @@ const FUNCTION_EXPORTS = [
 	'normalizeFleetTaskWorkspaceMounts',
 	'isReservedMountDir',
 	'parseFleetAgentTaskQuestionMarkdown',
-	'normalizeFleetAgentTaskQuestion'
+	'normalizeFleetAgentTaskQuestion',
+	'normalizeFleetNodeWorkerState'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -219,14 +230,16 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 112 runtime symbols', () => {
+	it('exposes exactly these 118 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		// 92 → 98 with fleet cost accounting (EW-777): two node bounds and
 		// four cost-accounting helpers, each pinned in its own spec.
+		// 114 → 118 with fleet health signals (EW-776): the worker-state
+		// list, its normaliser, the reason cap and the long-offline window.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(112);
+		expect(Object.keys(fleet)).toHaveLength(118);
 	});
 
 	it.each([

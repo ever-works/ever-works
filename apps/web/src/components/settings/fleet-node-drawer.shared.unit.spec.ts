@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { FleetJobView } from '@ever-works/contracts';
+import type { FleetJobView, FleetNodeJobHistoryEntry } from '@ever-works/contracts';
 import {
     FLEET_JOB_FILTERS,
     filterFleetJobs,
     fleetJobDurationMs,
+    fleetJobOutcomeKey,
+    fleetJobOutcomeText,
+    fleetWorkerStateBadgeClass,
+    fleetWorkerStateKey,
     formatFleetJobDuration,
 } from './fleet-node-drawer.shared';
 
@@ -54,6 +58,36 @@ describe('filterFleetJobs', () => {
 
     it('"failed" keeps only failed jobs', () => {
         expect(filterFleetJobs(jobs, 'failed').map((entry) => entry.id)).toEqual(['failed']);
+    });
+
+    /**
+     * The chip has to agree with the badge sitting next to it (EW-776).
+     * Judging the filter on `job.status` while the badge is judged on the
+     * reconciled run outcome would put a row rendering a red "Failed" in
+     * All and hide it under Failed — the original defect, one layer up.
+     */
+    it('"failed" is judged on the RECONCILED outcome, not the job status', () => {
+        const rows = [
+            {
+                ...job({ id: 'done-but-run-failed', status: 'done' }),
+                reconciled: { runId: 'r1', status: 'failed' as const, summary: null, error: null },
+            },
+            {
+                ...job({ id: 'failed-but-run-completed', status: 'failed' }),
+                reconciled: {
+                    runId: 'r2',
+                    status: 'completed' as const,
+                    summary: null,
+                    error: null,
+                },
+            },
+            { ...job({ id: 'failed-no-run', status: 'failed' }), reconciled: null },
+        ];
+
+        expect(filterFleetJobs(rows, 'failed').map((entry) => entry.id)).toEqual([
+            'done-but-run-failed',
+            'failed-no-run',
+        ]);
     });
 
     /**
@@ -110,5 +144,132 @@ describe('formatFleetJobDuration', () => {
         expect(formatFleetJobDuration(undefined)).toBeNull();
         expect(formatFleetJobDuration(-1)).toBeNull();
         expect(formatFleetJobDuration(Number.NaN)).toBeNull();
+    });
+});
+
+/**
+ * Fleet health signals (EW-776) — the drawer's new derivations.
+ *
+ * Two of these encode the defect directly: a node reads `online` while
+ * its worker is quarantined, and a job reads `done` while the run it
+ * carried failed. Both used to render as "fine".
+ */
+
+function historyJob(over: Partial<FleetNodeJobHistoryEntry> = {}): FleetNodeJobHistoryEntry {
+    return { ...job(), error: null, summary: null, reconciled: null, ...over };
+}
+
+const reconciled = (
+    over: Partial<NonNullable<FleetNodeJobHistoryEntry['reconciled']>> = {},
+): NonNullable<FleetNodeJobHistoryEntry['reconciled']> => ({
+    runId: 'run-1',
+    status: 'completed',
+    summary: null,
+    error: null,
+    ...over,
+});
+
+describe('fleetWorkerStateKey', () => {
+    it.each([['idle'], ['working'], ['paused'], ['quarantined'], ['throttled']] as const)(
+        'passes %s through',
+        (workerState) => {
+            expect(fleetWorkerStateKey({ workerState })).toBe(workerState);
+        },
+    );
+
+    it('reports unknown — never idle — for a node that has never said', () => {
+        // A fabricated readiness for a machine we know nothing about is
+        // the exact lie this feature exists to end.
+        expect(fleetWorkerStateKey({ workerState: null })).toBe('unknown');
+        expect(fleetWorkerStateKey({})).toBe('unknown');
+    });
+
+    it('reports unknown for a value this build does not recognise', () => {
+        expect(fleetWorkerStateKey({ workerState: 'hibernating' as never })).toBe('unknown');
+    });
+});
+
+describe('fleetWorkerStateBadgeClass', () => {
+    it('makes a quarantine stand out and leaves idle neutral', () => {
+        expect(fleetWorkerStateBadgeClass('quarantined')).toContain('danger');
+        expect(fleetWorkerStateBadgeClass('throttled')).toContain('warning');
+        expect(fleetWorkerStateBadgeClass('paused')).toContain('warning');
+        expect(fleetWorkerStateBadgeClass('working')).toContain('info');
+        // An idle machine is not an event.
+        expect(fleetWorkerStateBadgeClass('idle')).not.toContain('danger');
+        expect(fleetWorkerStateBadgeClass('unknown')).not.toContain('danger');
+    });
+});
+
+describe('fleetJobOutcomeKey', () => {
+    it('reports a FAILED run behind a job the node called done', () => {
+        expect(
+            fleetJobOutcomeKey(
+                historyJob({ status: 'done', reconciled: reconciled({ status: 'failed' }) }),
+            ),
+        ).toBe('failed');
+    });
+
+    it('keeps saying running while the reconciler has not settled the run', () => {
+        // "Completed" here would repeat the original mistake with fresher
+        // data: the JOB finished, the WORK has not.
+        expect(
+            fleetJobOutcomeKey(
+                historyJob({ status: 'done', reconciled: reconciled({ status: 'running' }) }),
+            ),
+        ).toBe('running');
+    });
+
+    it('surfaces a cancelled run', () => {
+        expect(
+            fleetJobOutcomeKey(historyJob({ reconciled: reconciled({ status: 'cancelled' }) })),
+        ).toBe('cancelled');
+    });
+
+    it.each([
+        ['done', 'completed'],
+        ['failed', 'failed'],
+        ['running', 'running'],
+        ['leased', 'running'],
+        ['queued', 'queued'],
+    ] as const)('falls back to the job status %s → %s when no run is known', (status, expected) => {
+        expect(fleetJobOutcomeKey(historyJob({ status, reconciled: null }))).toBe(expected);
+    });
+});
+
+describe('fleetJobOutcomeText', () => {
+    it('leads with the RUN error — the reconciled reason is the one that matters', () => {
+        const text = fleetJobOutcomeText(
+            historyJob({
+                error: 'job said: exit 1',
+                reconciled: reconciled({ status: 'failed', error: 'model refused the plan' }),
+            }),
+        );
+        expect(text).toBe('model refused the plan');
+    });
+
+    it("falls back to the job's own error", () => {
+        expect(fleetJobOutcomeText(historyJob({ error: 'pnpm install exploded' }))).toBe(
+            'pnpm install exploded',
+        );
+    });
+
+    it('shows the run summary only when nothing went wrong', () => {
+        expect(
+            fleetJobOutcomeText(
+                historyJob({ reconciled: reconciled({ summary: 'Added a guard' }) }),
+            ),
+        ).toBe('Added a guard');
+    });
+
+    it('returns null when there is nothing to say', () => {
+        expect(fleetJobOutcomeText(historyJob())).toBeNull();
+        expect(fleetJobOutcomeText(historyJob({ error: '   ' }))).toBeNull();
+    });
+
+    it('truncates so a pasted stack trace cannot take over the drawer', () => {
+        const text = fleetJobOutcomeText(historyJob({ error: 'x'.repeat(400) }), 240);
+        expect(text).toHaveLength(241);
+        expect(text?.endsWith('…')).toBe(true);
     });
 });

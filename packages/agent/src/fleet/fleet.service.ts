@@ -1,6 +1,7 @@
 import { randomBytes } from 'crypto';
 import {
     BadRequestException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
@@ -19,10 +20,13 @@ import {
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
+    FLEET_MAX_WORKER_STATE_REASON_LENGTH,
     FLEET_MIN_NODE_NAME_LENGTH,
+    normalizeFleetNodeWorkerState,
 } from '@ever-works/contracts';
-import type { FleetNodeView, FleetNodeLoadView } from '@ever-works/contracts';
+import type { FleetNodeView, FleetNodeLoadView, FleetNodeWorkerState } from '@ever-works/contracts';
 import { config } from '../config';
+import { INBOX_PRODUCER, type InboxProducer } from '../inbox/inbox-producer.port';
 import {
     FleetNode,
     FleetNodeKind,
@@ -145,6 +149,16 @@ export interface EnrollInput {
      * optional contract as {@link cliVersion}.
      */
     modelIdentity?: string;
+    /**
+     * Fleet health signals (EW-776) — what the node's WORKER reports
+     * doing. An untrusted STRING, not the union: the wire has to admit a
+     * value a newer daemon invented (rejecting it would fail the beat and
+     * take a live node offline), and it is normalized here before it is
+     * stored. Same additive contract as {@link cliVersion}.
+     */
+    workerState?: string;
+    /** Why — quarantine message, throttle reason. Sanitized and capped. */
+    workerStateReason?: string;
 }
 
 export interface EnrollResult {
@@ -192,6 +206,11 @@ export class FleetService {
         private readonly repository: FleetNodeRepository,
         @Optional() private readonly pluginRegistry?: PluginRegistryService,
         @Optional() private readonly pluginSettings?: PluginSettingsService,
+        // Fleet health signals (EW-776). Appended LAST and @Optional() per
+        // the positional-construction rule the specs rely on; the token is
+        // bound by the api-side @Global() InboxModule, so unit tests and
+        // the worker's RPC context simply file no notices.
+        @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
     ) {}
 
     /** Issue a one-time enrollment token for a new node (owner-scoped). */
@@ -271,6 +290,7 @@ export class FleetService {
 
         const secret = randomBytes(32).toString('base64url');
         const now = new Date();
+        const enrolledWorkerState = normalizeFleetNodeWorkerState(input.workerState);
         const patch = {
             enrollmentTokenHash: sha256Hex(secret),
             status: 'online' as FleetNodeStatus,
@@ -285,6 +305,17 @@ export class FleetService {
             cliVersion: sanitizeText(input.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH),
             diskFreeBytes: sanitizeByteCount(input.diskFreeBytes),
             modelIdentity: sanitizeModelIdentity(input.modelIdentity),
+            // Health signals (EW-776): normalized, never stored verbatim.
+            // Stamped (possibly null) for the same reason the rest of the
+            // telemetry is — the row is new, there is nothing to preserve.
+            workerState: enrolledWorkerState,
+            // Dropped with the state it explains when that state is one we
+            // could not recognise — same rule the heartbeat path applies.
+            // Captioning an "unknown" badge with text whose meaning we
+            // cannot vouch for is worse than saying nothing.
+            workerStateReason:
+                enrolledWorkerState === null ? null : sanitizeWorkerStateReason(input),
+            workerStateChangedAt: now,
         };
         // CAS: single-use by construction — a raced duplicate enroll
         // matches zero rows and gets the same null as a bad token.
@@ -369,9 +400,205 @@ export class FleetService {
         // the seat leaves the last reported seat in place.
         const modelIdentity = sanitizeModelIdentity(refresh.modelIdentity);
         if (modelIdentity) patch.modelIdentity = modelIdentity;
-
+        // Health signals (EW-776). `undefined` means the daemon said
+        // nothing about its worker — the same "leave alone" contract as
+        // the telemetry above — and is distinct from a REPORTED value this
+        // build does not recognise, which is stored as null / "unknown".
+        const workerState = this.applyWorkerState(node, refresh, patch);
+        // Re-arm the offline notice markers on EVERY accepted beat, not
+        // only on beats that happened to report a worker state. The beat
+        // itself is the proof the machine is reachable, and the daemons
+        // that report nothing are exactly the ones this must not forget:
+        // a build older than the field, a visibility-only node with its
+        // worker disabled, and — created by this very slice — a daemon
+        // that latched into liveness-only reporting after an older API
+        // 400'd the fields. Folding this into `applyWorkerState` left
+        // `offlineLongNoticedAt` set forever on all three, so their
+        // SECOND outage would never have been announced.
+        this.rearmOfflineNotices(node, patch);
         await this.repository.update(node.id, patch);
+        // Best-effort and AFTER the write, so a notice never claims a
+        // transition the database refused. The dedup markers ride in the
+        // same patch, which is what makes each notice fire once: if the
+        // Inbox call then fails we log it rather than re-arming, exactly
+        // as the daily-ceiling notice does.
+        await this.announceWorkerTransition(node, patch, workerState);
         return { node: this.toView({ ...node, ...patch }) };
+    }
+
+    /**
+     * Fold a heartbeat's reported worker state into the update patch.
+     *
+     * Returns the NORMALIZED state (`null` = reported but unknown), or
+     * `undefined` when the beat said nothing at all — the caller uses that
+     * to tell "an old daemon" apart from "a daemon reporting something we
+     * do not understand", which are different facts and must not collapse.
+     *
+     * `workerStateChangedAt` moves only on an actual transition: a
+     * quarantine that started at 03:14 must still say 03:14 after the
+     * three hundred beats that follow it, and re-stamping it every 30
+     * seconds would silently destroy the only durable evidence of when the
+     * machine stopped working.
+     */
+    private applyWorkerState(
+        node: FleetNode,
+        refresh: EnrollInput,
+        patch: Partial<FleetNode>,
+    ): FleetNodeWorkerState | null | undefined {
+        // `null` counts as "said nothing", not as "report unknown": the
+        // DTO's `@IsOptional()` already treats null as absent, so a client
+        // that serializes missing fields as null must not end up clearing a
+        // good reading that an older client would have preserved.
+        if (refresh.workerState === undefined || refresh.workerState === null) return undefined;
+        const state = normalizeFleetNodeWorkerState(refresh.workerState);
+        // A reason for a state we could not understand is not something to
+        // show an operator: it would caption an "unknown" badge with text
+        // whose meaning we cannot vouch for.
+        const reason = state === null ? null : sanitizeWorkerStateReason(refresh);
+        const previous = node.workerState ?? null;
+        if (state !== previous) {
+            patch.workerState = state;
+            patch.workerStateChangedAt = new Date();
+        }
+        if ((node.workerStateReason ?? null) !== reason) {
+            patch.workerStateReason = reason;
+        }
+        if (!this.inbox) return state;
+        // Quarantine dedup marker, written in the same patch as the state
+        // it describes. Set on the FIRST beat that reports the quarantine;
+        // cleared by the first beat that reports anything else, so a
+        // second quarantine hours later is news again.
+        if (state === 'quarantined') {
+            if (!node.quarantineNoticedAt) patch.quarantineNoticedAt = new Date();
+        } else if (node.quarantineNoticedAt) {
+            patch.quarantineNoticedAt = null;
+        }
+        return state;
+    }
+
+    /**
+     * Clear the offline notice markers, so the NEXT outage is announced.
+     *
+     * Called for every accepted heartbeat — whatever the beat said, or
+     * did not say, about its worker. A marker means "the owner has
+     * already been told about the outage that is currently running"; an
+     * accepted beat ends that outage by definition.
+     *
+     * Only bookkeeping the Inbox needs, so it stays inert when no
+     * producer is bound: a deployment that binds one later must not
+     * inherit markers written while nothing was ever notified.
+     */
+    private rearmOfflineNotices(node: FleetNode, patch: Partial<FleetNode>): void {
+        if (!this.inbox) return;
+        if (node.offlineNoticedAt) patch.offlineNoticedAt = null;
+        if (node.offlineLongNoticedAt) patch.offlineLongNoticedAt = null;
+    }
+
+    /**
+     * File the online → quarantined notice, once per quarantine.
+     *
+     * Only this transition is announced from the heartbeat: it is the one
+     * the platform can see NOW and could never see before (the beat
+     * arrives, the node looks perfectly online, and it is refusing every
+     * job). Going offline is announced by the sweep, because a node that
+     * has gone offline is by definition not sending beats.
+     */
+    private async announceWorkerTransition(
+        node: FleetNode,
+        patch: Partial<FleetNode>,
+        state: FleetNodeWorkerState | null | undefined,
+    ): Promise<void> {
+        if (!this.inbox || state !== 'quarantined' || node.quarantineNoticedAt) return;
+        // The reason as it was just STORED: the patch carries it when this
+        // beat changed it, and the row's own value when it did not.
+        const reason =
+            patch.workerStateReason !== undefined
+                ? patch.workerStateReason
+                : (node.workerStateReason ?? null);
+        await this.fileNodeNotice(node, {
+            title: `Fleet node quarantined: ${node.name}`,
+            body: [
+                `${node.name} (${node.kind}) has quarantined itself and is refusing new work.`,
+                'A quarantine is a fail-closed stop the machine imposed on itself and it survives a restart — it can only be cleared at that keyboard.',
+                `Reason: ${reason ?? 'not reported by the node'}`,
+                `Last seen: ${describeLastSeen(node)}`,
+            ].join('\n'),
+        });
+    }
+
+    /**
+     * Announce the offline transitions the SWEEP decides, then let the
+     * bulk sweep run as it always has.
+     *
+     * Two notices, each claimed by a CAS so it fires exactly once per
+     * outage: the flip to `offline`, and — a configurable window later,
+     * default 30 minutes — "this machine is still gone". The second one
+     * exists because the runbook recommends `local-wait`, under which
+     * there is no cloud fallback and therefore no other signal at all
+     * that somebody's PC went dark.
+     *
+     * Whole thing is best-effort: an Inbox or notice-bookkeeping failure
+     * must never take down the node list, which is the page an operator
+     * opens precisely when something is wrong.
+     */
+    private async announceOfflineTransitions(userId: string, cutoff: Date): Promise<void> {
+        if (!this.inbox) return;
+        try {
+            for (const row of await this.repository.findStaleOnline(userId, cutoff)) {
+                // The CAS is the dedup AND the flip: a node that beat back
+                // between the read and here is not flipped and not announced.
+                if (!(await this.repository.markOfflineIfStale(row.id, cutoff))) continue;
+                await this.fileNodeNotice(row, {
+                    title: `Fleet node offline: ${row.name}`,
+                    body: [
+                        `${row.name} (${row.kind}) stopped reporting and has been marked offline.`,
+                        'Work routed to this machine will queue until it comes back.',
+                        `Last seen: ${describeLastSeen(row)}`,
+                    ].join('\n'),
+                });
+            }
+
+            const longAfterMs = config.fleet.getNodeOfflineNoticeAfterMs();
+            const longCutoff = new Date(Date.now() - longAfterMs);
+            for (const row of await this.repository.findOfflineUnnoticed(userId, longCutoff)) {
+                if (!(await this.repository.markLongOfflineNoticed(row.id))) continue;
+                await this.fileNodeNotice(row, {
+                    title: `Fleet node still offline: ${row.name}`,
+                    body: [
+                        `${row.name} (${row.kind}) has now been offline for over ${formatDurationMs(longAfterMs)}.`,
+                        'Nothing will run on it until it is back; if this fleet routes with local-wait there is no cloud fallback covering for it.',
+                        `Last seen: ${describeLastSeen(row)}`,
+                    ].join('\n'),
+                });
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Fleet health notices skipped for user ${userId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /** File one node-scoped notice. Never throws — the inbox mirrors, it does not gate. */
+    private async fileNodeNotice(
+        node: FleetNode,
+        message: { title: string; body: string },
+    ): Promise<void> {
+        if (!this.inbox) return;
+        try {
+            await this.inbox.notice(node.userId, {
+                title: message.title,
+                body: message.body,
+                organizationId: node.organizationId ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Fleet health notice "${message.title}" was not filed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /**
@@ -429,10 +656,13 @@ export class FleetService {
      * router route work to a machine that will never poll for it.
      */
     async listEnrolledForUser(userId: string): Promise<FleetNodeView[]> {
-        await this.repository.sweepOffline(
-            userId,
-            new Date(Date.now() - config.fleet.getNodeOfflineAfterMs()),
-        );
+        const cutoff = new Date(Date.now() - config.fleet.getNodeOfflineAfterMs());
+        // Health signals (EW-776): name each node that is about to flip
+        // BEFORE the bulk sweep flips them all silently. The sweep below is
+        // unchanged and still runs — it is the catch-all for anything the
+        // per-row pass missed (or skipped, when no Inbox is bound).
+        await this.announceOfflineTransitions(userId, cutoff);
+        await this.repository.sweepOffline(userId, cutoff);
         const rows = await this.repository.findByUser(userId);
         return rows.map((row) => this.toView(row));
     }
@@ -812,6 +1042,13 @@ export class FleetService {
             modelIdentity: node.modelIdentity ?? null,
             dailyCostCeilingCents: toOptionalNumber(node.dailyCostCeilingCents),
             dailyCostTrippedOn: node.dailyCostTrippedOn ?? null,
+            // Fleet health signals (EW-776). Null is "unknown", never
+            // "idle" — see `normalizeFleetNodeWorkerState`.
+            workerState: node.workerState ?? null,
+            workerStateReason: node.workerStateReason ?? null,
+            workerStateChangedAt: node.workerStateChangedAt
+                ? toIso(node.workerStateChangedAt)
+                : null,
         };
     }
 }
@@ -879,6 +1116,43 @@ function sanitizeModelIdentity(value: unknown): string | null {
     if (!text) return null;
     // The placeholder can be longer than the token it replaces — re-cap.
     return redactSecrets(text).cleaned.slice(0, FLEET_MAX_MODEL_IDENTITY_LENGTH);
+}
+
+/**
+ * Fleet health signals (EW-776) — the free text a node offers to explain
+ * its worker state.
+ *
+ * Scrubbed the same way `modelIdentity` is, and for the same reason: this
+ * string is composed on an untrusted machine out of error messages and
+ * command output, it is stored, listed AND quoted into Inbox notices, and
+ * a quarantine reason is exactly the kind of message that carries a
+ * command line with a token in it. Capped after redaction because a
+ * placeholder can be longer than what it replaced.
+ */
+function sanitizeWorkerStateReason(source: { workerStateReason?: unknown }): string | null {
+    const text = sanitizeText(source.workerStateReason, FLEET_MAX_WORKER_STATE_REASON_LENGTH);
+    if (!text) return null;
+    return redactSecrets(text).cleaned.slice(0, FLEET_MAX_WORKER_STATE_REASON_LENGTH);
+}
+
+/** Last-seen line for a health notice; a node that never beat says so. */
+function describeLastSeen(node: FleetNode): string {
+    if (!node.lastHeartbeatAt) return 'never (this machine has not reported since enrolling)';
+    try {
+        return toIso(node.lastHeartbeatAt);
+    } catch {
+        return 'unknown';
+    }
+}
+
+/** `45s` / `30 minutes` / `2 hours` — for notice prose, not for parsing. */
+function formatDurationMs(ms: number): string {
+    if (!Number.isFinite(ms) || ms <= 0) return '0 minutes';
+    const minutes = Math.round(ms / 60_000);
+    if (minutes < 1) return `${Math.round(ms / 1000)} seconds`;
+    if (minutes < 120) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+    const hours = Math.round(minutes / 60);
+    return `${hours} hour${hours === 1 ? '' : 's'}`;
 }
 
 /**

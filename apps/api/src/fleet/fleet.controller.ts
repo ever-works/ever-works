@@ -7,6 +7,7 @@ import {
     HttpCode,
     HttpStatus,
     Logger,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -36,8 +37,14 @@ import type {
     FleetNodeView,
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
+import { AgentRunRepository } from '@ever-works/agent/database';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
+import {
+    buildNodeJobHistory,
+    isFailedNodeHistoryEntry,
+    nodeHistoryRunIds,
+} from './fleet-node-history';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -130,6 +137,12 @@ export class FleetController {
         private readonly costCeiling: FleetCostCeilingService,
         // EW-778 — owns the per-node drain so that drain-all reuses it.
         private readonly panic: FleetPanicService,
+        // EW-776 — the reconciled run outcome behind each history row.
+        // Appended LAST and @Optional() so every positional construction
+        // (the controller spec's included) keeps working, and so a missing
+        // binding degrades to `reconciled: null` instead of a 500 on the
+        // node drawer.
+        @Optional() private readonly runs?: AgentRunRepository,
     ) {}
 
     @Get('cost-ceiling')
@@ -268,12 +281,53 @@ export class FleetController {
             historyUnavailable = true;
         }
 
+        // The RECONCILED outcome (EW-776): a fleet job and the Agent run it
+        // carried settle separately, so a job the node called `done` can
+        // sit in front of a run that failed. One bulk read, owner-scoped in
+        // the query, and strictly best-effort — a run-table hiccup leaves
+        // `reconciled: null` ("not known") rather than taking the drawer
+        // down or, worse, inventing an outcome.
+        const runs = await this.readReconciledRuns(auth.userId, recentJobs);
+        // `buildNodeJobHistory` also strips `payload` from every row. A
+        // node's job payload is executor input composed from user content;
+        // a settings endpoint has no reason to ship it.
+        const history = buildNodeJobHistory(recentJobs, runs);
+
         return {
             node,
-            recentJobs,
-            failures: recentJobs.filter((job) => job.status === 'failed'),
+            recentJobs: history,
+            // Reconciled-aware, so the subset agrees with the badge each
+            // row renders: a job the node called `done` whose run failed
+            // belongs here, and one it called `failed` whose run the
+            // reconciler settled `completed` does not.
+            failures: history.filter(isFailedNodeHistoryEntry),
             historyUnavailable,
         };
+    }
+
+    /** Runs behind a page of node history, by id. Never throws. */
+    private async readReconciledRuns(
+        userId: string,
+        jobs: Awaited<ReturnType<FleetJobService['historyForNode']>>,
+    ): Promise<
+        Map<
+            string,
+            { id: string; status: string; summary?: string | null; errorMessage?: string | null }
+        >
+    > {
+        const runIds = nodeHistoryRunIds(jobs);
+        if (!this.runs || runIds.length === 0) return new Map();
+        try {
+            const rows = await this.runs.findByIds(runIds, userId);
+            return new Map(rows.map((run) => [run.id, run]));
+        } catch (error) {
+            this.logger.debug(
+                `Node history degraded to job outcomes only: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return new Map();
+        }
     }
 
     @Get('enrollment-tokens')
@@ -440,6 +494,8 @@ export class FleetController {
             cliVersion: body.cliVersion,
             diskFreeBytes: body.diskFreeBytes,
             modelIdentity: body.modelIdentity,
+            workerState: body.workerState,
+            workerStateReason: body.workerStateReason,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -465,6 +521,8 @@ export class FleetController {
             cliVersion: body.cliVersion,
             diskFreeBytes: body.diskFreeBytes,
             modelIdentity: body.modelIdentity,
+            workerState: body.workerState,
+            workerStateReason: body.workerStateReason,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

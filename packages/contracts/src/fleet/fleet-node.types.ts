@@ -102,6 +102,62 @@ export const FLEET_NODE_STATUSES: readonly FleetNodeStatus[] = ['enrolling', 'on
 export const FLEET_NODE_NON_LEASABLE_STATUSES: readonly FleetNodeStatus[] = ['enrolling', 'paused', 'disabled'];
 
 /**
+ * What the node's WORKER is doing, as opposed to {@link FleetNodeStatus},
+ * which is only what the platform can infer from heartbeats.
+ *
+ * The distinction is the whole point of this field (self-build finding
+ * OPS-02). A machine that has self-quarantined — the durable worker
+ * safety marker, set when a process tree could not be proven dead and
+ * clearable only at that keyboard — keeps beating and therefore keeps
+ * reporting `online`, while refusing every job it is offered. Status
+ * said "healthy", the queue said "nothing is running", and nothing
+ * anywhere said why. These five values are the node's own answer:
+ *
+ * - `idle`        — polling, ready to take work.
+ * - `working`     — at least one job in flight.
+ * - `paused`      — drained on purpose (operator pause, or draining
+ *                   the last in-flight jobs before a stop).
+ * - `quarantined` — fail-closed stop the node imposed on ITSELF; only
+ *                   an operator at that machine can clear it.
+ * - `throttled`   — over a resource ceiling (CPU/memory, disk floor):
+ *                   the loop runs and keeps its jobs, it just does not
+ *                   lease more.
+ *
+ * Stored in a plain `varchar(16)` with no enum/check constraint, like
+ * {@link FleetNodeStatus}, so adding a value stays a code change.
+ */
+export type FleetNodeWorkerState = 'idle' | 'working' | 'paused' | 'quarantined' | 'throttled';
+
+/** Canonical worker-state list — one source of truth for the server and the UI. */
+export const FLEET_NODE_WORKER_STATES: readonly FleetNodeWorkerState[] = [
+	'idle',
+	'working',
+	'paused',
+	'quarantined',
+	'throttled'
+];
+
+/**
+ * Normalize a worker state arriving off the wire.
+ *
+ * Returns `null` — meaning "unknown", rendered as such — for ANY value
+ * that is not an exact member: a non-string, a node-internal state name
+ * that is not part of this contract (`unsafe`, `draining`, `polling`),
+ * or a value a NEWER node build invented. Deliberately not a fallback to
+ * `idle`: a fabricated "idle" for a machine whose real state we do not
+ * understand is precisely the lie this whole field exists to stop.
+ *
+ * The wire itself stays permissive on purpose (the heartbeat DTO bounds
+ * `workerState` as a plain string, not an enum), so a future value can
+ * never make a beat fail and turn a live node offline. It is normalized
+ * here, once, before it is ever stored or shown.
+ */
+export function normalizeFleetNodeWorkerState(value: unknown): FleetNodeWorkerState | null {
+	if (typeof value !== 'string') return null;
+	return (FLEET_NODE_WORKER_STATES as readonly string[]).includes(value) ? (value as FleetNodeWorkerState) : null;
+}
+
+/**
  * Self-description a node sends on enroll and refreshes on every
  * heartbeat. Every field is optional: a node that reports nothing is
  * still a valid node, just an undescribed one.
@@ -155,6 +211,29 @@ export interface FleetNodeSelfDescription {
 	 * Capped at {@link FLEET_MAX_MODEL_IDENTITY_LENGTH}.
 	 */
 	modelIdentity?: string;
+	/**
+	 * What the node's WORKER is doing right now — one of
+	 * {@link FLEET_NODE_WORKER_STATES}.
+	 *
+	 * Typed as a plain `string` rather than the union ON PURPOSE: this is
+	 * the WIRE, and a node built after this API must be able to report a
+	 * value this API has never heard of without its heartbeat being
+	 * rejected (a rejected beat is a failed beat, and a node that cannot
+	 * beat goes offline). The server runs every incoming value through
+	 * {@link normalizeFleetNodeWorkerState}, which maps anything
+	 * unrecognised to "unknown" rather than trusting it verbatim.
+	 *
+	 * Same additive contract as {@link cliVersion}: absent leaves the
+	 * stored value alone, so an older daemon never blanks it.
+	 */
+	workerState?: string;
+	/**
+	 * Why the worker is in that state, when there is a reason worth
+	 * reading: the quarantine's own message, the resource ceiling that
+	 * throttled the lease. Free text from the machine, so the server
+	 * sanitizes and caps it at {@link FLEET_MAX_WORKER_STATE_REASON_LENGTH}.
+	 */
+	workerStateReason?: string;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -212,6 +291,21 @@ export interface FleetNodeView {
 	 * its owner re-enables it — a ceiling is a stop, not a rate limit.
 	 */
 	dailyCostTrippedOn?: string | null;
+	/**
+	 * What the node's worker last reported doing, or null when it has
+	 * never reported one (an older daemon, or a visibility-only node with
+	 * its worker disabled). Null renders as "unknown", which is the
+	 * honest answer — never as `idle`.
+	 */
+	workerState?: FleetNodeWorkerState | null;
+	/** Why the worker is in that state (quarantine / throttle reason), or null. */
+	workerStateReason?: string | null;
+	/**
+	 * ISO timestamp the worker state last CHANGED, or null. Stamped only
+	 * on a transition, so "quarantined since 03:14" stays true across the
+	 * hundreds of beats that follow rather than resetting every 30s.
+	 */
+	workerStateChangedAt?: string | null;
 }
 
 /**
@@ -290,6 +384,17 @@ export const FLEET_MAX_CLI_VERSION_LENGTH = 64;
 export const FLEET_MAX_MODEL_IDENTITY_LENGTH = 200;
 
 /**
+ * `sanitizeText(workerStateReason, 500)` server-side.
+ *
+ * Wide enough for a real quarantine message ("process tree for job X
+ * could not be proven terminated after N attempts: ..."), and hard
+ * enough that a machine cannot use a heartbeat field as unbounded
+ * storage. The node truncates to the same bound so what it shows locally
+ * matches what Fleet stores.
+ */
+export const FLEET_MAX_WORKER_STATE_REASON_LENGTH = 500;
+
+/**
  * Ceiling on a daily cost ceiling: $100,000 per UTC day, in cents. Not a
  * plausible fleet spend — it is the point past which a figure is a typo
  * (dollars entered as cents, or the reverse) rather than a decision, and
@@ -328,6 +433,21 @@ export const FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS = 15 * 60_000;
 /** Default silence after which an `online` node sweeps to `offline` (5 minutes). */
 export const FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS = 5 * 60_000;
 
+/**
+ * Default silence after which an already-`offline` node earns a SECOND,
+ * louder Inbox notice — "this machine has now been gone for half an
+ * hour" (30 minutes).
+ *
+ * Separate from {@link FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS} because the
+ * two answer different questions. Five minutes of silence is routine (a
+ * reboot, a lid closed, a flaky Wi-Fi minute) and the first notice says
+ * so. Half an hour is somebody's PC that is not coming back on its own,
+ * and under the runbook's recommended `local-wait` there is no cloud
+ * fallback to quietly cover for it. Filed exactly once per outage; the
+ * marker re-arms when the node beats again.
+ */
+export const FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS = 30 * 60_000;
+
 /** Default cap on how many capability tags one node may advertise. */
 export const FLEET_DEFAULT_MAX_CAPABILITY_TAGS = 16;
 
@@ -356,6 +476,63 @@ export const FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS = 30_000;
 export const FLEET_MIN_NODE_OFFLINE_AFTER_MS = 30_000;
 
 /**
+ * The RECONCILED outcome of the platform run a fleet job carried.
+ *
+ * The job row and the run row settle separately: the node reports a
+ * verdict on the job, then the api-side reconciler decides what that
+ * meant for the Agent run (completed with a summary, failed with a
+ * reason, parked on a question). Showing only the job status is how the
+ * drawer ended up saying "done" for a job whose run had failed — the
+ * exact question an operator opens the drawer to answer.
+ */
+export interface FleetJobReconciledOutcome {
+	/** The Agent run this job carried. */
+	runId: string;
+	status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+	/** The run's own summary, or null. */
+	summary: string | null;
+	/** The run's error message, or null. Length-capped server-side. */
+	error: string | null;
+}
+
+/**
+ * IDs-ONLY summary of what a job was for.
+ *
+ * Deliberately not the payload: `FleetJobView.payload` is executor input
+ * — instructions, mount grants, repo coordinates — and the drawer has no
+ * business rendering it (see `FLEET_JOB_MAX_PAYLOAD_BYTES` for how big
+ * it can get, and note that it is composed from user content). The
+ * identities below are what an operator actually needs to follow the
+ * trail from a node row to the Task and the run.
+ */
+export interface FleetJobHistorySummary {
+	kind: string;
+	taskId?: string | null;
+	runId?: string | null;
+	agentId?: string | null;
+}
+
+/**
+ * One row of the node drawer's job history: a {@link FleetJobView} plus
+ * the facts that were on the server and never reached the drawer — the
+ * job's own error text, the reconciled run outcome, and a payload-free
+ * summary.
+ *
+ * `payload` is inherited from {@link FleetJobView} and is always sent as
+ * `null` on this endpoint. Keeping the field (rather than omitting it)
+ * keeps the type a structural superset, so every existing consumer of
+ * the detail view still compiles.
+ */
+export interface FleetNodeJobHistoryEntry extends FleetJobView {
+	/** The verdict text the node reported, or null. Capped server-side. */
+	error?: string | null;
+	/** IDs-only description of the work, never the payload. */
+	summary?: FleetJobHistorySummary | null;
+	/** The reconciled run outcome, or null for a job that carried no run. */
+	reconciled?: FleetJobReconciledOutcome | null;
+}
+
+/**
  * `GET /api/fleet/nodes/:id` — one node plus what it has been doing.
  *
  * Lives in contracts (not at the API edge) because the web tier renders
@@ -365,13 +542,13 @@ export const FLEET_MIN_NODE_OFFLINE_AFTER_MS = 30_000;
 export interface FleetNodeDetailView {
 	node: FleetNodeView;
 	/** Newest-first job history for this node (all outcomes). */
-	recentJobs: FleetJobView[];
+	recentJobs: FleetNodeJobHistoryEntry[];
 	/**
 	 * The failed subset of {@link recentJobs}, newest first — pulled out
 	 * so the drawer can lead with "why is this machine unhappy" instead
 	 * of making the operator filter a mixed list by eye.
 	 */
-	failures: FleetJobView[];
+	failures: FleetNodeJobHistoryEntry[];
 	/**
 	 * True when the job history could not be read at all (job tables
 	 * unavailable). The node itself still renders — a job-runtime hiccup

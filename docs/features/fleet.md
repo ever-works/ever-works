@@ -67,11 +67,65 @@ POST   /api/fleet/nodes/:id/rotate   re-key the node; the replacement token is r
 DELETE /api/fleet/nodes/:id          remove the registration
 ```
 
-The **node drawer** on the Fleet page (the details action on a row) renders the same job history: each job's kind, status, attempt count, queued reason, queued / started / completed times and duration, filterable by **All / Failed / Running**.
+The **node drawer** on the Fleet page (the details action on a row) renders the same job history: each job's kind, status, **reconciled outcome and its reason**, attempt count, queued reason, queued / started / completed times and duration, filterable by **All / Failed / Running**. It also shows the node's **worker state** (see [Health signals](#health-signals)). It never renders a job's `payload` — the endpoint sends it as `null` and hands the drawer the task / run / agent ids instead.
 
 **Disabling drains.** A disabled node's heartbeats stop being accepted, so it goes quiet immediately rather than at the next sweep. Re-enabling puts it back to `offline` until its next accepted heartbeat proves it alive. Disabling a node that is still `enrolling` revokes its unused token.
 
 Everything here is owner-scoped: another account's node id is indistinguishable from one that does not exist.
+
+## Health signals
+
+`status` is what the platform can INFER from heartbeats. It cannot answer "will this machine actually take my job" — a node that has self-quarantined keeps heartbeating (that is what makes a quarantine observable instead of a blackout), so it reads `online` while refusing every lease. Before these signals, that machine looked healthy and idle, its owner was told nothing, and under the recommended `local-wait` routing there was no cloud fallback to quietly cover for it.
+
+### Worker state
+
+Every heartbeat now carries what the node's **worker** is doing, alongside the registry status:
+
+| Worker state  | The node reports it when                                                                  |
+| ------------- | ----------------------------------------------------------------------------------------- |
+| `idle`        | polling, ready to take work                                                               |
+| `working`     | at least one job in flight                                                                |
+| `paused`      | drained on purpose — an operator pause, or draining the last in-flight jobs before a stop |
+| `quarantined` | the fail-closed stop the node imposed on ITSELF; only clearable at that machine           |
+| `throttled`   | over a resource ceiling (CPU / memory, disk floor): keeps its jobs, leases no more        |
+
+`workerStateReason` carries the sentence that explains it — the quarantine's own message, the ceiling that was crossed — and `workerStateChangedAt` moves only on a TRANSITION, so "quarantined since 03:14" survives the hundreds of beats that follow. A node that has never reported one shows **unknown**, never `idle`: a fabricated readiness for a machine nobody has heard from is the thing these signals exist to end.
+
+Two properties are load-bearing and deliberately awkward:
+
+- **The field is a string on the wire, not an enum.** The heartbeat DTO runs under `whitelist + forbidNonWhitelisted`, so a value an older API rejects fails the whole request — and a failed heartbeat is a node that sweeps to `offline`. A node newer than the platform must be able to report a state this build has never heard of and stay alive; the server normalizes anything unrecognised to "unknown" rather than trusting it.
+- **The node tolerates an older platform.** If a heartbeat carrying the worker state comes back `400`, the daemon retries once immediately without those two fields; if that succeeds it logs once, keeps reporting liveness, and stops sending them until it restarts.
+
+The drawer judges a job FAILED on the reconciled run outcome — the badge, the **Failed** filter chip and the endpoint’s `failures` subset all use the same rule, so a job the node called `done` whose run failed appears in all three.
+
+Availability counts a node as **free** only when its worker state is not `quarantined`, `throttled` or `paused`. It stays counted as ONLINE — the operator must keep seeing it — but the run router no longer places work on a machine that will refuse it.
+
+### Inbox notices
+
+Three notices, each filed **exactly once per event** and re-armed when the node recovers:
+
+| Notice                     | Fired by                                                             | Re-armed by                            |
+| -------------------------- | -------------------------------------------------------------------- | -------------------------------------- |
+| `Fleet node offline`       | the heartbeat-expiry sweep, on the flip to offline                   | the next accepted heartbeat            |
+| `Fleet node still offline` | the sweep, once the node has been gone longer than the notice window | the next accepted heartbeat            |
+| `Fleet node quarantined`   | the first heartbeat reporting `quarantined`                          | the first beat reporting anything else |
+
+Each names the node, its kind, the reason where there is one, and when it was last seen. The dedup markers live on the `fleet_nodes` row (`offlineNoticedAt`, `offlineLongNoticedAt`, `quarantineNoticedAt`) and are claimed by a conditional UPDATE, so two API replicas sweeping the same owner produce one notice rather than two.
+
+The sweep is piggybacked on owner-scoped list reads (there is no cron): the runner pill polls it every 30 seconds while a dashboard is open, and a dispatch triggers it too. An owner with no open page and no dispatch gets the notice on their next visit rather than at the moment of the outage.
+
+### Knobs
+
+| Env                                  | Default | Meaning                                                        |
+| ------------------------------------ | ------- | -------------------------------------------------------------- |
+| `FLEET_NODE_OFFLINE_AFTER_MS`        | 5 min   | silence after which an `online` node sweeps to `offline`       |
+| `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` | 30 min  | how long a node stays offline before the second, louder notice |
+
+The notice window is floored at the sweep window: an escalation that could fire before the node is even considered offline would be two notices for one event.
+
+### Removing a node takes its pins with it
+
+Deleting a node deletes its `fleet_agent_node_affinities` rows — the durable "run this Agent on THAT machine" pins — in the same transaction. Left behind, they kept resolving: `FleetJobService.enqueue` stamped `targetNodeId` with a machine that no longer existed and the job sat queued forever, pinned to a ghost. Historical `fleet_jobs` rows are untouched; deleting a machine must not delete the record of what it did.
 
 ## Panic controls
 
@@ -167,6 +221,24 @@ With the `node` runtime selected, every Task run dispatched to an Agent becomes 
 When the node reports, the platform reconciles the result the same way a cloud run is reconciled: the run is marked started when the node leases the job and completed or failed when it reports (with the CLI's final message as the run summary and the acceptance-check verdicts on the run), the pushed task branch becomes a pull request (or is handed to a human when the Agent may not open one) and the Task moves to _In review_, the Agent posts the fleet report to the Task chat, a failure files an Inbox notice, and parked runs on the Work are drained. **Cancelling a run** cancels the fleet job too: a job no node has claimed is dropped; a job a node is executing is flagged, the node's next job heartbeat is refused, and the node aborts the CLI and reports.
 
 Routing preferences (**Settings → Fleet → Execution routing**) decide what happens when no runner is free: wait for one (`local-wait`), fall back to the cloud with a notice (`local-fallback`), or always use the cloud. An Agent can be pinned to one specific node (`PUT /api/fleet/agents/:agentId/node-affinity`); a pinned Agent never runs elsewhere.
+
+### Suspend safety (lease generations)
+
+Desk PCs sleep. A node that is suspended mid-run stops heart-beating, its lease (300 s by default) lapses, and the platform re-offers the job — possibly to the same machine once it wakes and polls again — while the first model run (up to 1200 s by default) is still going and, on its own, would only learn it lost the claim on its next heartbeat. Left alone that produces two runs against the same Task branch, and either the loser's push is rejected after full model spend or it lands first and the winner's is.
+
+What the platform does:
+
+- Every successful lease, including a re-lease after a lapse, increments the job's `leaseGeneration` and returns it with the lease.
+- Every heartbeat and every completion report must carry that generation. A call whose generation is not the job's current one is refused with `409 { "reason": "stale-lease" }`, before anything is written and before any lifecycle event fires — a stale holder can never flip the status, land a result, or cause a pull request to be opened for its branch. The repository guards pin the generation next to the node id in the same conditional `UPDATE`, so the guarantee holds against the same node re-leasing its own lapsed job, which a node-id check alone cannot see.
+- The `409` is the one differentiated answer in the node work channel, and it is reachable only by the node that is the recorded holder of an active job; every other refusal stays the undifferentiated `401`.
+
+What the node does:
+
+- It watches for a resume. The worker's own timers record when they were armed on both the wall clock and a monotonic clock, and each lease poll records when it began; a timer that fires far later than it was armed for (30 s beyond schedule, or the wall clock advancing 30 s more than the monotonic one), or a poll whose span is that long, is a suspend/resume. On resume every in-flight job is re-checked at once: if its lease deadline passed while the machine slept, the job is aborted — the model process is killed, nothing is committed or pushed, the in-memory workspace serialisation releases as the abort propagates — and the failure is reported with the reason `lease-lapsed-while-suspended`; if the lease is still valid, one immediate heartbeat re-confirms it with the platform instead of trusting a local deadline that saw nothing.
+- It aborts immediately on `stale-lease`, whether the answer comes from a heartbeat, from the publish-time confirmation that precedes every push, or from the final report. No follow-up failure report is sent for that job: the platform has already moved on to the claim that superseded it.
+- It keeps the two claims apart when it is handed its own job back. Reclaim runs inline on the node's own lease poll, so the first poll after a resume can re-lease the very job the node slept through while the lapsed run is still killing its model process. The old run is treated as void (nothing is reported for it), the fresh claim starts only once it has stopped — never beside it in the same workspace — and nothing the old run does on its way out can abort or silence the new one.
+
+Compatibility: a node built before this release sends no generation and is refused on heartbeat and complete (`400` at the edge); rows that were leased when the platform was upgraded carry generation 0, which is never accepted, so their in-flight runs abort at the node's next lapse and the jobs are re-offered under generation 1. Upgrade the node apps together with the platform.
 
 ### Tasks that span several repositories
 

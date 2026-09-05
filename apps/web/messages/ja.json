@@ -3230,7 +3230,8 @@
                     "diskFree": "Disk free",
                     "cliNotInstalled": "Not installed",
                     "billingIdentity": "Billing identity",
-                    "identityUnknown": "Not reported"
+                    "identityUnknown": "Not reported",
+                    "worker": "Worker"
                 },
                 "empty": {
                     "title": "No nodes enrolled yet",
@@ -3413,7 +3414,20 @@
                     "queuedReason": "Waiting: {reason}",
                     "queuedReasons": {
                         "waitingForRunner": "no runner can take it yet"
-                    }
+                    },
+                    "outcomes": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled",
+                        "unknown": "Unknown"
+                    },
+                    "outcome": "Outcome",
+                    "outcomeText": "{text}",
+                    "summaryTask": "Task {id}",
+                    "summaryRun": "Run {id}",
+                    "summaryAgent": "Agent {id}"
                 },
                 "costCeiling": {
                     "title": "Daily cost ceiling",
@@ -3475,7 +3489,17 @@
                         "done": "Cancel requested for {cancelled} of {requested} jobs ({runs} runs)."
                     },
                     "auditFailed": "The action succeeded, but its audit row could not be written — tell an operator."
-                }
+                },
+                "workerStates": {
+                    "idle": "Idle",
+                    "working": "Working",
+                    "paused": "Paused",
+                    "quarantined": "Quarantined",
+                    "throttled": "Throttled",
+                    "unknown": "Unknown"
+                },
+                "workerStateReason": "Reason: {reason}",
+                "workerStateSince": "Since {time}"
             },
             "jobRuntime": {
                 "title": "Job Runtime",
@@ -7150,6 +7174,8 @@
                     "wallClockHelp": "Measured from when the loop first started.",
                     "stuckThreshold": "Stuck after (iterations)",
                     "stuckThresholdHelp": "Iterations with no Definition-of-Done progress before the loop stops.",
+                    "maxConcurrentIterations": "Concurrent iterations",
+                    "maxConcurrentIterationsHelp": "How many iterations run at once (1-10). Leave empty for one at a time. Raise it only for a Goal whose iterations do not share a branch.",
                     "sessionBudget": "Session budget (minutes)",
                     "sessionBudgetHelp": "Advisory runtime budget handed to the routed agent.",
                     "gracePeriod": "Grace period (minutes)",

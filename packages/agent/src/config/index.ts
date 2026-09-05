@@ -22,6 +22,7 @@ import {
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+    FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
     FLEET_MAX_DAILY_COST_CEILING_CENTS,
@@ -470,6 +471,25 @@ export const config = {
                 process.env.FLEET_NODE_OFFLINE_AFTER_MS,
                 FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
                 FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Fleet health signals (EW-776) — how long an already-offline node
+         * stays gone before its owner gets a SECOND, louder Inbox notice.
+         * Default 30 minutes (`FLEET_NODE_OFFLINE_NOTICE_AFTER_MS`).
+         *
+         * Floored at {@link getNodeOfflineAfterMs}, not at a constant: a
+         * window shorter than the sweep window would fire the escalation
+         * before the node is even considered offline, i.e. two notices for
+         * one event. The floor is read live so lowering it below a raised
+         * `FLEET_NODE_OFFLINE_AFTER_MS` still cannot invert the pair.
+         */
+        getNodeOfflineNoticeAfterMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS,
+                FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
+                this.getNodeOfflineAfterMs(),
                 Number.MAX_SAFE_INTEGER,
             );
         },
@@ -1371,6 +1391,37 @@ export const config = {
         getMaxConcurrentRunsPerOrg() {
             const raw = parseInt(process.env.AGENT_MAX_CONCURRENT_RUNS_PER_ORG || '25', 10);
             return Number.isFinite(raw) ? raw : 25;
+        },
+        /**
+         * Task-graph fan-out (self-build slice AH) — how many TODO Tasks
+         * `TaskGraphFanoutService` may START for ONE owner in a single
+         * tick.
+         *
+         * 🛑 READ THE ZERO THE OTHER WAY ROUND. For the concurrency valves
+         * above, `<= 0` means "no ceiling". Here `<= 0` means the driver
+         * is OFF and starts nothing — which is the DEFAULT, because this
+         * is the one knob on the platform that begins work nobody clicked.
+         * An operator opts in by setting a positive number.
+         *
+         * The bound is per OWNER per tick, not a concurrency limit: the
+         * real ceilings (the Work / org valves, the plan entitlement, the
+         * credits precheck, the global stop flag) still decide whether any
+         * given start is admitted, and a Task refused by them stays `todo`
+         * and is a candidate again next tick.
+         */
+        getTaskFanoutMaxStartsPerOwner() {
+            const raw = parseInt(process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER || '0', 10);
+            return Number.isFinite(raw) ? raw : 0;
+        },
+        /**
+         * How many TODO Tasks one fan-out tick SCANS (before blocker,
+         * agent and admission filtering). Bounds the tick's cost — the
+         * blocker check is one query per blocker row — not how much work
+         * starts; `getTaskFanoutMaxStartsPerOwner` does that.
+         */
+        getTaskFanoutScanLimit() {
+            const raw = parseInt(process.env.TASK_FANOUT_SCAN_LIMIT || '50', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 50;
         },
         /**
          * H2 kill-switch for the plan-driven concurrency ceiling

@@ -20,10 +20,14 @@ import {
 	FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
 	FLEET_MIN_NODE_NAME_LENGTH,
 	FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+	FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
+	FLEET_MAX_WORKER_STATE_REASON_LENGTH,
 	FLEET_NODE_KINDS,
 	FLEET_NODE_NON_LEASABLE_STATUSES,
 	FLEET_NODE_STATUSES,
-	isFleetEnrollableNodeKind
+	FLEET_NODE_WORKER_STATES,
+	isFleetEnrollableNodeKind,
+	normalizeFleetNodeWorkerState
 } from '../fleet-node.types.js';
 
 /**
@@ -54,7 +58,9 @@ function BOUNDS_AND_TUNABLES(): Array<[string, number]> {
 		['FLEET_MAX_CAPABILITY_TAGS_CEILING', FLEET_MAX_CAPABILITY_TAGS_CEILING],
 		['FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING', FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING],
 		['FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS', FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS],
-		['FLEET_MIN_NODE_OFFLINE_AFTER_MS', FLEET_MIN_NODE_OFFLINE_AFTER_MS]
+		['FLEET_MIN_NODE_OFFLINE_AFTER_MS', FLEET_MIN_NODE_OFFLINE_AFTER_MS],
+		['FLEET_MAX_WORKER_STATE_REASON_LENGTH', FLEET_MAX_WORKER_STATE_REASON_LENGTH],
+		['FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS', FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS]
 	];
 }
 
@@ -329,5 +335,95 @@ describe('relational invariants a careless retune would break silently', () => {
 	it('allows a wider CLI version than a daemon version', () => {
 		// An agent CLI commonly reports `1.2.3 (Claude Code)`, not a bare semver.
 		expect(FLEET_MAX_CLI_VERSION_LENGTH).toBeGreaterThan(FLEET_MAX_VERSION_LENGTH);
+	});
+});
+
+describe('FLEET_NODE_WORKER_STATES', () => {
+	it('lists the five worker states', () => {
+		expect(FLEET_NODE_WORKER_STATES).toEqual(['idle', 'working', 'paused', 'quarantined', 'throttled']);
+	});
+
+	it('has exactly five unique members', () => {
+		expect(FLEET_NODE_WORKER_STATES).toHaveLength(5);
+		expect(new Set(FLEET_NODE_WORKER_STATES).size).toBe(5);
+	});
+
+	it('does not overlap the registry status names', () => {
+		// Worker state and registry status answer different questions
+		// ('what is the machine doing' vs 'what can the platform infer from
+		// heartbeats'), and the UI renders them side by side. `paused` is the
+		// ONE deliberate shared word — a drained node is drained in both
+		// senses — and pinning that keeps a future addition from quietly
+		// making the two lists read as one.
+		const shared = FLEET_NODE_WORKER_STATES.filter((state) =>
+			(FLEET_NODE_STATUSES as readonly string[]).includes(state)
+		);
+		expect(shared).toEqual(['paused']);
+	});
+});
+
+describe('normalizeFleetNodeWorkerState', () => {
+	it.each(FLEET_NODE_WORKER_STATES.map((state) => [state]))('round-trips %s', (state) => {
+		expect(normalizeFleetNodeWorkerState(state)).toBe(state);
+	});
+
+	it.each([
+		// The node's OWN internal state names that are not part of this
+		// contract. `describeWorkerHealth` maps them before they reach the
+		// wire; a daemon that skipped that step must not smuggle them in.
+		['unsafe'],
+		['draining'],
+		['polling'],
+		['retrying'],
+		['unauthorized'],
+		['stopped'],
+		// Case and whitespace are not "close enough" — the contract is exact.
+		['Idle'],
+		[' idle'],
+		['idle '],
+		['']
+	])('refuses the near-miss %p', (value) => {
+		expect(normalizeFleetNodeWorkerState(value)).toBeNull();
+	});
+
+	it.each([[42], [null], [undefined], [true], [{ workerState: 'idle' }], [['idle']]])(
+		'refuses the non-string %p',
+		(value) => {
+			expect(normalizeFleetNodeWorkerState(value)).toBeNull();
+		}
+	);
+
+	it('refuses a boxed String even though it stringifies to a member', () => {
+		// `typeof new String('idle') === 'object'`, and an `includes` on the
+		// raw value would miss it too — but a caller doing `String(value)`
+		// first would let it through. Pinned so nobody adds that coercion.
+		expect(normalizeFleetNodeWorkerState(new String('idle'))).toBeNull();
+	});
+
+	it('maps a value invented by a NEWER node to unknown rather than a member', () => {
+		// The whole compatibility story: a future daemon reporting a state
+		// this build has never heard of shows as unknown. It must never be
+		// rewritten into a plausible-looking `idle`, which is the fabrication
+		// this field exists to end.
+		expect(normalizeFleetNodeWorkerState('hibernating')).toBeNull();
+	});
+});
+
+describe('FLEET_MAX_WORKER_STATE_REASON_LENGTH', () => {
+	it('is wide enough for a real quarantine sentence but still bounded', () => {
+		expect(FLEET_MAX_WORKER_STATE_REASON_LENGTH).toBeGreaterThan(FLEET_MAX_MODEL_IDENTITY_LENGTH);
+		expect(FLEET_MAX_WORKER_STATE_REASON_LENGTH).toBeLessThanOrEqual(2000);
+	});
+});
+
+describe('FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS', () => {
+	it('is longer than the sweep window it escalates', () => {
+		// A "gone for a long time" notice that could fire before the node is
+		// even considered offline would be two notices for one event.
+		expect(FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS).toBeGreaterThan(FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS);
+	});
+
+	it('defaults to 30 minutes', () => {
+		expect(FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS).toBe(30 * 60_000);
 	});
 });

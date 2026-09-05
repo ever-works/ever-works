@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { FleetJobView, FleetNodeDetailView, FleetNodeView } from '@ever-works/contracts';
+import type {
+    FleetJobView,
+    FleetNodeDetailView,
+    FleetNodeJobHistoryEntry,
+    FleetNodeView,
+} from '@ever-works/contracts';
 import { FleetNodeDrawer } from './FleetNodeDrawer';
 
 /**
@@ -376,5 +381,171 @@ describe('FleetNodeDrawer — history states', () => {
     it('renders the all-jobs empty state for a node with no history', () => {
         renderDrawer({ detail: detail({ recentJobs: [], failures: [] }) });
         expect(screen.getByTestId('fleet-node-jobs-empty')).toHaveTextContent('jobs.emptyAll');
+    });
+});
+
+/**
+ * Fleet health signals (EW-776) — the three truths slices B and E left
+ * open, plus the one thing the drawer must never do.
+ *
+ * The mocked `useTranslations` renders `key:value1,value2`, so the
+ * assertions below read the KEY the component chose — which is exactly
+ * what is under test here: whether the drawer picks "quarantined" for a
+ * machine that is refusing work, and "failed" for a job whose RUN failed.
+ */
+describe('FleetNodeDrawer — worker state', () => {
+    it('shows a quarantine with its reason and when it started', () => {
+        // The defect: `status: 'online'` on a machine refusing every job.
+        // Both facts are now on screen at once.
+        const quarantined = node({
+            status: 'online',
+            workerState: 'quarantined',
+            workerStateReason: 'process tree for job 42 could not be proven terminated',
+            workerStateChangedAt: '2026-09-01T03:14:00.000Z',
+        });
+        renderDrawer({ node: quarantined, detail: detail({ node: quarantined }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-worker-state')).toHaveTextContent(
+            'workerStates.quarantined',
+        );
+        expect(screen.getByTestId('fleet-node-drawer-worker-reason')).toHaveTextContent(
+            'process tree for job 42 could not be proven terminated',
+        );
+        expect(screen.getByTestId('fleet-node-drawer-worker-since')).toHaveTextContent(
+            'workerStateSince',
+        );
+    });
+
+    it('says unknown — not idle — for a node that has never reported', () => {
+        renderDrawer();
+
+        expect(screen.getByTestId('fleet-node-drawer-worker-state')).toHaveTextContent(
+            'workerStates.unknown',
+        );
+        expect(screen.queryByTestId('fleet-node-drawer-worker-reason')).toBeNull();
+        expect(screen.queryByTestId('fleet-node-drawer-worker-since')).toBeNull();
+    });
+
+    it('shows a throttle reason so an idle-looking machine explains itself', () => {
+        const throttled = node({ workerState: 'throttled', workerStateReason: 'CPU ceiling' });
+        renderDrawer({ node: throttled, detail: detail({ node: throttled }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-worker-state')).toHaveTextContent(
+            'workerStates.throttled',
+        );
+        expect(screen.getByTestId('fleet-node-drawer-worker-reason')).toHaveTextContent(
+            'CPU ceiling',
+        );
+    });
+});
+
+describe('FleetNodeDrawer — reconciled job outcome', () => {
+    const historyRow = (over: Partial<FleetNodeJobHistoryEntry>): FleetNodeJobHistoryEntry => ({
+        ...job(),
+        error: null,
+        summary: null,
+        reconciled: null,
+        ...over,
+    });
+
+    const withHistory = (rows: FleetNodeJobHistoryEntry[]) =>
+        renderDrawer({
+            detail: detail({
+                recentJobs: rows,
+                failures: rows.filter((row) => row.status === 'failed'),
+            }),
+        });
+
+    it('shows a FAILED run behind a job the node called done', () => {
+        withHistory([
+            historyRow({
+                id: 'job-mixed',
+                status: 'done',
+                reconciled: {
+                    runId: 'run-1',
+                    status: 'failed',
+                    summary: null,
+                    error: 'model refused the plan',
+                },
+            }),
+        ]);
+
+        // The job badge still says what the JOB did — both facts, no lie.
+        expect(screen.getByTestId('fleet-node-job-status-job-mixed')).toHaveTextContent(
+            'jobs.statuses.done',
+        );
+        expect(screen.getByTestId('fleet-node-job-outcome-job-mixed')).toHaveTextContent(
+            'jobs.outcomes.failed',
+        );
+        expect(screen.getByTestId('fleet-node-job-outcome-text-job-mixed')).toHaveTextContent(
+            'model refused the plan',
+        );
+    });
+
+    it("shows a failed job's own error text", () => {
+        // Previously a red badge with no reason, whose next step was
+        // "open a database".
+        withHistory([
+            historyRow({ id: 'job-red', status: 'failed', error: 'pnpm install exploded' }),
+        ]);
+
+        expect(screen.getByTestId('fleet-node-job-outcome-text-job-red')).toHaveTextContent(
+            'pnpm install exploded',
+        );
+    });
+
+    it('shows the run summary for a clean completion', () => {
+        withHistory([
+            historyRow({
+                id: 'job-green',
+                reconciled: {
+                    runId: 'run-1',
+                    status: 'completed',
+                    summary: 'Added the missing guard',
+                    error: null,
+                },
+            }),
+        ]);
+
+        expect(screen.getByTestId('fleet-node-job-outcome-job-green')).toHaveTextContent(
+            'jobs.outcomes.completed',
+        );
+        expect(screen.getByTestId('fleet-node-job-outcome-text-job-green')).toHaveTextContent(
+            'Added the missing guard',
+        );
+    });
+
+    it('renders the ids-only summary, and NEVER the payload', () => {
+        // The load-bearing assertion of this whole file: `payload` is
+        // executor input composed from user content. The API sends it as
+        // null, and nothing here may start reading it.
+        withHistory([
+            historyRow({
+                id: 'job-ids',
+                payload: { instructions: 'PAYLOAD-SENTINEL' } as never,
+                summary: {
+                    kind: 'agent-task',
+                    taskId: 'task-77',
+                    runId: 'run-88',
+                    agentId: 'agent-99',
+                },
+            }),
+        ]);
+
+        const summary = screen.getByTestId('fleet-node-job-summary-job-ids');
+        expect(summary).toHaveTextContent('task-77');
+        expect(summary).toHaveTextContent('run-88');
+        expect(summary).toHaveTextContent('agent-99');
+        expect(document.body.textContent).not.toContain('PAYLOAD-SENTINEL');
+    });
+
+    it('renders no outcome line when there is nothing to explain', () => {
+        withHistory([historyRow({ id: 'job-quiet' })]);
+
+        expect(screen.getByTestId('fleet-node-job-outcome-job-quiet')).toHaveTextContent(
+            'jobs.outcomes.completed',
+        );
+        expect(screen.queryByTestId('fleet-node-job-outcome-text-job-quiet')).toBeNull();
+        expect(screen.queryByTestId('fleet-node-job-summary-job-quiet')).toBeNull();
     });
 });

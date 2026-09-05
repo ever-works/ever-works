@@ -274,6 +274,38 @@ describe('heartbeat', () => {
 		expect(JSON.parse(calls[1].init.body)).not.toHaveProperty('modelIdentity');
 	});
 
+	it('carries the worker state and reason, and omits both when absent', async () => {
+		// Fleet health signals (EW-776), same whitelist trap as above: a
+		// worker state the loop computes and the client never sends is a
+		// quarantined machine that still reads healthy in Fleet — the
+		// precise defect this slice exists to close.
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			workerState: 'quarantined',
+			workerStateReason: 'process tree for job 42 could not be proven terminated'
+		});
+		const body = JSON.parse(calls[0].init.body);
+		expect(body.workerState).toBe('quarantined');
+		expect(body.workerStateReason).toBe('process tree for job 42 could not be proven terminated');
+
+		await client(fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET });
+		expect(JSON.parse(calls[1].init.body)).not.toHaveProperty('workerState');
+		expect(JSON.parse(calls[1].init.body)).not.toHaveProperty('workerStateReason');
+	});
+
+	it('sends a state without a reason when there is nothing to explain', async () => {
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET, workerState: 'idle' });
+
+		const body = JSON.parse(calls[0].init.body);
+		expect(body.workerState).toBe('idle');
+		expect(body).not.toHaveProperty('workerStateReason');
+	});
+
 	it('reports a revoked/disabled node as unauthorized with an actionable message', async () => {
 		const { fetchFn } = fakeFetch(() => ({ status: 401 }));
 		const error = await client(fetchFn)

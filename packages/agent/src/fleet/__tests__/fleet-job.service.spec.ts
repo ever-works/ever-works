@@ -75,6 +75,7 @@ function makeRepos(stores: Stores): {
                 status: 'queued',
                 attempts: 0,
                 maxAttempts: 3,
+                leaseGeneration: 0,
                 requiredCapabilities: [],
                 createdAt: new Date(),
                 updatedAt: new Date(),
@@ -103,17 +104,33 @@ function makeRepos(stores: Stores): {
                 .slice(0, limit),
         ),
         claim: jest.fn(async (id: string, patch: Record<string, unknown>) => {
-            // The real guarantee: the row must STILL be queued.
+            // The real guarantee: the row must STILL be queued, and still
+            // carry the generation this claim advances from.
             return (
-                applyUpdate(stores.jobs, { id, status: 'queued' } as never, patch as never) === 1
+                applyUpdate(
+                    stores.jobs,
+                    {
+                        id,
+                        status: 'queued',
+                        leaseGeneration: (patch.leaseGeneration as number) - 1,
+                    } as never,
+                    patch as never,
+                ) === 1
             );
         }),
         extendLease: jest.fn(
-            async (id: string, nodeId: string, leaseExpiresAt: Date, startedAt?: Date) => {
+            async (
+                id: string,
+                nodeId: string,
+                leaseExpiresAt: Date,
+                startedAt: Date | undefined,
+                leaseGeneration: number,
+            ) => {
                 const row = stores.jobs.find(
                     (j) =>
                         j.id === id &&
                         j.nodeId === nodeId &&
+                        j.leaseGeneration === leaseGeneration &&
                         (j.status === 'leased' || j.status === 'running'),
                 );
                 if (!row) return false;
@@ -123,17 +140,25 @@ function makeRepos(stores: Stores): {
                 return true;
             },
         ),
-        complete: jest.fn(async (id: string, nodeId: string, patch: Record<string, unknown>) => {
-            const row = stores.jobs.find(
-                (j) =>
-                    j.id === id &&
-                    j.nodeId === nodeId &&
-                    (j.status === 'leased' || j.status === 'running'),
-            );
-            if (!row) return false;
-            Object.assign(row, patch, { leaseExpiresAt: null });
-            return true;
-        }),
+        complete: jest.fn(
+            async (
+                id: string,
+                nodeId: string,
+                patch: Record<string, unknown>,
+                leaseGeneration: number,
+            ) => {
+                const row = stores.jobs.find(
+                    (j) =>
+                        j.id === id &&
+                        j.nodeId === nodeId &&
+                        j.leaseGeneration === leaseGeneration &&
+                        (j.status === 'leased' || j.status === 'running'),
+                );
+                if (!row) return false;
+                Object.assign(row, patch, { leaseExpiresAt: null });
+                return true;
+            },
+        ),
         findExpiredLeases: jest.fn(async (cutoff: Date, limit: number, userId?: string) =>
             stores.jobs
                 .filter(
@@ -149,13 +174,19 @@ function makeRepos(stores: Stores): {
         reclaim: jest.fn(
             async (
                 id: string,
-                observed: { status: string; nodeId: string; leaseExpiresAt: Date },
+                observed: {
+                    status: string;
+                    nodeId: string;
+                    leaseExpiresAt: Date;
+                    leaseGeneration: number;
+                },
             ) => {
                 const row = stores.jobs.find(
                     (j) =>
                         j.id === id &&
                         j.status === observed.status &&
                         j.nodeId === observed.nodeId &&
+                        j.leaseGeneration === observed.leaseGeneration &&
                         j.leaseExpiresAt?.getTime() === observed.leaseExpiresAt.getTime(),
                 );
                 if (!row) return false;
@@ -170,7 +201,12 @@ function makeRepos(stores: Stores): {
         failExhausted: jest.fn(
             async (
                 id: string,
-                observed: { status: string; nodeId: string; leaseExpiresAt: Date },
+                observed: {
+                    status: string;
+                    nodeId: string;
+                    leaseExpiresAt: Date;
+                    leaseGeneration: number;
+                },
                 error: string,
                 completedAt: Date,
             ) => {
@@ -179,6 +215,7 @@ function makeRepos(stores: Stores): {
                         j.id === id &&
                         j.status === observed.status &&
                         j.nodeId === observed.nodeId &&
+                        j.leaseGeneration === observed.leaseGeneration &&
                         j.leaseExpiresAt?.getTime() === observed.leaseExpiresAt.getTime(),
                 );
                 if (!row) return false;
@@ -199,6 +236,9 @@ function makeRepos(stores: Stores): {
         ),
         findByUser: jest.fn(async (userId: string, limit: number) =>
             stores.jobs.filter((j) => j.userId === userId).slice(0, limit),
+        ),
+        findByNodeForUser: jest.fn(async (userId: string, nodeId: string, limit: number) =>
+            stores.jobs.filter((j) => j.userId === userId && j.nodeId === nodeId).slice(0, limit),
         ),
         // Queue SLA + heartbeat promotion (self-build slice S). Mirrored
         // here so the inline expiry on the lease path is EXERCISED by
@@ -684,7 +724,13 @@ describe('FleetJobService', () => {
             // Push the stored expiry back so any extension is unambiguous.
             stores.jobs[0].leaseExpiresAt = new Date(before - 60_000);
 
-            const beat = await service.heartbeatJob(NODE_A, secretA, leased![0].id);
+            const beat = await service.heartbeatJob(
+                NODE_A,
+                secretA,
+                leased![0].id,
+                undefined,
+                leased![0].leaseGeneration,
+            );
             expect(beat?.status).toBe('running');
             expect(new Date(beat!.leaseExpiresAt!).getTime()).toBeGreaterThan(before - 60_000);
             expect(beat?.startedAt).not.toBeNull();
@@ -693,7 +739,15 @@ describe('FleetJobService', () => {
         it("refuses to extend another node's claim", async () => {
             await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
             const leased = await service.lease({ nodeId: NODE_A, secret: secretA });
-            await expect(service.heartbeatJob(NODE_B, secretB, leased![0].id)).resolves.toBeNull();
+            await expect(
+                service.heartbeatJob(
+                    NODE_B,
+                    secretB,
+                    leased![0].id,
+                    undefined,
+                    leased![0].leaseGeneration,
+                ),
+            ).resolves.toBeNull();
         });
 
         it('refuses to extend a job that is still queued', async () => {
@@ -701,7 +755,91 @@ describe('FleetJobService', () => {
                 userId: 'owner-1',
                 kind: 'acceptance-checks',
             });
-            await expect(service.heartbeatJob(NODE_A, secretA, queued.id)).resolves.toBeNull();
+            await expect(
+                service.heartbeatJob(NODE_A, secretA, queued.id, undefined, 1),
+            ).resolves.toBeNull();
+        });
+
+        it('resets startedAt on a RE-lease so the clock measures this attempt', async () => {
+            // Fleet health signals (EW-776). `startedAt` used to be stamped
+            // once and preserved across re-leases, so the drawer's "running
+            // for 4h 12m" on a job that had lapsed twice was the age of an
+            // attempt that had ended hours earlier — a number that looked
+            // like a stuck job and was not one.
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+            const first = await service.lease({ nodeId: NODE_A, secret: secretA });
+            await service.heartbeatJob(
+                NODE_A,
+                secretA,
+                first![0].id,
+                undefined,
+                first![0].leaseGeneration,
+            );
+            const firstStart = stores.jobs[0].startedAt;
+            expect(firstStart).toBeInstanceOf(Date);
+
+            // The claim lapses and the job goes back to the pool.
+            stores.jobs[0].leaseExpiresAt = new Date(Date.now() - 60_000);
+            await service.reclaimExpired();
+            expect(stores.jobs[0].status).toBe('queued');
+
+            const second = await service.lease({ nodeId: NODE_A, secret: secretA });
+            // The claim itself clears it — before any heartbeat arrives the
+            // row reports "not started", which is exactly true.
+            expect(stores.jobs[0].startedAt).toBeNull();
+            expect(second![0].startedAt).toBeNull();
+            expect(second![0].attempts).toBe(2);
+
+            const beat = await service.heartbeatJob(
+                NODE_A,
+                secretA,
+                second![0].id,
+                undefined,
+                second![0].leaseGeneration,
+            );
+            // ...and the new attempt's first beat re-stamps it, later than
+            // the first attempt's stamp.
+            expect(beat?.startedAt).not.toBeNull();
+            expect(new Date(beat!.startedAt!).getTime()).toBeGreaterThanOrEqual(
+                (firstStart as Date).getTime(),
+            );
+        });
+    });
+
+    describe('historyForNode', () => {
+        beforeEach(() => {
+            stores.nodes.push(enrolledNode(NODE_A, secretA));
+        });
+
+        it('carries the error text the drawer needs to explain a failure', async () => {
+            // The verdict was on the row all along and never left the
+            // server: the drawer showed a red badge and no way to find out
+            // why, so the operator's next step was to open a database.
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+            const leased = await service.lease({ nodeId: NODE_A, secret: secretA });
+            await service.completeJob({
+                nodeId: NODE_A,
+                secret: secretA,
+                jobId: leased![0].id,
+                success: false,
+                error: 'pnpm install exploded',
+                leaseGeneration: leased![0].leaseGeneration,
+            });
+
+            const history = await service.historyForNode('owner-1', NODE_A);
+
+            expect(history).toHaveLength(1);
+            expect(history[0].status).toBe('failed');
+            expect(history[0].error).toBe('pnpm install exploded');
+        });
+
+        it('reports a null error for a job that has not failed', async () => {
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+            await service.lease({ nodeId: NODE_A, secret: secretA });
+
+            const history = await service.historyForNode('owner-1', NODE_A);
+
+            expect(history[0].error).toBeNull();
         });
     });
 
@@ -720,6 +858,7 @@ describe('FleetJobService', () => {
                 jobId: leased![0].id,
                 success: true,
                 result: { gateStatus: 'green' },
+                leaseGeneration: leased![0].leaseGeneration,
             });
 
             expect(done?.status).toBe('done');
@@ -737,6 +876,7 @@ describe('FleetJobService', () => {
                 jobId: leased![0].id,
                 success: false,
                 error: 'check `pnpm build` exited 1',
+                leaseGeneration: leased![0].leaseGeneration,
             });
 
             expect(failed?.status).toBe('failed');
@@ -755,6 +895,7 @@ describe('FleetJobService', () => {
                 secret: secretA,
                 jobId: leased![0].id,
                 success: true,
+                leaseGeneration: leased![0].leaseGeneration,
             };
             await expect(service.completeJob(input)).resolves.not.toBeNull();
             await expect(service.completeJob(input)).resolves.toBeNull();
@@ -769,6 +910,7 @@ describe('FleetJobService', () => {
                     secret: secretB,
                     jobId: leased![0].id,
                     success: true,
+                    leaseGeneration: leased![0].leaseGeneration,
                 }),
             ).resolves.toBeNull();
         });
@@ -870,10 +1012,12 @@ describe('FleetJobService', () => {
                             status: string;
                             nodeId: string;
                             leaseExpiresAt: Date;
+                            leaseGeneration: number;
                         };
                         if (
                             row.status !== observed.status ||
                             row.nodeId !== observed.nodeId ||
+                            row.leaseGeneration !== observed.leaseGeneration ||
                             row.leaseExpiresAt.getTime() !== observed.leaseExpiresAt.getTime()
                         ) {
                             return false;

@@ -355,3 +355,52 @@ describe('TaskRecurrenceDispatcherService — instance execution (schedule-modes
         });
     });
 });
+
+/**
+ * Task-graph fan-out (slice AH) — the third scan of the cron tick.
+ *
+ * The dispatcher owns no fan-out rules; it only makes the driver
+ * reachable from the cron through the RPC surface this class already
+ * has. What matters here is that the delegation is thin and that an
+ * install without the driver says so instead of reporting a silent zero.
+ */
+describe('TaskRecurrenceDispatcherService — dispatchUnblockedTodo', () => {
+    it('delegates to the fan-out driver, limit and all', async () => {
+        const fanout = {
+            dispatchUnblocked: jest.fn().mockResolvedValue({
+                limit: 9,
+                candidateCount: 4,
+                started: 2,
+                skipped: 2,
+                failed: 0,
+                halted: false,
+                disabled: false,
+                maxStartsPerOwner: 2,
+                entries: [],
+            }),
+        };
+        const svc = new TaskRecurrenceDispatcherService(
+            {} as never,
+            {} as never,
+            undefined,
+            undefined,
+            undefined,
+            fanout as never,
+        );
+
+        const summary = await svc.dispatchUnblockedTodo(9);
+
+        expect(fanout.dispatchUnblocked).toHaveBeenCalledWith(9);
+        expect(summary).toMatchObject({ started: 2, candidateCount: 4 });
+    });
+
+    it('reports a disabled tick — never a silent zero — when the driver is unbound', async () => {
+        const svc = new TaskRecurrenceDispatcherService({} as never, {} as never);
+
+        expect(await svc.dispatchUnblockedTodo()).toMatchObject({
+            disabled: true,
+            started: 0,
+            entries: [],
+        });
+    });
+});

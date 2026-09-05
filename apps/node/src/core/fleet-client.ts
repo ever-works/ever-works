@@ -34,7 +34,13 @@ export type FleetErrorKind =
 	| 'rate-limited'
 	| 'server'
 	| 'network'
-	| 'malformed';
+	| 'malformed'
+	/**
+	 * 409 from a job heartbeat/complete: the platform holds a NEWER lease on
+	 * the job than the one this node is renewing or finalizing (suspend-safe
+	 * leases). The claim is void; the worker aborts the run at once.
+	 */
+	| 'stale-lease';
 
 export class FleetClientError extends Error {
 	readonly kind: FleetErrorKind;
@@ -351,6 +357,15 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	}
 	if (source.modelIdentity !== undefined) {
 		out.modelIdentity = source.modelIdentity;
+	}
+	// Fleet health signals (EW-776). Named here for exactly the reason the
+	// header above gives: a field this whitelist does not list is a field
+	// the machine computes, logs and then silently never sends.
+	if (source.workerState !== undefined) {
+		out.workerState = source.workerState;
+	}
+	if (source.workerStateReason !== undefined) {
+		out.workerStateReason = source.workerStateReason;
 	}
 	return out;
 }

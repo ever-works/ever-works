@@ -474,6 +474,19 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
+        # A DIAGNOSTIC must never decide whether the shard passed. This step
+        # runs `if: always()`, so without this line anything that stops the
+        # upload — most cheaply the account's artifact storage quota, which
+        # is shared and recalculated only every 6-12 hours — fails the step
+        # and takes a fully green shard down with it.
+        #
+        # Observed on stage run 33962668128 (2026-09-05): shards 21 and 31
+        # reported `failure` with "Artifact storage quota has been hit" while
+        # their tests read `225 passed / 1 flaky` and `211 passed`. The
+        # promotion gate reads those conclusions, so a quota problem in one
+        # account presents as a broken product and invites an override label
+        # for a release that never needed one.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           # Per-shard artifact name so the 4 parallel uploads don't clobber.
@@ -486,6 +499,10 @@ jobs:
 
       - name: Upload server logs on failure
         if: failure()
+        # Same reasoning, and it compounds: once the report upload above has
+        # failed the job, THIS step's `if: failure()` becomes true, so a
+        # green shard uploads server logs it does not need and fails twice.
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: server-logs-${{ steps.tag.outputs.tag }}-shard${{ matrix.shard }}-${{ github.run_attempt }}

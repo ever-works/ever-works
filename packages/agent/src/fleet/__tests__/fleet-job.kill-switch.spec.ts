@@ -58,6 +58,10 @@ function makeJob(over: Partial<FleetJob> = {}): FleetJob {
         completedAt: null,
         createdAt: new Date('2026-09-05T10:00:00Z'),
         updatedAt: new Date('2026-09-05T10:00:00Z'),
+        // Suspend-safe leases (EW-792): a claim carries a generation and the
+        // platform refuses 0. The literal is cast, so leaving this out would
+        // read as undefined and every settle below would be a stale lease.
+        leaseGeneration: 1,
         ...over,
     } as FleetJob;
 }
@@ -179,7 +183,7 @@ describe('FleetJobService — global stop flag on the lease path', () => {
     it('keeps accepting job heartbeats while stopped', async () => {
         killSwitch.isStopped.mockResolvedValue(true);
         job = makeJob({ nodeId: NODE, status: 'leased', leaseExpiresAt: new Date() });
-        const beat = await build(killSwitch).heartbeatJob(NODE, secret, JOB, 60);
+        const beat = await build(killSwitch).heartbeatJob(NODE, secret, JOB, 60, 1);
         expect(beat?.status).toBe('running');
         expect(jobs.extendLease).toHaveBeenCalledTimes(1);
     });
@@ -193,6 +197,7 @@ describe('FleetJobService — global stop flag on the lease path', () => {
             jobId: JOB,
             success: true,
             result: { ok: true },
+            leaseGeneration: 1,
         });
         expect(done?.status).toBe('done');
         expect(jobs.complete).toHaveBeenCalledTimes(1);

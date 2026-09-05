@@ -31,6 +31,11 @@ import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
  *      maxAttempts`, otherwise `failed`. Reclaim runs inline on every
  *      lease poll AND on the `fleet-job-lease-sweeper` cron, so a fleet
  *      that stops polling still converges.
+ *   6. Every claim (step 2, including a re-lease after step 5) increments
+ *      `leaseGeneration`; heartbeat and complete carry it and are refused
+ *      (`409 stale-lease`) when it is not the current one, so a node that
+ *      slept through its lease can never overwrite the current holder —
+ *      not even when that holder is the same node on a later claim.
  *
  * Auth: every node-facing transition authenticates with the SAME node
  * secret minted at enrollment (constant-time compare against the
@@ -108,6 +113,21 @@ export class FleetJob {
 
     @Column({ type: 'int', default: 3 })
     maxAttempts: number;
+
+    /**
+     * Monotonic identity of the CLAIM (suspend-safe leases, self-build
+     * finding R7). 0 until the first lease; every successful claim —
+     * including a re-lease after a lapse — writes `previous + 1`, and the
+     * node is handed the new value with the lease. `extendLease` and
+     * `complete` pin it in their WHERE clause next to `nodeId`, which is
+     * what closes the hole `nodeId` alone cannot: the same machine
+     * re-leasing the job it slept through, whose old in-flight run would
+     * otherwise renew and finalize the NEW claim. No index — the row is
+     * always addressed by primary key and this is an equality predicate
+     * on that one row.
+     */
+    @Column({ type: 'int', default: 0 })
+    leaseGeneration: number;
 
     /**
      * Stable identity across retries (`JobEnqueueOptions.idempotencyKey`).

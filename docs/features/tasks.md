@@ -59,6 +59,24 @@ Below 768px — phones and split-screen — the AI chat stops being a side panel
 
 `/tasks/templates` lists pre-built Task shapes. **Use template** lands you on `/tasks/new?from=<slug>` with the title, description and the template's tags pre-filled into Labels (which counts as "touched", so the title no longer drives them). The form shows a notice whenever it was pre-filled from a URL — read the content before creating.
 
+### A template step can live in another repository
+
+Instantiating a template normally files the parent Task and every sub-task against the same Work. A
+step may instead name its **own Work** and its **own extra repositories**, so one template expresses
+"write the spec in the platform, update the docs in the website, publish the announcement in the
+marketing repo". A step that names neither inherits the tree's Work, which is what every template
+written before this did.
+
+Both are checked against you — the person instantiating — twice: when the template is saved, and again
+when it is instantiated. A step naming a Work you do not own, or a repository connection that has since
+been disabled, **refuses the whole instantiation** and names the step. It never quietly falls back to
+the parent's Work: a sub-task silently re-homed onto another repository files work, and pushes
+branches, in the wrong place.
+
+Extra repositories on a step obey exactly the rules a Task's own extra repositories obey — the
+connection must be yours and enabled, mount directories must be single safe names and unique, and a
+Task mounts at most eight of them.
+
 ## Priorities
 
 Five levels, `p0` (most urgent) through `p4`, defaulting to `p3`.
@@ -243,6 +261,41 @@ Attachments require a Work: the upload control is disabled on a Task that is not
 The **Recurring schedule** panel in the detail page's right rail turns a Task into a template. **Promote to recurring** opens the picker: a frequency of Daily, Weekly, Monthly or a custom RRULE, an optional end date, and an optional maximum number of occurrences (1–9999). It shows the rule it will send as a preview, and refuses to save an invalid one — or one that yields no future occurrence.
 
 The platform then spawns instances on that schedule, each pointing back at the template. **Demote to one-off** turns the template back into a plain Task, behind a browser confirmation; existing instances stay, and no new ones spawn.
+
+## Starting unblocked Tasks automatically
+
+A Task tree instantiated from a template is a graph: sub-tasks wait on each other through blockers.
+Nothing used to walk that graph — when a blocker finished, the sub-task behind it sat in **To Do**
+until somebody dragged it. The **task-graph fan-out** does that walk on the same per-minute tick as the
+recurring and scheduled scans.
+
+**It is off by default.** This is the only thing on the platform that starts work nobody clicked, so an
+operator has to switch it on with `TASK_FANOUT_MAX_STARTS_PER_OWNER` (a positive number; `0` — the
+default — means the driver starts nothing at all). Note the inversion: on the concurrency valves
+`AGENT_MAX_CONCURRENT_RUNS_PER_WORK` / `_PER_ORG`, `0` means "no ceiling"; here it means "no starts".
+`TASK_FANOUT_SCAN_LIMIT` (default `50`) bounds how many To Do Tasks one tick looks at.
+
+When it is on, one tick starts a Task only when **all** of the following hold:
+
+- it is in **To Do**, not hidden from the board, not a recurring template, and not a scheduled one-shot
+  (those belong to the other two scans);
+- it has **no open blocker** — a blocker counts as open until it is Done or Cancelled, exactly as the
+  board's own blocker gate defines it;
+- an agent is bound to it, by an assignee or on the Task itself. A Task with no agent is a human's
+  Task and is never auto-started;
+- it has **never been run**. "Still in To Do" is not the same as "never started": the board's **Run**
+  button, the recurring scan and a Goal's iteration loop all start a run and leave the card in To Do.
+  A Task that already has a run — even a finished one — is left alone, so the fan-out can never
+  re-run somebody else's work or push a Goal past its own iteration ceiling. Re-running a Task after
+  its run finished stays a human decision;
+- it is not a Goal's iteration Task and not an instance of a recurring Task. Those belong to the Goal
+  loop and the recurring scan respectively, each with its own ceiling;
+- the owner has not reached the per-owner bound for this tick, and the run admission gates admit it.
+
+Every start goes down the ordinary dispatch path, so the global stop flag, the per-Work and per-org
+concurrency valves, the plan entitlement, the credits precheck and the agent's own budget all apply
+unchanged. A refusal from any of them leaves the Task in **To Do** — it is a candidate again on the
+next tick, never consumed. While the global stop flag is set the fan-out starts nothing at all.
 
 ## Deleting a Task
 

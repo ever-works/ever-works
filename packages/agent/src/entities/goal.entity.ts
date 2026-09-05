@@ -506,6 +506,20 @@ export class Goal {
     @Column({ type: 'int', nullable: true })
     stuckThresholdIterations?: number | null;
 
+    /**
+     * Concurrent iterations (self-build slice AH): how many iterations
+     * this Goal's loop may have in flight at once.
+     *
+     * NULL — every row that exists today — reads as ONE, which is the
+     * serial loop the orchestrator has always run, so no Goal changes
+     * speed without someone raising this deliberately. Raise it only for
+     * a Goal whose iterations do not share a branch: the `wait` branch it
+     * relaxes exists because two concurrent iterations would race one
+     * workspace.
+     */
+    @Column({ type: 'int', nullable: true })
+    maxConcurrentIterations?: number | null;
+
     /** Advisory per-session runtime budget handed to the routed agent. */
     @Column({ type: 'int', nullable: true })
     sessionBudgetMinutes?: number | null;

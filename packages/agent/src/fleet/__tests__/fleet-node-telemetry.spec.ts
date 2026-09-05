@@ -396,4 +396,198 @@ describe('FleetService node telemetry', () => {
             expect(settings.getResolvedSettings).not.toHaveBeenCalled();
         });
     });
+
+    /**
+     * Fleet health signals (EW-776) — the worker state on the wire.
+     *
+     * Same additive contract as the telemetry above, plus one rule of its
+     * own: the value is NORMALIZED before it is stored. A node is an
+     * untrusted machine, and this string ends up in a status badge an
+     * operator makes decisions from.
+     */
+    describe('worker state', () => {
+        it('persists a reported state with its reason and stamps the change time', async () => {
+            repository.findById.mockResolvedValue(node({ workerState: 'idle' }));
+            const service = build();
+
+            const result = await service.heartbeat(NODE_ID, SECRET, {
+                workerState: 'throttled',
+                workerStateReason: 'CPU over the configured ceiling',
+            });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch.workerState).toBe('throttled');
+            expect(patch.workerStateReason).toBe('CPU over the configured ceiling');
+            expect(patch.workerStateChangedAt).toBeInstanceOf(Date);
+            expect(result!.node.workerState).toBe('throttled');
+            expect(result!.node.workerStateChangedAt).toEqual(expect.any(String));
+        });
+
+        it('does NOT re-stamp the change time while the state is unchanged', async () => {
+            // "Quarantined since 03:14" has to survive the several hundred
+            // beats that follow it. Re-stamping every 30s would erase the
+            // only durable record of when the machine stopped working.
+            repository.findById.mockResolvedValue(node({ workerState: 'quarantined' }));
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, { workerState: 'quarantined' });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch).not.toHaveProperty('workerState');
+            expect(patch).not.toHaveProperty('workerStateChangedAt');
+        });
+
+        it('updates the reason alone when only the reason moved', async () => {
+            // A throttle that changes from 'CPU' to 'disk floor' is still a
+            // throttle, but the operator needs the new sentence.
+            repository.findById.mockResolvedValue(
+                node({ workerState: 'throttled', workerStateReason: 'CPU ceiling' }),
+            );
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                workerState: 'throttled',
+                workerStateReason: 'free disk below the floor',
+            });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch.workerStateReason).toBe('free disk below the floor');
+            expect(patch).not.toHaveProperty('workerStateChangedAt');
+        });
+
+        it('leaves the stored state alone when the beat says nothing about it', async () => {
+            repository.findById.mockResolvedValue(node({ workerState: 'working' }));
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, { version: '1.1.0' });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch).not.toHaveProperty('workerState');
+            expect(patch).not.toHaveProperty('workerStateReason');
+            expect(patch).not.toHaveProperty('workerStateChangedAt');
+        });
+
+        it('stores an unrecognised value as unknown and discards its reason', async () => {
+            // A value this build has never heard of is never rewritten into
+            // a plausible-looking member, and a reason we cannot vouch for
+            // is not shown under an "unknown" badge.
+            repository.findById.mockResolvedValue(node({ workerState: 'idle' }));
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                workerState: 'hibernating',
+                workerStateReason: 'lid closed',
+            });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch.workerState).toBeNull();
+            // Nothing to clear here (the row carried no reason), and
+            // nothing is written either — see the next case for the clear.
+            expect(patch).not.toHaveProperty('workerStateReason');
+        });
+
+        it('clears a stored reason when the new state is unrecognised', async () => {
+            repository.findById.mockResolvedValue(
+                node({ workerState: 'throttled', workerStateReason: 'CPU ceiling' }),
+            );
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                workerState: 'hibernating',
+                workerStateReason: 'lid closed',
+            });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch.workerState).toBeNull();
+            // The OLD reason described a state that is no longer true, and
+            // the new one describes a state we cannot vouch for. Neither
+            // belongs under an "unknown" badge.
+            expect(patch.workerStateReason).toBeNull();
+        });
+
+        it('accepts a non-string worker state without failing the beat', async () => {
+            // A malformed field must never cost a node its liveness: a
+            // rejected beat is an offline node.
+            repository.findById.mockResolvedValue(node({ workerState: 'idle' }));
+            const service = build();
+
+            const result = await service.heartbeat(NODE_ID, SECRET, {
+                workerState: 42 as never,
+            });
+
+            expect(result).not.toBeNull();
+            expect(repository.update.mock.calls[0][1].workerState).toBeNull();
+        });
+
+        it('caps the reason at the contract bound', async () => {
+            repository.findById.mockResolvedValue(node({ workerState: 'idle' }));
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                workerState: 'quarantined',
+                workerStateReason: 'x'.repeat(900),
+            });
+
+            expect(repository.update.mock.calls[0][1].workerStateReason).toHaveLength(500);
+        });
+
+        it('does not let a quarantine reason leak a credential it quoted', async () => {
+            // The reason is composed on the machine out of error text and
+            // command output, then stored, listed AND quoted into notices.
+            const leaked = 'ghp_' + 'b'.repeat(36);
+            repository.findById.mockResolvedValue(node({ workerState: 'idle' }));
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                workerState: 'quarantined',
+                workerStateReason: 'kill failed for: node --token=' + leaked,
+            });
+
+            const stored = repository.update.mock.calls[0][1].workerStateReason as string;
+            expect(stored).not.toContain(leaked);
+        });
+
+        it('stamps the state on ENROLL, where there is nothing to preserve', async () => {
+            const token = 'tok_'.padEnd(43, 'c');
+            repository.findByCredentialHash.mockResolvedValue(
+                node({
+                    status: 'enrolling',
+                    enrollmentTokenHash: sha256(token),
+                    credentialIssuedAt: new Date(),
+                }),
+            );
+            const service = build();
+
+            await service.enroll(token, { workerState: 'idle' });
+
+            const patch = repository.consumeEnrollment.mock.calls[0][2];
+            expect(patch.workerState).toBe('idle');
+            expect(patch.workerStateChangedAt).toBeInstanceOf(Date);
+        });
+
+        it('drops an ENROLL reason whose state it could not recognise', async () => {
+            // Same rule as the heartbeat path: a reason we cannot vouch for
+            // must not end up captioning an "unknown" badge. Enroll is the
+            // easier place to get this wrong because the whole patch is
+            // written unconditionally.
+            const token = 'tok_'.padEnd(43, 'd');
+            repository.findByCredentialHash.mockResolvedValue(
+                node({
+                    status: 'enrolling',
+                    enrollmentTokenHash: sha256(token),
+                    credentialIssuedAt: new Date(),
+                }),
+            );
+            const service = build();
+
+            await service.enroll(token, {
+                workerState: 'hibernating',
+                workerStateReason: 'lid closed',
+            });
+
+            const patch = repository.consumeEnrollment.mock.calls[0][2];
+            expect(patch.workerState).toBeNull();
+            expect(patch.workerStateReason).toBeNull();
+        });
+    });
 });
