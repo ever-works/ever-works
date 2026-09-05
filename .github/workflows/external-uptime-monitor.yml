@@ -342,6 +342,18 @@ jobs:
           # comments while an outage is unchanged.
           FINGERPRINT="$(printf '%s' "${FAILING_URLS}" | sort | sha256sum | cut -c1-16)"
 
+          # The exact failing set, comma-joined onto ONE line so it can ride
+          # through $GITHUB_OUTPUT (which is key=value: an embedded newline
+          # would inject extra records or break the parse outright, and every
+          # later `if:` carries an implicit success(), so the monitor would go
+          # SILENT -- the same trap documented for EGRESS_IP above).
+          #
+          # EW-760: the alert step diffs this against the set recorded on the
+          # previous report to name the targets that RECOVERED while others
+          # stayed down. On 2026-08-23 demo.ever.works healed while the whole
+          # web app went down, and the open issue said neither thing.
+          FAILING_CSV="$(printf '%s' "${FAILING_URLS}" | tr '\n' ',' | sed 's/,\{1,\}/,/g; s/^,//; s/,$//')"
+
           # Is any CUSTOMER-FACING surface among the failures? This is what
           # decides whether the alert shouts or merely notes. Without it a total
           # outage and a flaky demo produce an identical-looking issue.
@@ -383,6 +395,7 @@ jobs:
             echo "critical=${CRITICAL_DOWN}"
             echo "fail_summary=${FAIL_SUMMARY}"
             echo "critical_list=${CRITICAL_LIST}"
+            echo "failing_urls=${FAILING_CSV}"
             if [ "${OVERALL_OK}" -eq 1 ]; then echo "status=up"; else echo "status=down"; fi
           } >> "${GITHUB_OUTPUT}"
 
@@ -395,7 +408,11 @@ jobs:
           FINGERPRINT: ${{ steps.probe.outputs.fingerprint }}
           CRITICAL: ${{ steps.probe.outputs.critical }}
           FAIL_SUMMARY: ${{ steps.probe.outputs.fail_summary }}
+          FAILING_URLS_CSV: ${{ steps.probe.outputs.failing_urls }}
           ALERT_LABEL: uptime-alert
+          # Labels applied as an outage crosses a duration threshold, so a
+          # sustained incident is filterable and not just differently worded.
+          SEV_LABEL_PREFIX: uptime-sev
           # Stable substring used ONLY to re-find the issue when the label
           # lookup misses. The visible title is computed per-run now, so it
           # must never be matched exactly.
@@ -432,8 +449,132 @@ jobs:
 
           MARK="<!-- uptime-fingerprint: ${FINGERPRINT} -->"
 
-          # 🛑 The title names what is failing RIGHT NOW, and shouts when a
-          # customer-facing surface is among them.
+          # --- What the LAST report said -------------------------------------
+          # Fetched here rather than just above the comment throttle (where it
+          # used to live) because the duration and recovery logic below needs it
+          # to compute the TITLE. Same two calls as before, just earlier; the
+          # create path below skips them entirely.
+          #
+          # Fall back to the ISSUE BODY when there are no comments yet. On the very first repeat
+          # of an outage the comments array is empty, so `.comments[-1]` yielded nothing, the
+          # freshness guard short-circuited, and the monitor posted a redundant full report 15
+          # minutes after opening the issue — the throttle only started working from the third
+          # cycle. Both markers are written into the body at creation, so the body is simply the
+          # zeroth comment.
+          LAST_AT=""
+          LAST_BODY=""
+          if [ -n "${EXISTING}" ]; then
+            LAST_AT="$(gh issue view "${EXISTING}" --json createdAt,comments \
+                         --jq '.comments[-1].createdAt // .createdAt // empty' 2>/dev/null || true)"
+            LAST_BODY="$(gh issue view "${EXISTING}" --json body,comments \
+                           --jq '.comments[-1].body // .body // empty' 2>/dev/null || true)"
+          fi
+
+          NOW_EPOCH="$(date -u +%s)"
+
+          # >>> uptime-escalation-state
+          # Contract-tested by apps/node/src/core/external-uptime-monitor.contract.spec.ts,
+          # which lifts everything between these two sentinels out of this YAML
+          # and runs it under these same Bash flags. KEEP IT FREE OF `gh` CALLS
+          # and of `date` — its only inputs are the four variables below, which
+          # is what makes it runnable, and therefore checkable, in isolation.
+          #
+          # Inputs : FINGERPRINT, FAILING_URLS_CSV, LAST_BODY, NOW_EPOCH
+          # Outputs: SINCE_EPOCH, AGE_MIN, PREV_TIER, TIER, ESCALATED,
+          #          DURATION_LABEL, RECOVERED_LIST, STATE_MARK
+          #
+          # EW-760 (3) and (4): the monitor kept NO state between runs, so the
+          # 2026-08-23 outage — 40 consecutive failing runs across ~18 hours —
+          # rendered exactly like a single 15-minute blip, and an issue whose
+          # original target had healed never said so. The state needed is tiny,
+          # so it rides in an HTML comment on the last thing we wrote instead of
+          # pulling in a store this workflow deliberately does not have.
+          PREV_STATE="$(sed -n '/<!-- uptime-state: /{s/.*<!-- uptime-state: \(.*\) -->.*/\1/p;q;}' <<< "${LAST_BODY}")"
+          # Word splitting is wanted below; pathname expansion is not. The
+          # values come off a GitHub issue, and a stray `*` matching a file in
+          # the runner's cwd would quietly rewrite the outage history.
+          set -f
+          PREV_FP=""
+          PREV_SINCE=""
+          PREV_TIER=0
+          PREV_URLS=""
+          # Word-splitting a `k=v k=v` list beats one sed per field: no \b, no
+          # anchoring games, and an unknown or reordered key is ignored rather
+          # than silently shifting every later capture by one.
+          # shellcheck disable=SC2086  # splitting IS the parser here; `set -f` above kills globbing
+          for KV in ${PREV_STATE}; do
+            case "${KV}" in
+              fp=*) PREV_FP="${KV#fp=}" ;;
+              since=*) PREV_SINCE="${KV#since=}" ;;
+              tier=*) PREV_TIER="${KV#tier=}" ;;
+              urls=*) PREV_URLS="${KV#urls=}" ;;
+            esac
+          done
+          # Non-numeric junk here would abort the arithmetic below and kill the
+          # step, i.e. silence the monitor — the one outcome it must never
+          # produce. Treat anything unparseable as absent.
+          case "${PREV_SINCE}" in ''|*[!0-9]*) PREV_SINCE="" ;; esac
+          case "${PREV_TIER}" in ''|*[!0-9]*) PREV_TIER=0 ;; esac
+
+          # A DIFFERENT failing set is a NEW event, not a continuation, so the
+          # clock restarts with it. Same reasoning as the per-run title: the
+          # duration must describe the outage the title is naming.
+          if [ -n "${PREV_SINCE}" ] && [ "${PREV_FP}" = "${FINGERPRINT}" ]; then
+            SINCE_EPOCH="${PREV_SINCE}"
+          else
+            SINCE_EPOCH="${NOW_EPOCH}"
+            PREV_TIER=0
+          fi
+
+          AGE_MIN=$(( (NOW_EPOCH - SINCE_EPOCH) / 60 ))
+          if [ "${AGE_MIN}" -lt 0 ]; then AGE_MIN=0; fi
+
+          # The schedule is every 15 minutes, so tier 1 is the ticket's "shout
+          # at, say, the fifth" consecutive failure and tier 2 is four hours of
+          # the same thing.
+          TIER=0
+          if [ "${AGE_MIN}" -ge 60 ]; then TIER=1; fi
+          if [ "${AGE_MIN}" -ge 240 ]; then TIER=2; fi
+          ESCALATED=0
+          if [ "${TIER}" -gt "${PREV_TIER}" ]; then ESCALATED=1; fi
+
+          # Bucketed to the probe interval so the title moves when the SEVERITY
+          # moves, not every 15 minutes. A title that churns on every run is the
+          # old noise problem wearing a clock.
+          DURATION_LABEL=""
+          if [ "${TIER}" -ge 1 ]; then
+            BUCKET_MIN=$(( (AGE_MIN / 15) * 15 ))
+            DUR_H=$(( BUCKET_MIN / 60 ))
+            DUR_M=$(( BUCKET_MIN % 60 ))
+            if [ "${DUR_H}" -gt 0 ]; then
+              DURATION_LABEL="${DUR_H}h${DUR_M}m"
+            else
+              DURATION_LABEL="${DUR_M}m"
+            fi
+          fi
+
+          # EW-760 (4): which targets healed while others stayed down. Without
+          # it an updated issue lists only what is broken now, so a reader
+          # cannot tell a partial recovery from a target that was never named.
+          RECOVERED_LIST=""
+          # shellcheck disable=SC2046  # splitting IS the parser here; `set -f` above kills globbing
+          for U in $(tr ',' ' ' <<< "${PREV_URLS}"); do
+            case ",${FAILING_URLS_CSV}," in
+              *",${U},"*) ;;
+              *) RECOVERED_LIST="${RECOVERED_LIST}${U} " ;;
+            esac
+          done
+          set +f
+
+          # Space-separated k=v, values free of spaces, so the reader above can
+          # be a word-split loop. Written alongside MARK, never instead of it:
+          # the comment throttle greps for MARK verbatim and must keep matching.
+          STATE_MARK="<!-- uptime-state: fp=${FINGERPRINT} since=${SINCE_EPOCH} tier=${TIER} urls=${FAILING_URLS_CSV} -->"
+          # <<< uptime-escalation-state
+
+          # 🛑 The title names what is failing RIGHT NOW, shouts when a
+          # customer-facing surface is among them, and says how long it has been
+          # going on.
           #
           # It used to be a constant, and that is what made EW-760 possible: an
           # issue opened for demo.ever.works kept its wording while the entire
@@ -445,10 +586,17 @@ jobs:
           else
             ALERT_TITLE="🔴 Uptime: ${FAIL_SUMMARY} unreachable"
           fi
+          # Duration goes in the TITLE, not only in a comment (EW-760 suggestion
+          # 3). Forty consecutive failures used to render identically to the
+          # first one; the top of the issue is the only thing a reader who has
+          # already triaged it will look at again.
+          if [ -n "${DURATION_LABEL}" ]; then
+            ALERT_TITLE="${ALERT_TITLE} (down ${DURATION_LABEL}+)"
+          fi
 
           if [ -z "${EXISTING}" ]; then
             echo "No open alert issue — creating one."
-            printf '\n%s\n' "${MARK}" >> "${REPORT_PATH}"
+            printf '\n%s\n%s\n' "${MARK}" "${STATE_MARK}" >> "${REPORT_PATH}"
             if ! gh issue create --title "${ALERT_TITLE}" \
                                  --label "${ALERT_LABEL}" \
                                  --assignee evereq \
@@ -481,26 +629,30 @@ jobs:
             gh issue edit "${EXISTING}" --title "${ALERT_TITLE}" >/dev/null 2>&1               || echo "::warning::Could not retitle #${EXISTING}; the comment below still records the change."
           fi
 
+          # An escalation makes itself heard through machinery that already
+          # exists: a louder title (above), a severity label, and one comment
+          # allowed past the throttle (below). Deliberately NOT a second issue —
+          # the single-open-issue property is what keeps this monitor from being
+          # muted, and muting it is how EW-760 stayed invisible for 18 hours.
+          if [ "${ESCALATED}" -eq 1 ]; then
+            echo "Outage sustained ${AGE_MIN}m — escalating to duration tier ${TIER} (was ${PREV_TIER})."
+            SEV_LABEL="${SEV_LABEL_PREFIX}${TIER}"
+            gh label create "${SEV_LABEL}" \
+              --color 'B60205' \
+              --description 'External uptime alert sustained past a duration threshold' \
+              >/dev/null 2>&1 || true
+            gh issue edit "${EXISTING}" --add-label "${SEV_LABEL}" >/dev/null 2>&1 \
+              || echo "::warning::Could not add ${SEV_LABEL} to #${EXISTING}; the retitled issue still carries the escalation."
+          fi
+
           # Only add a comment when something actually changed, or once an hour.
           # Without this, a multi-hour outage produces a comment every 15 min.
-          #
-          # Fall back to the ISSUE BODY when there are no comments yet. On the very first repeat
-          # of an outage the comments array is empty, so `.comments[-1]` yielded nothing, the
-          # freshness guard short-circuited, and the monitor posted a redundant full report 15
-          # minutes after opening the issue — the throttle only started working from the third
-          # cycle. The fingerprint marker is written into the body at creation, so the body is
-          # simply the zeroth comment.
-          LAST_AT="$(gh issue view "${EXISTING}" --json createdAt,comments \
-                       --jq '.comments[-1].createdAt // .createdAt // empty' 2>/dev/null || true)"
-          LAST_BODY="$(gh issue view "${EXISTING}" --json body,comments \
-                         --jq '.comments[-1].body // .body // empty' 2>/dev/null || true)"
-
+          # (LAST_AT / LAST_BODY were fetched above, before the title needed them.)
           SHOULD_COMMENT=1
           # No pipe in a decision: under `pipefail`, a producer killed by SIGPIPE can make an
           # already-matched grep report failure, defeating the throttle exactly when it matters.
           if [ -n "${LAST_AT}" ] && grep -qF -- "${MARK}" <<< "${LAST_BODY}"; then
             LAST_EPOCH="$(date -u -d "${LAST_AT}" +%s 2>/dev/null || echo 0)"
-            NOW_EPOCH="$(date -u +%s)"
             AGE=$(( NOW_EPOCH - LAST_EPOCH ))
             if [ "${LAST_EPOCH}" -gt 0 ] && [ "${AGE}" -lt 3600 ]; then
               SHOULD_COMMENT=0
@@ -508,8 +660,44 @@ jobs:
             fi
           fi
 
+          # ...but an escalation is precisely the "something changed" the
+          # throttle exists to let through, so it is never swallowed.
+          if [ "${ESCALATED}" -eq 1 ]; then
+            SHOULD_COMMENT=1
+          fi
+
           if [ "${SHOULD_COMMENT}" -eq 1 ]; then
-            printf '\n%s\n' "${MARK}" >> "${REPORT_PATH}"
+            # Lead with what CHANGED since the last report. An issue that only
+            # ever lists what is broken right now cannot show a partial
+            # recovery, and a reader who triaged the first version of this issue
+            # needs the delta, not the same table a second time.
+            PREAMBLE="${RUNNER_TEMP}/uptime-preamble.md"
+            : > "${PREAMBLE}"
+            if [ "${TIER}" -ge 1 ]; then
+              {
+                echo "> 🚨 **Sustained outage — down for ${DURATION_LABEL}+** (duration tier ${TIER}, first seen \`$(date -u -d "@${SINCE_EPOCH}" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo unknown)\`)."
+                echo
+              } >> "${PREAMBLE}"
+            fi
+            if [ -n "${RECOVERED_LIST}" ]; then
+              # Same deal as the parser above: split on spaces, never glob.
+              set -f
+              {
+                echo "### ✅ Recovered since the last report"
+                echo
+                # shellcheck disable=SC2086  # deliberate split of the space-joined list
+                for U in ${RECOVERED_LIST}; do echo "- \`${U}\`"; done
+                echo
+                echo "Everything below is what is **still** failing."
+                echo
+              } >> "${PREAMBLE}"
+              set +f
+            fi
+            if [ -s "${PREAMBLE}" ]; then
+              cat "${REPORT_PATH}" >> "${PREAMBLE}"
+              REPORT_PATH="${PREAMBLE}"
+            fi
+            printf '\n%s\n%s\n' "${MARK}" "${STATE_MARK}" >> "${REPORT_PATH}"
             gh issue comment "${EXISTING}" --body-file "${REPORT_PATH}"
           fi
 
