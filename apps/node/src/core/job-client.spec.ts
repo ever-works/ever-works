@@ -192,26 +192,6 @@ describe('FleetJobClient run env files', () => {
 
 	const clientWith = (fetchFn: FetchLike, logger?: { protect: (v: string) => void }) =>
 		new FleetJobClient({
-describe('FleetJobClient MCP run credentials (self-build slice Z)', () => {
-	const TOKEN = 'ew_run_0123456789abcdef0123456789abcdef';
-
-	/** Records the request so the credential body and path can be asserted. */
-	function recording(status: number, body: unknown) {
-		const calls: Array<{ url: string; body: unknown }> = [];
-		const fetchFn: FetchLike = async (url, init) => {
-			calls.push({ url, body: JSON.parse(init.body) });
-			return { ok: status < 400, status, text: async () => JSON.stringify(body) };
-		};
-		return { calls, fetchFn };
-	}
-
-	it('mints with the node credential and returns the token to the caller', async () => {
-		const { calls, fetchFn } = recording(200, {
-			token: TOKEN,
-			expiresAt: '2026-09-05T12:00:00.000Z',
-			serverUrl: 'https://mcp.ever.works/mcp'
-		});
-		const client = new FleetJobClient({
 			apiUrl: 'https://api.ever.works',
 			nodeId: NODE_ID,
 			secret: SECRET,
@@ -278,6 +258,33 @@ describe('FleetJobClient MCP run credentials (self-build slice Z)', () => {
 		await expect(
 			client.fetchRunEnvFiles('job-1', [{ repoConnectionId: ROW, paths: ['.env'] }], 3)
 		).rejects.toMatchObject({ kind: 'malformed' });
+	});
+});
+
+describe('FleetJobClient MCP run credentials (self-build slice Z)', () => {
+	const TOKEN = 'ew_run_0123456789abcdef0123456789abcdef';
+
+	/** Records the request so the credential body and path can be asserted. */
+	function recording(status: number, body: unknown) {
+		const calls: Array<{ url: string; body: unknown }> = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			calls.push({ url, body: JSON.parse(init.body) });
+			return { ok: status < 400, status, text: async () => JSON.stringify(body) };
+		};
+		return { calls, fetchFn };
+	}
+
+	it('mints with the node credential and returns the token to the caller', async () => {
+		const { calls, fetchFn } = recording(200, {
+			token: TOKEN,
+			expiresAt: '2026-09-05T12:00:00.000Z',
+			serverUrl: 'https://mcp.ever.works/mcp'
+		});
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
 			timeoutMs: 0
 		});
 

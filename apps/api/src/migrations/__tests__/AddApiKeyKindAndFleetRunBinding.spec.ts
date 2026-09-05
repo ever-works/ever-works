@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { AddApiKeyKindAndFleetRunBinding1788800000000 } from '../1788800000000-AddApiKeyKindAndFleetRunBinding';
+import { AddApiKeyKindAndFleetRunBinding1789400000000 } from '../1789400000000-AddApiKeyKindAndFleetRunBinding';
 
 /**
  * Migration test for `api_keys.kind` + the fleet-run binding columns
@@ -22,9 +22,9 @@ import { AddApiKeyKindAndFleetRunBinding1788800000000 } from '../1788800000000-A
  *    and every column this migration added is gone.
  *  - up() and down() are both idempotent (re-running changes nothing).
  */
-describe('AddApiKeyKindAndFleetRunBinding1788800000000', () => {
+describe('AddApiKeyKindAndFleetRunBinding1789400000000', () => {
     let dataSource: DataSource;
-    const migration = new AddApiKeyKindAndFleetRunBinding1788800000000();
+    const migration = new AddApiKeyKindAndFleetRunBinding1789400000000();
 
     const BINDING_COLUMNS = ['boundJobId', 'boundNodeId', 'boundRunId'];
 

@@ -240,6 +240,9 @@ export class FleetJobClient {
 			files.push({ repoConnectionId: file.repoConnectionId, path: file.path, content: file.content });
 		}
 		return files;
+	}
+
+	/**
 	 * Self-build slice Z (EW-796) — mint the run-scoped MCP credential for
 	 * a job this node holds.
 	 *
