@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
 
 type RouteContext = { params: Promise<{ id: string; runId: string }> };
 
@@ -22,16 +21,17 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * The token itself is a 60s single-run credential; it rides the JSON
  * response (never a URL) and the browser presents it as the first WS
  * message.
+ *
+ * Auth and workspace scope come from {@link bffProxy}: no session cookie is
+ * `401 Unauthorized`, a missing or malformed per-tab selector is
+ * `400 Invalid workspace scope`, and the handler is handed headers that
+ * already carry the session bearer and the Organization scope.
  */
-export async function POST(request: NextRequest, ctx: RouteContext) {
+export const POST = bffProxy<RouteContext>(async ({ request, headers }, ctx) => {
+    // Runs inside the wrapper, so auth and scope are already settled here.
     const { id, runId } = await ctx.params;
     if (!UUID.test(id) || !UUID.test(runId)) {
         return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
-    }
-
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Only the read-only downgrade is forwarded — never a raw
@@ -39,15 +39,9 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     // from being the place a new role could be smuggled in.
     const roleQuery = request.nextUrl.searchParams.get('role') === 'viewer' ? '?role=viewer' : '';
 
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`,
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
+    // bffProxy supplies the bearer and the scope header; the JSON `Accept`
+    // this proxy has always sent upstream is added on top of them.
+    headers.set('Accept', 'application/json');
 
     const upstream = await fetch(
         `${API_URL}/agents/${id}/runs/${runId}/terminal/attach-token${roleQuery}`,
@@ -84,4 +78,4 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
         { token: body.token, wsUrl, role: body.role, expiresInSec: body.expiresInSec },
         { headers: { 'Cache-Control': 'no-store' } },
     );
-}
+});

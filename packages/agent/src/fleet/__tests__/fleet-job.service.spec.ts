@@ -78,6 +78,8 @@ function makeRepos(stores: Stores): {
                 requiredCapabilities: [],
                 createdAt: new Date(),
                 updatedAt: new Date(),
+                // The real repository stamps the SLA clock at create.
+                queuedAt: new Date(),
                 ...data,
             } as unknown as FleetJob;
             stores.jobs.push(row);
@@ -160,6 +162,8 @@ function makeRepos(stores: Stores): {
                 row.status = 'queued';
                 row.nodeId = null;
                 row.leaseExpiresAt = null;
+                // Re-enters `queued`: the real repository restarts the clock.
+                row.queuedAt = new Date();
                 return true;
             },
         ),
@@ -195,6 +199,63 @@ function makeRepos(stores: Stores): {
         ),
         findByUser: jest.fn(async (userId: string, limit: number) =>
             stores.jobs.filter((j) => j.userId === userId).slice(0, limit),
+        ),
+        // Queue SLA + heartbeat promotion (self-build slice S). Mirrored
+        // here so the inline expiry on the lease path is EXERCISED by
+        // this suite rather than swallowed as a missing method.
+        findQueuedOlderThan: jest.fn(
+            async (kind: string, cutoff: Date, limit: number, userId?: string) =>
+                stores.jobs
+                    .filter(
+                        (j) =>
+                            (!userId || j.userId === userId) &&
+                            j.kind === kind &&
+                            j.status === 'queued' &&
+                            Boolean(j.queuedAt) &&
+                            j.queuedAt!.getTime() < cutoff.getTime() &&
+                            !j.cancelRequestedAt,
+                    )
+                    .slice(0, limit),
+        ),
+        failQueuedExpired: jest.fn(
+            async (id: string, cutoff: Date, error: string, completedAt: Date) => {
+                const row = stores.jobs.find(
+                    (j) =>
+                        j.id === id &&
+                        j.status === 'queued' &&
+                        Boolean(j.queuedAt) &&
+                        j.queuedAt!.getTime() < cutoff.getTime() &&
+                        !j.cancelRequestedAt,
+                );
+                if (!row) return false;
+                Object.assign(row, {
+                    status: 'failed',
+                    error,
+                    completedAt,
+                    leaseExpiresAt: null,
+                    queuedReason: null,
+                });
+                return true;
+            },
+        ),
+        findWaitingForNode: jest.fn(async (userId: string, nodeId: string, limit: number) =>
+            stores.jobs
+                .filter(
+                    (j) =>
+                        j.userId === userId &&
+                        j.status === 'queued' &&
+                        j.queuedReason === 'waiting-for-runner' &&
+                        (!j.targetNodeId || j.targetNodeId === nodeId),
+                )
+                .slice(0, limit),
+        ),
+        promoteWaiting: jest.fn(
+            async (id: string) =>
+                applyUpdate(
+                    stores.jobs,
+                    { id, status: 'queued', queuedReason: 'waiting-for-runner' } as never,
+                    { queuedReason: null } as never,
+                ) === 1,
         ),
     } as unknown as FleetJobRepository;
 
@@ -269,6 +330,13 @@ describe('FleetJobService', () => {
             expect(view.status).toBe('queued');
             expect(view.nodeId).toBeNull();
             expect(view.requiredCapabilities).toEqual(['workspace']);
+        });
+
+        it('starts the queue SLA clock on the row and exposes it on the view (slice S)', async () => {
+            const view = await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+
+            expect(stores.jobs[0].queuedAt).toBeInstanceOf(Date);
+            expect(view.queuedAt).toBe(stores.jobs[0].queuedAt!.toISOString());
         });
 
         it('reuses the row on an idempotency-key repeat instead of doubling the work', async () => {
@@ -744,6 +812,26 @@ describe('FleetJobService', () => {
             const summary = await service.reclaimExpired();
             expect(summary).toMatchObject({ requeued: 0, failed: 0 });
             expect(stores.jobs[0].status).toBe('leased');
+        });
+
+        it('a reclaimed row re-enters the queue with a fresh SLA clock, and is re-offered (slice S)', async () => {
+            await service.enqueue({ userId: 'owner-1', kind: 'acceptance-checks' });
+            await service.lease({ nodeId: NODE_A, secret: secretA });
+            const firstClock = stores.jobs[0].queuedAt!.getTime();
+            stores.jobs[0].leaseExpiresAt = new Date(Date.now() - 1_000);
+            // Pretend the row had been queued for a long time before the
+            // lease: the reclaim must not carry that age forward.
+            stores.jobs[0].queuedAt = new Date(firstClock - 48 * 60 * 60 * 1000);
+
+            await service.reclaimExpired();
+
+            expect(stores.jobs[0].status).toBe('queued');
+            expect(stores.jobs[0].queuedAt!.getTime()).toBeGreaterThanOrEqual(firstClock);
+            // Which is why the next poll leases it instead of the SLA
+            // failing a job that was actively being worked seconds ago.
+            const again = await service.lease({ nodeId: NODE_A, secret: secretA });
+            expect(again).toHaveLength(1);
+            expect(again![0].status).toBe('leased');
         });
 
         it.each([

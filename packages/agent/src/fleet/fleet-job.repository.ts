@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Not, Repository } from 'typeorm';
 import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
-import { FLEET_JOB_ACTIVE_STATUSES } from '@ever-works/contracts';
+import { FLEET_JOB_ACTIVE_STATUSES, QUEUED_REASON_WAITING_FOR_RUNNER } from '@ever-works/contracts';
 import { FleetJob } from '../entities/fleet-job.entity';
 
 export interface CreateFleetJobData {
@@ -68,6 +68,8 @@ export class FleetJobRepository {
                 requiredCapabilities: data.requiredCapabilities ?? [],
                 attempts: 0,
                 maxAttempts: data.maxAttempts ?? 3,
+                // The queue SLA clock starts here (see `queuedAt`).
+                queuedAt: new Date(),
             }),
         );
     }
@@ -230,6 +232,109 @@ export class FleetJobRepository {
     }
 
     /**
+     * Queue SLA (self-build slice S) — `queued` rows of one `kind` that
+     * entered the queue before `cutoff`. One query per kind because each
+     * kind has its own max age; ordered oldest-first so the batch limit
+     * never starves the rows that have waited longest. Owner-scoped on
+     * the lease path, global on the cron — the same split as
+     * {@link findExpiredLeases}.
+     *
+     * A row with `queuedAt IS NULL` (written before the column existed)
+     * never matches: an unknown age is not an old age.
+     */
+    async findQueuedOlderThan(
+        kind: FleetJobKind,
+        cutoff: Date,
+        limit: number,
+        userId?: string,
+    ): Promise<FleetJob[]> {
+        return this.repository.find({
+            where: {
+                ...(userId ? { userId } : {}),
+                kind,
+                status: 'queued',
+                queuedAt: LessThan(cutoff),
+                cancelRequestedAt: IsNull(),
+            },
+            order: { queuedAt: 'ASC' },
+            take: limit,
+        });
+    }
+
+    /**
+     * Queue SLA — fail a job NO node ever took. The WHERE clause pins the
+     * row to `queued`, to "still older than the scan's cutoff" and to
+     * "not cancelled", so a claim, a reclaim (which re-stamps `queuedAt`
+     * to now, which is never older than the cutoff) or a cancel that
+     * lands between the scan and this write wins and the caller sees
+     * `false`. Exactly one writer ever settles the row, which is what
+     * makes the completion event fire exactly once.
+     *
+     * Pinned with `LessThan(cutoff)` rather than equality on the
+     * `queuedAt` the scan read back, on purpose: the migration backfills
+     * `queuedAt` from `createdAt`, whose default is the DATABASE clock
+     * (Postgres `now()` carries microseconds; sqlite `datetime('now')`
+     * carries no fraction at all), and a JS `Date` cannot round-trip
+     * either exactly — an equality pin would silently never match the
+     * very rows the backfill exists to settle.
+     */
+    async failQueuedExpired(
+        id: string,
+        cutoff: Date,
+        error: string,
+        completedAt: Date,
+    ): Promise<boolean> {
+        const result = await this.repository.update(
+            { id, status: 'queued', queuedAt: LessThan(cutoff), cancelRequestedAt: IsNull() },
+            { status: 'failed', error, completedAt, leaseExpiresAt: null, queuedReason: null },
+        );
+        return (result.affected ?? 0) === 1;
+    }
+
+    /**
+     * Heartbeat promotion (self-build slice S) — the owner's queued rows
+     * still stamped `waiting-for-runner` that THIS node could lease:
+     * unbound, or pinned to it. Capability filtering happens in the
+     * service, for the same JSON-column reason as the lease scan.
+     */
+    async findWaitingForNode(userId: string, nodeId: string, limit: number): Promise<FleetJob[]> {
+        return this.repository.find({
+            where: [
+                {
+                    userId,
+                    status: 'queued',
+                    queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER,
+                    targetNodeId: IsNull(),
+                },
+                {
+                    userId,
+                    status: 'queued',
+                    queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER,
+                    targetNodeId: nodeId,
+                },
+            ],
+            order: { createdAt: 'ASC' },
+            take: limit,
+        });
+    }
+
+    /**
+     * Clear `waiting-for-runner` on a row an eligible runner can now take.
+     * Pinned to `queued` + the token, so a claim that already cleared it
+     * (or a row that moved on) is a no-op rather than a stale write.
+     * `queuedAt` is deliberately NOT touched: a promotion does not make
+     * the job younger, and the SLA still bounds a node that is online but
+     * never actually leases.
+     */
+    async promoteWaiting(id: string): Promise<boolean> {
+        const result = await this.repository.update(
+            { id, status: 'queued', queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER },
+            { queuedReason: null },
+        );
+        return (result.affected ?? 0) === 1;
+    }
+
+    /**
      * Return one lapsed claim to the pool. Pins the previous status so a
      * job that completed between the scan and the write is never
      * resurrected.
@@ -246,8 +351,15 @@ export class FleetJobRepository {
             // job: the reason it originally waited (no free runner) is
             // not necessarily why it is waiting now, and carrying a
             // stale token forward would misreport a lapsed lease as a
-            // capacity problem.
-            { status: 'queued', nodeId: null, leaseExpiresAt: null, queuedReason: null },
+            // capacity problem. The row re-ENTERS `queued`, so the queue
+            // SLA clock restarts too.
+            {
+                status: 'queued',
+                nodeId: null,
+                leaseExpiresAt: null,
+                queuedReason: null,
+                queuedAt: new Date(),
+            },
         );
         return (result.affected ?? 0) === 1;
     }
@@ -331,8 +443,49 @@ export class FleetJobRepository {
     async releaseClaimsForNode(userId: string, nodeId: string): Promise<number> {
         const result = await this.repository.update(
             { userId, nodeId, status: In([...FLEET_JOB_ACTIVE_STATUSES]) },
-            { status: 'queued', nodeId: null, leaseExpiresAt: null },
+            // Re-enters `queued`: the SLA clock restarts with it.
+            { status: 'queued', nodeId: null, leaseExpiresAt: null, queuedAt: new Date() },
         );
         return result.affected ?? 0;
+    }
+
+    /**
+     * Fleet cost accounting (EW-777) — record the model spend a job's run
+     * reported. Written by the API-side reconciler once per completion,
+     * BEFORE the daily ceilings are evaluated, so the sums below include
+     * the job that just finished.
+     */
+    async stampCostCents(id: string, costCents: number): Promise<void> {
+        await this.repository.update({ id }, { costCents });
+    }
+
+    /**
+     * Cents one node's jobs reported since `since` — the per-node DAILY
+     * ceiling's input when `since` is the start of the UTC day. Completed
+     * jobs keep their `nodeId` (a drain only requeues ACTIVE claims), so
+     * the sum survives the drain it may trigger. Uses
+     * `idx_fleet_jobs_node_completed`. NULL costs (no model ran, or the CLI
+     * printed no price) sum as 0 here — the ceiling service fails closed on
+     * the current job's own null cost separately.
+     */
+    async sumCostCentsForNodeSince(nodeId: string, since: Date): Promise<number> {
+        const row = await this.repository
+            .createQueryBuilder('j')
+            .select('COALESCE(SUM(j.costCents), 0)', 'total')
+            .where('j.nodeId = :nodeId', { nodeId })
+            .andWhere('j.completedAt >= :since', { since })
+            .getRawOne<{ total: string | number | null }>();
+        return Number(row?.total ?? 0);
+    }
+
+    /** Cents every job of one owner reported since `since` — the FLEET-WIDE daily ceiling's input. */
+    async sumCostCentsForUserSince(userId: string, since: Date): Promise<number> {
+        const row = await this.repository
+            .createQueryBuilder('j')
+            .select('COALESCE(SUM(j.costCents), 0)', 'total')
+            .where('j.userId = :userId', { userId })
+            .andWhere('j.completedAt >= :since', { since })
+            .getRawOne<{ total: string | number | null }>();
+        return Number(row?.total ?? 0);
     }
 }

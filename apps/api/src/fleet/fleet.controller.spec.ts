@@ -33,11 +33,12 @@ describe('FleetController', () => {
         createEnrollmentToken: jest.Mock;
         renameForUser: jest.Mock;
         setDisabledForUser: jest.Mock;
+        setDailyCostCeilingForUser: jest.Mock;
         deleteForUser: jest.Mock;
         enroll: jest.Mock;
         heartbeat: jest.Mock;
     };
-    let jobs: { loadByNodeForUser: jest.Mock };
+    let jobs: { loadByNodeForUser: jest.Mock; promoteWaitingForNode: jest.Mock };
     let controller: FleetController;
 
     // Appended constructor deps (runner status + execution preferences).
@@ -48,6 +49,19 @@ describe('FleetController', () => {
         listForUser: jest.fn(async () => []),
         setForUser: jest.fn(async () => null),
         clearForUser: jest.fn(async () => undefined),
+    };
+    // Fleet cost accounting (EW-777) — the fleet-wide ceiling routes.
+    const ceilingView = {
+        dailyCeilingCents: null,
+        effectiveDailyCeilingCents: null,
+        source: 'none',
+        trippedOn: null,
+        todaySpendCents: 0,
+        day: '2026-09-05',
+    };
+    const ceilingStub = {
+        describeForUser: jest.fn(async () => ceilingView),
+        setFleetCeilingForUser: jest.fn(async () => ({ ...ceilingView, dailyCeilingCents: 5_000 })),
     };
 
     beforeEach(() => {
@@ -60,17 +74,92 @@ describe('FleetController', () => {
             })),
             renameForUser: jest.fn(async () => ({ ...nodeView, name: 'renamed' })),
             setDisabledForUser: jest.fn(async () => ({ ...nodeView, status: 'disabled' })),
+            setDailyCostCeilingForUser: jest.fn(async () => ({
+                ...nodeView,
+                dailyCostCeilingCents: 2_500,
+            })),
             deleteForUser: jest.fn(async () => undefined),
             enroll: jest.fn(async () => null),
             heartbeat: jest.fn(async () => null),
         };
-        jobs = { loadByNodeForUser: jest.fn(async () => ({})) };
+        jobs = {
+            loadByNodeForUser: jest.fn(async () => ({})),
+            promoteWaitingForNode: jest.fn(async () => 0),
+        };
+        ceilingStub.describeForUser.mockClear();
+        ceilingStub.setFleetCeilingForUser.mockClear();
         controller = new FleetController(
             service as never,
             jobs as never,
             runnerStub as never,
             preferenceStub as never,
+            ceilingStub as never,
+            // EW-778 — the per-node drain now lives in FleetPanicService
+            // (shared with drain-all); its own spec covers it.
+            { drainNodeForUser: jest.fn(async () => null) } as never,
         );
+    });
+
+    describe('cost ceilings (fleet cost accounting, EW-777)', () => {
+        it('reads and sets the fleet-wide ceiling, owner-scoped', async () => {
+            expect(await controller.getCostCeiling(auth)).toEqual(ceilingView);
+            expect(ceilingStub.describeForUser).toHaveBeenCalledWith('user-1');
+
+            const set = await controller.setCostCeiling(auth, { dailyCeilingCents: 5_000 });
+            expect(ceilingStub.setFleetCeilingForUser).toHaveBeenCalledWith('user-1', 5_000);
+            expect(set.dailyCeilingCents).toBe(5_000);
+
+            // null is a VALUE: it clears the owner's ceiling.
+            await controller.setCostCeiling(auth, { dailyCeilingCents: null });
+            expect(ceilingStub.setFleetCeilingForUser).toHaveBeenLastCalledWith('user-1', null);
+        });
+
+        it('update sets and clears a per-node ceiling through PATCH, and null is not "absent"', async () => {
+            const id = nodeView.id;
+            const set = await controller.update(auth, id, {
+                dailyCostCeilingCents: 2_500,
+            } as UpdateFleetNodeDto);
+            expect(service.setDailyCostCeilingForUser).toHaveBeenCalledWith('user-1', id, 2_500);
+            expect(set.dailyCostCeilingCents).toBe(2_500);
+
+            await controller.update(auth, id, {
+                dailyCostCeilingCents: null,
+            } as UpdateFleetNodeDto);
+            expect(service.setDailyCostCeilingForUser).toHaveBeenLastCalledWith('user-1', id, null);
+            // A ceiling-only PATCH is a valid PATCH — the empty-body guard
+            // must name the field or it 400s a legitimate edit.
+            expect(service.renameForUser).not.toHaveBeenCalled();
+        });
+
+        it('forwards the model identity on enroll AND heartbeat — a whitelist that dropped it would lose the seat silently', async () => {
+            service.enroll.mockResolvedValue({
+                nodeId: nodeView.id,
+                secret: 'node-secret',
+                node: nodeView,
+            });
+            await controller.enroll({
+                token: 'x'.repeat(43),
+                modelIdentity: 'claude-code: ops@example.com (Acme, max)',
+            } as EnrollFleetNodeDto);
+            expect(service.enroll).toHaveBeenCalledWith(
+                'x'.repeat(43),
+                expect.objectContaining({
+                    modelIdentity: 'claude-code: ops@example.com (Acme, max)',
+                }),
+            );
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+                modelIdentity: 'codex: chatgpt',
+            } as FleetHeartbeatDto);
+            expect(service.heartbeat).toHaveBeenCalledWith(
+                nodeView.id,
+                'x'.repeat(43),
+                expect.objectContaining({ modelIdentity: 'codex: chatgpt' }),
+            );
+        });
     });
 
     it('list is owner-scoped to the authenticated user', async () => {
@@ -183,6 +272,41 @@ describe('FleetController', () => {
                 secret: 'x'.repeat(43),
             } as FleetHeartbeatDto);
             expect(result).toEqual({ ok: true, node: nodeView });
+        });
+
+        it('promotes waiting jobs after a beat that leaves the node online, and never otherwise (slice S)', async () => {
+            const beat = { nodeId: nodeView.id, secret: 'x'.repeat(43) } as FleetHeartbeatDto;
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat(beat);
+            expect(jobs.promoteWaitingForNode).toHaveBeenCalledWith(nodeView.id);
+
+            // A drained node keeps beating (observability) but will not
+            // lease, so nothing may be promoted on its account.
+            for (const status of ['paused', 'disabled', 'offline'] as const) {
+                jobs.promoteWaitingForNode.mockClear();
+                service.heartbeat.mockResolvedValue({ node: { ...nodeView, status } });
+                await controller.heartbeat(beat);
+                expect(jobs.promoteWaitingForNode).not.toHaveBeenCalled();
+            }
+
+            // A rejected credential promotes nothing either.
+            jobs.promoteWaitingForNode.mockClear();
+            service.heartbeat.mockResolvedValue(null);
+            await expect(controller.heartbeat(beat)).rejects.toBeInstanceOf(UnauthorizedException);
+            expect(jobs.promoteWaitingForNode).not.toHaveBeenCalled();
+        });
+
+        it('a promotion failure never fails the beat', async () => {
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            jobs.promoteWaitingForNode.mockRejectedValue(new Error('db down'));
+
+            await expect(
+                controller.heartbeat({
+                    nodeId: nodeView.id,
+                    secret: 'x'.repeat(43),
+                } as FleetHeartbeatDto),
+            ).resolves.toEqual({ ok: true, node: nodeView });
         });
 
         it('enroll and heartbeat are @Public (token/secret ARE the auth)', () => {

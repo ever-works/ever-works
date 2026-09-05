@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
     ArrayMaxSize,
+    ArrayMinSize,
     IsArray,
     IsBoolean,
     IsDateString,
@@ -15,22 +16,116 @@ import {
     MaxLength,
     Min,
     MinLength,
+    Validate,
+    ValidateIf,
     ValidateNested,
+    ValidatorConstraint,
+    type ValidationArguments,
+    type ValidatorConstraintInterface,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+// The kind vocabulary comes from `@ever-works/contracts` rather than the
+// agent barrel so specs that stub the barrel (the house idiom for these
+// DTOs) keep the real list.
+import { GOAL_KINDS, isGoalKind, type GoalKind } from '@ever-works/contracts';
 import {
     GOAL_CONSTRAINT_CATEGORIES,
     MAX_GOAL_CONSTRAINTS,
     MAX_GOAL_CRITERIA,
+    MAX_GOAL_DOD_CRITERIA,
     type GoalComparator,
     type GoalConstraintCategory,
     type GoalOutcome,
     type GoalWindow,
 } from '@ever-works/agent/goals';
+import { GoalDoDCriterionDto } from './goal-orchestration.dto';
 
 const GOAL_COMPARATORS: GoalComparator[] = ['gte', 'lte'];
 const GOAL_WINDOWS: GoalWindow[] = ['day', 'week', 'month', 'total', 'point'];
 const GOAL_OUTCOMES: GoalOutcome[] = ['achieved', 'missed', 'abandoned'] as GoalOutcome[];
+
+/**
+ * Fields that only mean something on a metric Goal. Mirrors
+ * `GOAL_METRIC_ONLY_FIELDS` in `@ever-works/agent/goals` (goal-kind.ts);
+ * spelled out here because the DTO must not depend on the agent barrel's
+ * runtime for a rule the service re-checks anyway.
+ */
+const METRIC_ONLY_FIELDS = [
+    'metricSource',
+    'comparator',
+    'targetValue',
+    'unit',
+    'window',
+    'baselineValue',
+    'criteria',
+    'constraints',
+] as const;
+
+/** Omitted kind = metric — every client that predates kinds. */
+function isMetricKind(body: { goalKind?: unknown }): boolean {
+    return body.goalKind === undefined || body.goalKind === null || body.goalKind === 'metric';
+}
+
+/**
+ * Cross-field shape rule for `CreateGoalDto`, evaluated on `goalKind`
+ * WITHOUT `@IsOptional()` — that decorator would skip the whole property
+ * when the kind is omitted, which is exactly the (metric) case the
+ * per-field validators below must still cover.
+ *
+ * Returns the problems for a DELIVERY body; a metric body reports nothing
+ * here because its missing fields keep their own per-field messages
+ * (pinned by the e2e validation matrix), and an unknown kind is reported
+ * by {@link GoalKindMemberConstraint} instead.
+ */
+function goalKindShapeProblems(body: Record<string, unknown>): string[] {
+    const kind = body.goalKind === undefined || body.goalKind === null ? 'metric' : body.goalKind;
+    if (!isGoalKind(kind) || kind === 'metric') return [];
+    const problems = METRIC_ONLY_FIELDS.filter(
+        (field) => body[field] !== undefined && body[field] !== null,
+    ).map((field) => `${field} must be omitted for a delivery Goal`);
+    if (!Array.isArray(body.dodCriteria) || body.dodCriteria.length === 0) {
+        problems.push(
+            'a delivery Goal requires at least one Definition-of-Done criterion (dodCriteria)',
+        );
+    } else if (
+        body.dodCriteria.every(
+            (entry) =>
+                typeof entry === 'object' &&
+                entry !== null &&
+                (entry as { proposed?: unknown }).proposed === true,
+        )
+    ) {
+        // `summarizeDoD` excludes proposed criteria from the rollup, so a
+        // Goal born with nothing but proposals would have no finish line at
+        // all. Mirrors `validateDeliveryGoalInput` in the service.
+        problems.push(
+            'a delivery Goal cannot be created with only proposed (unapproved) criteria — at least one must be approved',
+        );
+    }
+    return problems;
+}
+
+@ValidatorConstraint({ name: 'goalKindMember' })
+class GoalKindMemberConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        return value === undefined || value === null || isGoalKind(value);
+    }
+
+    defaultMessage(): string {
+        return `goalKind must be one of the following values: ${GOAL_KINDS.join(', ')}`;
+    }
+}
+
+@ValidatorConstraint({ name: 'goalKindShape' })
+class GoalKindShapeConstraint implements ValidatorConstraintInterface {
+    validate(_value: unknown, args: ValidationArguments): boolean {
+        return goalKindShapeProblems(args.object as Record<string, unknown>).length === 0;
+    }
+
+    defaultMessage(args: ValidationArguments): string {
+        return goalKindShapeProblems(args.object as Record<string, unknown>).join('; ');
+    }
+}
 
 /**
  * Goals & Metrics — PR-8. Which metrics-provider plugin + metric a
@@ -174,8 +269,21 @@ export class GoalConstraintDto {
 /**
  * Request body for `POST /api/me/goals`. Semantic rules
  * (comparator/window membership, metricSource shape, the ≥15-minute
- * frequency clamp — spec FR-12) are re-validated in
+ * frequency clamp — spec FR-12, the per-kind shape) are re-validated in
  * `GoalsService.create`, the single source of truth PATCH reuses.
+ *
+ * Two KINDS share this body (self-build slice AG, EW-795):
+ *   - `metric` (default) — `metricSource`, `comparator`, `targetValue`,
+ *     `unit` and `window` are REQUIRED, exactly as before the kind
+ *     existed; each keeps its own validator and message.
+ *   - `delivery` — those fields must be omitted (or null) and `dodCriteria`
+ *     must carry at least one criterion; the cross-field rule lives on
+ *     `goalKind` so a body that satisfies neither kind is refused here,
+ *     before the service refuses it again.
+ *
+ * The MCP `create_goal` tool schema is derived from these `@ApiProperty`
+ * annotations, so the metric fields are declared optional on the wire and
+ * the per-kind requirement is documented in their descriptions.
  */
 export class CreateGoalDto {
     @ApiProperty({ minLength: 1, maxLength: 200 })
@@ -190,30 +298,70 @@ export class CreateGoalDto {
     @MaxLength(10000)
     description?: string | null;
 
-    @ApiProperty({ type: GoalMetricSourceDto })
+    @ApiProperty({
+        required: false,
+        enum: [...GOAL_KINDS],
+        default: 'metric',
+        description:
+            "'metric' (default) reads a metrics-provider plugin and completes when comparator/targetValue is satisfied — metricSource, comparator, targetValue, unit and window are required. 'delivery' has no metric: omit those fields, supply dodCriteria (at least one), and the Goal completes when every approved Definition-of-Done criterion is done or waived. Immutable after create.",
+    })
+    @Validate(GoalKindMemberConstraint)
+    @Validate(GoalKindShapeConstraint)
+    goalKind?: GoalKind;
+
+    @ApiProperty({
+        required: false,
+        type: GoalMetricSourceDto,
+        description:
+            'Metric Goals only — required when goalKind is metric, must be omitted for delivery.',
+    })
+    @ValidateIf(isMetricKind)
     @ValidateNested()
     @Type(() => GoalMetricSourceDto)
-    metricSource: GoalMetricSourceDto;
+    metricSource?: GoalMetricSourceDto;
 
-    @ApiProperty({ enum: GOAL_COMPARATORS, description: 'gte = grow-to-target, lte = shrink.' })
+    @ApiProperty({
+        required: false,
+        enum: GOAL_COMPARATORS,
+        description:
+            'Metric Goals only (required for metric, omit for delivery). gte = grow-to-target, lte = shrink.',
+    })
+    @ValidateIf(isMetricKind)
     @IsIn(GOAL_COMPARATORS)
-    comparator: GoalComparator;
+    comparator?: GoalComparator;
 
-    @ApiProperty()
+    @ApiProperty({
+        required: false,
+        description:
+            'Metric Goals only — required when goalKind is metric, must be omitted for delivery.',
+    })
+    @ValidateIf(isMetricKind)
     @IsNumber()
-    targetValue: number;
+    targetValue?: number;
 
-    @ApiProperty({ maxLength: 32, description: "Unit of targetValue (e.g. 'usd', 'count')." })
+    @ApiProperty({
+        required: false,
+        maxLength: 32,
+        description:
+            "Metric Goals only (required for metric, omit for delivery). Unit of targetValue (e.g. 'usd', 'count').",
+    })
+    @ValidateIf(isMetricKind)
     @IsString()
     @MinLength(1)
     @MaxLength(32)
-    unit: string;
+    unit?: string;
 
-    @ApiProperty({ enum: GOAL_WINDOWS })
+    @ApiProperty({
+        required: false,
+        enum: GOAL_WINDOWS,
+        description:
+            'Metric Goals only — required when goalKind is metric, must be omitted for delivery.',
+    })
+    @ValidateIf(isMetricKind)
     @IsIn(GOAL_WINDOWS)
-    window: GoalWindow;
+    window?: GoalWindow;
 
-    @ApiProperty({ required: false, nullable: true })
+    @ApiProperty({ required: false, nullable: true, description: 'Metric Goals only.' })
     @IsOptional()
     @IsNumber()
     baselineValue?: number | null;
@@ -254,7 +402,7 @@ export class CreateGoalDto {
         required: false,
         type: [GoalConstraintDto],
         description:
-            'Judgment layer G1 - constraints that must hold; a hard violation vetoes ACHIEVED.',
+            'Judgment layer G1 - constraints that must hold; a hard violation vetoes ACHIEVED. Metric Goals only.',
     })
     @IsOptional()
     @IsArray()
@@ -262,6 +410,22 @@ export class CreateGoalDto {
     @ValidateNested({ each: true })
     @Type(() => GoalConstraintDto)
     constraints?: GoalConstraintDto[];
+
+    @ApiProperty({
+        required: false,
+        type: [GoalDoDCriterionDto],
+        minItems: 1,
+        maxItems: MAX_GOAL_DOD_CRITERIA,
+        description:
+            'Definition of Done. REQUIRED for a delivery Goal (at least one approved criterion — it is the whole completion rule); an optional seed checklist for a metric Goal.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMinSize(1)
+    @ArrayMaxSize(MAX_GOAL_DOD_CRITERIA)
+    @ValidateNested({ each: true })
+    @Type(() => GoalDoDCriterionDto)
+    dodCriteria?: GoalDoDCriterionDto[];
 }
 
 /**
@@ -269,7 +433,9 @@ export class CreateGoalDto {
  * `null` clears nullable fields. `status` is NOT writable here (use
  * activate/pause) — but `outcome` IS: spec FR-13 makes auto-set
  * outcomes human-overridable, including `abandoned` and clearing
- * with `null`.
+ * with `null`. `goalKind` is deliberately absent: the kind is immutable
+ * after create, and the service refuses every metric field on a delivery
+ * Goal.
  */
 export class UpdateGoalDto {
     @ApiProperty({ required: false, minLength: 1, maxLength: 200 })
@@ -285,35 +451,58 @@ export class UpdateGoalDto {
     @MaxLength(10000)
     description?: string | null;
 
-    @ApiProperty({ required: false, type: GoalMetricSourceDto })
+    @ApiProperty({
+        required: false,
+        type: GoalMetricSourceDto,
+        description: 'Metric Goals only — rejected (400) on a delivery Goal.',
+    })
     @IsOptional()
     @ValidateNested()
     @Type(() => GoalMetricSourceDto)
     metricSource?: GoalMetricSourceDto;
 
-    @ApiProperty({ required: false, enum: GOAL_COMPARATORS })
+    @ApiProperty({
+        required: false,
+        enum: GOAL_COMPARATORS,
+        description: 'Metric Goals only — rejected (400) on a delivery Goal.',
+    })
     @IsOptional()
     @IsIn(GOAL_COMPARATORS)
     comparator?: GoalComparator;
 
-    @ApiProperty({ required: false })
+    @ApiProperty({
+        required: false,
+        description: 'Metric Goals only — rejected (400) on a delivery Goal.',
+    })
     @IsOptional()
     @IsNumber()
     targetValue?: number;
 
-    @ApiProperty({ required: false, maxLength: 32 })
+    @ApiProperty({
+        required: false,
+        maxLength: 32,
+        description: 'Metric Goals only — rejected (400) on a delivery Goal.',
+    })
     @IsOptional()
     @IsString()
     @MinLength(1)
     @MaxLength(32)
     unit?: string;
 
-    @ApiProperty({ required: false, enum: GOAL_WINDOWS })
+    @ApiProperty({
+        required: false,
+        enum: GOAL_WINDOWS,
+        description: 'Metric Goals only — rejected (400) on a delivery Goal.',
+    })
     @IsOptional()
     @IsIn(GOAL_WINDOWS)
     window?: GoalWindow;
 
-    @ApiProperty({ required: false, nullable: true })
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        description: 'Metric Goals only — rejected (400) on a delivery Goal.',
+    })
     @IsOptional()
     @IsNumber()
     baselineValue?: number | null;

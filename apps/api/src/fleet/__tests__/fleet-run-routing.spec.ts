@@ -2,7 +2,7 @@ import type {
     AgentTaskExecuteDispatcher,
     AgentTaskExecuteDispatchPayload,
 } from '@ever-works/agent/tasks-domain';
-import type { FleetExecutionPreferenceService } from '@ever-works/agent/fleet';
+import type { FleetExecutionPreferenceService, FleetJobService } from '@ever-works/agent/fleet';
 import { NodeDispatcherFactory, NodeJobRuntimePlugin } from '@ever-works/job-runtime-node-plugin';
 import { QUEUED_REASON_WAITING_FOR_RUNNER } from '@ever-works/contracts';
 import type { FleetRunnerAvailability } from '@ever-works/contracts';
@@ -26,7 +26,12 @@ import type { FleetRunnerStatusService } from '../fleet-runner-status.service';
  *   - a tenant that was never on the fleet stays silent, because nothing
  *     was taken away from it;
  *   - a notification outage cannot turn a successful fallback into a
- *     failed dispatch.
+ *     failed dispatch;
+ *   - (self-build slice S / EW-775) the availability question is asked
+ *     about the runners that could take THIS job — the Agent's pinned
+ *     node and the tags the job will require — so a pin to an offline PC
+ *     with five idle siblings is a fallback (or a visible wait), never a
+ *     silent forever-queue.
  */
 
 const WORK_ID = '44444444-4444-4444-8444-444444444444';
@@ -55,6 +60,8 @@ describe('fleet run routing (local-runner preference matrix)', () => {
     let runners: { availability: jest.Mock };
     let notifications: { notifyFleetRunnerFallback: jest.Mock };
     let scopeResolver: { resolve: jest.Mock };
+    let jobs: { resolveAgentTaskTarget: jest.Mock };
+    let planner: { plan: jest.Mock; requirements?: jest.Mock } | undefined;
 
     const buildDispatcher = (): AgentTaskExecuteDispatcher => {
         const factory = new NodeDispatcherFactory({ store });
@@ -65,10 +72,12 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             undefined,
             preferences as unknown as FleetExecutionPreferenceService,
             runners as unknown as FleetRunnerStatusService,
+            jobs as unknown as FleetJobService,
         );
         return createFleetAwareAgentTaskExecuteDispatcher(delegate, router, {
             scopeResolver,
             notifications,
+            ...(planner ? { planner } : {}),
         });
     };
 
@@ -88,7 +97,10 @@ describe('fleet run routing (local-runner preference matrix)', () => {
         process.env.EVER_WORKS_JOB_RUNTIME = 'node';
         delete process.env.FLEET_NODE_RUNTIME_ENABLED;
         delete process.env.FLEET_NODE_AGENT_TASK_COMMAND;
+        delete process.env.FLEET_NODE_REQUIRED_CAPABILITIES;
 
+        jobs = { resolveAgentTaskTarget: jest.fn(async () => null) };
+        planner = undefined;
         store = {
             enqueue: jest.fn(async () => ({ id: 'fleet-job-1' })),
             findById: jest.fn(async () => null),
@@ -264,6 +276,180 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             await buildDispatcher().enqueue(payload());
 
             expect(preferences.resolveForUser).toHaveBeenCalledWith('user-1', {});
+        });
+    });
+
+    describe('eligibility — the job is judged against the runners that could take it (slice S)', () => {
+        const NODE_B = '22222222-2222-4222-8222-222222222222';
+        const pinnedOffline = (): FleetRunnerAvailability => ({
+            total: 1,
+            online: 0,
+            free: 0,
+            fleetTotal: 6,
+            pinnedNodeId: NODE_B,
+        });
+
+        it('asks the affinity question BEFORE the job exists and counts against the pinned node', async () => {
+            jobs.resolveAgentTaskTarget.mockResolvedValue(NODE_B);
+
+            await buildDispatcher().enqueue(payload());
+
+            // The SAME question the enqueue path asks, so the two agree.
+            expect(jobs.resolveAgentTaskTarget).toHaveBeenCalledWith('user-1', 'agent-1');
+            expect(runners.availability).toHaveBeenCalledWith('user-1', {
+                targetNodeId: NODE_B,
+                requiredCapabilities: [],
+            });
+        });
+
+        it('REGRESSION (R5): an Agent pinned to an offline PC with five idle siblings falls back to the cloud, naming the pinned runner', async () => {
+            // Before: the router judged the WHOLE fleet — five idle siblings
+            // made `free > 0`, the decision was `fleet`, the enqueue pinned
+            // the row to the offline node, and the job sat queued forever
+            // with `queuedReason` null and no notice.
+            jobs.resolveAgentTaskTarget.mockResolvedValue(NODE_B);
+            preferences.resolveForUser.mockResolvedValue('local-fallback');
+            runners.availability.mockResolvedValue(pinnedOffline());
+
+            const result = await buildDispatcher().enqueue(payload());
+
+            expect(result).toEqual({ runId: 'trigger-run-1' });
+            expect(store.enqueue).not.toHaveBeenCalled();
+            expect(notifications.notifyFleetRunnerFallback).toHaveBeenCalledWith({
+                userId: 'user-1',
+                taskId: 'task-1',
+                reason: 'pinned-runner-offline',
+                // Precise: ONE eligible runner (the pinned one), of six.
+                runnerCount: 1,
+                fleetRunnerCount: 6,
+                pinnedNodeId: NODE_B,
+            });
+        });
+
+        it('REGRESSION (R5): the same pin under local-wait WAITS with the reason on the row', async () => {
+            jobs.resolveAgentTaskTarget.mockResolvedValue(NODE_B);
+            preferences.resolveForUser.mockResolvedValue('local-wait');
+            runners.availability.mockResolvedValue(pinnedOffline());
+
+            const result = await buildDispatcher().enqueue(payload());
+
+            // Still the fleet — the fleet queue IS the wait — but VISIBLY,
+            // and the queue SLA bounds it from here.
+            expect(result).toEqual({ runId: 'fleet-job-1' });
+            expect(store.enqueue.mock.calls[0][0].queuedReason).toBe(
+                QUEUED_REASON_WAITING_FOR_RUNNER,
+            );
+            expect(notifications.notifyFleetRunnerFallback).not.toHaveBeenCalled();
+        });
+
+        it('reports no-eligible-runners with the precise counts when nothing advertises the required tags', async () => {
+            runners.availability.mockResolvedValue({
+                total: 0,
+                online: 0,
+                free: 0,
+                fleetTotal: 3,
+                pinnedNodeId: null,
+            });
+
+            await buildDispatcher().enqueue(payload());
+
+            expect(delegate.enqueue).toHaveBeenCalledTimes(1);
+            expect(notifications.notifyFleetRunnerFallback).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    reason: 'no-eligible-runners',
+                    runnerCount: 0,
+                    fleetRunnerCount: 3,
+                }),
+            );
+            expect(notifications.notifyFleetRunnerFallback.mock.calls[0][0]).not.toHaveProperty(
+                'pinnedNodeId',
+            );
+        });
+
+        it('feeds the planner-resolved tags to the availability check, and the config tags without a planner', async () => {
+            process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace';
+            planner = {
+                plan: jest.fn(async () => null),
+                requirements: jest.fn(async () => ({
+                    requiredCapabilities: ['workspace', 'claude-code'],
+                })),
+            };
+
+            await buildDispatcher().enqueue(payload());
+
+            expect(planner.requirements).toHaveBeenCalledWith(
+                expect.objectContaining({ taskId: 'task-1', userId: 'user-1' }),
+            );
+            expect(runners.availability).toHaveBeenCalledWith('user-1', {
+                targetNodeId: null,
+                requiredCapabilities: ['workspace', 'claude-code'],
+            });
+            // The plan is still built AFTER the decision, only for a fleet run.
+            expect(planner.plan).toHaveBeenCalledTimes(1);
+
+            runners.availability.mockClear();
+            planner = undefined;
+            await buildDispatcher().enqueue(payload());
+            expect(runners.availability).toHaveBeenCalledWith('user-1', {
+                targetNodeId: null,
+                requiredCapabilities: ['workspace'],
+            });
+        });
+
+        it('never plans, and never asks the affinity question, for a tenant not on the fleet', async () => {
+            process.env.EVER_WORKS_JOB_RUNTIME = 'trigger';
+            planner = {
+                plan: jest.fn(async () => null),
+                requirements: jest.fn(async () => ({ requiredCapabilities: [] })),
+            };
+
+            await buildDispatcher().enqueue(payload());
+
+            // The requirements lookup is settings-only and cheap, but a
+            // tenant not on the fleet must still never plan anything.
+            expect(planner.plan).not.toHaveBeenCalled();
+            expect(jobs.resolveAgentTaskTarget).not.toHaveBeenCalled();
+            expect(delegate.enqueue).toHaveBeenCalledTimes(1);
+        });
+
+        it('degrades to the config tags when the requirements lookup throws, and still dispatches', async () => {
+            process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace';
+            planner = {
+                plan: jest.fn(async () => null),
+                requirements: jest.fn(async () => {
+                    throw new Error('settings down');
+                }),
+            };
+
+            const result = await buildDispatcher().enqueue(payload());
+
+            expect(result).toEqual({ runId: 'fleet-job-1' });
+            expect(runners.availability).toHaveBeenCalledWith('user-1', {
+                targetNodeId: null,
+                requiredCapabilities: ['workspace'],
+            });
+        });
+
+        it('judges an affinity lookup that throws as unpinned, and still dispatches', async () => {
+            jobs.resolveAgentTaskTarget.mockRejectedValue(new Error('affinity table down'));
+
+            const result = await buildDispatcher().enqueue(payload());
+
+            expect(result).toEqual({ runId: 'fleet-job-1' });
+            expect(runners.availability).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({ targetNodeId: null }),
+            );
+        });
+
+        it('stamps the SAME tag set on the row that the decision was counted against', async () => {
+            process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace';
+
+            await buildDispatcher().enqueue(payload());
+
+            const counted = runners.availability.mock.calls[0][1].requiredCapabilities;
+            expect(store.enqueue.mock.calls[0][0].requiredCapabilities).toEqual(counted);
+            expect(counted).toEqual(['workspace']);
         });
     });
 });

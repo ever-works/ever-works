@@ -195,3 +195,19 @@ describe('isFreePlan', () => {
         expect(isFreePlan({ monthlyPrice: 'oops' })).toBe(false);
     });
 });
+
+describe('buildUsageExportQuery — workspace carrier', () => {
+    it('appends the Organization selector as ?scope=', () => {
+        expect(buildUsageExportQuery({ scope: { kind: 'organization', slug: 'ever' } })).toBe(
+            '?scope=org%3Aever',
+        );
+    });
+
+    it('appends the personal selector', () => {
+        expect(buildUsageExportQuery({ scope: { kind: 'personal' } })).toBe('?scope=personal');
+    });
+
+    it('leaves the carrier off for a null scope', () => {
+        expect(buildUsageExportQuery({ scope: null })).toBe('');
+    });
+});

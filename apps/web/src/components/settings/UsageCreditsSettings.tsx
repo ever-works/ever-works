@@ -24,6 +24,7 @@ import {
     type UsageSummaryTotals,
 } from '@/lib/api/credits.shared';
 import type { AccountWideUsage } from '@/lib/api/usage';
+import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
 
 /** Everything the page renders for ONE period. */
 interface UsageSnapshot {
@@ -51,6 +52,7 @@ interface UsageCreditsSettingsProps {
 const MONTH_OPTION_COUNT = 12;
 
 async function fetchUsage<T>(query: string): Promise<T> {
+    // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
     const response = await fetch(`/api/credits/usage-summary${query}`, {
         method: 'GET',
         cache: 'no-store',
@@ -106,6 +108,8 @@ export function UsageCreditsSettings({
     pricing = null,
 }: UsageCreditsSettingsProps) {
     const t = useTranslations('dashboard.settings.usage');
+    // The export is a navigation, so the tab's workspace rides on the href.
+    const scope = useWorkspaceScope();
 
     const initialSnapshot = useMemo<UsageSnapshot>(
         () => ({
@@ -180,7 +184,7 @@ export function UsageCreditsSettings({
     };
 
     const selectedMonth = isUsageMonthPeriod(period) ? period : '';
-    const exportHref = `/api/credits/usage/export${buildUsageExportQuery({ period })}`;
+    const exportHref = `/api/credits/usage/export${buildUsageExportQuery({ period, scope })}`;
     const periodLabel = isUsageMonthPeriod(period) ? formatUsageMonthLabel(period) : period;
 
     // `accountWide` is the CURRENT month's account-wide spend; it must not

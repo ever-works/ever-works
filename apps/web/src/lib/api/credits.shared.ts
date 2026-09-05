@@ -1,3 +1,9 @@
+import {
+    serializeWorkspaceScope,
+    WORKSPACE_SCOPE_QUERY_PARAM,
+    type WorkspaceScope,
+} from '../workspace-scope';
+
 /**
  * Billing + Usage & Credits (Wave 13) — client-safe wire types + pure
  * helpers for the `/settings/billing` and `/settings/usage` pages.
@@ -379,11 +385,23 @@ export function formatUsageMonthLabel(month: string, locale = 'en-US'): string {
     }
 }
 
-/** Build the `/credits/usage/export` query string (B29 CSV download). */
-export function buildUsageExportQuery(params: { period?: UsagePeriod } = {}): string {
+/**
+ * Build the `/credits/usage/export` query string (B29 CSV download).
+ *
+ * `scope` is the navigation carrier: the export is an `<a href download>`,
+ * which cannot send `x-ever-workspace`, so the tab's workspace travels as
+ * `?scope=` and the BFF route turns it into `X-Scope-Slug`. `null` leaves it
+ * off and the route runs personal.
+ */
+export function buildUsageExportQuery(
+    params: { period?: UsagePeriod; scope?: WorkspaceScope | null } = {},
+): string {
     const search = new URLSearchParams();
     if (params.period) {
         search.set('period', params.period);
+    }
+    if (params.scope) {
+        search.set(WORKSPACE_SCOPE_QUERY_PARAM, serializeWorkspaceScope(params.scope));
     }
     const qs = search.toString();
     return qs ? `?${qs}` : '';

@@ -82,6 +82,7 @@ export function uploadFile(file: File, opts?: UploadFileOptions): Promise<Upload
             ? `/api/uploads/file?workId=${encodeURIComponent(workId)}`
             : '/api/uploads/file';
 
+        // eslint-disable-next-line no-restricted-syntax -- EW-788 blocked
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url, true);
         // Never send cookies on the upload bytes path itself — the proxy

@@ -94,6 +94,7 @@ export function KbAddDocModal({
         if (initialTags !== undefined) return;
         let cancelled = false;
         // Security: encode workId to prevent URL corruption if value ever contains special chars
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
         fetch(`/api/works/${encodeURIComponent(workId)}/kb/tags`, { credentials: 'same-origin' })
             .then(async (res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);

@@ -3,9 +3,15 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { RunDispatchGateService } from '@ever-works/agent/agents';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import type { AgentRun, FleetNode, Task } from '@ever-works/agent/entities';
+import { PluginUsageCapability } from '@ever-works/agent/entities';
 import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '@ever-works/agent/events';
-import { FleetNodeRepository } from '@ever-works/agent/fleet';
+import {
+    FleetCostCeilingService,
+    FleetJobRepository,
+    FleetNodeRepository,
+} from '@ever-works/agent/fleet';
 import { INBOX_PRODUCER, type InboxProducer } from '@ever-works/agent/inbox';
+import { PluginUsageService } from '@ever-works/agent/usage';
 import {
     TaskChatService,
     TaskRepository,
@@ -17,7 +23,10 @@ import {
 import { redactSecrets } from '@ever-works/agent/utils';
 import {
     FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS,
+    FLEET_JOB_QUEUE_EXPIRED_REASON,
     INBOX_MAX_BODY_CHARS,
+    fleetModelCostUsdToCents,
+    fleetModelPluginId,
     normalizeFleetAgentTaskQuestion,
     normalizeFleetTaskWorkspaceMounts,
     type FleetAgentTaskGitResult,
@@ -29,13 +38,13 @@ import {
     type GateStatus,
     type TaskCheckResult,
 } from '@ever-works/contracts';
+import {
+    correlateAgentTaskJob,
+    type FleetAgentTaskCorrelation,
+} from './fleet-agent-task.correlation';
 
-/** What an `agent-task` job correlates to on the platform side. */
-export interface FleetAgentTaskCorrelation {
-    runId: string;
-    taskId: string;
-    agentId: string | null;
-}
+/** What an `agent-task` job correlates to on the platform side (declared in the leaf). */
+export type { FleetAgentTaskCorrelation };
 
 /** Longest run summary / chat body the reconciler will store. */
 const MAX_SUMMARY_CHARS = 4000;
@@ -99,6 +108,16 @@ const MAX_QUESTION_CONTEXT_CHARS =
  * already carries one, a replayed completion for a run that is already
  * terminal files no second question, and a listener failure is logged
  * rather than propagated (an event has no caller to fail).
+ *
+ * Fleet cost accounting (EW-777) — `accountModelSpend`, taken for ANY
+ * verdict BEFORE the question / success / failure split, writes what the
+ * cloud path writes: ONE `plugin_usage_events` row tagged with the run
+ * (the same row the AI facades record per call), the run's token total,
+ * and the job's cost. The terminal CAS that follows settles that row onto
+ * `agent_runs.costCents` through the very same `RunCostSettlementService`
+ * a cloud run uses — so the Goal spend cap, the Costs dashboard and the
+ * budget precheck see a fleet run without a second accounting. The daily
+ * cost ceilings are evaluated right after, on the stamped job.
  */
 @Injectable()
 export class FleetAgentTaskReconcilerService {
@@ -114,21 +133,21 @@ export class FleetAgentTaskReconcilerService {
         @Optional() private readonly dispatchGate?: RunDispatchGateService,
         @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
         @Optional() private readonly nodes?: FleetNodeRepository,
+        // Fleet cost accounting (EW-777). Appended LAST and @Optional()
+        // per the positional-construction rule the spec relies on.
+        @Optional() private readonly pluginUsage?: PluginUsageService,
+        @Optional() private readonly jobs?: FleetJobRepository,
+        @Optional() private readonly costCeiling?: FleetCostCeilingService,
     ) {}
 
-    /** The platform identities an `agent-task` job carries, or null for any other job. */
+    /**
+     * The platform identities an `agent-task` job carries, or null for
+     * any other job. The rule itself lives in the leaf
+     * `fleet-agent-task.correlation.ts` so the panic controls
+     * (cancel-in-flight, EW-778) share it without importing this graph.
+     */
     static correlate(job: FleetJobView): FleetAgentTaskCorrelation | null {
-        if (job.kind !== 'agent-task') return null;
-        const payload = job.payload;
-        if (!payload || typeof payload !== 'object') return null;
-        const runId = typeof payload.runId === 'string' ? payload.runId.trim() : '';
-        const taskId = typeof payload.taskId === 'string' ? payload.taskId.trim() : '';
-        if (!runId || !taskId) return null;
-        const agentId =
-            typeof payload.agentId === 'string' && payload.agentId.trim()
-                ? payload.agentId.trim()
-                : null;
-        return { runId, taskId, agentId };
+        return correlateAgentTaskJob(job);
     }
 
     @OnEvent(FleetJobLeasedEvent.EVENT_NAME, { async: true })
@@ -246,6 +265,11 @@ export class FleetAgentTaskReconcilerService {
             );
         }
 
+        // Fleet cost accounting (EW-777) — BEFORE the three-way split, so
+        // the usage row exists when the terminal CAS settles it, whichever
+        // of markCompleted / markFailed / tryMarkCompleted that is.
+        await this.accountModelSpend(event, ctx, run, task, agentId, result);
+
         // Self-build slice Q — the model asked the owner a question. Taken
         // for ANY status / gate verdict / git error, BEFORE the success-
         // failure split: partial work almost always reports a red required
@@ -259,12 +283,20 @@ export class FleetAgentTaskReconcilerService {
 
         const succeeded = event.succeeded && result?.status === 'succeeded';
         if (!succeeded) {
+            // Self-build slice S — the queue SLA settled a job NO node ever
+            // took. Same failure path (the run must settle either way; the
+            // stable `queued-max-age-exceeded` prefix lands in
+            // `failureReason`), but the notice says "never started" rather
+            // than "failed": the owner's fix is a runner, not the code.
+            const queueExpired = event.source === 'queue-expired';
             const reason = truncate(
                 result?.failureReason ||
                     event.error ||
                     (event.source === 'lease-exhausted'
                         ? 'The fleet node stopped reporting; lease budget exhausted'
-                        : 'Fleet job failed without a reason'),
+                        : queueExpired
+                          ? `${FLEET_JOB_QUEUE_EXPIRED_REASON}: no eligible fleet runner took the job within its max queued age`
+                          : 'Fleet job failed without a reason'),
                 MAX_SUMMARY_CHARS,
             );
             await this.runs.markFailed(ctx.runId, reason);
@@ -300,12 +332,22 @@ export class FleetAgentTaskReconcilerService {
                     );
                 }
             }
-            await this.postChat(task, event.userId, agentId, composeFailureMessage(reason, result));
+            await this.postChat(
+                task,
+                event.userId,
+                agentId,
+                composeFailureMessage(reason, result, queueExpired),
+            );
+            // Exactly ONE Inbox notice per settled job: this is the single
+            // producer, and the emitting CAS fires the event once.
             await this.bestEffort('inbox notice', async () => {
                 if (!this.inbox) return;
+                const taskLabel = task?.title ? truncate(task.title, 120) : ctx.taskId;
                 await this.inbox.notice(event.userId, {
-                    title: `Fleet run failed: ${task?.title ? truncate(task.title, 120) : ctx.taskId}`,
-                    body: reason,
+                    title: queueExpired
+                        ? `Fleet run never started: ${taskLabel}`
+                        : `Fleet run failed: ${taskLabel}`,
+                    body: queueExpired ? composeQueueExpiryBody(event.job) : reason,
                     agentId,
                     agentRunId: ctx.runId,
                     taskId: ctx.taskId,
@@ -647,6 +689,133 @@ export class FleetAgentTaskReconcilerService {
             composeQuestionMessage(question, result, mountNotes),
         );
         await this.drain(task?.workId ?? run.workId ?? null);
+    }
+
+    /**
+     * Fleet cost accounting (EW-777) — carry the node's CLI-reported cost
+     * and tokens onto the platform's own books, the way a cloud run's are.
+     *
+     *   1. replay guard — a run that is already terminal was reconciled
+     *      before (a replayed completion event); recording again would
+     *      double the spend, so nothing below runs;
+     *   2. the usage row — `plugin_usage_events` tagged with the run, the
+     *      Agent, the Task and the Work, `pluginId: fleet-node:<provider>`
+     *      (a bring-your-own tag no real plugin can claim — see
+     *      `FLEET_BYO_MODEL_PLUGIN_ID_PREFIX`), `requestId: <job id>` for
+     *      forensics, and the node's billing identity in the metadata so
+     *      per-run attribution survives a later re-login. Recorded only
+     *      when the CLI reported a PRICE: a Codex run (tokens, no price)
+     *      keeps `agent_runs.costCents` NULL — "unknown", never "free";
+     *   3. the run's token total, through the same `addTokens` the cloud
+     *      tool loop accumulates with;
+     *   4. the job's cost, so the daily ceilings can sum per node;
+     *   5. the ceilings themselves — drain + one notice on a crossing,
+     *      fail closed when the spend cannot be evaluated.
+     *
+     * Every write is best-effort: a metering hiccup must never keep a
+     * finished run from settling. The ONE exception to "no second
+     * accounting" is a run with no Work to attribute to (the usage row's
+     * `workId` is NOT NULL) or no usage service bound: its cost is stamped
+     * on the run directly so the Goal cap and the run list still see it.
+     */
+    private async accountModelSpend(
+        event: FleetJobCompletedEvent,
+        ctx: FleetAgentTaskCorrelation,
+        run: AgentRun,
+        task: Task | null,
+        agentId: string | null,
+        result: FleetAgentTaskResult | null,
+    ): Promise<void> {
+        if (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') {
+            this.logger.debug(
+                `Run ${ctx.runId}: model spend not recorded — run already ${run.status} (replayed completion)`,
+            );
+            return;
+        }
+        const model = result?.model ?? null;
+        const costCents = model ? fleetModelCostUsdToCents(model.costUsd) : null;
+        const totalTokens =
+            typeof model?.totalTokens === 'number' &&
+            Number.isFinite(model.totalTokens) &&
+            model.totalTokens > 0
+                ? Math.floor(model.totalTokens)
+                : null;
+        const nodeId = event.nodeId ?? event.job.nodeId ?? null;
+        const workId = task?.workId ?? run.workId ?? null;
+        const organizationId = task?.organizationId ?? run.organizationId ?? null;
+        const node = await this.lookupNode(nodeId, event.userId);
+
+        if (model && costCents !== null) {
+            if (workId && this.pluginUsage) {
+                const pluginUsage = this.pluginUsage;
+                await this.bestEffort('model usage row', () =>
+                    pluginUsage.record({
+                        workId,
+                        userId: event.userId,
+                        pluginId: fleetModelPluginId(model.provider),
+                        capability: PluginUsageCapability.AI,
+                        units: Math.max(1, Math.floor(model.turns ?? 1)),
+                        costCents,
+                        modelId: model.modelId ?? null,
+                        requestId: event.job.id,
+                        metadata: {
+                            source: 'fleet-node',
+                            provider: model.provider,
+                            nodeId,
+                            fleetJobId: event.job.id,
+                            billedTo: node?.modelIdentity ?? null,
+                            costUsd: model.costUsd ?? null,
+                            turns: model.turns ?? null,
+                            inputTokens: model.inputTokens ?? null,
+                            outputTokens: model.outputTokens ?? null,
+                            cacheReadTokens: model.cacheReadTokens ?? null,
+                            cacheCreationTokens: model.cacheCreationTokens ?? null,
+                            totalTokens,
+                        },
+                        agentId,
+                        taskId: ctx.taskId,
+                        runId: ctx.runId,
+                    }),
+                );
+            } else {
+                this.logger.warn(
+                    `Run ${ctx.runId}: fleet model spend (${costCents}c) stamped directly — ${
+                        workId ? 'no usage service bound' : 'no Work to attribute the usage row to'
+                    }`,
+                );
+                await this.bestEffort('run cost stamp', () =>
+                    this.runs.stampCostCents(ctx.runId, costCents),
+                );
+            }
+            if (this.jobs) {
+                const jobs = this.jobs;
+                await this.bestEffort('job cost stamp', () =>
+                    jobs.stampCostCents(event.job.id, costCents),
+                );
+            }
+        }
+        if (totalTokens !== null) {
+            await this.bestEffort('run tokens', () => this.runs.addTokens(ctx.runId, totalTokens));
+        }
+        if (this.costCeiling) {
+            const costCeiling = this.costCeiling;
+            await this.bestEffort('daily cost ceiling', () =>
+                costCeiling.evaluateAfterCompletion({
+                    userId: event.userId,
+                    nodeId,
+                    jobId: event.job.id,
+                    // No model ran ⇒ this completion cost nothing; a model
+                    // ran and printed no price ⇒ null, which a configured
+                    // ceiling fails closed on.
+                    costCents: model ? costCents : 0,
+                    runId: ctx.runId,
+                    taskId: ctx.taskId,
+                    agentId,
+                    workId,
+                    organizationId,
+                }),
+            );
+        }
     }
 
     private async postChat(
@@ -1035,8 +1204,55 @@ function composeQuestionMessage(
     return lines.join('\n');
 }
 
-function composeFailureMessage(reason: string, result: FleetAgentTaskResult | null): string {
-    const lines = ['**Fleet run failed** (executed on one of your own machines).', '', reason];
+/**
+ * The human body of the "never started" notice (self-build slice S): how
+ * long it waited, what narrowed the eligible set to nothing, and the
+ * three fixes. The stable machine token stays on the run row; the owner
+ * reads a sentence.
+ */
+function composeQueueExpiryBody(job: FleetJobView): string {
+    const waited = describeQueuedAge(job);
+    const lines = [
+        `No eligible runner on your machines took this run${waited ? ` within ${waited}` : ''}.`,
+    ];
+    if (job.targetNodeId) {
+        lines.push(`It was pinned to node ${truncate(job.targetNodeId, MAX_QUOTED_CHARS)}.`);
+    }
+    if (job.requiredCapabilities.length > 0) {
+        lines.push(
+            `It required: ${job.requiredCapabilities
+                .map((tag) => truncate(tag, MAX_QUOTED_CHARS))
+                .join(', ')}.`,
+        );
+    }
+    lines.push(
+        'Wake the runner, bind the Agent to another machine, or set the Work to "Local runner (fall back to cloud)".',
+    );
+    return truncate(lines.join(' '), INBOX_MAX_BODY_CHARS);
+}
+
+/** "24h" / "90m" from the job's own timestamps; empty when either is missing. */
+function describeQueuedAge(job: FleetJobView): string {
+    if (!job.queuedAt || !job.completedAt) return '';
+    const ms = new Date(job.completedAt).getTime() - new Date(job.queuedAt).getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return '';
+    const minutes = Math.round(ms / 60_000);
+    if (minutes >= 120) return `${Math.round(minutes / 60)}h`;
+    return `${Math.max(minutes, 1)}m`;
+}
+
+function composeFailureMessage(
+    reason: string,
+    result: FleetAgentTaskResult | null,
+    neverStarted = false,
+): string {
+    const lines = [
+        neverStarted
+            ? '**Fleet run never started** (no eligible runner among your own machines took it).'
+            : '**Fleet run failed** (executed on one of your own machines).',
+        '',
+        reason,
+    ];
     const failing = result?.checks?.filter((check) => check.status !== 'green') ?? [];
     if (failing.length > 0) {
         lines.push('', 'Failing checks:');

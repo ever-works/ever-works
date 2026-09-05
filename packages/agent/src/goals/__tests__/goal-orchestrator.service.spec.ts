@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { Repository } from 'typeorm';
-import { Goal } from '../../entities/goal.entity';
+import { Goal, GoalOutcome, GoalStatus } from '../../entities/goal.entity';
 import type { GoalEvent } from '../../entities/goal-event.entity';
 import type { AgentRun } from '../../entities/agent-run.entity';
 import { Task } from '../../entities/task.entity';
@@ -87,6 +87,7 @@ function goalRow(overrides: Partial<Goal> = {}): AnyRow {
         userId: 'u1',
         title: 'Reach 1k signups',
         description: null,
+        goalKind: 'metric',
         metricSource: { pluginId: 'stripe', metricId: 'signups' },
         comparator: 'gte',
         targetValue: 1000,
@@ -134,6 +135,17 @@ function build(overrides: { goal?: Partial<Goal> } = {}) {
                 _userId?: string,
                 _scope?: { tenantId: string | null; organizationId: string | null },
             ) => ({ id, name: `Agent ${id}`, slug: id }),
+        ),
+        // Cold-start pool (self-build slice AG): EMPTY by default so every
+        // pre-existing expectation keeps its outcome (a fresh unpinned Goal
+        // still goes stuck when the scope has no agent); the scope-fallback
+        // suite below overrides it per test.
+        findByUserIdScoped: jest.fn(
+            async (
+                _userId: string,
+                _filter?: { limit?: number },
+                _scope?: { tenantId: string | null; organizationId: string | null },
+            ) => ({ rows: [] as Array<Record<string, unknown>>, total: 0 }),
         ),
     };
     const tasksService = {
@@ -563,6 +575,52 @@ describe('GoalOrchestratorService — spend rollup', () => {
         expect(dto.spentCents).toBe(425);
     });
 
+    it('counts a FLEET-executed run exactly like a cloud one (fleet cost accounting, EW-777)', async () => {
+        // A fleet run's `remoteRunId` is the fleet job id and its
+        // `costCents` is stamped by the same settlement the cloud path
+        // uses; the rollup reads the column and never asks who ran it.
+        const { service, tasks, runs } = build();
+        tasks._rows.push(
+            {
+                id: 'task-1',
+                goalId: 'g1',
+                slug: 'T-1',
+                title: 'a',
+                status: 'done',
+                createdAt: new Date(1),
+            },
+            {
+                id: 'task-2',
+                goalId: 'g1',
+                slug: 'T-2',
+                title: 'b',
+                status: 'done',
+                createdAt: new Date(2),
+            },
+        );
+        runs._rows.push(
+            {
+                id: 'r-cloud',
+                taskId: 'task-1',
+                status: 'completed',
+                remoteRunId: 'run_trigger_dev_1',
+                costCents: 100,
+                startedAt: new Date(1),
+            },
+            {
+                id: 'r-fleet',
+                taskId: 'task-2',
+                status: 'completed',
+                remoteRunId: '22222222-2222-4222-8222-222222222222',
+                costCents: 300,
+                startedAt: new Date(2),
+            },
+        );
+
+        const dto = await service.rollupSpend('u1', 'g1');
+        expect(dto.spentCents).toBe(400);
+    });
+
     it('treats a null cost as zero rather than NaN', async () => {
         const { service, tasks, runs } = build();
         tasks._rows.push({
@@ -790,6 +848,35 @@ describe('GoalOrchestratorService — advance', () => {
         expect(goals._rows[0].spentCents).toBe(400);
         expect(eventKinds(events)).toEqual(['limit']);
         expect(notifications.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('pauses the loop when FLEET spend alone reaches the cap (fleet cost accounting, EW-777)', async () => {
+        const { service, tasks, runs, goals } = build({
+            goal: { loopStatus: 'running', spendCapCents: 300, assignedAgentId: 'agent-7' },
+        });
+        tasks._rows.push({
+            id: 'task-1',
+            goalId: 'g1',
+            slug: 'T-1',
+            title: 'a',
+            status: 'done',
+            createdAt: new Date(1),
+        });
+        runs._rows.push({
+            id: 'r-fleet',
+            taskId: 'task-1',
+            status: 'completed',
+            // A fleet job id where a Trigger.dev run id would be.
+            remoteRunId: '22222222-2222-4222-8222-222222222222',
+            costCents: 300,
+            startedAt: new Date(1),
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('pause');
+        expect(result.reasonCode).toBe('spend-cap-exceeded');
+        expect(goals._rows[0].spentCents).toBe(300);
     });
 
     it('marks the loop done when every criterion is closed', async () => {
@@ -1223,5 +1310,432 @@ describe('GoalOrchestratorService — archive + sessions', () => {
         );
         const log = await service.listEvents('u1', 'g1');
         expect(log.map((e) => e.message)).toEqual(['second', 'first']);
+    });
+});
+
+// ── Self-build slice AG (EW-795) ────────────────────────────────────────
+
+describe('GoalOrchestratorService — cold start (scope fallback)', () => {
+    const everScope = {
+        tenantId: '11111111-1111-4111-8111-111111111111',
+        organizationId: '22222222-2222-4222-8222-222222222222',
+    };
+    const yoScope = {
+        tenantId: everScope.tenantId,
+        organizationId: '33333333-3333-4333-8333-333333333333',
+    };
+    const agentRow = (id: string, createdAt: string, scope: Record<string, unknown> = {}) => ({
+        id,
+        userId: 'u1',
+        name: `Agent ${id}`,
+        slug: id,
+        status: 'draft',
+        createdAt: new Date(createdAt),
+        ...scope,
+    });
+
+    it('routes a fresh unpinned Goal to an agent in its scope instead of going stuck', async () => {
+        const { service, agents, tasksService, transitions, events, goals } = build({
+            goal: {
+                loopStatus: 'running',
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+        agents.findByUserIdScoped.mockResolvedValue({
+            rows: [agentRow('agent-a', '2026-08-01T00:00:00.000Z')],
+            total: 1,
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('dispatch');
+        expect(result.reasonCode).toBe('routed-scope-fallback');
+        expect(result.agentId).toBe('agent-a');
+        expect(result.iteration).toBe(1);
+        // A legacy null/null Goal asks for the owner-wide pool (undefined
+        // scope), exactly as the pin path does for `findByIdAndUser`.
+        expect(agents.findByUserIdScoped).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ limit: expect.any(Number) }),
+            undefined,
+        );
+        expect(tasksService.create).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ goalId: 'g1', agentId: 'agent-a' }),
+            { tenantId: null, organizationId: null },
+        );
+        expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 'task-1' }),
+            'agent-a',
+            { dedupKey: 'goal:g1:1' },
+        );
+        expect(eventKinds(events)).toEqual(['route', 'dispatch']);
+        expect(eventMessages(events)[0]).toContain("in the Goal's scope");
+        expect(goals._rows[0].loopStatus).toBe('running');
+        expect(goals._rows[0].activeAgentId).toBe('agent-a');
+    });
+
+    it('asks the repository for the Goal exact Organization scope and routes to what it returns', async () => {
+        const { service, agents, tasksService, transitions } = build({
+            goal: { loopStatus: 'running', ...everScope },
+        });
+        const everAgent = agentRow('ever-agent', '2026-08-01T00:00:00.000Z', everScope);
+        // The repository applies the ownership predicate for the scope it is
+        // handed; mirror that so a wrong scope argument yields nothing.
+        agents.findByUserIdScoped.mockImplementation(async (_userId, _filter, scope) =>
+            scope?.organizationId === everScope.organizationId
+                ? { rows: [everAgent], total: 1 }
+                : { rows: [], total: 0 },
+        );
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(agents.findByUserIdScoped).toHaveBeenCalledWith('u1', expect.anything(), everScope);
+        expect(result.action).toBe('dispatch');
+        expect(result.agentId).toBe('ever-agent');
+        expect(tasksService.create).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ agentId: 'ever-agent' }),
+            everScope,
+        );
+        expect(transitions.dispatchAgentRun).toHaveBeenCalledWith(
+            expect.objectContaining(everScope),
+            'ever-agent',
+            expect.anything(),
+        );
+    });
+
+    it('never routes to an agent that exists only in another Organization of the same user', async () => {
+        const { service, agents, transitions, goals } = build({
+            goal: { loopStatus: 'running', ...everScope },
+        });
+        const yoAgent = agentRow('yo-agent', '2026-08-01T00:00:00.000Z', yoScope);
+        agents.findByUserIdScoped.mockImplementation(async (_userId, _filter, scope) =>
+            scope?.organizationId === yoScope.organizationId
+                ? { rows: [yoAgent], total: 1 }
+                : { rows: [], total: 0 },
+        );
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(agents.findByUserIdScoped).toHaveBeenCalledWith('u1', expect.anything(), everScope);
+        expect(result.action).toBe('stuck');
+        expect(result.reasonCode).toBe('no-candidate-agent');
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+        expect(goals._rows[0].loopStatus).toBe('stuck');
+    });
+
+    it('goes stuck with the existing reason when the scope has no agent at all', async () => {
+        const { service, goals, events, transitions } = build({
+            goal: { loopStatus: 'running' },
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('stuck');
+        expect(result.reasonCode).toBe('no-candidate-agent');
+        expect(goals._rows[0].loopStatus).toBe('stuck');
+        expect(eventKinds(events)).toEqual(['limit']);
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+    });
+
+    it('prefers the Goal own history over the scope pool', async () => {
+        const { service, agents, tasks } = build({
+            goal: { loopStatus: 'running', iteration: 1 },
+        });
+        tasks._rows.push({
+            id: 'task-1',
+            goalId: 'g1',
+            agentId: 'agent-hist',
+            slug: 'T-1',
+            title: '[Goal] x — iteration 1',
+            status: 'done',
+            createdAt: new Date(1),
+        });
+        agents.findByUserIdScoped.mockResolvedValue({
+            rows: [agentRow('agent-scope', '2026-08-01T00:00:00.000Z')],
+            total: 1,
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.agentId).toBe('agent-hist');
+        expect(result.reasonCode).toBe('routed-round-robin');
+        expect(agents.findByUserIdScoped).not.toHaveBeenCalled();
+    });
+
+    it('does NOT fall back to the scope when an explicit pin fails its scope check', async () => {
+        const { service, agents, transitions, goals } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+                ...everScope,
+            },
+        });
+        agents.findByIdAndUser.mockResolvedValue(null as never);
+        agents.findByUserIdScoped.mockResolvedValue({
+            rows: [agentRow('ever-agent', '2026-08-01T00:00:00.000Z', everScope)],
+            total: 1,
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        // An unhonoured explicit pin is the operator's to fix, not something
+        // to route around silently.
+        expect(result.action).toBe('stuck');
+        expect(result.reasonCode).toBe('no-candidate-agent');
+        expect(agents.findByUserIdScoped).not.toHaveBeenCalled();
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+        expect(goals._rows[0].loopStatus).toBe('stuck');
+    });
+
+    it('orders the pool by createdAt so the round-robin is reproducible from the iteration counter', async () => {
+        const { service, agents } = build({ goal: { loopStatus: 'running', iteration: 1 } });
+        // The repository returns updatedAt DESC — newest first. Under that
+        // order nextIteration 2 % 2 = 0 would pick agent-b; sorted by
+        // createdAt it picks agent-a, and keeps picking it however often
+        // agent-b is edited.
+        agents.findByUserIdScoped.mockResolvedValue({
+            rows: [
+                agentRow('agent-b', '2026-08-02T00:00:00.000Z'),
+                agentRow('agent-a', '2026-08-01T00:00:00.000Z'),
+            ],
+            total: 2,
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.agentId).toBe('agent-a');
+        expect(result.reasoning).toContain("2 eligible agent(s) in the Goal's scope");
+    });
+
+    it('degrades to stuck on a slim install with no Agent repository wired', async () => {
+        const { goals, events, tasks, runs } = build({ goal: { loopStatus: 'running' } });
+        const slim = new GoalOrchestratorService(
+            goals as never,
+            events as never,
+            tasks as never,
+            runs as never,
+        );
+
+        const result = await slim.advance('u1', 'g1');
+
+        expect(result.action).toBe('stuck');
+        expect(result.reasonCode).toBe('no-candidate-agent');
+    });
+});
+
+describe('GoalOrchestratorService — delivery Goals', () => {
+    const deliveryRow = (overrides: Partial<Goal> = {}): Partial<Goal> => ({
+        goalKind: 'delivery',
+        metricSource: null,
+        comparator: null,
+        targetValue: null,
+        unit: null,
+        window: 'total',
+        ...overrides,
+    });
+
+    it('a finished loop completes the delivery Goal itself (COMPLETED + ACHIEVED, schedule cleared)', async () => {
+        const { service, goals, events, transitions } = build({
+            goal: deliveryRow({
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'done' }],
+                nextCheckAt: new Date('2026-08-15T00:00:00.000Z'),
+            }),
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('complete');
+        expect(goals._rows[0]).toMatchObject({
+            loopStatus: 'done',
+            activeAgentId: null,
+            status: 'completed',
+            outcome: 'achieved',
+            nextCheckAt: null,
+        });
+        expect(eventKinds(events)).toEqual(['complete']);
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+    });
+
+    it('a finished loop leaves a METRIC Goal status untouched (loop done ≠ metric reached)', async () => {
+        const { service, goals } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'done' }],
+                nextCheckAt: new Date('2026-08-15T00:00:00.000Z'),
+            },
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('complete');
+        expect(goals._rows[0]).toMatchObject({
+            loopStatus: 'done',
+            status: 'active',
+            outcome: null,
+            nextCheckAt: new Date('2026-08-15T00:00:00.000Z'),
+        });
+    });
+
+    it('never overwrites a human outcome override on an already-completed delivery Goal (FR-13)', async () => {
+        // The operator abandoned the Goal while its loop was still running;
+        // an agent then closed the last criterion. The loop finishes, but the
+        // human decision on the Goal row stands.
+        const { service, goals } = build({
+            goal: deliveryRow({
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                status: GoalStatus.COMPLETED,
+                outcome: GoalOutcome.ABANDONED,
+                nextCheckAt: null,
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'done' }],
+            }),
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('complete');
+        expect(goals._rows[0]).toMatchObject({
+            loopStatus: 'done',
+            activeAgentId: null,
+            status: 'completed',
+            outcome: 'abandoned',
+        });
+    });
+
+    it('does not flip a deadline-missed delivery Goal to achieved when its loop finishes late', async () => {
+        // Metric parity: once the evaluation tick has recorded MISSED the Goal
+        // is COMPLETED and never re-evaluated; the loop landing the last
+        // criterion afterwards must not rewrite that history either.
+        const { service, goals } = build({
+            goal: deliveryRow({
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                status: GoalStatus.COMPLETED,
+                outcome: GoalOutcome.MISSED,
+                deadline: new Date('2026-01-01T00:00:00.000Z'),
+                nextCheckAt: null,
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'done' }],
+            }),
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('complete');
+        expect(goals._rows[0]).toMatchObject({
+            loopStatus: 'done',
+            status: 'completed',
+            outcome: 'missed',
+        });
+    });
+
+    it('keeps a not-yet-done delivery Goal iterating under the usual loop rules', async () => {
+        const { service, goals, transitions } = build({
+            goal: deliveryRow({
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                dodCriteria: [
+                    { id: 'a', text: 'Ship pricing', status: 'done' },
+                    { id: 'p', text: 'Proposed by a planner', status: 'done', proposed: true },
+                    { id: 'b', text: 'Write docs', status: 'open' },
+                ],
+            }),
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('dispatch');
+        expect(transitions.dispatchAgentRun).toHaveBeenCalled();
+        expect(goals._rows[0]).toMatchObject({
+            status: 'active',
+            outcome: null,
+            loopStatus: 'running',
+        });
+    });
+
+    it('tells the routed agent that the checklist is the whole definition of done', async () => {
+        const { service, tasksService } = build({
+            goal: deliveryRow({
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            }),
+        });
+
+        await service.advance('u1', 'g1');
+
+        const brief = String(tasksService.create.mock.calls[0][1].description);
+        expect(brief).toContain('Delivery Goal — there is no metric');
+        expect(brief).toContain('Ship pricing');
+    });
+
+    it('a metric Goal brief carries no delivery banner', async () => {
+        const { service, tasksService } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+
+        await service.advance('u1', 'g1');
+
+        const brief = String(tasksService.create.mock.calls[0][1].description);
+        expect(brief).not.toContain('Delivery Goal');
+    });
+
+    it('refuses to clear, empty or de-approve the whole checklist of a delivery Goal', async () => {
+        const { service, goals } = build({
+            goal: deliveryRow({ dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }] }),
+        });
+
+        await expect(service.setDodCriteria('u1', 'g1', null)).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+        await expect(service.setDodCriteria('u1', 'g1', [])).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+        await expect(
+            service.setDodCriteria('u1', 'g1', [
+                { id: 'p', text: 'Only a proposal', status: 'open', proposed: true },
+            ]),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(goals._rows[0].dodCriteria).toHaveLength(1);
+
+        // Replacing it with another approved list is fine.
+        const dto = await service.setDodCriteria('u1', 'g1', [
+            { id: 'b', text: 'Write docs', status: 'open' },
+        ]);
+        expect(dto.dodSummary).toMatchObject({ total: 1, open: 1 });
+    });
+
+    it('still clears a metric Goal checklist with null', async () => {
+        const { service } = build({
+            goal: { dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }] },
+        });
+        const dto = await service.setDodCriteria('u1', 'g1', null);
+        expect(dto.dodCriteria).toBeNull();
+    });
+
+    it('refuses to start the loop on a delivery Goal with no approved criterion', async () => {
+        const { service, goals } = build({
+            goal: deliveryRow({
+                dodCriteria: [{ id: 'p', text: 'Only a proposal', status: 'open', proposed: true }],
+            }),
+        });
+        await expect(service.startLoop('u1', 'g1')).rejects.toBeInstanceOf(BadRequestException);
+        expect(goals._rows[0].loopStatus).toBeNull();
+    });
+
+    it('starts the loop on a delivery Goal with an approved criterion', async () => {
+        const { service, goals } = build({
+            goal: deliveryRow({ dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }] }),
+        });
+        await service.startLoop('u1', 'g1');
+        expect(goals._rows[0].loopStatus).toBe('running');
     });
 });

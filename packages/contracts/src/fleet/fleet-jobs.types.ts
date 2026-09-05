@@ -168,6 +168,66 @@ export function clampMaxAttempts(value: unknown): number {
 }
 
 /**
+ * Queue SLA (self-build slice S / EW-775) — the longest a `queued` job
+ * may wait for an eligible runner before the platform FAILS it.
+ *
+ * Nothing used to bound a queued row's age: the reclaim sweep only scans
+ * ACTIVE statuses, so a job pinned to a node that never came back, or
+ * requiring a tag no node advertises, sat `queued` forever with its
+ * AgentRun waiting on a verdict that was never coming. The SLA is the
+ * backstop behind eligibility-aware routing: routing stops the common
+ * case from being enqueued at all, and the SLA settles whatever slips
+ * past it (a runner that went offline between the decision and the
+ * lease, a `local-wait` job whose machine never returns).
+ *
+ * Per kind, because the honest wait differs: an `agent-task` under
+ * `local-wait` is deliberately held for one machine and a day is a
+ * plausible wait for a closed laptop; a check that has not run in two
+ * hours is stale evidence. Deliberately NOT disableable — the floor and
+ * ceiling below clamp any operator value, and "unset" means the kind's
+ * default, never "wait forever". A tenant that genuinely wants longer
+ * raises `FLEET_NODE_QUEUE_MAX_AGE_SECONDS[_<KIND>]` up to the ceiling.
+ */
+export const FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC: Readonly<Record<FleetJobKind, number>> = Object.freeze({
+	'agent-task': 24 * 60 * 60,
+	'acceptance-checks': 2 * 60 * 60,
+	'browser-check': 2 * 60 * 60
+});
+
+/** Floor/ceiling clamps applied to any operator-supplied queued max age. */
+export const FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC = 60;
+export const FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC = 7 * 24 * 60 * 60;
+
+/**
+ * Clamp an operator-supplied queued max age for `kind` into the supported
+ * range. Unset / NaN / non-positive is the kind's default (fail closed:
+ * a typo in the deploy manifest must not turn into an unbounded wait);
+ * an unknown kind gets the SHORTEST default, for the same reason.
+ */
+export function clampQueuedMaxAgeSec(kind: FleetJobKind, value?: unknown): number {
+	const fallback =
+		FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC[kind] ?? Math.min(...Object.values(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC));
+	if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+		return fallback;
+	}
+	return Math.min(Math.max(Math.round(value), FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC), FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC);
+}
+
+/**
+ * Stable machine-readable token a queue-SLA failure is recorded under.
+ * It is the PREFIX of `fleet_jobs.error` (and, through the reconciler, of
+ * `agent_runs.failureReason`), followed by a human sentence — the same
+ * discipline the stuck-run sweeper's prefix follows, so a UI can switch
+ * on it and a log search can find every occurrence.
+ */
+export const FLEET_JOB_QUEUE_EXPIRED_REASON = 'queued-max-age-exceeded';
+
+/** True when a job / run error was written by the queue SLA. */
+export function isQueueExpiredError(error: string | null | undefined): boolean {
+	return typeof error === 'string' && error.startsWith(FLEET_JOB_QUEUE_EXPIRED_REASON);
+}
+
+/**
  * Capability-tag filter: a node may only lease a job whose every
  * required tag is present in the node's own advertised capability set.
  *
@@ -206,6 +266,16 @@ export interface FleetJobView {
 	createdAt: string | null;
 	startedAt: string | null;
 	completedAt: string | null;
+	/**
+	 * ISO timestamp the row last ENTERED `queued`: set at enqueue, reset
+	 * when a lapsed or drained claim returns to the pool, untouched by a
+	 * heartbeat promotion. The queue SLA (`FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC`)
+	 * is measured from it. Null on rows written before the column existed
+	 * — an unknown age is never destructively failed.
+	 *
+	 * Optional on the wire so an older API build still satisfies this type.
+	 */
+	queuedAt?: string | null;
 	/**
 	 * Why a `queued` job has not started — today only
 	 * `waiting-for-runner` (see `QUEUED_REASON_WAITING_FOR_RUNNER`),
@@ -612,14 +682,96 @@ export interface FleetAgentTaskModelResult {
 	durationMs: number;
 	/** The CLI's final message (Claude Code `result`), when it produced one. */
 	summary: string | null;
-	/** Spend the CLI reported for this run, when it did. */
+	/**
+	 * Spend the CLI reported for this run, when it did.
+	 *
+	 * Fleet cost accounting (EW-777): this is the CLI's OWN estimate —
+	 * Claude Code prints `total_cost_usd` at API list price even when the
+	 * seat is a flat-rate subscription; Codex prints tokens but no price,
+	 * so a Codex run reports `null` here rather than an invented figure.
+	 * The platform records it as the run's cost (`plugin_usage_events` +
+	 * `agent_runs.costCents`) and evaluates daily ceilings against it; it
+	 * never debits platform credits for it (the seat is the owner's).
+	 */
 	costUsd?: number | null;
 	/** Model round-trips the CLI reported, when it did. */
 	turns?: number | null;
 	/** CLI session id, for a later resume. */
 	sessionId?: string | null;
+	/**
+	 * The model the CLI billed the bulk of this run to (e.g.
+	 * `claude-opus-4-1-20250805`), when the CLI reported one. Feeds the
+	 * per-model Costs panel next to the cloud runs' `modelId`.
+	 */
+	modelId?: string | null;
+	/** Prompt tokens the CLI reported (uncached input), when it did. */
+	inputTokens?: number | null;
+	/** Completion tokens the CLI reported, when it did. */
+	outputTokens?: number | null;
+	/**
+	 * Prompt tokens served from the provider's cache, when reported. For
+	 * Claude Code this is a bucket of its own (`input_tokens` excludes
+	 * cache traffic); for Codex it is the cached SHARE of `inputTokens`
+	 * (`cached_input_tokens` ⊆ `input_tokens`), so `totalTokens` never
+	 * counts it twice.
+	 */
+	cacheReadTokens?: number | null;
+	/** Prompt tokens written to the provider's cache, when reported. */
+	cacheCreationTokens?: number | null;
+	/**
+	 * Every token the run consumed, input + output + cache traffic. The
+	 * number `agent_runs.totalTokens` accumulates for a cloud run, so a
+	 * fleet run reads the same way in the run list.
+	 */
+	totalTokens?: number | null;
 	/** Last bytes of combined stdout/stderr, for the run report. */
 	outputTail?: string;
+}
+
+/**
+ * Fleet cost accounting (EW-777) — the ONE conversion from the CLI's
+ * dollar figure to the platform's cents.
+ *
+ * Shared by the node (which never converts — it forwards the CLI's
+ * number), the API reconciler (which records the usage row) and every
+ * spec, so nobody rounds differently. Half-cents round to the nearest
+ * cent (`Math.round`), matching how `PluginUsageService.record` already
+ * rounds the cloud facades' figures. Anything that is not a finite,
+ * non-negative number is `null` — "unknown", never "free": a ceiling
+ * evaluated against a null cost fails closed rather than permitting.
+ *
+ * The product is snapped to a micro-cent before rounding because the
+ * CLI's figure is a printed DECIMAL that JSON hands us as a binary
+ * double: `1.005 * 100` is `100.49999999999999` in IEEE-754 and a bare
+ * `Math.round` would bill 100 cents for a run the CLI priced at $1.005.
+ * Snapping first lets the decimal the CLI printed decide the cent.
+ */
+export function fleetModelCostUsdToCents(costUsd: unknown): number | null {
+	if (typeof costUsd !== 'number' || !Number.isFinite(costUsd) || costUsd < 0) return null;
+	return Math.round(Number((costUsd * 100).toFixed(6)));
+}
+
+/**
+ * `pluginId` prefix of the `plugin_usage_events` row a FLEET run leaves
+ * behind (`fleet-node:claude-code`, `fleet-node:codex`).
+ *
+ * A fleet run's model spend is billed to the CLI seat the node is logged
+ * in as, never to a platform-supplied provider key, so the row is tagged
+ * with a plugin id no real plugin can claim: the settlement recognises
+ * the prefix as bring-your-own (stamped on the run for visibility and
+ * ceilings, exempt from the credits debit), and the Costs dashboard
+ * groups it apart from the cloud providers.
+ */
+export const FLEET_BYO_MODEL_PLUGIN_ID_PREFIX = 'fleet-node:';
+
+/** The usage-row `pluginId` for one execution provider. */
+export function fleetModelPluginId(provider: FleetAgentExecutionProvider): string {
+	return `${FLEET_BYO_MODEL_PLUGIN_ID_PREFIX}${provider}`;
+}
+
+/** True for a usage row a fleet run wrote (see {@link FLEET_BYO_MODEL_PLUGIN_ID_PREFIX}). */
+export function isFleetModelPluginId(pluginId: unknown): boolean {
+	return typeof pluginId === 'string' && pluginId.startsWith(FLEET_BYO_MODEL_PLUGIN_ID_PREFIX);
 }
 
 /** What the node did with the working tree after the model ran. */

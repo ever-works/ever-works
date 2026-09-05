@@ -1,3 +1,4 @@
+import { normalizeGoalKind, type GoalKind } from '@ever-works/contracts';
 import type {
     Goal,
     GoalComparator,
@@ -39,10 +40,14 @@ export interface GoalDto {
     organizationId: string | null;
     title: string;
     description: string | null;
-    metricSource: GoalMetricSource;
-    comparator: GoalComparator;
-    targetValue: number;
-    unit: string;
+    /** `metric` (default) | `delivery` — see the entity docblock. */
+    goalKind: GoalKind;
+    // The four metric fields are `null` on a delivery Goal and always set
+    // on a metric Goal.
+    metricSource: GoalMetricSource | null;
+    comparator: GoalComparator | null;
+    targetValue: number | null;
+    unit: string | null;
     window: GoalWindow;
     baselineValue: number | null;
     currentValue: number | null;
@@ -91,10 +96,13 @@ export function toGoalDto(goal: Goal): GoalDto {
         organizationId: goal.organizationId ?? null,
         title: goal.title,
         description: goal.description ?? null,
-        metricSource: goal.metricSource,
-        comparator: goal.comparator,
-        targetValue: goal.targetValue,
-        unit: goal.unit,
+        // Read-path normalisation: a row from before the column (or one
+        // written by a newer server) renders as the metric Goal it is.
+        goalKind: normalizeGoalKind(goal.goalKind),
+        metricSource: goal.metricSource ?? null,
+        comparator: goal.comparator ?? null,
+        targetValue: goal.targetValue ?? null,
+        unit: goal.unit ?? null,
         window: goal.window,
         baselineValue: goal.baselineValue ?? null,
         currentValue: goal.currentValue ?? null,
@@ -179,17 +187,23 @@ export function toMissionGoalLinkDto(link: MissionGoal, goal?: Goal | null): Mis
  * Input shape for `GoalsService.create`. Validation of primitive
  * shapes lives at the DTO layer (`CreateGoalDto` in apps/api);
  * the service re-validates the semantic rules (comparator/window
- * membership, metricSource shape, ≥15-minute clamp) as the single
- * source of truth.
+ * membership, metricSource shape, ≥15-minute clamp, the per-kind
+ * shape in `goal-kind.ts`) as the single source of truth.
+ *
+ * The metric fields are optional at the TYPE level only because a
+ * delivery Goal omits them; a metric Goal (the default) is refused
+ * without every one of them, exactly as before the kind existed.
  */
 export interface CreateGoalInput {
     title: string;
     description?: string | null;
-    metricSource: GoalMetricSource;
-    comparator: GoalComparator;
-    targetValue: number;
-    unit: string;
-    window: GoalWindow;
+    /** Omitted = `metric`. Immutable after create. */
+    goalKind?: GoalKind;
+    metricSource?: GoalMetricSource | null;
+    comparator?: GoalComparator | null;
+    targetValue?: number | null;
+    unit?: string | null;
+    window?: GoalWindow | null;
     baselineValue?: number | null;
     deadline?: Date | null;
     checkFrequencyMinutes?: number;
@@ -197,6 +211,12 @@ export interface CreateGoalInput {
     criteria?: GoalCriterion[] | null;
     /** Judgment layer G1 - constraints that must hold. */
     constraints?: GoalConstraint[] | null;
+    /**
+     * Definition of Done. REQUIRED (≥ 1 approved criterion) for a delivery
+     * Goal — it is the whole completion rule; an optional seed checklist
+     * for a metric Goal.
+     */
+    dodCriteria?: GoalDoDCriterion[] | null;
 }
 
 /**
@@ -343,6 +363,7 @@ export interface GoalAdvanceSummary {
 export interface GoalEvaluationEntry {
     goalId: string;
     outcome: 'evaluated' | 'achieved' | 'missed' | 'skipped' | 'failed';
+    /** The observed metric value. Absent for a delivery Goal — nothing is read. */
     value?: number;
     message?: string;
     /**

@@ -43,13 +43,15 @@ pointing at that checkout.
 ## Commands
 
 ```bash
-ever-works-node enroll --api-url <url> --token <one-time-token> [--name <label>] [-i <seconds>]
-ever-works-node start [-i <seconds>] [--work] [--concurrency <count>] [--claude-path <file>] [--codex-path <file>] [--workspace-root <dir>]
+ever-works-node enroll --api-url <url> --token <one-time-token> [--name <label>] [-i <seconds>] [--min-free-disk <mb>] [--workspace-max-age <days>]
+ever-works-node start [-i <seconds>] [--work] [--concurrency <count>] [--claude-path <file>] [--codex-path <file>] [--workspace-root <dir>] [--min-free-disk <mb> | --no-disk-floor] [--workspace-max-age <days>] [--workspace-max-count <n>]
 ever-works-node pause [--local-only]
 ever-works-node resume [--local-only]
 ever-works-node unenroll [--local-only]
 ever-works-node status
 ever-works-node capabilities
+ever-works-node doctor [--workspace-root <dir>] [--max-age <days>] [--max-count <n>] [--offline] [--json]
+ever-works-node gc [--workspace-root <dir>] [--max-age <days>] [--max-count <n>] [--dry-run] [--offline]
 ```
 
 - **`enroll`** consumes a one-time token from the platform's Fleet page (`POST /api/fleet/enroll`)
@@ -74,6 +76,12 @@ ever-works-node capabilities
 - **`status`** prints the local enrollment with the credential reported but never shown, including
   where it is stored and whether the node is paused.
 - **`capabilities`** prints the tags this machine would report, without enrolling.
+- **`doctor`** is read-only: free space on the workspace volume against the disk floor, the workspace
+  root, how many Task worktrees and repository pools it holds, and — per worktree — what `gc` would do
+  and why. `--json` emits one object for scripts. Works whether or not the machine is enrolled.
+- **`gc`** runs the workspace reaper (see "Disk floor and workspace GC" below). `--dry-run` prints the
+  plan and removes nothing; `--max-age` / `--max-count` override the stored policy for that run only.
+  Exit `1` when a planned removal failed — nothing is ever force-deleted.
 
 `--local-only` skips the API call, for a machine being drained or decommissioned offline.
 
@@ -244,6 +252,72 @@ primary's Git never sees it. After the model step the node commits and pushes ev
 (one verdict each, reported as `mountGit`) and then the primary. A mount that cannot be provisioned
 fails the job naming it; a mount whose push fails is reported on its own entry while the others still
 complete.
+
+### Disk floor and workspace GC
+
+Two node-side guards keep a machine from filling its disk with Task worktrees (self-build program note
+§6, findings OPS-12 and R8).
+
+**Disk floor.** A node refuses to lease work while the volume that holds its workspace root has fewer
+free bytes than the floor — **2 GiB by default**, set with `--min-free-disk <mb>` (persisted by
+`enroll`, process-only on `start`, like `--max-cpu`), switched off with `--no-disk-floor`. The floor is
+measured on the **workspace root's volume** (the nearest existing ancestor of it), never on the system
+drive, and it is checked twice: at the lease, and again by the provisioner right before it writes
+anything — once before the primary worktree and once before every mount, because disk can drop between
+the two. A refused lease shows the node as `throttled` with the reason in the status window and one
+warning in the log (one more line when it clears); a provision refused for disk (`disk-low`) is not a
+verdict about the work — the node hands the job back **unsettled**, its claim lapses and the platform
+re-offers it to a node with room, and the very next poll throttles this one. An unreadable volume never blocks anything: the
+heartbeat simply carries no `diskFreeBytes`, which is now measured on the same volume, so the Fleet
+runner pill finally shows the number that matters.
+
+**Workspace reaper.** With `--work`, the node runs a reaper over its workspace root a minute after start
+and then every six hours (skipped, and retried in half an hour, while a job is running); `ever-works-node
+gc` runs the same reaper by hand. It removes a Task worktree only when it can **prove** all of this, and
+`doctor` prints the first rule each worktree fails:
+
+1. it is the node's own — the provider's binding stamp _and_ an exact `git worktree list` registration;
+2. no provisioning intent is pending for it;
+3. no live process holds its lease (see below), and this process is not using it;
+4. `git status --porcelain --untracked-files=all` is empty and no `index.lock` / `HEAD.lock` exists;
+5. no commit on `HEAD` is missing from every remote-tracking ref;
+6. the remote was reachable, **and** the branch is gone from it or merged into its default branch — a
+   branch still open on the remote keeps the worktree, however old;
+7. it was last provisioned longer ago than `--workspace-max-age` (default **14 days**, persisted by
+   `enroll` and by `start`, which differs from the process-only ceilings on purpose:
+   `install-service.ps1` re-applies `start` flags on every re-install). An optional
+   `--workspace-max-count <n>` additionally trims the least recently used worktrees that already pass
+   rules 1–6.
+
+Unknown always means keep, so an `--offline` scan can inform but never removes. Rules 5 and 6 need the
+remote because the node **pushes to a URL**, which never updates `refs/remotes/origin/<branch>`: the
+scan does one `ls-remote` and one batched `fetch` per repository pool through the node's own Git
+credential helper (token-free, `GIT_TERMINAL_PROMPT=0`, 30 s bound per call) before judging, and a
+branch the remote no longer has gets its stale tracking ref deleted. A merged branch that still exists
+on the remote is judged by `merge-base --is-ancestor` against the refreshed default branch; when the
+merge predates the pool's shallow boundary that answers "no" and the worktree is kept.
+
+Removal never calls a recursive filesystem delete on a checkout. Every `.mounts/*` link is unlinked
+first — a junction there points at **another** Task's worktree — then the provider's own `teardown`
+re-proves ownership and runs `git worktree remove --force` (which also deletes ignored files such as
+`node_modules`; that is intended, the worktree was proven clean, pushed and closed) and `git worktree
+prune`. A bare repository pool is deleted only once Git lists no worktree for it, no intent is pending,
+its remote was refreshed by this scan, **and** no commit on any of its _local_ branches is missing from
+every remote-tracking ref — `git worktree remove` leaves the branch behind, so an emptied pool can still
+hold the only copy of unpushed work (a branch-change re-cut, a manual clean-up), and that keeps it. A
+pool is dated by its `worktrees/` and intents directories, never by `FETCH_HEAD`, which the scan itself
+rewrites. Anything the reaper does not recognise under the root is reported and left alone.
+
+Two files in each worktree's **private gitdir** (`<pool>/worktrees/<id>/`, never in the working tree,
+gone with the worktree) carry the evidence: `ew-workspace-lease.json` (`{purpose: job|gc, pid, taskId}`,
+created with `O_EXCL`; a lease held by a dead pid is reclaimable; one held by a live foreign job is a
+`path-collision` that preserves the worktree and fails the job naming the holder; one held by the reaper
+mid-removal is a transient `workspace-busy` that hands the job back unsettled, and the retry lands on a
+fresh checkout) and
+`ew-workspace-usage.json` (`lastUsedAt`, refreshed on every provision and release). A worktree from
+before this build has neither; it is dated by its Git mtimes, and while a `.worker-session` marker
+exists for the config — a worker that may predate leases could be using it — `gc` keeps it until its
+first run under this build stamps it.
 
 ## Follow-ups
 

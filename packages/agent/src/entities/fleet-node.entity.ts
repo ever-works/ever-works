@@ -174,6 +174,50 @@ export class FleetNode {
     @Column({ type: 'bigint', nullable: true })
     diskFreeBytes?: string | number | null;
 
+    /**
+     * Fleet cost accounting (EW-777) — which account / seat the agent CLI
+     * on this machine is logged in as, as last reported by the node
+     * (`claude-code: user@example.com (Acme, max)`, `codex: chatgpt`). A
+     * display label the node builds from whitelisted fields; never a
+     * credential. Makes the spend a run reports ATTRIBUTABLE to the
+     * subscription that paid for it — it does not decide which
+     * subscription that should be (dedicated seat per PC vs the owner's
+     * own login is the founder's call; see
+     * `docs/internal/feat-fleet-cost-accounting-notes.md`).
+     *
+     * Same additive telemetry contract as {@link cliVersion}: absent on a
+     * heartbeat means "leave alone", so an older daemon never blanks it.
+     * Migration: `1788300000000-AddFleetCostAccounting`.
+     */
+    @Column({ type: 'varchar', length: 200, nullable: true })
+    modelIdentity?: string | null;
+
+    /**
+     * Per-node DAILY (UTC day) model-spend ceiling in cents. NULL = inherit
+     * the deployment default (`FLEET_NODE_DAILY_COST_CEILING_USD`), itself
+     * unset by default, i.e. no ceiling. `FleetCostCeilingService`
+     * evaluates it on every fleet job completion against
+     * `SUM(fleet_jobs.costCents)` for the day; crossing it DRAINS the node
+     * (`disabled` + claims requeued) — the same stop the drain endpoint
+     * applies, chosen over `paused` because a node can lift its own pause
+     * but not an owner-level disable.
+     */
+    @Column({ type: 'int', nullable: true })
+    dailyCostCeilingCents?: number | null;
+
+    /**
+     * The UTC day (`YYYY-MM-DD`) this node was last drained by its daily
+     * ceiling. The ONE-NOTICE idempotency key: the trip is a CAS on this
+     * column (`FleetNodeRepository.casTripDailyCeiling`), so however many
+     * completions cross the ceiling on one day, exactly one of them files
+     * the Inbox notice. Draining itself is repeated on every crossing —
+     * a ceiling is a stop, not a rate limit. Cleared whenever the owner
+     * changes the ceiling (`FleetService.setDailyCostCeilingForUser`): the
+     * next crossing of a NEW ceiling is news again.
+     */
+    @Column({ type: 'varchar', length: 10, nullable: true })
+    dailyCostTrippedOn?: string | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

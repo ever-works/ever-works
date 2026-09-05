@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
 
 /**
  * Proxy for the scheduled Memory Consolidation settings.
@@ -30,25 +29,15 @@ import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
  * a hard 400.
  */
 
-async function forward(request: NextRequest, method: 'GET' | 'PUT', body?: string) {
-    const token = await getAuthAccessCookie();
-    if (!token) return new Response('Unauthorized', { status: 401 });
-
-    const base: Record<string, string> = {
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-    };
-    if (body !== undefined) base['Content-Type'] = 'application/json';
-
-    // Fail closed. A missing or stale selector is answered here rather
-    // than forwarded unscoped, which would silently read and write the
-    // caller's personal scope while they are looking at an Organization.
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, base);
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
+/**
+ * Auth and scope are settled by {@link bffProxy} before this runs, and it
+ * fails closed on a missing or stale selector — which is the point: an
+ * unscoped forward would silently read and write the caller's PERSONAL
+ * scope while they are looking at an Organization.
+ */
+async function forward(headers: Headers, method: 'GET' | 'PUT', body?: string) {
+    headers.set('Accept', 'application/json');
+    if (body !== undefined) headers.set('Content-Type', 'application/json');
 
     const upstream = await fetch(`${API_URL}/memory/consolidation/settings`, {
         method,
@@ -72,13 +61,22 @@ async function forward(request: NextRequest, method: 'GET' | 'PUT', body?: strin
     return NextResponse.json(json ?? {}, { status: 200 });
 }
 
-export async function GET(request: NextRequest) {
-    return forward(request, 'GET');
-}
+// The plain-text `Unauthorized` is preserved deliberately: the wrapper's
+// default is JSON, and changing this route's wire format as a side effect of
+// adopting it would be exactly the kind of silent drift bffProxy exists to
+// stop.
+const unauthorizedText = () => new Response('Unauthorized', { status: 401 });
 
-export async function PUT(request: NextRequest) {
-    // Read and re-serialize rather than streaming: this is a small JSON
-    // body, and buffering keeps the upstream Content-Length honest.
-    const raw = await request.text().catch(() => '{}');
-    return forward(request, 'PUT', raw || '{}');
-}
+export const GET = bffProxy(async ({ headers }) => forward(headers, 'GET'), {
+    onUnauthorized: unauthorizedText,
+});
+
+export const PUT = bffProxy(
+    async ({ request, headers }) => {
+        // Read and re-serialize rather than streaming: this is a small JSON
+        // body, and buffering keeps the upstream Content-Length honest.
+        const raw = await request.text().catch(() => '{}');
+        return forward(headers, 'PUT', raw || '{}');
+    },
+    { onUnauthorized: unauthorizedText },
+);

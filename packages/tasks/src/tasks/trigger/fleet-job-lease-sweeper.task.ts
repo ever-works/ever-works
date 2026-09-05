@@ -24,6 +24,13 @@ import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-inte
  * laptop slept and the build moved to the desktop". Cron offset off the
  * minute boundary per the sweeper-family rationale (see
  * agent-run-sweeper) so it does not collide with the per-minute crons.
+ *
+ * The same tick runs the QUEUE SLA (`expireQueued`, self-build slice S):
+ * a job no eligible runner took within its kind's max queued age is
+ * failed with a stable reason so its run settles. Like reclaim it also
+ * runs inline on the lease path, and like reclaim this cron is the only
+ * path that reaches an owner whose every runner is offline — which is
+ * exactly the fleet a job pinned to a closed laptop is waiting on.
  */
 export const fleetJobLeaseSweeperTask = schedules.task({
     id: 'fleet-job-lease-sweeper',
@@ -47,7 +54,22 @@ export const fleetJobLeaseSweeperTask = schedules.task({
                         scanned: summary.scanned,
                     });
                 }
-                return { status: 'completed' as const, ...summary };
+                // Global, like the reclaim above (no userId). The method
+                // is on `FleetJobService`'s prototype, so the internal
+                // RPC allow-list already admits it.
+                const expiry = await svc.expireQueued();
+                if (expiry.expired > 0) {
+                    logger.warn('fleet-job-lease-sweeper failed queued jobs past their max age', {
+                        expired: expiry.expired,
+                        scanned: expiry.scanned,
+                    });
+                }
+                return {
+                    status: 'completed' as const,
+                    ...summary,
+                    queueScanned: expiry.scanned,
+                    queueExpired: expiry.expired,
+                };
             },
             TriggerInternalModule,
         );

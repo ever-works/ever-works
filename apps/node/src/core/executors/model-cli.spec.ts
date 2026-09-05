@@ -600,6 +600,78 @@ describe('parseModelCliResult — claude-code', () => {
 		expect(parseModelCliResult('claude-code', stream, step()).sessionId).toBe('sess-1');
 	});
 
+	describe('cost accounting (EW-777) — tokens and the billed model', () => {
+		const billed = {
+			...envelope,
+			usage: {
+				input_tokens: 120,
+				output_tokens: 3400,
+				cache_read_input_tokens: 90_000,
+				cache_creation_input_tokens: 2500
+			},
+			modelUsage: {
+				'claude-haiku-4-5-20251001': { inputTokens: 20, outputTokens: 400, costUSD: 0.01 },
+				'claude-opus-4-1-20250805': { inputTokens: 100, outputTokens: 3000, costUSD: 0.41 }
+			}
+		};
+
+		it('carries every token bucket, their total and the model the money went to', () => {
+			const out = parseModelCliResult('claude-code', JSON.stringify(billed), step());
+			expect(out).toMatchObject({
+				costUsd: 0.42,
+				turns: 7,
+				modelId: 'claude-opus-4-1-20250805',
+				inputTokens: 120,
+				outputTokens: 3400,
+				cacheReadTokens: 90_000,
+				cacheCreationTokens: 2500,
+				totalTokens: 120 + 3400 + 90_000 + 2500
+			});
+		});
+
+		it('leaves the token fields ABSENT (not 0) when the CLI reported no usage', () => {
+			// Absent means "unknown" downstream; 0 would read as a free run.
+			const out = parseModelCliResult('claude-code', JSON.stringify(envelope), step());
+			expect(out).not.toHaveProperty('inputTokens');
+			expect(out).not.toHaveProperty('totalTokens');
+			expect(out).not.toHaveProperty('modelId');
+		});
+
+		it('ranks the billed model by cost, then by output tokens when no cost is printed', () => {
+			const byTokens = {
+				...envelope,
+				modelUsage: {
+					small: { outputTokens: 10 },
+					big: { outputTokens: 900 }
+				}
+			};
+			expect(parseModelCliResult('claude-code', JSON.stringify(byTokens), step()).modelId).toBe('big');
+		});
+
+		it('refuses negative, non-numeric and non-finite token counts rather than summing garbage', () => {
+			const broken = {
+				...envelope,
+				usage: { input_tokens: -5, output_tokens: '12', cache_read_input_tokens: 40.9 }
+			};
+			const out = parseModelCliResult('claude-code', JSON.stringify(broken), step());
+			expect(out).not.toHaveProperty('inputTokens');
+			expect(out).not.toHaveProperty('outputTokens');
+			expect(out.cacheReadTokens).toBe(40);
+			expect(out.totalTokens).toBe(40);
+		});
+
+		it('reads the usage off the last `result` line of a stream-json run', () => {
+			const stream = [
+				JSON.stringify({ type: 'system', subtype: 'init' }),
+				JSON.stringify({ type: 'assistant', message: {} }),
+				JSON.stringify(billed)
+			].join('\n');
+			const out = parseModelCliResult('claude-code', stream, step());
+			expect(out.totalTokens).toBe(96_020);
+			expect(out.modelId).toBe('claude-opus-4-1-20250805');
+		});
+	});
+
 	it('keeps an output tail when nothing parses', () => {
 		const out = parseModelCliResult(
 			'claude-code',
@@ -643,7 +715,50 @@ describe('parseModelCliResult — codex', () => {
 			exitCode: 0,
 			durationMs: 1234,
 			summary: 'All green, pushed.',
-			sessionId: 'thr-9'
+			sessionId: 'thr-9',
+			// The one `turn.completed` in the stream reported one input token.
+			inputTokens: 1,
+			totalTokens: 1
+		});
+	});
+
+	describe('cost accounting (EW-777)', () => {
+		it('sums the token usage across every turn and reports NO cost — Codex prints none', () => {
+			const events = [
+				JSON.stringify({ type: 'thread.started', thread_id: 'thr-9' }),
+				JSON.stringify({
+					type: 'turn.completed',
+					usage: { input_tokens: 100, cached_input_tokens: 4000, output_tokens: 50 }
+				}),
+				JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'done' } }),
+				JSON.stringify({
+					type: 'turn.completed',
+					usage: { input_tokens: 20, cached_input_tokens: 1000, output_tokens: 30 }
+				})
+			].join('\n');
+			const out = parseModelCliResult('codex', events, step());
+			expect(out).toMatchObject({
+				inputTokens: 120,
+				cacheReadTokens: 5000,
+				outputTokens: 80,
+				// `cached_input_tokens` is the cached SHARE of `input_tokens`
+				// (OpenAI usage semantics), not a bucket on top of it: the
+				// total is input + output, never input + cache + output.
+				totalTokens: 200
+			});
+			// Absent, not 0: "unknown" fails a ceiling closed; "free" would not.
+			expect(out).not.toHaveProperty('costUsd');
+			expect(out).not.toHaveProperty('modelId');
+		});
+
+		it('leaves the token fields absent when no turn reported usage', () => {
+			const events = [
+				JSON.stringify({ type: 'thread.started', thread_id: 'thr-9' }),
+				JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'done' } })
+			].join('\n');
+			const out = parseModelCliResult('codex', events, step());
+			expect(out).not.toHaveProperty('inputTokens');
+			expect(out).not.toHaveProperty('totalTokens');
 		});
 	});
 });
