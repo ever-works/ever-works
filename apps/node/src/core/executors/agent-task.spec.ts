@@ -252,6 +252,49 @@ describe('runAgentTaskJob — verdicts', () => {
 		expect(provisionWorkspace).not.toHaveBeenCalled();
 	});
 
+	it('applies the disk floor to a workspacePath the provisioner never sees (review AO-10)', async () => {
+		// The lease gate measures the FLEET workspace root's volume, which in
+		// the Windows installer's own recommended layout is a different drive
+		// from a `workspacePath` the payload names. Without this the job ran
+		// the model and spent its whole budget on a volume neither gate had
+		// looked at, and died inside the first git or npm step — the exact
+		// loss this slice exists to prevent, reached through a payload shape
+		// the executor accepts by design.
+		const checkWorkspaceHeadroom = vi.fn(async (path: string) => {
+			const error = new Error(`Refusing to provision: 40 MiB free on the workspace volume (${path})`);
+			error.name = 'FleetTaskWorkspaceError';
+			(error as Error & { code: string }).code = 'disk-low';
+			throw error;
+		});
+		const onProvisionDeclined = vi.fn();
+		const spawnFn = vi.fn();
+
+		await expect(
+			runAgentTaskJob(job({ taskId: 't1', workspacePath: ABSOLUTE, steps: [{ id: 'run', command: 'x' }] }), {
+				...alwaysExists,
+				checkWorkspaceHeadroom,
+				onProvisionDeclined,
+				spawnFn: spawnFn as never
+			})
+		).rejects.toMatchObject({ code: 'disk-low' });
+
+		expect(checkWorkspaceHeadroom).toHaveBeenCalledWith(ABSOLUTE, undefined);
+		// Nothing ran, and the refusal is a DEFERRAL — the same treatment the
+		// provisioner's own `disk-low` gets, so the job goes back unsettled
+		// rather than being retired as a failure of the work.
+		expect(spawnFn).not.toHaveBeenCalled();
+		expect(onProvisionDeclined).toHaveBeenCalledOnce();
+
+		// And a volume with room is transparent: the check runs, the job runs.
+		const ok = vi.fn(async () => undefined);
+		const outcome = await runAgentTaskJob(
+			job({ taskId: 't1', workspacePath: ABSOLUTE, steps: [{ id: 'run', command: 'passing' }] }),
+			{ ...alwaysExists, checkWorkspaceHeadroom: ok, spawnFn: fakeSpawn({ passing: 0 }) }
+		);
+		expect(ok).toHaveBeenCalledOnce();
+		expect(outcome.status).toBe('succeeded');
+	});
+
 	it('aborts the active command and never starts the next step after lease cancellation', async () => {
 		const controller = new AbortController();
 		const commands: string[] = [];

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { promises as fs, type Dirent } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { FLEET_AGENT_TASK_META_DIR } from '@ever-works/contracts';
 import { execFileWithVerifiedCancellation } from '@ever-works/local-workspace-plugin';
 import {
 	defaultIsProcessAlive,
@@ -86,6 +87,17 @@ export interface WorkspaceRecord {
 	lease: WorkspaceLeaseEvidence | null;
 	/** `.mounts/*` entries that are links (junctions / symlinks). */
 	mountLinks: string[];
+	/**
+	 * What `.mounts` itself is. `'foreign'` (a link or a file) and
+	 * `'unknown'` are never removed: enumerating or deleting through it
+	 * would reach whatever it points at. See {@link inspectMountsDir}.
+	 */
+	mountsDir: MountsDirState;
+	/**
+	 * Output under the fleet's own exclude rules (`.ever-works/`), which
+	 * `git status` structurally cannot see. See {@link hasFleetExcludedOutput}.
+	 */
+	excludedOutput: Tristate;
 }
 
 /** One bare pool clone. */
@@ -357,10 +369,15 @@ async function scanWorktree(
 		mergedIntoDefault: 'unknown',
 		intentPending: false,
 		lease: null,
-		mountLinks: []
+		mountLinks: [],
+		mountsDir: 'absent',
+		excludedOutput: 'unknown'
 	};
 
-	record.mountLinks = await listMountLinks(worktreePath);
+	const mounts = await inspectMountsDir(worktreePath);
+	record.mountsDir = mounts.state;
+	record.mountLinks = mounts.links;
+	record.excludedOutput = await hasFleetExcludedOutput(worktreePath);
 	record.sizeBytes = context.measureSize ? await directorySize(worktreePath) : 0;
 
 	const ownership = await proveOwnership(worktreePath, pools, context);
@@ -570,13 +587,33 @@ async function refreshPoolRemote(
 }
 
 /**
- * Commits on the pool's LOCAL branches that no remote-tracking ref reaches,
+ * Everything the pool can still reach that no remote-tracking ref does,
  * judged after the refresh. This is what makes an emptied pool safe (or
- * not) to delete: the worktrees are gone, the branches are not.
+ * not) to delete: deleting it is the one irreversible `fs.rm` in the
+ * reaper, and it takes the object store with it.
+ *
+ * `--all --reflog`, not `--branches` (review AO-2). `--branches` sees only
+ * `refs/heads/*`, and the provider's own
+ * `worktree add -B <branch> <dir> <startPoint>` FORCE-RESETS an existing
+ * local branch — so a commit from a run whose publish was withheld can
+ * end up reachable from that branch's reflog alone, at which point
+ * `--branches` counts zero and the pool (its last copy) becomes
+ * removable. `--all` additionally covers `refs/stash` and tags. Counting
+ * more is always the safe direction here: it can only keep a pool, never
+ * delete one.
  */
+export const POOL_UNPUSHED_REVISION_ARGS: readonly string[] = [
+	'rev-list',
+	'--count',
+	'--all',
+	'--reflog',
+	'--not',
+	'--remotes'
+];
+
 async function judgePool(pool: WorkspacePoolRecord, context: ScanContext): Promise<void> {
 	if (!pool.owned) return;
-	const counted = await git(['rev-list', '--count', '--branches', '--not', '--remotes'], pool.path, context);
+	const counted = await git(POOL_UNPUSHED_REVISION_ARGS, pool.path, context);
 	if (counted.code === 0 && /^\d+$/.test(counted.stdout.trim())) {
 		pool.unpushedCount = Number(counted.stdout.trim());
 	}
@@ -701,13 +738,100 @@ export function intentPath(poolPath: string, bindingKey: string): string {
 	return join(poolPath, FLEET_WORKSPACE_INTENTS_DIR, `${key}.json`);
 }
 
+/**
+ * What `<worktree>/.mounts` is right now, and the links inside it.
+ *
+ * `.mounts` is the one path in a worktree that the MODEL can replace,
+ * running as the node service account, and the provisioner deliberately
+ * leaves a link there in place for a single-repository task
+ * (`reconcileMountsDir`) rather than deleting it. So it is untrusted
+ * input to the reaper as well, and it is `lstat`-ed here before anything
+ * is enumerated: a bare `readdir` RESOLVES a junction, so the reaper
+ * would have listed the entries of the junction's TARGET — another Task's
+ * live checkout — and then unlinked them there while reporting that it
+ * had only touched this worktree (review AO-1).
+ *
+ * Each entry is `lstat`-ed again for the same reason `reconcileMountsDir`
+ * does it: the `Dirent` type is a snapshot, the unlink happens later.
+ */
+export type MountsDirState = 'absent' | 'directory' | 'foreign' | 'unknown';
+
+export interface MountsDirInventory {
+	state: MountsDirState;
+	/** Links to unlink before Git removes the worktree; only ever non-empty for `'directory'`. */
+	links: string[];
+}
+
+export async function inspectMountsDir(worktreePath: string): Promise<MountsDirInventory> {
+	const mountsDir = join(worktreePath, FLEET_TASK_WORKSPACE_MOUNTS_DIR);
+	let stats: Awaited<ReturnType<typeof fs.lstat>>;
+	try {
+		stats = await fs.lstat(mountsDir);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { state: 'absent', links: [] };
+		return { state: 'unknown', links: [] };
+	}
+	if (stats.isSymbolicLink() || !stats.isDirectory()) return { state: 'foreign', links: [] };
+	let entries: Dirent[];
+	try {
+		entries = await fs.readdir(mountsDir, { withFileTypes: true });
+	} catch {
+		return { state: 'unknown', links: [] };
+	}
+	const links: string[] = [];
+	for (const entry of entries) {
+		const entryPath = join(mountsDir, entry.name);
+		const entryStats = await lstatOrNull(entryPath);
+		if (!entryStats) continue;
+		if (entryStats.isSymbolicLink()) links.push(entryPath);
+	}
+	return { state: 'directory', links };
+}
+
 /** `.mounts/*` entries that are links right now; the reaper unlinks these before Git removes the worktree. */
 export async function listMountLinks(worktreePath: string): Promise<string[]> {
-	const links: string[] = [];
-	for (const entry of await readdirSafe(join(worktreePath, FLEET_TASK_WORKSPACE_MOUNTS_DIR))) {
-		if (entry.isSymbolicLink()) links.push(join(worktreePath, FLEET_TASK_WORKSPACE_MOUNTS_DIR, entry.name));
+	return (await inspectMountsDir(worktreePath)).links;
+}
+
+/**
+ * Whether the worktree holds output under the fleet's OWN exclude rules
+ * — `.ever-works/`, the owner-question channel and the agent meta
+ * directory (review AO-4).
+ *
+ * `git status --porcelain --untracked-files=all`, which is the reaper's
+ * entire "no uncommitted work" proof, reports NOTHING for these paths:
+ * the node writes `/.ever-works` and `.ever-works` into the pool's shared
+ * `info/exclude` itself (`FLEET_TASK_WORKSPACE_EXCLUDE_RULES`). So the
+ * one directory the fleet designates for non-committed model output is
+ * structurally invisible to the rule that decides whether a worktree may
+ * be deleted, and a run interrupted between writing `QUESTION.md` and
+ * `collectOwnerQuestion` reading it looked perfectly clean.
+ *
+ * Scoped to the fleet's own rules on purpose. Consulting the OWNER's
+ * `.gitignore` (via `--ignored`) would make almost every worktree read as
+ * dirty — `node_modules`, `dist`, caches — and the reaper would never
+ * reclaim anything, which is the defect this slice exists to close.
+ * Anything found here is left for an operator, because the normal path
+ * REMOVES the question file (and its directory) as soon as it is
+ * collected: a `.ever-works` still on disk means nobody read it.
+ */
+export async function hasFleetExcludedOutput(worktreePath: string): Promise<Tristate> {
+	const metaDir = join(worktreePath, FLEET_AGENT_TASK_META_DIR);
+	let stats: Awaited<ReturnType<typeof fs.lstat>>;
+	try {
+		stats = await fs.lstat(metaDir);
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+		return 'unknown';
 	}
-	return links;
+	// A link or a file where the meta DIRECTORY belongs is not something
+	// this reaper is entitled to reason about, let alone delete through.
+	if (stats.isSymbolicLink() || !stats.isDirectory()) return 'unknown';
+	try {
+		return (await fs.readdir(metaDir)).length > 0;
+	} catch {
+		return 'unknown';
+	}
 }
 
 function normalizedPath(value: string): string {

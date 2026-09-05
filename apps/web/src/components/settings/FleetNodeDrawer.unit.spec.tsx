@@ -439,6 +439,107 @@ describe('FleetNodeDrawer — worker state', () => {
     });
 });
 
+/**
+ * Node housekeeping (EW-803).
+ *
+ * The two facts that used to be invisible from Fleet: the floor a machine
+ * enforces on itself (without which a free-space figure means nothing),
+ * and whether its reaper has run at all.
+ */
+describe('FleetNodeDrawer — housekeeping', () => {
+    const GIB = 1024 ** 3;
+
+    it('shows a node below its own floor, with both figures', () => {
+        // "Online, no jobs, 200 MB free, floor 2 GiB" is the whole story
+        // in one line — previously the operator saw only "online".
+        const starved = node({
+            status: 'online',
+            diskFreeBytes: 200 * 1024 ** 2,
+            minFreeDiskBytes: 2 * GIB,
+        });
+        renderDrawer({ node: starved, detail: detail({ node: starved }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-disk-state')).toHaveTextContent(
+            'housekeeping.disk.below',
+        );
+        // Rendered through `formatBytes`, which is base-1000 SI on
+        // purpose: the node's owner compares this against what Explorer
+        // or Finder shows them, so 200 MiB reads as 210 MB.
+        const figures = screen.getByTestId('fleet-node-drawer-disk-figures');
+        expect(figures).toHaveTextContent('210 MB');
+        expect(figures).toHaveTextContent('2.1 GB');
+    });
+
+    it('shows the workspaces retained and the last reclaim', () => {
+        const swept = node({
+            diskFreeBytes: 40 * GIB,
+            minFreeDiskBytes: 2 * GIB,
+            workspaceCount: 12,
+            workspaceBytes: 30 * GIB,
+            lastReclaimAt: '2026-09-05T09:30:00.000Z',
+            lastReclaimFreedBytes: 3 * GIB,
+        });
+        renderDrawer({ node: swept, detail: detail({ node: swept }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-disk-state')).toHaveTextContent(
+            'housekeeping.disk.ok',
+        );
+        expect(screen.getByTestId('fleet-node-drawer-workspaces')).toHaveTextContent('12');
+        expect(screen.getByTestId('fleet-node-drawer-last-reclaim')).toHaveTextContent(
+            'housekeeping.lastReclaim',
+        );
+        expect(screen.queryByTestId('fleet-node-drawer-never-reclaimed')).toBeNull();
+    });
+
+    it('says a node holding workspaces has never reclaimed, which is the finding', () => {
+        // Workspaces reported, no sweep ever reported: the reaper is not
+        // running on this machine. That is exactly the state that took a
+        // PC to 38 MB free, and it must not read as an absence of data.
+        const hoarding = node({
+            diskFreeBytes: 3 * GIB,
+            minFreeDiskBytes: 2 * GIB,
+            workspaceCount: 210,
+            workspaceBytes: 180 * GIB,
+            lastReclaimAt: null,
+        });
+        renderDrawer({ node: hoarding, detail: detail({ node: hoarding }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-never-reclaimed')).toBeInTheDocument();
+        expect(screen.queryByTestId('fleet-node-drawer-last-reclaim')).toBeNull();
+        expect(screen.queryByTestId('fleet-node-drawer-housekeeping-unreported')).toBeNull();
+    });
+
+    it('says "not reported" ONCE for a node that has never told us anything', () => {
+        // An older daemon, or a visibility-only node. Four dashes would
+        // read as four separate faults instead of one silent machine.
+        renderDrawer();
+
+        expect(screen.getByTestId('fleet-node-drawer-disk-state')).toHaveTextContent(
+            'housekeeping.disk.unknown',
+        );
+        expect(screen.getByTestId('fleet-node-drawer-housekeeping-unreported')).toBeInTheDocument();
+        expect(screen.queryByTestId('fleet-node-drawer-workspaces')).toBeNull();
+        expect(screen.queryByTestId('fleet-node-drawer-never-reclaimed')).toBeNull();
+    });
+
+    it('never claims a verdict for a node with free space but no floor', () => {
+        // The floor is off, or the daemon predates the field. Plenty of
+        // space is not the same as "above the line", because there is no
+        // line — and saying so would be a reassurance nobody earned.
+        const noFloor = node({ diskFreeBytes: 400_000_000_000, minFreeDiskBytes: null });
+        renderDrawer({ node: noFloor, detail: detail({ node: noFloor }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-disk-state')).toHaveTextContent(
+            'housekeeping.disk.unknown',
+        );
+        const figures = screen.getByTestId('fleet-node-drawer-disk-figures');
+        expect(figures).toHaveTextContent('400 GB');
+        // …and says the floor is OFF rather than printing a bare dash,
+        // which would look like a missing reading.
+        expect(figures).toHaveTextContent('housekeeping.noFloor');
+    });
+});
+
 describe('FleetNodeDrawer — reconciled job outcome', () => {
     const historyRow = (over: Partial<FleetNodeJobHistoryEntry>): FleetNodeJobHistoryEntry => ({
         ...job(),
