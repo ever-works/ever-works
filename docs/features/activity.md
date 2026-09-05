@@ -16,6 +16,7 @@ The page lives at `/activity` and holds two views: **Log** (what already happene
 | ---------------------------------------------------------------- | ---------------------------------------------------- |
 | See everything that happened across all your Works               | **Activity → Log**                                   |
 | See everything happening on **one** directory, visitors included | that Work's own **Activity Feed** tab                |
+| See what one Work's repos, trackers and chats have done          | that Work's **External activity** panel              |
 | See what is going to run next, and when                          | **Activity → Schedules**                             |
 | Stop a generation that is running right now                      | **Activity → Log**, then **Stop** on the running row |
 | Pull the history into a spreadsheet                              | **Export CSV**, in the Log view                      |
@@ -130,6 +131,8 @@ You cannot pause, edit, or delete a schedule from this page. Follow the Owner li
 
 Below the schedules list is the **Inbound triggers** panel — signed webhooks that spawn a Task when something external fires them. Here you can create a trigger, pause or resume it, rotate its signing secret, and delete it. Creating one gives you the webhook URL, the signing secret, and a ready-to-run signed-request example.
 
+This panel is the small half of the feature. The full surface is the **Triggers** tab of the Tasks page (`/tasks/triggers`): a detail page per trigger, the fire log, **Test fire** and **Fire now**, triggers that match an ingested platform event instead of exposing a URL, and a declared payload contract that deliveries are validated against. See [Inbound Triggers](./inbound-triggers.md).
+
 :::warning The signing secret is shown exactly once
 Copy it before closing the reveal panel — it is never displayed again.
 
@@ -172,6 +175,26 @@ Pull-mode entries fetched from the deployed site carry no status at all, so they
 
 If a pull-mode Work's deployed site cannot be reached, a banner names the reason, tells you what to do about it, and shows when the last successful sync was. Push-mode and disabled Works never raise it. When the problem is one that will not clear on its own, the Users, Submissions, and Reports chips are dimmed so you do not keep clicking into empty tabs.
 
+### External activity from your connectors
+
+Below the feed, on the same `/works/:id/activity` page, sits the **External activity** panel: the commits, pull requests, tracker issues, docs pages, chat messages and meeting recordings that the [connectors](./connectors.md) ingested and routed to this Work.
+
+Each row carries the producing plugin id as a chip (`slack-connector`, `jira-connector`, `github`), the event kind with its source prefix stripped (`github.pr.review` reads as "pr review"), the event title, the actor who caused it, when it happened, and — when the connector captured a link — an icon that opens the original in the source system.
+
+The filter chips above the list are built from the sources actually present in this Work's events, so a newly enabled connector shows up without anyone editing a list; **All sources** is always the first chip. Picking a chip re-queries the server (`GET /api/ingest/events?workId=&source=`) instead of filtering the rows already on screen, so the chips stay right as the history grows past one page. The panel asks for 50 rows at a time.
+
+:::note External activity is a separate list from everything above it
+These rows come from the ingest spine, not the activity log. They are **not** in **Activity → Log**, not selectable in the Type dropdown, and not part of the CSV export. The panel does not poll either: it loads when you open the tab, and again each time you pick a chip — reload the page to refresh it.
+
+The endpoint applies your owner scope first and unconditionally, so a Work id you do not own returns an empty page rather than someone else's events. When the panel is empty the usual reason is that no connector has claimed this Work's repository, channel or project yet — see [Connectors](./connectors.md) and [Integrations](./integrations.md).
+:::
+
+## Getting the same activity pushed to you
+
+Activity is a page you visit. A **digest** is the same history delivered without you asking: one message covering the last 24 hours (daily) or the last 7 days (weekly), counting the agent runs that finished, the tasks that reached done or review, the pull requests that opened, the events that arrived from your connected sources — the same ingested events the External activity panel shows per Work — the escalations still waiting on you, and where your goals stand.
+
+Digests are **off by default**. Turn one on at **Settings → Digest** (`/settings/digest`); it then arrives in-app and on your notification channels. A digest is scheduled on its own, so it is not one of the seven sources aggregated into the Schedules view above. See [Digests](./digests.md).
+
 ## Known layout trap
 
 :::caution On a narrow window, the AI chat drawer covers the page
@@ -185,3 +208,7 @@ Below 768px — phones and split-screen — the AI chat drawer stops being a sid
 - [Missions](./missions.md) — Mission ticks are one of the schedule sources listed here.
 - [Work Changelog](./work-changelog.md) — the per-Work record of content changes.
 - [Data Management](./data-management.md) — exporting and moving your data more broadly.
+- [Inbound Triggers](./inbound-triggers.md) — the full trigger surface behind the panel in the Schedules view.
+- [Connectors](./connectors.md) — the plugins that produce the events in the **External activity** panel.
+- [Integrations](./integrations.md) — the Slack app, GitHub pull-request review, and the event envelope itself.
+- [Digests](./digests.md) — the daily or weekly briefing built from the same activity.

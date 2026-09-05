@@ -17,9 +17,15 @@ Ever Works is split across multiple repositories under the [ever-works](https://
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [ever-works](https://github.com/ever-works/ever-works)                                   | Platform monorepo (API, Web Dashboard, CLI, AI agents, plugins) |
 | [ever-works-website-template](https://github.com/ever-works/ever-works-website-template) | Standalone Next.js work website template                        |
-| [ever-works-docs](https://github.com/ever-works/ever-works-docs)                         | Documentation site (this site)                                  |
+| [ever-works/docs](https://github.com/ever-works/ever-works/tree/main/docs)               | Documentation source for this site (inside the monorepo)        |
 
 Each repository has its own issue tracker. File issues in the repository most relevant to your contribution.
+
+:::note The documentation is not a separate repository
+
+Every page on **docs.ever.works** is a Markdown file under `docs/` in the `ever-works` monorepo, rendered by the Docusaurus app in `apps/docs/`. `apps/docs/docusaurus.config.ts` sets `path: '../../docs/'` and `routeBasePath: '/'`, and points `editUrl` at `https://github.com/ever-works/ever-works/tree/main/` — which is why the **Edit this page** link at the bottom of any page opens the exact source file in `ever-works`. Run the site locally with `pnpm dev:docs`, and open documentation issues and PRs against `ever-works`.
+
+:::
 
 ## Prerequisites
 
@@ -55,13 +61,16 @@ git clone https://github.com/ever-works/ever-works.git
 cd ever-works
 pnpm install
 
-# Start everything in dev mode
-pnpm dev
+# Start every app in watch mode (docs and the desktop apps are excluded)
+pnpm dev:apps
 
 # Or start individual apps
-pnpm dev:api    # NestJS API on port 3100
-pnpm dev:web    # Next.js Web Dashboard on port 3000
+pnpm dev:api     # NestJS API on port 3100
+pnpm dev:web     # Next.js Web Dashboard on port 3000
+pnpm dev:docs    # Docusaurus documentation site (this site)
 ```
+
+The `dev:*` scripts in the root `package.json` are thin wrappers over Turborepo filters — `pnpm dev:docs` runs `turbo run dev --filter=ever-works-docs`, which runs `docusaurus start` in `apps/docs/`.
 
 ### Template (Standalone)
 
@@ -224,6 +233,54 @@ The Platform has an extensible plugin system. Plugins live in `packages/plugins/
 
 See the [Plugin System documentation](/plugin-system) for architecture details.
 
+## Documentation Contributions
+
+Documentation is not a side repository you have to hunt for: it is `docs/**` in the platform monorepo, and a docs change is an ordinary PR against `ever-works`.
+
+| Path                            | What lives there                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `docs/`                         | Every published page, as Markdown. `docs/index.md` is the site home (`routeBasePath: '/'`).      |
+| `docs/features/`                | User-facing feature pages (Agents, Missions, Knowledge Base, …).                                 |
+| `docs/guides/`                  | Task-oriented how-to guides.                                                                     |
+| `docs/api/`, `docs/cli/`        | Reference for the REST API and the CLI.                                                          |
+| `docs/assets/`                  | Images and other static files, registered via `staticDirectories` and served from the site root. |
+| `docs/specs/`, `docs/internal/` | Internal specs and working docs. Real pages, deliberately left out of the sidebar.               |
+| `apps/docs/`                    | The Docusaurus site itself: `docusaurus.config.ts`, `sidebarsPlatform.ts`, theme, translations.  |
+
+### How to add or edit a page
+
+1. Install once from the monorepo root with `pnpm install`, then start the docs site with `pnpm dev:docs`. It serves on `http://localhost:3000`; if the web dashboard already holds that port, run `pnpm --filter ever-works-docs dev -- --port 3200` instead. Edits hot-reload.
+2. Create or edit the Markdown file under `docs/`. Put user-facing pages in the folder that matches their area, internal plans and hand-off notes in `docs/internal/`, and feature specs in `docs/specs/<feature>/`. Never leave a working document in the monorepo root.
+3. Give every new page frontmatter that matches its neighbours — `id`, `title`, `sidebar_label`, and an optional `description` — then open with an H1 that repeats the title.
+4. Link to other pages with **relative Markdown paths** (`./missions.md`, `../features/agents.md`). Docusaurus rewrites them to site URLs and reports the ones that no longer resolve.
+5. Add the page's `id` to `apps/docs/sidebarsPlatform.ts`. The sidebar is hand-maintained: a file that is not listed still builds and is still reachable by URL, but it never appears in the navigation — which is exactly how `docs/specs/` and `docs/internal/` stay off the nav.
+6. Use standard Markdown tables for reference material, and fenced code blocks tagged `mermaid` for diagrams — Mermaid is enabled through `@docusaurus/theme-mermaid` and `markdown.mermaid: true`, so no extra setup is needed. Admonitions (`:::note`, `:::caution`, `:::tip`) are available.
+7. Reference images from `docs/assets/`. That folder is a Docusaurus static directory, so `docs/assets/overview.png` is served as `/overview.png`.
+
+### Checks to run before opening a docs PR
+
+```bash
+# From the monorepo root
+pnpm format                              # Prettier — its glob covers **/*.md
+pnpm format:check                        # Exactly what CI runs
+pnpm build:docs                          # turbo run build --filter=ever-works-docs
+pnpm --filter ever-works-docs spellcheck # cspell over apps/docs (config: apps/docs/.cspell.json)
+```
+
+Three details are easy to get caught by:
+
+- **Prettier owns Markdown.** The root `format` script globs `**/*.{ts,tsx,jsx,json,css,md}`, and the CI job runs `pnpm format:check`, so an unformatted table or a trailing space fails the build like any other file.
+- **The docs build is not part of `pnpm build`.** Both the root `build` script and the CI build step pass `--filter=!./apps/docs`, so the site is only compiled when you run `pnpm build:docs` (or `pnpm build:all`). Run it yourself before you push.
+- **Broken links warn, they do not fail.** `onBrokenLinks` and `onBrokenMarkdownLinks` are both set to `warn`, so a bad relative link ships silently unless you read the build output.
+
+### Translations
+
+The site is internationalized with the Docusaurus `i18n` plugin. Translations live in `apps/docs/i18n/`, and `DOCS_BUILD_LOCALES` decides which locales are actually built — it defaults to `en,fr` because building every aspirational locale produced thousands of untranslated duplicate pages and exhausted the CI disk. To add strings for a locale, run `pnpm --filter ever-works-docs write-translations`, translate the generated JSON, then build with `DOCS_BUILD_LOCALES=en,fr,<locale> pnpm build:docs`.
+
+### How a docs change reaches docs.ever.works
+
+Merging to `main` triggers `.github/workflows/k8s-build.yml`, which rebuilds the `ever-works-docs` image from `.deploy/docker/docs/Dockerfile` and pushes `:prod` and `:sha-<sha>` tags to GHCR. The `docs-ever-works-prod` ArgoCD application tracks the `:prod` tag by digest and rolls the site out. Nothing has to be deployed by hand.
+
 ## License
 
 - **Ever Works Platform** and **Work Web Template** are licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. This applies to all packages in `apps/` and `packages/`, including the **Plugin SDK** (`@ever-works/plugin` and `@ever-works/contracts`) and all first-party plugins.
@@ -241,3 +298,12 @@ If you have questions about contributing:
 - Open a [GitHub Discussion](https://github.com/ever-works/ever-works/discussions) for general questions
 - Join the [Discord community](https://discord.gg/ever) for real-time help
 - Email [ever@ever.co](mailto:ever@ever.co) for private inquiries
+
+## Related
+
+- [Installation](./installation.md) — get the monorepo running before you change it
+- [Development Workflow](./development-workflow.md) — the day-to-day commands, debugging, and quality loop
+- [Monorepo Structure](./monorepo-structure.md) — what lives in which `apps/*` and `packages/*` workspace
+- [Testing Overview](./testing/overview.md) — the per-workspace test runners and how to run them
+- [Plugin System](./plugin-system/index.md) · [Plugin Development Guide](./advanced/plugin-development-guide.md)
+- [Support](/support) · [Changelog](./changelog.md)

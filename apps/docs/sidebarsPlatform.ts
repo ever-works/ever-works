@@ -57,17 +57,41 @@ const sidebars: SidebarsConfig = {
 				// the wizard makes is changed there afterwards.
 				'features/creating-an-account',
 				'features/creating-a-work',
+				// What a Work's kind decides (website, landing page, blog,
+				// directory, awesome repo, plus the company and campaign
+				// kinds minted by their own flows). Sits with the creation
+				// pages because kind is chosen at creation and never after.
+				'features/work-kinds',
 				'features/onboarding',
 				'features/settings-map',
+				// The three screens every session passes through: the home
+				// cockpit, the unified /new creation surface, and the chat
+				// rail that can drive both. They follow the settings map
+				// because that is where the wizard's choices are changed.
+				'features/dashboard',
+				'features/new-page',
+				'features/platform-chat',
 				'features/missions',
 				'features/ideas',
 				'features/goals',
+				// A campaign Work is a Goal with a go-to-market pipeline and
+				// a seeded agent bench behind it, so it reads straight after
+				// Goals rather than with the other Work kinds.
+				'features/campaigns',
 				'features/tasks',
+				// The webhook-to-Task edge of Tasks: a signed HTTPS call or a
+				// matched platform event spawns a Task and hands it to an
+				// Agent, so it sits between the two pages it joins.
+				'features/inbound-triggers',
 				'features/agents',
 				'features/agents-catalog',
 				'features/skills-catalog',
 				'features/plugins',
 				'features/agent-email',
+				// The operator's message center: the queue an agent writes to
+				// when it needs a human, next to the email surface it sits
+				// beside in the sidebar.
+				'features/inbox',
 				'features/mission-templates',
 				// 2026-07 feature program — how agent work is isolated,
 				// verified, landed and steered. These four read as one
@@ -76,13 +100,43 @@ const sidebars: SidebarsConfig = {
 				'features/task-isolation',
 				'features/quality-gates',
 				'features/merge-policy',
+				// Not part of that chain — Agent Capabilities is Merge
+				// Policy's sibling matrix (same four-scope lattice,
+				// opposite default), so it is listed next to it.
+				'features/agent-capabilities',
 				'features/sessions-and-steering',
+				// The human-in-the-loop layer above a session (guardrails,
+				// the approval queue, escalations), then the two per-Agent
+				// readouts you watch a session through: its scorecard and
+				// its live terminal.
+				'features/approvals-and-escalations',
+				'features/agent-scorecards',
+				'features/agent-terminals',
 				'features/memory-decisions',
+				// Meetings is a memory SOURCE (its catalog renders inside the
+				// Memory page), so it reads next to the memory pages rather
+				// than next to the connectors that feed it.
+				'features/meetings',
 				'features/budgets-and-usage',
 				'features/credits-and-billing',
 				'features/knowledge-base',
+				// The org-wide layer above a single Work's KB: shared
+				// documents, the review queue, consolidation and recall.
+				// Reads straight after the KB it generalises; its two
+				// sources, Decisions and Meetings, are listed above.
+				'features/memory',
 				'features/autonomous-operation',
 				'features/workers',
+				'features/job-runtimes',
+				// The named runtime an Agent run is handed (packages,
+				// networking, allowed hosts). Sits between the runtime and
+				// the credential layers because it is the third thing an
+				// execution host resolves before it starts.
+				'features/environments',
+				// Secret Stores is the credential-reference layer the
+				// job-runtime tenant overlay reads, so it follows the
+				// two runtime pages rather than sitting with plugins.
+				'features/secret-stores',
 				'features/store-builder',
 				'features/company-builder',
 				'features/desktop-app',
@@ -90,17 +144,41 @@ const sidebars: SidebarsConfig = {
 				// keep it adjacent so the two read together.
 				'features/fleet',
 				'features/integrations',
+				// The connector catalog is the per-provider detail behind
+				// Integrations — keep the two adjacent.
+				'features/connectors',
+				// The other side of the same wire: external MCP servers
+				// registered under Settings > Connections and bound per
+				// Agent. Sits with the connection surfaces, not with
+				// features/mcp-server (which is Ever Works AS an MCP
+				// server, further down this list).
+				'features/mcp-connections',
+				// The account-level registry of Git repositories that are NOT
+				// a Work's own repos, attached per Agent from the same
+				// Capabilities screen as Skills and MCP connections.
+				'features/repositories',
 				'features/community-pr-processing',
 				'features/work-changelog',
 				'features/collections',
+				// The Items workbench and its bulk CSV/Excel path. Both sit next
+				// to Collections because the four pages describe one surface: the
+				// items themselves, how they are grouped, how they move in and out
+				// of the Work in bulk, and how their source URLs are checked.
+				'features/items',
+				'features/item-import-export',
 				'features/item-source-validation',
 				'features/scheduled-updates',
 				'features/activity',
+				// The delivery surfaces for everything above: the bell and its
+				// channels, then the scheduled briefing built on the same stack.
+				'features/notifications',
+				'features/digests',
 				'features/generation-cancellation',
 				'features/works-config',
 				'features/work-import',
 				'features/work-members',
 				'features/teams',
+				'features/organizations',
 				'features/comparisons',
 				'features/advanced-prompts',
 				'features/git-operations',
@@ -108,8 +186,18 @@ const sidebars: SidebarsConfig = {
 				'features/api-keys',
 				'features/custom-domains',
 				'features/website-templates',
+				'features/generated-site',
 				'features/work-templates',
+				// The third catalog behind the other two: the manifest in the
+				// public works repository that seeds the blueprint picker.
+				'features/work-blueprints',
 				'features/k8s-deployment',
+				'features/managed-hosting',
+				// Where uploaded bytes land (local-fs / S3 / MinIO / GitHub
+				// + LFS). An operator-level STORAGE_BACKEND choice, so it
+				// reads with the deployment pages rather than with the
+				// features that produce the uploads.
+				'features/storage-backends',
 				'features/mcp-server',
 				'features/data-management'
 			]
@@ -117,7 +205,68 @@ const sidebars: SidebarsConfig = {
 		{
 			type: 'category',
 			label: 'Guides',
-			items: ['guides/founder-journey']
+			collapsed: false,
+			items: [
+				'guides/founder-journey',
+				'guides/platform-tour',
+				'guides/quickstart-directory',
+				'guides/quickstart-blog',
+				'guides/quickstart-landing-page',
+				'guides/quickstart-website',
+				'guides/quickstart-awesome-repo',
+				// The hands-off counterpart to the quickstarts: template ->
+				// scheduled Mission -> Ideas gears -> budgets, wired once and
+				// then watched from Sessions, Schedules and the Inbox. Reads
+				// after them because it assumes you have built one Work by hand.
+				'guides/autonomous-site-from-template',
+				// The workforce guide the autonomous one implies: Mission ->
+				// Goals -> hired Agents -> Teams -> heartbeats, budgets and
+				// guardrails, then the surfaces you operate them from.
+				'guides/run-your-business-24-7',
+				// "Chat does everything" as a task guide: ten worked prompts,
+				// each mapped to a tool that is actually registered in
+				// apps/web/src/lib/ai/tools. Sits after the quickstarts
+				// because it drives the surfaces they create.
+				'guides/do-everything-from-chat',
+				// The catalogs the quickstarts pick from, in one place:
+				// website templates, Work templates, blueprints, Mission,
+				// Agent, Skill and Task templates.
+				'guides/templates-catalogs',
+				// Seeding a Work's Knowledge Base from real files, reviewing
+				// what the agents wrote back, the org-wide Memory layer above
+				// it and the five Agent definition files. Sits after the
+				// Work-building guides because it assumes a Work exists to
+				// hang knowledge off.
+				'guides/knowledge-base-and-memory',
+				// Every ceiling in one place - account, Work, Agent, run
+				// concurrency, tool grants, merge policy - and safe defaults
+				// for a new team. Follows the workforce guide it constrains.
+				'guides/budgets-and-guardrails',
+				// Adding people to the picture: Organizations, invitations,
+				// Teams, the org chart and Work members.
+				'guides/teams-and-organizations',
+				// Wiring the outside world in and out: the Slack app, the
+				// GitHub App, connector plugins, notification channels.
+				'guides/connect-integrations',
+				// Shipping a Work and bringing one in: the deploy-target and
+				// custom-domain guide, then the four ways an existing
+				// repository becomes a Work (copy, link, .works/works.yml,
+				// GitHub App installation).
+				'guides/custom-domains-and-deploy-targets',
+				'guides/import-an-existing-repo',
+				// Bringing your own model keys, then the three machine
+				// surfaces the platform speaks through: MCP clients, the
+				// CLI and the desktop app.
+				'guides/bring-your-own-ai-provider',
+				'guides/mcp-server-setup',
+				'guides/cli-quickstart',
+				'guides/desktop-app',
+				// Operator-facing guide: the five Compose files, the boot-time
+				// env checks, the GHCR images and the .deploy/k8s manifests.
+				// Last in Guides because it is about running the platform
+				// rather than building a Work with it.
+				'guides/self-host-docker-kubernetes'
+			]
 		},
 		{
 			// EW-639 Phase 3 — KB user-facing docs (concepts, classes,

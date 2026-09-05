@@ -10,6 +10,8 @@ A **Task** is one trackable unit of work — a fix, a review, a chore — with a
 
 Reach for a Task when you know what needs doing and want it tracked to completion. Tasks live at `/tasks`.
 
+The Tasks surface carries a two-tab strip — **Tasks | Triggers**. Everything below describes the Tasks tab; the [Triggers tab](#the-triggers-tab) holds the standing rules that create Tasks for you when something happens outside the platform.
+
 ## When to use a Task vs a Work, Mission or Idea
 
 | You want to…                                                   | Use a…                           |
@@ -59,6 +61,49 @@ Below 768px — phones and split-screen — the AI chat stops being a side panel
 
 `/tasks/templates` lists pre-built Task shapes. **Use template** lands you on `/tasks/new?from=<slug>` with the title, description and the template's tags pre-filled into Labels (which counts as "touched", so the title no longer drives them). The form shows a notice whenever it was pre-filled from a URL — read the content before creating.
 
+### Building a task tree from a workflow template
+
+That catalog produces **one** Task. The other kind of template produces a whole tree.
+
+`/tasks/new` opens on **Blank task**; the second radio, **From template**, swaps the form over to a _workflow_ template — a named, ordered list of steps that expands into a parent Task plus one sub-task per step, in a single transaction.
+
+1. Go to `/tasks/new` and click **From template**. The template list loads on that first switch, so the blank path never pays for the round-trip.
+2. Pick one in the **Workflow template** dropdown. Each option reads `<name> — <n> steps`.
+3. Optionally set a **Branch name** (`feat/my-feature`, up to 200 characters) — it is stamped on the parent Task.
+4. Fill **Feature name** and **Feature description** — the same two inputs the blank form calls Title and Description — and pick a **Work** if the tree should be filed under one.
+5. **Create workflow** expands the tree and lands you on the parent Task's detail page.
+
+Under the dropdown, **Will create a parent Task plus N sub-tasks** previews the steps in order and marks each one carrying an _approval_ gate.
+
+What each step turns into:
+
+| The step carries        | The created sub-task gets                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| A **prompt**            | Your feature description, then an `## Agent prompt` heading holding the step's prompt — which is what the Agent actually reads |
+| A **`dependsOn`** entry | A blocker row pointing at that step's sub-task, so this step cannot reach In progress or Done while the one it needs is open   |
+| A bound **Agent**       | An Agent assignee row — the kind of assignment no other screen creates                                                         |
+| **`requiresApproval`**  | An approver row for you, plus _require all approvers_, so the step cannot reach Done unapproved                                |
+
+Parent and children are all created in **To do** (not Backlog), at **P2** unless the caller sends another priority, carrying the template's labels and the Work / Mission / Idea you chose on the form. The parent's description records `Instantiated from template: <name> (<slug>)`.
+
+Your workflow templates live under **My workflows**, at the top of `/tasks/templates` and above the single-Task catalog. Each card lists the steps in order, flags the ones that require approval, names the agent template a step is bound to, and carries a delete button — deleting a template keeps every Task already created from it. The first time that list is ever read, the platform seeds one for you: **Compound Engineering Workflow** (`compound-engineering-workflow`), nine steps — _Write spec → Plan implementation → Plan review → Revise plan from review → Implement → AI review → Apply review fixes → Update wiki → Review & Deploy_, the last one deliberately a human step with no agent.
+
+Authoring and editing workflow templates is API-only today:
+
+| Endpoint                                   | What it does                                                                                                          |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/task-templates`                  | Your templates with their steps embedded. Seeds the default template on your first call.                              |
+| `POST /api/task-templates`                 | Create one: `name`, optional `slug` / `description` / `labels`, and **1–30** `steps`.                                 |
+| `PATCH /api/task-templates/:id`            | Update. A supplied `steps` array **replaces** the step list wholesale.                                                |
+| `DELETE /api/task-templates/:id`           | Delete the template. Tasks already instantiated from it are untouched.                                                |
+| `POST /api/task-templates/:id/instantiate` | The expansion above: `title`, plus optional `description`, `workId`, `missionId`, `ideaId`, `branchName`, `priority`. |
+
+A step that depends on a position which does not exist, on itself, or on a cycle is rejected at write time — so a stored template is always one that can actually expand.
+
+:::note Saved workflow _graphs_ are a separate, API-only feature
+`/api/workflows` stores executable graphs — nodes, edges, `llm_decide` branches, `agent.delegate` steps — validated on every write so a saved graph is a runnable one. `POST /api/workflows/:id/run` answers **202** with a run id and does not wait (a large graph walks for far longer than any HTTP timeout); poll `GET /api/workflows/runs/:runId` for the trace, or `GET /api/workflows/:id/runs` for history. No dashboard screen reads or writes them yet, and Agents can run or check an inline graph through their `run_workflow_graph` / `validate_workflow_graph` tools. Graphs are not Task templates and do not create Tasks.
+:::
+
 ## Priorities
 
 Five levels, `p0` (most urgent) through `p4`, defaulting to `p3`.
@@ -94,6 +139,23 @@ Changing the owners of a Task that has sub-tasks is refused: _"Task … has N su
 :::note Mission and Idea associations are read-only after creation
 The detail page shows the Mission or Idea a Task belongs to, but only Work is editable there. To change a Mission or Idea association from the UI, use **Add existing** on that Mission's or Idea's Tasks tab.
 :::
+
+## Sub-tasks
+
+Any Task can be the parent of others. The **Sub-tasks** section on Task detail is the checklist of its children, headed by an `n/m` counter — children already in **Done** over the total number of children.
+
+Each row carries the child's status icon and title (a link to its own detail page, struck through once it is done), one **Agent** chip per agent assignee, an **Approval** / **Approved** badge when the child has approvers — hover it for _"x of y approvers signed off"_ — and the child's status in words.
+
+To add one, type a title in the box at the bottom of the section (200 characters, same cap as the create form) and press **Add**. The child is created with `parentTaskId` set and inherits the parent's **whole owner tuple** — Work, Mission, Idea, Team, Agent and Goal — because the API requires parent and child to agree on every owner, not merely on one of them:
+
+> Parent Task scope (…) must match child Task scope (…).
+
+Two structural rules protect the tree:
+
+- **A parent with children cannot be re-filed.** Changing its owners is refused until you move or detach the children — the caution under [Scoping a Task](#scoping-a-task-to-a-work-mission-or-idea) is the same rule seen from the parent's side.
+- **Chains deeper than 64 are refused** on create: _"Parent Task chain exceeds depth 64; refusing to add child for safety."_ Re-anchor the chain closer to its root instead.
+
+The checklist reads `GET /api/tasks/:id/subtasks`, which returns `{ data, meta: { total, doneCount } }` — the children together with their agent assignees and approval state in one call, rather than a request per row. To create a child from the API, `POST /api/tasks` with `parentTaskId` plus the parent's owners. A whole tree at once is what [workflow templates](#building-a-task-tree-from-a-workflow-template) instantiate.
 
 ## The list, its views and its filters
 
@@ -131,6 +193,22 @@ Columns read **Backlog · Todo · In Progress · In Review · Blocked · Done ·
 - **Run** dispatches the Task to an Agent (see below). With a card focused, pressing **`r`** does the same thing.
 - **Run all** appears in the Backlog, Todo and In Progress column headers only, and only while that column holds at least one card. It runs at most **20** Tasks from the top of that column. Each one reports its own outcome — one failing never stops the others — and the column prints a `started/total` summary underneath its header.
 - Cards carrying a branch, a pull request or a change count show a **± diff** affordance that opens a preview of the branch's changes.
+
+## The Triggers tab
+
+`/tasks` and `/tasks/triggers` are the two tabs of one surface. A **Trigger** is a standing rule that turns something happening outside Ever Works into work inside it: each one owns a signed HTTPS endpoint (or matches an ingested platform event), creates a Task from its own template on every verified delivery, assigns it to the Agent you nominated, and — unless you asked it to wait — starts the agent run immediately.
+
+The tab lists every trigger you own: its **Mode** (`Task` or `Template`, fixed at creation), its target, an **Enabled** switch that pauses or resumes it in place, when it last fired, and its lifetime fire count. The row menu (**⋯**) holds **Fire now**, **Test fire**, **Edit**, **Rotate secret** and **Delete**, and each trigger has a detail page at `/tasks/triggers/:id` with its recent-fires log.
+
+To create one:
+
+1. Go to **Tasks → Triggers** (`/tasks/triggers`) and click **New Trigger**.
+2. Name it, then pick the **Source** — _Webhook (signed URL)_ or _Platform event_.
+3. Pick the **Mode**: _Task_ (you write the agent instructions) or _Template_ (the Task is built from a task-template slug).
+4. Choose the Agent under **Assign agent**, decide whether the first Task starts automatically or waits in Backlog, and click **Create**.
+5. For a webhook trigger, copy the **Webhook URL** and the **Signing secret** from the dialog — the secret is shown exactly once.
+
+Signing a delivery, the replay window, payload contracts, title templates and the fire log are all covered in [Inbound Triggers](./inbound-triggers.md).
 
 ## Statuses and transitions
 
@@ -228,6 +306,18 @@ The API rejects more than **20** acceptance checks on a Task, on both create and
 
 The full model — how a Task's checks merge over the Work's defaults, what `off` / `warn` / `required` mean, and how to read a gate result — is in [Quality Gates](./quality-gates.md).
 
+## Settled decisions this Task may re-open
+
+Task detail carries one panel you never configure: an amber banner, between the status row and the description, listing the **accepted decisions** in the Work's Knowledge Base that this Task appears to re-litigate. It renders only when there is something to say — on the overwhelming majority of Tasks it is silent.
+
+The check is deterministic: a term-overlap heuristic (`term-overlap/v1`, no model call, no embeddings) run over the Task's title and description against the `class: decision`, `status: accepted` documents in that Task's Work KB. Each hit is tagged **Strong match** or **Possible match**, shows the terms it shares with the decision and the decision's rationale, and links straight to the document so you can read the call before spending a run re-arguing it. The banner re-runs whenever you save the description.
+
+:::note Advisory only — nothing is blocked
+No Task action is gated, disabled or refused by this panel; it exists so you learn the question is already settled _before_ the work starts. If the call genuinely has changed, supersede the decision rather than working around it — see [Decisions & the Memory Review Queue](./memory-decisions.md).
+:::
+
+The same report is available at `GET /api/tasks/:id/decision-conflicts`, which answers `{ conflicts, scanned, heuristic }`; an empty `conflicts` array is the normal case.
+
 ## Editing a Task afterwards
 
 The detail page can edit the **description** (inline, with Save/Cancel), the **Work**, the **Agent**, the **acceptance checks** and attempt budget, the **Task isolation** override, and the **recurring** schedule.
@@ -238,7 +328,45 @@ No form on the Task detail page changes a Task's title, its priority or its labe
 
 Attachments require a Work: the upload control is disabled on a Task that is not filed under one, and the API refuses the attach.
 
+## Scheduling a Task: Run once, Scheduled, Recurring
+
+The **Schedule** panel in the Task detail right rail is a single control with three mutually exclusive modes:
+
+| Mode          | What it means                                                                                                              | What it stores                                                   |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| **Run once**  | The default. No schedule at all — the Task runs when you or an Agent dispatch it.                                          | Nothing.                                                         |
+| **Scheduled** | One-shot. **This** Task runs once, automatically, at an instant you pick. No clone is made.                                | `scheduledAt`, plus `scheduleClaimedAt` once the slot has fired. |
+| **Recurring** | A template that spawns a fresh instance per occurrence — the panel described in [Recurring Tasks](#recurring-tasks) below. | `recurrenceRule` or `recurrenceCron`, plus the next occurrence.  |
+
+Picking a mode only decides which panel is on screen; the modes are enforced as exclusive server-side, so the radio cannot arm two at once.
+
+### Scheduled (one-shot)
+
+1. Open the Task and find **Schedule** in the right rail.
+2. Click **Scheduled**.
+3. Pick a date and time under **Run at** — a local-time picker; the platform stores the instant.
+4. Click **Schedule**. The panel then reads **Armed for** your time, and **Dispatched at** the moment the slot actually fired.
+5. **Remove schedule** clears the slot and returns the Task to **Run once**. A Task still carrying a slot also says _"Still scheduled for …"_ under **Run once**, with the same clear button, so a forgotten schedule cannot hide behind the mode you are looking at.
+
+A time that is not in the future is refused twice over — _"Pick a time in the future."_ in the picker, and `runAt must be in the future.` from the API. Re-saving a new time **moves** the existing slot rather than adding a second one, and clears the previous claim so the dispatcher picks up the new instant.
+
+A dispatcher runs every minute, scans the Tasks whose `scheduledAt` is due, claims each slot exactly once — so two workers can never double-fire it — and dispatches the Task through the same gated path a board **Run** uses. Agent resolution matches the move-to-In-progress fan-out: the Task's **Agent assignee** rows when it has any, otherwise the Task's own **Agent**. With neither, nothing runs and you get a `task_run_no_agent` notification instead of a silent skip.
+
+:::caution One-shot and recurring are mutually exclusive
+Scheduling a one-shot run on a recurring template is refused — _"This Task is a recurring template — stop the recurrence before scheduling a one-shot run."_ The panel says so before you try. Demote the recurrence first.
+:::
+
+:::note A one-shot slot is not in Activity → Schedules
+The **Schedules** view at `/activity` gathers _recurring_ Tasks (alongside agent heartbeats, Work schedules, Mission ticks and the rest). A one-shot `Scheduled` Task is not one of its sources, so the Task's own **Schedule** panel is the only place its armed time is shown.
+:::
+
+API: `POST /api/tasks/:id/schedule` with `{ "runAt": "<ISO datetime>" }`, and `DELETE /api/tasks/:id/schedule` to clear it. `PATCH /api/tasks/:id` also accepts `scheduledAt`, where the three states are distinct: absent leaves the schedule untouched, `null` clears it, and a string (re-)schedules.
+
 ## Recurring Tasks
+
+:::note Where the recurring panel lives
+It is the **Recurring** mode of the Schedule panel above — on a Task that does not repeat yet, click **Recurring** in the right rail to reveal it.
+:::
 
 The **Recurring schedule** panel in the detail page's right rail turns a Task into a template. **Promote to recurring** opens the picker: a frequency of Daily, Weekly, Monthly or a custom RRULE, an optional end date, and an optional maximum number of occurrences (1–9999). It shows the rule it will send as a preview, and refuses to save an invalid one — or one that yields no future occurrence.
 
@@ -256,3 +384,7 @@ The platform then spawns instances on that schedule, each pointing back at the t
 - [Quality Gates](./quality-gates.md) — the acceptance checks a Task declares.
 - [Task Isolation](./task-isolation.md) — the per-Task branch an agent run works on.
 - [Merge Policy](./merge-policy.md) — what happens to that branch afterwards.
+- [Inbound Triggers](./inbound-triggers.md) — the Triggers tab: rules that create a Task every time something outside the platform happens.
+- [Decisions & the Memory Review Queue](./memory-decisions.md) — the accepted decisions the Task detail banner checks against.
+- [Activity](./activity.md) — the Schedules view, where a recurring Task is listed alongside every other timer in your account.
+- API reference: [Tasks API](../api/tasks.md).

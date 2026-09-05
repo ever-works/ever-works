@@ -2,6 +2,7 @@
 id: integrations
 title: Integrations (Slack, GitHub, connectors, meetings)
 sidebar_label: Integrations
+description: The event envelope every integration produces, the Slack app and GitHub pull-request receivers, the eleven native connectors, and the Meetings API.
 ---
 
 # Integrations
@@ -59,19 +60,80 @@ Deliveries are verified with the configured webhook secret (HMAC SHA-256 over th
 
 ## Native connectors
 
-| Connector   | Direction          | Brings in                                 |
-| ----------- | ------------------ | ----------------------------------------- |
-| **Slack**   | inbound + outbound | Channel messages, mentions; posts replies |
-| **Discord** | inbound + outbound | Channel messages; posts replies           |
-| **Linear**  | inbound + outbound | Issue activity; posts comments            |
-| **Notion**  | inbound + outbound | Page activity; appends comments           |
-| **Zoom**    | inbound            | Completed cloud recordings → Meetings     |
+Eleven connectors ship today, all in the `connector` plugin category. Each one declares up to two
+independent legs, and the difference is what the two middle columns below record:
 
-Enable them like any other [plugin](../plugin-system/index.md), under **Settings → Integrations**.
+- the **`connector` capability** — the messaging leg, whose `direction` is `outbound`, `inbound` or
+  `bidirectional`;
+- the **`event-source` capability** — the ingest leg, a `pullEvents` sweep that feeds the event spine
+  on the `event-ingest-tick` cron.
+
+They are genuinely independent. A connector can be `direction: 'outbound'` and still pull a rich
+event stream — Linear, Jira, HubSpot, Pipedrive, Bluesky and Mastodon are all exactly that.
+
+| Connector            | Plugin id                    | `connector` direction | `event-source` | Brings in                                                                  | Pushes out                                          |
+| -------------------- | ---------------------------- | --------------------- | -------------- | -------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Slack**            | `slack-connector`            | bidirectional         | yes            | Channel messages and bot mentions from the configured channels             | Channel messages and threaded replies, Block Kit    |
+| **Discord**          | `discord-connector`          | **outbound**          | **no**         | Nothing — this connector has no ingest leg                                 | Channel messages with embeds, via `discord.js` REST |
+| **Linear**           | `linear-connector`           | outbound              | yes            | Issues created/updated, and comments                                       | Comments on Linear issues                           |
+| **Notion**           | `notion-connector`           | outbound              | yes            | Pages created or edited — workspace-wide, or per database                  | Comments appended to Notion pages                   |
+| **Jira**             | `jira-connector`             | outbound              | yes            | Issues created/updated, and comments                                       | Comments on Jira issues                             |
+| **HubSpot**          | `hubspot-connector`          | outbound              | yes            | Contacts, companies, deals and custom objects                              | Notes appended to CRM records, and new records      |
+| **Pipedrive**        | `pipedrive-connector`        | outbound              | yes            | Deals, persons and organizations                                           | Notes on those records, and new records             |
+| **Zoom**             | `zoom-connector`             | inbound               | yes            | Completed cloud recordings, with transcripts when available → Meetings     | Nothing — ingest only                               |
+| **Google Workspace** | `google-workspace-connector` | inbound               | yes            | Drive file changes, Calendar events, Meet recording transcripts → Meetings | Nothing — ingest only                               |
+| **Bluesky**          | `bluesky-connector`          | outbound              | yes            | Mentions and replies, plus the connected account's own posts               | Posts and threaded replies over AT Protocol         |
+| **Mastodon**         | `mastodon-connector`         | outbound              | yes            | Mention notifications and the account's own statuses                       | Statuses and threaded replies on your own instance  |
+
+Every connector talks to its provider through that provider's own official SDK — `@slack/web-api`,
+`discord.js`, `@linear/sdk`, `@notionhq/client`, `jira.js`, `@hubspot/api-client`, the `pipedrive`
+Node SDK, `@zoom/rivet`, the Google API Node.js clients, `@atproto/api` and `masto`.
+
+:::caution Discord is outbound only
+The Discord connector's manifest declares `direction: 'outbound'` with `inbound: false` and
+`reply: false`, and it does **not** declare the `event-source` capability. It posts into a channel;
+it does not read one, and nothing from Discord reaches your Activity feed. Inbound Interactions API
+routing is a documented follow-up — the connector's **Application public key** setting exists for
+it and is unused today.
+:::
+
+[Connectors](./connectors.md) is the full catalog: every credential each one needs, the event kinds
+it emits, how its events are routed to a Work, and what each connector deliberately does not do.
+
+### How to enable a connector
+
+1. Open **Sidebar → Plugins** (`/plugins`), or go straight to **Settings → Plugins → Connectors**
+   (`/settings/plugins/connector`).
+2. Press **Enable** on the connector's card, leave **Also enable for all works** ticked in the
+   dialog, and press **Enable** again to commit — account-level _on_ does not cascade to your Works
+   on its own.
+3. Open the connector's settings form, paste its credentials, and press **Save Settings**.
+4. Narrow the sweep with the scoping fields on the same form (`eventChannelIds`, `teamIds`,
+   `databaseIds`, `projectKeys`, `objectTypes`, `entityTypes`, `driveFolderIds`, `calendarIds`).
+   Empty usually means "everything".
+5. Wait for the next sweep — `event-ingest-tick` runs every 5 minutes; there is no "sync now"
+   button — then check **Sidebar → Activity** (`/activity`) or a Work's **Activity** tab
+   (`/works/:id/activity`).
+
+:::note There is no Settings → Integrations index page
+`/settings/integrations` has no index page and soft-404s: the settings navigation deliberately omits
+a bare **Integrations** tab. Only its two children exist — **Channels**
+(`/settings/integrations/channels`) and **Emails** (`/settings/integrations/emails`), both of which
+belong to [Notifications](./notifications.md). Connectors live under **Plugins**. Bare
+`/settings/plugins` redirects to `/settings/plugins/ai-provider`, so link to
+`/settings/plugins/connector` when you mean the connector catalog.
+:::
+
+:::tip Connectors are not notification channels
+If what you want is routine outbound delivery — alerts, digests, run results pushed into a channel —
+reach for a [notification channel](./notifications.md) instead. Slack, Discord, Telegram, WhatsApp
+and Novu ship as a separate outbound-only plugin family with their own Settings screen and a
+test-send button.
+:::
 
 ## Meetings
 
-A **Meeting** is a first-class record: title, start/end, source, participants, a deep link, and optionally a transcript.
+A **Meeting** is a first-class record: title, start/end, source, participants, a deep link, and optionally a transcript. This section is the API surface; [Meetings](./meetings.md) covers the record itself — every field, the transcript enrichment fan-out, and the screens you create and read meetings on.
 
 :::note Where to find it
 Meetings have no sidebar entry of their own — a meeting is a _memory source_, so the catalog renders as the **Meetings** block on **Sidebar → Memory** (anchor `/memory#meetings`), right under the agent-memory panel. The source and Work filters, pagination and **New meeting** button are unchanged. The old `/meetings` link still works: it redirects to that block and carries its filters across. `/meetings/new` and the meeting detail pages (`/meetings/:id`) are unchanged.
@@ -95,3 +157,8 @@ List rows omit the transcript body; the detail endpoint includes it.
 ## Related
 
 - [Plugin System](../plugin-system/index.md) · [Knowledge Base & Memory](./knowledge-base.md) · [Agents](./agents.md)
+- [Connectors](./connectors.md) — the full eleven-connector catalog: credentials, event kinds, work-routing claims
+- [Meetings](./meetings.md) — the Meeting record, transcripts, AI summaries and the Memory fan-out
+- [Notifications](./notifications.md) — outbound channels (Slack, Discord, Telegram, WhatsApp, Novu) and event subscriptions
+- [Plugins](./plugins.md) — enabling plugins, account-level vs work-level, the Settings → Plugins screens
+- [Activity](./activity.md) — where ingested events land, and the Schedules view

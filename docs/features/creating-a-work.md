@@ -3,11 +3,83 @@ id: creating-a-work
 title: Creating a Work
 sidebar_label: Creating a Work
 sidebar_position: 1
+description: The whole Create-Work flow — the /new prompt entry, work-kind chips, the blueprint picker, Git and deploy targets, building from an Idea, and the AI, manual and import methods.
 ---
 
 # Creating a Work
 
 When you create a new work, the platform presents three creation methods. Each method leads to a fully functional work backed by git repositories, but they differ in how the initial content is produced and how much control you have over the process.
+
+## Start from `/new`
+
+`/works/new` is never a page you land on empty. Opening it with no query string redirects to [`/new`](./new-page.md) — the single prompt-and-chips creation surface behind the sidebar's **+ New** button. Picking a Work chip there brings you back here with the kind already chosen and your prompt already in the AI chat.
+
+```mermaid
+flowchart LR
+    N["/new — prompt + chip"] -->|Website · Landing Page · Blog<br/>Directory · Awesome Repo| Q["/works/new?mode=ai&kind=…"]
+    I["Idea card → Build"] --> P["/works/new?proposal=…"]
+    Q --> F["Create-Work form"]
+    P --> F
+    F -->|Back to options| E["Entry view: prompt + kind chips<br/>Manual · Import · Campaign"]
+    E -->|Create Work Manually| F
+    E -->|Import Existing Work| F
+    E -->|Start a campaign| C["/works/new/campaign"]
+```
+
+### How you get to the form
+
+| URL                            | What opens                                                            |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `/works/new`                   | Nothing — the route redirects to `/new`.                              |
+| `/works/new?mode=ai`           | The unified create form (**New Work — with AI**).                     |
+| `/works/new?mode=ai&kind=blog` | The same form with the **Blog** kind preselected.                     |
+| `/works/new?mode=manual`       | The same form, reached through **Create Work Manually**.              |
+| `/works/new?mode=import`       | The [import](#import) form.                                           |
+| `/works/new?prompt=…`          | Implies `mode=ai`. The text is trimmed and capped at 4000 characters. |
+| `/works/new?proposal=<id>`     | Builds from an [Idea](#from-an-idea).                                 |
+
+An unrecognized `mode` is ignored — the page falls back to `ai` when a `prompt` is present, and otherwise redirects to `/new`. An unrecognized `kind` is dropped, and so is a kind that a feature flag has switched off for your environment.
+
+### The entry view
+
+Click **← Back to options** at the top of the form and the page swaps to its entry view — the same composer `/new` uses, but with Work-only chips so you stay focused on a Work:
+
+- A **prompt box** whose placeholder cycles through example briefs for the selected kind. **Enter** submits, **Shift+Enter** inserts a newline, **Cmd/Ctrl+Enter** submits from anywhere in the text. A description shorter than 10 characters is rejected with _"Add a description (at least 10 characters) to start."_
+- The **`+` attach menu** — upload files or a folder, or **Import GitHub repo** by public URL. You can also drag files onto the card or paste a screenshot. `/works/new` is the surface where pointing at an existing repository makes sense, so this menu is enabled here.
+- The **work-kind chips**, and a one-line description of the selected kind underneath them.
+- An **or** row with three buttons: **Create Work Manually**, **Import Existing Work**, and **Start a campaign**.
+
+Submitting the prompt does not create anything on its own. The text is handed to the AI chat panel prefixed with the kind you picked ("website", "landing page", "blog", "directory", "awesome list repo") plus links to any attachments, the panel opens, and the canvas switches to the AI creation form. That form deliberately starts **empty**: the chat carries your brief, so you are never asked to confirm the same sentence twice.
+
+### Pick a kind
+
+The chip row offers the five user-selectable [work kinds](./work-kinds.md) — **Website**, **Landing Page**, **Blog**, **Directory**, **Awesome Repo** — followed by **Store** and **Company**, which render here as inert **Soon** chips (the live Company chip lives on `/new`, and `store` has no entry in the kind vocabulary yet).
+
+- **Picking a chip writes that kind's first example prompt into the box**, so you start from real text you can edit rather than a placeholder hint. It only ever replaces its own seed: once you have edited the text — or arrived with a `?prompt=` handoff — switching chips never overwrites what is in the box.
+- The line under the row explains the selected kind, for example _"A focused one-pager — waitlists, product launches, webinar signups, lead capture."_
+- Every chip is gated by a `works-<kind>` PostHog flag evaluated server-side, and the gate **fails open** — no PostHog key, a missing flag, or an error all leave the chip enabled, so self-hosted installs get every kind. Only a flag that resolves strictly to `false` turns a chip into "Soon".
+- A disabled kind can never be submitted: it is not selectable, it cannot be deep-linked through `?kind=`, and the form falls back to the first live kind.
+- The chosen kind travels with the create call as the Work's `kind`, and kind is **create-only** — `PUT /api/works/:id` will not change it later.
+
+See [Work Kinds & Capabilities](./work-kinds.md) for what each kind changes about the Work you get: which tabs appear, which metric tiles show, and which repositories are provisioned.
+
+### Pick a blueprint
+
+The create form carries a **Template** field — a searchable picker over every ready-made starting point that fits the kind you selected. Its helper text says it plainly: _"Choose the Work template that will be used when the Work repository is first created."_
+
+| Control            | Behaviour                                                                                                                                                                                                                                                                          |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Type chips**     | Website · Landing · Blog · Directory · Store · Company · Awesome. The chip matching your selected work kind comes first and is preselected; the others appear only when they have at least one pickable blueprint. Changing the work kind resets the chip.                         |
+| **Search box**     | "Search templates…" filters the list by name, description, category and tags. A count under the list reports how many matched.                                                                                                                                                     |
+| **Your templates** | Your own and built-in [website templates](./website-templates.md), always listed **first**.                                                                                                                                                                                        |
+| **Blueprints**     | Manifest entries from the public [`ever-works/works`](./work-blueprints.md) catalog for the selected chip, with **Featured** ones pinned to the top. Placeholder entries (no repository yet) are excluded, and a template of yours wins over a blueprint with the same identifier. |
+| **Badges**         | **Default** marks the entry that will be used if you pick nothing; **Featured** marks a curated blueprint.                                                                                                                                                                         |
+
+Leaving the field alone keeps the "use my default template" behaviour: the highlighted default is the manifest's `default: true` blueprint, then your own default template, then the first option. The picker is hidden entirely when the selected chip resolves to no pickable template at all.
+
+:::tip Three catalogs, one field
+[Website Templates](./website-templates.md) are the site code cloned into the Work's website repository. [Work Blueprints](./work-blueprints.md) are ready-made Work definitions read from a public manifest. [Work Templates](./work-templates.md) are starter repositories you fork first from `/templates?kind=work` — a separate flow that does not appear in this picker.
+:::
 
 ## Creation Methods
 
@@ -159,6 +231,48 @@ For Awesome README imports, you can also configure the **expansion factor** — 
 | 3x             | ~33%              | Aggressive — two-thirds of items are newly discovered          |
 | 5x             | ~20%              | Maximum expansion — source is just the starting point          |
 
+## From an Idea
+
+Every [Idea](./ideas.md) card carries a **Build** button. It routes to `/works/new?proposal=<id>`, and the create form opens already filled in from the Idea:
+
+| Form field             | Filled from                                                                                                                                        |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Work Name**          | The Idea's title.                                                                                                                                  |
+| **Work Slug**          | The Idea's slug suggestion, falling back to the slugified title. Still editable, and still live-checked for availability as you type.              |
+| **Describe Your Work** | The Idea's AI-refined generated prompt, falling back to its description — so an Idea you wrote by hand still lands your own words in the textarea. |
+
+Four rules make the handoff safe:
+
+1. A `?proposal=` always opens in **AI mode**, whatever `mode` says.
+2. If the Idea was already accepted **and** its Work exists, you are redirected straight to that Work instead of starting a duplicate.
+3. Any other status — pending, queued, building, failed, dismissed, or accepted without a Work — still prefills the form, because the dashboard surfaces Ideas of every status and **Build** routes here from all of them.
+4. If the Idea cannot be fetched (deleted, not yours, or a transient blip), the form opens blank rather than erroring the whole route.
+
+When you submit, the Idea's id travels with the create call, so the resulting Work is recorded as built from that Idea.
+
+## Start a campaign
+
+The third button on the entry row, **Start a campaign**, is not a work kind — campaigns are not websites, so they get their own activation surface at `/works/new/campaign`. It is a single brief:
+
+| Field                     | Required | Example                                                                                          |
+| ------------------------- | -------- | ------------------------------------------------------------------------------------------------ |
+| **Campaign name**         | Yes      | `Q3 developer launch`                                                                            |
+| **Objective**             | Yes      | `Book 25 qualified demos with platform engineering teams`                                        |
+| **Target** (value + unit) | No       | `25` / `demos`                                                                                   |
+| **Channels**              | No       | `email, linkedin, newsletter` — comma-separated, recorded as labels on the seeded pipeline tasks |
+
+Pressing **Start campaign** provisions the whole go-to-market setup in one call — all of it, or none of it:
+
+- a **Work of kind `campaign`**,
+- a **Goal** capturing the objective,
+- the prebuilt **go-to-market Agents**,
+- **Tasks** for the first pipeline stages,
+- the **go-to-market pipeline** pinned as that Work's pipeline preference.
+
+:::info Early access
+The go-to-market pipeline plugin does **not** auto-enable — turn it on before starting a campaign, or runs fall back to auto-detecting a pipeline. A campaign Work also has no website repository, no deploy provider and no Deploy tab. See [Campaigns](./campaigns.md) for the full stage list and the review gate.
+:::
+
 ## Common Concepts
 
 ### Git Provider
@@ -170,6 +284,37 @@ If no git provider is connected, the AI and Manual methods will show an error pr
 ### Deploy Provider
 
 Optionally, you can select a **deploy provider** (e.g., Vercel) in the sidebar. This determines where the work's website will be deployed after generation. If no deploy provider is selected, the website repository is still created but not deployed.
+
+### Deploy Provider Selector — What Is in the List
+
+The sidebar selector lists the **loaded deployment plugins**, not every deploy target the platform knows about. Today that means two rows:
+
+| Row            | Provider id | You supply                                               | Notes                                                                                                           |
+| -------------- | ----------- | -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Vercel**     | `vercel`    | A Vercel API token.                                      | Becomes the default as soon as its token is connected.                                                          |
+| **Kubernetes** | `k8s`       | A kubeconfig, or the platform's shared customer cluster. | Needs no external account, so it is the zero-config fallback. See [Kubernetes Deployment](./k8s-deployment.md). |
+
+Each row shows **Ready to deploy** or **Not configured**. Selecting a row that is enabled but not configured reveals a **Configure** link straight to that plugin's settings page at `/plugins/<id>`.
+
+The preselected provider is resolved server-side in this order:
+
+1. the first provider that is both **enabled and configured**;
+2. otherwise **Kubernetes**, if it is enabled — it is deterministic and needs no account;
+3. otherwise the first enabled provider;
+4. otherwise none, and the whole block is hidden. The website repository is still created; nothing is deployed until you pick a target on the Work's Deploy tab.
+
+:::note The managed "Ever Works" target is not in this list
+`ever-works` — the fully managed `*.ever.works` hosting path — is a platform provider rather than a registered deploy plugin, so it never appears in this selector. You choose it once in the [onboarding wizard](./onboarding.md) at **Step 5 — Your deployment**, and it is applied when a Work is created. See [Managed Hosting](./managed-hosting.md).
+:::
+
+### Git Provider Picker — Connection States
+
+The **Git Provider** block above the deploy selector lists each available provider with its live connection state, and offers **Connect** for any that is not linked. Connecting starts the OAuth flow and returns you to `/works/new` when it completes.
+
+Two behaviours are worth knowing:
+
+- **Managed Git storage replaces the picker.** If your account keeps Work repositories in the managed Ever Works GitHub organization, the block shows where repositories go instead of a provider list — the platform creates the repository in its own org, so there is nothing for you to connect.
+- **A missing connection never costs you the form.** If the create call comes back needing a Git provider, the page stays exactly where it is with your name, slug, prompt, template and provider selections intact — the **Connect** control is right there in the sidebar.
 
 ### Repository Owner
 
@@ -197,3 +342,11 @@ If you don't explicitly select providers, the platform uses the defaults. The fo
 - [Pipeline Plugins](/plugin-system/pipeline-plugins) — How pipeline plugins orchestrate generation
 - [Scheduled Updates](./scheduled-updates) — Automatic periodic regeneration
 - [Plugin System](/plugin-system/) — Overview of the plugin architecture
+- [The + New page](./new-page.md) — The prompt-and-chips surface every create button funnels into
+- [Work Kinds & Capabilities](./work-kinds.md) — What each kind changes about the Work you get
+- [Work Blueprints](./work-blueprints.md) — The `ever-works/works` catalog behind the Blueprints group
+- [Website Templates](./website-templates.md) — The site code cloned into the website repository
+- [Ideas](./ideas.md) — Where the `?proposal=` handoff comes from
+- [Campaigns](./campaigns.md) — What "Start a campaign" provisions
+- [Managed Hosting](./managed-hosting.md) — The managed `*.ever.works` deploy target
+- [Kubernetes Deployment](./k8s-deployment.md) — Deploying a Work to a cluster

@@ -66,6 +66,21 @@ A few whose scope is easy to guess wrong:
 Both categories exist in the manifest schema, but **no plugin ships under either one**. Since a chip only appears for a category that has a registered plugin, you will not see them on the page. The per-Work Knowledge Base is unaffected — it does not go through them.
 :::
 
+### Where each category is documented in full
+
+Six categories have a page of their own, because choosing a provider in them is a decision with consequences well beyond the plugin card:
+
+| Category                            | Page                                                        | What that page adds                                                                                                                        |
+| ----------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Storage**                         | [Upload Storage Backends](./storage-backends.md)            | The four backends — local disk, AWS S3, MinIO, GitHub with Git LFS — what actually flows through them, and why vector stores are separate. |
+| **Secret Stores**                   | [Secret Stores](./secret-stores.md)                         | The seven resolver plugins, the `vault:` / `k8s:` / `aws-sm:` pointer schemes, and how far the consumer path currently reaches.            |
+| **Job Runtimes**                    | [Job Runtimes](./job-runtimes.md)                           | The six bundled runtimes, the instance selector, the tenant overlay, and the operator allow-lists.                                         |
+| **Connectors**                      | [Connectors](./connectors.md)                               | The eleven connectors one by one — credentials, inbound leg, outbound leg, and what each one does _not_ do.                                |
+| **Notification Channels**           | [Notifications, Channels & Preferences](./notifications.md) | Adding and test-sending a channel, and the event subscriptions that decide which event reaches which channel.                              |
+| **Databases** and **DNS Providers** | [Managed Hosting](./managed-hosting.md)                     | `postgres-db` (one database per Work) and `cloudflare-dns` on the managed `*.ever.works` path.                                             |
+
+Three more categories are documented inside the feature they power: **Git Providers** in [Git operations](./git-operations.md), **Deployment** in [Kubernetes deployment](./k8s-deployment.md), and **Metrics** in [Goals](./goals.md).
+
 ## Enabling a plugin
 
 Press **Enable** on the card. A dialog opens — titled **Enable**, described as _"Configure how this plugin is enabled across your works."_ — carrying one checkbox, **Also enable for all works**. Press **Enable** again in the dialog to commit.
@@ -87,7 +102,7 @@ Cancelling the dialog declines _that_ enable and nothing more: the checkbox is r
 
 ### There is no install step
 
-Enabling is the whole lifecycle. On installs running in **dynamic** plugin-distribution mode, enabling a plugin that is not yet on the server downloads and verifies the package first, then registers it. On bundled installs that step is a no-op — everything is already present.
+Enabling is the whole lifecycle. On installs running in **dynamic** plugin-distribution mode, enabling a plugin that is not yet on the server downloads and verifies the package first, then registers it. On bundled installs that step is a no-op — everything is already present. Which mode you are on, and what an operator has to configure before the dynamic one can fetch anything, is in [Dynamic plugin distribution](#dynamic-plugin-distribution) below.
 
 :::warning
 Neither `/plugins` nor a plugin's own page has an **Install** or **Uninstall** button. If you are following a guide that tells you to install a plugin before enabling it, that guide is describing the developer-facing plugin system, not this screen. Enable is the action you want.
@@ -171,6 +186,97 @@ A capability call resolves its provider **at the moment of the call**, not once 
 **Enabled is not the same as configured.** A plugin with no API key is enabled and still useless, and the two failures read differently. Search distinguishes them explicitly: _"Search plugins are enabled but none have all required settings configured (e.g. API key)."_ means you turned the plugin on but never finished its settings page.
 :::
 
+## Dynamic plugin distribution
+
+Everything above assumes the plugin's code already sits on the server. Whether that is true is an **operator** decision, made once per install with the `PLUGIN_DISTRIBUTION_MODE` environment variable on the API:
+
+| Mode                    | What the image carries                                                            | When code is fetched                                                                                                                                                                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bundled` **(default)** | Every plugin, discovered at boot.                                                 | Never. No registry calls, no network dependency, nothing to install.                                                                                                                                                                             |
+| `dynamic`               | Only plugins whose manifest declares `distribution: "core"`, plus system plugins. | On demand and per replica, from the configured registry — every other plugin is treated as `distribution: "registry"`. The field is optional and derived when omitted: `systemPlugin: true` implies `core`, everything else falls to `registry`. |
+
+Anything other than the exact string `dynamic` — empty, unset, `BUNDLED`, a typo — coerces to `bundled`. The fail-safe is always the offline one.
+
+### What an operator sets
+
+| Variable                     | Default                      | What it controls                                                                                                                                                                                                                                   |
+| ---------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PLUGIN_DISTRIBUTION_MODE`   | `bundled`                    | The mode above.                                                                                                                                                                                                                                    |
+| `FEATURE_DYNAMIC_PLUGINS`    | `false`                      | The independent master switch for the dynamic surface — the catalog, the install / uninstall API and the admin allowlist. Set it to `true` together with the mode; what it does on today's build is spelled out below.                             |
+| `PLUGIN_REGISTRY_URL`        | `https://registry.npmjs.org` | The primary registry the installer resolves packages from. Point it at your own mirror to install without reaching public npm. **The default applies to resolution only** — the boot guard below reads the raw variable, so unset counts as empty. |
+| `PLUGIN_REGISTRY_GITHUB_URL` | `https://npm.pkg.github.com` | The GitHub Packages fallback — used when an allowlist row's source is `github-packages`, or when the primary registry answers 404 for a first-party package. Its default is resolution-only too, on the same terms as the row above.               |
+| `PLUGIN_REGISTRY_TOKEN`      | unset                        | Bearer token for the registry. Read lazily, so a missing token surfaces on the first install rather than at boot. Never logged.                                                                                                                    |
+| `PLUGIN_INSTALL_DIR`         | `/app/plugins`               | Where installed packages are placed so Node can import them. In dynamic mode it **must** be writable — the boot reconciler refuses to start on a read-only directory.                                                                              |
+
+:::caution Set a registry URL explicitly — the defaults do not satisfy the boot guard
+In dynamic mode **at least one of `PLUGIN_REGISTRY_URL` or `PLUGIN_REGISTRY_GITHUB_URL` must be set explicitly.** The guard runs on the raw environment rather than on the resolved value, so leaving both unset — relying on the defaults in the table above — fails at boot exactly as clearing them does: _"PLUGIN_DISTRIBUTION_MODE=dynamic requires at least one of PLUGIN_REGISTRY_URL or PLUGIN_REGISTRY_GITHUB_URL to be set. Set PLUGIN_REGISTRY_URL=https://registry.npmjs.org (or your mirror) and re-deploy. Bundled-mode deployments are unaffected."_
+
+Setting `PLUGIN_REGISTRY_URL=https://registry.npmjs.org` explicitly is the whole fix. Failing loudly at boot is deliberate: the alternative is a confusing `502` on the first install.
+:::
+
+:::note What `FEATURE_DYNAMIC_PLUGINS` does today
+The flag is defined in the API configuration with a default of `false`, and [Self-host with Docker or Kubernetes](../guides/self-host-docker-kubernetes.md) lists it as the gate on the catalog, the install/uninstall API and the admin allowlist. On the current build nothing outside that configuration module reads it: the catalog and allowlist controllers are mounted regardless, and install / uninstall are refused on `PLUGIN_DISTRIBUTION_MODE` alone. So the flag turns nothing on or off by itself yet — set it to `true` alongside the mode anyway, so nothing changes underneath you when the gate is wired up.
+:::
+
+Building the image is a separate switch, covered in [Self-host with Docker or Kubernetes](../guides/self-host-docker-kubernetes.md).
+
+### The admin allowlist
+
+In dynamic mode the installer will not fetch an arbitrary package. First-party `@ever-works/*` is implicitly permitted and never appears in the list; **everything else needs an enabled allowlist row first**, or the install is refused with `409`.
+
+Platform admins manage that list on the **Plugin allowlist** page at `/admin/plugins/allowlist`:
+
+1. Fill the **Add package** form — **Package name** (for example `@some-vendor/cool-plugin`), **Version range** (`^2.0.0`) and **Source** (`npm` or `GitHub Packages`).
+2. Press **Add to allowlist**. The row joins the table below it, under the columns Package, Version range, Source, Enabled and Actions.
+3. Click a row's **Enabled** / **Disabled** pill to toggle it without deleting it — a disabled row registers the package but permits no installs.
+4. **Remove** deletes the row — a browser confirmation appears first, asking _"Remove “…” from the allowlist?"_. Already-installed plugins keep running; uninstalling one is a separate action.
+
+The route is invisible to everyone else: a non-admin gets the ordinary **404** page rather than a 403, so the page never advertises its own existence. The same list is available over REST at `/api/admin/plugins/allowlist` — `GET`, `POST`, `PATCH /:id` and `DELETE /:id`, all platform-admin only.
+
+### Installing, and what refuses
+
+| Action                   | Endpoint                                    | CLI                                      |
+| ------------------------ | ------------------------------------------- | ---------------------------------------- |
+| List what is installable | `GET /api/plugins/catalog`                  | `ever-works plugins catalog`             |
+| Install                  | `POST /api/plugins/:pluginId/install`       | `ever-works plugins install <id>`        |
+| Poll progress            | `GET /api/plugins/:pluginId/install-status` | `ever-works plugins install-status <id>` |
+| Uninstall                | `DELETE /api/plugins/:pluginId/install`     | `ever-works plugins uninstall <id>`      |
+
+The install body accepts `version` (pin an exact release instead of taking the latest), `integrity` (a `sha512-…` hash enforced before the package is trusted) and `source` (`npm`, the default, or `github-packages`). The CLI mirrors the three as `--version`, `--integrity` and `--source`.
+
+```mermaid
+graph LR
+    A[available] -->|install| B[installing]
+    B -->|package verified and linked| C[installed]
+    B -->|allowlist, integrity or registry failure| D[error]
+    C -->|uninstall| A
+    D -->|install| B
+```
+
+Install is idempotent — repeating it after a success is a no-op — and rate-limited to **5 installs per minute per user**. Uninstall unlinks the package and returns the state to `available` while keeping the downloaded files on disk, so a later install re-links without re-downloading.
+
+| Status        | When you get it                                                                                                                                          |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `404`         | The deployment is not in dynamic mode — _"Plugin install unavailable — PLUGIN_DISTRIBUTION_MODE=dynamic not configured."_ — or the plugin id is unknown. |
+| `409`         | On install: the package is not on the allowlist. On uninstall: it is a core or system plugin, which cannot be removed.                                   |
+| `424`         | Integrity mismatch — the downloaded package does not match the expected hash.                                                                            |
+| `502` / `504` | The registry was unreachable or failed.                                                                                                                  |
+
+On a bundled install the catalog is not an error either: with no catalog service wired it answers an empty list flagged `degraded: true`, so the same scripts and screens run everywhere.
+
+:::caution The four CLI subcommands do not work yet
+`plugins catalog`, `plugins install`, `plugins uninstall` and `plugins install-status` are registered and appear in `ever-works plugins --help`, but their handlers call raw `get` / `post` / `delete` verbs that the CLI's API service does not expose — each one fails before a request leaves your machine and exits non-zero. Until that wiring lands, call the REST endpoints above directly, or manage plugins from `/plugins` and `/settings/plugins`. See [CLI commands](../cli/commands.md#dynamic-distribution-subcommands).
+:::
+
+### How to install a distributable plugin
+
+1. Configure the API for dynamic distribution and restart it: `PLUGIN_DISTRIBUTION_MODE=dynamic`, `FEATURE_DYNAMIC_PLUGINS=true`, and `PLUGIN_REGISTRY_URL` set **explicitly** — `https://registry.npmjs.org`, or your own mirror. Leaving the registry URLs to their defaults is what the boot guard rejects. In bundled mode there is nothing to install: every plugin is already in the image.
+2. As a platform admin, add the package at `/admin/plugins/allowlist` and leave the row **Enabled**. Skip this step for first-party `@ever-works/*` packages.
+3. List what is installable: `GET /api/plugins/catalog`.
+4. Install it: `POST /api/plugins/notion-extractor/install`, optionally with a body of `{"version": "1.2.0", "integrity": "sha512-…", "source": "npm"}`.
+5. Poll `GET /api/plugins/notion-extractor/install-status` until `installState` reads `installed`; on `error`, read `installError` for the reason.
+6. Open **Plugins** (`/plugins`), press **Enable** on the card, and decide about **Also enable for all works** exactly as you would for any bundled plugin.
+
 ## On small screens
 
 :::caution On a narrow window, the AI chat panel can sit over the buttons
@@ -180,9 +286,17 @@ On a narrow window — below 768px, so phones and split-screen — the AI chat d
 ## Related
 
 - [Integrations](./integrations.md) — connectors and the event stream they feed.
+- [Connectors](./connectors.md) — the eleven connector plugins, one by one.
+- [Notifications, Channels & Preferences](./notifications.md) — where the Notification Channels category is put to work.
+- [Upload Storage Backends](./storage-backends.md) — the Storage category end to end.
+- [Secret Stores](./secret-stores.md) — resolving a credential reference instead of storing a secret.
+- [Job Runtimes](./job-runtimes.md) — which engine runs the background work.
+- [Managed Hosting](./managed-hosting.md) — the Databases and DNS Providers categories on the managed path.
 - [Goals](./goals.md) — what the Metrics category is for.
 - [Git operations](./git-operations.md) — what a Git provider plugin unlocks.
 - [Kubernetes deployment](./k8s-deployment.md) — a deployment plugin end to end.
 - [Knowledge Base](./knowledge-base.md) — retrieval that leans on AI provider and vector-store plugins.
 - [Settings map](./settings-map.md) — where every other setting lives.
 - [Onboarding](./onboarding.md) — the wizard that enables your first plugins.
+- [CLI commands](../cli/commands.md) — the `plugins` command group, including the dynamic-distribution subcommands.
+- [Self-host with Docker or Kubernetes](../guides/self-host-docker-kubernetes.md) — choosing a distribution mode when you build the image.
