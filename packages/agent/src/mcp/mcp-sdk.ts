@@ -105,6 +105,13 @@ export function createSdkMcpClientFactory(): McpClientFactory {
 }
 
 /**
+ * Bound for a stdio server's `initialize` handshake, matching the remote
+ * path's connect bound. A spawn that succeeds and then never speaks must not
+ * cost more than a dead HTTP server does.
+ */
+export const MCP_STDIO_CONNECT_TIMEOUT_MS = 10_000;
+
+/**
  * Spawn a stdio MCP server and return a CONNECTED client for it (AP-14).
  *
  * Two orderings here are load-bearing, and both are why this could not reuse
@@ -131,18 +138,30 @@ export async function createStdioSdkClient(params: {
     args: string[];
     env: Record<string, string>;
     cwd: string;
+    /** Bound for the `initialize` handshake. See {@link MCP_STDIO_CONNECT_TIMEOUT_MS}. */
+    timeoutMs?: number;
 }): Promise<{ client: McpSdkClient; close(): Promise<void> }> {
     const { Client } = await import('@modelcontextprotocol/sdk/client/index.js');
     const { StdioClientTransport } = await import('@modelcontextprotocol/sdk/client/stdio.js');
 
-    const transport = new StdioClientTransport({ ...params, stderr: 'pipe' });
+    const { timeoutMs = MCP_STDIO_CONNECT_TIMEOUT_MS, ...spawn } = params;
+    const transport = new StdioClientTransport({ ...spawn, stderr: 'pipe' });
     const client = new Client({ name: 'ever-works-agent', version: '1.0.0' }, { capabilities: {} });
 
     // Before connect. See (2) above — after is a deadlock, not a style choice.
     transport.stderr?.on('data', () => undefined);
 
     try {
-        await client.connect(transport);
+        // BOUNDED. `Client.connect` runs the `initialize` handshake as an
+        // ordinary request, so without this it falls back to the SDK's
+        // `DEFAULT_REQUEST_TIMEOUT_MSEC` of 60s. This is awaited inside run
+        // assembly, once per stdio connection, serially and before the run
+        // loop's first cancellation checkpoint — so a package that spawns
+        // and then never answers would freeze the whole run for a minute per
+        // server, uncancellable. The remote path bounds its connect at the
+        // same 10s and says why; this is that rule applied to a transport
+        // that can hang just as easily.
+        await client.connect(transport, { timeout: timeoutMs });
     } catch (err) {
         // The child may already be running even though initialization failed.
         await transport.close().catch(() => undefined);

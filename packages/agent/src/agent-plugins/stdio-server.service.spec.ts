@@ -393,6 +393,26 @@ describe('AgentPluginStdioServerService.launchClient', () => {
     });
 
     /**
+     * The backstop. `McpToolSource.releaseRun` handles the normal case, but a
+     * pod told to drain mid-run has no run end to hook — and until this was
+     * wired, `running` was a write-only accumulator while the docstring
+     * claimed otherwise.
+     */
+    it('onModuleDestroy stops everything still running', async () => {
+        await svc.launchClient(req());
+        await svc.launchClient(req());
+
+        await svc.onModuleDestroy();
+
+        expect(svc.closes).toEqual(['closed', 'closed']);
+    });
+
+    it('onModuleDestroy is quiet and safe when nothing is running', async () => {
+        await expect(svc.onModuleDestroy()).resolves.toBeUndefined();
+        expect(svc.closes).toEqual([]);
+    });
+
+    /**
      * The race the generation counter exists for: a shutdown that snapshots
      * the running set while this launch is still connecting would never see
      * the new server. It must stop itself rather than register into a set

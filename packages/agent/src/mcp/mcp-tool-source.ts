@@ -14,6 +14,16 @@ import {
 } from './mcp-stdio-launcher';
 import type { McpSdkClient } from './mcp-sdk';
 
+/**
+ * One run's hold on a launched stdio server. `released` is flipped by the
+ * run's teardown so a descriptor captured by a finished run fails locally
+ * rather than against a closed client.
+ */
+interface StdioSession {
+    readonly client: McpSdkClient;
+    released: boolean;
+}
+
 /** `mcp__<server>__<tool>` must stay within provider tool-name limits. */
 export const MCP_TOOL_NAME_MAX = 128;
 const MCP_DESCRIPTION_MAX = 1024;
@@ -127,9 +137,9 @@ export class McpToolSource implements AgentMcpToolSource {
             // For a stdio connection this SPAWNS the server and keeps the
             // client for the whole run; for a remote one it is null and the
             // dial-per-call path below is unchanged.
-            let runClient: McpSdkClient | null;
+            let session: StdioSession | null;
             try {
-                runClient = await this.openStdioClient(agent, connection, run);
+                session = await this.openStdioClient(agent, connection, run);
             } catch (err) {
                 this.logger.warn(
                     `Agent ${agent.id} run ${run.runId}: stdio MCP server "${connection.name}" could not be launched (skipped): ${
@@ -139,8 +149,8 @@ export class McpToolSource implements AgentMcpToolSource {
                 continue;
             }
             try {
-                tools = runClient
-                    ? await this.client.listToolsOver(runClient, connection)
+                tools = session
+                    ? await this.client.listToolsOver(session.client, connection)
                     : await this.client.listTools(connection);
             } catch (err) {
                 // Dead server → zero tools + WARN, never a failed run. The
@@ -155,7 +165,7 @@ export class McpToolSource implements AgentMcpToolSource {
                 continue;
             }
             for (const tool of tools) {
-                const descriptor = this.toDescriptor(agent, connection, tool, runClient);
+                const descriptor = this.toDescriptor(agent, connection, tool, session);
                 if (!descriptor) continue;
                 if (seen.has(descriptor.name)) {
                     this.logger.warn(
@@ -220,7 +230,7 @@ export class McpToolSource implements AgentMcpToolSource {
         agent: Agent,
         connection: McpServerConnection,
         run: AgentMcpRunHandle,
-    ): Promise<McpSdkClient | null> {
+    ): Promise<StdioSession | null> {
         if (connection.transport !== 'stdio') return null;
 
         if (!this.stdioLauncher) {
@@ -242,8 +252,21 @@ export class McpToolSource implements AgentMcpToolSource {
             packageName: target.packageName,
             serverName: target.serverName,
         });
-        this.registerRunResource(run.runId, { close: () => launched.close() });
-        return launched.client;
+
+        // The session, not the bare client. A descriptor captures this object,
+        // so once the run is released `invoke` refuses locally instead of
+        // reaching a closed client — whose "Not connected" rejection would be
+        // classified as a server error and STAMPED onto `lastError`, leaving a
+        // healthy connection showing a fault in the UI because a tool call
+        // arrived late.
+        const session: StdioSession = { client: launched.client, released: false };
+        this.registerRunResource(run.runId, {
+            close: async () => {
+                session.released = true;
+                await launched.close();
+            },
+        });
+        return session;
     }
 
     // ── internals ─────────────────────────────────────────────────
@@ -252,7 +275,7 @@ export class McpToolSource implements AgentMcpToolSource {
         agent: Agent,
         connection: McpServerConnection,
         tool: McpToolInfo,
-        runClient: McpSdkClient | null = null,
+        session: StdioSession | null = null,
     ): AgentToolDescriptor | null {
         const sanitizedTool = this.sanitizeToolName(tool.name);
         if (!sanitizedTool) {
@@ -293,8 +316,16 @@ export class McpToolSource implements AgentMcpToolSource {
             invoke: async (args: unknown) => {
                 const record =
                     args && typeof args === 'object' ? (args as Record<string, unknown>) : {};
-                const result = runClient
-                    ? await this.client.callToolOver(runClient, connection, tool.name, record)
+                if (session?.released) {
+                    // The run that owned this subprocess has ended. Answering
+                    // locally keeps a late call from stamping a failure onto a
+                    // connection that is perfectly healthy.
+                    return {
+                        error: `MCP server "${connection.name}": the run that started this server has ended.`,
+                    };
+                }
+                const result = session
+                    ? await this.client.callToolOver(session.client, connection, tool.name, record)
                     : await this.client.callTool(connection, tool.name, record);
                 // Started but NOT awaited. The helper swallows its own
                 // rejections, but `repository.save()` can still stall — and a

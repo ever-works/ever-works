@@ -152,6 +152,27 @@ describe('McpToolSource — stdio connections (AP-14)', () => {
         expect(close).toHaveBeenCalledTimes(1);
     });
 
+    /**
+     * A tool descriptor outlives its run: the model can hold one and call it
+     * late. Reaching the closed client would surface as "Not connected",
+     * which `callToolOver` classifies as a server fault and STAMPS onto
+     * `lastError` — leaving a healthy connection showing an error in the
+     * Settings UI because a call arrived after the run ended.
+     */
+    it('a call after releaseRun fails locally, without touching the connection or its status', async () => {
+        const { launcher } = makeLauncher();
+        const { source, client } = makeSource({ connections: [makeConnection()], launcher });
+
+        const [tool] = await source.buildTools(makeAgent(), RUN);
+        await source.releaseRun('run-1');
+
+        const result = (await tool.invoke({ q: 'x' })) as { error: string };
+
+        expect(result.error).toContain('the run that started this server has ended');
+        expect(client.callToolOver).not.toHaveBeenCalled();
+        expect(client.callTool).not.toHaveBeenCalled();
+    });
+
     it('keeps runs apart — releasing another run leaves this one’s server running', async () => {
         const { launcher, close } = makeLauncher();
         const { source } = makeSource({ connections: [makeConnection()], launcher });

@@ -59,8 +59,13 @@ export function stdioConnectionUrl(packageName: string, serverName: string): str
  * including a row whose transport says stdio but whose URL does not parse —
  * a mismatch is treated as "no tools", never as a guess.
  *
- * A package name may itself contain `/` (npm scopes), so the SERVER name is
- * taken from the last segment and the package name is everything before it.
+ * The SERVER name is the last segment and the package name is everything
+ * before it. Both are already constrained upstream — a manifest name matches
+ * `^[a-z0-9][a-z0-9.-]*[a-z0-9]$` and a server name reaching the reconciler
+ * matches `^[a-zA-Z0-9][a-zA-Z0-9_-]*$` — so neither can contain `/` and no
+ * two pairs can produce the same pointer today. `lastIndexOf` is chosen so
+ * that stays true if a scoped name (`@acme/tools`) is ever allowed, rather
+ * than because one is allowed now.
  */
 export function parseStdioConnectionUrl(
     url: string,

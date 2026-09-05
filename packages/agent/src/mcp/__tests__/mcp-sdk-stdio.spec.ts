@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { createStdioSdkClient } from '../mcp-sdk';
+import { createStdioSdkClient, MCP_STDIO_CONNECT_TIMEOUT_MS } from '../mcp-sdk';
 
 /**
  * `createStdioSdkClient` against a REAL child process (AP-14).
@@ -88,6 +88,26 @@ describe('createStdioSdkClient', () => {
                 cwd: __dirname,
             }),
         ).rejects.toBeDefined();
+    });
+
+    /**
+     * A server can spawn cleanly and then never speak. `Client.connect` runs
+     * `initialize` as an ordinary request, so unbounded it waits the SDK's
+     * 60s default — awaited inside run assembly, per connection, serially,
+     * and before the run loop's first cancellation checkpoint.
+     */
+    it('gives up on a server that spawns and never answers, instead of hanging', async () => {
+        const started = Date.now();
+
+        await expect(
+            createStdioSdkClient({ ...baseParams({ HANG_FOREVER: '1' }), timeoutMs: 1_000 }),
+        ).rejects.toBeDefined();
+
+        expect(Date.now() - started).toBeLessThan(20_000);
+    });
+
+    it('defaults the bound to the same 10s the remote connect path uses', () => {
+        expect(MCP_STDIO_CONNECT_TIMEOUT_MS).toBe(10_000);
     });
 
     it('close() is safe to call twice', async () => {

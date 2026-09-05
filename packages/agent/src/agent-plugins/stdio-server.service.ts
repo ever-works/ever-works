@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import type { McpStdioServer } from '@ever-works/agent-plugins';
 import { config } from '../config';
 import { AgentPluginPackageDataDirService } from './package-data-dir.service';
@@ -55,7 +55,7 @@ export interface RunningStdioClient extends RunningStdioServer {
 }
 
 @Injectable()
-export class AgentPluginStdioServerService {
+export class AgentPluginStdioServerService implements OnModuleDestroy {
     private readonly logger = new Logger(AgentPluginStdioServerService.name);
     private factory: StdioTransportFactory | null = null;
 
@@ -177,6 +177,26 @@ export class AgentPluginStdioServerService {
      * cannot strand the others — a half-completed teardown leaks processes,
      * which is worse than a noisy log line.
      */
+    /**
+     * The backstop this service's own docstring has promised since it was
+     * written, and which nothing actually called until now.
+     *
+     * `McpToolSource.releaseRun` stops the servers it launched on every exit
+     * path of a run, and that is the normal case. This covers the ones it
+     * cannot reach: a pod told to drain mid-run, a runtime whose tool service
+     * predates `releaseMcpRun`, or any future caller of `launch()` that holds
+     * a handle of its own. Without it the `running` set is a write-only
+     * accumulator and the guarantee is imaginary.
+     */
+    async onModuleDestroy(): Promise<void> {
+        const { stopped, failed } = await this.shutdownAll();
+        if (stopped > 0 || failed > 0) {
+            this.logger.log(
+                `Shutdown: stopped ${stopped} stdio server(s), ${failed} failed to stop.`,
+            );
+        }
+    }
+
     async shutdownAll(): Promise<{ stopped: number; failed: number }> {
         // Bumped BEFORE the snapshot, so a launch that completes during
         // teardown sees a different generation and closes itself rather than
@@ -206,8 +226,8 @@ export class AgentPluginStdioServerService {
      * race guard — the difference is who starts the transport. `launch()`
      * starts it standalone; here the SDK client does, because it must
      * (`createStdioSdkClient` documents why). Both register into the same
-     * `running` set, so `shutdownAll` on module destroy still stops every
-     * subprocess this service ever spawned, whoever is holding it.
+     * `running` set, which `onModuleDestroy` drains — so a subprocess whose
+     * handle nobody closes is still stopped when the module goes down.
      */
     async launchClient(request: StdioLaunchRequest): Promise<RunningStdioClient> {
         const generation = this.shutdownGeneration;

@@ -4,6 +4,8 @@ import { McpToolSource } from '../mcp-tool-source';
 import { McpClientService } from '../mcp-client.service';
 import { McpConnectionsService } from '../mcp-connections.service';
 import { MCP_STDIO_LAUNCHER, type McpStdioLauncher } from '../mcp-stdio-launcher';
+import { McpModule } from '../mcp.module';
+import { AgentPluginsModule } from '../../agent-plugins/agent-plugins.module';
 
 /**
  * DI wiring for the AP-14 seam.
@@ -72,12 +74,12 @@ describe('MCP_STDIO_LAUNCHER wiring', () => {
         await moduleRef.close();
     });
 
-    it('the production McpModule lists AgentPluginsModule among its imports', async () => {
+    it('the production McpModule lists AgentPluginsModule among its imports', () => {
         // Belt to the braces above: the instance test proves the SHAPE works,
         // this proves the shipped module actually has it. Read off the Nest
         // metadata rather than the file, so a re-ordering does not break it.
-        const { McpModule } = await import('../mcp.module');
-        const { AgentPluginsModule } = await import('../../agent-plugins/agent-plugins.module');
+        // Static imports, not `await import(...)` — a dynamic import in a spec
+        // fails tsc under this repo's `node16` module resolution.
         const imports = Reflect.getMetadata('imports', McpModule) as unknown[];
 
         expect(imports).toContain(AgentPluginsModule);

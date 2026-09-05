@@ -329,6 +329,58 @@ describe('PackageMcpReconcilerService', () => {
         expect(repo.create).toHaveBeenCalled();
     });
 
+    /**
+     * The escalation this must not allow. What an operator authorised when
+     * they enabled a `streamable-http` row is an agent reaching a remote API.
+     * If a package update turns that same row into `stdio`, carrying the
+     * enable forward would silently convert it into permission to execute
+     * local code — with the package author's release as the only input.
+     */
+    it('DISABLES an enabled row when a package update changes its transport to stdio', async () => {
+        process.env.AGENT_PLUGINS_STDIO = 'true';
+        await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
+            local: { type: 'stdio', command: './bin/server' },
+        });
+        const { service, repo } = build();
+        const existing = {
+            id: 'c1',
+            name: 'acme-tools-local',
+            url: 'https://acme.example.com/mcp',
+            transport: 'streamable-http',
+            source: 'package',
+            enabled: true,
+        };
+        repo.findByUserAndName.mockResolvedValue(existing);
+
+        const result = await service.reconcile({ userId: 'user-1' }, 'acme.tools');
+
+        expect(result.updated).toHaveLength(1);
+        expect(existing.transport).toBe('stdio');
+        expect(existing.enabled).toBe(false);
+        expect(repo.save).toHaveBeenCalledWith(existing);
+    });
+
+    it('leaves `enabled` alone when only the URL moved — a new address is not a new kind', async () => {
+        await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
+            local: { type: 'streamable-http', url: 'https://moved.example.com/mcp' },
+        });
+        const { service, repo } = build();
+        const existing = {
+            id: 'c1',
+            name: 'acme-tools-local',
+            url: 'https://acme.example.com/mcp',
+            transport: 'streamable-http',
+            source: 'package',
+            enabled: true,
+        };
+        repo.findByUserAndName.mockResolvedValue(existing);
+
+        await service.reconcile({ userId: 'user-1' }, 'acme.tools');
+
+        expect(existing.url).toBe('https://moved.example.com/mcp');
+        expect(existing.enabled).toBe(true);
+    });
+
     it('carries forward what the resolver already refused, in one report', async () => {
         await writePackage(process.env.AGENT_PLUGINS_DIR!, 'acme', 'acme.tools', {
             // A REMOTE server referencing ${PLUGIN_DATA}: nothing can resolve

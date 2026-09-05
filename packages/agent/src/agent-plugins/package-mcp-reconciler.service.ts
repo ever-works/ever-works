@@ -314,11 +314,30 @@ export class PackageMcpReconcilerService {
             return { kind: 'unchanged', name };
         }
 
-        // The package changed where its server lives. Update the address, but
-        // leave `enabled` and any bindings exactly as the operator set them —
-        // a new URL is not a reason to re-authorise, nor to revoke.
+        // The package changed where its server lives. A new URL is not a
+        // reason to re-authorise, nor to revoke — but a new TRANSPORT is.
+        //
+        // What an operator authorised when they enabled a `streamable-http`
+        // row is an agent reaching a remote API. If a package update turns
+        // that same row into `stdio`, carrying the enable forward would
+        // convert that decision into permission to execute local code, with
+        // no human action anywhere in the sequence — the package author's
+        // release is the only input. So a transport change forces the row
+        // back to disabled and the operator decides again. Bindings are left
+        // alone deliberately: they are inert while the row is disabled
+        // (`resolveEffectiveConnections` requires the connection enabled),
+        // and dropping them would lose configuration the operator may well
+        // want to keep once they have re-approved.
+        const transportChanged = existing.transport !== server.transport;
         existing.url = url;
         existing.transport = server.transport as McpServerConnection['transport'];
+        if (transportChanged && existing.enabled) {
+            existing.enabled = false;
+            this.logger.warn(
+                `Connection "${name}" changed transport to "${server.transport}" and was ` +
+                    `DISABLED pending re-authorisation.`,
+            );
+        }
         await this.connections.save(existing);
         return { kind: 'updated', name };
     }
