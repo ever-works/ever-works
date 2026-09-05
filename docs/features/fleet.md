@@ -259,8 +259,8 @@ cannot read) fails the plan naming the attachment rather than silently running w
 
 ### When the agent needs you
 
-The agent on your machine has no platform tools — it cannot message you mid-run. What it can do is
-**pause the run with a question**: when it hits a decision only you can make (an ambiguous
+Unless the MCP bridge below is switched on, the agent on your machine has no platform tools — it
+cannot message you mid-run. What it can do is **pause the run with a question**: when it hits a decision only you can make (an ambiguous
 requirement, a risky or irreversible step, a choice between materially different directions) it
 writes `.ever-works/QUESTION.md` in the repository root — the first line (or a `# ` heading) is the
 question, the rest is optional context and options — and stops. The node reports the question and
@@ -303,6 +303,53 @@ lose uncommitted work when the answer run lands on a different node, because tha
 the base ref — the `# OWNER ANSWER` section tells the model when that is the case; a question file
 written somewhere other than the repository root (or a mounted repository's root) is kept out of Git
 but is not reported as a question.
+
+### Platform tools from a fleet run (MCP bridge)
+
+By default a fleet run is sealed: the model gets a Task brief, a worktree and nothing else. The
+**MCP bridge** opens a narrow, temporary channel to the platform's own tools — Tasks, Inbox, Goals,
+Missions, Works, Agents, Plugins and read-only Fleet status — so an agent can read the context it
+needs and record progress instead of guessing and reporting at the end.
+
+It is **off by default** and needs three separate yeses:
+
+1. the operator turns it on for the whole install (`FLEET_NODE_MCP_BRIDGE_ENABLED=true` plus
+   `FLEET_NODE_MCP_URL` pointing at your MCP server's `/mcp` endpoint);
+2. the Agent has **Call external tools** (Agent → Capabilities) — the same permission that gates MCP
+   tools for a cloud run, so an Agent you have not trusted with tools does not gain them by landing
+   on a fleet node;
+3. the run is not in `plan` permission mode (a read-only session must not be able to write through
+   tools).
+
+**How the credential works.** When the model step starts, the node asks the platform for a token
+scoped to that one run. The platform mints it only for the node **currently holding the lease** on
+that job, binds it to the job, the run, you, and the run's Organization, and expires it with the
+lease. The node keeps it in memory and starts a listener on `127.0.0.1` at a random port and a
+random path; the model is handed only that local URL. Every call the model makes is forwarded to the
+platform with the token attached on the way out. The token is never written to disk, never put in
+the model's environment, never logged, and never appears in the run's result. It is revoked when the
+model step ends and again when the job settles — including when the machine dies mid-run, because
+the platform revokes on the job's own completion.
+
+**What the tools can and cannot do.** They act as **you**, in the run's Organization scope, and only
+for the life of the run. They are limited to the tool surface above: a run token cannot mint another
+credential, cannot touch your API keys, cannot report a verdict on its own job, and cannot drain the
+machine it is running on or repoint another Agent's node pinning (Fleet is read-only for a run). A
+handful of routes that merely share a URL prefix with the tool surface are carved back out for the
+same reason — an Agent run's **terminal** (which mints a WebSocket credential and opens your worker
+shell), its MCP-server and repository **connection bindings**, its **collaborator** roster, and the
+Composio **OAuth** endpoints. None of them is a tool, and a run token is refused on all of them. The
+instructions also tell the model never to use the tools to approve, review or transition its own work
+past a human gate.
+
+**Operator prerequisites.** The MCP server the nodes reach must accept per-user credentials
+(`EVER_WORKS_MCP_AUTH_MODE=per-user-jwt`, or `hybrid` in development) — a node holds no shared key —
+and its `EVER_WORKS_SCOPE_SLUG` must be unset or equal to the Organization the runs belong to, since
+the token's own scope wins and a mismatch is refused.
+
+The run's result records whether the bridge was up and how many tool calls went through it. If the
+bridge cannot start for any reason, the run proceeds exactly as a run without it and says so — a
+tool channel that fails never fails a Task.
 
 ## Related
 

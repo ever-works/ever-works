@@ -29,5 +29,7 @@ export * from './worker-safety-store';
 export * from './executors/acceptance-checks';
 export * from './executors/agent-task';
 export * from './executors/browser-check';
+// Fleet MCP bridge (self-build slice Z / EW-796) — the loopback proxy.
+export * from './executors/mcp-bridge';
 export * from './executors/model-cli';
 export * from './model-cli-probe';

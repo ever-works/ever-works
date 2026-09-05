@@ -927,6 +927,13 @@ export function parseAgentTaskResult(
     return {
         ...(raw as FleetAgentTaskResult),
         status,
+        // Self-build slice Z (EW-796): the MCP bridge verdict, narrowed at
+        // the boundary like every other block here. The raw spread would
+        // already carry it, but untyped — and this is a value a run report
+        // renders, so a malformed shape must become `null` rather than
+        // travel as an object nobody validated. It can never carry the
+        // token: the node has no path to put one there.
+        mcp: normalizeMcpResult(raw.mcp),
         taskId: typeof raw.taskId === 'string' ? raw.taskId : '',
         runId: typeof raw.runId === 'string' ? raw.runId : null,
         checks,
@@ -941,6 +948,33 @@ export function parseAgentTaskResult(
         // never leak an untyped (or smuggled-field) question into the
         // parked-run path.
         question: normalizeFleetAgentTaskQuestion(redactQuestionFields(raw.question)),
+    };
+}
+
+/**
+ * Self-build slice Z — coerce the node's MCP block to `{ enabled, toolCalls,
+ * unavailableReason }` or `null`.
+ *
+ * Deliberately total: any shape that is not recognisable is `null`, which
+ * reads exactly like a run that never had a bridge. The bridge is a
+ * reporting nicety and must never be able to fail a reconcile.
+ */
+function normalizeMcpResult(raw: unknown): FleetAgentTaskResult['mcp'] {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const input = raw as Record<string, unknown>;
+    if (typeof input.enabled !== 'boolean') return null;
+    const toolCalls =
+        typeof input.toolCalls === 'number' &&
+        Number.isFinite(input.toolCalls) &&
+        input.toolCalls >= 0
+            ? Math.floor(input.toolCalls)
+            : null;
+    return {
+        enabled: input.enabled,
+        toolCalls,
+        ...(typeof input.unavailableReason === 'string'
+            ? { unavailableReason: truncate(input.unavailableReason, 500) }
+            : {}),
     };
 }
 

@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { randomBytes, createHash } from 'crypto';
 import { ApiKeyRepository } from '@ever-works/agent/database';
+import { PERSONAL_API_KEY_KIND } from '@ever-works/contracts';
 
 const API_KEY_PREFIX = 'ew_live_';
 const MAX_KEYS_PER_USER = 10;
@@ -97,6 +98,27 @@ export class ApiKeyService {
         const apiKey = await this.apiKeyRepository.findByHashedKey(hashedKey);
 
         if (!apiKey) {
+            return null;
+        }
+
+        // Self-build slice Z (EW-796) — PERSONAL keys only.
+        //
+        // `api_keys` now holds two kinds of row. A `fleet-run` row is a
+        // short-lived credential minted for a model on someone's desktop,
+        // and it is only safe because `FleetRunCredentialService.authenticate`
+        // gates it on a route allowlist, on the bound job still being held
+        // by the bound node, and on an Organization pin the scope guard
+        // enforces. THIS method applies none of those checks, so it must
+        // never accept such a row — otherwise any caller that reaches
+        // `validateKey` (the `ew_live_` guard branch, and the @Public()
+        // uploads controller, which forwards ANY `x-api-key` value it is
+        // handed) would authenticate a run token as the plain owner with
+        // the whole API surface open to it.
+        //
+        // Discriminating on the stored `kind` rather than on the raw
+        // prefix is deliberate: the row is the fact, the prefix is only a
+        // routing hint, and a future kind is refused here by default.
+        if (apiKey.kind !== PERSONAL_API_KEY_KIND) {
             return null;
         }
 

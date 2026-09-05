@@ -2,6 +2,8 @@ import type {
 	FleetJobCompleteResponse,
 	FleetJobHeartbeatResponse,
 	FleetJobLeaseResponse,
+	FleetJobMcpCredentialResponse,
+	FleetJobMcpCredentialRevokeResponse,
 	FleetJobView
 } from '@ever-works/contracts';
 import { FleetClientError, joinUrl, normalizeApiUrl, type FetchLike, type FetchRequestInit } from './fleet-client';
@@ -14,6 +16,8 @@ import { MAX_CREDENTIAL_LENGTH, MIN_CREDENTIAL_LENGTH } from './types';
  *   POST /api/fleet/jobs/lease           → claim queued work
  *   POST /api/fleet/jobs/:id/heartbeat   → keep the claim alive
  *   POST /api/fleet/jobs/:id/complete    → report the verdict
+ *   POST /api/fleet/jobs/:id/mcp-credential          → mint a run token
+ *   POST /api/fleet/jobs/:id/mcp-credential/revoke   → drop it early
  *
  * Same posture as {@link FleetClient}: all three are `@Public()` and
  * self-authenticating (the `(nodeId, secret)` pair in the body IS the
@@ -173,6 +177,56 @@ export class FleetJobClient {
 			body
 		)) as FleetJobCompleteResponse;
 		return Boolean(payload?.ok);
+	}
+
+	/**
+	 * Self-build slice Z (EW-796) — mint the run-scoped MCP credential for
+	 * a job this node holds.
+	 *
+	 * Authenticated with the node secret like every other call here; the
+	 * platform authorises on the LEASE, so this only succeeds while this
+	 * machine actually holds the claim. The returned token is registered
+	 * with the redacting logger before it leaves this method, so from that
+	 * instant it cannot appear in any node log line even by accident.
+	 *
+	 * The token is NOT stored on this client. It is returned to the caller
+	 * (the model step), lives in that closure, and is dropped when the
+	 * step ends.
+	 */
+	async mintMcpCredential(jobId: string): Promise<FleetJobMcpCredentialResponse> {
+		const payload = (await this.post(
+			`api/fleet/jobs/${encodeURIComponent(jobId)}/mcp-credential`,
+			'job-mcp-credential',
+			{ nodeId: this.nodeId, secret: this.secret }
+		)) as FleetJobMcpCredentialResponse;
+		if (
+			!payload ||
+			typeof payload.token !== 'string' ||
+			!payload.token ||
+			typeof payload.serverUrl !== 'string' ||
+			!payload.serverUrl
+		) {
+			throw new FleetClientError('malformed', 'MCP credential response did not contain a token');
+		}
+		this.logger?.protect(payload.token);
+		return payload;
+	}
+
+	/**
+	 * Revoke this job's run credentials early, right after the model step.
+	 *
+	 * Best-effort by contract: the platform revokes again when the job
+	 * settles and the token expires with the lease regardless, so a
+	 * failure here narrows a window rather than opening one. Returns the
+	 * number the platform actually deactivated.
+	 */
+	async revokeMcpCredential(jobId: string): Promise<number> {
+		const payload = (await this.post(
+			`api/fleet/jobs/${encodeURIComponent(jobId)}/mcp-credential/revoke`,
+			'job-mcp-credential-revoke',
+			{ nodeId: this.nodeId, secret: this.secret }
+		)) as FleetJobMcpCredentialRevokeResponse;
+		return typeof payload?.revoked === 'number' ? payload.revoked : 0;
 	}
 
 	private async post(

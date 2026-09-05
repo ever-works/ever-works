@@ -1672,6 +1672,74 @@ describe('parseAgentTaskResult', () => {
         });
     });
 
+    /**
+     * Self-build slice Z (EW-796) — the MCP bridge verdict.
+     *
+     * It is a reporting value that a run report renders, so it is narrowed
+     * at this boundary like every other block: a shape nobody validated
+     * must not travel onward, and a malformed one must read exactly like a
+     * run that never had a bridge rather than failing the reconcile
+     * half-way through.
+     */
+    it('normalises the MCP bridge block (slice Z)', () => {
+        // Absent → null, indistinguishable from a run without the bridge.
+        expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })!.mcp).toBeNull();
+
+        // The two real shapes the node reports.
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: 7 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: 7 });
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: false, toolCalls: null, unavailableReason: 'EADDRINUSE' },
+            })!.mcp,
+        ).toEqual({ enabled: false, toolCalls: null, unavailableReason: 'EADDRINUSE' });
+
+        // Garbage of every shape → null rather than a throw.
+        for (const mcp of [null, 'yes', 42, [], {}, { enabled: 'true' }, { toolCalls: 3 }]) {
+            expect(
+                parseAgentTaskResult({ status: 'succeeded', taskId: TASK, mcp })!.mcp,
+            ).toBeNull();
+        }
+
+        // A nonsense count is dropped, not carried.
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: -1 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: null });
+        expect(
+            parseAgentTaskResult({
+                status: 'succeeded',
+                taskId: TASK,
+                mcp: { enabled: true, toolCalls: 2.7 },
+            })!.mcp,
+        ).toEqual({ enabled: true, toolCalls: 2 });
+
+        // Smuggled keys are dropped — including anything token-shaped a
+        // node could never legitimately have put there.
+        const parsed = parseAgentTaskResult({
+            status: 'succeeded',
+            taskId: TASK,
+            mcp: {
+                enabled: true,
+                toolCalls: 1,
+                token: 'ew_run_secret',
+                serverUrl: 'https://x/mcp',
+            },
+        })!.mcp!;
+        expect(Object.keys(parsed).sort()).toEqual(['enabled', 'toolCalls']);
+        expect(JSON.stringify(parsed)).not.toContain('ew_run_');
+    });
+
     it('normalises the owner question (slice Q): absent or garbage → null, oversize text sliced, unknown keys dropped', () => {
         expect(parseAgentTaskResult({ status: 'succeeded', taskId: TASK })!.question).toBeNull();
         expect(

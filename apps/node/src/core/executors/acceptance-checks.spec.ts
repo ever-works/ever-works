@@ -298,4 +298,53 @@ describe('buildNodeCheckEnv — a check never inherits this machine', () => {
 	it('injects CI=1 so watch modes do not hang a check to its timeout', () => {
 		expect(buildNodeCheckEnv(undefined, parent).CI).toBe('1');
 	});
+
+	/**
+	 * Self-build slice Z (EW-796) — the MCP bridge did NOT weaken this.
+	 *
+	 * The bridge exists precisely BECAUSE `EVER_WORKS_` can never be
+	 * granted: a run credential could not be handed to the model through
+	 * the environment, so it is handed to a loopback proxy instead and the
+	 * model never sees it at all. These cases exist so that a future
+	 * "just add one exception" cannot land quietly — an env-based bridge
+	 * would have to delete a passing test, and the reviewer would see it.
+	 */
+	it('refuses the EVER_WORKS_ namespace even when a job explicitly grants it', () => {
+		const withPlatformVars: NodeJS.ProcessEnv = {
+			...parent,
+			EVER_WORKS_MCP_TOKEN: 'ew_run_0123456789abcdef',
+			EVER_WORKS_MCP_URL: 'https://mcp.ever.works/mcp',
+			EVER_WORKS_API_KEY: 'ew_live_should-never-appear'
+		};
+
+		// Ungranted: dropped, like every other platform-owned name.
+		const ungranted = buildNodeCheckEnv(undefined, withPlatformVars);
+		expect(ungranted.EVER_WORKS_MCP_TOKEN).toBeUndefined();
+		expect(ungranted.EVER_WORKS_MCP_URL).toBeUndefined();
+		expect(ungranted.EVER_WORKS_API_KEY).toBeUndefined();
+
+		// GRANTED explicitly: still dropped. The grant is not a bypass.
+		const granted = buildNodeCheckEnv(
+			['EVER_WORKS_MCP_TOKEN', 'EVER_WORKS_MCP_URL', 'EVER_WORKS_API_KEY'],
+			withPlatformVars
+		);
+		expect(granted.EVER_WORKS_MCP_TOKEN).toBeUndefined();
+		expect(granted.EVER_WORKS_MCP_URL).toBeUndefined();
+		expect(granted.EVER_WORKS_API_KEY).toBeUndefined();
+		// And nothing that looks like a run token survives anywhere in it.
+		expect(JSON.stringify(granted)).not.toContain('ew_run_');
+		expect(JSON.stringify(granted)).not.toContain('ew_live_');
+	});
+
+	it('still grants an ordinary name in the same call that refuses a platform one', () => {
+		// Proving the refusal is per-NAME and not "any call with a platform
+		// name in it grants nothing" — otherwise the test above would pass
+		// for the wrong reason.
+		const env = buildNodeCheckEnv(['EVER_WORKS_MCP_TOKEN', 'CUSTOM_BUILD_FLAG'], {
+			...parent,
+			EVER_WORKS_MCP_TOKEN: 'ew_run_0123456789abcdef'
+		});
+		expect(env.EVER_WORKS_MCP_TOKEN).toBeUndefined();
+		expect(env.CUSTOM_BUILD_FLAG).toBe('yes');
+	});
 });

@@ -334,6 +334,56 @@ export const config = {
                 .filter((name) => name.length > 0);
         },
 
+        // ── Self-build slice Z (EW-796) — the platform-MCP bridge ───
+        //
+        // OFF by default and off in two independent ways: this operator
+        // switch AND a configured server URL. Neither implies the other,
+        // and a run additionally needs its Agent's `canCallExternalTools`
+        // permission, so three separate facts have to line up before a
+        // node is ever asked to mint a credential.
+        //
+        // Why an operator switch at all: the bridge hands a model on
+        // someone's desktop a live (if short-lived and narrowly scoped)
+        // platform credential. That is a deployment-level decision about
+        // the whole install, not a per-tenant preference, and it must be
+        // possible to turn the whole thing off in one place during an
+        // incident without touching a single Agent.
+
+        /**
+         * Operator switch for the fleet MCP bridge. Default FALSE —
+         * only the literal `true` / `1` turns it on, so a typo or an
+         * empty value fails closed to today's behaviour (no platform
+         * tools in a fleet run).
+         */
+        isMcpBridgeEnabled(): boolean {
+            const raw = (process.env.FLEET_NODE_MCP_BRIDGE_ENABLED || '').trim().toLowerCase();
+            return raw === 'true' || raw === '1';
+        },
+        /**
+         * Absolute URL of the platform MCP endpoint the node's loopback
+         * proxy forwards to (`apps/mcp` streamable-HTTP transport, whose
+         * endpoint is `/mcp` on `EVER_WORKS_MCP_PORT`).
+         *
+         * Validated here rather than at the node: a nonsense value must
+         * fail on the platform, where an operator reads logs, and not on
+         * fifteen desktops. Anything that is not an absolute http(s) URL
+         * is treated as unset — which switches the bridge off rather
+         * than pointing a credential-bearing proxy at a garbage host.
+         */
+        getMcpServerUrl(): string | undefined {
+            const raw = (process.env.FLEET_NODE_MCP_URL || '').trim();
+            if (!raw) return undefined;
+            let parsed: URL;
+            try {
+                parsed = new URL(raw);
+            } catch {
+                return undefined;
+            }
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+            // Strip a trailing slash so the node builds one canonical URL.
+            return raw.endsWith('/') && raw.length > 1 ? raw.slice(0, -1) : raw;
+        },
+
         // ── Agent execution v2 — model CLIs on the node ─────────────
         //
         // Instance-level DEFAULTS for how a fleet node executes an

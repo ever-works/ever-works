@@ -5,6 +5,8 @@ import { dirname, isAbsolute, join, relative, resolve } from 'path';
 import type {
 	FleetAgentModelExecution,
 	FleetAgentTaskGitResult,
+	FleetAgentTaskMcpBridge,
+	FleetAgentTaskMcpResult,
 	FleetAgentTaskModelResult,
 	FleetAgentTaskPayload,
 	FleetAgentTaskQuestion,
@@ -44,6 +46,8 @@ import {
 	type ModelCliPaths,
 	MODEL_CLI_MAX_OUTPUT_BYTES
 } from './model-cli';
+import { startMcpLoopbackProxy, type McpBridgeFetch, type McpLoopbackProxy } from './mcp-bridge';
+import type { Logger } from '../logger';
 import type { FleetTaskWorkspaceErrorCode } from '../workspaces/fleet-task-workspace';
 
 /**
@@ -232,6 +236,43 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	onProvisionDeclined?: (reason: string) => void;
 	/** Model CLIs this node may drive, resolved once at startup. */
 	modelCli?: ModelCliPaths;
+	/**
+	 * Self-build slice Z (EW-796) — the node's redacting logger.
+	 *
+	 * Optional and additive: an absent logger simply means the bridge's
+	 * diagnostics go nowhere. When present, the run token is registered
+	 * with `protect()` the moment it is minted, so it is scrubbed out of
+	 * every line this executor could ever emit — including the text of an
+	 * error thrown by something that had the token in scope.
+	 */
+	logger?: Logger;
+	/**
+	 * Self-build slice Z (EW-796) — the platform side of the MCP bridge.
+	 *
+	 * Absent means this caller cannot mint run credentials (the cloud
+	 * runner, and every unit test that does not exercise the bridge), and
+	 * a job whose payload asks for MCP then runs exactly as it always did
+	 * and reports `mcp: { enabled: false }`. Present, it is the node's
+	 * authenticated job client: `mint` proves this node holds the lease
+	 * and returns a short-lived token, `revoke` drops it early.
+	 *
+	 * The token returned by `mint` is handled ONLY in memory by
+	 * {@link runModelStep} — it is never written to the scratch config,
+	 * never put in the child's environment, and never logged.
+	 */
+	mcpBridge?: {
+		mint: (jobId: string) => Promise<{ token: string; expiresAt: string; serverUrl: string }>;
+		revoke?: (jobId: string) => Promise<void>;
+		/** Injected `fetch` for the proxy's upstream calls (tests). */
+		fetchFn?: McpBridgeFetch;
+		/** Test seam: replaces the real listener. */
+		start?: typeof startMcpLoopbackProxy;
+		/**
+		 * Test seam for the RENEWAL timer. Production uses `setInterval`
+		 * (unref'd, so a stray timer can never hold the process open).
+		 */
+		scheduleRenewal?: (fn: () => void, intervalMs: number) => { cancel: () => void };
+	};
 	/** Root for per-job scratch files (instructions / CLI output). */
 	scratchRoot?: string;
 	scratchFs?: AgentTaskScratchFs;
@@ -364,15 +405,22 @@ async function runResolvedAgentTask(
 
 	const failures: string[] = [];
 	let model: FleetAgentTaskModelResult | null = null;
+	// Slice Z: the bridge verdict rides alongside the model verdict — it is
+	// reported, never a failure. A run whose platform tools did not come up
+	// is a run without tools, not a broken run.
+	let mcp: FleetAgentTaskMcpResult | null = null;
 	if (execution) {
-		model = await runModelStep(
+		const modelStep = await runModelStep(
 			job.id,
 			execution,
 			workspaceResolution.path,
 			workspaceResolution.descriptor?.mounts,
+			resolveMcpBridgeSpec(payload),
 			io,
 			signal
 		);
+		model = modelStep.model;
+		mcp = modelStep.mcp;
 		throwIfAgentTaskAborted(signal);
 		if (model.status !== 'succeeded') {
 			failures.push(describeModelFailure(model));
@@ -478,6 +526,10 @@ async function runResolvedAgentTask(
 		// Conditional key: a run without a question reports exactly what it
 		// always did (`question: null` would be a wire change for nothing).
 		...(question ? { question } : {}),
+		// Same posture for the MCP bridge: absent unless the job actually
+		// asked for one. NEVER carries the token — only whether the bridge
+		// ran and how many tool calls went through it.
+		...(mcp ? { mcp } : {}),
 		...(failures.length > 0 ? { failureReason: failures.join('; ') } : {})
 	};
 }
@@ -494,6 +546,30 @@ function resolveExecution(payload: FleetAgentTaskPayload): FleetAgentModelExecut
 		}
 		throw error;
 	}
+}
+
+/**
+ * Self-build slice Z (EW-796) — read the payload's MCP block.
+ *
+ * Strict on the shape and silent about a malformed one: the block is
+ * written by the platform's own planner, so anything that is not exactly
+ * `{ enabled: true, serverUrl, serverName }` is treated as "no bridge"
+ * rather than as a payload error. Failing the whole Task because an
+ * optional tool channel was mis-serialised would be the wrong trade —
+ * and `null` here is the same fail-closed answer a legacy job produces.
+ */
+function resolveMcpBridgeSpec(payload: FleetAgentTaskPayload): FleetAgentTaskMcpBridge | null {
+	const mcp = payload.mcp;
+	if (!mcp || typeof mcp !== 'object') return null;
+	if (mcp.enabled !== true) return null;
+	if (typeof mcp.serverUrl !== 'string' || !mcp.serverUrl.trim()) return null;
+	if (typeof mcp.serverName !== 'string' || !mcp.serverName.trim()) return null;
+	return {
+		enabled: true,
+		serverUrl: mcp.serverUrl.trim(),
+		serverName: mcp.serverName.trim(),
+		...(Array.isArray(mcp.toolFamilies) ? { toolFamilies: mcp.toolFamilies } : {})
+	};
 }
 
 function resolveAcceptanceChecks(payload: FleetAgentTaskPayload): WireCheck[] {
@@ -528,9 +604,10 @@ async function runModelStep(
 	execution: FleetAgentModelExecution,
 	workspacePath: string,
 	mounts: readonly FleetTaskWorkspaceMountDescriptor[] | undefined,
+	bridgeSpec: FleetAgentTaskMcpBridge | null,
 	io: AgentTaskIo,
 	signal?: AbortSignal
-): Promise<FleetAgentTaskModelResult> {
+): Promise<{ model: FleetAgentTaskModelResult; mcp: FleetAgentTaskMcpResult | null }> {
 	const executable = io.modelCli?.[execution.provider];
 	if (typeof executable !== 'string' || !executable.trim()) {
 		throw new AgentTaskPayloadError(
@@ -544,6 +621,12 @@ async function runModelStep(
 		instructionsPath: join(scratchDir, 'instructions.md'),
 		resultPath: join(scratchDir, 'model-output.json')
 	};
+	// Slice Z: the config file lives in SCRATCH, not the worktree. That is
+	// what keeps it out of `git add -A`, out of every diff and out of the
+	// changed-file count — by construction rather than by an exclude rule,
+	// which is why `.ever-works/` needed one and this does not.
+	const mcpConfigPath = join(scratchDir, 'mcp.json');
+	const bridge = await startBridge(jobId, bridgeSpec, mcpConfigPath, scratchFs, io);
 	try {
 		await scratchFs.writeFile(scratch.instructionsPath, execution.instructions);
 		let command: string;
@@ -554,6 +637,7 @@ async function runModelStep(
 				workspacePath,
 				scratch,
 				...(mounts && mounts.length > 0 ? { mounts } : {}),
+				...(bridge.cli ? { mcp: bridge.cli } : {}),
 				...(io.platform ? { platform: io.platform } : {})
 			});
 			// Last gate before the spawn: the grant has to be in the string
@@ -570,14 +654,24 @@ async function runModelStep(
 			if (error instanceof ModelCliCommandError) throw new AgentTaskPayloadError(error.message);
 			throw error;
 		}
+		// `execution.envPassthrough` is unchanged and deliberately so: the
+		// run token is NOT in it, is not in the child's environment, and
+		// could not be even if a payload asked — `EVER_WORKS_` is refused
+		// by `NODE_PLATFORM_OWNED_ENV_PATTERN` whatever a grant says.
 		const step = buildModelCliStep(execution, command, execution.envPassthrough);
 		const result = await runNodeCommandStep(step, workspacePath, io, signal);
 		const rawOutput = await scratchFs.readFile(scratch.resultPath);
 		// `envPassthrough` names the credential env vars this CLI was handed;
 		// their values are scrubbed out of the summary and output tail before
 		// the result leaves the node.
-		return parseModelCliResult(execution.provider, rawOutput, result, execution.envPassthrough);
+		const model = parseModelCliResult(execution.provider, rawOutput, result, execution.envPassthrough);
+		return { model, mcp: bridge.result() };
 	} finally {
+		// Order matters. The proxy stops FIRST (a still-listening socket
+		// after the model exited is a live credential path nothing is
+		// watching), then the platform is told to revoke, and only then is
+		// scratch — `mcp.json` included — removed.
+		await bridge.stop();
 		try {
 			await scratchFs.remove(scratchDir);
 		} catch {
@@ -585,6 +679,195 @@ async function runModelStep(
 			// a run whose verdict is already known.
 		}
 	}
+}
+
+/** What {@link startBridge} hands back to the model step. */
+interface ActiveMcpBridge {
+	/** Flags to add to the CLI command, or null when there is no bridge. */
+	cli: { configPath: string; serverName: string; serverUrl: string } | null;
+	/** Stop the listener, revoke the credential. Idempotent, never throws. */
+	stop: () => Promise<void>;
+	/** The block reported on the job result. Null when no bridge was asked for. */
+	result: () => FleetAgentTaskMcpResult | null;
+}
+
+/** A bridge that was never asked for: no listener, no credential, no result key. */
+const NO_MCP_BRIDGE: ActiveMcpBridge = {
+	cli: null,
+	stop: async () => undefined,
+	result: () => null
+};
+
+/**
+ * Self-build slice Z (EW-796) — mint, listen and write the ephemeral
+ * config, or degrade to today's tool-free run.
+ *
+ * ## Where the token is, at every moment
+ *
+ *   1. the platform generates it and returns it in ONE HTTPS response;
+ *   2. it is assigned to the local `token` variable here — a closure
+ *      variable in the node process, nothing more;
+ *   3. `logger.protect(token)` makes the redacting logger scrub it out
+ *      of anything the node ever emits, so even a mistake cannot print it;
+ *   4. the proxy's `token()` getter reads that variable per request and
+ *      attaches it to the OUTBOUND header, then drops it;
+ *   5. `stop()` clears the variable and asks the platform to revoke.
+ *
+ * It is never written to `mcp.json` (which holds only the loopback URL),
+ * never put in the child's environment, and never returned on the job
+ * result. The model can read the config file and learn nothing except a
+ * localhost URL it was handed anyway.
+ *
+ * ## Degradation
+ *
+ * Any failure — the mint refused, the listener unable to bind, the config
+ * unwritable — logs and returns a bridge with `cli: null`. The run then
+ * proceeds EXACTLY as a run without the bridge and reports
+ * `mcp: { enabled: false, unavailableReason }`, so an operator can see
+ * that tools were asked for and did not appear. A bridge that cannot
+ * start must never fail a Task.
+ */
+async function startBridge(
+	jobId: string,
+	spec: FleetAgentTaskMcpBridge | null,
+	configPath: string,
+	scratchFs: AgentTaskScratchFs,
+	io: AgentTaskIo
+): Promise<ActiveMcpBridge> {
+	if (!spec?.enabled) return NO_MCP_BRIDGE;
+	const bridgeIo = io.mcpBridge;
+	if (!bridgeIo) {
+		return unavailableBridge('this node has no fleet job client to mint a run credential with');
+	}
+
+	let token: string | null = null;
+	let proxy: McpLoopbackProxy | null = null;
+	try {
+		const credential = await bridgeIo.mint(jobId);
+		token = credential.token;
+		io.logger?.protect(token);
+		const start = bridgeIo.start ?? startMcpLoopbackProxy;
+		proxy = await start({
+			// The platform's answer wins over the payload's copy: the
+			// payload was written at plan time and the credential was minted
+			// just now, so the response is the fresher fact.
+			upstreamUrl: credential.serverUrl || spec.serverUrl,
+			token: () => token,
+			...(io.logger ? { logger: io.logger } : {}),
+			...(bridgeIo.fetchFn ? { fetchFn: bridgeIo.fetchFn } : {})
+		});
+		// The config carries the loopback URL and NOTHING else — no header
+		// block, no credential. Both CLIs accept this shape; codex
+		// additionally gets the same URL as an argv override, because it
+		// reads MCP servers from its own config rather than from a file
+		// named on the command line.
+		await scratchFs.writeFile(
+			configPath,
+			JSON.stringify({ mcpServers: { [spec.serverName]: { type: 'http', url: proxy.url } } }, null, 2) + '\n'
+		);
+	} catch (error) {
+		const reason = describeBridgeFailure(error, io);
+		io.logger?.warn(`MCP bridge unavailable for job ${jobId}: ${reason}`);
+		token = null;
+		if (proxy) await proxy.close().catch(() => undefined);
+		await bridgeIo.revoke?.(jobId).catch(() => undefined);
+		return unavailableBridge(reason);
+	}
+
+	// ── The renewal timer ────────────────────────────────────────────────
+	//
+	// A run token expires with the LEASE it was minted under — the default
+	// lease TTL is 300 s while a model step may legitimately run for half an
+	// hour. Binding the two is the whole point (a node that loses its claim
+	// loses its credential in the same breath), so the answer is not a
+	// longer token but a shorter loop: re-mint as the lease is renewed.
+	//
+	// Every re-mint ROTATES — the platform deactivates the predecessor — so
+	// at most one token per job is ever live, and the new one is picked up
+	// by the proxy's getter on the very next request without restarting the
+	// listener or telling the model anything.
+	//
+	// A failed renewal is NOT fatal: the current token stays valid until its
+	// own expiry, the next tick tries again, and the worst case is the tool
+	// channel going quiet for the rest of the run while the run itself
+	// continues exactly as a run without tools.
+	const schedule = bridgeIo.scheduleRenewal ?? defaultScheduleRenewal;
+	const renewal = schedule(() => {
+		void (async () => {
+			try {
+				const renewed = await bridgeIo.mint(jobId);
+				io.logger?.protect(renewed.token);
+				// The swap is a single assignment to the closure variable the
+				// proxy reads per request, so there is no window in which the
+				// proxy holds a half-updated credential.
+				token = renewed.token;
+			} catch (error) {
+				io.logger?.warn(
+					`MCP run credential renewal failed for job ${jobId}: ${describeBridgeFailure(error, io)}`
+				);
+			}
+		})();
+	}, MCP_CREDENTIAL_RENEWAL_INTERVAL_MS);
+
+	const activeProxy = proxy;
+	let stopped = false;
+	return {
+		cli: { configPath, serverName: spec.serverName, serverUrl: activeProxy.url },
+		stop: async () => {
+			if (stopped) return;
+			stopped = true;
+			// Drop the credential from memory BEFORE anything that can
+			// await: from this instant no in-flight request can pick it up
+			// (the proxy's getter answers null and refuses locally). The
+			// renewal timer goes first so it cannot put a fresh one back.
+			renewal.cancel();
+			token = null;
+			await activeProxy.close().catch(() => undefined);
+			try {
+				await bridgeIo.revoke?.(jobId);
+			} catch (error) {
+				// The platform revokes again when the job settles, and the
+				// token expires with the lease regardless, so a failed early
+				// revoke narrows to a bounded window rather than an open one.
+				io.logger?.warn(
+					`MCP run credential revoke failed for job ${jobId}: ${describeBridgeFailure(error, io)}`
+				);
+			}
+		},
+		result: () => ({ enabled: true, toolCalls: activeProxy.toolCalls() })
+	};
+}
+
+/**
+ * How often the node re-mints the run credential.
+ *
+ * Half the platform's MINIMUM lease TTL rather than half of whatever this
+ * job happened to get: the node does not know the lease policy, and a
+ * renewal that is too frequent costs one cheap authenticated POST while a
+ * renewal that is too rare costs the run its tools. 120 s sits comfortably
+ * inside the 300 s default TTL plus its 60 s grace.
+ */
+export const MCP_CREDENTIAL_RENEWAL_INTERVAL_MS = 120_000;
+
+/** `setInterval`, unref'd so a stray timer can never hold the process open. */
+function defaultScheduleRenewal(fn: () => void, intervalMs: number): { cancel: () => void } {
+	const handle = setInterval(fn, intervalMs);
+	(handle as { unref?: () => void }).unref?.();
+	return { cancel: () => clearInterval(handle) };
+}
+
+function unavailableBridge(reason: string): ActiveMcpBridge {
+	return {
+		cli: null,
+		stop: async () => undefined,
+		result: () => ({ enabled: false, toolCalls: null, unavailableReason: reason })
+	};
+}
+
+/** Redacted through the node logger, so a token in an error text cannot escape. */
+function describeBridgeFailure(error: unknown, io: AgentTaskIo): string {
+	const raw = error instanceof Error ? error.message : String(error);
+	return io.logger?.redact(raw) ?? raw;
 }
 
 async function finalizeWorkspace(

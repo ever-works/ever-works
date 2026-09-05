@@ -1,6 +1,7 @@
 import { INBOX_MAX_TITLE_CHARS } from '../inbox/inbox.types.js';
 import type { TaskAcceptanceCheck, TaskCheckResult } from '../tasks/task-gates.types.js';
 import type { FleetTaskWorkspaceDescriptor, FleetTaskWorkspaceSpec } from './fleet-task-workspace.types.js';
+import type { FleetAgentTaskMcpBridge, FleetAgentTaskMcpResult } from './fleet-run-credential.types.js';
 
 /**
  * Fleet job lease protocol — the wire shapes an enrolled node and the
@@ -443,6 +444,17 @@ export interface FleetAgentTaskPayload {
 	 * (the platform opens the pull request from the pushed branch).
 	 */
 	git?: FleetAgentTaskGitPolicy | null;
+	/**
+	 * Self-build slice Z (EW-796) — the platform-MCP bridge for this run.
+	 *
+	 * Absent or `enabled: false` (the default, and every job enqueued
+	 * before this slice) means the node behaves exactly as it always has:
+	 * no credential is minted, no loopback proxy is started, and the model
+	 * CLI's command line is byte-for-byte the one it had. Only when this
+	 * says `enabled` does the node ask the platform for a run-scoped
+	 * token and point the CLI at its own loopback listener.
+	 */
+	mcp?: FleetAgentTaskMcpBridge | null;
 }
 
 // ─── Agent execution v2 — model CLIs on the node ─────────────────────
@@ -1077,6 +1089,14 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	 * non-zero model exit and that verdict is still true.
 	 */
 	question?: FleetAgentTaskQuestion | null;
+	/**
+	 * Self-build slice Z: what the MCP bridge did, when the payload asked
+	 * for one. Reports whether it actually ran and how many `tools/call`
+	 * requests the loopback proxy forwarded. NEVER the token — the whole
+	 * point of the design is that the credential has no path into the
+	 * result, which is stored on the job row and rendered in run reports.
+	 */
+	mcp?: FleetAgentTaskMcpResult | null;
 	/** Why `status` is `failed`, in one sentence, for the run report. */
 	failureReason?: string | null;
 }
