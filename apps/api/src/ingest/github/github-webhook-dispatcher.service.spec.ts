@@ -384,4 +384,92 @@ describe('GitHubWebhookDispatcherService', () => {
             expect(appSync.handleWebhook).toHaveBeenCalled();
         });
     });
+
+    /**
+     * Issue / Dependabot intake (self-build §6, R2): feature services
+     * register as consumers at boot instead of being injected, so the
+     * dispatcher's constructor and the PR-review bridge stay untouched.
+     * A consumer sees ONLY verified, owner-attributed deliveries.
+     */
+    describe('registered intake consumers', () => {
+        const ISSUE_BODY = {
+            action: 'opened',
+            installation: { id: 4242 },
+            repository: { full_name: 'octo/site', owner: { login: 'octo' } },
+            issue: { number: 42, title: 'Login broken' },
+        };
+
+        function consumer(events: string[]) {
+            return { events, handle: jest.fn().mockResolvedValue(undefined) };
+        }
+
+        it('hands a verified delivery to a consumer registered for its event name', async () => {
+            const { dispatcher } = createDispatcher();
+            const issues = consumer(['issues', 'dependabot_alert']);
+            dispatcher.registerConsumer(issues);
+
+            const result = await dispatcher.dispatch(signed(ISSUE_BODY, INSTALL_SECRET, 'issues'));
+
+            expect(issues.handle).toHaveBeenCalledWith(INSTALL_BINDING, 'issues', ISSUE_BODY);
+            expect(result.errors.intake).toBeUndefined();
+            // The pre-existing legs and their result shape are untouched.
+            expect(result.handled).toEqual({ sync: true, review: true });
+        });
+
+        it('never calls a consumer for ping, for events it did not register, or before verification', async () => {
+            const { dispatcher, bridge } = createDispatcher();
+            const issues = consumer(['issues']);
+            dispatcher.registerConsumer(issues);
+
+            await dispatcher.dispatch(signed({ zen: 'Keep it simple.' }, INSTALL_SECRET, 'ping'));
+            await dispatcher.dispatch(signed(PR_BODY, INSTALL_SECRET, 'pull_request'));
+            expect(issues.handle).not.toHaveBeenCalled();
+
+            await expect(
+                dispatcher.dispatch({
+                    ...signed(ISSUE_BODY, INSTALL_SECRET, 'issues'),
+                    signature: 'sha256=deadbeef',
+                }),
+            ).rejects.toThrow(UnauthorizedException);
+            expect(issues.handle).not.toHaveBeenCalled();
+
+            bridge.resolveBinding.mockResolvedValue({
+                status: 'unresolved',
+                reason: 'unknown-workspace',
+            });
+            await dispatcher.dispatch(signed(ISSUE_BODY, INSTALL_SECRET, 'issues'));
+            expect(issues.handle).not.toHaveBeenCalled();
+        });
+
+        it('skips consumers (like the review leg) when an App delivery has no resolvable owner', async () => {
+            const { dispatcher } = createDispatcher({ appSecret: APP_SECRET });
+            const issues = consumer(['issues']);
+            dispatcher.registerConsumer(issues);
+
+            const result = await dispatcher.dispatch(signed(ISSUE_BODY, APP_SECRET, 'issues'));
+
+            expect(result.handled).toEqual({ sync: true, review: false });
+            expect(issues.handle).not.toHaveBeenCalled();
+        });
+
+        it('isolates a consumer failure into errors.intake without touching the other legs', async () => {
+            const { dispatcher, bridge, appSync } = createDispatcher();
+            const boom = new Error('intake exploded');
+            const failing = { events: ['issues'], handle: jest.fn().mockRejectedValue(boom) };
+            const healthy = consumer(['issues']);
+            dispatcher.registerConsumer(failing);
+            dispatcher.registerConsumer(healthy);
+
+            const result = await dispatcher.dispatch(signed(ISSUE_BODY, INSTALL_SECRET, 'issues'));
+
+            expect(result.errors.intake).toBe(boom);
+            expect(result.errors.review).toBeUndefined();
+            expect(result.errors.sync).toBeUndefined();
+            expect(result.handled).toEqual({ sync: true, review: true });
+            expect(bridge.handleEvent).toHaveBeenCalled();
+            expect(appSync.handleWebhook).toHaveBeenCalled();
+            // One consumer blowing up does not starve the next.
+            expect(healthy.handle).toHaveBeenCalled();
+        });
+    });
 });

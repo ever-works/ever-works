@@ -271,6 +271,16 @@ export const config = {
             return [`${slug}[bot]`];
         },
     },
+
+    /**
+     * Sentry INBOUND intake (`POST /api/ingest/sentry/events`). The
+     * integration's client secret signs every webhook Sentry sends
+     * (`Sentry-Hook-Signature`); unset means the receiver fails closed
+     * with 401. Distinct from `SENTRY_DSN`, which is the OUTBOUND SDK.
+     */
+    sentryIntake: {
+        webhookClientSecret: () => process.env.SENTRY_WEBHOOK_CLIENT_SECRET,
+    },
     facebook: {
         clientId: () => process.env.FACEBOOK_CLIENT_ID,
         clientSecret: () => process.env.FACEBOOK_CLIENT_SECRET,

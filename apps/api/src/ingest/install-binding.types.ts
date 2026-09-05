@@ -58,5 +58,17 @@ export type IngestBindingRefusal =
  * GitHub App turns the review loop on with no second setup step — the
  * binding it produces is still written to `ingest_install_bindings`, so
  * there remains exactly ONE install-binding table.
+ *
+ * `site-match` is the Jira-only sixth path: a Jira Cloud delivery names
+ * its site (`issue.self` origin) and each `jira-connector` install is
+ * configured with a site `baseUrl`, so a UNIQUE host match among the
+ * candidates selects the install whose secret the HMAC is then checked
+ * against. Like `installation.id` on GitHub it only SELECTS a secret —
+ * a forged host picks a secret that fails the signature.
  */
-export type IngestBindingMatch = 'binding' | 'single-install' | 'signature' | 'app-install';
+export type IngestBindingMatch =
+    | 'binding'
+    | 'single-install'
+    | 'signature'
+    | 'app-install'
+    | 'site-match';
