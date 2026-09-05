@@ -19,6 +19,9 @@
  *   }
  */
 
+import { applyBrowserWorkspaceScope } from './browser-api';
+import { withWorkspaceScopeQuery, type WorkspaceScope } from '../workspace-scope';
+
 export interface UploadResult {
     readonly id: string;
     readonly url: string;
@@ -57,6 +60,28 @@ export class UploadError extends Error {
     }
 }
 
+/** The path the API mints for every uploaded file; the only URL family this decorates. */
+const SERVE_PATH_PREFIX = '/api/uploads/';
+
+/**
+ * Put the tab's workspace on an API-minted serve URL (`/api/uploads/<userId>/
+ * <sha256>.<ext>`) at RENDER time, for `<a href>` / `<img src>`, which cannot
+ * carry a header. The serve route reads `?scope=` back and runs the lookup in
+ * that Organization; without the carrier it runs personal.
+ *
+ * Render-time on purpose: the URL the API mints, the one stored in chat text,
+ * and the one in attachment lists must stay scope-free — a stored scope would
+ * freeze a tab context into persisted data. Anything that is not a serve URL
+ * (a `blob:` preview, an absolute URL, `undefined`) is returned untouched.
+ */
+export function withUploadServeScope<T extends string | undefined>(
+    url: T,
+    scope: WorkspaceScope | null,
+): T {
+    if (!url || !scope || !url.startsWith(SERVE_PATH_PREFIX)) return url;
+    return withWorkspaceScopeQuery(url, scope) as T;
+}
+
 /**
  * Upload a single file via `POST /api/uploads/file` (the web proxy
  * forwards to the NestJS endpoint with the auth cookie translated to a
@@ -75,6 +100,17 @@ export function uploadFile(file: File, opts?: UploadFileOptions): Promise<Upload
             return;
         }
 
+        // The BFF fails closed without the tab's workspace selector. Resolve
+        // it before touching the XHR so a malformed tab path is this module's
+        // own error type rather than a generic throw inside the executor.
+        let scopeHeaders: Headers;
+        try {
+            scopeHeaders = applyBrowserWorkspaceScope();
+        } catch {
+            reject(new UploadError('Invalid workspace scope', 0));
+            return;
+        }
+
         const form = new FormData();
         form.append('file', file, file.name);
 
@@ -82,9 +118,13 @@ export function uploadFile(file: File, opts?: UploadFileOptions): Promise<Upload
             ? `/api/uploads/file?workId=${encodeURIComponent(workId)}`
             : '/api/uploads/file';
 
-        // eslint-disable-next-line no-restricted-syntax -- EW-788 blocked
+        // eslint-disable-next-line no-restricted-syntax -- selector set below via applyBrowserWorkspaceScope + setRequestHeader (EW-788)
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url, true);
+        // setRequestHeader is only legal between open() and send(). Content-Type
+        // is deliberately NOT set here: the browser generates the multipart
+        // boundary for the FormData body.
+        scopeHeaders.forEach((value, name) => xhr.setRequestHeader(name, value));
         // Never send cookies on the upload bytes path itself — the proxy
         // route on the Next.js side reads our session cookie and forwards
         // a Bearer header. `xhr.withCredentials = false` keeps the cross-

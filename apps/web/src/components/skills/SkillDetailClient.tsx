@@ -28,6 +28,7 @@ import { Select } from '@/components/ui/select';
 import { SkillMarkdownEditor } from '@/components/skills/SkillMarkdownEditor';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
+import { browserApiFetch } from '@/lib/api/browser-api';
 import type {
     Skill,
     SkillBinding,
@@ -340,11 +341,10 @@ function FilesSection({ skillId, initialFiles }: { skillId: string; initialFiles
                 form.append('file', file, file.name);
                 const kind = kindOverride || defaultKindForFilename(file.name);
                 form.append('kind', kind);
-                // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
-                const res = await fetch(`/api/skills/${encodeURIComponent(skillId)}/files`, {
-                    method: 'POST',
-                    body: form,
-                });
+                const res = await browserApiFetch(
+                    `/api/skills/${encodeURIComponent(skillId)}/files`,
+                    { method: 'POST', body: form },
+                );
                 const body = (await res.json().catch(() => null)) as
                     | (SkillFile & { message?: string })
                     | { message?: string }
