@@ -178,6 +178,7 @@ test.describe('SEC PIN — web BFF upload proxies (Wave M #64)', () => {
         // parallel-worker load and never again (2 consecutive full green
         // re-runs) — retry a single time before failing for real.
         let res = await request.post('/api/uploads', {
+            headers: { 'x-ever-workspace': 'personal' },
             multipart: pngMultipart(),
         });
         if (res.status() !== 201) {
@@ -186,6 +187,7 @@ test.describe('SEC PIN — web BFF upload proxies (Wave M #64)', () => {
                 `seeded BFF upload first attempt → ${res.status()} ${firstBody.slice(0, 200)}; retrying once (next-dev cold-compile tolerance)`,
             );
             res = await request.post('/api/uploads', {
+                headers: { 'x-ever-workspace': 'personal' },
                 multipart: pngMultipart(),
             });
         }
@@ -198,6 +200,19 @@ test.describe('SEC PIN — web BFF upload proxies (Wave M #64)', () => {
         expect(String(body.url)).toMatch(/^\/api\/uploads\/[^/]+\/[a-f0-9]{64}\.png$/);
         expect(body.mimeType).toBe('image/png');
         expect(body.size).toBe(TINY_PNG.length);
+    });
+
+    test('seeded auth cookie WITHOUT a workspace selector → 400 {error:"Invalid workspace scope"}: the BFF fails closed before the API sees the upload', async ({
+        request,
+    }) => {
+        // Every in-app caller sends `x-ever-workspace` (uploadFile sets it on
+        // the XHR). A cookie-authed request without it is a client bug, and
+        // the answer is an error, not a silently personal-scoped row.
+        const res = await request.post('/api/uploads', { multipart: pngMultipart() });
+        expect(res.status(), `no selector → 400 (got ${res.status()})`).toBe(400);
+        expect((await res.json()) as Record<string, unknown>).toEqual({
+            error: 'Invalid workspace scope',
+        });
     });
 });
 

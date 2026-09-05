@@ -19,6 +19,8 @@
  *   }
  */
 
+import { applyBrowserWorkspaceScope } from './browser-api';
+
 export interface UploadResult {
     readonly id: string;
     readonly url: string;
@@ -75,6 +77,17 @@ export function uploadFile(file: File, opts?: UploadFileOptions): Promise<Upload
             return;
         }
 
+        // The BFF fails closed without the tab's workspace selector. Resolve
+        // it before touching the XHR so a malformed tab path is this module's
+        // own error type rather than a generic throw inside the executor.
+        let scopeHeaders: Headers;
+        try {
+            scopeHeaders = applyBrowserWorkspaceScope();
+        } catch {
+            reject(new UploadError('Invalid workspace scope', 0));
+            return;
+        }
+
         const form = new FormData();
         form.append('file', file, file.name);
 
@@ -82,9 +95,13 @@ export function uploadFile(file: File, opts?: UploadFileOptions): Promise<Upload
             ? `/api/uploads/file?workId=${encodeURIComponent(workId)}`
             : '/api/uploads/file';
 
-        // eslint-disable-next-line no-restricted-syntax -- EW-788 blocked
+        // eslint-disable-next-line no-restricted-syntax -- selector set below via applyBrowserWorkspaceScope + setRequestHeader (EW-788)
         const xhr = new XMLHttpRequest();
         xhr.open('POST', url, true);
+        // setRequestHeader is only legal between open() and send(). Content-Type
+        // is deliberately NOT set here: the browser generates the multipart
+        // boundary for the FormData body.
+        scopeHeaders.forEach((value, name) => xhr.setRequestHeader(name, value));
         // Never send cookies on the upload bytes path itself — the proxy
         // route on the Next.js side reads our session cookie and forwards
         // a Bearer header. `xhr.withCredentials = false` keeps the cross-
