@@ -13,10 +13,13 @@ import { cn } from '@/lib/utils/cn';
 import {
     MIN_CHECK_FREQUENCY_MINUTES,
     DEFAULT_CHECK_FREQUENCY_MINUTES,
+    GOAL_KINDS,
     type GoalComparator,
+    type GoalKind,
     type GoalWindow,
 } from '@/lib/api/goals.shared';
 import { createGoalAction } from './actions';
+import { buildCreateGoalPayload, validateGoalFormFields } from './goal-form-payload';
 
 const COMPARATORS: GoalComparator[] = ['gte', 'lte'];
 const WINDOWS: GoalWindow[] = ['day', 'week', 'month', 'total', 'point'];
@@ -26,19 +29,41 @@ const sectionCard =
 
 const fieldLabel = 'block text-xs font-medium text-text dark:text-text-dark mb-2';
 
+const fieldHint = 'mt-1.5 text-xs text-text-muted dark:text-text-muted-dark';
+
+const dateInput = cn(
+    'w-full text-sm rounded-lg transition-colors outline-none px-4 py-2',
+    'bg-card dark:bg-card-primary-dark',
+    'border border-card-border dark:border-white/9',
+    'text-text dark:text-text-dark',
+    'focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20',
+);
+
 /**
  * Goals & Metrics — PR-8. Create-Goal form backing `/goals/new`.
- * Collects the metric source (pluginId + metricId + optional
- * params-JSON), the target comparator/value/unit/window, an optional
- * deadline, and the evaluation cadence (clamped server-side to
+ *
+ * Two KINDS share the form (self-build slice AG, EW-795), chosen by the
+ * selector in the Basics card:
+ *
+ *   - **Metric** (the default) — the original Goal: metric source
+ *     (pluginId + metricId + optional params-JSON), target
+ *     comparator/value/unit/window. Those sections render, and their
+ *     fields are sent, ONLY for this kind.
+ *   - **Delivery** — "ship feature X across three repos": no metric at
+ *     all. A Definition of Done (one criterion per line, at least one) is
+ *     collected instead, and the payload carries no metric key.
+ *
+ * Deadline and evaluation cadence apply to both (clamped server-side to
  * ≥15 min — surfaced here as a hint). New Goals land in `draft`;
- * activation happens from the detail page.
+ * activation happens from the detail page. The accept/reject decision and
+ * the exact payload live in `goal-form-payload.ts`.
  */
 export function GoalForm() {
     const t = useTranslations('dashboard.goalNew');
     const router = useRouter();
     const [pending, startSubmit] = useTransition();
 
+    const [kind, setKind] = useState<GoalKind>('metric');
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [pluginId, setPluginId] = useState('');
@@ -49,10 +74,13 @@ export function GoalForm() {
     const [targetValue, setTargetValue] = useState('');
     const [unit, setUnit] = useState('');
     const [metricWindow, setMetricWindow] = useState<GoalWindow>('month');
+    const [dodText, setDodText] = useState('');
     const [deadline, setDeadline] = useState('');
     const [checkFrequencyMinutes, setCheckFrequencyMinutes] = useState(
         String(DEFAULT_CHECK_FREQUENCY_MINUTES),
     );
+
+    const isMetric = kind === 'metric';
 
     const parseParams = (): { ok: true; value?: Record<string, unknown> } | { ok: false } => {
         const raw = paramsText.trim();
@@ -75,39 +103,37 @@ export function GoalForm() {
     };
 
     const submit = () => {
-        const trimmedTitle = title.trim();
-        if (trimmedTitle.length < 1) {
-            toast.error(t('errors.titleRequired'));
+        const fields = {
+            title,
+            description,
+            pluginId,
+            metricId,
+            comparator,
+            targetValue,
+            unit,
+            window: metricWindow,
+            dodText,
+            deadline: null as string | null,
+            checkFrequencyMinutes: DEFAULT_CHECK_FREQUENCY_MINUTES,
+        };
+
+        // Kind-aware: a metric Goal keeps the legacy checks in the legacy
+        // order (title → source → target → unit, EW-044's empty-target guard
+        // included); a delivery Goal needs a title and at least one criterion.
+        const problem = validateGoalFormFields(kind, fields);
+        if (problem) {
+            toast.error(t(problem));
             return;
         }
-        if (!pluginId.trim() || !metricId.trim()) {
-            toast.error(t('errors.metricSourceRequired'));
-            return;
-        }
-        // `Number('')` is 0, NOT NaN — so checking only `Number.isFinite` let an
-        // EMPTY Target value through as a real target of 0. Combined with the
-        // default comparator `gte`, that creates a Goal meaning "reach at least
-        // 0", which every possible metric value already satisfies: the Goal is
-        // vacuous and reports success on its first evaluation. Verified on
-        // production — submitting the form with Target value blank produced
-        // `targetValue = 0, comparator = gte` with no error shown.
-        //
-        // The empty case must be rejected explicitly, before the conversion.
-        // `Number(' ')` is 0 too, hence the trim.
-        const rawTarget = targetValue.trim();
-        const target = Number(rawTarget);
-        if (rawTarget.length === 0 || !Number.isFinite(target)) {
-            toast.error(t('errors.targetInvalid'));
-            return;
-        }
-        if (!unit.trim()) {
-            toast.error(t('errors.unitRequired'));
-            return;
-        }
-        const params = parseParams();
-        if (!params.ok) {
-            toast.error(t('fields.paramsInvalid'));
-            return;
+
+        let params: Record<string, unknown> | undefined;
+        if (isMetric) {
+            const parsed = parseParams();
+            if (!parsed.ok) {
+                toast.error(t('fields.paramsInvalid'));
+                return;
+            }
+            params = parsed.value;
         }
 
         let deadlineIso: string | null = null;
@@ -124,23 +150,16 @@ export function GoalForm() {
         const checkFreq =
             Number.isFinite(freq) && freq > 0 ? Math.round(freq) : DEFAULT_CHECK_FREQUENCY_MINUTES;
 
+        const payload = buildCreateGoalPayload(kind, {
+            ...fields,
+            params,
+            deadline: deadlineIso,
+            checkFrequencyMinutes: checkFreq,
+        });
+
         startSubmit(async () => {
             try {
-                const goal = await createGoalAction({
-                    title: trimmedTitle,
-                    description: description.trim() || null,
-                    metricSource: {
-                        pluginId: pluginId.trim(),
-                        metricId: metricId.trim(),
-                        ...(params.value ? { params: params.value } : {}),
-                    },
-                    comparator,
-                    targetValue: target,
-                    unit: unit.trim(),
-                    window: metricWindow,
-                    deadline: deadlineIso,
-                    checkFrequencyMinutes: checkFreq,
-                });
+                const goal = await createGoalAction(payload);
                 toast.success(t('created'));
                 router.push(`/goals/${goal.id}`);
             } catch (err) {
@@ -193,82 +212,100 @@ export function GoalForm() {
                         placeholder={t('fields.descriptionPlaceholder')}
                     />
                 </div>
-            </section>
-
-            {/* Metric source */}
-            <section className={sectionCard}>
-                <h2 className="text-sm font-semibold text-text dark:text-text-dark">
-                    {t('sections.metricSource')}
-                </h2>
-                <div className="grid gap-4 @lg/main:grid-cols-2">
-                    <Input
-                        label={t('fields.pluginId')}
-                        value={pluginId}
-                        onChange={(e) => setPluginId(e.target.value)}
-                        maxLength={100}
-                        placeholder="stripe"
-                    />
-                    <Input
-                        label={t('fields.metricId')}
-                        value={metricId}
-                        onChange={(e) => setMetricId(e.target.value)}
-                        maxLength={200}
-                        placeholder="income"
-                    />
-                </div>
                 <div>
-                    <label className={fieldLabel}>{t('fields.params')}</label>
-                    <Textarea
-                        value={paramsText}
-                        onChange={(e) => setParamsText(e.target.value)}
-                        onBlur={parseParams}
-                        rows={4}
-                        placeholder={'{\n  "currency": "usd"\n}'}
-                        className="font-mono text-xs"
-                        error={paramsError ?? undefined}
-                    />
-                    <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('fields.paramsHint')}
-                    </p>
+                    <label className={fieldLabel} htmlFor="goal-kind">
+                        {t('fields.goalKind')}
+                    </label>
+                    <Select
+                        id="goal-kind"
+                        value={kind}
+                        onValueChange={(v) => setKind(v as GoalKind)}
+                        data-testid="goal-kind-select"
+                    >
+                        {GOAL_KINDS.map((k) => (
+                            <option key={k} value={k}>
+                                {t(`kinds.${k}`)}
+                            </option>
+                        ))}
+                    </Select>
+                    <p className={fieldHint}>{t(`kindHints.${kind}`)}</p>
                 </div>
             </section>
 
-            {/* Target */}
-            <section className={sectionCard}>
-                <h2 className="text-sm font-semibold text-text dark:text-text-dark">
-                    {t('sections.target')}
-                </h2>
-                <div className="grid gap-4 @lg/main:grid-cols-3">
-                    <div>
-                        <label className={fieldLabel}>{t('fields.comparator')}</label>
-                        <Select
-                            value={comparator}
-                            onValueChange={(v) => setComparator(v as GoalComparator)}
-                        >
-                            {COMPARATORS.map((c) => (
-                                <option key={c} value={c}>
-                                    {t(`comparators.${c}`)}
-                                </option>
-                            ))}
-                        </Select>
+            {/* Metric source — metric Goals only */}
+            {isMetric ? (
+                <section className={sectionCard}>
+                    <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                        {t('sections.metricSource')}
+                    </h2>
+                    <div className="grid gap-4 @lg/main:grid-cols-2">
+                        <Input
+                            label={t('fields.pluginId')}
+                            value={pluginId}
+                            onChange={(e) => setPluginId(e.target.value)}
+                            maxLength={100}
+                            placeholder="stripe"
+                        />
+                        <Input
+                            label={t('fields.metricId')}
+                            value={metricId}
+                            onChange={(e) => setMetricId(e.target.value)}
+                            maxLength={200}
+                            placeholder="income"
+                        />
                     </div>
-                    <Input
-                        type="number"
-                        label={t('fields.targetValue')}
-                        value={targetValue}
-                        onChange={(e) => setTargetValue(e.target.value)}
-                        step="any"
-                        placeholder="1000"
-                    />
-                    <Input
-                        label={t('fields.unit')}
-                        value={unit}
-                        onChange={(e) => setUnit(e.target.value)}
-                        maxLength={32}
-                        placeholder="usd"
-                    />
-                </div>
-                <div className="grid gap-4 @lg/main:grid-cols-2">
+                    <div>
+                        <label className={fieldLabel}>{t('fields.params')}</label>
+                        <Textarea
+                            value={paramsText}
+                            onChange={(e) => setParamsText(e.target.value)}
+                            onBlur={parseParams}
+                            rows={4}
+                            placeholder={'{\n  "currency": "usd"\n}'}
+                            className="font-mono text-xs"
+                            error={paramsError ?? undefined}
+                        />
+                        <p className={fieldHint}>{t('fields.paramsHint')}</p>
+                    </div>
+                </section>
+            ) : null}
+
+            {/* Target — metric Goals only */}
+            {isMetric ? (
+                <section className={sectionCard}>
+                    <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                        {t('sections.target')}
+                    </h2>
+                    <div className="grid gap-4 @lg/main:grid-cols-3">
+                        <div>
+                            <label className={fieldLabel}>{t('fields.comparator')}</label>
+                            <Select
+                                value={comparator}
+                                onValueChange={(v) => setComparator(v as GoalComparator)}
+                            >
+                                {COMPARATORS.map((c) => (
+                                    <option key={c} value={c}>
+                                        {t(`comparators.${c}`)}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
+                        <Input
+                            type="number"
+                            label={t('fields.targetValue')}
+                            value={targetValue}
+                            onChange={(e) => setTargetValue(e.target.value)}
+                            step="any"
+                            placeholder="1000"
+                        />
+                        <Input
+                            label={t('fields.unit')}
+                            value={unit}
+                            onChange={(e) => setUnit(e.target.value)}
+                            maxLength={32}
+                            placeholder="usd"
+                        />
+                    </div>
                     <div>
                         <label className={fieldLabel}>{t('fields.window')}</label>
                         <Select
@@ -282,40 +319,54 @@ export function GoalForm() {
                             ))}
                         </Select>
                     </div>
+                </section>
+            ) : null}
+
+            {/* Definition of Done — delivery Goals only */}
+            {!isMetric ? (
+                <section className={sectionCard}>
+                    <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                        {t('sections.definitionOfDone')}
+                    </h2>
+                    <Textarea
+                        label={t('fields.dodCriteria')}
+                        value={dodText}
+                        onChange={(e) => setDodText(e.target.value)}
+                        rows={5}
+                        placeholder={t('fields.dodCriteriaPlaceholder')}
+                        helperText={t('fields.dodCriteriaHint')}
+                        data-testid="goal-dod-text"
+                    />
+                </section>
+            ) : null}
+
+            {/* Cadence + deadline — both kinds */}
+            <section className={sectionCard}>
+                <h2 className="text-sm font-semibold text-text dark:text-text-dark">
+                    {t('sections.cadence')}
+                </h2>
+                <div className="grid gap-4 @lg/main:grid-cols-2">
+                    <Input
+                        type="number"
+                        label={t('fields.checkFrequency')}
+                        value={checkFrequencyMinutes}
+                        min={MIN_CHECK_FREQUENCY_MINUTES}
+                        step={1}
+                        onChange={(e) => setCheckFrequencyMinutes(e.target.value)}
+                        helperText={t('fields.checkFrequencyHint', {
+                            min: MIN_CHECK_FREQUENCY_MINUTES,
+                        })}
+                    />
                     <div>
                         <label className={fieldLabel}>{t('fields.deadline')}</label>
                         <input
                             type="datetime-local"
                             value={deadline}
                             onChange={(e) => setDeadline(e.target.value)}
-                            className={cn(
-                                'w-full text-sm rounded-lg transition-colors outline-none px-4 py-2',
-                                'bg-card dark:bg-card-primary-dark',
-                                'border border-card-border dark:border-white/9',
-                                'text-text dark:text-text-dark',
-                                'focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20',
-                            )}
+                            className={dateInput}
                         />
                     </div>
                 </div>
-            </section>
-
-            {/* Cadence */}
-            <section className={sectionCard}>
-                <h2 className="text-sm font-semibold text-text dark:text-text-dark">
-                    {t('sections.cadence')}
-                </h2>
-                <Input
-                    type="number"
-                    label={t('fields.checkFrequency')}
-                    value={checkFrequencyMinutes}
-                    min={MIN_CHECK_FREQUENCY_MINUTES}
-                    step={1}
-                    onChange={(e) => setCheckFrequencyMinutes(e.target.value)}
-                    helperText={t('fields.checkFrequencyHint', {
-                        min: MIN_CHECK_FREQUENCY_MINUTES,
-                    })}
-                />
             </section>
 
             <div className="flex items-center gap-2">

@@ -49,6 +49,11 @@ import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
 @Index('idx_fleet_jobs_node_status', ['nodeId', 'status'])
 @Index('idx_fleet_jobs_target_status', ['targetNodeId', 'status'])
 @Index('idx_fleet_jobs_lease_expiry', ['status', 'leaseExpiresAt'])
+@Index('idx_fleet_jobs_queued_at', ['status', 'queuedAt'])
+// Fleet cost accounting (EW-777): the per-node daily spend sum is
+// `WHERE nodeId = ? AND completedAt >= dayStart`. Migration
+// `1788300000000-AddFleetCostAccounting` adds the index with the column.
+@Index('idx_fleet_jobs_node_completed', ['nodeId', 'completedAt'])
 export class FleetJob {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -121,6 +126,20 @@ export class FleetJob {
     error?: string | null;
 
     /**
+     * Fleet cost accounting (EW-777) — the model spend this job's run
+     * reported, in cents, stamped by the API-side reconciler when the
+     * node's result carried a CLI cost. NULL = no model ran, or the CLI
+     * printed no price (Codex reports tokens only). Denormalised HERE, next
+     * to `nodeId` and `completedAt`, because the per-node and fleet-wide
+     * DAILY ceilings are one portable
+     * `SUM(costCents) WHERE nodeId|userId = ? AND completedAt >= dayStart`
+     * — and `plugin_usage_events`, which carries the same cents for the
+     * Costs dashboard, has no node id to sum by.
+     */
+    @Column({ type: 'int', nullable: true })
+    costCents?: number | null;
+
+    /**
      * Why a `queued` row has not started yet — today only
      * `waiting-for-runner`, stamped by the fleet run router when the job
      * was accepted with no runner able to take it.
@@ -135,6 +154,21 @@ export class FleetJob {
      */
     @Column({ type: 'varchar', length: 64, nullable: true })
     queuedReason?: string | null;
+
+    /**
+     * When the row last ENTERED `queued` (self-build slice S / EW-775).
+     * Set at enqueue, reset by reclaim and by a drain releasing the
+     * claim, NOT reset by a heartbeat promotion (clearing
+     * `queuedReason` does not make the job younger). The queue SLA
+     * (`FleetJobService.expireQueued`) is measured from it. Nullable so
+     * a row written by an older replica during rollout has an UNKNOWN
+     * age, and an unknown age is never destructively failed.
+     *
+     * Migration: `1788200000000-AddFleetJobQueuedAt` (backfills
+     * `createdAt` onto rows that were `queued` at upgrade time).
+     */
+    @PortableDateColumn({ nullable: true })
+    queuedAt?: Date | null;
 
     /**
      * Operator cancel request on an ACTIVE job (agent execution v2 /

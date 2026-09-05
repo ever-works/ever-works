@@ -108,6 +108,7 @@ function renderDrawer(
         detail?: FleetNodeDetailView | null;
         loading?: boolean;
         node?: FleetNodeView | null;
+        onSaveCostCeiling?: (cents: number | null) => void;
     } = {},
 ) {
     return render(
@@ -119,6 +120,7 @@ function renderDrawer(
             isPending={false}
             onClose={() => undefined}
             onSaveCapabilities={() => undefined}
+            onSaveCostCeiling={over.onSaveCostCeiling ?? (() => undefined)}
             onRotate={() => undefined}
             onDrain={() => undefined}
         />,
@@ -127,6 +129,72 @@ function renderDrawer(
 
 beforeEach(() => {
     vi.clearAllMocks();
+});
+
+describe('FleetNodeDrawer — billing identity and daily ceiling (fleet cost accounting, EW-777)', () => {
+    it('shows the seat the machine is billed to, and says so when it never reported one', () => {
+        const { unmount } = renderDrawer({
+            node: node({ modelIdentity: 'claude-code: ops@example.com (Acme, max)' }),
+            detail: detail({
+                node: node({ modelIdentity: 'claude-code: ops@example.com (Acme, max)' }),
+            }),
+        });
+        expect(screen.getByTestId('fleet-node-drawer-identity')).toHaveTextContent(
+            'claude-code: ops@example.com (Acme, max)',
+        );
+        unmount();
+
+        renderDrawer();
+        expect(screen.getByTestId('fleet-node-drawer-identity')).toHaveTextContent(
+            'table.identityUnknown',
+        );
+    });
+
+    it('shows the ceiling in force, the day it last tripped, and seeds the editor in dollars', () => {
+        const tripped = node({ dailyCostCeilingCents: 2_500, dailyCostTrippedOn: '2026-09-04' });
+        renderDrawer({ node: tripped, detail: detail({ node: tripped }) });
+
+        expect(screen.getByTestId('fleet-node-drawer-ceiling')).toHaveTextContent('$25.00');
+        expect(screen.getByTestId('fleet-node-drawer-ceiling')).toHaveTextContent(
+            'costCeiling.nodeTripped:2026-09-04',
+        );
+        expect(screen.getByTestId('fleet-node-cost-ceiling-input')).toHaveValue('25.00');
+    });
+
+    it('reads "inherit" with an empty editor when the node has no ceiling of its own', () => {
+        renderDrawer();
+        expect(screen.getByTestId('fleet-node-drawer-ceiling')).toHaveTextContent(
+            'costCeiling.nodeInherit',
+        );
+        expect(screen.getByTestId('fleet-node-cost-ceiling-input')).toHaveValue('');
+        expect(screen.getByTestId('fleet-node-cost-ceiling-clear')).toBeDisabled();
+    });
+
+    it('saves the typed dollars as whole cents, and clears with null', async () => {
+        const onSaveCostCeiling = vi.fn();
+        const capped = node({ dailyCostCeilingCents: 1_000 });
+        renderDrawer({ node: capped, detail: detail({ node: capped }), onSaveCostCeiling });
+        const user = userEvent.setup();
+
+        const input = screen.getByTestId('fleet-node-cost-ceiling-input');
+        await user.clear(input);
+        await user.type(input, '12.5');
+        await user.click(screen.getByTestId('fleet-node-cost-ceiling-save'));
+        expect(onSaveCostCeiling).toHaveBeenCalledWith(1_250);
+
+        await user.click(screen.getByTestId('fleet-node-cost-ceiling-clear'));
+        expect(onSaveCostCeiling).toHaveBeenLastCalledWith(null);
+    });
+
+    it('refuses a figure the API would refuse instead of sending it', async () => {
+        const onSaveCostCeiling = vi.fn();
+        renderDrawer({ onSaveCostCeiling });
+        const user = userEvent.setup();
+
+        await user.type(screen.getByTestId('fleet-node-cost-ceiling-input'), '-5');
+        await user.click(screen.getByTestId('fleet-node-cost-ceiling-save'));
+        expect(onSaveCostCeiling).not.toHaveBeenCalled();
+    });
 });
 
 describe('FleetNodeDrawer — job history rows', () => {
@@ -276,6 +344,7 @@ describe('FleetNodeDrawer — job filter', () => {
                 isPending={false}
                 onClose={() => undefined}
                 onSaveCapabilities={() => undefined}
+                onSaveCostCeiling={() => undefined}
                 onRotate={() => undefined}
                 onDrain={() => undefined}
             />,

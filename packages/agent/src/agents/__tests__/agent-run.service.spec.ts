@@ -167,6 +167,129 @@ describe('AgentRunService', () => {
         expect(result.budgetCheck?.reason).toBe('unlimited');
     });
 
+    describe('budget precheck spend aggregation (fleet cost accounting, EW-777)', () => {
+        const capped = {
+            intervalUnit: 'month',
+            intervalCount: 1,
+            capCents: 1_000,
+            currency: 'usd',
+        };
+
+        /** The service with the usage repository bound as its trailing optional dep. */
+        const withUsage = (pluginUsage: any) =>
+            new AgentRunService(
+                agents,
+                runs,
+                runLogs,
+                budgets,
+                assembler,
+                skillBindings,
+                activity,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                pluginUsage,
+            );
+
+        it('trips on spend a FLEET run accumulated — the same rows a cloud run writes', async () => {
+            // A fleet completion records a `fleet-node:claude-code` usage
+            // row tagged with the Agent; the precheck sums by (user, agent)
+            // and neither knows nor cares which runtime produced it.
+            const pluginUsage = { getTotalSpendCentsForAgent: jest.fn().mockResolvedValue(1_250) };
+            agents.findById.mockResolvedValueOnce(makeAgent());
+            budgets.findByAgentId.mockResolvedValueOnce({ ...capped });
+
+            const result = await withUsage(pluginUsage).execute({
+                runId: 'r1',
+                agentId: 'a1',
+                userId: 'u1',
+                kind: 'heartbeat',
+            });
+
+            expect(pluginUsage.getTotalSpendCentsForAgent).toHaveBeenCalledWith(
+                'u1',
+                'a1',
+                expect.any(Date),
+                expect.any(Date),
+                'usd',
+            );
+            expect(result.status).toBe('budget-blocked');
+            expect(result.budgetCheck).toMatchObject({
+                allowed: false,
+                reason: 'over-cap',
+                currentSpendCents: 1_250,
+                capCents: 1_000,
+            });
+            expect(runs.markFailed).toHaveBeenCalledWith('r1', 'Budget exceeded');
+        });
+
+        it('trips exactly AT the cap, and admits one cent below it', async () => {
+            agents.findById.mockResolvedValue(makeAgent());
+            budgets.findByAgentId.mockResolvedValue({ ...capped });
+
+            const atCap = await withUsage({
+                getTotalSpendCentsForAgent: jest.fn().mockResolvedValue(1_000),
+            }).execute({ runId: 'r1', agentId: 'a1', userId: 'u1', kind: 'heartbeat' });
+            expect(atCap.status).toBe('budget-blocked');
+
+            const below = await withUsage({
+                getTotalSpendCentsForAgent: jest.fn().mockResolvedValue(999),
+            }).execute({ runId: 'r2', agentId: 'a1', userId: 'u1', kind: 'heartbeat' });
+            expect(below.status).toBe('assembled');
+            expect(below.budgetCheck).toMatchObject({
+                allowed: true,
+                reason: 'ok',
+                currentSpendCents: 999,
+            });
+        });
+
+        it('fails CLOSED when the spend cannot be read: query throws, or no usage repository is bound', async () => {
+            agents.findById.mockResolvedValue(makeAgent());
+            budgets.findByAgentId.mockResolvedValue({ ...capped });
+
+            const throwing = await withUsage({
+                getTotalSpendCentsForAgent: jest.fn().mockRejectedValue(new Error('db down')),
+            }).execute({ runId: 'r1', agentId: 'a1', userId: 'u1', kind: 'heartbeat' });
+            expect(throwing.status).toBe('budget-blocked');
+            expect(throwing.budgetCheck?.reason).toBe('unevaluable');
+
+            // The positional fixture `svc` binds no usage repository at all.
+            const unbound = await svc.execute({
+                runId: 'r2',
+                agentId: 'a1',
+                userId: 'u1',
+                kind: 'heartbeat',
+            });
+            expect(unbound.status).toBe('budget-blocked');
+            expect(unbound.budgetCheck?.reason).toBe('unevaluable');
+        });
+
+        it('never consults the usage repository for an uncapped or unlimited budget', async () => {
+            const pluginUsage = { getTotalSpendCentsForAgent: jest.fn().mockResolvedValue(0) };
+            agents.findById.mockResolvedValue(makeAgent());
+            budgets.findByAgentId.mockResolvedValueOnce({
+                ...capped,
+                intervalUnit: 'unlimited',
+                capCents: null,
+            });
+
+            const result = await withUsage(pluginUsage).execute({
+                runId: 'r1',
+                agentId: 'a1',
+                userId: 'u1',
+                kind: 'heartbeat',
+            });
+            expect(result.budgetCheck?.reason).toBe('unlimited');
+            expect(pluginUsage.getTotalSpendCentsForAgent).not.toHaveBeenCalled();
+        });
+    });
+
     it('budget blocked path — marks run failed, emits ERROR log + AGENT_BUDGET_EXCEEDED activity', async () => {
         agents.findById.mockResolvedValueOnce(makeAgent());
         // v1 currentSpendCents synthesizes to 0; force the cap-based

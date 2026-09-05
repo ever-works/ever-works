@@ -71,6 +71,9 @@ function mkGoal(overrides: Partial<Goal> = {}): Goal {
         id: 'g1',
         title: 'Reach 1k signups',
         description: null,
+        // Self-build slice AG: `Goal.goalKind` is required on the wire type;
+        // every Goal in this spec is the metric kind it always was.
+        goalKind: 'metric',
         metricSource: { pluginId: 'p', metricId: 'm' },
         comparator: 'gte',
         targetValue: 1000,
@@ -145,6 +148,47 @@ describe('MissionGoalsPanel', () => {
         // No Goals to attach either — the select is replaced by a hint.
         expect(screen.getByText('noGoalsToAttach')).toBeInTheDocument();
         expect(screen.queryByTestId('mission-attach-goal-select')).toBeNull();
+    });
+
+    it('shows the current/target readout for a metric Goal', () => {
+        render(<MissionGoalsPanel missionId="m1" initialLinks={[mkLink()]} attachableGoals={[]} />);
+        const row = screen.getByTestId('mission-goals-row-g1');
+        expect(row.textContent).toContain('≥');
+        expect(row.textContent).toContain('1,000 signups');
+        expect(screen.queryByText('rollup')).toBeNull();
+    });
+
+    it('shows the Definition-of-Done rollup instead of a metric readout for a delivery Goal', () => {
+        // Self-build slice AG: a delivery Goal has no metric fields at all.
+        const delivery = mkGoal({
+            goalKind: 'delivery',
+            metricSource: null,
+            comparator: null,
+            targetValue: null,
+            unit: null,
+            currentValue: null,
+            dodSummary: {
+                total: 3,
+                done: 1,
+                waived: 0,
+                open: 2,
+                proposed: 0,
+                closed: 1,
+                complete: false,
+            },
+        });
+        render(
+            <MissionGoalsPanel
+                missionId="m1"
+                initialLinks={[mkLink({ goal: delivery })]}
+                attachableGoals={[]}
+            />,
+        );
+        const row = screen.getByTestId('mission-goals-row-g1');
+        // The mocked `t` echoes the key — the rollup rendered, the glyph did not.
+        expect(screen.getByText('rollup')).toBeInTheDocument();
+        expect(row.textContent).not.toContain('≥');
+        expect(row.textContent).not.toContain('≤');
     });
 
     it('tags each picker option with a status-keyed Goal icon', () => {

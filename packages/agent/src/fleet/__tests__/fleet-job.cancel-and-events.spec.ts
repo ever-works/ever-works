@@ -53,6 +53,7 @@ function makeJob(over: Partial<FleetJob> = {}): FleetJob {
         result: null,
         error: null,
         queuedReason: null,
+        queuedAt: new Date('2026-09-02T10:00:00Z'),
         cancelRequestedAt: null,
         startedAt: null,
         completedAt: null,
@@ -101,6 +102,8 @@ describe('FleetJobService — cancel + lifecycle events', () => {
                 return true;
             }),
             findExpiredLeases: jest.fn(async () => []),
+            // Queue SLA scan on the lease path (slice S): nothing stale here.
+            findQueuedOlderThan: jest.fn(async () => []),
             reclaim: jest.fn(async () => true),
             failExhausted: jest.fn(
                 async (_id: string, _observed: unknown, error: string, completedAt: Date) => {

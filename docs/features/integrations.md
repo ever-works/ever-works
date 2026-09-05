@@ -51,7 +51,9 @@ Security: every delivery — events and slash commands alike — is verified wit
 
 Point a repository webhook at `POST /api/ingest/github/events` and Agents review your pull requests.
 
-On `pull_request` opened/synchronize — and on `@ever-works` mentions in PR comments — the reviewer matches the repository to a Work (across all three repo roles), builds a byte-capped diff, adds Knowledge-Base context and memory recall, makes one structured AI call, and posts the review. The review is keyed on the head SHA, so each pushed revision is reviewed exactly once and bot comments are never re-ingested.
+On `pull_request` opened/synchronize — and on `@ever-works` mentions in PR comments — the reviewer matches the repository to a Work (across all three repo roles), builds a byte-capped diff, adds Knowledge-Base context and memory recall, makes one structured AI call, and posts the review. The review is keyed on the head SHA, so each pushed revision is reviewed exactly once.
+
+The platform's own replies and unknown bots are never ingested — the loop must not echo its own output. Reviews, inline findings and summary comments from **trusted reviewer bots** (CodeRabbit, Copilot, Codex and Greptile by default; `GITHUB_TRUSTED_REVIEW_BOTS` to change the list, `none` to disable) become Task rejection feedback with a severity (`critical | major | minor`, mapped from CodeRabbit's Major/Minor/Critical and Codex/Greptile P1–P3) so the next resumed run fixes P2+ first. A `changes_requested` review from a trusted bot is recorded exactly as a human's would be; a bot comment is recorded, never reviewed. The platform's own `<GITHUB_APP_SLUG>[bot]` identity stays excluded even if it is listed. A trusted-bot finding with no recognisable marker is stored with no severity and the resumed run is told to treat it as major — an unrecognised marker is never read as a nit.
 
 Deliveries are verified with the configured webhook secret (HMAC SHA-256 over the raw body, constant-time compare) and the endpoint fails closed the same way. A missing `x-github-event` header is rejected outright.
 

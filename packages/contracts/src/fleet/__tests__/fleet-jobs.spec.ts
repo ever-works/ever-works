@@ -4,6 +4,7 @@ import { INBOX_MAX_BODY_CHARS, INBOX_MAX_TITLE_CHARS } from '../../inbox/inbox.t
 import {
 	clampLeaseTtlSec,
 	clampMaxAttempts,
+	clampQueuedMaxAgeSec,
 	FLEET_AGENT_TASK_MAX_STEPS,
 	FLEET_AGENT_TASK_META_DIR,
 	FLEET_AGENT_TASK_QUESTION_FILE,
@@ -15,21 +16,26 @@ import {
 	FLEET_JOB_ACTIVE_STATUSES,
 	FLEET_JOB_DEFAULT_LEASE_TTL_SEC,
 	FLEET_JOB_DEFAULT_MAX_ATTEMPTS,
+	FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC,
 	FLEET_JOB_KINDS,
 	FLEET_JOB_MAX_ATTEMPTS_CEILING,
 	FLEET_JOB_MAX_ERROR_LENGTH,
 	FLEET_JOB_MAX_LEASE_BATCH,
 	FLEET_JOB_MAX_LEASE_TTL_SEC,
 	FLEET_JOB_MAX_PAYLOAD_BYTES,
+	FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC,
 	FLEET_JOB_MAX_REQUIRED_CAPABILITIES,
 	FLEET_JOB_MAX_RESULT_BYTES,
 	FLEET_JOB_MIN_LEASE_TTL_SEC,
+	FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC,
+	FLEET_JOB_QUEUE_EXPIRED_REASON,
 	FLEET_JOB_STATUSES,
 	FLEET_JOB_TERMINAL_STATUSES,
 	isFleetJobActive,
 	isFleetJobKind,
 	isFleetJobTerminal,
 	isNodeBusy,
+	isQueueExpiredError,
 	nodeSatisfiesCapabilities,
 	normalizeFleetAgentTaskQuestion,
 	parseFleetAgentTaskQuestionMarkdown,
@@ -844,5 +850,81 @@ describe('normalizeFleetAgentTaskQuestion (self-build slice Q)', () => {
 			mountDir: 'template'
 		});
 		expect(normalizeFleetAgentTaskQuestion(once)).toEqual(once);
+	});
+});
+
+describe('clampQueuedMaxAgeSec (queue SLA, self-build slice S)', () => {
+	it('defaults per kind: a day for agent-task, two hours for the checks', () => {
+		expect(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC).toEqual({
+			'agent-task': 86_400,
+			'acceptance-checks': 7_200,
+			'browser-check': 7_200
+		});
+		for (const kind of FLEET_JOB_KINDS) {
+			expect(clampQueuedMaxAgeSec(kind)).toBe(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC[kind]);
+			expect(clampQueuedMaxAgeSec(kind, undefined)).toBe(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC[kind]);
+		}
+	});
+
+	it('covers every kind — a new kind without a default would be a compile error, not a silent "forever"', () => {
+		expect(Object.keys(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC).sort()).toEqual([...FLEET_JOB_KINDS].sort());
+		expect(Object.isFrozen(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC)).toBe(true);
+	});
+
+	it('orders the bounds min < every default <= max', () => {
+		expect(FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC).toBe(60);
+		expect(FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC).toBe(7 * 86_400);
+		for (const value of Object.values(FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC)) {
+			expect(value).toBeGreaterThan(FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC);
+			expect(value).toBeLessThanOrEqual(FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC);
+		}
+	});
+
+	it.each([
+		['null', null],
+		['a numeric string', '3600'],
+		['NaN', Number.NaN],
+		['Infinity', Number.POSITIVE_INFINITY],
+		['zero', 0],
+		['a negative number', -5],
+		['an object', { seconds: 60 }]
+	] as Array<[string, unknown]>)(
+		'falls back to the kind default for %s (fail closed — never "disabled")',
+		(_label, value) => {
+			expect(clampQueuedMaxAgeSec('agent-task', value)).toBe(86_400);
+			expect(clampQueuedMaxAgeSec('browser-check', value)).toBe(7_200);
+		}
+	);
+
+	it('clamps into [min, max] and rounds', () => {
+		expect(clampQueuedMaxAgeSec('agent-task', 1)).toBe(FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC);
+		expect(clampQueuedMaxAgeSec('agent-task', 59.4)).toBe(FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC);
+		expect(clampQueuedMaxAgeSec('agent-task', 90.6)).toBe(91);
+		expect(clampQueuedMaxAgeSec('agent-task', 10 ** 9)).toBe(FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC);
+		expect(clampQueuedMaxAgeSec('acceptance-checks', 3_600)).toBe(3_600);
+	});
+
+	it('uses the SHORTEST default for an unknown kind (fail closed)', () => {
+		expect(clampQueuedMaxAgeSec('teleport' as unknown as FleetJobKind)).toBe(7_200);
+	});
+});
+
+describe('FLEET_JOB_QUEUE_EXPIRED_REASON / isQueueExpiredError', () => {
+	it('is a short machine token, never free text', () => {
+		expect(FLEET_JOB_QUEUE_EXPIRED_REASON).toBe('queued-max-age-exceeded');
+		expect(FLEET_JOB_QUEUE_EXPIRED_REASON).toMatch(/^[a-z-]+$/);
+		expect(FLEET_JOB_QUEUE_EXPIRED_REASON.length).toBeLessThanOrEqual(64);
+	});
+
+	it('matches the stored prefix form and nothing else', () => {
+		expect(isQueueExpiredError(FLEET_JOB_QUEUE_EXPIRED_REASON)).toBe(true);
+		expect(
+			isQueueExpiredError(`${FLEET_JOB_QUEUE_EXPIRED_REASON}: no eligible runner took the job within 24h`)
+		).toBe(true);
+		expect(isQueueExpiredError('Lease expired 3 time(s) without a result')).toBe(false);
+		expect(isQueueExpiredError(` ${FLEET_JOB_QUEUE_EXPIRED_REASON}`)).toBe(false);
+		expect(isQueueExpiredError('')).toBe(false);
+		expect(isQueueExpiredError(null)).toBe(false);
+		expect(isQueueExpiredError(undefined)).toBe(false);
 	});
 });

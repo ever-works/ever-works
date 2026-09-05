@@ -13,4 +13,11 @@ export type {
     FleetNodeDetailView,
     FleetNodeDrainResult,
     FleetEnrollmentTokenView,
+    // Panic controls (EW-778).
+    FleetAuditView,
+    FleetCancelInFlightResult,
+    FleetDrainAllResult,
+    FleetKillSwitchAdminState,
+    FleetKillSwitchChangeResult,
+    FleetKillSwitchState,
 } from '@ever-works/contracts';

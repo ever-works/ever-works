@@ -4,8 +4,17 @@ import { clampLeaseTtlSec, FLEET_JOB_DEFAULT_LEASE_TTL_SEC, FLEET_JOB_MAX_LEASE_
 import type { Logger } from './logger';
 import type { Scheduler } from './heartbeat';
 import { systemScheduler } from './heartbeat';
-import { admitByResourceLimits, hasAdmissionCeilings, type ResourceProbe } from './resource-limits';
+import {
+	admitByResourceLimits,
+	hasAdmissionCeilings,
+	hasDiskFloor,
+	type AdmissionDecision,
+	type ResourceProbe,
+	type ResourceSample
+} from './resource-limits';
+import type { DiskProbeIo } from './telemetry-probe';
 import { clampResourceLimits, type NodeResourceLimits } from './types';
+import { measureWorkspaceFreeBytes } from './workspaces/disk-headroom';
 import type { WorkerSafetyGate } from './worker-safety-store';
 
 /**
@@ -257,6 +266,16 @@ export interface WorkerLoopOptions {
 	limits?: NodeResourceLimits;
 	/** Host sampler backing the admission gate. Absent = no ceilings. */
 	resourceProbe?: ResourceProbe;
+	/**
+	 * Free-space probe backing the disk floor. Both this and `workspacePath`
+	 * are needed for the floor to be enforced at the lease: the reading has
+	 * to be taken on the volume that actually holds the worktrees, which is
+	 * not necessarily the one the service's cwd is on. Absent = the floor is
+	 * enforced only at provision time (by the workspace provisioner).
+	 */
+	diskProbe?: DiskProbeIo;
+	/** The workspace ROOT whose volume `diskProbe` measures. */
+	workspacePath?: string;
 	client: JobLeaseCapableClient;
 	/** Max jobs in flight on this node at once. */
 	concurrency?: number;
@@ -309,6 +328,10 @@ export class WorkerLoop {
 	private readonly idlePollMs: number;
 	private readonly limits: NodeResourceLimits;
 	private readonly resourceProbe: ResourceProbe | undefined;
+	private readonly diskProbe: DiskProbeIo | undefined;
+	private readonly workspacePath: string | undefined;
+	/** Last disk refusal reason logged, so the warning fires once per episode. */
+	private lastDiskRefusal: string | null = null;
 	private readonly now: () => number;
 	private readonly monotonicNow: () => number;
 	private readonly leasePollDrainTimeoutMs: number;
@@ -361,6 +384,8 @@ export class WorkerLoop {
 		// exactly one number in play once an operator has set limits.
 		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
 		this.resourceProbe = options.resourceProbe;
+		this.diskProbe = options.diskProbe;
+		this.workspacePath = options.workspacePath;
 		this.paused = options.startPaused === true;
 		this.unsafe = options.startUnsafe != null;
 		this.state.paused = this.paused;
@@ -690,20 +715,62 @@ export class WorkerLoop {
 	 * A probe that throws or is absent ADMITS: the ceilings are a courtesy to
 	 * the machine's owner, and a broken sampler must degrade to "behave like
 	 * there were no ceiling", never to "this node is permanently idle".
+	 *
+	 * The disk floor is sampled on the workspace root's volume and folded
+	 * into the same decision. It is sampled ONLY when a floor is in force,
+	 * so the "skips sampling entirely when no ceiling is set" contract for
+	 * CPU/memory keeps holding for its own probe; a null floor takes no
+	 * reading at all.
 	 */
-	private async checkResourceAdmission(): Promise<{ admit: boolean; reason: string | null }> {
-		if (!this.resourceProbe || !hasAdmissionCeilings(this.limits)) {
+	private async checkResourceAdmission(): Promise<AdmissionDecision> {
+		const wantsHost = this.resourceProbe !== undefined && hasAdmissionCeilings(this.limits);
+		const wantsDisk = this.diskProbe !== undefined && this.workspacePath !== undefined && hasDiskFloor(this.limits);
+		if (!wantsHost && !wantsDisk) {
 			return { admit: true, reason: null };
 		}
-		try {
-			const sample = await this.resourceProbe.sample();
-			return admitByResourceLimits(this.limits, sample);
-		} catch (error) {
-			const raw = error instanceof Error ? error.message : String(error);
-			this.options.logger?.warn(
-				`Resource probe failed, admitting work anyway: ${this.options.logger?.redact(raw) ?? raw}`
-			);
-			return { admit: true, reason: null };
+		// NaN never blocks (see `admitByResourceLimits`), so a dimension that
+		// is not sampled cannot refuse.
+		let sample: ResourceSample = { cpuPercent: Number.NaN, usedMemoryMb: Number.NaN, totalMemoryMb: Number.NaN };
+		if (wantsHost) {
+			try {
+				sample = { ...(await this.resourceProbe!.sample()) };
+			} catch (error) {
+				const raw = error instanceof Error ? error.message : String(error);
+				this.options.logger?.warn(
+					`Resource probe failed, admitting work anyway: ${this.options.logger?.redact(raw) ?? raw}`
+				);
+			}
+		}
+		if (wantsDisk) {
+			// Measured on the nearest EXISTING ancestor of the root (a fresh
+			// node has not created it yet). A throwing / nonsense probe maps
+			// to null, and null admits: an unreadable volume is reported (the
+			// heartbeat carries no figure) rather than idling the node.
+			sample.diskFreeBytes = await measureWorkspaceFreeBytes(this.diskProbe!, this.workspacePath!);
+		}
+		const decision = admitByResourceLimits(this.limits, sample);
+		this.noteDiskDecision(decision);
+		return decision;
+	}
+
+	/**
+	 * One warning when the floor starts refusing, one info line when it
+	 * clears — not a line per poll, which at the idle cadence would be a
+	 * log entry every five seconds for as long as the disk stays full.
+	 */
+	private noteDiskDecision(decision: AdmissionDecision): void {
+		if (!decision.admit && decision.dimension === 'disk') {
+			if (this.lastDiskRefusal !== decision.reason) {
+				this.lastDiskRefusal = decision.reason;
+				this.options.logger?.warn(
+					`Refusing to lease work: ${decision.reason}. Free space on the workspace volume (\`ever-works-node doctor\`, \`ever-works-node gc\`) or lower the floor with --min-free-disk.`
+				);
+			}
+			return;
+		}
+		if (this.lastDiskRefusal !== null && (decision.admit || decision.dimension !== 'disk')) {
+			this.lastDiskRefusal = null;
+			this.options.logger?.info('Workspace volume is back above the disk floor — leasing resumes');
 		}
 	}
 

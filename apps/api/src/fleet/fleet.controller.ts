@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Logger,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -22,17 +23,20 @@ import type {
     FleetEnrollmentTokenView,
 } from '@ever-works/agent/fleet';
 import {
+    FleetCostCeilingService,
     FleetExecutionPreferenceService,
     FleetJobService,
     FleetService,
 } from '@ever-works/agent/fleet';
 import type {
+    FleetCostCeilingView,
     FleetEnrollResponse,
     FleetExecutionPreferenceView,
     FleetHeartbeatResponse,
     FleetNodeView,
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
+import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
@@ -46,6 +50,7 @@ import {
     FleetHeartbeatDto,
     FleetNodePauseDto,
     FleetUnenrollDto,
+    SetFleetCostCeilingDto,
     SetFleetExecutionPreferenceDto,
     UpdateFleetNodeDto,
 } from './dto/fleet.dto';
@@ -79,6 +84,18 @@ const NODE_HISTORY_LIMIT = 25;
  *   GET    /api/fleet/execution-preferences   local-vs-cloud routing rows
  *   PUT    /api/fleet/execution-preference    set one scope's routing
  *   DELETE /api/fleet/execution-preference    clear one scope's routing
+ *   GET    /api/fleet/cost-ceiling            fleet-wide daily model-spend
+ *                                             ceiling + today's spend
+ *   PUT    /api/fleet/cost-ceiling            set / clear that ceiling
+ *
+ * Panic controls (EW-778), on their own controllers:
+ *   POST   /api/fleet/drain-all               drain EVERY node I own
+ *   POST   /api/fleet/cancel-in-flight        cancel my running fleet work
+ *                                             (explicit second step)
+ *   GET    /api/fleet/kill-switch             is the global stop flag set?
+ *   POST   /api/fleet/kill-switch/stop        platform admin: set it
+ *   POST   /api/fleet/kill-switch/clear       platform admin: clear it
+ *   GET    /api/fleet/kill-switch/audit       platform admin: audit trail
  *
  * Public, self-authenticating (called by the node apps — throttled,
  * fail-closed: any invalid credential path is one undifferentiated
@@ -103,12 +120,41 @@ const NODE_HISTORY_LIMIT = 25;
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard)
 export class FleetController {
+    private readonly logger = new Logger(FleetController.name);
+
     constructor(
         private readonly service: FleetService,
         private readonly jobs: FleetJobService,
         private readonly runners: FleetRunnerStatusService,
         private readonly preferences: FleetExecutionPreferenceService,
+        private readonly costCeiling: FleetCostCeilingService,
+        // EW-778 — owns the per-node drain so that drain-all reuses it.
+        private readonly panic: FleetPanicService,
     ) {}
+
+    @Get('cost-ceiling')
+    @ApiOperation({
+        summary:
+            "This account's FLEET-WIDE daily (UTC) model-spend ceiling — the owner's value, the deployment default it falls back to, the day it last drained the fleet, and today's spend across every node. Sums only what the owner's own machines reported, never cloud spend.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async getCostCeiling(@CurrentUser() auth: AuthenticatedUser): Promise<FleetCostCeilingView> {
+        return this.costCeiling.describeForUser(auth.userId);
+    }
+
+    @Put('cost-ceiling')
+    @ApiOperation({
+        summary:
+            'Set (or clear, with null) the fleet-wide daily model-spend ceiling. Crossing it drains every node of the account until they are re-enabled — a stop, not a rate limit.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async setCostCeiling(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: SetFleetCostCeilingDto,
+    ): Promise<FleetCostCeilingView> {
+        return this.costCeiling.setFleetCeilingForUser(auth.userId, body.dailyCeilingCents);
+    }
 
     @Get('runner-status')
     @ApiOperation({
@@ -282,12 +328,10 @@ export class FleetController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: DrainFleetNodeDto,
     ): Promise<FleetNodeDrainResult> {
-        // Order matters: disable FIRST. The node stops being able to
-        // lease the instant its status flips, so a claim requeued after
-        // that cannot be re-claimed by the machine being drained.
-        const node = await this.service.setDisabledForUser(auth.userId, id, body.drain);
-        const releasedJobs = body.drain ? await this.jobs.releaseClaimsForNode(auth.userId, id) : 0;
-        return { node, releasedJobs };
+        // The drain itself (disable FIRST, then requeue — the order is
+        // load-bearing) lives in FleetPanicService so that drain-all
+        // (EW-778) performs exactly this, once per node.
+        return this.panic.drainNodeForUser(auth.userId, id, body.drain);
     }
 
     @Post('nodes/enrollment-token')
@@ -317,19 +361,31 @@ export class FleetController {
         @Body() body: UpdateFleetNodeDto,
     ): Promise<FleetNodeView> {
         // Reject only when NOTHING actionable arrived. Each field is an
-        // independent edit, so the guard has to name all four — dropping
+        // independent edit, so the guard has to name all five — dropping
         // one here would 400 a perfectly valid single-field PATCH.
         if (
             typeof body.name !== 'string' &&
             typeof body.disabled !== 'boolean' &&
             typeof body.paused !== 'boolean' &&
-            !Array.isArray(body.capabilities)
+            !Array.isArray(body.capabilities) &&
+            body.dailyCostCeilingCents === undefined
         ) {
-            throw new BadRequestException('Provide name, disabled, paused and/or capabilities');
+            throw new BadRequestException(
+                'Provide name, disabled, paused, capabilities and/or dailyCostCeilingCents',
+            );
         }
         let view: FleetNodeView | null = null;
         if (typeof body.name === 'string') {
             view = await this.service.renameForUser(auth.userId, id, body.name);
+        }
+        // Fleet cost accounting (EW-777): `null` is a value here (clear the
+        // ceiling), so the test is on `undefined`, never on truthiness.
+        if (body.dailyCostCeilingCents !== undefined) {
+            view = await this.service.setDailyCostCeilingForUser(
+                auth.userId,
+                id,
+                body.dailyCostCeilingCents,
+            );
         }
         if (Array.isArray(body.capabilities)) {
             // Writing tags pins them by default: an admin edit the
@@ -383,6 +439,7 @@ export class FleetController {
             capabilities: body.capabilities,
             cliVersion: body.cliVersion,
             diskFreeBytes: body.diskFreeBytes,
+            modelIdentity: body.modelIdentity,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -407,9 +464,29 @@ export class FleetController {
             capabilities: body.capabilities,
             cliVersion: body.cliVersion,
             diskFreeBytes: body.diskFreeBytes,
+            modelIdentity: body.modelIdentity,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');
+        }
+        // Self-build slice S — an eligible runner is back: clear
+        // `waiting-for-runner` on the owner's queued jobs this node can
+        // take, so the Fleet UI stops saying "waiting" the moment it is
+        // no longer true (the node's own lease poll claims them next).
+        // Only for a beat that left the node ONLINE — a paused/disabled
+        // node keeps beating but will not lease — and never able to fail
+        // or refuse the beat: the service re-reads the node row itself
+        // and swallows its own errors; this guard is the belt.
+        if (result.node.status === 'online') {
+            try {
+                await this.jobs.promoteWaitingForNode(result.node.id);
+            } catch (err) {
+                this.logger.debug(
+                    `waiting-job promotion skipped for node ${result.node.id}: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
         }
         return { ok: true, node: result.node };
     }

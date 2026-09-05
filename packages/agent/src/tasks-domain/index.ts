@@ -60,3 +60,10 @@ export {
     TaskReviewRejectionRepository,
     type RecordTaskReviewRejectionInput,
 } from '../database/repositories/task-review-rejection.repository';
+// Trusted review bots (R16) — the classification a bridge attaches to a
+// reviewer-bot finding, exported so api-side writers speak the same union.
+export {
+    TASK_REVIEW_REJECTION_SEVERITIES,
+    type TaskReviewRejectionReviewerKind,
+    type TaskReviewRejectionSeverity,
+} from '../entities/task-review-rejection.entity';

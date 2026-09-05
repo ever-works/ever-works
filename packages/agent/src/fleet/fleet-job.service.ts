@@ -10,20 +10,27 @@ import type {
 import {
     clampLeaseTtlSec,
     clampMaxAttempts,
+    FLEET_JOB_KINDS,
     FLEET_JOB_MAX_ERROR_LENGTH,
     FLEET_JOB_MAX_LEASE_BATCH,
     FLEET_JOB_MAX_PAYLOAD_BYTES,
     FLEET_JOB_MAX_REQUIRED_CAPABILITIES,
     FLEET_JOB_MAX_RESULT_BYTES,
+    FLEET_JOB_QUEUE_EXPIRED_REASON,
     isFleetJobKind,
     nodeSatisfiesCapabilities,
 } from '@ever-works/contracts';
+import { config } from '../config';
 import { FleetJob } from '../entities/fleet-job.entity';
 import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '../events/fleet-job.events';
 import { FleetJobRepository } from './fleet-job.repository';
 import { FleetNodeRepository } from './fleet-node.repository';
 import { verifyNodeSecret } from './fleet-node-credential';
 import { FleetAgentNodeAffinityRepository } from './fleet-agent-node-affinity.repository';
+import { FleetKillSwitchService } from './fleet-kill-switch.service';
+
+/** Upper bound on the queued rows `queuedForUser` returns (cancel-in-flight with `includeQueued`). */
+export const FLEET_JOB_QUEUED_SCAN_LIMIT = 500;
 
 /** Batch ceiling on one reclaim pass, so a huge backlog can't stall a poll. */
 export const FLEET_JOB_RECLAIM_BATCH = 200;
@@ -66,6 +73,14 @@ export interface ReclaimSummary {
     scanned: number;
     requeued: number;
     failed: number;
+}
+
+/** What one queue-SLA pass did (see {@link FleetJobService.expireQueued}). */
+export interface QueueExpirySummary {
+    /** Queued rows older than their kind's max age that the scan returned. */
+    scanned: number;
+    /** Of those, the rows this pass actually settled `failed`. */
+    expired: number;
 }
 
 /** Error text a job settles with when an operator cancels it before any node claimed it. */
@@ -134,6 +149,12 @@ export class FleetJobService {
         // positionally keeps compiling; absent, the lease protocol is
         // byte-for-byte what it was (no consumer, no event).
         @Optional() private readonly events?: EventEmitter2,
+        // Panic controls (EW-778) — the GLOBAL STOP FLAG. Same appended-
+        // LAST + @Optional() posture. Absent (unit tests built
+        // positionally), the lease protocol is byte-for-byte what it was;
+        // present, `lease()` answers `[]` while the flag is set OR cannot
+        // be read — the service folds read failures into "stopped".
+        @Optional() private readonly killSwitch?: FleetKillSwitchService,
     ) {}
 
     /**
@@ -187,8 +208,9 @@ export class FleetJobService {
      * the job would silently un-pin exactly the runs the owner bound.
      *
      * Public because the run router asks the same question BEFORE the
-     * job exists, to judge availability against the bound node instead
-     * of the whole fleet; both callers must agree on the answer.
+     * job exists (`FleetRunRouterService.routeAgentTask`, self-build
+     * slice S), to judge availability against the bound node instead of
+     * the whole fleet; both callers must agree on the answer.
      */
     async resolveAgentTaskTarget(userId: string, agentId: unknown): Promise<string | null> {
         if (typeof agentId !== 'string' || !isUUID(agentId)) {
@@ -223,9 +245,49 @@ export class FleetJobService {
             return null;
         }
 
+        // Panic controls (EW-778) — EVERY lease consults the global stop
+        // flag, after auth (a bad credential is still a 401, never "no
+        // work") and before anything is claimed. `[]` is the honest
+        // node-side answer: the fleet has nothing for you right now.
+        // Heartbeat and complete are deliberately NOT gated — a stopped
+        // fleet must still settle the work it already holds, or a later
+        // cancel-in-flight could never resolve.
+        if (this.killSwitch) {
+            let stopped: boolean;
+            try {
+                stopped = await this.killSwitch.isStopped();
+            } catch (error) {
+                // The service folds read failures into `true` itself; this
+                // catch covers a stub or a future implementation that
+                // throws. A switch that cannot be consulted counts as SET.
+                this.logger.error(
+                    `fleet lease refused for node ${node.id}: global stop flag could not be read (fail-closed): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                stopped = true;
+            }
+            if (stopped) {
+                this.logger.log(`fleet lease refused for node ${node.id}: global stop flag is set`);
+                return [];
+            }
+        }
+
         // Inline reclaim before the scan: a job whose holder died is
         // eligible again on the very next poll, with no cron in the loop.
         await this.reclaimExpired(node.userId);
+        // Queue SLA on the same poll (owner-scoped, bounded): a job nobody
+        // eligible ever took must not be re-offered forever. Best-effort —
+        // an SLA scan that fails must never refuse a healthy node its work.
+        try {
+            await this.expireQueued(node.userId);
+        } catch (error) {
+            this.logger.warn(
+                `fleet queue expiry skipped on lease for owner ${node.userId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
 
         const capabilities = Array.isArray(input.capabilities)
             ? normalizeCapabilities(input.capabilities, FLEET_JOB_MAX_REQUIRED_CAPABILITIES * 4)
@@ -584,6 +646,152 @@ export class FleetJobService {
     }
 
     /**
+     * Queue SLA (self-build slice S / EW-775) — fail every `queued` job
+     * that has waited longer than its kind's max queued age
+     * (`config.fleetNode.getQueuedMaxAgeSeconds`) for an eligible runner.
+     *
+     * Why this exists: reclaim only ever looks at ACTIVE statuses, so a
+     * job no node could take — pinned to a machine that never came back,
+     * or requiring a tag no node advertises — sat `queued` forever, and
+     * its AgentRun with it. Eligibility-aware routing stops the common
+     * case at the door; this is the backstop for everything that slips
+     * past (a runner that went offline between the decision and the
+     * lease, a `local-wait` job whose machine never returns).
+     *
+     * Per row: the `failQueuedExpired` CAS pins `queued` + `queuedAt`
+     * still older than the kind's cutoff + not-cancelled, so a claim, a
+     * reclaim (which re-stamps the clock to now) or a cancel that lands
+     * first wins and NO event fires here. A row settled here emits
+     * exactly one `fleet.job.completed` with source `queue-expired` and
+     * the stable {@link FLEET_JOB_QUEUE_EXPIRED_REASON} prefix, which is
+     * what lets the API-side reconciler settle the run and file the one
+     * Inbox notice. Rows with an unknown age (`queuedAt IS NULL`, written
+     * before the column existed) are never touched.
+     *
+     * Scoped to one owner on the lease path, global on the cron, and
+     * best-effort per row — one bad row must not abort the sweep.
+     */
+    async expireQueued(userId?: string): Promise<QueueExpirySummary> {
+        const now = new Date();
+        const summary: QueueExpirySummary = { scanned: 0, expired: 0 };
+
+        for (const kind of FLEET_JOB_KINDS) {
+            const maxAgeSec = config.fleetNode.getQueuedMaxAgeSeconds(kind);
+            const cutoff = new Date(now.getTime() - maxAgeSec * 1000);
+            const stale = await this.jobs.findQueuedOlderThan(
+                kind,
+                cutoff,
+                FLEET_JOB_RECLAIM_BATCH,
+                userId,
+            );
+            summary.scanned += stale.length;
+
+            for (const job of stale) {
+                try {
+                    // Belt on top of the query: an unknown age is not an
+                    // old age, and this transition is destructive.
+                    if (!job.queuedAt || job.cancelRequestedAt) continue;
+                    const error = describeQueueExpiry(job, maxAgeSec);
+                    // The CAS re-checks the AGE against the same cutoff the
+                    // scan used, not the exact instant the driver read back
+                    // (see `FleetJobRepository.failQueuedExpired`).
+                    const settled = await this.jobs.failQueuedExpired(job.id, cutoff, error, now);
+                    if (!settled) continue;
+                    summary.expired += 1;
+                    this.emit(
+                        FleetJobCompletedEvent.EVENT_NAME,
+                        new FleetJobCompletedEvent(
+                            toJobView({
+                                ...job,
+                                status: 'failed',
+                                error,
+                                completedAt: now,
+                                leaseExpiresAt: null,
+                                queuedReason: null,
+                            } as FleetJob),
+                            job.userId,
+                            'queue-expired',
+                            null,
+                            null,
+                            error,
+                        ),
+                    );
+                } catch (error) {
+                    this.logger.warn(
+                        `fleet queue expiry failed for ${job.id}: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                }
+            }
+        }
+
+        if (summary.expired > 0) {
+            this.logger.log(
+                `fleet queue expiry: expired=${summary.expired} scanned=${summary.scanned}`,
+            );
+        }
+        return summary;
+    }
+
+    /**
+     * Heartbeat promotion (self-build slice S) — clear `waiting-for-runner`
+     * on the owner's queued jobs that `nodeId` can now take, because it
+     * just beat as ONLINE and holds no claim.
+     *
+     * The token is what the Fleet UI reads. The lease CAS already clears
+     * it when the node's next poll claims the job, so promotion buys no
+     * correctness — it buys honesty in the window between "the laptop
+     * woke up" and "it polled", and it must never make the UI lie the
+     * other way: a node that is online but BUSY is not "able to take it"
+     * (the token stays true), and `queuedAt` is left alone (a promotion
+     * does not make the job younger, so a node that is online but never
+     * leases is still bounded by the SLA).
+     *
+     * Eligibility is judged the way the lease scan judges it — unbound
+     * or pinned to this node, every required tag advertised — from the
+     * node ROW (owner, status, tags), never from a caller-supplied
+     * shape, so a node id that travelled cannot promote another owner's
+     * work. Never throws: a promotion failure must not fail the beat.
+     */
+    async promoteWaitingForNode(nodeId: string): Promise<number> {
+        try {
+            if (typeof nodeId !== 'string' || !isUUID(nodeId)) return 0;
+            const node = await this.nodes.findById(nodeId);
+            if (!node || node.status !== 'online') return 0;
+
+            const active = await this.jobs.findActiveForUser(node.userId);
+            if (active.some((job) => job.nodeId === node.id)) return 0;
+
+            const waiting = await this.jobs.findWaitingForNode(
+                node.userId,
+                node.id,
+                FLEET_JOB_RECLAIM_BATCH,
+            );
+            const capabilities = node.capabilities ?? [];
+            let promoted = 0;
+            for (const job of waiting) {
+                if (job.cancelRequestedAt) continue;
+                if (!nodeSatisfiesCapabilities(capabilities, job.requiredCapabilities)) continue;
+                if (await this.jobs.promoteWaiting(job.id)) promoted += 1;
+            }
+            if (promoted > 0) {
+                this.logger.log(
+                    `fleet node ${node.id} back online: ${promoted} waiting job(s) promoted for owner ${node.userId}`,
+                );
+            }
+            return promoted;
+        } catch (error) {
+            this.logger.warn(
+                `fleet waiting-job promotion failed for node ${nodeId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return 0;
+        }
+    }
+
+    /**
      * Per-node load for the Fleet settings page: how many live claims
      * each node holds and what the oldest one is. Keyed by node id;
      * nodes with nothing in flight are simply absent (the UI renders
@@ -609,6 +817,30 @@ export class FleetJobService {
             };
         }
         return byNode;
+    }
+
+    /**
+     * Every live claim (`leased` / `running`) held by any of this owner's
+     * nodes, oldest first — the cancel-in-flight candidate set.
+     */
+    async activeForUser(userId: string): Promise<FleetJobView[]> {
+        const rows = await this.jobs.findActiveForUser(userId);
+        return rows.map(toJobView);
+    }
+
+    /**
+     * This owner's `queued` rows, oldest first, bounded — the optional
+     * second half of cancel-in-flight (`includeQueued`).
+     */
+    async queuedForUser(
+        userId: string,
+        limit = FLEET_JOB_QUEUED_SCAN_LIMIT,
+    ): Promise<FleetJobView[]> {
+        const rows = await this.jobs.findQueuedForUser(
+            userId,
+            Math.min(Math.max(limit, 1), FLEET_JOB_QUEUED_SCAN_LIMIT),
+        );
+        return rows.map(toJobView);
     }
 
     /** Owner-scoped job listing (chat tool / future job history UI). */
@@ -713,9 +945,35 @@ export function toJobView(job: FleetJob): FleetJobView {
         createdAt: job.createdAt ? toIso(job.createdAt) : null,
         startedAt: job.startedAt ? toIso(job.startedAt) : null,
         completedAt: job.completedAt ? toIso(job.completedAt) : null,
+        queuedAt: job.queuedAt ? toIso(job.queuedAt) : null,
         queuedReason: job.queuedReason ?? null,
         cancelRequestedAt: job.cancelRequestedAt ? toIso(job.cancelRequestedAt) : null,
     };
+}
+
+/**
+ * The error a queue-SLA failure settles with: the stable machine token
+ * first, then the human sentence, then the facts an owner needs to fix
+ * it (which node it was pinned to, which tags it needed). Length-capped
+ * like every other stored error.
+ */
+function describeQueueExpiry(job: FleetJob, maxAgeSec: number): string {
+    const parts = [
+        `${FLEET_JOB_QUEUE_EXPIRED_REASON}: no eligible runner took the job within ${formatDuration(maxAgeSec)}`,
+    ];
+    if (job.targetNodeId) {
+        parts.push(`(pinned to node ${job.targetNodeId})`);
+    }
+    if (Array.isArray(job.requiredCapabilities) && job.requiredCapabilities.length > 0) {
+        parts.push(`[requires ${job.requiredCapabilities.join(', ')}]`);
+    }
+    return truncate(parts.join(' '), FLEET_JOB_MAX_ERROR_LENGTH) ?? FLEET_JOB_QUEUE_EXPIRED_REASON;
+}
+
+function formatDuration(seconds: number): string {
+    if (seconds % 3600 === 0) return `${seconds / 3600}h`;
+    if (seconds % 60 === 0) return `${seconds / 60}m`;
+    return `${seconds}s`;
 }
 
 /**

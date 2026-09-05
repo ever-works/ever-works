@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { IsNull, LessThan, Not, Repository } from 'typeorm';
 import { FleetNode, FleetNodeKind, FleetNodeStatus } from '../entities/fleet-node.entity';
 
 export interface CreateFleetNodeData {
@@ -27,6 +27,8 @@ export interface ConsumeEnrollmentPatch {
     cliVersion?: string | null;
     /** Free bytes on the node's workspace volume. */
     diskFreeBytes?: number | null;
+    /** Which account / seat the agent CLI is logged in as (EW-777). */
+    modelIdentity?: string | null;
 }
 
 /**
@@ -104,5 +106,29 @@ export class FleetNodeRepository {
             { status: 'offline' },
         );
         return result.affected ?? 0;
+    }
+
+    /**
+     * Fleet cost accounting (EW-777) — claim the ONE per-day daily-ceiling
+     * trip for a node. Returns true exactly once per (node, UTC day): the
+     * caller that wins files the Inbox notice; every other crossing on the
+     * same day still drains, but says nothing new.
+     *
+     * Two conditional UPDATEs rather than one `OR`: `trippedOn IS NULL`
+     * and `trippedOn <> :day` are each an atomic CAS on both engines, and
+     * a NULL never matches `<>`, so the pair covers a never-tripped row and
+     * a row tripped on an earlier day without a driver-specific predicate.
+     */
+    async casTripDailyCeiling(id: string, day: string): Promise<boolean> {
+        const fresh = await this.repository.update(
+            { id, dailyCostTrippedOn: IsNull() },
+            { dailyCostTrippedOn: day },
+        );
+        if ((fresh.affected ?? 0) === 1) return true;
+        const rolled = await this.repository.update(
+            { id, dailyCostTrippedOn: Not(day) },
+            { dailyCostTrippedOn: day },
+        );
+        return (rolled.affected ?? 0) === 1;
     }
 }

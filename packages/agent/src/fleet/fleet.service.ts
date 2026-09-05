@@ -15,6 +15,7 @@ import {
     FLEET_ENROLLABLE_NODE_KINDS,
     FLEET_MAX_CLI_VERSION_LENGTH,
     FLEET_MAX_DISK_FREE_BYTES,
+    FLEET_MAX_MODEL_IDENTITY_LENGTH,
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
@@ -30,7 +31,9 @@ import {
 } from '../entities/fleet-node.entity';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
+import { redactSecrets } from '../utils/secret-scan';
 import { FleetNodeRepository } from './fleet-node.repository';
+import { normalizeDailyCeilingCents } from './fleet-cost-ceiling.shared';
 import {
     CREDENTIAL_MAX_LENGTH,
     CREDENTIAL_MIN_LENGTH,
@@ -136,6 +139,12 @@ export interface EnrollInput {
     cliVersion?: string;
     /** Free bytes on the node's workspace volume. Same optional contract. */
     diskFreeBytes?: number;
+    /**
+     * Which account / seat the agent CLI is logged in as (fleet cost
+     * accounting, EW-777) — a display label, never a credential. Same
+     * optional contract as {@link cliVersion}.
+     */
+    modelIdentity?: string;
 }
 
 export interface EnrollResult {
@@ -275,6 +284,7 @@ export class FleetService {
             // "leave alone"; see the comment there.
             cliVersion: sanitizeText(input.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH),
             diskFreeBytes: sanitizeByteCount(input.diskFreeBytes),
+            modelIdentity: sanitizeModelIdentity(input.modelIdentity),
         };
         // CAS: single-use by construction — a raced duplicate enroll
         // matches zero rows and gets the same null as a bad token.
@@ -355,9 +365,42 @@ export class FleetService {
         if (cliVersion) patch.cliVersion = cliVersion;
         const diskFreeBytes = sanitizeByteCount(refresh.diskFreeBytes);
         if (diskFreeBytes !== null) patch.diskFreeBytes = diskFreeBytes;
+        // Same additive contract (EW-777): a beat that says nothing about
+        // the seat leaves the last reported seat in place.
+        const modelIdentity = sanitizeModelIdentity(refresh.modelIdentity);
+        if (modelIdentity) patch.modelIdentity = modelIdentity;
 
         await this.repository.update(node.id, patch);
         return { node: this.toView({ ...node, ...patch }) };
+    }
+
+    /**
+     * Fleet cost accounting (EW-777) — set (or clear, with null) one node's
+     * DAILY model-spend ceiling, owner-scoped. Validated the way the
+     * fleet-wide one is: a positive whole number of cents up to the
+     * contract cap, refused rather than clamped. Clearing it hands the node
+     * back to the deployment default (`FLEET_NODE_DAILY_COST_CEILING_USD`).
+     *
+     * Changing the ceiling RE-ARMS the one-notice marker
+     * (`dailyCostTrippedOn`). The marker exists so that the tenth
+     * completion crossing the same ceiling on the same day says nothing
+     * new — but an owner who raised the ceiling after a trip has made a
+     * new decision, and the NEXT crossing (of the new ceiling) is news
+     * again. Left set, that crossing would drain the node in silence.
+     */
+    async setDailyCostCeilingForUser(
+        userId: string,
+        nodeId: string,
+        dailyCostCeilingCents: unknown,
+    ): Promise<FleetNodeView> {
+        const ceiling = normalizeDailyCeilingCents(dailyCostCeilingCents);
+        const node = await this.getOwnedNode(userId, nodeId);
+        const patch: Partial<FleetNode> = {
+            dailyCostCeilingCents: ceiling,
+            dailyCostTrippedOn: null,
+        };
+        await this.repository.update(node.id, patch);
+        return this.toView({ ...node, ...patch } as FleetNode);
     }
 
     /**
@@ -765,6 +808,10 @@ export class FleetService {
             // a wire view — is what stops `"12345" > 0` style bugs from
             // reaching the UI on one driver and not the other.
             diskFreeBytes: toOptionalNumber(node.diskFreeBytes),
+            // Fleet cost accounting (EW-777).
+            modelIdentity: node.modelIdentity ?? null,
+            dailyCostCeilingCents: toOptionalNumber(node.dailyCostCeilingCents),
+            dailyCostTrippedOn: node.dailyCostTrippedOn ?? null,
         };
     }
 }
@@ -816,6 +863,22 @@ function sanitizeText(value: unknown, maxLength: number): string | null {
     const trimmed = value.trim();
     if (!trimmed) return null;
     return trimmed.slice(0, maxLength);
+}
+
+/**
+ * Fleet cost accounting (EW-777) — the billing identity a node reports.
+ *
+ * The daemon builds the label from whitelisted fields of the CLI's own
+ * status output, so a credential can only arrive here from a tampered or
+ * misbuilt daemon — and this field is stored, listed, frozen into every
+ * run's usage metadata and quoted in Inbox notices, so it is scrubbed for
+ * known token shapes anyway. Defence in depth: the wire is untrusted.
+ */
+function sanitizeModelIdentity(value: unknown): string | null {
+    const text = sanitizeText(value, FLEET_MAX_MODEL_IDENTITY_LENGTH);
+    if (!text) return null;
+    // The placeholder can be longer than the token it replaces — re-cap.
+    return redactSecrets(text).cleaned.slice(0, FLEET_MAX_MODEL_IDENTITY_LENGTH);
 }
 
 /**

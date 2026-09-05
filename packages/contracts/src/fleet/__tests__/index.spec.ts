@@ -32,7 +32,8 @@ const EXECUTION_PREFERENCE_EXPORTS = [
 	'FLEET_EXECUTION_SCOPE_TYPES',
 	'QUEUED_REASON_WAITING_FOR_RUNNER',
 	'resolveFleetExecutionMode',
-	'decideFleetRouting'
+	'decideFleetRouting',
+	'FLEET_FALLBACK_REASONS'
 ] as const;
 
 const JOB_EXPORTS = [
@@ -59,7 +60,13 @@ const JOB_EXPORTS = [
 	'clampMaxAttempts',
 	'nodeSatisfiesCapabilities',
 	'FLEET_AGENT_TASK_MAX_STEPS',
-	'isNodeBusy'
+	'isNodeBusy',
+	'FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC',
+	'FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC',
+	'FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC',
+	'clampQueuedMaxAgeSec',
+	'FLEET_JOB_QUEUE_EXPIRED_REASON',
+	'isQueueExpiredError'
 ] as const;
 
 const NODE_EXPORTS = [
@@ -72,6 +79,10 @@ const NODE_EXPORTS = [
 	'FLEET_MAX_VERSION_LENGTH',
 	'FLEET_MAX_CLI_VERSION_LENGTH',
 	'FLEET_MAX_DISK_FREE_BYTES',
+	// Fleet cost accounting (EW-777): the billing-identity label cap and
+	// the daily-ceiling cap. Covered in `fleet-node.spec.ts`.
+	'FLEET_MAX_MODEL_IDENTITY_LENGTH',
+	'FLEET_MAX_DAILY_COST_CEILING_CENTS',
 	'FLEET_MIN_NODE_NAME_LENGTH',
 	'FLEET_MAX_NODE_NAME_LENGTH',
 	'FLEET_CREDENTIAL_MIN_LENGTH',
@@ -107,7 +118,14 @@ const AGENT_EXECUTION_EXPORTS = [
 	'FLEET_AGENT_EXECUTION_MAX_BUDGET_USD',
 	'FLEET_AGENT_EXECUTION_MODEL_PATTERN',
 	'FleetAgentExecutionError',
-	'normalizeFleetAgentModelExecution'
+	'normalizeFleetAgentModelExecution',
+	// Fleet cost accounting (EW-777): the one dollar → cents conversion
+	// and the bring-your-own usage-row tag. Covered in
+	// `fleet-agent-execution.spec.ts`.
+	'FLEET_BYO_MODEL_PLUGIN_ID_PREFIX',
+	'fleetModelCostUsdToCents',
+	'fleetModelPluginId',
+	'isFleetModelPluginId'
 ] as const;
 
 const RUNNER_STATUS_EXPORTS = [
@@ -134,7 +152,15 @@ const QUESTION_EXPORTS = [
 	'FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS',
 	'FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES',
 	'parseFleetAgentTaskQuestionMarkdown',
-	'normalizeFleetAgentTaskQuestion'
+	'normalizeFleetAgentTaskQuestion',
+	// Panic controls (EW-778) — fleet-panic.types.ts
+	'FLEET_AUDIT_ACTIONS',
+	'FLEET_AUDIT_DEFAULT_LIMIT',
+	'FLEET_AUDIT_MAX_LIMIT',
+	'FLEET_CANCEL_IN_FLIGHT_MAX_IDS',
+	'FLEET_JOB_CANCEL_STATES',
+	'FLEET_KILL_SWITCH_ID',
+	'FLEET_KILL_SWITCH_REASON_MAX_LENGTH'
 ] as const;
 
 const ALL_EXPORTS = [
@@ -159,6 +185,8 @@ const FUNCTION_EXPORTS = [
 	'isFleetJobKind',
 	'clampLeaseTtlSec',
 	'clampMaxAttempts',
+	'clampQueuedMaxAgeSec',
+	'isQueueExpiredError',
 	'nodeSatisfiesCapabilities',
 	'isNodeBusy',
 	'isFleetEnrollableNodeKind',
@@ -169,6 +197,9 @@ const FUNCTION_EXPORTS = [
 	'isFleetAgentExecutionEffort',
 	'isFleetAgentExecutionPermissionMode',
 	'normalizeFleetAgentModelExecution',
+	'fleetModelCostUsdToCents',
+	'fleetModelPluginId',
+	'isFleetModelPluginId',
 	'FleetTaskWorkspaceMountError',
 	'normalizeFleetTaskWorkspaceMounts',
 	'isReservedMountDir',
@@ -188,12 +219,14 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 92 runtime symbols', () => {
+	it('exposes exactly these 112 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
+		// 92 → 98 with fleet cost accounting (EW-777): two node bounds and
+		// four cost-accounting helpers, each pinned in its own spec.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(92);
+		expect(Object.keys(fleet)).toHaveLength(112);
 	});
 
 	it.each([
@@ -201,6 +234,7 @@ describe('fleet barrel', () => {
 		['fleet-execution-preference.types.js', 'FLEET_EXECUTION_MODES'],
 		['fleet-jobs.types.js', 'FLEET_JOB_STATUSES'],
 		['fleet-node.types.js', 'FLEET_NODE_KINDS'],
+		['fleet-panic.types.js', 'FLEET_KILL_SWITCH_ID'],
 		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
 		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {

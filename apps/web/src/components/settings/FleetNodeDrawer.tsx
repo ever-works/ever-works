@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertTriangle, KeyRound, Pin, PinOff, Plus, X } from 'lucide-react';
 import { QUEUED_REASON_WAITING_FOR_RUNNER } from '@ever-works/contracts';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -14,6 +15,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import type { FleetJobView, FleetNodeDetailView, FleetNodeView } from '@/lib/api/fleet';
+import { centsToUsdInput, formatCeilingCents, usdInputToCents } from './fleet-cost-ceiling.shared';
 import {
     FLEET_JOB_FILTERS,
     filterFleetJobs,
@@ -30,6 +32,11 @@ interface FleetNodeDrawerProps {
     isPending: boolean;
     onClose: () => void;
     onSaveCapabilities: (capabilities: string[], pinned: boolean) => void;
+    /**
+     * Fleet cost accounting (EW-777): this node's daily model-spend
+     * ceiling, in cents; null clears it back to the deployment default.
+     */
+    onSaveCostCeiling: (dailyCostCeilingCents: number | null) => void;
     onRotate: () => void;
     onDrain: (drain: boolean) => void;
 }
@@ -89,6 +96,7 @@ export function FleetNodeDrawer({
     isPending,
     onClose,
     onSaveCapabilities,
+    onSaveCostCeiling,
     onRotate,
     onDrain,
 }: FleetNodeDrawerProps) {
@@ -97,6 +105,9 @@ export function FleetNodeDrawer({
     const [pinned, setPinned] = useState(false);
     const [draft, setDraft] = useState('');
     const [jobFilter, setJobFilter] = useState<FleetJobFilter>('all');
+    // Fleet cost accounting (EW-777): the per-node daily ceiling, edited
+    // in dollars and sent as whole cents.
+    const [ceilingDraft, setCeilingDraft] = useState('');
 
     // Re-seed the editor whenever a different node (or fresher data for
     // the same node) arrives, so the form never shows another machine's
@@ -121,7 +132,25 @@ export function FleetNodeDrawer({
         setJobFilter('all');
     }, [nodeId]);
 
+    // Re-seed the ceiling editor from the server's value, keyed the same
+    // way as the tags so a save (or another node) never shows a stale draft.
+    const serverCeiling = detail?.node.dailyCostCeilingCents ?? node?.dailyCostCeilingCents ?? null;
+    const ceilingSeedKey = `${nodeId}|${serverCeiling ?? ''}`;
+    useEffect(() => {
+        setCeilingDraft(centsToUsdInput(serverCeiling));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ceilingSeedKey]);
+
     if (!node) return null;
+
+    const saveCeiling = () => {
+        const cents = usdInputToCents(ceilingDraft);
+        if (cents === undefined) {
+            toast.error(t('costCeiling.invalid'));
+            return;
+        }
+        onSaveCostCeiling(cents);
+    };
 
     const recentJobs = detail?.recentJobs ?? [];
     const visibleJobs = filterFleetJobs(recentJobs, jobFilter);
@@ -199,7 +228,80 @@ export function FleetNodeDrawer({
                                 {formatMoment(node.lastHeartbeatAt)}
                             </dd>
                         </div>
+                        {/* Fleet cost accounting (EW-777): the seat this
+                            machine's spend is billed to, and its ceiling. */}
+                        <div className="col-span-2">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('table.billingIdentity')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark break-all"
+                                data-testid="fleet-node-drawer-identity"
+                            >
+                                {node.modelIdentity ?? t('table.identityUnknown')}
+                            </dd>
+                        </div>
+                        <div className="col-span-2">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('costCeiling.nodeTitle')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark"
+                                data-testid="fleet-node-drawer-ceiling"
+                            >
+                                {formatCeilingCents(node.dailyCostCeilingCents) ??
+                                    t('costCeiling.nodeInherit')}
+                                {node.dailyCostTrippedOn ? (
+                                    <span className="block text-xs text-warning">
+                                        {t('costCeiling.nodeTripped', {
+                                            day: node.dailyCostTrippedOn,
+                                        })}
+                                    </span>
+                                ) : null}
+                            </dd>
+                        </div>
                     </dl>
+
+                    {/* Per-node daily cost ceiling — editable */}
+                    <section className="space-y-2" data-testid="fleet-node-cost-ceiling">
+                        <h4 className="text-sm font-semibold text-text dark:text-text-dark">
+                            {t('costCeiling.nodeTitle')}
+                        </h4>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('costCeiling.nodeHint')}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <Input
+                                inputMode="decimal"
+                                value={ceilingDraft}
+                                onChange={(event) => setCeilingDraft(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        saveCeiling();
+                                    }
+                                }}
+                                placeholder={t('costCeiling.inputPlaceholder')}
+                                aria-label={t('costCeiling.nodeTitle')}
+                                data-testid="fleet-node-cost-ceiling-input"
+                            />
+                            <Button
+                                onClick={saveCeiling}
+                                loading={isPending}
+                                data-testid="fleet-node-cost-ceiling-save"
+                            >
+                                {t('costCeiling.save')}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => onSaveCostCeiling(null)}
+                                disabled={isPending || node.dailyCostCeilingCents == null}
+                                data-testid="fleet-node-cost-ceiling-clear"
+                            >
+                                {t('costCeiling.clear')}
+                            </Button>
+                        </div>
+                    </section>
 
                     {/* Capability tags — admin-editable */}
                     <section className="space-y-2" data-testid="fleet-capability-editor">

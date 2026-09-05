@@ -17,6 +17,7 @@ const node = (overrides: Partial<FleetNodeView> = {}): FleetNodeView => ({
     capabilitiesPinned: false,
     cliVersion: 'claude 1.4.2',
     diskFreeBytes: 900_000_000,
+    modelIdentity: 'claude-code: ops@example.com (Acme, max)',
     ...overrides,
 });
 
@@ -30,7 +31,11 @@ const node = (overrides: Partial<FleetNodeView> = {}): FleetNodeView => ({
  *   2. a job-runtime hiccup degrades (nodes still render, `busy` reads
  *      false, `loadUnavailable` says so) instead of taking down the read
  *      — and, crucially, `availability` reports ZERO free runners in that
- *      state rather than claiming capacity it could not verify.
+ *      state rather than claiming capacity it could not verify;
+ *   3. (self-build slice S) with an eligibility filter, `availability`
+ *      counts only the nodes that could take THE job — the pinned node,
+ *      the nodes advertising the required tags — and says how big the
+ *      whole fleet was, so a pin to a closed laptop reads 1/0/0 of 6.
  */
 describe('FleetRunnerStatusService', () => {
     let fleet: { listEnrolledForUser: jest.Mock };
@@ -89,6 +94,8 @@ describe('FleetRunnerStatusService', () => {
                 daemonVersion: '1.2.0',
                 cliVersion: 'claude 1.4.2',
                 diskFreeBytes: 900_000_000,
+                // Fleet cost accounting (EW-777): the seat the spend is billed to.
+                modelIdentity: 'claude-code: ops@example.com (Acme, max)',
                 busy: true,
                 activeJobCount: 1,
                 currentJobKind: 'agent-task',
@@ -183,6 +190,172 @@ describe('FleetRunnerStatusService', () => {
                 total: 0,
                 online: 0,
                 free: 0,
+            });
+        });
+    });
+
+    describe('availability — eligibility (self-build slice S)', () => {
+        const sixNodes = () => [
+            node({ id: 'a', status: 'online' }),
+            node({ id: 'b', status: 'offline' }),
+            node({ id: 'c', status: 'online' }),
+            node({ id: 'd', status: 'online' }),
+            node({ id: 'e', status: 'online' }),
+            node({ id: 'f', status: 'online' }),
+        ];
+
+        it('keeps the fleet-wide three-field shape when no eligibility is given', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue(sixNodes());
+
+            // Exactly three keys: the legacy callers (and the pure rule's
+            // legacy shapes) see byte-for-byte what they always saw.
+            await expect(build().availability('user-1')).resolves.toEqual({
+                total: 6,
+                online: 5,
+                free: 5,
+            });
+        });
+
+        it('REGRESSION (R5): a pin to an offline node with five idle siblings is 1/0/0 of 6, not 6/5/5', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue(sixNodes());
+
+            await expect(build().availability('user-1', { targetNodeId: 'b' })).resolves.toEqual({
+                total: 1,
+                online: 0,
+                free: 0,
+                fleetTotal: 6,
+                pinnedNodeId: 'b',
+            });
+        });
+
+        it('a pinned node that is online and idle is placeable', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue(sixNodes());
+
+            await expect(build().availability('user-1', { targetNodeId: 'a' })).resolves.toEqual({
+                total: 1,
+                online: 1,
+                free: 1,
+                fleetTotal: 6,
+                pinnedNodeId: 'a',
+            });
+        });
+
+        it('a pinned node that is online but busy is eligible, not free', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue(sixNodes());
+            jobs.loadByNodeForUser.mockResolvedValue({
+                a: { activeJobCount: 1, currentJobKind: 'agent-task', currentJobId: 'j' },
+            });
+
+            await expect(
+                build().availability('user-1', { targetNodeId: 'a' }),
+            ).resolves.toMatchObject({ total: 1, online: 1, free: 0 });
+        });
+
+        it.each(['paused', 'disabled'] as const)(
+            'a pinned node that is %s is not online (the lease would refuse it)',
+            async (status) => {
+                fleet.listEnrolledForUser.mockResolvedValue([node({ id: 'a', status })]);
+
+                await expect(
+                    build().availability('user-1', { targetNodeId: 'a' }),
+                ).resolves.toMatchObject({ total: 1, online: 0, free: 0 });
+            },
+        );
+
+        it('a pinned node that is no longer enrolled is no eligible runner at all', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue(sixNodes());
+
+            await expect(
+                build().availability('user-1', { targetNodeId: 'ghost' }),
+            ).resolves.toEqual({
+                total: 0,
+                online: 0,
+                free: 0,
+                fleetTotal: 6,
+                pinnedNodeId: 'ghost',
+            });
+        });
+
+        it('excludes nodes that do not advertise EVERY required tag', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue([
+                node({ id: 'claude', capabilities: ['terminal', 'claude-code'] }),
+                node({ id: 'codex', capabilities: ['terminal', 'codex'] }),
+                node({ id: 'bare', capabilities: [] }),
+            ]);
+
+            await expect(
+                build().availability('user-1', { requiredCapabilities: ['claude-code'] }),
+            ).resolves.toEqual({
+                total: 1,
+                online: 1,
+                free: 1,
+                fleetTotal: 3,
+                pinnedNodeId: null,
+            });
+            await expect(
+                build().availability('user-1', {
+                    requiredCapabilities: ['terminal', 'claude-code'],
+                }),
+            ).resolves.toMatchObject({ total: 1 });
+            await expect(
+                build().availability('user-1', { requiredCapabilities: ['gpu'] }),
+            ).resolves.toMatchObject({ total: 0, fleetTotal: 3 });
+        });
+
+        it('applies both filters: the pinned node must also advertise the tags', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue([
+                node({ id: 'a', capabilities: ['terminal'] }),
+                node({ id: 'b', capabilities: ['terminal', 'claude-code'] }),
+            ]);
+
+            await expect(
+                build().availability('user-1', {
+                    targetNodeId: 'a',
+                    requiredCapabilities: ['claude-code'],
+                }),
+            ).resolves.toEqual({
+                total: 0,
+                online: 0,
+                free: 0,
+                fleetTotal: 2,
+                pinnedNodeId: 'a',
+            });
+        });
+
+        it('treats an empty filter as "every enrolled node", with the fleet fields attached', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue(sixNodes());
+
+            await expect(build().availability('user-1', {})).resolves.toEqual({
+                total: 6,
+                online: 5,
+                free: 5,
+                fleetTotal: 6,
+                pinnedNodeId: null,
+            });
+        });
+
+        it('still reports ZERO free for the eligible set when the job load could not be read', async () => {
+            fleet.listEnrolledForUser.mockResolvedValue(sixNodes());
+            jobs.loadByNodeForUser.mockRejectedValue(new Error('fleet_jobs unreachable'));
+
+            await expect(build().availability('user-1', { targetNodeId: 'a' })).resolves.toEqual({
+                total: 1,
+                online: 1,
+                free: 0,
+                fleetTotal: 6,
+                pinnedNodeId: 'a',
+            });
+        });
+
+        it('keeps the pin on the "fleet unavailable" answer when the registry read throws', async () => {
+            fleet.listEnrolledForUser.mockRejectedValue(new Error('db down'));
+
+            await expect(build().availability('user-1', { targetNodeId: 'b' })).resolves.toEqual({
+                total: 0,
+                online: 0,
+                free: 0,
+                fleetTotal: 0,
+                pinnedNodeId: 'b',
             });
         });
     });

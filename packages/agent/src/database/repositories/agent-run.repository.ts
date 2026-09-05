@@ -362,10 +362,18 @@ export class AgentRunRepository {
      * COALESCE is also defence against a future second writer.
      *
      * Bounded by `limit` on purpose — see {@link markStuckFailed}.
+     *
+     * `exemptQueuedReasons` (EW-778) — `queued` rows parked for one of
+     * these reasons are NOT stuck either: a run the global stop flag
+     * parked is waiting for an operator, possibly for hours, and reaping
+     * it would leave nothing to resume when the flag is cleared. Same
+     * belt-and-braces as `awaitingInput`: excluded here AND re-asserted
+     * in `AgentRunSweeperService`.
      */
     async findStuckNonTerminal(
         cutoff: Date,
         limit: number,
+        exemptQueuedReasons: readonly string[] = [],
     ): Promise<
         Pick<
             AgentRun,
@@ -377,39 +385,48 @@ export class AgentRunRepository {
             | 'createdAt'
             | 'workId'
             | 'awaitingInput'
+            | 'queuedReason'
         >[]
     > {
-        return (
-            this.repository
-                .createQueryBuilder('run')
-                .select([
-                    'run.id',
-                    'run.agentId',
-                    'run.triggerKind',
-                    'run.status',
-                    'run.startedAt',
-                    'run.createdAt',
-                    // Wave 4 M2 — the sweeper drains the concurrency queue for
-                    // every Work whose stuck run it just reaped.
-                    'run.workId',
-                    // Wave 4 M5 — selected so the sweeper can re-assert the
-                    // never-reap-awaiting_input rule in the service layer too.
-                    'run.awaitingInput',
-                ])
-                .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
-                // Wave 4 M5 — a run parked on a human question is NOT stuck; it is
-                // waiting, possibly for days. Reaping it is the production bug this
-                // predicate exists to prevent, so the exemption lives in the SQL
-                // (and again in `AgentRunSweeperService`, belt-and-braces). The
-                // NULL arm covers rows written before the column existed.
-                .andWhere('(run.awaitingInput IS NULL OR run.awaitingInput = :notAwaiting)', {
-                    notAwaiting: false,
-                })
-                .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
-                .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC')
-                .limit(limit)
-                .getMany()
-        );
+        const query = this.repository
+            .createQueryBuilder('run')
+            .select([
+                'run.id',
+                'run.agentId',
+                'run.triggerKind',
+                'run.status',
+                'run.startedAt',
+                'run.createdAt',
+                // Wave 4 M2 — the sweeper drains the concurrency queue for
+                // every Work whose stuck run it just reaped.
+                'run.workId',
+                // Wave 4 M5 — selected so the sweeper can re-assert the
+                // never-reap-awaiting_input rule in the service layer too.
+                'run.awaitingInput',
+                // EW-778 — selected so the sweeper can re-assert the
+                // never-reap-kill-switch-parked rule in the service layer too.
+                'run.queuedReason',
+            ])
+            .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
+            // Wave 4 M5 — a run parked on a human question is NOT stuck; it is
+            // waiting, possibly for days. Reaping it is the production bug this
+            // predicate exists to prevent, so the exemption lives in the SQL
+            // (and again in `AgentRunSweeperService`, belt-and-braces). The
+            // NULL arm covers rows written before the column existed.
+            .andWhere('(run.awaitingInput IS NULL OR run.awaitingInput = :notAwaiting)', {
+                notAwaiting: false,
+            });
+        if (exemptQueuedReasons.length > 0) {
+            query.andWhere(
+                '(run.queuedReason IS NULL OR run.queuedReason NOT IN (:...exemptQueuedReasons))',
+                { exemptQueuedReasons: [...exemptQueuedReasons] },
+            );
+        }
+        return query
+            .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
+            .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC')
+            .limit(limit)
+            .getMany();
     }
 
     /**
@@ -1171,6 +1188,44 @@ export class AgentRunRepository {
             .where('id = :id', { id: runId })
             .andWhere('status = :status', { status: 'queued' satisfies AgentRunStatus })
             .andWhere('queuedReason = :queuedReason', { queuedReason })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Panic controls (EW-778) — the distinct Works that have at least
+     * one run parked with `queuedReason`, so a clear of the global stop
+     * flag can promote them Work by Work through the ordinary drain.
+     * Work-less parked runs are invisible here by construction (the
+     * drain is Work-keyed).
+     */
+    async findQueuedWorkIdsByReason(queuedReason: string, limit: number): Promise<string[]> {
+        const rows: Array<{ workId: string | null }> = await this.repository
+            .createQueryBuilder('run')
+            .select('run.workId', 'workId')
+            .distinct(true)
+            .where('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
+            .andWhere('run.queuedReason = :queuedReason', { queuedReason })
+            .andWhere('run.workId IS NOT NULL')
+            .limit(Math.max(1, Math.trunc(limit)))
+            .getRawMany();
+        return rows.map((row) => row.workId).filter((workId): workId is string => !!workId);
+    }
+
+    /**
+     * Panic controls (EW-778) — CAS-relabel a parked run from one
+     * reason to another (kill-switch → concurrency-limit when the flag
+     * is off but the Work is saturated). Only a still-`queued` row still
+     * carrying `from` is touched, so a raced promotion is a no-op.
+     */
+    async relabelQueuedReason(runId: string, from: string, to: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ queuedReason: to })
+            .where('id = :id', { id: runId })
+            .andWhere('status = :status', { status: 'queued' satisfies AgentRunStatus })
+            .andWhere('queuedReason = :from', { from })
             .execute();
         return (result.affected ?? 0) > 0;
     }

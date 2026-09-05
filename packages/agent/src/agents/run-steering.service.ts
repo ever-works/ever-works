@@ -74,12 +74,28 @@ export function composeRejectionFeedbackMessage(
         feedback: string;
         reviewerLabel?: string | null;
         prNumber?: number | null;
+        /**
+         * Trusted review bots (R16) — `human` | `bot`. A bot finding is
+         * labelled "automated review" so the model weighs it as a
+         * reviewer bot's opinion rather than the owner's instruction.
+         */
+        reviewerKind?: string | null;
+        /** R16 — `critical` | `major` | `minor` when the bot stated one. */
+        severity?: string | null;
     }>,
 ): string {
     const lines: string[] = [
         'Your previous work on this task was REJECTED by a reviewer. Address the feedback below before doing anything else, then finish.',
         '',
     ];
+    // Only when at least one row is bot-authored, so a human-only message
+    // stays byte-identical to what the model has already learned to read.
+    if (rejections.some((rejection) => rejection.reviewerKind === 'bot')) {
+        lines.push(
+            'Some of it comes from automated reviewers. Fix every finding marked critical or major, and every one with no stated severity (treat it as major); a minor one may be left as-is only if you say why.',
+            '',
+        );
+    }
     for (const rejection of rejections) {
         const who = rejection.reviewerLabel
             ? neutralizeRejectionText(String(rejection.reviewerLabel))
@@ -90,7 +106,13 @@ export function composeRejectionFeedbackMessage(
                 : rejection.source === 'gate'
                   ? 'quality gate'
                   : 'task review';
-        lines.push(`Rejection from ${who} (${where}):`);
+        const qualifiers: string[] = [];
+        if (rejection.reviewerKind === 'bot') qualifiers.push('automated review');
+        if (rejection.severity) {
+            qualifiers.push(`severity: ${neutralizeRejectionText(String(rejection.severity))}`);
+        }
+        const context = qualifiers.length > 0 ? `${where}, ${qualifiers.join(', ')}` : where;
+        lines.push(`Rejection from ${who} (${context}):`);
         for (const feedbackLine of neutralizeRejectionText(rejection.feedback).split('\n')) {
             lines.push(`  ${feedbackLine}`);
         }

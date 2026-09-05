@@ -1036,7 +1036,11 @@
                     "propose": "Proponer fusiones"
                 },
                 "subtitle": "Fusiona periódicamente documentos casi duplicados. Las propuestas van a la cola de revisión; nada se acepta ni se elimina automáticamente.",
-                "title": "Consolidación programada"
+                "title": "Consolidación programada",
+                "saveFailed": "Could not save the schedule. Your change was not stored — try again."
+            },
+            "meetings": {
+                "hint": "Meetings are one of the richest things the platform learns from — every transcript and summary is ingested straight into Memory."
             }
         },
         "agentsPage": {
@@ -1200,7 +1204,8 @@
             "pageTabs": {
                 "agents": "Agents",
                 "sessions": "Sessions",
-                "archived": "Archivados"
+                "archived": "Archivados",
+                "teams": "Teams"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1401,6 +1406,11 @@
                     "routingUnavailable": "Execution routing could not be loaded right now.",
                     "routingChange": "Change in Settings → Fleet"
                 }
+            },
+            "agentsChartCta": "Agents Chart",
+            "skillsBlock": {
+                "title": "Skills",
+                "subtitle": "Skills your Agents can use — installed, available in the catalog, and custom ones you wrote."
             }
         },
         "tasksPage": {
@@ -3162,6 +3172,59 @@
                     "body": "Update your payment method to keep your plan active. Your card details are handled by the payment provider.",
                     "action": "Update payment method",
                     "error": "Could not open the billing portal."
+                },
+                "seats": {
+                    "title": "Seats",
+                    "usage": "{used} of {allowance} seats in use",
+                    "unlimited": "{used} seats in use · unlimited on this plan",
+                    "breakdown": "{members} people · {agents} agents",
+                    "included": "{included} included + {purchased} added",
+                    "totalLabel": "Total seats",
+                    "price": "{price} per additional seat / month",
+                    "notManageable": "Seats are adjusted on a paid plan once card payments are enabled.",
+                    "save": "Save",
+                    "saved": "Seats updated",
+                    "saveError": "Failed to update seats"
+                },
+                "payg": {
+                    "title": "Pay-as-you-go",
+                    "comingSoon": "Pay-as-you-go arrives with the payments launch.",
+                    "needsPaymentMethod": "Buy credits once to save a payment method, then pay-as-you-go can be enabled.",
+                    "description": "When your credits run out, keep going and pay for what you use at the end of the month.",
+                    "toggle": "Enable pay-as-you-go",
+                    "capLabel": "Monthly cap (credits)",
+                    "capHint": "Usage beyond your balance is billed in arrears at the rates below, up to this cap. Runs pause at the cap until you raise it, buy credits, or the cycle resets.",
+                    "capRange": "Between {min} and {max} credits",
+                    "statusOn": "On",
+                    "statusOff": "Off",
+                    "statusPastDue": "Payment failed",
+                    "thisCycle": "This cycle: {used} of {cap} credits · ≈ {estimate}",
+                    "cycleEnds": "Cycle resets {date}",
+                    "capEstimate": "≈ {estimate} / cycle at the cap",
+                    "invoiceThreshold": "Usage is invoiced when it reaches {amount} and at the end of each cycle.",
+                    "tiersTitle": "Pay-as-you-go rates (per cycle)",
+                    "tierRow": "{from}–{to} credits",
+                    "tierRowOpen": "{from}+ credits",
+                    "perCredit": "{rate} per credit",
+                    "pastDue": "Your last pay-as-you-go invoice could not be collected. Pay-as-you-go is paused until it is settled; prepaid credits keep working.",
+                    "save": "Save",
+                    "saved": "Pay-as-you-go updated",
+                    "saveError": "Failed to update pay-as-you-go",
+                    "disableConfirm": "Turning pay-as-you-go off invoices what you have used so far immediately."
+                },
+                "licence": {
+                    "title": "Commercial licence (self-hosted)",
+                    "subtitle": "Run Ever Works on your own infrastructure under a commercial licence.",
+                    "explainer": "A perpetual commercial licence for a deployment you run yourself. It lifts the AGPLv3 obligation for your own installation — it does not change your plan on this hosted service.",
+                    "buyLifetime": "Buy lifetime licence — {price}",
+                    "confirmBody": "You are buying a one-off perpetual licence for your OWN deployment. Your plan and credits on this hosted service stay exactly as they are.",
+                    "confirmCta": "Continue to payment",
+                    "cancel": "Cancel"
+                },
+                "checkoutReturn": {
+                    "confirmed": "Payment confirmed — thank you.",
+                    "settling": "Payment received. It is still settling; this page will reflect it shortly.",
+                    "licenceBody": "Your {name} commercial licence is recorded against this payment. It applies to the deployment you run yourself — your plan and credits on this hosted service are unchanged."
                 }
             },
             "usage": {
@@ -3176,7 +3239,10 @@
                     "tasksCompleted": "Tasks completed",
                     "worksActive": "Works active",
                     "agentRuns": "Agent runs",
-                    "periodNote": "Showing period {period}"
+                    "periodNote": "Showing period {period}",
+                    "expired": "Credits expired",
+                    "pricingNote": "{perDollar} credits = $1 of platform-billed usage.",
+                    "pricingNoteWithMargin": "{perDollar} credits = $1 of platform-billed usage. The platform rate includes a {margin}% service margin over provider list prices."
                 },
                 "charts": {
                     "byDay": "Usage per day",
@@ -3230,7 +3296,9 @@
                     "load": "Load",
                     "cliVersion": "Agent CLI",
                     "diskFree": "Disk free",
-                    "cliNotInstalled": "Not installed"
+                    "cliNotInstalled": "Not installed",
+                    "billingIdentity": "Billing identity",
+                    "identityUnknown": "Not reported"
                 },
                 "empty": {
                     "title": "No nodes enrolled yet",
@@ -3414,6 +3482,67 @@
                     "queuedReasons": {
                         "waitingForRunner": "no runner can take it yet"
                     }
+                },
+                "costCeiling": {
+                    "title": "Daily cost ceiling",
+                    "description": "A stop on the model spend your own machines report per UTC day, summed across every node. Crossing it drains every node — no new work is leased and in-flight claims return to the queue — and files one Inbox notice. Drained nodes stay disabled until you re-enable them; raise the ceiling first if the spend was expected. The figure is the CLI's own estimate, billed to the seat each node is logged in as, never to platform credits.",
+                    "loading": "Loading the ceiling…",
+                    "effectiveLabel": "Ceiling in force",
+                    "noCeiling": "None",
+                    "sourceOwner": "Set by you",
+                    "sourceDefault": "Deployment default",
+                    "sourceNone": "No ceiling configured",
+                    "todaySpend": "Spend today ({day} UTC)",
+                    "trippedOn": "Last tripped",
+                    "inputLabel": "Fleet-wide ceiling per day (USD)",
+                    "inputPlaceholder": "e.g. 25.00 — leave empty for no ceiling",
+                    "hint": "Whole cents, at most $100,000 per day. Empty clears your value and falls back to the deployment default.",
+                    "save": "Save",
+                    "clear": "Clear",
+                    "saved": "Fleet cost ceiling saved",
+                    "cleared": "Fleet cost ceiling cleared",
+                    "invalid": "Enter a positive dollar amount up to 100000, or leave the field empty",
+                    "nodeTitle": "Daily cost ceiling for this node",
+                    "nodeHint": "Model spend this node may report per UTC day, in USD. Crossing it drains this node until you re-enable it. Empty inherits the deployment default. A ceiling on a node whose CLI reports no price (Codex) fails closed: the first completion drains it.",
+                    "nodeInherit": "Inherits the deployment default",
+                    "nodeTripped": "Drained by the ceiling on {day}",
+                    "nodeSaved": "Node cost ceiling saved",
+                    "nodeCleared": "Node cost ceiling cleared"
+                },
+                "killSwitch": {
+                    "stoppedTitle": "The platform is stopped",
+                    "stoppedBody": "An operator has set the global stop flag. No new agent runs are dispatched, routed or leased to your nodes until it is cleared. Work that is already running continues and keeps reporting.",
+                    "reason": "Reason: {reason}",
+                    "since": "Since {since}",
+                    "unverifiedTitle": "Dispatch is refusing new work: the stop flag could not be read",
+                    "unverifiedBody": "The platform could not read its global stop flag, so it refuses to start anything new (fail-closed). Nobody threw the switch — this usually means a database migration has not run yet or the database is unreachable.",
+                    "unknownTitle": "Stop flag status unavailable",
+                    "unknownBody": "This page could not read the global stop flag: {error}"
+                },
+                "panic": {
+                    "title": "Panic controls",
+                    "description": "Two separate decisions for a bad night: drain every node so nothing new starts on your machines, and — only if you also want to abort what is already running — cancel the in-flight work.",
+                    "drainAll": {
+                        "button": "Drain all nodes",
+                        "hint": "Disables every enrolled node and returns the claims they hold to the queue. Nothing is cancelled; the work waits for a node that may take it.",
+                        "none": "No node to drain.",
+                        "confirmTitle": "Drain all nodes?",
+                        "confirmBody": "{count, plural, one {# node} other {# nodes}} will be disabled and every claim they hold goes back to the queue. Running work is NOT aborted.",
+                        "confirm": "Drain all",
+                        "cancel": "Keep running",
+                        "done": "Drained {nodes, plural, one {# node} other {# nodes}}; {jobs, plural, one {# job} other {# jobs}} returned to the queue."
+                    },
+                    "cancelInFlight": {
+                        "button": "Cancel in-flight work",
+                        "hint": "Aborts the fleet jobs running right now and cancels the agent runs behind them. This is a separate, explicit step — draining never does it.",
+                        "confirmTitle": "Cancel in-flight work?",
+                        "confirmBody": "This ABORTS running work: every leased or running fleet job you own is cancelled and the agent run behind each is marked cancelled. A node learns of it on its next heartbeat, so a job that is about to finish may still report.",
+                        "includeQueued": "Also cancel queued jobs that have not started",
+                        "confirm": "Cancel in-flight work",
+                        "cancel": "Keep running",
+                        "done": "Cancel requested for {cancelled} of {requested} jobs ({runs} runs)."
+                    },
+                    "auditFailed": "The action succeeded, but its audit row could not be written — tell an operator."
                 }
             },
             "jobRuntime": {
@@ -5592,6 +5721,24 @@
                     "invalidFormat": "Use 3-63 lowercase letters, digits, or hyphens (cannot start or end with a hyphen).",
                     "helperSuffix": ".ever.works",
                     "readonlyHint": "Managed subdomain is read-only for this Work."
+                },
+                "runtimeEnvVars": {
+                    "title": "Environment variables",
+                    "description": "Per-site settings the deployed directory reads at runtime (e.g. Stripe payment keys). Only the keys listed here can be set.",
+                    "placeholderSet": "Enter a new value to replace the current one",
+                    "placeholderUnset": "Enter a value",
+                    "saveButton": "Save",
+                    "removeButton": "Remove",
+                    "saveAria": "Save {key}",
+                    "removeAria": "Remove {key}",
+                    "saveSuccess": "Environment variable saved — redeploy to apply it to the live site.",
+                    "saveFailed": "Failed to save environment variable",
+                    "removeSuccess": "Environment variable removed — redeploy to apply it to the live site.",
+                    "removeFailed": "Failed to remove environment variable",
+                    "currentSecret": "Set (value hidden)",
+                    "currentValue": "Set: {masked}",
+                    "notSet": "Not set",
+                    "hint": "Applied on the next deploy. Stored encrypted; values are never shown back in full."
                 }
             },
             "kb": {
@@ -6255,7 +6402,8 @@
                 "organizations": "Organizaciones",
                 "personalHelp": "El repositorio se creará bajo tu cuenta personal de GitHub",
                 "organizationHelp": "El repositorio se creará bajo la organización {org}",
-                "connectRequired": "Conecta un proveedor de Git en la barra lateral para elegir dónde se creará tu repositorio."
+                "connectRequired": "Conecta un proveedor de Git en la barra lateral para elegir dónde se creará tu repositorio.",
+                "managedByEverWorks": "The repository will be created in the managed Ever Works GitHub organization."
             },
             "ai": {
                 "title": "Crear con IA",
@@ -6647,7 +6795,11 @@
                 "connected": "Conectado",
                 "connecting": "Conectando...",
                 "connect": "Conectar",
-                "connectError": "Error al conectar"
+                "connectError": "Error al conectar",
+                "managed": {
+                    "title": "Ever Works Git",
+                    "description": "Your repositories are created in the managed Ever Works GitHub org — nothing to connect. Change this in onboarding under Storage."
+                }
             },
             "settings": {
                 "title": "Conexiones de Proveedores de Git",
@@ -6779,6 +6931,10 @@
                 "missed": "Missed",
                 "abandoned": "Abandoned"
             },
+            "kinds": {
+                "metric": "Metric",
+                "delivery": "Delivery"
+            },
             "filterBar": {
                 "status": "Status",
                 "anyStatus": "Any status",
@@ -6825,12 +6981,13 @@
         },
         "goalNew": {
             "title": "New Goal",
-            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "subtitle": "Define what done looks like: a measurable metric target, or a delivery checklist with no metric at all. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
             "backToGoals": "Back to Goals",
             "created": "Goal created",
             "sections": {
                 "metricSource": "Metric source",
                 "target": "Target",
+                "definitionOfDone": "Definition of Done",
                 "cadence": "Evaluation cadence"
             },
             "fields": {
@@ -6838,6 +6995,7 @@
                 "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
                 "description": "Description",
                 "descriptionPlaceholder": "Optional context for this Goal",
+                "goalKind": "Goal kind",
                 "pluginId": "Provider plugin ID",
                 "metricId": "Metric ID",
                 "params": "Parameters (JSON)",
@@ -6848,9 +7006,20 @@
                 "targetValue": "Target value",
                 "unit": "Unit",
                 "window": "Window",
+                "dodCriteria": "Criteria (one per line)",
+                "dodCriteriaPlaceholder": "API endpoint merged\nWeb form merged\nDocs updated",
+                "dodCriteriaHint": "Each line becomes one approved criterion. At least one is required; refine the list on the Goal page after creation.",
                 "deadline": "Deadline (optional)",
                 "checkFrequency": "Check frequency (minutes)",
                 "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "kinds": {
+                "metric": "Metric target",
+                "delivery": "Delivery"
+            },
+            "kindHints": {
+                "metric": "Reads a number from a metrics provider on a schedule and completes when the target is reached.",
+                "delivery": "No metric. Completes when every approved Definition-of-Done criterion is done or waived — for outcomes like \"ship feature X across three repos\"."
             },
             "comparators": {
                 "gte": "At least (grow to target)",
@@ -6868,6 +7037,7 @@
                 "metricSourceRequired": "Provider plugin ID and metric ID are required.",
                 "targetInvalid": "Target value must be a number.",
                 "unitRequired": "Unit is required.",
+                "dodRequired": "A delivery Goal needs at least one Definition-of-Done criterion.",
                 "deadlineInvalid": "Deadline is not a valid date.",
                 "createFailed": "Couldn't create the Goal. Please try again."
             },
@@ -6896,6 +7066,7 @@
                 "current": "Current",
                 "target": "Target",
                 "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "deliveryHint": "This is a delivery Goal — there is no metric to chart. Progress is the Definition of Done: the Goal completes when every approved criterion is done or waived.",
                 "sampleCount": "{count} observations"
             },
             "comparator": {
@@ -6910,6 +7081,7 @@
                 "point": "Point-in-time"
             },
             "details": {
+                "kind": "Kind",
                 "plugin": "Provider",
                 "metric": "Metric",
                 "window": "Window",
@@ -7058,7 +7230,7 @@
                     "workerModelHelp": "Free text; passed through to iteration runs.",
                     "assignedAgent": "Pinned agent",
                     "assignedAgentNone": "No pin (round-robin)",
-                    "assignedAgentHelp": "Routing always picks this agent. Without a pin the router round-robins over the agents that have already worked this Goal — so a brand-new Goal needs one before the loop can start work."
+                    "assignedAgentHelp": "Routing always picks this agent. Without a pin the router round-robins over the agents that have already worked this Goal — and, for a brand-new Goal, over the eligible agents in its scope — so the loop can start without one."
                 },
                 "executionTargets": {
                     "cloud": "Cloud",
@@ -7412,7 +7584,8 @@
                 "savedSuccess": "Acceso a organizaciones guardado.",
                 "saveFailed": "Error al guardar.",
                 "removeLabel": "Eliminar {login}"
-            }
+            },
+            "enableFailed": "Failed to enable plugin"
         },
         "templates": {
             "title": "Plantillas",
@@ -8098,7 +8271,8 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "transcript": "Transcript"
+                "transcript": "Transcript",
+                "participants": "Participants"
             },
             "sources": {
                 "manual": "Manual",
@@ -8308,6 +8482,13 @@
                 "hour": "{value}h ago",
                 "day": "{value}d ago"
             }
+        },
+        "agentsChartPage": {
+            "title": "Agents Chart",
+            "subtitle": "How your Agents are organized — teams and reporting lines, without human members.",
+            "backToAgents": "Back to Agents",
+            "empty": "No Agents yet. Create an Agent and it will appear here.",
+            "noOrg": "Create an Organization first — the Agents Chart is drawn per Organization."
         }
     },
     "layout": {
