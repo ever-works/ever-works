@@ -83,6 +83,7 @@ export interface NodeContractBaseline {
     selfDescription: {
         dtoOptionalKeys: string[];
         nodeEmits: string[];
+        nodeEmitsOptional: string[];
         controllerForwards: Record<string, string[]>;
     };
     platformStatusCodes: Record<string, Record<string, unknown>>;

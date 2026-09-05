@@ -514,16 +514,8 @@
 			"workerState",
 			"workerStateReason"
 		],
-		"nodeEmits": [
-			"platform",
-			"version",
-			"capabilities",
-			"cliVersion",
-			"diskFreeBytes",
-			"modelIdentity",
-			"workerState",
-			"workerStateReason"
-		],
+		"nodeEmits": ["platform", "version", "capabilities", "cliVersion", "diskFreeBytes", "modelIdentity"],
+		"nodeEmitsOptional": ["workerState", "workerStateReason"],
 		"controllerForwards": {
 			"enroll": [
 				"platform",
