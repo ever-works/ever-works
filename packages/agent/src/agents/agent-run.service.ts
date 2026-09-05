@@ -708,7 +708,41 @@ export class AgentRunService {
         }
     }
 
-    private async runToolLoop(
+    /**
+     * The tool loop, with the MCP tool source released on EVERY exit path
+     * (AP-14 prerequisite). Tool resolution happens before the loop's own
+     * try/catch, so a throw from it would escape the inner `finally`; this
+     * wrapper is what makes the release unconditional — a launched stdio
+     * server must never outlive its run, whether the run completed, errored,
+     * was cancelled, was interrupted, or never got its tools at all.
+     */
+    private async runToolLoop(context: AgentRunContext, agent: Agent, prompt: AssembledPrompt) {
+        try {
+            return await this.runToolLoopInner(context, agent, prompt);
+        } finally {
+            await this.releaseRunTools(context.runId);
+        }
+    }
+
+    /**
+     * Best-effort by construction: the run's outcome is already decided by
+     * the time this runs, and a cleanup failure must not rewrite it.
+     */
+    private async releaseRunTools(runId: string): Promise<void> {
+        const release = this.toolService?.releaseMcpRun;
+        if (typeof release !== 'function') return;
+        try {
+            await release.call(this.toolService, runId);
+        } catch (err) {
+            this.logger.warn(
+                `Run ${runId}: releasing MCP run resources failed: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+    }
+
+    private async runToolLoopInner(
         context: AgentRunContext,
         agent: Agent,
         prompt: AssembledPrompt,

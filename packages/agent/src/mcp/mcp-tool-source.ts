@@ -2,7 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { Agent } from '../entities/agent.entity';
 import type { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import type { AgentToolDescriptor, AgentToolParameterSchema } from '../agents/agent-tool.service';
-import type { AgentMcpToolSource } from '../agents/agent-mcp-tool-source';
+import type { AgentMcpRunHandle, AgentMcpToolSource } from '../agents/agent-mcp-tool-source';
 import { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 import { PluginUsageCapability } from '../entities/plugin-usage-event.entity';
 import { McpClientService, type McpToolInfo } from './mcp-client.service';
@@ -33,6 +33,16 @@ const MCP_DESCRIPTION_MAX = 1024;
 @Injectable()
 export class McpToolSource implements AgentMcpToolSource {
     private readonly logger = new Logger(McpToolSource.name);
+
+    /**
+     * Per-run resources `buildTools` acquired, keyed by run id and let go by
+     * `releaseRun`. Today nothing is registered — HTTP clients are opened and
+     * closed inside `McpClientService.listTools` — so this is the seam the
+     * stdio slice (AP-14) registers each launched server into. An entry only
+     * exists once something is registered, so a runtime that never releases
+     * (there is none, but the contract allows it) accumulates nothing.
+     */
+    private readonly runResources = new Map<string, Array<{ close(): Promise<void> }>>();
 
     constructor(
         private readonly connections: McpConnectionsService,
@@ -81,7 +91,7 @@ export class McpToolSource implements AgentMcpToolSource {
         }
     }
 
-    async buildTools(agent: Agent): Promise<AgentToolDescriptor[]> {
+    async buildTools(agent: Agent, run: AgentMcpRunHandle): Promise<AgentToolDescriptor[]> {
         if (!agent.permissions?.canCallExternalTools) return [];
 
         let effective: McpServerConnection[];
@@ -89,7 +99,7 @@ export class McpToolSource implements AgentMcpToolSource {
             effective = await this.connections.resolveEffectiveConnections(agent.userId, agent.id);
         } catch (err) {
             this.logger.warn(
-                `Agent ${agent.id}: MCP connection resolution failed (no MCP tools this run): ${
+                `Agent ${agent.id} run ${run.runId}: MCP connection resolution failed (no MCP tools this run): ${
                     err instanceof Error ? err.message : String(err)
                 }`,
             );
@@ -106,7 +116,7 @@ export class McpToolSource implements AgentMcpToolSource {
             } catch (err) {
                 // Dead server → zero tools + WARN, never a failed run.
                 this.logger.warn(
-                    `Agent ${agent.id}: MCP server "${connection.name}" unavailable (skipped): ${
+                    `Agent ${agent.id} run ${run.runId}: MCP server "${connection.name}" unavailable (skipped): ${
                         err instanceof Error ? err.message : String(err)
                     }`,
                 );
@@ -126,6 +136,39 @@ export class McpToolSource implements AgentMcpToolSource {
             }
         }
         return out;
+    }
+
+    /**
+     * AP-14 prerequisite. Closes everything registered for the run, once,
+     * tolerating a closer that rejects (logged, never thrown — the run is
+     * already over). A second call for the same run is a no-op.
+     */
+    async releaseRun(runId: string): Promise<void> {
+        const resources = this.runResources.get(runId);
+        this.runResources.delete(runId);
+        if (!resources?.length) return;
+        const results = await Promise.allSettled(resources.map((resource) => resource.close()));
+        for (const result of results) {
+            if (result.status === 'rejected') {
+                this.logger.warn(
+                    `Run ${runId}: MCP run resource failed to close: ${
+                        result.reason instanceof Error
+                            ? result.reason.message
+                            : String(result.reason)
+                    }`,
+                );
+            }
+        }
+    }
+
+    /** Hold a resource for the run until `releaseRun(runId)`. */
+    protected registerRunResource(runId: string, resource: { close(): Promise<void> }): void {
+        const existing = this.runResources.get(runId);
+        if (existing) {
+            existing.push(resource);
+        } else {
+            this.runResources.set(runId, [resource]);
+        }
     }
 
     // ── internals ─────────────────────────────────────────────────
