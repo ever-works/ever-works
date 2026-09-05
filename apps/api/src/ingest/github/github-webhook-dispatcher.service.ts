@@ -29,6 +29,40 @@ export interface GitHubWebhookDelivery {
 export type GitHubWebhookCredential = 'app-secret' | 'install-secret';
 
 /**
+ * The `x-github-event` names on which `GitHubAppSyncService` WRITES
+ * platform state: `installation` upserts / soft-deletes a row in
+ * `github_app_installations` and can overwrite its
+ * `createdByGithubUserId`; `installation_repositories` re-pulls the
+ * installation's private repository list; `push` stamps
+ * `pendingSyncRequestedAt` on whichever Work claims the named repo.
+ *
+ * Each of those acts on an identifier taken STRAIGHT OUT of the body
+ * (`installation.id`, `repository.full_name`) with no relation to the
+ * verified sender, so they may only run when GitHub itself vouched for
+ * the delivery with the PLATFORM App webhook secret. A delivery verified
+ * with a tenant's own per-install `webhookSecret` proves who the sender
+ * is, and a tenant is not an authority on another tenant's App
+ * installation — before this gate, any tenant could sign
+ * `{"action":"deleted","installation":{"id":<victim>}}` with their own
+ * secret and soft-delete a stranger's installation.
+ *
+ * Every OTHER event name is left flowing to the sync service exactly as
+ * before: `handleWebhook` has no branch for them, so the call is an inert
+ * no-op and the consolidated fan-out keeps its shape.
+ */
+const APP_STATE_EVENTS: readonly string[] = ['installation', 'installation_repositories', 'push'];
+
+/**
+ * The ONE 401 body this receiver ever returns.
+ *
+ * A receiver that answers 'not configured' when a secret is missing and
+ * 'invalid signature' when it is present hands an unauthenticated prober
+ * a configuration oracle. Both cases mean the same thing to a caller —
+ * nothing here verified you — so both say it the same way.
+ */
+export const INVALID_GITHUB_SIGNATURE = 'Invalid GitHub webhook signature';
+
+/**
  * Outcome of one dispatch. Both consumers' failures are REPORTED rather
  * than thrown, so each route can keep its own historical failure
  * contract (see the class doc).
@@ -116,7 +150,10 @@ export interface GitHubWebhookConsumer {
  *    RECORDED into the same table — no second binding store;
  *  * **fans out internally to every consumer**: the App sync service and
  *    the PR-review/ingest bridge, on every verified delivery, regardless
- *    of which URL it arrived at.
+ *    of which URL it arrived at — except that the sync leg's
+ *    STATE-WRITING events ({@link APP_STATE_EVENTS}) require the platform
+ *    App credential, because a tenant's own webhook secret is not an
+ *    authority on another tenant's App installation.
  *
  * ## Failure contracts are per-route, on purpose
  *
@@ -211,8 +248,17 @@ export class GitHubWebhookDispatcherService {
 
             // Fail-closed: nothing configured anywhere → reject, including
             // the initial `ping` (GitHub signs that too).
+            //
+            // The message is deliberately the SAME one a bad signature
+            // gets. "Not configured" here means `loadCandidates()` came
+            // back empty — i.e. no user anywhere on this deployment has an
+            // enabled `github` install with a webhook secret. Saying so to
+            // an unauthenticated prober is a per-deployment tenant oracle:
+            // it tells them which integrations are live before they hold
+            // any credential. Operators read the reason out of the logs,
+            // which is where it belongs.
             if (resolution.status === 'not-configured') {
-                throw new UnauthorizedException('GitHub events receiver is not configured');
+                throw new UnauthorizedException(INVALID_GITHUB_SIGNATURE);
             }
             // Unknown/ambiguous installation → clean no-op. The bridge
             // already logged the refusal; 200 so GitHub does not retry a
@@ -228,7 +274,7 @@ export class GitHubWebhookDispatcherService {
 
             binding = resolution.binding;
             if (!verify(binding.webhookSecret)) {
-                throw new UnauthorizedException('Invalid GitHub webhook signature');
+                throw new UnauthorizedException(INVALID_GITHUB_SIGNATURE);
             }
 
             // Verified — persist the installation→user binding so
@@ -242,14 +288,24 @@ export class GitHubWebhookDispatcherService {
 
         // 1. GitHub App sync (installation / installation_repositories).
         //    Ran on every verified delivery of the legacy route before;
-        //    now runs on every verified delivery of BOTH routes.
+        //    now runs on every verified delivery of BOTH routes — EXCEPT
+        //    the state-writing event names, which require the platform App
+        //    credential (see {@link APP_STATE_EVENTS}).
         let syncHandled = false;
-        try {
-            await this.appSync.handleWebhook(eventName, body as never);
-            syncHandled = true;
-        } catch (error) {
-            errors.sync = error;
-            this.logger.warn(`GitHub App sync failed for '${eventName}': ${this.messageOf(error)}`);
+        if (credential !== 'app-secret' && APP_STATE_EVENTS.includes(eventName)) {
+            this.logger.warn(
+                `Refusing to run the GitHub App sync leg for '${eventName}': the delivery verified with a per-install secret, which is not an authority on platform App state`,
+            );
+        } else {
+            try {
+                await this.appSync.handleWebhook(eventName, body as never);
+                syncHandled = true;
+            } catch (error) {
+                errors.sync = error;
+                this.logger.warn(
+                    `GitHub App sync failed for '${eventName}': ${this.messageOf(error)}`,
+                );
+            }
         }
 
         // 2. Ingest spine + PR review. `ping` is the webhook-creation
@@ -267,12 +323,16 @@ export class GitHubWebhookDispatcherService {
             }
         } else if (eventName !== 'ping' && !binding) {
             // App-secret delivery we cannot attribute to a platform user.
-            // The sync leg still ran (it is user-agnostic); the review leg
-            // has no owner to run as, so it is skipped rather than guessed.
+            // The sync leg still ran (it is user-agnostic); the review and
+            // INTAKE legs have no owner to run as, so they are skipped
+            // rather than guessed — an unattributable `issues` delivery
+            // files nothing rather than filing into somebody's org. The
+            // owner-less case is named explicitly here because it is the
+            // one way a correctly signed issue produces no Task at all.
             this.logger.warn(
                 `GitHub delivery '${eventName}' verified with the app secret but no platform owner is bound to ${
                     workspace?.keys[0] ?? 'the installation'
-                }; skipping the review leg`,
+                }; skipping the review and intake legs`,
             );
         }
 
@@ -305,15 +365,27 @@ export class GitHubWebhookDispatcherService {
     /**
      * Owner for a delivery that verified against the PLATFORM App secret.
      *
-     * Order (mirrors the per-install resolver's "never guess" posture):
+     * Order — AUTHORITATIVE PLATFORM STATE FIRST:
      *
-     *   1. an existing `ingest_install_bindings` row for the delivery's
-     *      installation / owner key — the same single binding table the
-     *      per-install path uses;
-     *   2. `github_app_installations.createdByUserId` — the platform user
-     *      who installed the App;
-     *   3. that installation's `createdByGithubUserId` resolved through
-     *      `github_app_user_links`.
+     *   1. `github_app_installations.createdByUserId` — the platform user
+     *      who installed the App, written by the App-install flow;
+     *   2. that installation's `createdByGithubUserId` resolved through
+     *      `github_app_user_links`;
+     *   3. only then an existing `ingest_install_bindings` row for the
+     *      delivery's installation / owner key — the same single binding
+     *      table the per-install path uses.
+     *
+     * The order matters and used to be the other way round. Binding rows
+     * on the `install-secret` path are written from an UNVERIFIED body
+     * (`recordBinding`), so a tenant can name `owner:<somebody-else>` in
+     * a body signed with their own webhook secret. With the binding
+     * consulted first, that squatted row outranked
+     * `github_app_installations` and every genuinely App-signed delivery
+     * for the victim's installation — their issues included — was filed
+     * into the squatter's organization. Platform state cannot be written
+     * by an inbound delivery that only proved the sender's own secret, so
+     * it goes first and the binding row is the fallback for
+     * installations the App-install flow never recorded.
      *
      * `null` when none of the three answer: the review leg is skipped
      * rather than attributed to an arbitrary user.
@@ -329,41 +401,36 @@ export class GitHubWebhookDispatcherService {
             ...(workspace ? { workspace } : {}),
         });
 
+        const installationKey = workspace?.keys.find((key) => key.startsWith('installation:'));
+        if (installationKey) {
+            const installationId = installationKey.slice('installation:'.length);
+            const installation = await this.installations
+                .findByInstallationId(installationId)
+                .catch((error: unknown) => {
+                    this.logger.warn(
+                        `GitHub App installation lookup failed for ${installationId}: ${this.messageOf(error)}`,
+                    );
+                    return null;
+                });
+
+            if (installation?.createdByUserId) {
+                return asBinding(installation.createdByUserId);
+            }
+
+            if (installation?.createdByGithubUserId) {
+                const link = await this.userLinks
+                    .findByGithubUserId(installation.createdByGithubUserId)
+                    .catch(() => null);
+                if (link?.userId) {
+                    return asBinding(link.userId);
+                }
+            }
+        }
+
         for (const key of workspace?.keys ?? []) {
             const bound = await this.bridge.installBindingFor(key);
             if (bound) {
                 return { ...asBinding(bound.userId), matchedBy: 'binding' };
-            }
-        }
-
-        const installationKey = workspace?.keys.find((key) => key.startsWith('installation:'));
-        if (!installationKey) {
-            return null;
-        }
-        const installationId = installationKey.slice('installation:'.length);
-
-        const installation = await this.installations
-            .findByInstallationId(installationId)
-            .catch((error: unknown) => {
-                this.logger.warn(
-                    `GitHub App installation lookup failed for ${installationId}: ${this.messageOf(error)}`,
-                );
-                return null;
-            });
-        if (!installation) {
-            return null;
-        }
-
-        if (installation.createdByUserId) {
-            return asBinding(installation.createdByUserId);
-        }
-
-        if (installation.createdByGithubUserId) {
-            const link = await this.userLinks
-                .findByGithubUserId(installation.createdByGithubUserId)
-                .catch(() => null);
-            if (link?.userId) {
-                return asBinding(link.userId);
             }
         }
 

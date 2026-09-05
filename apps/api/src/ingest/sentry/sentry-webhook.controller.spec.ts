@@ -159,10 +159,30 @@ describe('SentryWebhookController (POST /api/ingest/sentry/events)', () => {
         await expect(controller.receiveEvents(req as never, signature, 'issue')).rejects.toThrow(
             UnauthorizedException,
         );
+        // The 401 body is INDISTINGUISHABLE from the bad-signature one.
+        // This used to assert 'not configured', which told an
+        // unauthenticated prober whether SENTRY_WEBHOOK_CLIENT_SECRET is
+        // set on this deployment — a free map of which integrations are
+        // live, before they hold any credential.
         await expect(controller.receiveEvents(req as never, signature, 'issue')).rejects.toThrow(
-            'not configured',
+            'Invalid Sentry webhook signature',
         );
         expect(eventIngestService.ingest).not.toHaveBeenCalled();
+    });
+
+    it('answers an unconfigured deployment and a bad signature with the SAME 401 body', async () => {
+        const { controller } = createController();
+        const { req, signature } = signedRequest(issueBody());
+        const badSignature = await controller
+            .receiveEvents(req as never, 'deadbeef', 'issue')
+            .catch((error: Error) => error.message);
+
+        delete process.env.SENTRY_WEBHOOK_CLIENT_SECRET;
+        const unconfigured = await controller
+            .receiveEvents(req as never, signature, 'issue')
+            .catch((error: Error) => error.message);
+
+        expect(unconfigured).toBe(badSignature);
     });
 
     it('rejects a missing signature with 401 and files nothing', async () => {
@@ -199,6 +219,52 @@ describe('SentryWebhookController (POST /api/ingest/sentry/events)', () => {
             controller.receiveEvents(req as never, `sha256=${signature}`, 'issue'),
         ).rejects.toThrow(UnauthorizedException);
         expect(eventIngestService.ingest).not.toHaveBeenCalled();
+    });
+
+    /**
+     * The delivered bytes are the only thing Sentry signed. Verifying a
+     * RE-SERIALIZED body would pass here by luck (`JSON.stringify` of a
+     * body Jest itself built) and fail against real Sentry traffic, whose
+     * whitespace and key order are its own — so both directions are
+     * pinned: the raw bytes verify, and a digest of the re-serialization
+     * does not.
+     */
+    describe('verification is against the raw delivered bytes', () => {
+        /** Same document, different bytes: pretty-printed with 2-space indent. */
+        const prettyDelivery = () => {
+            const body = issueBody();
+            const rawBody = JSON.stringify(body, null, 2);
+            return { body, rawBody };
+        };
+
+        it('accepts a delivery whose raw bytes are not what JSON.stringify(body) would produce', async () => {
+            const { controller, eventIngestService } = createController();
+            const { body, rawBody } = prettyDelivery();
+            expect(rawBody).not.toBe(JSON.stringify(body));
+
+            await expect(
+                controller.receiveEvents(
+                    { body, rawBody } as never,
+                    computeSentrySignature(CLIENT_SECRET, rawBody),
+                    'issue',
+                ),
+            ).resolves.toEqual({ ok: true });
+            expect(eventIngestService.ingest).toHaveBeenCalledTimes(1);
+        });
+
+        it('rejects a digest computed over the re-serialized object instead of the raw bytes', async () => {
+            const { controller, eventIngestService } = createController();
+            const { body, rawBody } = prettyDelivery();
+
+            await expect(
+                controller.receiveEvents(
+                    { body, rawBody } as never,
+                    computeSentrySignature(CLIENT_SECRET, JSON.stringify(body)),
+                    'issue',
+                ),
+            ).rejects.toThrow(UnauthorizedException);
+            expect(eventIngestService.ingest).not.toHaveBeenCalled();
+        });
     });
 
     it('ingests a verified issue delivery as an incident for the account that claimed the installation', async () => {
@@ -346,6 +412,39 @@ describe('SentryWebhookController (POST /api/ingest/sentry/events)', () => {
             await expect(
                 controller.receiveEvents(req as never, undefined, 'installation'),
             ).rejects.toThrow(UnauthorizedException);
+            expect(bindings.has(`sentry|installation:${CLAIMED_UUID}`)).toBe(true);
+        });
+
+        /**
+         * Sentry signs with ONE platform-level client secret, so a
+         * verified delivery proves it came from Sentry and never WHOSE it
+         * is — the claim table is the only thing between a delivery and a
+         * tenant's data. The installation branch used to run BEFORE
+         * `resolveOwner` was ever called, so one signed request could
+         * drop a binding whose owner had not been looked up at all.
+         * Owner resolution now runs first, for every resource.
+         */
+        it('resolves the owner BEFORE acting on an installation delivery', async () => {
+            const { controller, bindingRepo } = createController();
+            const gone = signedRequest(installationBody('deleted'));
+
+            await controller.receiveEvents(gone.req as never, gone.signature, 'installation');
+
+            const lookupCall = bindingRepo.findByWorkspace.mock.invocationCallOrder[0];
+            const removeCall = bindingRepo.remove.mock.invocationCallOrder[0];
+            expect(lookupCall).toBeLessThan(removeCall);
+        });
+
+        it('an installation.deleted for an UNCLAIMED uuid touches nothing', async () => {
+            const { controller, bindingRepo, bindings } = createController();
+            const gone = signedRequest(installationBody('deleted', UNCLAIMED_UUID));
+
+            await expect(
+                controller.receiveEvents(gone.req as never, gone.signature, 'installation'),
+            ).resolves.toEqual({ ok: true });
+
+            expect(bindingRepo.remove).not.toHaveBeenCalled();
+            // The claimed binding next door is untouched.
             expect(bindings.has(`sentry|installation:${CLAIMED_UUID}`)).toBe(true);
         });
 

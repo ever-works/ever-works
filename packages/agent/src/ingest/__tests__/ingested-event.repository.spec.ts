@@ -43,11 +43,18 @@ describe('IngestedEventRepository', () => {
 
     beforeEach(() => {
         qb = {
+            select: jest.fn(() => qb),
             where: jest.fn(() => qb),
             andWhere: jest.fn(() => qb),
+            groupBy: jest.fn(() => qb),
             orderBy: jest.fn(() => qb),
             take: jest.fn(() => qb),
+            limit: jest.fn(() => qb),
             getMany: jest.fn(async () => []),
+            // Default: ONE owner has unprocessed work, which is the
+            // short-circuit path (identical to the plain oldest-first
+            // query). The fairness tests below override it.
+            getRawMany: jest.fn(async () => [{ userId: 'user-1' }]),
         };
         typeormRepo = {
             findOne: jest.fn(),
@@ -111,6 +118,73 @@ describe('IngestedEventRepository', () => {
             where: { processedAt: IsNull() },
             order: { occurredAt: 'ASC', createdAt: 'ASC' },
             take: 25,
+        });
+    });
+
+    /**
+     * The drain that consumes this is a five-minute cron with a fifty-row
+     * batch, so a global `ORDER BY occurredAt ASC LIMIT n` means one
+     * chatty source decides how long EVERY other customer waits: two
+     * thousand rows from one flapping Sentry issue is forty ticks — over
+     * three hours — during which a newly filed GitHub issue anywhere on
+     * the deployment does not become a Task. That is the input that
+     * silently swallows genuinely new work.
+     */
+    describe('findUnprocessed shares the batch between owners', () => {
+        const rowFor = (userId: string, minute: number) =>
+            ({
+                id: `${userId}-${minute}`,
+                userId,
+                occurredAt: new Date(Date.UTC(2026, 8, 1, 12, minute)),
+            }) as never;
+
+        it('gives every waiting owner a share instead of a global FIFO head', async () => {
+            qb.getRawMany.mockResolvedValue([{ userId: 'flooder' }, { userId: 'quiet-tenant' }]);
+            typeormRepo.find.mockImplementation(async (options: any) => {
+                const userId = options.where.userId as string;
+                // The flooder has far more waiting rows AND older ones, so
+                // a global FIFO would hand back nothing but theirs.
+                return userId === 'flooder'
+                    ? [rowFor('flooder', 0), rowFor('flooder', 1)]
+                    : [rowFor('quiet-tenant', 30)];
+            });
+
+            const batch = await repository.findUnprocessed(4);
+
+            expect(qb.getRawMany).toHaveBeenCalled();
+            expect(batch.map((row) => row.userId)).toContain('quiet-tenant');
+            // Per-owner reads are owner-scoped AND still oldest-first.
+            expect(typeormRepo.find).toHaveBeenCalledWith({
+                where: { processedAt: IsNull(), userId: 'flooder' },
+                order: { occurredAt: 'ASC', createdAt: 'ASC' },
+                take: 2,
+            });
+        });
+
+        it('hands the merged batch back oldest-first and inside the limit', async () => {
+            qb.getRawMany.mockResolvedValue([{ userId: 'a' }, { userId: 'b' }]);
+            typeormRepo.find.mockImplementation(async (options: any) =>
+                options.where.userId === 'a'
+                    ? [rowFor('a', 10), rowFor('a', 40)]
+                    : [rowFor('b', 5), rowFor('b', 20)],
+            );
+
+            const batch = await repository.findUnprocessed(3);
+
+            expect(batch).toHaveLength(3);
+            expect(batch.map((row) => row.id)).toEqual(['b-5', 'a-10', 'b-20']);
+        });
+
+        it('falls back to the plain query when the owner scan is unavailable', async () => {
+            qb.getRawMany.mockRejectedValue(new Error('no such function'));
+
+            await repository.findUnprocessed(25);
+
+            expect(typeormRepo.find).toHaveBeenCalledWith({
+                where: { processedAt: IsNull() },
+                order: { occurredAt: 'ASC', createdAt: 'ASC' },
+                take: 25,
+            });
         });
     });
 

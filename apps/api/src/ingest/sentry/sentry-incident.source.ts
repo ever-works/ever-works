@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { IngestedEventEnvelope } from '@ever-works/contracts';
-import { httpsUrl, isoOrNow, nonEmpty } from '../ingest-envelope.util';
+import { httpsUrl, nonEmpty } from '../ingest-envelope.util';
 import {
     buildIncidentEnvelope,
     type IncidentPayload,
@@ -25,6 +25,24 @@ export const SENTRY_EVENT_SOURCE = 'sentry';
  */
 export const SENTRY_INCIDENT_RESOURCES: readonly string[] = ['event_alert', 'issue'];
 
+/**
+ * Width of the bucket that repeated `event_alert` deliveries for ONE
+ * Sentry issue collapse into, in milliseconds.
+ *
+ * A Sentry issue that is flapping alerts once per occurrence. Keying the
+ * envelope on the individual `event_id` (as this source used to) meant
+ * one `ingested_events` row per alert — 2000 alerts in a minute became
+ * 2000 rows, all in front of every other tenant in the drain's global
+ * `occurredAt ASC` queue, each one an Activity row, a Memory write, a
+ * triage comment and a fire of every `{kind:'incident'}` trigger. The
+ * issue is the unit of work (that is what a Sentry issue IS — one
+ * fingerprint), so alerts inside one bucket are the same revision and
+ * the spine's `(source, sourceEventId)` dedupe collapses them to a
+ * single row. Five minutes caps one flapping issue at 12 rows an hour
+ * while a genuinely later alert still lands as a new revision.
+ */
+export const SENTRY_EVENT_ALERT_BUCKET_MS = 5 * 60_000;
+
 /** `issue` resource actions worth a revision of the incident. */
 export const SENTRY_ISSUE_ACTIONS: readonly string[] = [
     'created',
@@ -35,6 +53,54 @@ export const SENTRY_ISSUE_ACTIONS: readonly string[] = [
     'archived',
     'unarchived',
 ];
+
+/**
+ * The start of the `widthMs` bucket `value` falls in, as an ISO string.
+ *
+ * Used to build a dedupe identity that is a function of WHEN something
+ * happened rather than of which individual delivery carried it. A body
+ * with no usable vendor timestamp buckets the receive time instead of
+ * being stamped with the raw clock: a replayed delivery then collapses
+ * into the bucket it is replayed in rather than minting a fresh row per
+ * replay, and a genuinely later alert still opens a new bucket.
+ */
+function bucketOf(value: string | number | null | undefined, widthMs: number): string {
+    const ms = epochMsOf(value) ?? Date.now();
+    return new Date(Math.floor(ms / widthMs) * widthMs).toISOString();
+}
+
+/**
+ * Epoch milliseconds for a vendor timestamp, or `undefined`.
+ *
+ * Mirrors `isoOrNow`'s parsing (Sentry reports unix epochs in SECONDS on
+ * some resources and ISO strings on others) without its `now()`
+ * fallback — the caller decides what "no timestamp" means.
+ */
+function epochMsOf(value: string | number | null | undefined): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return value < 1e12 ? value * 1000 : value;
+    }
+    if (typeof value === 'string' && value.length > 0) {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) return parsed.getTime();
+    }
+    return undefined;
+}
+
+/**
+ * The vendor's own revision timestamp, or a bounded stand-in.
+ *
+ * Never `now()`: this value goes into `sourceEventId`, which IS the
+ * replay control. When the vendor stamps the revision the identity is
+ * exact (a redelivery of the same transition dedupes to zero); when it
+ * does not, the identity degrades to a 5-minute bucket, which is
+ * bounded, rather than to the clock, which is not.
+ */
+function revisionStampOf(value: string | number | null | undefined): string {
+    const ms = epochMsOf(value);
+    if (ms !== undefined) return new Date(ms).toISOString();
+    return bucketOf(undefined, SENTRY_EVENT_ALERT_BUCKET_MS);
+}
 
 /** The subset of a Sentry integration webhook body the source reads. */
 export interface SentryWebhookBody {
@@ -207,9 +273,12 @@ export class SentryIncidentSource implements IncidentSource<SentryIncidentInput>
         const occurredAt = event.datetime ?? event.timestamp;
         return buildIncidentEnvelope({
             source: this.source,
-            // One envelope per alerting EVENT: a repeated alert for the same
-            // issue is a new revision; an exact redelivery dedupes to zero.
-            sourceEventId: `event_alert:${issueId}:${eventId ?? isoOrNow(occurredAt)}`,
+            // One envelope per ISSUE per bucket, not per alerting event:
+            // see {@link SENTRY_EVENT_ALERT_BUCKET_MS}. The bucket is
+            // derived from the vendor timestamp when there is one, so a
+            // replayed delivery lands in the bucket it originally
+            // occurred in and dedupes instead of minting a new row.
+            sourceEventId: `event_alert:${issueId}:${bucketOf(occurredAt, SENTRY_EVENT_ALERT_BUCKET_MS)}`,
             occurredAt,
             ...(actor ? { actor } : {}),
             ...(issueUrl ? { sourceUrl: issueUrl } : {}),
@@ -270,7 +339,15 @@ export class SentryIncidentSource implements IncidentSource<SentryIncidentInput>
             // Revision = lifecycle action + when the issue was last seen: a
             // retried delivery of the same transition dedupes, a later
             // transition (resolved → unresolved) lands as a new event.
-            sourceEventId: `issue:${issueId}:${action}:${isoOrNow(lastSeen ?? issue.firstSeen)}`,
+            //
+            // `revisionStampOf` — NOT `isoOrNow` — because a body with
+            // neither `lastSeen` nor `firstSeen` would otherwise get
+            // `now()` stamped into its dedupe identity, and a captured,
+            // still-signed delivery replayed N times would mint N
+            // distinct rows. The whole documented replay control on this
+            // receiver is the spine's `(source, sourceEventId)` dedupe,
+            // so that identity must not contain the clock.
+            sourceEventId: `issue:${issueId}:${action}:${revisionStampOf(lastSeen ?? issue.firstSeen)}`,
             occurredAt: lastSeen ?? issue.firstSeen,
             ...(actor ? { actor } : {}),
             ...(url ? { sourceUrl: url } : {}),

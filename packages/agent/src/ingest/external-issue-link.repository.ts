@@ -16,6 +16,30 @@ export interface UpsertExternalIssueLinkData {
     lastSeenAt?: Date | null;
     tenantId?: string | null;
     organizationId?: string | null;
+    /**
+     * Times this issue has re-opened work after its Task was closed.
+     * Omitted = left untouched (the ordinary file / refresh path never
+     * moves it); the triage filer sets it explicitly when a regression
+     * supersedes a closed Task.
+     */
+    regressionCount?: number;
+    /**
+     * Insert-only: when a row already binds this
+     * `(userId, source, externalIssueId)`, leave it exactly as it is and
+     * hand it back instead of re-pointing it at `taskId`.
+     *
+     * This is what makes a FIRST link race-safe. Two concurrent drains
+     * that both miss the link both create a Task and both write; without
+     * this flag the second write re-points the single row at the second
+     * Task and ORPHANS the first — no link row references it, so it never
+     * receives an update comment and is never deduped away, and the board
+     * shows two triage Tasks for one issue. With it the loser learns it
+     * lost (the returned row names the winner's Task) and can clean up.
+     *
+     * A deliberate RE-POINT — a regression superseding a closed Task, or
+     * re-filing after the linked Task was deleted — omits the flag.
+     */
+    onlyIfAbsent?: boolean;
 }
 
 /** Freshness breadcrumbs stamped by the ingest drain. */
@@ -81,6 +105,9 @@ export class ExternalIssueLinkRepository {
     async upsert(data: UpsertExternalIssueLinkData): Promise<ExternalIssueLink> {
         const existing = await this.findByExternal(data.userId, data.source, data.externalIssueId);
         if (existing) {
+            // Insert-only caller and the key is taken: the holder wins,
+            // untouched. See `onlyIfAbsent`.
+            if (data.onlyIfAbsent) return existing;
             existing.taskId = data.taskId;
             if (data.externalKey !== undefined) existing.externalKey = data.externalKey;
             if (data.title !== undefined) existing.title = data.title;
@@ -91,11 +118,19 @@ export class ExternalIssueLinkRepository {
             if (data.lastSeenAt !== undefined) existing.lastSeenAt = data.lastSeenAt;
             if (data.tenantId !== undefined) existing.tenantId = data.tenantId;
             if (data.organizationId !== undefined) existing.organizationId = data.organizationId;
+            if (data.regressionCount !== undefined) {
+                existing.regressionCount = data.regressionCount;
+            }
             return this.repository.save(existing);
         }
 
+        // `onlyIfAbsent` is a write MODE, not a column — keep it out of
+        // the entity the insert is built from.
+        const { onlyIfAbsent: _mode, ...columns } = data;
         try {
-            return await this.repository.save(this.repository.create({ ...data }));
+            return await this.repository.save(
+                this.repository.create({ ...columns, regressionCount: data.regressionCount ?? 0 }),
+            );
         } catch (error) {
             // Concurrent first link for the same issue — the UNIQUE index
             // picked a winner; adopt it rather than throw.

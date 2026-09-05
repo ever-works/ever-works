@@ -23,6 +23,13 @@ import { verifySentrySignature } from './sentry-signature.util';
 const INSTALLATION_RESOURCE = 'installation';
 
 /**
+ * The ONE 401 body this receiver ever returns — an unconfigured
+ * deployment and a bad signature are indistinguishable from outside, so
+ * probing cannot map which integrations are live.
+ */
+export const INVALID_SENTRY_SIGNATURE = 'Invalid Sentry webhook signature';
+
+/**
  * Sentry integration webhook receiver (self-build program note §6, R23)
  * — the platform-side endpoint the Sentry internal integration's webhook
  * URL points at.
@@ -92,14 +99,23 @@ export class SentryWebhookController {
         }
 
         // Fail-closed: no client secret configured → reject everything.
+        //
+        // The 401 body is the SAME one a bad signature gets. Answering
+        // 'not configured' when `SENTRY_WEBHOOK_CLIENT_SECRET` is unset
+        // and 'invalid signature' when it is set hands an unauthenticated
+        // prober a map of which integrations this deployment has live.
+        // Operators read the reason out of the logs instead.
         const clientSecret = config.sentryIntake.webhookClientSecret();
         if (!clientSecret) {
-            throw new UnauthorizedException('Sentry events receiver is not configured');
+            this.logger.warn(
+                'Rejecting a Sentry delivery: SENTRY_WEBHOOK_CLIENT_SECRET is not configured',
+            );
+            throw new UnauthorizedException(INVALID_SENTRY_SIGNATURE);
         }
 
         const verdict = verifySentrySignature({ rawBody: req.rawBody, signature, clientSecret });
         if (!verdict.valid) {
-            throw new UnauthorizedException('Invalid Sentry webhook signature');
+            throw new UnauthorizedException(INVALID_SENTRY_SIGNATURE);
         }
 
         // ---- Verified from here on -----------------------------------
@@ -107,16 +123,29 @@ export class SentryWebhookController {
         const action = nonEmpty(body.action);
         const installationUuid = body.data?.installation?.uuid ?? body.installation?.uuid;
 
+        // Owner resolution runs FIRST, for every resource including
+        // `installation`. Sentry signs with one platform-level client
+        // secret, so a verified delivery proves it came from Sentry and
+        // never WHOSE it is — the only thing standing between a delivery
+        // and a tenant's data is the claim table. Acting on an
+        // `installation.deleted` before consulting it (as this receiver
+        // used to) let one signed request drop a binding whose owner had
+        // never been looked up, silently stopping that account's incident
+        // intake and freeing the uuid for the next first-claim race.
+        const owner = await this.bindings.resolveOwner(installationUuid);
+
         if (resource === INSTALLATION_RESOURCE) {
-            if (action === 'deleted') {
-                await this.bindings.onInstallationDeleted(installationUuid);
+            // A lifecycle delivery for a uuid nobody has claimed has
+            // nothing to act on; one for a claimed uuid removes exactly
+            // that owner's own binding.
+            if (action === 'deleted' && owner) {
+                await this.bindings.onInstallationDeleted(owner.installationUuid);
             }
             // `created` carries no owner we could trust — the owner claims
             // the uuid through the authenticated endpoint instead.
             return { ok: true };
         }
 
-        const owner = await this.bindings.resolveOwner(installationUuid);
         if (!owner) {
             // Only a PREFIX of the uuid: on this receiver the installation
             // uuid is the whole claim credential (`POST /bindings` binds
