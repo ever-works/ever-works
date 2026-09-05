@@ -50,8 +50,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * NULL before, and NULL-ing every org-stamped child would also strip rows
  * that were stamped correctly at insert time.
  */
-export class BackfillUploadAndSkillFileOrgScope1788100000000 implements MigrationInterface {
-    name = 'BackfillUploadAndSkillFileOrgScope1788100000000';
+export class BackfillUploadAndSkillFileOrgScope1788800000000 implements MigrationInterface {
+    name = 'BackfillUploadAndSkillFileOrgScope1788800000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (await this.allExist(queryRunner, ['user_uploads', 'works', 'organizations'])) {

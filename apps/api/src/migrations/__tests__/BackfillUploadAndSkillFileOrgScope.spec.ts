@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { BackfillUploadAndSkillFileOrgScope1788100000000 } from '../1788100000000-BackfillUploadAndSkillFileOrgScope';
+import { BackfillUploadAndSkillFileOrgScope1788800000000 } from '../1788800000000-BackfillUploadAndSkillFileOrgScope';
 
 /**
  * Data-migration test on the in-memory better-sqlite3 harness the sibling
@@ -8,9 +8,9 @@ import { BackfillUploadAndSkillFileOrgScope1788100000000 } from '../178810000000
  * does not: the migration must NARROW visibility to the right Organization
  * and never widen it, and a second run must be a no-op.
  */
-describe('BackfillUploadAndSkillFileOrgScope1788100000000', () => {
+describe('BackfillUploadAndSkillFileOrgScope1788800000000', () => {
     let dataSource: DataSource;
-    const migration = new BackfillUploadAndSkillFileOrgScope1788100000000();
+    const migration = new BackfillUploadAndSkillFileOrgScope1788800000000();
 
     const T = 'tenant-a';
     const T_OTHER = 'tenant-b';
