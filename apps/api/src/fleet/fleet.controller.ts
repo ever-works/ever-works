@@ -24,20 +24,24 @@ import type {
     FleetEnrollmentTokenView,
 } from '@ever-works/agent/fleet';
 import {
+    FleetAuditService,
     FleetCostCeilingService,
     FleetExecutionPreferenceService,
     FleetJobService,
     FleetService,
 } from '@ever-works/agent/fleet';
 import type {
+    FleetAuditView,
     FleetCostCeilingView,
     FleetEnrollResponse,
     FleetExecutionPreferenceView,
     FleetHeartbeatResponse,
+    FleetNodeRotateCredentialResponse,
     FleetNodeView,
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
 import { AgentRunRepository } from '@ever-works/agent/database';
+import { FLEET_AUDIT_DEFAULT_LIMIT } from '@ever-works/contracts';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
@@ -57,10 +61,12 @@ import {
     FleetHeartbeatDto,
     FleetNodePauseDto,
     FleetUnenrollDto,
+    RotateFleetNodeCredentialDto,
     SetFleetCostCeilingDto,
     SetFleetExecutionPreferenceDto,
     UpdateFleetNodeDto,
 } from './dto/fleet.dto';
+import { FleetAuditQueryDto } from './dto/fleet-kill-switch.dto';
 import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
 
 /** How much of a node's job history the detail drawer reads. */
@@ -80,6 +86,7 @@ const NODE_HISTORY_LIMIT = 25;
  *                                             edit capability tags
  *   POST   /api/fleet/nodes/:id/rotate        re-key: new one-time token,
  *                                             old secret dies immediately
+ *   GET    /api/fleet/nodes/:id/audit         this node's lifecycle trail
  *   POST   /api/fleet/nodes/:id/drain         drain: disable AND requeue
  *                                             the node's in-flight claims
  *   PATCH  /api/fleet/nodes/:id               rename / pause / disable
@@ -99,6 +106,10 @@ const NODE_HISTORY_LIMIT = 25;
  *   POST   /api/fleet/drain-all               drain EVERY node I own
  *   POST   /api/fleet/cancel-in-flight        cancel my running fleet work
  *                                             (explicit second step)
+ *   POST   /api/fleet/rotate-all              QUEUE a credential rotation
+ *                                             on every node I own; each
+ *                                             machine re-keys itself on
+ *                                             its next beat
  *   GET    /api/fleet/kill-switch             is the global stop flag set?
  *   POST   /api/fleet/kill-switch/stop        platform admin: set it
  *   POST   /api/fleet/kill-switch/clear       platform admin: clear it
@@ -122,6 +133,9 @@ const NODE_HISTORY_LIMIT = 25;
  * registry and the node work channel go dark together.
  *   POST   /api/fleet/pause                   node drains/resumes itself
  *   POST   /api/fleet/unenroll                node retires itself
+ *   POST   /api/fleet/rotate-credential       node re-keys itself; both
+ *                                             credentials work for a
+ *                                             bounded overlap
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
@@ -143,6 +157,11 @@ export class FleetController {
         // binding degrades to `reconciled: null` instead of a 500 on the
         // node drawer.
         @Optional() private readonly runs?: AgentRunRepository,
+        // EW-799 — the one `fleet_audit` reader. @Optional() for the same
+        // reason as `runs` above: every positional construction in the
+        // specs keeps working, and a missing binding degrades to an empty
+        // audit list rather than a 500 on the drawer.
+        @Optional() private readonly audit?: FleetAuditService,
     ) {}
 
     @Get('cost-ceiling')
@@ -370,6 +389,32 @@ export class FleetController {
         return this.service.rotateCredentialForUser(auth.userId, id);
     }
 
+    @Get('nodes/:id/audit')
+    @ApiOperation({
+        summary:
+            'This node’s lifecycle audit trail (newest first): every enroll, rotation, rename, capability edit, pause, disable, drain and delete, with the actor, the time and a before/after. Never contains a credential. Owner-scoped: another account’s node id answers 404, exactly like an unknown one.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async nodeAudit(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query() query: FleetAuditQueryDto,
+    ): Promise<FleetAuditView[]> {
+        // Ownership is settled FIRST and by the registry — a foreign id
+        // throws 404 here and nothing else runs, so the trail can never be
+        // read for a node the caller does not own. The audit read is then
+        // owner-scoped a SECOND time in `recentForOwnerNode`: the
+        // platform-wide `recent()` stays admin-only on the kill-switch
+        // controller, because one method whose scoping depends on which
+        // arguments happen to be passed is how a leak gets shipped.
+        await this.service.getForUser(auth.userId, id);
+        return this.audit.recentForOwnerNode(
+            auth.userId,
+            id,
+            query.limit ?? FLEET_AUDIT_DEFAULT_LIMIT,
+        );
+    }
+
     @Post('nodes/:id/drain')
     @ApiOperation({
         summary:
@@ -546,7 +591,38 @@ export class FleetController {
                 );
             }
         }
-        return { ok: true, node: result.node };
+        return { ok: true, node: result.node, rotationRequested: result.rotationRequested };
+    }
+
+    @Public()
+    @Post('rotate-credential')
+    @ApiOperation({
+        summary:
+            'Node self-rotation (public, node-secret-authenticated). Mints a NEW node secret — returned exactly once — while the credential presented here keeps working for a bounded overlap, so the machine can finish its in-flight job and persist the new secret before the old one dies. The old credential expires on a clock, not on a callback. Requires the CURRENT credential: a previous-window one, a still-enrolling node, or a second rotation while a window is open are all refused.',
+    })
+    @HttpCode(HttpStatus.OK)
+    // Tighter than `pause` (30/min): rotation mints 32 random bytes and
+    // writes on every call, and six machines beating every 30s need
+    // nothing like ten a minute between them.
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async rotateCredential(
+        @Body() body: RotateFleetNodeCredentialDto,
+    ): Promise<FleetNodeRotateCredentialResponse> {
+        const result = await this.service.rotateCredentialByCredential(body.nodeId, body.secret);
+        if (!result) {
+            // The SAME message every refused node credential gets — never
+            // say which check failed, or this becomes a probe for which
+            // node ids exist and which are mid-rotation.
+            throw new UnauthorizedException('Invalid node credential');
+        }
+        return {
+            ok: true,
+            nodeId: result.nodeId,
+            secret: result.secret,
+            previousCredentialExpiresAt: result.previousCredentialExpiresAt.toISOString(),
+            overlapSec: result.overlapSec,
+            node: result.node,
+        };
     }
 
     @Public()

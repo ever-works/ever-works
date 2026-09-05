@@ -36,7 +36,9 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  *   - `FleetAgentAffinityController` — owner + active-Organization scoped
  *     Agent-to-node scheduling intent (session/API-key auth).
  *   - `FleetPanicController` (EW-778) — owner-scoped drain-all and
- *     cancel-in-flight, plus the read of the global stop flag.
+ *     cancel-in-flight, plus the read of the global stop flag; EW-799
+ *     adds `rotate-all` here rather than to `FleetController`, because it
+ *     is a whole-fleet owner verb like the other two, not a per-node edit.
  *   - `FleetKillSwitchController` (EW-778) — PLATFORM-ADMIN set / clear
  *     of the global stop flag and the fleet audit trail
  *     (`IsPlatformAdminGuard`, provided here the way `BudgetsModule`

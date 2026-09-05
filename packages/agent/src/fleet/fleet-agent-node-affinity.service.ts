@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Agent } from '../entities/agent.entity';
 import { FleetAgentNodeAffinity } from '../entities/fleet-agent-node-affinity.entity';
 import { FleetAgentNodeAffinityRepository } from './fleet-agent-node-affinity.repository';
+import { FleetAuditService } from './fleet-audit.service';
 import { FleetNodeRepository } from './fleet-node.repository';
 
 const AFFINITY_NOT_FOUND = 'Fleet Agent or node not found';
@@ -29,6 +30,10 @@ export class FleetAgentNodeAffinityService {
         @InjectRepository(Agent)
         private readonly agents: Repository<Agent>,
         private readonly nodes: FleetNodeRepository,
+        // APPENDED and @Optional(), like every other fleet audit
+        // dependency: binding an Agent to a PC must not become
+        // impossible because the audit repository is unavailable.
+        @Optional() private readonly audit?: FleetAuditService,
     ) {}
 
     async getAffinity(input: FleetAgentNodeAffinityScope): Promise<FleetAgentNodeAffinity | null> {
@@ -46,12 +51,30 @@ export class FleetAgentNodeAffinityService {
             throw new NotFoundException(AFFINITY_NOT_FOUND);
         }
 
-        return this.affinities.upsert({
+        const before = await this.affinities.findForAgent(
+            input.userId,
+            organizationId,
+            input.agentId,
+        );
+        const row = await this.affinities.upsert({
             userId: input.userId,
             organizationId,
             agentId: input.agentId,
             nodeId: input.nodeId,
         });
+        // Act first, then audit (EW-799). `nodeId` is the AFFINITY TARGET
+        // — the machine the Agent is now pinned to — which is what makes
+        // this row show up in that node's own history.
+        await this.audit?.recordNodeAction({
+            action: 'affinity.set',
+            actorUserId: input.userId,
+            ownerUserId: input.userId,
+            nodeId: input.nodeId,
+            before: before ? { nodeId: before.nodeId } : null,
+            after: { nodeId: row.nodeId },
+            extra: { agentId: input.agentId, organizationId },
+        });
+        return row;
     }
 
     /**
@@ -64,7 +87,23 @@ export class FleetAgentNodeAffinityService {
     async clearAffinity(input: FleetAgentNodeAffinityScope): Promise<{ cleared: boolean }> {
         const organizationId = this.requireOrganization(input.organizationId);
         await this.requireOwnedOrganizationAgent(input.userId, organizationId, input.agentId);
+        const before = await this.affinities.findForAgent(
+            input.userId,
+            organizationId,
+            input.agentId,
+        );
         const cleared = await this.affinities.remove(input.userId, organizationId, input.agentId);
+        await this.audit?.recordNodeAction({
+            action: 'affinity.clear',
+            actorUserId: input.userId,
+            ownerUserId: input.userId,
+            // The node the Agent WAS pinned to, so the unbinding lands in
+            // that machine's history rather than nowhere.
+            nodeId: before?.nodeId ?? null,
+            before: before ? { nodeId: before.nodeId } : null,
+            after: null,
+            extra: { agentId: input.agentId, organizationId, cleared },
+        });
         return { cleared };
     }
 

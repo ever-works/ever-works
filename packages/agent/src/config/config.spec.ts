@@ -259,6 +259,56 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet (FLEET_* operator knobs)', () => {
+        describe('getEnrollmentTokenTtlMs', () => {
+            it('defaults to 15 minutes', () => {
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(15 * 60_000);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = String(3 * 60_000);
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(3 * 60_000);
+            });
+
+            it('floors a value that would make a token unredeemable', () => {
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = '0';
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(30_000);
+            });
+
+            it('degrades a nonsense value to the default rather than NaN', () => {
+                // NaN here silently expires every token ever minted.
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = 'soon';
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(15 * 60_000);
+            });
+        });
+
+        describe('getCredentialRotationOverlapMs (EW-799)', () => {
+            it('defaults to 15 minutes of dual-accept', () => {
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = String(2 * 60_000);
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(2 * 60_000);
+            });
+
+            it('floors a window too short to finish a round-trip and a disk write', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = '1';
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(30_000);
+            });
+
+            it('caps the window at 24h — past that it is a second permanent credential', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = String(30 * 86_400_000);
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(86_400_000);
+            });
+
+            it('degrades a nonsense value to the default', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = 'a while';
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+        });
+    });
+
     describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {
         describe('getApiUrl', () => {
             it('returns undefined when unset', () => {

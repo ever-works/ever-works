@@ -26,6 +26,14 @@ import { PortableDateColumn } from './_types';
  *      `enrolling` with a freshly minted one-time token: the old
  *      heartbeat secret stops working the instant the hash is replaced,
  *      and the operator re-enrolls the machine with the new token.
+ *   6. `rotateCredentialByCredential` (EW-799) is the SELF-service
+ *      rotation the machine performs with the credential it already
+ *      holds. It leaves the status alone and opens a bounded DUAL-ACCEPT
+ *      window: the replaced hash moves to `previousCredentialHash` and
+ *      both credentials authenticate until `previousCredentialExpiresAt`,
+ *      after which the old one is refused. That window is why rotation
+ *      can actually happen on six machines spread across desks — step 5
+ *      requires a human at the keyboard, so in practice it never runs.
  *
  * Cluster boundary: rows only ever describe user-enrolled machines.
  * Nodes of user-configured clusters (`clusterSource:
@@ -124,6 +132,57 @@ export class FleetNode {
      */
     @PortableDateColumn({ nullable: true })
     credentialIssuedAt?: Date | null;
+
+    /**
+     * Credential lifecycle (EW-799) — sha256 hex of the credential this
+     * node held BEFORE its last self-rotation, or NULL.
+     *
+     * Deliberately a SEPARATE, NON-UNIQUE column rather than a second
+     * value in {@link enrollmentTokenHash}, for two independent reasons:
+     *
+     *   1. `idx_fleet_nodes_credential` is UNIQUE on `enrollmentTokenHash`;
+     *      two live hashes cannot share it.
+     *   2. `enroll` resolves a row BY hash
+     *      (`FleetNodeRepository.findByCredentialHash`). Anything reachable
+     *      from that lookup is, by construction, a redeemable enrollment
+     *      token — so a still-valid previous credential found there would
+     *      turn a rotation window into a replayable enrollment. This column
+     *      is therefore written and read ONLY by node id, never queried by
+     *      value, and `matchNodeCredential` is its one reader.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    previousCredentialHash?: string | null;
+
+    /**
+     * When the credential in {@link previousCredentialHash} stops being
+     * accepted — the end of the DUAL-ACCEPT window.
+     *
+     * The window closes on this CLOCK and on nothing else. No callback,
+     * no confirmation from the node, no sweeper: a rotation whose node
+     * never comes back still ends, on time, because every verification
+     * site compares against this instant. NULL (or an unparseable value)
+     * counts as EXPIRED, never as "no expiry" — the same fail-closed rule
+     * `credentialIssuedAtMs` applies to token age.
+     */
+    @PortableDateColumn({ nullable: true })
+    previousCredentialExpiresAt?: Date | null;
+
+    /**
+     * When the OWNER queued a rotation for this node
+     * (`POST /api/fleet/rotate-all`), or NULL.
+     *
+     * A request, not an act: the platform cannot rotate a credential the
+     * machine has to store, so this is a flag the node reads off its own
+     * heartbeat response and answers by calling
+     * `POST /api/fleet/rotate-credential`. Cleared by the rotation that
+     * satisfies it.
+     */
+    @PortableDateColumn({ nullable: true })
+    rotationRequestedAt?: Date | null;
+
+    /** Who queued that rotation. Raw uuid (EW-654); FK lives in the migration. */
+    @Column({ type: 'uuid', nullable: true })
+    rotationRequestedByUserId?: string | null;
 
     /** Capability tags ('terminal', 'workspace', 'docker', ...). */
     @Column({ type: 'simple-json' })

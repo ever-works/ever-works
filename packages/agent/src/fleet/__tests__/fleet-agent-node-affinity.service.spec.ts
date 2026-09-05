@@ -94,7 +94,17 @@ function ownedAgent(overrides: Partial<Agent> = {}): Agent {
 }
 
 function ownedNode(overrides: Partial<FleetNode> = {}): FleetNode {
-    return { id: NODE, userId: OWNER, ...overrides } as FleetNode;
+    return {
+        id: NODE,
+        userId: OWNER,
+        // Credential lifecycle (EW-799) — see the note on the sibling
+        // fixtures: `as FleetNode` hides a missing new column.
+        previousCredentialHash: null,
+        previousCredentialExpiresAt: null,
+        rotationRequestedAt: null,
+        rotationRequestedByUserId: null,
+        ...overrides,
+    } as FleetNode;
 }
 
 describe('FleetAgentNodeAffinityService', () => {

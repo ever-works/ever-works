@@ -33,6 +33,14 @@ export interface ConsumeEnrollmentPatch {
     cliVersion?: string | null;
     /** Free bytes on the node's workspace volume. */
     diskFreeBytes?: number | null;
+    /**
+     * Credential lifecycle (EW-799) — cleared to null on every enroll.
+     * A freshly enrolled machine must never inherit a dual-accept window
+     * from whatever the row was doing before, or a credential from a
+     * previous life would still authenticate against it.
+     */
+    previousCredentialHash?: string | null;
+    previousCredentialExpiresAt?: Date | null;
     /** Which account / seat the agent CLI is logged in as (EW-777). */
     modelIdentity?: string | null;
     /** What the node's worker reported doing at enroll time (EW-776). */
@@ -41,6 +49,24 @@ export interface ConsumeEnrollmentPatch {
     workerStateReason?: string | null;
     /** When that state was first observed — the enroll instant. */
     workerStateChangedAt?: Date | null;
+}
+
+/**
+ * Columns the node-initiated rotation CAS is allowed to stamp
+ * (EW-799). Narrow on purpose: a rotation re-keys and opens the
+ * dual-accept window, and nothing else — in particular it must never
+ * touch `status`, unlike the operator re-key, so a machine keeps
+ * working straight through its own rotation.
+ */
+export interface RotateCredentialPatch {
+    enrollmentTokenHash: string;
+    /** The hash being replaced — accepted until the expiry below. */
+    previousCredentialHash: string;
+    previousCredentialExpiresAt: Date;
+    credentialIssuedAt: Date;
+    /** Clears the owner's queued request, which this rotation satisfies. */
+    rotationRequestedAt: Date | null;
+    rotationRequestedByUserId: string | null;
 }
 
 /**
@@ -97,6 +123,52 @@ export class FleetNodeRepository {
             patch,
         );
         return (result.affected ?? 0) === 1;
+    }
+
+    /**
+     * CAS-rotate a node's credential (EW-799): the row must STILL carry
+     * the hash the node presented. Two simultaneous rotations therefore
+     * cannot both win — the loser matches zero rows and is refused with
+     * the same null a wrong credential gets, instead of leaving the
+     * machine holding a secret the row no longer knows.
+     *
+     * Note what is NOT in the predicate: `status`. A `paused` or
+     * `disabled` node may re-key itself, exactly as it may still beat —
+     * a drained machine must stay observable and must not be locked out
+     * of rotating.
+     */
+    async casRotateCredential(
+        id: string,
+        expectedCurrentHash: string,
+        patch: RotateCredentialPatch,
+    ): Promise<boolean> {
+        const result = await this.repository.update(
+            { id, enrollmentTokenHash: expectedCurrentHash },
+            patch,
+        );
+        return (result.affected ?? 0) === 1;
+    }
+
+    /**
+     * Mark every eligible node of one owner as needing a credential
+     * rotation, and return how many were marked.
+     *
+     * One owner-scoped UPDATE rather than a read-then-write loop: the
+     * marking is idempotent (re-queueing an already-queued node just
+     * refreshes the request), and a loop would be N round-trips to set a
+     * flag. Nodes still `enrolling` are excluded — they hold an
+     * unconsumed token, not a secret, so there is nothing to rotate.
+     */
+    async markRotationRequestedForUser(
+        userId: string,
+        requestedByUserId: string,
+        at: Date,
+    ): Promise<number> {
+        const result = await this.repository.update(
+            { userId, status: Not('enrolling') },
+            { rotationRequestedAt: at, rotationRequestedByUserId: requestedByUserId },
+        );
+        return result.affected ?? 0;
     }
 
     async update(id: string, patch: Partial<FleetNode>): Promise<void> {

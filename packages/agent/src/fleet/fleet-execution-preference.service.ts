@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     DEFAULT_FLEET_EXECUTION_MODE,
     FLEET_EXECUTION_SCOPE_TYPES,
@@ -12,6 +12,7 @@ import type {
     FleetExecutionScopeType,
 } from '@ever-works/contracts';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
+import { FleetAuditService } from './fleet-audit.service';
 import { FleetExecutionPreferenceRepository } from './fleet-execution-preference.repository';
 
 /** A UUID, loosely — the shape every platform id has. */
@@ -44,7 +45,13 @@ export interface SetFleetExecutionPreferenceInput {
 export class FleetExecutionPreferenceService {
     private readonly logger = new Logger(FleetExecutionPreferenceService.name);
 
-    constructor(private readonly repository: FleetExecutionPreferenceRepository) {}
+    constructor(
+        private readonly repository: FleetExecutionPreferenceRepository,
+        // APPENDED and @Optional(): existing constructions pass only the
+        // repository, and routing must never fail because bookkeeping is
+        // unavailable.
+        @Optional() private readonly audit?: FleetAuditService,
+    ) {}
 
     /** Every preference row this owner has configured. */
     async listForUser(userId: string): Promise<FleetExecutionPreferenceView[]> {
@@ -74,12 +81,27 @@ export class FleetExecutionPreferenceService {
             throw new BadRequestException('Unsupported execution mode');
         }
         const scopeId = normalizeScopeId(input.scopeType, input.scopeId);
+        // Read the existing row FIRST so the audit delta says what
+        // actually changed. Best-effort: a failed read must not stop the
+        // write, so `before` degrades to null rather than throwing.
+        const before = await this.findExisting(userId, input.scopeType, scopeId);
         const row = await this.repository.upsert({
             userId,
             organizationId: input.organizationId ?? null,
             scopeType: input.scopeType,
             scopeId,
             mode: input.mode,
+        });
+        // Act first, then audit (EW-799). No node id: a preference is an
+        // owner-level routing decision, not a per-machine one.
+        await this.audit?.recordNodeAction({
+            action: 'execution-preference.set',
+            actorUserId: userId,
+            ownerUserId: userId,
+            nodeId: null,
+            before: before ? { mode: before.mode } : null,
+            after: { mode: row.mode },
+            extra: { scopeType: input.scopeType, scopeId },
         });
         return toView(row);
     }
@@ -99,7 +121,48 @@ export class FleetExecutionPreferenceService {
                 `Scope must be one of: ${FLEET_EXECUTION_SCOPE_TYPES.join(', ')}`,
             );
         }
-        await this.repository.remove(userId, scopeType, normalizeScopeId(scopeType, scopeId));
+        const normalized = normalizeScopeId(scopeType, scopeId);
+        const before = await this.findExisting(userId, scopeType, normalized);
+        await this.repository.remove(userId, scopeType, normalized);
+        // Recorded even when there was nothing to remove: "someone asked
+        // this scope to inherit" is the decision, and a clear that found
+        // no row is exactly the case an operator later wonders about.
+        await this.audit?.recordNodeAction({
+            action: 'execution-preference.clear',
+            actorUserId: userId,
+            ownerUserId: userId,
+            nodeId: null,
+            before: before ? { mode: before.mode } : null,
+            after: null,
+            extra: { scopeType, scopeId: normalized, existed: before !== null },
+        });
+    }
+
+    /**
+     * The owner's row for one scope, or null. Never throws: it exists to
+     * enrich an audit delta, and a lookup hiccup must not cost the caller
+     * their write.
+     */
+    private async findExisting(
+        userId: string,
+        scopeType: FleetExecutionScopeType,
+        scopeId: string | null,
+    ): Promise<FleetExecutionPreference | null> {
+        try {
+            const rows = await this.repository.findByUser(userId);
+            return (
+                rows.find(
+                    (row) => row.scopeType === scopeType && (row.scopeId ?? null) === scopeId,
+                ) ?? null
+            );
+        } catch (err) {
+            this.logger.debug(
+                `Execution-preference audit delta unavailable for user ${userId}: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return null;
+        }
     }
 
     /**

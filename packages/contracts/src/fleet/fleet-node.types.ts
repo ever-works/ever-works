@@ -306,6 +306,16 @@ export interface FleetNodeView {
 	 * hundreds of beats that follow rather than resetting every 30s.
 	 */
 	workerStateChangedAt?: string | null;
+	/**
+	 * ISO instant at which the owner QUEUED a credential rotation for this
+	 * node (`POST /api/fleet/rotate-all`), or null when none is pending.
+	 *
+	 * A flag, not an instruction the platform can carry out: only the
+	 * machine can rotate its own credential, so this is what its next
+	 * heartbeat reads to decide to call `POST /api/fleet/rotate-credential`.
+	 * Cleared by the rotation that satisfies it.
+	 */
+	rotationRequestedAt?: string | null;
 }
 
 /**
@@ -359,6 +369,18 @@ export interface FleetHeartbeatRequest extends FleetNodeSelfDescription {
 export interface FleetHeartbeatResponse {
 	ok: true;
 	node: FleetNodeView;
+	/**
+	 * True when the owner has QUEUED a credential rotation for this node
+	 * (`POST /api/fleet/rotate-all`). The daemon answers by calling
+	 * `POST /api/fleet/rotate-credential` with the credential it is
+	 * holding; until it does, nothing changes and the node keeps working.
+	 *
+	 * Optional and additive on purpose: a daemon built before this field
+	 * existed ignores it and simply never self-rotates — its owner can
+	 * still re-key it the old way. Nothing breaks, which is the only way
+	 * to ship a protocol field to machines nobody can redeploy at once.
+	 */
+	rotationRequested?: boolean;
 }
 
 // ─── Protocol bounds (fixed) ────────────────────────────────────────────────
@@ -467,6 +489,67 @@ export const FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING = 128;
 
 /** Floor for the enrollment-token TTL — a zero-TTL token cannot be redeemed. */
 export const FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS = 30_000;
+
+/**
+ * Default DUAL-ACCEPT window for a node-initiated credential rotation
+ * (15 minutes, `FLEET_CREDENTIAL_ROTATION_OVERLAP_MS`).
+ *
+ * For this long after a node rotates itself, BOTH the new credential and
+ * the one it replaced authenticate. That overlap is what makes rotation
+ * survivable on a real machine: the daemon can finish the job it is
+ * holding, write the new secret to disk, restart, and only then stop
+ * needing the old one. A zero-overlap re-key (the operator-side
+ * `POST /api/fleet/nodes/:id/rotate`) kills the old secret instantly and
+ * therefore requires a human at the keyboard — which is exactly why
+ * credentials never rotated.
+ *
+ * The window closes on a CLOCK, not on a callback: the old credential
+ * stops being accepted when `previousCredentialExpiresAt` passes, whether
+ * or not the node ever confirms it stored the new one.
+ */
+export const FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS = 15 * 60_000;
+
+/**
+ * Floor for the rotation overlap. Below this a node could not finish a
+ * single HTTP round-trip plus a disk write inside the window, so the
+ * "bounded overlap" would be a re-key with extra steps.
+ */
+export const FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS = 30_000;
+
+/**
+ * Ceiling on the rotation overlap: 24 hours. Not a recommendation — it is
+ * the point past which "the old credential still works" stops being a
+ * handover window and becomes a second, permanent credential, which is
+ * the property rotation exists to remove.
+ */
+export const FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS = 24 * 60 * 60_000;
+
+/** Request body for the PUBLIC `POST /api/fleet/rotate-credential`. */
+export interface FleetNodeRotateCredentialRequest extends FleetNodeSelfDescription {
+	nodeId: string;
+	/** The node's CURRENT secret. A previous-window secret is refused. */
+	secret: string;
+}
+
+/**
+ * Response body for `POST /api/fleet/rotate-credential`.
+ *
+ * `secret` is the NEW credential and is returned exactly once — only its
+ * sha256 is stored, the same contract enroll has always had. The node
+ * must persist it before {@link FleetNodeRotateCredentialResponse.previousCredentialExpiresAt},
+ * after which the credential it presented here stops working.
+ */
+export interface FleetNodeRotateCredentialResponse {
+	ok: true;
+	nodeId: string;
+	/** The new node secret, returned exactly once. */
+	secret: string;
+	/** ISO instant the OLD credential stops being accepted. */
+	previousCredentialExpiresAt: string | null;
+	/** Seconds the old credential remains valid, for a node that cannot parse dates. */
+	overlapSec: number;
+	node: FleetNodeView;
+}
 
 /**
  * Floor for the offline sweep window. Below the node's own minimum
