@@ -448,4 +448,44 @@ export class FleetJobRepository {
         );
         return result.affected ?? 0;
     }
+
+    /**
+     * Fleet cost accounting (EW-777) — record the model spend a job's run
+     * reported. Written by the API-side reconciler once per completion,
+     * BEFORE the daily ceilings are evaluated, so the sums below include
+     * the job that just finished.
+     */
+    async stampCostCents(id: string, costCents: number): Promise<void> {
+        await this.repository.update({ id }, { costCents });
+    }
+
+    /**
+     * Cents one node's jobs reported since `since` — the per-node DAILY
+     * ceiling's input when `since` is the start of the UTC day. Completed
+     * jobs keep their `nodeId` (a drain only requeues ACTIVE claims), so
+     * the sum survives the drain it may trigger. Uses
+     * `idx_fleet_jobs_node_completed`. NULL costs (no model ran, or the CLI
+     * printed no price) sum as 0 here — the ceiling service fails closed on
+     * the current job's own null cost separately.
+     */
+    async sumCostCentsForNodeSince(nodeId: string, since: Date): Promise<number> {
+        const row = await this.repository
+            .createQueryBuilder('j')
+            .select('COALESCE(SUM(j.costCents), 0)', 'total')
+            .where('j.nodeId = :nodeId', { nodeId })
+            .andWhere('j.completedAt >= :since', { since })
+            .getRawOne<{ total: string | number | null }>();
+        return Number(row?.total ?? 0);
+    }
+
+    /** Cents every job of one owner reported since `since` — the FLEET-WIDE daily ceiling's input. */
+    async sumCostCentsForUserSince(userId: string, since: Date): Promise<number> {
+        const row = await this.repository
+            .createQueryBuilder('j')
+            .select('COALESCE(SUM(j.costCents), 0)', 'total')
+            .where('j.userId = :userId', { userId })
+            .andWhere('j.completedAt >= :since', { since })
+            .getRawOne<{ total: string | number | null }>();
+        return Number(row?.total ?? 0);
+    }
 }

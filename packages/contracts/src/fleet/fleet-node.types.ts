@@ -139,6 +139,22 @@ export interface FleetNodeSelfDescription {
 	 * server-side rather than stored.
 	 */
 	diskFreeBytes?: number;
+	/**
+	 * Fleet cost accounting (EW-777) — which account / seat the agent CLI
+	 * on this machine is logged in as, so the spend a run reports can be
+	 * attributed to the subscription that actually paid for it. A display
+	 * label only, e.g. `claude-code: user@example.com (Acme, max)` or
+	 * `codex: chatgpt`; NEVER a token or a credential.
+	 *
+	 * The platform records it and shows it. It does NOT decide whether a
+	 * PC should run under a dedicated seat or its owner's own login —
+	 * that is the founder's call, recorded as such in
+	 * `docs/internal/feat-fleet-cost-accounting-notes.md`.
+	 *
+	 * Same additive contract as {@link FleetNodeSelfDescription.cliVersion}.
+	 * Capped at {@link FLEET_MAX_MODEL_IDENTITY_LENGTH}.
+	 */
+	modelIdentity?: string;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -178,6 +194,51 @@ export interface FleetNodeView {
 	cliVersion?: string | null;
 	/** Free bytes last reported for the node's workspace volume, or null. */
 	diskFreeBytes?: number | null;
+	/**
+	 * Which account / seat the node's agent CLI last reported being logged
+	 * in as, or null when it never reported one. See
+	 * {@link FleetNodeSelfDescription.modelIdentity}.
+	 */
+	modelIdentity?: string | null;
+	/**
+	 * Per-node DAILY (UTC day) model-spend ceiling in cents, or null when
+	 * the node inherits the deployment default (`FLEET_NODE_DAILY_COST_CEILING_USD`,
+	 * itself unset by default = no ceiling). Crossing it drains the node.
+	 */
+	dailyCostCeilingCents?: number | null;
+	/**
+	 * The UTC day (`YYYY-MM-DD`) on which this node was last drained by
+	 * its daily ceiling, or null. A drained node stays `disabled` until
+	 * its owner re-enables it — a ceiling is a stop, not a rate limit.
+	 */
+	dailyCostTrippedOn?: string | null;
+}
+
+/**
+ * `GET /api/fleet/cost-ceiling` — the owner's FLEET-WIDE daily model-spend
+ * ceiling (every enrolled node of the account, summed per UTC day).
+ *
+ * Sums `fleet_jobs.costCents` only — the spend the owner's own machines
+ * reported — never the account's cloud spend or BYOK usage rows. Those
+ * have their own budgets; folding them in here would make one ceiling
+ * drain a fleet for money spent elsewhere.
+ */
+export interface FleetCostCeilingView {
+	/** Owner-set ceiling in cents; null = inherit the deployment default. */
+	dailyCeilingCents: number | null;
+	/**
+	 * The ceiling actually in force: the owner's, else the deployment
+	 * default (`FLEET_DAILY_COST_CEILING_USD`), else null (no ceiling).
+	 */
+	effectiveDailyCeilingCents: number | null;
+	/** Where the effective ceiling came from. */
+	source: 'owner' | 'default' | 'none';
+	/** The UTC day the fleet was last drained by this ceiling, or null. */
+	trippedOn: string | null;
+	/** Cents the fleet reported so far today (UTC), across every node. */
+	todaySpendCents: number;
+	/** The UTC day `todaySpendCents` covers (`YYYY-MM-DD`). */
+	day: string;
 }
 
 /** Request body for `POST /api/fleet/enroll`. */
@@ -220,6 +281,22 @@ export const FLEET_MAX_VERSION_LENGTH = 32;
  * `1.2.3 (Claude Code)` rather than a bare semver.
  */
 export const FLEET_MAX_CLI_VERSION_LENGTH = 64;
+
+/**
+ * `sanitizeText(modelIdentity, 200)` server-side. Wide enough for
+ * `<provider>: <email> (<organization>, <plan>)`; the node builds the
+ * label from whitelisted fields, so nothing longer is ever legitimate.
+ */
+export const FLEET_MAX_MODEL_IDENTITY_LENGTH = 200;
+
+/**
+ * Ceiling on a daily cost ceiling: $100,000 per UTC day, in cents. Not a
+ * plausible fleet spend — it is the point past which a figure is a typo
+ * (dollars entered as cents, or the reverse) rather than a decision, and
+ * the DTO / service refuse it so a mis-typed ceiling cannot silently be
+ * "no ceiling at all".
+ */
+export const FLEET_MAX_DAILY_COST_CEILING_CENTS = 100_000 * 100;
 
 /**
  * Ceiling on a reported `diskFreeBytes`, ~1 EiB. Not a real disk size —

@@ -257,6 +257,23 @@ describe('heartbeat', () => {
 		expect(body).not.toHaveProperty('diskFreeBytes');
 	});
 
+	it('carries the model identity onto the wire, and omits it when the probe had no answer', async () => {
+		// Fleet cost accounting (EW-777): `selfDescription` is an explicit
+		// whitelist, so a field it does not name is computed, logged and
+		// never sent — the exact way `cliVersion` was once lost.
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			modelIdentity: 'claude-code: ops@example.com (Acme, max)'
+		});
+		expect(JSON.parse(calls[0].init.body).modelIdentity).toBe('claude-code: ops@example.com (Acme, max)');
+
+		await client(fetchFn).heartbeat({ nodeId: NODE_ID, secret: SECRET });
+		expect(JSON.parse(calls[1].init.body)).not.toHaveProperty('modelIdentity');
+	});
+
 	it('reports a revoked/disabled node as unauthorized with an actionable message', async () => {
 		const { fetchFn } = fakeFetch(() => ({ status: 401 }));
 		const error = await client(fetchFn)

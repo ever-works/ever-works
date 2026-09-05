@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CapabilityEnvironment, CommandRunner } from './capabilities';
 import type { FetchLike } from './fleet-client';
 import { createLogger, type LogEntry } from './logger';
-import { clampHeartbeatInterval, createNodeRuntime, enrollNode, installShutdownHandlers } from './runtime';
+import {
+	buildSelfDescriptionTelemetry,
+	clampHeartbeatInterval,
+	createNodeRuntime,
+	enrollNode,
+	installShutdownHandlers
+} from './runtime';
 import { PUBLISH_FENCE_MARGIN_MS } from './worker-loop';
 import {
 	clampResourceLimits,
@@ -58,6 +64,38 @@ describe('clampHeartbeatInterval', () => {
 		expect(clampHeartbeatInterval(1)).toBe(MIN_HEARTBEAT_INTERVAL_MS);
 		expect(clampHeartbeatInterval(99_999_999)).toBe(MAX_HEARTBEAT_INTERVAL_MS);
 		expect(clampHeartbeatInterval(30_000)).toBe(30_000);
+	});
+});
+
+describe('buildSelfDescriptionTelemetry — model identity (fleet cost accounting, EW-777)', () => {
+	it('asks the SAME claude-code binary the agent-task step spawns which seat it is logged in as', async () => {
+		const run = vi.fn(async (command: string, args: string[]) => {
+			if (command === '/opt/claude' && args[0] === 'auth') {
+				return { code: 0, stdout: JSON.stringify({ loggedIn: true, email: 'ops@example.com' }), stderr: '' };
+			}
+			return { code: 127, stdout: '', stderr: '' };
+		});
+		const telemetry = buildSelfDescriptionTelemetry({
+			...io(async () => ({ ok: true, status: 200, text: async () => '{}' })).io,
+			runner: { run },
+			environment: { ...environment, modelCli: { 'claude-code': '/opt/claude' } }
+		});
+
+		await expect(telemetry.modelIdentity?.()).resolves.toBe('claude-code: ops@example.com');
+		expect(run).toHaveBeenCalledWith('/opt/claude', ['auth', 'status', '--json']);
+	});
+
+	it('does not spawn the CLI on every beat — the reading is cached', async () => {
+		const run = vi.fn(async () => ({ code: 0, stdout: JSON.stringify({ loggedIn: true }), stderr: '' }));
+		const telemetry = buildSelfDescriptionTelemetry({
+			...io(async () => ({ ok: true, status: 200, text: async () => '{}' })).io,
+			runner: { run }
+		});
+
+		await telemetry.modelIdentity?.();
+		await telemetry.modelIdentity?.();
+		await telemetry.modelIdentity?.();
+		expect(run).toHaveBeenCalledTimes(1);
 	});
 });
 

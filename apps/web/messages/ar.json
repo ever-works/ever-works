@@ -3230,7 +3230,9 @@
                     "load": "Load",
                     "cliVersion": "Agent CLI",
                     "diskFree": "Disk free",
-                    "cliNotInstalled": "Not installed"
+                    "cliNotInstalled": "Not installed",
+                    "billingIdentity": "Billing identity",
+                    "identityUnknown": "Not reported"
                 },
                 "empty": {
                     "title": "No nodes enrolled yet",
@@ -3414,6 +3416,32 @@
                     "queuedReasons": {
                         "waitingForRunner": "no runner can take it yet"
                     }
+                },
+                "costCeiling": {
+                    "title": "Daily cost ceiling",
+                    "description": "A stop on the model spend your own machines report per UTC day, summed across every node. Crossing it drains every node — no new work is leased and in-flight claims return to the queue — and files one Inbox notice. Drained nodes stay disabled until you re-enable them; raise the ceiling first if the spend was expected. The figure is the CLI's own estimate, billed to the seat each node is logged in as, never to platform credits.",
+                    "loading": "Loading the ceiling…",
+                    "effectiveLabel": "Ceiling in force",
+                    "noCeiling": "None",
+                    "sourceOwner": "Set by you",
+                    "sourceDefault": "Deployment default",
+                    "sourceNone": "No ceiling configured",
+                    "todaySpend": "Spend today ({day} UTC)",
+                    "trippedOn": "Last tripped",
+                    "inputLabel": "Fleet-wide ceiling per day (USD)",
+                    "inputPlaceholder": "e.g. 25.00 — leave empty for no ceiling",
+                    "hint": "Whole cents, at most $100,000 per day. Empty clears your value and falls back to the deployment default.",
+                    "save": "Save",
+                    "clear": "Clear",
+                    "saved": "Fleet cost ceiling saved",
+                    "cleared": "Fleet cost ceiling cleared",
+                    "invalid": "Enter a positive dollar amount up to 100000, or leave the field empty",
+                    "nodeTitle": "Daily cost ceiling for this node",
+                    "nodeHint": "Model spend this node may report per UTC day, in USD. Crossing it drains this node until you re-enable it. Empty inherits the deployment default. A ceiling on a node whose CLI reports no price (Codex) fails closed: the first completion drains it.",
+                    "nodeInherit": "Inherits the deployment default",
+                    "nodeTripped": "Drained by the ceiling on {day}",
+                    "nodeSaved": "Node cost ceiling saved",
+                    "nodeCleared": "Node cost ceiling cleared"
                 }
             },
             "jobRuntime": {

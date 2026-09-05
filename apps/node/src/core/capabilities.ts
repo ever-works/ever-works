@@ -286,6 +286,12 @@ export interface SelfDescriptionTelemetry {
 	cliVersion?: () => Promise<string | null> | string | null;
 	/** Free-disk probe for the node's workspace volume. */
 	diskFreeBytes?: () => Promise<number | null> | number | null;
+	/**
+	 * Which account / seat the agent CLI is logged in as (fleet cost
+	 * accounting, EW-777), e.g. `detectModelIdentity(runner, paths)`. A
+	 * display label, never a credential.
+	 */
+	modelIdentity?: () => Promise<string | null> | string | null;
 }
 
 /**
@@ -322,6 +328,10 @@ export async function describeSelf(
 	const diskFreeBytes = await resolveTelemetry(telemetry.diskFreeBytes);
 	if (typeof diskFreeBytes === 'number' && Number.isFinite(diskFreeBytes) && diskFreeBytes >= 0) {
 		description.diskFreeBytes = diskFreeBytes;
+	}
+	const modelIdentity = await resolveTelemetry(telemetry.modelIdentity);
+	if (typeof modelIdentity === 'string' && modelIdentity) {
+		description.modelIdentity = modelIdentity;
 	}
 	return description;
 }

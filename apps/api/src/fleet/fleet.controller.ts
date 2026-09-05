@@ -23,11 +23,13 @@ import type {
     FleetEnrollmentTokenView,
 } from '@ever-works/agent/fleet';
 import {
+    FleetCostCeilingService,
     FleetExecutionPreferenceService,
     FleetJobService,
     FleetService,
 } from '@ever-works/agent/fleet';
 import type {
+    FleetCostCeilingView,
     FleetEnrollResponse,
     FleetExecutionPreferenceView,
     FleetHeartbeatResponse,
@@ -47,6 +49,7 @@ import {
     FleetHeartbeatDto,
     FleetNodePauseDto,
     FleetUnenrollDto,
+    SetFleetCostCeilingDto,
     SetFleetExecutionPreferenceDto,
     UpdateFleetNodeDto,
 } from './dto/fleet.dto';
@@ -80,6 +83,9 @@ const NODE_HISTORY_LIMIT = 25;
  *   GET    /api/fleet/execution-preferences   local-vs-cloud routing rows
  *   PUT    /api/fleet/execution-preference    set one scope's routing
  *   DELETE /api/fleet/execution-preference    clear one scope's routing
+ *   GET    /api/fleet/cost-ceiling            fleet-wide daily model-spend
+ *                                             ceiling + today's spend
+ *   PUT    /api/fleet/cost-ceiling            set / clear that ceiling
  *
  * Public, self-authenticating (called by the node apps — throttled,
  * fail-closed: any invalid credential path is one undifferentiated
@@ -111,7 +117,32 @@ export class FleetController {
         private readonly jobs: FleetJobService,
         private readonly runners: FleetRunnerStatusService,
         private readonly preferences: FleetExecutionPreferenceService,
+        private readonly costCeiling: FleetCostCeilingService,
     ) {}
+
+    @Get('cost-ceiling')
+    @ApiOperation({
+        summary:
+            "This account's FLEET-WIDE daily (UTC) model-spend ceiling — the owner's value, the deployment default it falls back to, the day it last drained the fleet, and today's spend across every node. Sums only what the owner's own machines reported, never cloud spend.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async getCostCeiling(@CurrentUser() auth: AuthenticatedUser): Promise<FleetCostCeilingView> {
+        return this.costCeiling.describeForUser(auth.userId);
+    }
+
+    @Put('cost-ceiling')
+    @ApiOperation({
+        summary:
+            'Set (or clear, with null) the fleet-wide daily model-spend ceiling. Crossing it drains every node of the account until they are re-enabled — a stop, not a rate limit.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async setCostCeiling(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: SetFleetCostCeilingDto,
+    ): Promise<FleetCostCeilingView> {
+        return this.costCeiling.setFleetCeilingForUser(auth.userId, body.dailyCeilingCents);
+    }
 
     @Get('runner-status')
     @ApiOperation({
@@ -320,19 +351,31 @@ export class FleetController {
         @Body() body: UpdateFleetNodeDto,
     ): Promise<FleetNodeView> {
         // Reject only when NOTHING actionable arrived. Each field is an
-        // independent edit, so the guard has to name all four — dropping
+        // independent edit, so the guard has to name all five — dropping
         // one here would 400 a perfectly valid single-field PATCH.
         if (
             typeof body.name !== 'string' &&
             typeof body.disabled !== 'boolean' &&
             typeof body.paused !== 'boolean' &&
-            !Array.isArray(body.capabilities)
+            !Array.isArray(body.capabilities) &&
+            body.dailyCostCeilingCents === undefined
         ) {
-            throw new BadRequestException('Provide name, disabled, paused and/or capabilities');
+            throw new BadRequestException(
+                'Provide name, disabled, paused, capabilities and/or dailyCostCeilingCents',
+            );
         }
         let view: FleetNodeView | null = null;
         if (typeof body.name === 'string') {
             view = await this.service.renameForUser(auth.userId, id, body.name);
+        }
+        // Fleet cost accounting (EW-777): `null` is a value here (clear the
+        // ceiling), so the test is on `undefined`, never on truthiness.
+        if (body.dailyCostCeilingCents !== undefined) {
+            view = await this.service.setDailyCostCeilingForUser(
+                auth.userId,
+                id,
+                body.dailyCostCeilingCents,
+            );
         }
         if (Array.isArray(body.capabilities)) {
             // Writing tags pins them by default: an admin edit the
@@ -386,6 +429,7 @@ export class FleetController {
             capabilities: body.capabilities,
             cliVersion: body.cliVersion,
             diskFreeBytes: body.diskFreeBytes,
+            modelIdentity: body.modelIdentity,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -410,6 +454,7 @@ export class FleetController {
             capabilities: body.capabilities,
             cliVersion: body.cliVersion,
             diskFreeBytes: body.diskFreeBytes,
+            modelIdentity: body.modelIdentity,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

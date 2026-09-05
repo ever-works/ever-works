@@ -10,6 +10,7 @@ import {
     type CreateFleetEnrollmentTokenPayload,
     type CreateFleetEnrollmentTokenResponse,
     type FleetAgentNodeAffinityView,
+    type FleetCostCeilingView,
     type FleetEnrollmentTokenView,
     type FleetNodeDetailView,
     type FleetNodeDrainResult,
@@ -204,6 +205,41 @@ export async function drainFleetNodeAction(
             success: false,
             data: null,
             error: errorMessage(error, 'Failed to drain the node'),
+        };
+    }
+}
+
+/** Fleet cost accounting (EW-777) — the fleet-wide daily model-spend ceiling. */
+export async function getFleetCostCeilingAction(): Promise<
+    FleetActionResult<FleetCostCeilingView>
+> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.getCostCeiling();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to load the fleet cost ceiling'),
+        };
+    }
+}
+
+/** Set (or clear, with null) the fleet-wide daily model-spend ceiling. */
+export async function setFleetCostCeilingAction(
+    dailyCeilingCents: number | null,
+): Promise<FleetActionResult<FleetCostCeilingView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setCostCeiling(dailyCeilingCents);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to update the fleet cost ceiling'),
         };
     }
 }

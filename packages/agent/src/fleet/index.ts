@@ -13,8 +13,12 @@ export * from './fleet-execution-preference.service';
 export * from './fleet-execution-preference.repository';
 export * from './fleet-agent-node-affinity.service';
 export * from './fleet-agent-node-affinity.repository';
+// Fleet cost accounting (EW-777) — daily model-spend ceilings.
+export * from './fleet-cost-ceiling.service';
+export * from './fleet-cost-policy.repository';
 export * from './agent-fleet-tools';
 export { FleetNode } from '../entities/fleet-node.entity';
+export { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 export type { FleetNodeKind, FleetNodeStatus } from '../entities/fleet-node.entity';
 export { FleetJob } from '../entities/fleet-job.entity';
 export { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';

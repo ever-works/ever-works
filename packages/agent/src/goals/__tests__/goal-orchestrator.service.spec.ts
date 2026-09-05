@@ -563,6 +563,52 @@ describe('GoalOrchestratorService — spend rollup', () => {
         expect(dto.spentCents).toBe(425);
     });
 
+    it('counts a FLEET-executed run exactly like a cloud one (fleet cost accounting, EW-777)', async () => {
+        // A fleet run's `remoteRunId` is the fleet job id and its
+        // `costCents` is stamped by the same settlement the cloud path
+        // uses; the rollup reads the column and never asks who ran it.
+        const { service, tasks, runs } = build();
+        tasks._rows.push(
+            {
+                id: 'task-1',
+                goalId: 'g1',
+                slug: 'T-1',
+                title: 'a',
+                status: 'done',
+                createdAt: new Date(1),
+            },
+            {
+                id: 'task-2',
+                goalId: 'g1',
+                slug: 'T-2',
+                title: 'b',
+                status: 'done',
+                createdAt: new Date(2),
+            },
+        );
+        runs._rows.push(
+            {
+                id: 'r-cloud',
+                taskId: 'task-1',
+                status: 'completed',
+                remoteRunId: 'run_trigger_dev_1',
+                costCents: 100,
+                startedAt: new Date(1),
+            },
+            {
+                id: 'r-fleet',
+                taskId: 'task-2',
+                status: 'completed',
+                remoteRunId: '22222222-2222-4222-8222-222222222222',
+                costCents: 300,
+                startedAt: new Date(2),
+            },
+        );
+
+        const dto = await service.rollupSpend('u1', 'g1');
+        expect(dto.spentCents).toBe(400);
+    });
+
     it('treats a null cost as zero rather than NaN', async () => {
         const { service, tasks, runs } = build();
         tasks._rows.push({
@@ -790,6 +836,35 @@ describe('GoalOrchestratorService — advance', () => {
         expect(goals._rows[0].spentCents).toBe(400);
         expect(eventKinds(events)).toEqual(['limit']);
         expect(notifications.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('pauses the loop when FLEET spend alone reaches the cap (fleet cost accounting, EW-777)', async () => {
+        const { service, tasks, runs, goals } = build({
+            goal: { loopStatus: 'running', spendCapCents: 300, assignedAgentId: 'agent-7' },
+        });
+        tasks._rows.push({
+            id: 'task-1',
+            goalId: 'g1',
+            slug: 'T-1',
+            title: 'a',
+            status: 'done',
+            createdAt: new Date(1),
+        });
+        runs._rows.push({
+            id: 'r-fleet',
+            taskId: 'task-1',
+            status: 'completed',
+            // A fleet job id where a Trigger.dev run id would be.
+            remoteRunId: '22222222-2222-4222-8222-222222222222',
+            costCents: 300,
+            startedAt: new Date(1),
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('pause');
+        expect(result.reasonCode).toBe('spend-cap-exceeded');
+        expect(goals._rows[0].spentCents).toBe(300);
     });
 
     it('marks the loop done when every criterion is closed', async () => {

@@ -79,6 +79,10 @@ const NODE_EXPORTS = [
 	'FLEET_MAX_VERSION_LENGTH',
 	'FLEET_MAX_CLI_VERSION_LENGTH',
 	'FLEET_MAX_DISK_FREE_BYTES',
+	// Fleet cost accounting (EW-777): the billing-identity label cap and
+	// the daily-ceiling cap. Covered in `fleet-node.spec.ts`.
+	'FLEET_MAX_MODEL_IDENTITY_LENGTH',
+	'FLEET_MAX_DAILY_COST_CEILING_CENTS',
 	'FLEET_MIN_NODE_NAME_LENGTH',
 	'FLEET_MAX_NODE_NAME_LENGTH',
 	'FLEET_CREDENTIAL_MIN_LENGTH',
@@ -114,7 +118,14 @@ const AGENT_EXECUTION_EXPORTS = [
 	'FLEET_AGENT_EXECUTION_MAX_BUDGET_USD',
 	'FLEET_AGENT_EXECUTION_MODEL_PATTERN',
 	'FleetAgentExecutionError',
-	'normalizeFleetAgentModelExecution'
+	'normalizeFleetAgentModelExecution',
+	// Fleet cost accounting (EW-777): the one dollar → cents conversion
+	// and the bring-your-own usage-row tag. Covered in
+	// `fleet-agent-execution.spec.ts`.
+	'FLEET_BYO_MODEL_PLUGIN_ID_PREFIX',
+	'fleetModelCostUsdToCents',
+	'fleetModelPluginId',
+	'isFleetModelPluginId'
 ] as const;
 
 const RUNNER_STATUS_EXPORTS = [
@@ -178,6 +189,9 @@ const FUNCTION_EXPORTS = [
 	'isFleetAgentExecutionEffort',
 	'isFleetAgentExecutionPermissionMode',
 	'normalizeFleetAgentModelExecution',
+	'fleetModelCostUsdToCents',
+	'fleetModelPluginId',
+	'isFleetModelPluginId',
 	'FleetTaskWorkspaceMountError',
 	'normalizeFleetTaskWorkspaceMounts',
 	'isReservedMountDir',
@@ -197,12 +211,14 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 99 runtime symbols', () => {
+	it('exposes exactly these 105 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
+		// 92 → 98 with fleet cost accounting (EW-777): two node bounds and
+		// four cost-accounting helpers, each pinned in its own spec.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(99);
+		expect(Object.keys(fleet)).toHaveLength(105);
 	});
 
 	it.each([

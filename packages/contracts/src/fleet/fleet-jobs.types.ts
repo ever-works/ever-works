@@ -682,14 +682,96 @@ export interface FleetAgentTaskModelResult {
 	durationMs: number;
 	/** The CLI's final message (Claude Code `result`), when it produced one. */
 	summary: string | null;
-	/** Spend the CLI reported for this run, when it did. */
+	/**
+	 * Spend the CLI reported for this run, when it did.
+	 *
+	 * Fleet cost accounting (EW-777): this is the CLI's OWN estimate —
+	 * Claude Code prints `total_cost_usd` at API list price even when the
+	 * seat is a flat-rate subscription; Codex prints tokens but no price,
+	 * so a Codex run reports `null` here rather than an invented figure.
+	 * The platform records it as the run's cost (`plugin_usage_events` +
+	 * `agent_runs.costCents`) and evaluates daily ceilings against it; it
+	 * never debits platform credits for it (the seat is the owner's).
+	 */
 	costUsd?: number | null;
 	/** Model round-trips the CLI reported, when it did. */
 	turns?: number | null;
 	/** CLI session id, for a later resume. */
 	sessionId?: string | null;
+	/**
+	 * The model the CLI billed the bulk of this run to (e.g.
+	 * `claude-opus-4-1-20250805`), when the CLI reported one. Feeds the
+	 * per-model Costs panel next to the cloud runs' `modelId`.
+	 */
+	modelId?: string | null;
+	/** Prompt tokens the CLI reported (uncached input), when it did. */
+	inputTokens?: number | null;
+	/** Completion tokens the CLI reported, when it did. */
+	outputTokens?: number | null;
+	/**
+	 * Prompt tokens served from the provider's cache, when reported. For
+	 * Claude Code this is a bucket of its own (`input_tokens` excludes
+	 * cache traffic); for Codex it is the cached SHARE of `inputTokens`
+	 * (`cached_input_tokens` ⊆ `input_tokens`), so `totalTokens` never
+	 * counts it twice.
+	 */
+	cacheReadTokens?: number | null;
+	/** Prompt tokens written to the provider's cache, when reported. */
+	cacheCreationTokens?: number | null;
+	/**
+	 * Every token the run consumed, input + output + cache traffic. The
+	 * number `agent_runs.totalTokens` accumulates for a cloud run, so a
+	 * fleet run reads the same way in the run list.
+	 */
+	totalTokens?: number | null;
 	/** Last bytes of combined stdout/stderr, for the run report. */
 	outputTail?: string;
+}
+
+/**
+ * Fleet cost accounting (EW-777) — the ONE conversion from the CLI's
+ * dollar figure to the platform's cents.
+ *
+ * Shared by the node (which never converts — it forwards the CLI's
+ * number), the API reconciler (which records the usage row) and every
+ * spec, so nobody rounds differently. Half-cents round to the nearest
+ * cent (`Math.round`), matching how `PluginUsageService.record` already
+ * rounds the cloud facades' figures. Anything that is not a finite,
+ * non-negative number is `null` — "unknown", never "free": a ceiling
+ * evaluated against a null cost fails closed rather than permitting.
+ *
+ * The product is snapped to a micro-cent before rounding because the
+ * CLI's figure is a printed DECIMAL that JSON hands us as a binary
+ * double: `1.005 * 100` is `100.49999999999999` in IEEE-754 and a bare
+ * `Math.round` would bill 100 cents for a run the CLI priced at $1.005.
+ * Snapping first lets the decimal the CLI printed decide the cent.
+ */
+export function fleetModelCostUsdToCents(costUsd: unknown): number | null {
+	if (typeof costUsd !== 'number' || !Number.isFinite(costUsd) || costUsd < 0) return null;
+	return Math.round(Number((costUsd * 100).toFixed(6)));
+}
+
+/**
+ * `pluginId` prefix of the `plugin_usage_events` row a FLEET run leaves
+ * behind (`fleet-node:claude-code`, `fleet-node:codex`).
+ *
+ * A fleet run's model spend is billed to the CLI seat the node is logged
+ * in as, never to a platform-supplied provider key, so the row is tagged
+ * with a plugin id no real plugin can claim: the settlement recognises
+ * the prefix as bring-your-own (stamped on the run for visibility and
+ * ceilings, exempt from the credits debit), and the Costs dashboard
+ * groups it apart from the cloud providers.
+ */
+export const FLEET_BYO_MODEL_PLUGIN_ID_PREFIX = 'fleet-node:';
+
+/** The usage-row `pluginId` for one execution provider. */
+export function fleetModelPluginId(provider: FleetAgentExecutionProvider): string {
+	return `${FLEET_BYO_MODEL_PLUGIN_ID_PREFIX}${provider}`;
+}
+
+/** True for a usage row a fleet run wrote (see {@link FLEET_BYO_MODEL_PLUGIN_ID_PREFIX}). */
+export function isFleetModelPluginId(pluginId: unknown): boolean {
+	return typeof pluginId === 'string' && pluginId.startsWith(FLEET_BYO_MODEL_PLUGIN_ID_PREFIX);
 }
 
 /** What the node did with the working tree after the model ran. */

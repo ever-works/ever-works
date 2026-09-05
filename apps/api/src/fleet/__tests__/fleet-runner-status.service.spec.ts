@@ -17,6 +17,7 @@ const node = (overrides: Partial<FleetNodeView> = {}): FleetNodeView => ({
     capabilitiesPinned: false,
     cliVersion: 'claude 1.4.2',
     diskFreeBytes: 900_000_000,
+    modelIdentity: 'claude-code: ops@example.com (Acme, max)',
     ...overrides,
 });
 
@@ -93,6 +94,8 @@ describe('FleetRunnerStatusService', () => {
                 daemonVersion: '1.2.0',
                 cliVersion: 'claude 1.4.2',
                 diskFreeBytes: 900_000_000,
+                // Fleet cost accounting (EW-777): the seat the spend is billed to.
+                modelIdentity: 'claude-code: ops@example.com (Acme, max)',
                 busy: true,
                 activeJobCount: 1,
                 currentJobKind: 'agent-task',
