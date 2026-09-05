@@ -24,6 +24,7 @@ import {
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
+    FLEET_MAX_DAILY_COST_CEILING_CENTS,
     FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_MIN_NODE_OFFLINE_AFTER_MS,
 } from '@ever-works/contracts';
@@ -34,6 +35,21 @@ import {
     catalogPaygMaxMonthlyCapCredits,
 } from '../subscriptions/billing/stripe-catalog';
 type AppType = 'cli' | 'api';
+
+/**
+ * Fleet cost accounting (EW-777) — parse a dollar env var into whole
+ * cents, or null when unset. Unlike the clamped knobs, a nonsense value
+ * (non-numeric, zero, negative, above the contract cap) is `null` = "no
+ * ceiling", NOT a clamped one: a ceiling nobody typed correctly must not
+ * silently become a ceiling nobody chose. The service logs which value is
+ * in force, and the settings page shows it.
+ */
+function usdEnvToCents(raw: string | undefined): number | null {
+    const usd = parseFloat(raw || '');
+    if (!Number.isFinite(usd) || usd <= 0) return null;
+    const cents = Math.round(usd * 100);
+    return cents >= 1 && cents <= FLEET_MAX_DAILY_COST_CEILING_CENTS ? cents : null;
+}
 
 /**
  * Parse an integer env var into a clamped range, falling back to
@@ -472,6 +488,27 @@ export const config = {
                 1,
                 FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
             );
+        },
+        /**
+         * Fleet cost accounting (EW-777) — deployment-default DAILY (UTC
+         * day) model-spend ceiling for ONE node, in cents, or null for no
+         * ceiling. `FLEET_NODE_DAILY_COST_CEILING_USD`; a node's own
+         * `dailyCostCeilingCents` column overrides it. Unset (the default)
+         * means no ceiling and zero behaviour change — enabling one is an
+         * explicit decision, and crossing it DRAINS the node until its
+         * owner re-enables it.
+         */
+        getDefaultNodeDailyCostCeilingCents(): number | null {
+            return usdEnvToCents(process.env.FLEET_NODE_DAILY_COST_CEILING_USD);
+        },
+        /**
+         * Deployment-default FLEET-WIDE daily ceiling (every node of one
+         * owner, summed), in cents, or null. `FLEET_DAILY_COST_CEILING_USD`;
+         * the owner's `fleet_cost_policies` row overrides it. Same
+         * unset-means-none rule as the per-node default.
+         */
+        getDefaultFleetDailyCostCeilingCents(): number | null {
+            return usdEnvToCents(process.env.FLEET_DAILY_COST_CEILING_USD);
         },
     },
 

@@ -53,6 +53,11 @@ export interface FleetRunnerNodeView {
 	/** Free bytes on the node's workspace volume. */
 	diskFreeBytes: number | null;
 	/**
+	 * Which account / seat the machine's agent CLI is logged in as (a
+	 * display label, never a credential), or null when never reported.
+	 */
+	modelIdentity: string | null;
+	/**
 	 * True when the node currently holds at least one live job claim.
 	 *
 	 * Deliberately NOT a {@link FleetNodeStatus} value: busy is a

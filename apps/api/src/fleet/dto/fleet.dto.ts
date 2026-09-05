@@ -20,7 +20,9 @@ import {
     FLEET_EXECUTION_MODES,
     FLEET_EXECUTION_SCOPE_TYPES,
     FLEET_MAX_CLI_VERSION_LENGTH,
+    FLEET_MAX_DAILY_COST_CEILING_CENTS,
     FLEET_MAX_DISK_FREE_BYTES,
+    FLEET_MAX_MODEL_IDENTITY_LENGTH,
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
@@ -121,6 +123,49 @@ export class UpdateFleetNodeDto {
     @IsOptional()
     @IsBoolean()
     capabilitiesPinned?: boolean;
+
+    /**
+     * Fleet cost accounting (EW-777) — this node's DAILY (UTC) model-spend
+     * ceiling in cents. `null` clears it back to the deployment default;
+     * absent leaves it alone. Crossing it drains the node until its owner
+     * re-enables it. Re-validated in `FleetService`, the source of truth.
+     */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        minimum: 1,
+        maximum: FLEET_MAX_DAILY_COST_CEILING_CENTS,
+        description:
+            'Daily (UTC day) model-spend ceiling for this node, in cents; null clears it (inherit the deployment default). Crossing it drains the node until you re-enable it.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(FLEET_MAX_DAILY_COST_CEILING_CENTS)
+    dailyCostCeilingCents?: number | null;
+}
+
+/**
+ * Request body for `PUT /api/fleet/cost-ceiling` — the owner's FLEET-WIDE
+ * daily model-spend ceiling (fleet cost accounting, EW-777).
+ *
+ * `null` is a value here, not an omission: it clears the owner's ceiling
+ * back to the deployment default, so it is validated with `ValidateIf`
+ * rather than skipped by `IsOptional`.
+ */
+export class SetFleetCostCeilingDto {
+    @ApiProperty({
+        nullable: true,
+        minimum: 1,
+        maximum: FLEET_MAX_DAILY_COST_CEILING_CENTS,
+        description:
+            'Daily (UTC day) model-spend ceiling across every node of this account, in cents; null clears it (inherit the deployment default). Crossing it drains every node until you re-enable them.',
+    })
+    @ValidateIf((dto: SetFleetCostCeilingDto) => dto.dailyCeilingCents !== null)
+    @IsInt()
+    @Min(1)
+    @Max(FLEET_MAX_DAILY_COST_CEILING_CENTS)
+    dailyCeilingCents: number | null;
 }
 
 /**
@@ -202,6 +247,23 @@ export class FleetNodeSelfDescriptionDto {
     @Min(0)
     @Max(FLEET_MAX_DISK_FREE_BYTES)
     diskFreeBytes?: number;
+
+    /**
+     * Fleet cost accounting (EW-777) — which account / seat the agent CLI
+     * is logged in as, as a display label (`claude-code: user@example.com
+     * (Acme, max)`). Never a credential. Same optional, leave-alone-when-
+     * absent contract as `cliVersion`.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_MAX_MODEL_IDENTITY_LENGTH,
+        description:
+            'Which account/seat the agent CLI on the node is logged in as (display label, never a credential).',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_MAX_MODEL_IDENTITY_LENGTH)
+    modelIdentity?: string;
 }
 
 /**

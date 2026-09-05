@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FleetNode } from '../../entities/fleet-node.entity';
 import { FleetService } from '../fleet.service';
 
@@ -23,6 +24,9 @@ const node = (overrides: Partial<FleetNode> = {}): FleetNode =>
         version: '1.0.0',
         cliVersion: null,
         diskFreeBytes: null,
+        modelIdentity: null,
+        dailyCostCeilingCents: null,
+        dailyCostTrippedOn: null,
         createdAt: new Date(),
         ...overrides,
     }) as FleetNode;
@@ -228,6 +232,147 @@ describe('FleetService node telemetry', () => {
             const [view] = await service.listEnrolledForUser('user-1');
 
             expect(view.diskFreeBytes).toBeNull();
+        });
+    });
+
+    describe('model identity (fleet cost accounting, EW-777)', () => {
+        const IDENTITY = 'claude-code: ops@example.com (Acme, max)';
+
+        it('stores the seat a NEW daemon reports and exposes it on the view', async () => {
+            const service = build();
+
+            const result = await service.heartbeat(NODE_ID, SECRET, { modelIdentity: IDENTITY });
+
+            expect(repository.update.mock.calls[0][1].modelIdentity).toBe(IDENTITY);
+            expect(result?.node.modelIdentity).toBe(IDENTITY);
+        });
+
+        it('leaves the stored seat alone when a beat omits it (older daemon, transient probe miss)', async () => {
+            repository.findById.mockResolvedValue(node({ modelIdentity: IDENTITY }));
+            const service = build();
+
+            const result = await service.heartbeat(NODE_ID, SECRET, { cliVersion: 'claude 1.4.2' });
+
+            expect(repository.update.mock.calls[0][1]).not.toHaveProperty('modelIdentity');
+            expect(result?.node.modelIdentity).toBe(IDENTITY);
+        });
+
+        it('ignores a blank seat and truncates an over-long one to the contract cap', async () => {
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, { modelIdentity: '   ' });
+            expect(repository.update.mock.calls[0][1]).not.toHaveProperty('modelIdentity');
+
+            await service.heartbeat(NODE_ID, SECRET, { modelIdentity: 'x'.repeat(500) });
+            expect(repository.update.mock.calls[1][1].modelIdentity).toHaveLength(200);
+        });
+
+        it('never stores a credential-shaped seat verbatim — the wire is untrusted', async () => {
+            // The daemon whitelists what it sends; a tampered one need not.
+            // The label is listed, frozen into usage metadata and quoted in
+            // notices, so a token in it would be a token in four places.
+            const service = build();
+            const token = `sk-ant-api03-${'a'.repeat(40)}`;
+
+            await service.heartbeat(NODE_ID, SECRET, { modelIdentity: `claude-code: ${token}` });
+            const stored = repository.update.mock.calls[0][1].modelIdentity as string;
+            expect(stored).not.toContain(token);
+            expect(stored).toContain('[redacted secret]');
+            expect(stored.length).toBeLessThanOrEqual(200);
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                modelIdentity: `codex: Bearer ${'b'.repeat(32)}`,
+            });
+            expect(repository.update.mock.calls[1][1].modelIdentity).not.toContain('b'.repeat(32));
+        });
+
+        it('writes the seat (or null) onto the fresh row at enroll', async () => {
+            const token = 'd'.repeat(43);
+            repository.findByCredentialHash.mockResolvedValue(
+                node({
+                    status: 'enrolling',
+                    enrollmentTokenHash: sha256(token),
+                    credentialIssuedAt: new Date(),
+                }),
+            );
+            const service = build();
+
+            await service.enroll(token, { modelIdentity: 'codex: chatgpt' });
+            expect(repository.consumeEnrollment.mock.calls[0][2].modelIdentity).toBe(
+                'codex: chatgpt',
+            );
+
+            repository.findByCredentialHash.mockResolvedValue(
+                node({
+                    status: 'enrolling',
+                    enrollmentTokenHash: sha256(token),
+                    credentialIssuedAt: new Date(),
+                }),
+            );
+            await service.enroll(token, {});
+            expect(repository.consumeEnrollment.mock.calls[1][2].modelIdentity).toBeNull();
+        });
+
+        it('never exposes a seat for a node that reported none', async () => {
+            repository.findByUser.mockResolvedValue([node()]);
+            const [view] = await build().listEnrolledForUser('user-1');
+            expect(view.modelIdentity).toBeNull();
+        });
+    });
+
+    describe('per-node daily cost ceiling (fleet cost accounting, EW-777)', () => {
+        it('sets a whole-cent ceiling, owner-scoped, and re-arms the one-notice marker', async () => {
+            repository.findById.mockResolvedValue(node({ dailyCostTrippedOn: '2026-09-04' }));
+            const service = build();
+
+            const view = await service.setDailyCostCeilingForUser('user-1', NODE_ID, 2_500);
+
+            // A raised ceiling crossed again on the same day is NEWS — left
+            // set, the day's marker would make that second crossing drain
+            // the node in silence.
+            expect(repository.update).toHaveBeenCalledWith(NODE_ID, {
+                dailyCostCeilingCents: 2_500,
+                dailyCostTrippedOn: null,
+            });
+            expect(view.dailyCostCeilingCents).toBe(2_500);
+            expect(view.dailyCostTrippedOn).toBeNull();
+        });
+
+        it('clears the ceiling with null (back to the deployment default)', async () => {
+            repository.findById.mockResolvedValue(node({ dailyCostCeilingCents: 2_500 }));
+            const service = build();
+
+            const view = await service.setDailyCostCeilingForUser('user-1', NODE_ID, null);
+
+            expect(repository.update).toHaveBeenCalledWith(NODE_ID, {
+                dailyCostCeilingCents: null,
+                dailyCostTrippedOn: null,
+            });
+            expect(view.dailyCostCeilingCents).toBeNull();
+        });
+
+        it.each([
+            ['zero', 0],
+            ['negative', -100],
+            ['fractional cents', 12.5],
+            ['above the contract cap', 10_000_001],
+            ['a string', '2500'],
+        ])('refuses %s rather than clamping it', async (_label, value) => {
+            const service = build();
+
+            await expect(
+                service.setDailyCostCeilingForUser('user-1', NODE_ID, value as number),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(repository.update).not.toHaveBeenCalled();
+        });
+
+        it("treats another owner's node as missing", async () => {
+            repository.findById.mockResolvedValue(node({ userId: 'someone-else' }));
+            const service = build();
+
+            await expect(
+                service.setDailyCostCeilingForUser('user-1', NODE_ID, 100),
+            ).rejects.toBeInstanceOf(NotFoundException);
         });
     });
 

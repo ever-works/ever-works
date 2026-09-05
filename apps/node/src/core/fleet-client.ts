@@ -349,6 +349,9 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	if (source.diskFreeBytes !== undefined) {
 		out.diskFreeBytes = source.diskFreeBytes;
 	}
+	if (source.modelIdentity !== undefined) {
+		out.modelIdentity = source.modelIdentity;
+	}
 	return out;
 }
 

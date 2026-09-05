@@ -144,6 +144,7 @@ import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.e
 
 import { FleetJob } from '../entities/fleet-job.entity';
 import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
+import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
 import { McpServerConnection } from '../entities/mcp-server-connection.entity';
 import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
@@ -363,6 +364,9 @@ export const ENTITIES = [
     // Fleet local-runner routing — per Work / Goal / account preference
     // for local-runner vs cloud execution.
     FleetExecutionPreference,
+    // Fleet cost accounting (EW-777) — per-owner fleet-wide daily
+    // model-spend ceiling + its one-notice trip marker.
+    FleetCostPolicy,
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,

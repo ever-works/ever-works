@@ -22,6 +22,7 @@ import { serverFetch, serverMutation } from './server-api';
  */
 import type {
     FleetAgentNodeAffinityView,
+    FleetCostCeilingView,
     FleetNodeDetailView,
     FleetNodeDrainResult,
     FleetEnrollmentTokenView,
@@ -33,6 +34,7 @@ import type {
 
 export type {
     FleetAgentNodeAffinityView,
+    FleetCostCeilingView,
     FleetJobKind,
     FleetJobStatus,
     FleetJobView,
@@ -81,6 +83,12 @@ export interface UpdateFleetNodePayload {
     capabilities?: string[];
     /** `false` hands tag ownership back to the node's heartbeats. */
     capabilitiesPinned?: boolean;
+    /**
+     * Fleet cost accounting (EW-777) — this node's daily (UTC) model-spend
+     * ceiling in cents; `null` clears it back to the deployment default.
+     * Crossing it drains the node until it is re-enabled.
+     */
+    dailyCostCeilingCents?: number | null;
 }
 
 export interface SetFleetExecutionPreferencePayload {
@@ -197,6 +205,25 @@ export const fleetAPI = {
             endpoint: `${BASE}/nodes/${nodeId}/drain`,
             data: { drain },
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Fleet cost accounting (EW-777) — the account's fleet-wide daily
+     * model-spend ceiling, with the deployment default it falls back to
+     * and today's spend across every node.
+     */
+    getCostCeiling: async () => {
+        return serverFetch<FleetCostCeilingView>(`${BASE}/cost-ceiling`);
+    },
+
+    /** `null` clears the owner's ceiling back to the deployment default. */
+    setCostCeiling: async (dailyCeilingCents: number | null) => {
+        return serverMutation<FleetCostCeilingView>({
+            endpoint: `${BASE}/cost-ceiling`,
+            data: { dailyCeilingCents },
+            method: 'PUT',
             wrapInData: false,
         });
     },

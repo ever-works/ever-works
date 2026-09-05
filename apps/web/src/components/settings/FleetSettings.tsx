@@ -46,6 +46,7 @@ import {
     updateFleetNodeAction,
 } from '@/app/actions/settings/fleet';
 import { formatBytes } from '@/components/dashboard/runner-status.shared';
+import { FleetCostCeiling } from './FleetCostCeiling';
 import { FleetEnrollHandoff } from './FleetEnrollHandoff';
 import { FleetExecutionPreferences } from './FleetExecutionPreferences';
 import { FleetNodeDrawer } from './FleetNodeDrawer';
@@ -322,6 +323,29 @@ export function FleetSettings({
         });
     };
 
+    /** Fleet cost accounting (EW-777): the per-node daily ceiling, in cents; null clears it. */
+    const handleSaveCostCeiling = (dailyCostCeilingCents: number | null) => {
+        const target = drawerNode;
+        if (!target) return;
+        startTransition(async () => {
+            const result = await updateFleetNodeAction(target.id, { dailyCostCeilingCents });
+            if (result.success) {
+                setNodes((prev) =>
+                    prev.map((entry) => (entry.id === target.id ? result.data : entry)),
+                );
+                setDrawerNode(result.data);
+                setDrawerDetail((prev) => (prev ? { ...prev, node: result.data } : prev));
+                toast.success(
+                    dailyCostCeilingCents === null
+                        ? t('costCeiling.nodeCleared')
+                        : t('costCeiling.nodeSaved'),
+                );
+            } else {
+                toast.error(result.error);
+            }
+        });
+    };
+
     const handleDrain = (drain: boolean) => {
         const target = drawerNode;
         if (!target) return;
@@ -418,6 +442,9 @@ export function FleetSettings({
                                     {t('table.cliVersion')}
                                 </th>
                                 <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                    {t('table.billingIdentity')}
+                                </th>
+                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
                                     {t('table.diskFree')}
                                 </th>
                                 <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
@@ -475,6 +502,18 @@ export function FleetSettings({
                                         data-testid={`fleet-node-cli-${node.id}`}
                                     >
                                         {node.cliVersion ?? t('table.cliNotInstalled')}
+                                    </td>
+                                    {/* Fleet cost accounting (EW-777): which
+                                        seat this machine's spend is billed
+                                        to — observed and shown here; which
+                                        seat it SHOULD be is the founder's
+                                        call, not the table's. */}
+                                    <td
+                                        className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
+                                        data-testid={`fleet-node-identity-${node.id}`}
+                                        title={node.modelIdentity ?? undefined}
+                                    >
+                                        {node.modelIdentity ?? t('table.identityUnknown')}
                                     </td>
                                     <td
                                         className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
@@ -596,6 +635,8 @@ export function FleetSettings({
                 initialPreferences={initialPreferences}
                 error={preferencesError}
             />
+
+            <FleetCostCeiling />
 
             <FleetTokensSection
                 tokens={tokens}
@@ -782,6 +823,7 @@ export function FleetSettings({
                     setDrawerError(null);
                 }}
                 onSaveCapabilities={handleSaveCapabilities}
+                onSaveCostCeiling={handleSaveCostCeiling}
                 onRotate={handleRotate}
                 onDrain={handleDrain}
             />

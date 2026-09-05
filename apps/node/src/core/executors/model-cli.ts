@@ -335,6 +335,22 @@ interface ClaudeResultEnvelope {
 	num_turns?: unknown;
 	session_id?: unknown;
 	duration_ms?: unknown;
+	/**
+	 * Fleet cost accounting (EW-777): Claude Code's `--output-format json`
+	 * result carries the run's token counts (`usage`) and a per-model
+	 * breakdown (`modelUsage`, keyed by model id, each with its own tokens
+	 * and `costUSD`). Both used to be dropped on the floor here.
+	 */
+	usage?: unknown;
+	modelUsage?: unknown;
+}
+
+/** Token counts a CLI reported for one run, normalised across providers. */
+interface ModelTokenUsage {
+	inputTokens: number | null;
+	outputTokens: number | null;
+	cacheReadTokens: number | null;
+	cacheCreationTokens: number | null;
 }
 
 function tail(text: string): string {
@@ -343,6 +359,87 @@ function tail(text: string): string {
 
 function finiteNumber(value: unknown): number | null {
 	return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** A token count: a finite, non-negative number, floored. Anything else is "not reported". */
+function tokenCount(value: unknown): number | null {
+	const parsed = finiteNumber(value);
+	return parsed === null || parsed < 0 ? null : Math.floor(parsed);
+}
+
+/**
+ * Sum of the reported token buckets, or null when the CLI reported none
+ * of them.
+ *
+ * `cacheInsideInput` says how the provider counts cached prompt tokens.
+ * Claude Code reports them as buckets of their own (`input_tokens`
+ * EXCLUDES cache reads and cache writes), so every bucket is added.
+ * Codex / OpenAI usage reports `cached_input_tokens` as a SUBSET of
+ * `input_tokens`, so adding it again would bill the cache twice — for
+ * that shape only input + output are summed.
+ */
+function totalTokensOf(usage: ModelTokenUsage, cacheInsideInput: boolean): number | null {
+	const buckets = cacheInsideInput
+		? [usage.inputTokens, usage.outputTokens]
+		: [usage.inputTokens, usage.outputTokens, usage.cacheReadTokens, usage.cacheCreationTokens];
+	const parts = buckets.filter((part): part is number => part !== null);
+	return parts.length === 0 ? null : parts.reduce((sum, part) => sum + part, 0);
+}
+
+/** The optional token / model fields of a {@link FleetAgentTaskModelResult}, only the ones that were reported. */
+function tokenFields(
+	usage: ModelTokenUsage,
+	modelId: string | null,
+	cacheInsideInput = false
+): Partial<FleetAgentTaskModelResult> {
+	const out: Partial<FleetAgentTaskModelResult> = {};
+	if (modelId) out.modelId = modelId;
+	if (usage.inputTokens !== null) out.inputTokens = usage.inputTokens;
+	if (usage.outputTokens !== null) out.outputTokens = usage.outputTokens;
+	if (usage.cacheReadTokens !== null) out.cacheReadTokens = usage.cacheReadTokens;
+	if (usage.cacheCreationTokens !== null) out.cacheCreationTokens = usage.cacheCreationTokens;
+	const total = totalTokensOf(usage, cacheInsideInput);
+	if (total !== null) out.totalTokens = total;
+	return out;
+}
+
+/**
+ * Claude Code's `usage` block: `input_tokens`, `output_tokens`,
+ * `cache_read_input_tokens`, `cache_creation_input_tokens`.
+ */
+function parseClaudeUsage(raw: unknown): ModelTokenUsage {
+	const usage = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+	return {
+		inputTokens: tokenCount(usage.input_tokens),
+		outputTokens: tokenCount(usage.output_tokens),
+		cacheReadTokens: tokenCount(usage.cache_read_input_tokens),
+		cacheCreationTokens: tokenCount(usage.cache_creation_input_tokens)
+	};
+}
+
+/**
+ * The model that carried the bulk of the run, from Claude Code's
+ * `modelUsage` map (`{ [modelId]: { inputTokens, outputTokens, costUSD, … } }`).
+ *
+ * A run routinely touches two models (the main model plus a fast one for
+ * summaries / tool-result compaction); the row on the Costs dashboard
+ * should name the one the money went to. Ranked by `costUSD`, then by
+ * output tokens when no cost is reported, then by key order — so the
+ * answer is deterministic whatever the CLI prints.
+ */
+function dominantClaudeModel(raw: unknown): string | null {
+	if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+	let best: { id: string; cost: number; output: number } | null = null;
+	for (const [id, entry] of Object.entries(raw as Record<string, unknown>)) {
+		if (!id.trim() || !entry || typeof entry !== 'object') continue;
+		const stats = entry as Record<string, unknown>;
+		const cost = finiteNumber(stats.costUSD) ?? -1;
+		const output = tokenCount(stats.outputTokens) ?? -1;
+		if (!best || cost > best.cost || (cost === best.cost && output > best.output)) {
+			best = { id, cost, output };
+		}
+	}
+	return best?.id ?? null;
 }
 
 function nonEmptyString(value: unknown): string | null {
@@ -467,6 +564,10 @@ function parseModelCliOutcome(
 				costUsd: finiteNumber(envelope.total_cost_usd),
 				turns: finiteNumber(envelope.num_turns),
 				sessionId: nonEmptyString(envelope.session_id),
+				// Fleet cost accounting (EW-777): tokens and the billed model
+				// travel with the cost, so the run row and the Costs dashboard
+				// read a fleet run exactly like a cloud one.
+				...tokenFields(parseClaudeUsage(envelope.usage), dominantClaudeModel(envelope.modelUsage)),
 				...(summary ? {} : { outputTail: combinedTail })
 			};
 		}
@@ -477,6 +578,12 @@ function parseModelCliOutcome(
 				...base,
 				summary: parsed.summary,
 				sessionId: parsed.sessionId,
+				// Codex prints tokens but no price. `costUsd` stays ABSENT
+				// (unknown) rather than 0 (free): a daily ceiling evaluated
+				// against it fails closed instead of waving the run through.
+				// Its `cached_input_tokens` sit INSIDE `input_tokens`, so the
+				// total is input + output (see `totalTokensOf`).
+				...tokenFields(parsed.usage, null, true),
 				...(parsed.summary ? {} : { outputTail: combinedTail })
 			};
 		}
@@ -524,13 +631,29 @@ function parseClaudeEnvelope(output: string): ClaudeResultEnvelope | null {
 	return null;
 }
 
-/** Codex `exec --json` prints JSONL events; the last agent message is the summary. */
-function parseCodexEvents(output: string): { summary: string | null; sessionId: string | null } | null {
+/**
+ * Codex `exec --json` prints JSONL events; the last agent message is the
+ * summary, and every `turn.completed` carries that turn's `usage`
+ * (`input_tokens`, `cached_input_tokens`, `output_tokens`), summed here
+ * across the run. `cached_input_tokens` is the cached share OF
+ * `input_tokens` (OpenAI usage semantics), kept as `cacheReadTokens` for
+ * the record but never added on top. Codex reports no price — see the
+ * caller.
+ */
+function parseCodexEvents(
+	output: string
+): { summary: string | null; sessionId: string | null; usage: ModelTokenUsage } | null {
 	const lines = output.split(/\r?\n/).filter((line) => line.trim());
 	if (lines.length === 0) return null;
 	let summary: string | null = null;
 	let sessionId: string | null = null;
 	let sawEvent = false;
+	const usage: ModelTokenUsage = {
+		inputTokens: null,
+		outputTokens: null,
+		cacheReadTokens: null,
+		cacheCreationTokens: null
+	};
 	for (const line of lines) {
 		let event: Record<string, unknown>;
 		try {
@@ -547,6 +670,18 @@ function parseCodexEvents(output: string): { summary: string | null; sessionId: 
 		if (event.type === 'item.completed' && item && item.type === 'agent_message' && typeof item.text === 'string') {
 			summary = item.text;
 		}
+		if (event.type === 'turn.completed' && event.usage && typeof event.usage === 'object') {
+			const turn = event.usage as Record<string, unknown>;
+			usage.inputTokens = addTokens(usage.inputTokens, tokenCount(turn.input_tokens));
+			usage.cacheReadTokens = addTokens(usage.cacheReadTokens, tokenCount(turn.cached_input_tokens));
+			usage.outputTokens = addTokens(usage.outputTokens, tokenCount(turn.output_tokens));
+		}
 	}
-	return sawEvent ? { summary, sessionId } : null;
+	return sawEvent ? { summary, sessionId, usage } : null;
+}
+
+/** `null + null` stays "not reported"; a reported count joins a running sum. */
+function addTokens(sum: number | null, delta: number | null): number | null {
+	if (delta === null) return sum;
+	return (sum ?? 0) + delta;
 }

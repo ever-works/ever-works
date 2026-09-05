@@ -22,6 +22,9 @@ jest.mock('../../entities/fleet-job.entity', () => ({
 jest.mock('../../entities/fleet-execution-preference.entity', () => ({
     FleetExecutionPreference: class FleetExecutionPreference {},
 }));
+jest.mock('../../entities/fleet-cost-policy.entity', () => ({
+    FleetCostPolicy: class FleetCostPolicy {},
+}));
 jest.mock('../../entities/agent.entity', () => ({
     Agent: class Agent {},
 }));
@@ -58,6 +61,12 @@ jest.mock('../fleet-execution-preference.service', () => ({
 jest.mock('../fleet-agent-node-affinity.service', () => ({
     FleetAgentNodeAffinityService: class FleetAgentNodeAffinityService {},
 }));
+jest.mock('../fleet-cost-policy.repository', () => ({
+    FleetCostPolicyRepository: class FleetCostPolicyRepository {},
+}));
+jest.mock('../fleet-cost-ceiling.service', () => ({
+    FleetCostCeilingService: class FleetCostCeilingService {},
+}));
 
 import 'reflect-metadata';
 import { FleetModule } from '../fleet.module';
@@ -69,33 +78,42 @@ import { FleetExecutionPreferenceRepository } from '../fleet-execution-preferenc
 import { FleetExecutionPreferenceService } from '../fleet-execution-preference.service';
 import { FleetAgentNodeAffinityRepository } from '../fleet-agent-node-affinity.repository';
 import { FleetAgentNodeAffinityService } from '../fleet-agent-node-affinity.service';
+import { FleetCostPolicyRepository } from '../fleet-cost-policy.repository';
+import { FleetCostCeilingService } from '../fleet-cost-ceiling.service';
 
 describe('FleetModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, FleetModule) ?? [];
 
-    it('provides the registry, the job-runtime halves and the routing preference', () => {
+    // Fleet cost accounting (EW-777) appended the cost-policy repository
+    // and the daily-ceiling service to both lists; the pin below grew
+    // with them so the shape stays exact.
+    it('provides the registry, the job-runtime halves, the routing preference and the cost ceilings', () => {
         expect(meta('providers')).toEqual([
             FleetNodeRepository,
             FleetJobRepository,
             FleetExecutionPreferenceRepository,
             FleetAgentNodeAffinityRepository,
+            FleetCostPolicyRepository,
             FleetService,
             FleetJobService,
             FleetExecutionPreferenceService,
             FleetAgentNodeAffinityService,
+            FleetCostCeilingService,
         ]);
     });
 
-    it('exports all six for the API surface + chat-tool assembly', () => {
+    it('exports all of them for the API surface + chat-tool assembly', () => {
         expect(meta('exports')).toEqual([
             FleetNodeRepository,
             FleetJobRepository,
             FleetExecutionPreferenceRepository,
             FleetAgentNodeAffinityRepository,
+            FleetCostPolicyRepository,
             FleetService,
             FleetJobService,
             FleetExecutionPreferenceService,
             FleetAgentNodeAffinityService,
+            FleetCostCeilingService,
         ]);
     });
 
@@ -118,6 +136,8 @@ describe('fleet barrel', () => {
         expect(barrel.FleetExecutionPreferenceRepository).toBe(FleetExecutionPreferenceRepository);
         expect(barrel.FleetAgentNodeAffinityService).toBe(FleetAgentNodeAffinityService);
         expect(barrel.FleetAgentNodeAffinityRepository).toBe(FleetAgentNodeAffinityRepository);
+        expect(barrel.FleetCostPolicyRepository).toBe(FleetCostPolicyRepository);
+        expect(barrel.FleetCostCeilingService).toBe(FleetCostCeilingService);
         expect(typeof barrel.buildFleetTools).toBe('function');
     });
 

@@ -227,6 +227,8 @@ function toRunnerView(node: FleetNodeView, load: FleetNodeLoadView | null): Flee
         daemonVersion: node.version,
         cliVersion: node.cliVersion ?? null,
         diskFreeBytes: node.diskFreeBytes ?? null,
+        // Fleet cost accounting (EW-777): the seat the spend is billed to.
+        modelIdentity: node.modelIdentity ?? null,
         busy: activeJobCount > 0,
         activeJobCount,
         currentJobKind: load?.currentJobKind ?? null,

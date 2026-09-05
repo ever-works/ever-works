@@ -5,7 +5,13 @@ import {
 	type CommandRunner,
 	type SelfDescriptionTelemetry
 } from './capabilities';
-import { detectAgentCliVersion, detectDiskFreeBytes, type DiskProbeIo } from './telemetry-probe';
+import {
+	cacheProbe,
+	detectAgentCliVersion,
+	detectDiskFreeBytes,
+	detectModelIdentity,
+	type DiskProbeIo
+} from './telemetry-probe';
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
@@ -74,10 +80,16 @@ export interface NodeIo {
  * absent field as "leave the stored reading alone". So a machine with no
  * agent CLI, or an unreadable volume, keeps heartbeating with everything
  * else intact.
+ *
+ * The model-identity probe (fleet cost accounting, EW-777) asks the SAME
+ * CLI binaries the `agent-task` step spawns (`io.environment.modelCli`)
+ * which account they are logged in as, and is cached for a few minutes:
+ * a login changes once a month, a beat happens twice a minute.
  */
 export function buildSelfDescriptionTelemetry(io: NodeIo): SelfDescriptionTelemetry {
 	const telemetry: SelfDescriptionTelemetry = {
-		cliVersion: () => detectAgentCliVersion(io.runner)
+		cliVersion: () => detectAgentCliVersion(io.runner),
+		modelIdentity: cacheProbe(() => detectModelIdentity(io.runner, io.environment.modelCli ?? {}))
 	};
 	if (io.diskProbe) {
 		const probe = io.diskProbe;

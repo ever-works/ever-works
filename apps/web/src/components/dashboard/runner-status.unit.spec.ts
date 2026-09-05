@@ -16,6 +16,8 @@ const node = (overrides: Partial<FleetRunnerNodeView> = {}): FleetRunnerNodeView
     daemonVersion: '1.0.0',
     cliVersion: null,
     diskFreeBytes: null,
+    // Fleet cost accounting (EW-777): the seat the spend is billed to.
+    modelIdentity: null,
     busy: false,
     activeJobCount: 0,
     currentJobKind: null,

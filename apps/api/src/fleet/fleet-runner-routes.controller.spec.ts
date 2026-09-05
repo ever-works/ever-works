@@ -64,6 +64,13 @@ describe('FleetController runner status + execution preferences', () => {
             { loadByNodeForUser: jest.fn(async () => ({})) } as never,
             runners as never,
             preferences as never,
+            // Fleet cost accounting (EW-777) — the ceiling routes have
+            // their own cases in `fleet.controller.spec.ts`; stubbed here
+            // so this suite keeps asserting only what it was written for.
+            {
+                describeForUser: jest.fn(async () => null),
+                setFleetCeilingForUser: jest.fn(async () => null),
+            } as never,
         );
     });
 

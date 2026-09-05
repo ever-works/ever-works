@@ -50,6 +50,10 @@ import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
 @Index('idx_fleet_jobs_target_status', ['targetNodeId', 'status'])
 @Index('idx_fleet_jobs_lease_expiry', ['status', 'leaseExpiresAt'])
 @Index('idx_fleet_jobs_queued_at', ['status', 'queuedAt'])
+// Fleet cost accounting (EW-777): the per-node daily spend sum is
+// `WHERE nodeId = ? AND completedAt >= dayStart`. Migration
+// `1788300000000-AddFleetCostAccounting` adds the index with the column.
+@Index('idx_fleet_jobs_node_completed', ['nodeId', 'completedAt'])
 export class FleetJob {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -120,6 +124,20 @@ export class FleetJob {
     /** Failure detail on `failed`. Length-capped at the edge. */
     @Column({ type: 'text', nullable: true })
     error?: string | null;
+
+    /**
+     * Fleet cost accounting (EW-777) — the model spend this job's run
+     * reported, in cents, stamped by the API-side reconciler when the
+     * node's result carried a CLI cost. NULL = no model ran, or the CLI
+     * printed no price (Codex reports tokens only). Denormalised HERE, next
+     * to `nodeId` and `completedAt`, because the per-node and fleet-wide
+     * DAILY ceilings are one portable
+     * `SUM(costCents) WHERE nodeId|userId = ? AND completedAt >= dayStart`
+     * — and `plugin_usage_events`, which carries the same cents for the
+     * Costs dashboard, has no node id to sum by.
+     */
+    @Column({ type: 'int', nullable: true })
+    costCents?: number | null;
 
     /**
      * Why a `queued` row has not started yet — today only

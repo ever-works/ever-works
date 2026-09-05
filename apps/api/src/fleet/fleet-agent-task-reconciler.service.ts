@@ -3,9 +3,15 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { RunDispatchGateService } from '@ever-works/agent/agents';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import type { AgentRun, FleetNode, Task } from '@ever-works/agent/entities';
+import { PluginUsageCapability } from '@ever-works/agent/entities';
 import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '@ever-works/agent/events';
-import { FleetNodeRepository } from '@ever-works/agent/fleet';
+import {
+    FleetCostCeilingService,
+    FleetJobRepository,
+    FleetNodeRepository,
+} from '@ever-works/agent/fleet';
 import { INBOX_PRODUCER, type InboxProducer } from '@ever-works/agent/inbox';
+import { PluginUsageService } from '@ever-works/agent/usage';
 import {
     TaskChatService,
     TaskRepository,
@@ -19,6 +25,8 @@ import {
     FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS,
     FLEET_JOB_QUEUE_EXPIRED_REASON,
     INBOX_MAX_BODY_CHARS,
+    fleetModelCostUsdToCents,
+    fleetModelPluginId,
     normalizeFleetAgentTaskQuestion,
     normalizeFleetTaskWorkspaceMounts,
     type FleetAgentTaskGitResult,
@@ -100,6 +108,16 @@ const MAX_QUESTION_CONTEXT_CHARS =
  * already carries one, a replayed completion for a run that is already
  * terminal files no second question, and a listener failure is logged
  * rather than propagated (an event has no caller to fail).
+ *
+ * Fleet cost accounting (EW-777) — `accountModelSpend`, taken for ANY
+ * verdict BEFORE the question / success / failure split, writes what the
+ * cloud path writes: ONE `plugin_usage_events` row tagged with the run
+ * (the same row the AI facades record per call), the run's token total,
+ * and the job's cost. The terminal CAS that follows settles that row onto
+ * `agent_runs.costCents` through the very same `RunCostSettlementService`
+ * a cloud run uses — so the Goal spend cap, the Costs dashboard and the
+ * budget precheck see a fleet run without a second accounting. The daily
+ * cost ceilings are evaluated right after, on the stamped job.
  */
 @Injectable()
 export class FleetAgentTaskReconcilerService {
@@ -115,6 +133,11 @@ export class FleetAgentTaskReconcilerService {
         @Optional() private readonly dispatchGate?: RunDispatchGateService,
         @Optional() @Inject(INBOX_PRODUCER) private readonly inbox?: InboxProducer,
         @Optional() private readonly nodes?: FleetNodeRepository,
+        // Fleet cost accounting (EW-777). Appended LAST and @Optional()
+        // per the positional-construction rule the spec relies on.
+        @Optional() private readonly pluginUsage?: PluginUsageService,
+        @Optional() private readonly jobs?: FleetJobRepository,
+        @Optional() private readonly costCeiling?: FleetCostCeilingService,
     ) {}
 
     /** The platform identities an `agent-task` job carries, or null for any other job. */
@@ -246,6 +269,11 @@ export class FleetAgentTaskReconcilerService {
                 }),
             );
         }
+
+        // Fleet cost accounting (EW-777) — BEFORE the three-way split, so
+        // the usage row exists when the terminal CAS settles it, whichever
+        // of markCompleted / markFailed / tryMarkCompleted that is.
+        await this.accountModelSpend(event, ctx, run, task, agentId, result);
 
         // Self-build slice Q — the model asked the owner a question. Taken
         // for ANY status / gate verdict / git error, BEFORE the success-
@@ -666,6 +694,133 @@ export class FleetAgentTaskReconcilerService {
             composeQuestionMessage(question, result, mountNotes),
         );
         await this.drain(task?.workId ?? run.workId ?? null);
+    }
+
+    /**
+     * Fleet cost accounting (EW-777) — carry the node's CLI-reported cost
+     * and tokens onto the platform's own books, the way a cloud run's are.
+     *
+     *   1. replay guard — a run that is already terminal was reconciled
+     *      before (a replayed completion event); recording again would
+     *      double the spend, so nothing below runs;
+     *   2. the usage row — `plugin_usage_events` tagged with the run, the
+     *      Agent, the Task and the Work, `pluginId: fleet-node:<provider>`
+     *      (a bring-your-own tag no real plugin can claim — see
+     *      `FLEET_BYO_MODEL_PLUGIN_ID_PREFIX`), `requestId: <job id>` for
+     *      forensics, and the node's billing identity in the metadata so
+     *      per-run attribution survives a later re-login. Recorded only
+     *      when the CLI reported a PRICE: a Codex run (tokens, no price)
+     *      keeps `agent_runs.costCents` NULL — "unknown", never "free";
+     *   3. the run's token total, through the same `addTokens` the cloud
+     *      tool loop accumulates with;
+     *   4. the job's cost, so the daily ceilings can sum per node;
+     *   5. the ceilings themselves — drain + one notice on a crossing,
+     *      fail closed when the spend cannot be evaluated.
+     *
+     * Every write is best-effort: a metering hiccup must never keep a
+     * finished run from settling. The ONE exception to "no second
+     * accounting" is a run with no Work to attribute to (the usage row's
+     * `workId` is NOT NULL) or no usage service bound: its cost is stamped
+     * on the run directly so the Goal cap and the run list still see it.
+     */
+    private async accountModelSpend(
+        event: FleetJobCompletedEvent,
+        ctx: FleetAgentTaskCorrelation,
+        run: AgentRun,
+        task: Task | null,
+        agentId: string | null,
+        result: FleetAgentTaskResult | null,
+    ): Promise<void> {
+        if (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled') {
+            this.logger.debug(
+                `Run ${ctx.runId}: model spend not recorded — run already ${run.status} (replayed completion)`,
+            );
+            return;
+        }
+        const model = result?.model ?? null;
+        const costCents = model ? fleetModelCostUsdToCents(model.costUsd) : null;
+        const totalTokens =
+            typeof model?.totalTokens === 'number' &&
+            Number.isFinite(model.totalTokens) &&
+            model.totalTokens > 0
+                ? Math.floor(model.totalTokens)
+                : null;
+        const nodeId = event.nodeId ?? event.job.nodeId ?? null;
+        const workId = task?.workId ?? run.workId ?? null;
+        const organizationId = task?.organizationId ?? run.organizationId ?? null;
+        const node = await this.lookupNode(nodeId, event.userId);
+
+        if (model && costCents !== null) {
+            if (workId && this.pluginUsage) {
+                const pluginUsage = this.pluginUsage;
+                await this.bestEffort('model usage row', () =>
+                    pluginUsage.record({
+                        workId,
+                        userId: event.userId,
+                        pluginId: fleetModelPluginId(model.provider),
+                        capability: PluginUsageCapability.AI,
+                        units: Math.max(1, Math.floor(model.turns ?? 1)),
+                        costCents,
+                        modelId: model.modelId ?? null,
+                        requestId: event.job.id,
+                        metadata: {
+                            source: 'fleet-node',
+                            provider: model.provider,
+                            nodeId,
+                            fleetJobId: event.job.id,
+                            billedTo: node?.modelIdentity ?? null,
+                            costUsd: model.costUsd ?? null,
+                            turns: model.turns ?? null,
+                            inputTokens: model.inputTokens ?? null,
+                            outputTokens: model.outputTokens ?? null,
+                            cacheReadTokens: model.cacheReadTokens ?? null,
+                            cacheCreationTokens: model.cacheCreationTokens ?? null,
+                            totalTokens,
+                        },
+                        agentId,
+                        taskId: ctx.taskId,
+                        runId: ctx.runId,
+                    }),
+                );
+            } else {
+                this.logger.warn(
+                    `Run ${ctx.runId}: fleet model spend (${costCents}c) stamped directly — ${
+                        workId ? 'no usage service bound' : 'no Work to attribute the usage row to'
+                    }`,
+                );
+                await this.bestEffort('run cost stamp', () =>
+                    this.runs.stampCostCents(ctx.runId, costCents),
+                );
+            }
+            if (this.jobs) {
+                const jobs = this.jobs;
+                await this.bestEffort('job cost stamp', () =>
+                    jobs.stampCostCents(event.job.id, costCents),
+                );
+            }
+        }
+        if (totalTokens !== null) {
+            await this.bestEffort('run tokens', () => this.runs.addTokens(ctx.runId, totalTokens));
+        }
+        if (this.costCeiling) {
+            const costCeiling = this.costCeiling;
+            await this.bestEffort('daily cost ceiling', () =>
+                costCeiling.evaluateAfterCompletion({
+                    userId: event.userId,
+                    nodeId,
+                    jobId: event.job.id,
+                    // No model ran ⇒ this completion cost nothing; a model
+                    // ran and printed no price ⇒ null, which a configured
+                    // ceiling fails closed on.
+                    costCents: model ? costCents : 0,
+                    runId: ctx.runId,
+                    taskId: ctx.taskId,
+                    agentId,
+                    workId,
+                    organizationId,
+                }),
+            );
+        }
     }
 
     private async postChat(

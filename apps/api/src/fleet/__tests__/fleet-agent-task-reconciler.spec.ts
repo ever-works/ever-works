@@ -94,6 +94,10 @@ describe('FleetAgentTaskReconcilerService', () => {
     let dispatchGate: { drainForWork: jest.Mock };
     let inbox: { notice: jest.Mock; questionRaised: jest.Mock } | undefined;
     let nodes: { findById: jest.Mock };
+    // Fleet cost accounting (EW-777) — the three trailing optional deps.
+    let pluginUsage: { record: jest.Mock } | undefined;
+    let jobsRepo: { stampCostCents: jest.Mock } | undefined;
+    let costCeiling: { evaluateAfterCompletion: jest.Mock } | undefined;
 
     const build = () =>
         new FleetAgentTaskReconcilerService(
@@ -106,6 +110,9 @@ describe('FleetAgentTaskReconcilerService', () => {
             dispatchGate as never,
             inbox as never,
             nodes as never,
+            pluginUsage as never,
+            jobsRepo as never,
+            costCeiling as never,
         );
 
     beforeEach(() => {
@@ -120,6 +127,8 @@ describe('FleetAgentTaskReconcilerService', () => {
             setAwaitingInput: jest.fn().mockResolvedValue(undefined),
             updateGateResults: jest.fn().mockResolvedValue(undefined),
             updateTelemetry: jest.fn().mockResolvedValue(undefined),
+            addTokens: jest.fn().mockResolvedValue(undefined),
+            stampCostCents: jest.fn().mockResolvedValue(undefined),
         };
         tasks = {
             findById: jest.fn().mockResolvedValue({
@@ -159,8 +168,269 @@ describe('FleetAgentTaskReconcilerService', () => {
             questionRaised: jest.fn().mockResolvedValue(undefined),
         };
         nodes = {
-            findById: jest.fn().mockResolvedValue({ id: NODE, userId: USER, name: 'everdesk2' }),
+            findById: jest.fn().mockResolvedValue({
+                id: NODE,
+                userId: USER,
+                name: 'everdesk2',
+                modelIdentity: 'claude-code: ops@example.com (Acme, max)',
+            }),
         };
+        pluginUsage = { record: jest.fn().mockResolvedValue({ id: 'usage-1' }) };
+        jobsRepo = { stampCostCents: jest.fn().mockResolvedValue(undefined) };
+        costCeiling = {
+            evaluateAfterCompletion: jest
+                .fn()
+                .mockResolvedValue({ drainedNodeIds: [], noticesFiled: 0 }),
+        };
+    });
+
+    describe('fleet cost accounting (EW-777)', () => {
+        const billed: FleetAgentTaskResult = {
+            ...successResult,
+            model: {
+                ...successResult.model!,
+                costUsd: 0.42,
+                turns: 4,
+                modelId: 'claude-opus-4-1-20250805',
+                inputTokens: 120,
+                outputTokens: 3400,
+                cacheReadTokens: 90_000,
+                cacheCreationTokens: 2500,
+                totalTokens: 96_020,
+            },
+        };
+
+        const completed = (result: FleetAgentTaskResult, status: FleetJobView['status'] = 'done') =>
+            build().onCompleted(
+                new FleetJobCompletedEvent(
+                    job({ status }),
+                    USER,
+                    'node-report',
+                    NODE,
+                    result as unknown as Record<string, unknown>,
+                ),
+            );
+
+        it('writes what the cloud path writes — the usage row, the tokens, the job cost — BEFORE the terminal write, in exact cents', async () => {
+            await completed(billed);
+
+            expect(pluginUsage!.record).toHaveBeenCalledTimes(1);
+            expect(pluginUsage!.record).toHaveBeenCalledWith({
+                workId: 'work-1',
+                userId: USER,
+                pluginId: 'fleet-node:claude-code',
+                capability: 'ai',
+                units: 4,
+                costCents: 42,
+                modelId: 'claude-opus-4-1-20250805',
+                requestId: 'job-1',
+                metadata: expect.objectContaining({
+                    source: 'fleet-node',
+                    provider: 'claude-code',
+                    nodeId: NODE,
+                    fleetJobId: 'job-1',
+                    // The seat the spend is billed to, frozen per run so
+                    // attribution survives a later re-login on the node.
+                    billedTo: 'claude-code: ops@example.com (Acme, max)',
+                    costUsd: 0.42,
+                    turns: 4,
+                    inputTokens: 120,
+                    outputTokens: 3400,
+                    cacheReadTokens: 90_000,
+                    cacheCreationTokens: 2500,
+                    totalTokens: 96_020,
+                }),
+                agentId: AGENT,
+                taskId: TASK,
+                runId: RUN,
+            });
+            expect(runs.addTokens).toHaveBeenCalledWith(RUN, 96_020);
+            expect(jobsRepo!.stampCostCents).toHaveBeenCalledWith('job-1', 42);
+            // The row must exist when `markCompleted`'s CAS settles it.
+            expect(pluginUsage!.record.mock.invocationCallOrder[0]).toBeLessThan(
+                runs.markCompleted.mock.invocationCallOrder[0],
+            );
+            // And the ceiling reads the job AFTER its cost is stamped.
+            expect(jobsRepo!.stampCostCents.mock.invocationCallOrder[0]).toBeLessThan(
+                costCeiling!.evaluateAfterCompletion.mock.invocationCallOrder[0],
+            );
+            expect(costCeiling!.evaluateAfterCompletion).toHaveBeenCalledWith({
+                userId: USER,
+                nodeId: NODE,
+                jobId: 'job-1',
+                costCents: 42,
+                runId: RUN,
+                taskId: TASK,
+                agentId: AGENT,
+                workId: 'work-1',
+                organizationId: null,
+            });
+            // `stampCostCents` on the RUN is the settlement's job, not ours.
+            expect(runs.stampCostCents).not.toHaveBeenCalled();
+            // The chat sentence is byte-identical to before.
+            expect(taskChat.post.mock.calls[0][1].body).toContain('$0.42');
+        });
+
+        it('rounds the dollar figure to the nearest cent and defaults the units to one turn', async () => {
+            await completed({
+                ...billed,
+                model: { ...billed.model!, costUsd: 0.125, turns: null },
+            });
+
+            expect(pluginUsage!.record).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 13, units: 1 }),
+            );
+            expect(jobsRepo!.stampCostCents).toHaveBeenCalledWith('job-1', 13);
+        });
+
+        it('records on the FAILURE path too, before markFailed', async () => {
+            await completed(
+                {
+                    ...billed,
+                    status: 'failed',
+                    failureReason: 'a required acceptance check did not pass',
+                },
+                'failed',
+            );
+
+            expect(pluginUsage!.record).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 42 }),
+            );
+            expect(pluginUsage!.record.mock.invocationCallOrder[0]).toBeLessThan(
+                runs.markFailed.mock.invocationCallOrder[0],
+            );
+            expect(runs.markCompleted).not.toHaveBeenCalled();
+        });
+
+        it('records on the QUESTION path, before the parking CAS', async () => {
+            await completed({
+                ...billed,
+                question: {
+                    text: 'Which database should this target?',
+                    context: null,
+                    truncated: false,
+                    mountDir: null,
+                },
+            });
+
+            expect(pluginUsage!.record).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 42 }),
+            );
+            expect(pluginUsage!.record.mock.invocationCallOrder[0]).toBeLessThan(
+                runs.tryMarkCompleted.mock.invocationCallOrder[0],
+            );
+            expect(runs.markFailed).not.toHaveBeenCalled();
+        });
+
+        it('a Codex run (tokens, no price) adds its tokens, writes NO usage row, stamps NO cost, and hands the ceiling a null cost', async () => {
+            await completed({
+                ...billed,
+                model: {
+                    provider: 'codex',
+                    status: 'succeeded',
+                    exitCode: 0,
+                    durationMs: 5000,
+                    summary: 'done',
+                    inputTokens: 120,
+                    outputTokens: 80,
+                    totalTokens: 200,
+                },
+            });
+
+            // Absent, not 0: a zero-cost row would settle `costCents = 0`,
+            // and the run list would read a Codex run as free.
+            expect(pluginUsage!.record).not.toHaveBeenCalled();
+            expect(jobsRepo!.stampCostCents).not.toHaveBeenCalled();
+            expect(runs.stampCostCents).not.toHaveBeenCalled();
+            expect(runs.addTokens).toHaveBeenCalledWith(RUN, 200);
+            expect(costCeiling!.evaluateAfterCompletion).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: null }),
+            );
+            expect(runs.markCompleted).toHaveBeenCalled();
+        });
+
+        it('hands the ceiling a ZERO cost when no model ran at all (legacy command job)', async () => {
+            await completed({ ...billed, model: null });
+
+            expect(pluginUsage!.record).not.toHaveBeenCalled();
+            expect(runs.addTokens).not.toHaveBeenCalled();
+            expect(costCeiling!.evaluateAfterCompletion).toHaveBeenCalledWith(
+                expect.objectContaining({ costCents: 0 }),
+            );
+        });
+
+        it('records nothing — and evaluates no ceiling — on a replayed completion whose run is already terminal', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'completed',
+            });
+
+            await completed(billed);
+
+            expect(pluginUsage!.record).not.toHaveBeenCalled();
+            expect(runs.addTokens).not.toHaveBeenCalled();
+            expect(jobsRepo!.stampCostCents).not.toHaveBeenCalled();
+            expect(costCeiling!.evaluateAfterCompletion).not.toHaveBeenCalled();
+        });
+
+        it('stamps the run directly when there is no Work to attribute the usage row to (its workId is NOT NULL)', async () => {
+            tasks.findById.mockResolvedValue({
+                id: TASK,
+                workId: null,
+                title: 'Fix the thing',
+                organizationId: null,
+            });
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: null,
+            });
+
+            await completed(billed);
+
+            expect(pluginUsage!.record).not.toHaveBeenCalled();
+            expect(runs.stampCostCents).toHaveBeenCalledWith(RUN, 42);
+            // The job cost and the tokens still land — the ceilings and
+            // the run list do not depend on a Work.
+            expect(jobsRepo!.stampCostCents).toHaveBeenCalledWith('job-1', 42);
+            expect(runs.addTokens).toHaveBeenCalledWith(RUN, 96_020);
+        });
+
+        it('stamps the run directly when no usage service is bound, so the spend is never silently lost', async () => {
+            pluginUsage = undefined;
+
+            await completed(billed);
+
+            expect(runs.stampCostCents).toHaveBeenCalledWith(RUN, 42);
+            expect(jobsRepo!.stampCostCents).toHaveBeenCalledWith('job-1', 42);
+        });
+
+        it('still settles the run when the usage write, the stamp or the ceiling throws — every write is best-effort', async () => {
+            pluginUsage!.record.mockRejectedValue(new Error('usage table unavailable'));
+            jobsRepo!.stampCostCents.mockRejectedValue(new Error('fleet_jobs unavailable'));
+            costCeiling!.evaluateAfterCompletion.mockRejectedValue(new Error('ceiling exploded'));
+
+            await completed(billed);
+
+            expect(runs.markCompleted).toHaveBeenCalledWith(RUN, 'Fixed it.');
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'completed');
+        });
+
+        it('works without the three optional deps at all (older wiring): the run still settles', async () => {
+            pluginUsage = undefined;
+            jobsRepo = undefined;
+            costCeiling = undefined;
+
+            await completed(billed);
+
+            expect(runs.stampCostCents).toHaveBeenCalledWith(RUN, 42);
+            expect(runs.addTokens).toHaveBeenCalledWith(RUN, 96_020);
+            expect(runs.markCompleted).toHaveBeenCalledWith(RUN, 'Fixed it.');
+        });
     });
 
     it('correlates only agent-task jobs that carry run and task ids', () => {
