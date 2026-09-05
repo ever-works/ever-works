@@ -203,6 +203,7 @@ describe('ApiKeyService', () => {
         it('returns null when key is expired', async () => {
             repo.findByHashedKey.mockResolvedValue({
                 id: 'k-1',
+                kind: 'personal',
                 expiresAt: new Date(Date.now() - 1000),
             } as any);
 
@@ -215,6 +216,7 @@ describe('ApiKeyService', () => {
         it('returns the key and triggers fire-and-forget updateLastUsed when valid', async () => {
             const apiKey = {
                 id: 'k-1',
+                kind: 'personal',
                 expiresAt: new Date(Date.now() + 100000),
             };
             repo.findByHashedKey.mockResolvedValue(apiKey as any);
@@ -226,7 +228,7 @@ describe('ApiKeyService', () => {
         });
 
         it('treats null expiresAt as never-expiring', async () => {
-            const apiKey = { id: 'k-2', expiresAt: null };
+            const apiKey = { id: 'k-2', kind: 'personal', expiresAt: null };
             repo.findByHashedKey.mockResolvedValue(apiKey as any);
 
             const result = await service.validateKey(RAW);
@@ -235,8 +237,49 @@ describe('ApiKeyService', () => {
             expect(repo.updateLastUsed).toHaveBeenCalledWith('k-2');
         });
 
+        // ── Self-build slice Z (EW-796) — kind discrimination ──────────
+        //
+        // `api_keys` holds two kinds of row since the MCP bridge landed.
+        // A `fleet-run` row is only safe because
+        // `FleetRunCredentialService.authenticate` gates it on a route
+        // allowlist, on the bound job still being held by the bound node,
+        // and on an Organization pin. `validateKey` applies NONE of those,
+        // so it must refuse such a row outright — otherwise every caller
+        // that reaches it (the `ew_live_` guard branch, and the @Public()
+        // uploads controller, which forwards ANY `x-api-key` value it is
+        // handed) would authenticate a run token as the plain owner with
+        // the whole API surface open to it.
+        it('refuses a fleet-run row — a run token is never a personal key', async () => {
+            const runToken = 'ew_run_' + 'b'.repeat(64);
+            repo.findByHashedKey.mockResolvedValue({
+                id: 'run-1',
+                userId: 'user-1',
+                kind: 'fleet-run',
+                boundJobId: 'job-1',
+                expiresAt: new Date(Date.now() + 100000),
+            } as any);
+
+            const result = await service.validateKey(runToken);
+
+            expect(result).toBeNull();
+            // Not even a `lastUsedAt` write: nothing about this row was
+            // accepted, so nothing about it may be recorded as used.
+            expect(repo.updateLastUsed).not.toHaveBeenCalled();
+        });
+
+        it('refuses an unrecognised kind — deny by omission, not by enumeration', async () => {
+            repo.findByHashedKey.mockResolvedValue({
+                id: 'k-9',
+                kind: 'some-future-kind',
+                expiresAt: null,
+            } as any);
+
+            await expect(service.validateKey(RAW)).resolves.toBeNull();
+            expect(repo.updateLastUsed).not.toHaveBeenCalled();
+        });
+
         it('swallows updateLastUsed failure (fire-and-forget)', async () => {
-            const apiKey = { id: 'k-3', expiresAt: null };
+            const apiKey = { id: 'k-3', kind: 'personal', expiresAt: null };
             repo.findByHashedKey.mockResolvedValue(apiKey as any);
             repo.updateLastUsed.mockRejectedValue(new Error('db down'));
 

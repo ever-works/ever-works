@@ -492,6 +492,59 @@ describe('agent/config', () => {
                 expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(false);
             });
         });
+
+        /**
+         * Self-build slice Z (EW-796) — the operator switch for the fleet
+         * MCP bridge.
+         *
+         * Default OFF, and off in two independent ways. Handing a model on
+         * somebody's desktop a live platform credential is a deployment
+         * decision about the whole install, so a typo, an empty envsubst
+         * render or a missing server URL must all land on "no bridge"
+         * rather than on a half-configured one.
+         */
+        describe('isMcpBridgeEnabled / getMcpServerUrl (MCP bridge)', () => {
+            it('is OFF by default', () => {
+                expect(config.fleetNode.isMcpBridgeEnabled()).toBe(false);
+            });
+
+            it('turns on for the literal true/1 only', () => {
+                for (const value of ['true', 'TRUE', '1', ' true ']) {
+                    process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = value;
+                    expect(config.fleetNode.isMcpBridgeEnabled()).toBe(true);
+                }
+                // Anything else — including values a human would read as
+                // "on" — fails closed rather than guessing.
+                for (const value of ['yes', 'on', 'enabled', '2', 'false', '', '   ']) {
+                    process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = value;
+                    expect(config.fleetNode.isMcpBridgeEnabled()).toBe(false);
+                }
+            });
+
+            it('returns undefined for an unset server URL', () => {
+                expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+                process.env.FLEET_NODE_MCP_URL = '   ';
+                expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+            });
+
+            it('accepts an absolute http(s) URL and strips one trailing slash', () => {
+                process.env.FLEET_NODE_MCP_URL = 'https://mcp.ever.works/mcp';
+                expect(config.fleetNode.getMcpServerUrl()).toBe('https://mcp.ever.works/mcp');
+                process.env.FLEET_NODE_MCP_URL = ' http://localhost:3200/mcp/ ';
+                expect(config.fleetNode.getMcpServerUrl()).toBe('http://localhost:3200/mcp');
+            });
+
+            it('treats a non-URL as UNSET, which switches the bridge off', () => {
+                // Validated on the platform, where an operator reads logs,
+                // rather than on fifteen desktops — and the failure mode is
+                // "no bridge", never "a credential-bearing proxy aimed at a
+                // garbage host".
+                for (const value of ['not a url', '/mcp', 'ftp://host/mcp', 'file:///etc/passwd']) {
+                    process.env.FLEET_NODE_MCP_URL = value;
+                    expect(config.fleetNode.getMcpServerUrl()).toBeUndefined();
+                }
+            });
+        });
     });
 
     describe('config.database', () => {

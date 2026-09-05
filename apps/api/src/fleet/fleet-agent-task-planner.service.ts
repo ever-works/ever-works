@@ -19,6 +19,8 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import {
     FLEET_AGENT_EXECUTION_MAX_BUDGET_USD,
+    FLEET_RUN_MCP_SERVER_NAME,
+    FLEET_RUN_MCP_TOOL_FAMILIES,
     FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES,
     FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
     FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
@@ -34,6 +36,7 @@ import {
     type FleetAgentExecutionPermissionMode,
     type FleetAgentExecutionProvider,
     type FleetAgentModelExecution,
+    type FleetAgentTaskMcpBridge,
     type FleetTaskWorkspaceSpec,
     type TaskAcceptanceCheck,
 } from '@ever-works/contracts';
@@ -326,6 +329,13 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         const work = task.workId ? await this.works.findById(task.workId) : null;
         const acceptanceChecks = safeResolveChecks(task, work);
         const ownerMessages = await this.resolveOwnerMessages(payload);
+        // Self-build slice Z (EW-796) — resolved BEFORE the instructions
+        // because the instructions have to tell the model whether it has
+        // platform tools. The two must never disagree: a prompt that
+        // promises Tasks/Inbox tools to a run with no bridge produces a
+        // model that hunts for them and gives up, and a bridge nobody
+        // told the model about is a credential minted for nothing.
+        const mcp = resolveMcpBridge(agent, settings);
         const instructions = await this.composeInstructions({
             agent,
             task,
@@ -333,6 +343,7 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             acceptanceChecks,
             ownerMessages,
             settings,
+            mcp,
         });
 
         const execution: FleetAgentModelExecution = {
@@ -357,6 +368,10 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 push: canCommit,
                 commitMessage: `feat(task): ${task.slug ?? task.id} agent run output`,
             },
+            // Conditional key: a run without the bridge produces the exact
+            // payload it always produced, so nothing about a normal fleet
+            // job changes shape because this slice exists.
+            ...(mcp ? { mcp } : {}),
         };
     }
 
@@ -423,6 +438,8 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         acceptanceChecks: TaskAcceptanceCheck[];
         ownerMessages: string[];
         settings: FleetAgentExecutionSettings;
+        /** Slice Z — present only when the run actually gets platform tools. */
+        mcp?: FleetAgentTaskMcpBridge | null;
     }): Promise<string> {
         const { agent, task, workspace, acceptanceChecks, ownerMessages, settings } = input;
         // `plan` maps to `--permission-mode plan` / Codex `--sandbox
@@ -485,7 +502,10 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
 
         const fleetSections = [
             '# WORKSPACE (fleet node)',
-            describeWorkspaceSection(workspace, { canAskOwner }),
+            describeWorkspaceSection(workspace, {
+                canAskOwner,
+                ...(input.mcp ? { mcp: input.mcp } : {}),
+            }),
             '# ACCEPTANCE CHECKS',
             checksSection,
             '# OUTPUT CONTRACT',
@@ -679,6 +699,50 @@ function describeQuestionProtocol(): string {
 }
 
 /**
+ * Self-build slice Z (EW-796) — decide whether THIS run gets platform
+ * tools, and describe the bridge if it does.
+ *
+ * THREE independent switches, all of which must say yes:
+ *
+ *   1. `FLEET_NODE_MCP_BRIDGE_ENABLED` — the operator's install-wide
+ *      switch, default OFF. Handing a model on someone's desktop a live
+ *      platform credential is a deployment decision, not a preference.
+ *   2. `FLEET_NODE_MCP_URL` — a configured, valid MCP endpoint. Without
+ *      one there is nothing for the node's proxy to forward to, and
+ *      minting a credential would be minting it for nowhere.
+ *   3. `agent.permissions.canCallExternalTools` — the per-Agent opt-in.
+ *
+ * Why #3 reuses the EXISTING permission rather than adding a flag: it is
+ * already the exact gate the CLOUD path applies to MCP tools
+ * (`packages/agent/src/mcp/mcp-tool-source.ts`) and to every other
+ * outbound tool call. An Agent the owner has not trusted with tools in
+ * the cloud must not silently gain them because its run landed on a
+ * fleet node — that asymmetry would be a surprise, and a new ninth flag
+ * would have left the two paths free to drift.
+ *
+ * `plan` permission mode is excluded on top of all three: the CLI runs
+ * read-only there, and a read-only session that can nevertheless POST to
+ * the platform through MCP tools is not a plan-mode run in any sense the
+ * owner would recognise.
+ */
+export function resolveMcpBridge(
+    agent: Pick<Agent, 'permissions'>,
+    settings: FleetAgentExecutionSettings,
+): FleetAgentTaskMcpBridge | null {
+    if (settings.permissionMode === 'plan') return null;
+    if (agent.permissions?.canCallExternalTools !== true) return null;
+    if (!config.fleetNode.isMcpBridgeEnabled()) return null;
+    const serverUrl = config.fleetNode.getMcpServerUrl();
+    if (!serverUrl) return null;
+    return {
+        enabled: true,
+        serverUrl,
+        serverName: FLEET_RUN_MCP_SERVER_NAME,
+        toolFamilies: [...FLEET_RUN_MCP_TOOL_FAMILIES],
+    };
+}
+
+/**
  * The `# WORKSPACE` section of the fleet instructions.
  *
  * Multi-repo Task workspaces (self-build slice C): when the spec carries
@@ -691,10 +755,17 @@ function describeQuestionProtocol(): string {
  * blocked model at the question file instead of at its final message;
  * without it (plan mode, or any caller that does not opt in) the closing
  * line is today's, verbatim.
+ *
+ * Self-build slice Z (EW-796): with `mcp` the closing line stops saying
+ * the session has no platform tools — because it now has them — and
+ * names the families, the scope they act in, and the one thing the model
+ * must not do with them (approve its own work). Without `mcp` the line
+ * is today's, verbatim, which is what every run that has not opted into
+ * the bridge still gets.
  */
 export function describeWorkspaceSection(
     workspace: FleetTaskWorkspaceSpec,
-    options: { canAskOwner?: boolean } = {},
+    options: { canAskOwner?: boolean; mcp?: FleetAgentTaskMcpBridge } = {},
 ): string {
     const mounts = workspace.mounts ?? [];
     const lines = [
@@ -717,10 +788,20 @@ export function describeWorkspaceSection(
             'Edit the primary repository here and the mounted repositories in place when the Task needs it. Do NOT commit, push, switch branches, or touch any other repository: when you finish, the node commits and pushes each repository that changed, and the platform opens one pull request per repository and links them.',
         );
     }
+    const bridge = options.mcp;
+    if (bridge?.enabled) {
+        const families = (bridge.toolFamilies ?? []).join(', ');
+        lines.push(
+            `You DO have Ever Works platform tools in this session, through the MCP server \`${bridge.serverName}\`${
+                families ? ` (${families})` : ''
+            }. They act as the Task owner, in this run's own scope, and only for as long as this run holds its claim — read context with them, record progress with them, and NEVER use them to approve, review or transition your own work past a human gate.`,
+        );
+    }
+    const noTools = bridge?.enabled ? '' : 'You have no platform tools in this session. ';
     lines.push(
         options.canAskOwner
-            ? `You have no platform tools in this session. If the Task cannot be completed as written, do not guess — ask the owner through \`${FLEET_AGENT_TASK_QUESTION_FILE}\` (see OUTPUT CONTRACT) and stop, leaving the working tree in a consistent state.`
-            : 'You have no platform tools in this session. If the Task cannot be completed as written, do not guess — leave the working tree unchanged and explain exactly what is missing in your final message.',
+            ? `${noTools}If the Task cannot be completed as written, do not guess — ask the owner through \`${FLEET_AGENT_TASK_QUESTION_FILE}\` (see OUTPUT CONTRACT) and stop, leaving the working tree in a consistent state.`
+            : `${noTools}If the Task cannot be completed as written, do not guess — leave the working tree unchanged and explain exactly what is missing in your final message.`,
     );
     return lines.join('\n');
 }

@@ -668,6 +668,172 @@ describe('FleetAgentTaskPlannerService', () => {
             await expect(build().plan(payload)).resolves.not.toBeNull();
         });
     });
+
+    /**
+     * Self-build slice Z (EW-796) — the platform MCP bridge.
+     *
+     * Two things must stay welded together: whether the payload carries a
+     * bridge, and what the instructions TELL the model about its tools. A
+     * prompt promising Tasks/Inbox tools to a run that has none produces a
+     * model that hunts for them and gives up; a bridge nobody told the
+     * model about is a credential minted for nothing.
+     *
+     * Three independent switches gate it, and the default posture — the
+     * one every existing install has — is unchanged, word for word.
+     */
+    describe('MCP bridge enablement and the prompt posture', () => {
+        /**
+         * A COMPLETE `AgentPermissions` object: the entity's type has all
+         * eight flags, and `Partial<Agent>` does not make the nested shape
+         * partial too. Spelling them out also makes the point of the tests
+         * below visible — only `canCallExternalTools` moves.
+         */
+        const perms = (over: { canCallExternalTools?: boolean } = {}) => ({
+            canCreateAgents: false,
+            canAssignTasks: false,
+            canEditSkills: false,
+            canEditAgentFiles: false,
+            canSpend: false,
+            canCommitToRepo: true,
+            canOpenPullRequests: false,
+            canCallExternalTools: false,
+            ...over,
+        });
+
+        const TOOL_AGENT = agent({ permissions: perms({ canCallExternalTools: true }) });
+
+        beforeEach(() => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            delete process.env.FLEET_NODE_MCP_BRIDGE_ENABLED;
+            delete process.env.FLEET_NODE_MCP_URL;
+        });
+
+        const enableOperatorSwitch = () => {
+            process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = 'true';
+            process.env.FLEET_NODE_MCP_URL = 'https://mcp.ever.works/mcp';
+        };
+
+        it('stamps the bridge and names the tool families when all three switches say yes', async () => {
+            enableOperatorSwitch();
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.mcp).toEqual({
+                enabled: true,
+                serverUrl: 'https://mcp.ever.works/mcp',
+                serverName: 'ever-works',
+                toolFamilies: expect.arrayContaining(['Tasks', 'Inbox', 'Goals']),
+            });
+            const workspaceSection = plan!.execution.instructions;
+            expect(workspaceSection).toContain(
+                'You DO have Ever Works platform tools in this session',
+            );
+            expect(workspaceSection).toContain('`ever-works`');
+            expect(workspaceSection).toContain('Tasks, Inbox, Goals');
+            // The guardrail the owner needs and the model would not infer.
+            expect(workspaceSection).toContain('NEVER use them to approve');
+            expect(workspaceSection).not.toContain('You have no platform tools in this session');
+        });
+
+        it('keeps the question protocol sentence alongside the new tool sentence', async () => {
+            enableOperatorSwitch();
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.execution.instructions).toContain('`.ever-works/QUESTION.md`');
+            expect(plan!.execution.instructions).toContain(
+                'If the Task cannot be completed as written',
+            );
+        });
+
+        it("keeps today's posture, word for word, when the OPERATOR switch is off", async () => {
+            process.env.FLEET_NODE_MCP_URL = 'https://mcp.ever.works/mcp';
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.mcp).toBeUndefined();
+            expect(plan!.execution.instructions).toContain(
+                'You have no platform tools in this session',
+            );
+            expect(plan!.execution.instructions).not.toContain('MCP server');
+        });
+
+        it('refuses to enable without a configured server URL', async () => {
+            process.env.FLEET_NODE_MCP_BRIDGE_ENABLED = 'true';
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.mcp).toBeUndefined();
+            expect(plan!.execution.instructions).toContain(
+                'You have no platform tools in this session',
+            );
+        });
+
+        it('refuses an Agent without canCallExternalTools — the SAME gate the cloud path uses', async () => {
+            enableOperatorSwitch();
+            // Absent, and explicitly false, both mean no.
+            for (const permissions of [
+                { ...perms(), canCallExternalTools: undefined } as never,
+                perms({ canCallExternalTools: false }),
+            ]) {
+                agents.findByIdAndUser.mockResolvedValue(agent({ permissions }));
+                const plan = await build().plan(payload);
+                expect(plan!.mcp).toBeUndefined();
+                expect(plan!.execution.instructions).toContain(
+                    'You have no platform tools in this session',
+                );
+            }
+        });
+
+        it('refuses in PLAN mode — a read-only session must not be able to POST through tools', async () => {
+            enableOperatorSwitch();
+            process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE = 'plan';
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            expect(plan!.execution.permissionMode).toBe('plan');
+            expect(plan!.mcp).toBeUndefined();
+            expect(plan!.execution.instructions).toContain(
+                'You have no platform tools in this session',
+            );
+        });
+
+        it('never puts a credential in the plan — only where to reach the server', async () => {
+            enableOperatorSwitch();
+            agents.findByIdAndUser.mockResolvedValue(TOOL_AGENT);
+
+            const plan = await build().plan(payload);
+
+            // Nothing token-shaped anywhere in the plan. (A substring check
+            // for "authorization" would be useless here — the assembled
+            // prompt legitimately contains the word in its prompt-injection
+            // warning — so the assertion is on the credential PREFIXES,
+            // which have exactly one meaning.)
+            const serialized = JSON.stringify(plan);
+            expect(serialized).not.toContain('ew_run_');
+            expect(serialized).not.toContain('ew_live_');
+            // The bridge block carries where to reach the server and nothing
+            // else: no header block, no credential field.
+            expect(Object.keys(plan!.mcp!).sort()).toEqual([
+                'enabled',
+                'serverName',
+                'serverUrl',
+                'toolFamilies',
+            ]);
+            // And `envPassthrough` is untouched: the token could not travel
+            // that way even if someone tried — `EVER_WORKS_` is refused by
+            // the node's platform-owned pattern whatever a payload grants.
+            expect(plan!.execution.envPassthrough).not.toContain('EVER_WORKS_MCP_TOKEN');
+            expect(
+                plan!.execution.envPassthrough?.some((name) => name.startsWith('EVER_WORKS_')),
+            ).toBe(false);
+        });
+    });
 });
 
 describe('FleetAgentTaskPlannerService — wire-contract ceilings (review follow-ups)', () => {

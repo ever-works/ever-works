@@ -168,4 +168,49 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         expect(delegate.enqueue).toHaveBeenCalledTimes(1);
         expect(store.enqueue).not.toHaveBeenCalled();
     });
+
+    /**
+     * Self-build slice Z (EW-796) — the MCP block reaches the node the same
+     * way `execution` / `workspace` / `git` do, and ONLY when the planner
+     * put one on the plan.
+     *
+     * This matters beyond wiring: `FleetRunCredentialService.mint` re-reads
+     * `payload.mcp.enabled` on the job row before it will issue anything, so
+     * a payload without the block is a job for which no credential can ever
+     * be minted — by a node, or by anyone who has one.
+     */
+    describe('MCP bridge block (slice Z)', () => {
+        const bridge = {
+            enabled: true,
+            serverUrl: 'https://mcp.ever.works/mcp',
+            serverName: 'ever-works',
+            toolFamilies: ['Tasks', 'Inbox'],
+        };
+
+        it('carries the bridge onto the job payload when the planner enabled it', async () => {
+            const planner = { plan: jest.fn().mockResolvedValue({ ...plan, mcp: bridge }) };
+            await buildDispatcher(planner).enqueue(payload());
+
+            const request = store.enqueue.mock.calls[0][0];
+            expect(request.payload.mcp).toEqual(bridge);
+        });
+
+        it('omits the key entirely when the planner did not — no `mcp: null` on the wire', async () => {
+            const planner = { plan: jest.fn().mockResolvedValue(plan) };
+            await buildDispatcher(planner).enqueue(payload());
+
+            const request = store.enqueue.mock.calls[0][0];
+            expect('mcp' in request.payload).toBe(false);
+        });
+
+        it('never puts a credential on the payload — only where to reach the server', async () => {
+            const planner = { plan: jest.fn().mockResolvedValue({ ...plan, mcp: bridge }) };
+            await buildDispatcher(planner).enqueue(payload());
+
+            const serialized = JSON.stringify(store.enqueue.mock.calls[0][0].payload);
+            expect(serialized).not.toContain('ew_run_');
+            expect(serialized).not.toContain('ew_live_');
+            expect(serialized.toLowerCase()).not.toContain('authorization');
+        });
+    });
 });

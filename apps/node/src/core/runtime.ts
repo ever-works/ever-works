@@ -473,6 +473,20 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 							}
 						: {}),
 					modelCli,
+					// Self-build slice Z (EW-796) — the platform side of the
+					// MCP bridge, wired through the SAME authenticated job
+					// client the lease protocol uses. No new endpoint, no new
+					// credential on the node: the node secret is what proves
+					// this machine holds the claim, and what it gets back is a
+					// separate, short-lived token the model step keeps in
+					// memory only.
+					logger: io.logger,
+					mcpBridge: {
+						mint: (id: string) => jobClient.mintMcpCredential(id),
+						revoke: async (id: string) => {
+							await jobClient.revokeMcpCredential(id);
+						}
+					},
 					...(options.agentTaskScratchRoot !== undefined
 						? { scratchRoot: options.agentTaskScratchRoot }
 						: {}),
