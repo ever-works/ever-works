@@ -20,6 +20,15 @@ import type { AgentToolDescriptor } from './agent-tool.service';
  */
 export const AGENT_MCP_TOOL_SOURCE = 'AGENT_MCP_TOOL_SOURCE' as const;
 
+/**
+ * The run the tools are being built FOR. Everything a source acquires on
+ * the run's behalf — a launched stdio server, an open client — is held under
+ * this id and let go by `releaseRun(runId)`.
+ */
+export interface AgentMcpRunHandle {
+    readonly runId: string;
+}
+
 export interface AgentMcpToolSource {
     /**
      * Resolve the agent's bound + enabled MCP connections into tool
@@ -27,5 +36,16 @@ export interface AgentMcpToolSource {
      * isolated: a dead server or a resolution error yields fewer (or
      * zero) tools, never a rejection that fails run assembly.
      */
-    buildTools(agent: Agent): Promise<AgentToolDescriptor[]>;
+    buildTools(agent: Agent, run: AgentMcpRunHandle): Promise<AgentToolDescriptor[]>;
+
+    /**
+     * Release everything `buildTools` acquired for this run (AP-14
+     * prerequisite). `AgentRunService` calls it on EVERY exit path of the
+     * tool loop — completion, error, cancel, interrupt, and a throw from
+     * tool resolution itself — so a launched stdio server can never outlive
+     * its run. MUST be idempotent and MUST NOT throw: a source that cannot
+     * clean up logs and moves on, it does not fail a run that already
+     * ended.
+     */
+    releaseRun(runId: string): Promise<void>;
 }
