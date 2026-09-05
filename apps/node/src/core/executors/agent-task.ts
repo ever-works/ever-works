@@ -44,6 +44,7 @@ import {
 	type ModelCliPaths,
 	MODEL_CLI_MAX_OUTPUT_BYTES
 } from './model-cli';
+import type { FleetTaskWorkspaceErrorCode } from '../workspaces/fleet-task-workspace';
 
 /**
  * The `agent-task` executor — the node's general job kind.
@@ -193,6 +194,14 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 		}>
 	>;
 	/**
+	 * Called once the run is over — success, failure or abort alike — so the
+	 * provisioner can drop the on-disk lease it took on the worktree (and its
+	 * mounts) and stamp the workspace's last use. Absent on callers whose
+	 * provisioner keeps no lease. Never decides the verdict: a release that
+	 * fails is logged by the caller, not reported as the job's failure.
+	 */
+	releaseWorkspace?: (taskId: string, descriptor: FleetTaskWorkspaceDescriptor) => Promise<void>;
+	/**
 	 * The lease deadline this run is publishing under, resolved as LATE as
 	 * possible — right before the commit/push — because the keep-alive
 	 * advances it on every renewal and a model step outlives four or five
@@ -212,6 +221,15 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	 * as terminal.
 	 */
 	onPublishWithheld?: (reason: string) => void;
+	/**
+	 * Called when the node DECLINED to start the run before anything was
+	 * written: the workspace volume is below the disk floor, or the worktree
+	 * is being reclaimed by the workspace reaper at this very moment. Like
+	 * `onPublishWithheld`, this executor only reports it; the caller decides
+	 * what it means for the job (the runtime hands it back unsettled so the
+	 * platform re-offers it to a node with room).
+	 */
+	onProvisionDeclined?: (reason: string) => void;
 	/** Model CLIs this node may drive, resolved once at startup. */
 	modelCli?: ModelCliPaths;
 	/** Root for per-job scratch files (instructions / CLI output). */
@@ -261,7 +279,69 @@ export async function runAgentTaskJob(
 	}
 	const checks = resolveAcceptanceChecks(payload);
 
-	const workspaceResolution = await resolveAgentTaskWorkspace(taskId, payload, io, signal);
+	let workspaceResolution: { path: string; descriptor: FleetTaskWorkspaceDescriptor | null };
+	try {
+		workspaceResolution = await resolveAgentTaskWorkspace(taskId, payload, io, signal);
+	} catch (error) {
+		// A refusal that is about this MACHINE right now (no disk headroom,
+		// the reaper mid-removal) rather than about the job: report it so the
+		// caller can hand the job back, then let it propagate as it always did.
+		if (isProvisionDeclined(error)) io.onProvisionDeclined?.(error.message);
+		throw error;
+	}
+	try {
+		return await runResolvedAgentTask(
+			{ job, payload, taskId, runId, execution, steps, checks, workspaceResolution },
+			io,
+			signal
+		);
+	} finally {
+		// Whatever the verdict — and whatever threw — the lease the
+		// provisioner took on the worktree is dropped, or the workspace
+		// reaper would treat this checkout as busy until the process dies.
+		if (workspaceResolution.descriptor && io.releaseWorkspace) {
+			await io.releaseWorkspace(taskId, workspaceResolution.descriptor).catch(() => undefined);
+		}
+	}
+}
+
+/** Provision refusals that clear on their own and say nothing about the work. */
+const DECLINED_PROVISION_CODES: ReadonlySet<FleetTaskWorkspaceErrorCode> = new Set<FleetTaskWorkspaceErrorCode>([
+	'disk-low',
+	'workspace-busy'
+]);
+
+/**
+ * A `FleetTaskWorkspaceError` the provisioner threw BEFORE writing a byte,
+ * for a reason that is about this machine at this moment. Matched by name
+ * and code, like every other cross-module error in the node, so a
+ * duplicated class identity can never turn a deferral into a terminal
+ * failure.
+ */
+function isProvisionDeclined(error: unknown): error is Error & { code: FleetTaskWorkspaceErrorCode } {
+	if (!(error instanceof Error) || error.name !== 'FleetTaskWorkspaceError') return false;
+	const code = (error as { code?: unknown }).code;
+	return typeof code === 'string' && DECLINED_PROVISION_CODES.has(code as FleetTaskWorkspaceErrorCode);
+}
+
+interface ResolvedAgentTask {
+	job: FleetJobView;
+	payload: FleetAgentTaskPayload;
+	taskId: string;
+	runId: string | null;
+	execution: FleetAgentModelExecution | null;
+	steps: WireCheck[];
+	checks: WireCheck[];
+	workspaceResolution: { path: string; descriptor: FleetTaskWorkspaceDescriptor | null };
+}
+
+/** The run proper, once the payload is validated and the workspace resolved. */
+async function runResolvedAgentTask(
+	context: ResolvedAgentTask,
+	io: AgentTaskIo,
+	signal?: AbortSignal
+): Promise<AgentTaskOutcome> {
+	const { job, payload, taskId, runId, execution, steps, checks, workspaceResolution } = context;
 	throwIfAgentTaskAborted(signal);
 
 	const questionFs = io.questionFs ?? defaultQuestionFs;
