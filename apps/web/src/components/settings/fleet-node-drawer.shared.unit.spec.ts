@@ -6,9 +6,12 @@ import {
     fleetJobDurationMs,
     fleetJobOutcomeKey,
     fleetJobOutcomeText,
+    fleetNodeDiskBadgeClass,
+    fleetNodeDiskState,
     fleetWorkerStateBadgeClass,
     fleetWorkerStateKey,
     formatFleetJobDuration,
+    hasFleetNodeHousekeeping,
 } from './fleet-node-drawer.shared';
 
 function job(over: Partial<FleetJobView> = {}): FleetJobView {
@@ -271,5 +274,81 @@ describe('fleetJobOutcomeText', () => {
         const text = fleetJobOutcomeText(historyJob({ error: 'x'.repeat(400) }), 240);
         expect(text).toHaveLength(241);
         expect(text?.endsWith('…')).toBe(true);
+    });
+});
+
+/**
+ * Node housekeeping (EW-803) — the derivations behind the drawer's disk
+ * and workspace block.
+ *
+ * The property that matters is that UNKNOWN never renders as a verdict.
+ * A node we have not heard from about its floor must not read "above
+ * floor" (a reassurance nobody earned) and must not read "below floor"
+ * (an alarm nobody raised).
+ */
+describe('fleetNodeDiskState', () => {
+    const GIB = 1024 ** 3;
+
+    it('reads a node under its own floor as below', () => {
+        // The state this whole slice exists to surface: online, idle, and
+        // refusing every job because the volume filled up.
+        expect(
+            fleetNodeDiskState({ diskFreeBytes: 200 * 1024 ** 2, minFreeDiskBytes: 2 * GIB }),
+        ).toBe('below');
+    });
+
+    it('reads a node with room as ok, including exactly at the floor', () => {
+        expect(fleetNodeDiskState({ diskFreeBytes: 9 * GIB, minFreeDiskBytes: 2 * GIB })).toBe(
+            'ok',
+        );
+        // The node admits at `free >= floor`, so the boundary must agree
+        // with the gate rather than being off by one machine's worth of
+        // confusion.
+        expect(fleetNodeDiskState({ diskFreeBytes: 2 * GIB, minFreeDiskBytes: 2 * GIB })).toBe(
+            'ok',
+        );
+    });
+
+    it.each([
+        ['no reading at all', { diskFreeBytes: null, minFreeDiskBytes: 2 * GIB }],
+        ['no floor reported', { diskFreeBytes: 9 * GIB, minFreeDiskBytes: undefined }],
+        ['the floor switched off', { diskFreeBytes: 9 * GIB, minFreeDiskBytes: null }],
+        ['an older daemon reporting neither', {}],
+        ['a non-finite reading', { diskFreeBytes: Number.NaN, minFreeDiskBytes: 2 * GIB }],
+    ])('reads %s as unknown rather than as a verdict', (_label, node) => {
+        expect(fleetNodeDiskState(node)).toBe('unknown');
+    });
+
+    it('colours only the below state, since neither ok nor unknown is an event', () => {
+        expect(fleetNodeDiskBadgeClass('below')).toContain('danger');
+        expect(fleetNodeDiskBadgeClass('ok')).not.toContain('danger');
+        expect(fleetNodeDiskBadgeClass('unknown')).not.toContain('danger');
+    });
+});
+
+describe('hasFleetNodeHousekeeping', () => {
+    it('is true once the node has reported any housekeeping figure', () => {
+        expect(hasFleetNodeHousekeeping({ minFreeDiskBytes: 2 * 1024 ** 3 })).toBe(true);
+        expect(hasFleetNodeHousekeeping({ workspaceCount: 0 })).toBe(true);
+        expect(hasFleetNodeHousekeeping({ workspaceBytes: 0 })).toBe(true);
+        expect(hasFleetNodeHousekeeping({ lastReclaimAt: '2026-09-05T09:30:00.000Z' })).toBe(true);
+    });
+
+    it('does NOT count a null floor, which every stored row carries', () => {
+        // `toView` emits null for an unset column, so treating null as
+        // evidence would make every node ever enrolled claim to have
+        // reported — and the "not reported yet" line would never show.
+        expect(
+            hasFleetNodeHousekeeping({
+                minFreeDiskBytes: null,
+                workspaceCount: null,
+                workspaceBytes: null,
+                lastReclaimAt: null,
+            }),
+        ).toBe(false);
+    });
+
+    it('is false for a node that has reported nothing at all', () => {
+        expect(hasFleetNodeHousekeeping({})).toBe(false);
     });
 });

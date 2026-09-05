@@ -14,6 +14,7 @@ import {
 	admitByResourceLimits,
 	hasAdmissionCeilings,
 	hasDiskFloor,
+	judgeDiskFloor,
 	type AdmissionDecision,
 	type ResourceProbe,
 	type ResourceSample
@@ -905,12 +906,20 @@ export class WorkerLoop {
 		if (wantsDisk) {
 			// Measured on the nearest EXISTING ancestor of the root (a fresh
 			// node has not created it yet). A throwing / nonsense probe maps
-			// to null, and null admits: an unreadable volume is reported (the
-			// heartbeat carries no figure) rather than idling the node.
+			// to null, and null now REFUSES: the provisioner refuses the same
+			// unreadable reading, and a node that leases on it only defers the
+			// job later, burning its attempt budget (review AO-11).
 			sample.diskFreeBytes = await measureWorkspaceFreeBytes(this.diskProbe!, this.workspacePath!);
+		} else {
+			// Not sampled on this poll. Cleared explicitly so a host probe
+			// that happens to carry the field cannot make the floor speak.
+			delete sample.diskFreeBytes;
 		}
 		const decision = admitByResourceLimits(this.limits, sample);
-		this.noteDiskDecision(decision);
+		// Judged from the SAMPLE, not from `decision`: `admitByResourceLimits`
+		// reports only the first refusing dimension, so a disk refusal
+		// disappears from it the moment CPU or memory also trips.
+		this.noteDiskDecision(wantsDisk ? judgeDiskFloor(this.limits, sample) : null);
 		return decision;
 	}
 
@@ -918,18 +927,31 @@ export class WorkerLoop {
 	 * One warning when the floor starts refusing, one info line when it
 	 * clears — not a line per poll, which at the idle cadence would be a
 	 * log entry every five seconds for as long as the disk stays full.
+	 *
+	 * `refusal` is the DISK's own verdict (null = the volume is fine, or
+	 * the floor was not evaluated on this poll). It used to be the whole
+	 * admission decision, which meant a CPU refusal on the next poll
+	 * cleared the latch and logged "the volume is back above the disk floor
+	 * — leasing resumes" about a machine still sitting at 190 MB and still
+	 * leasing nothing (review AO-7). On a node with a CPU ceiling that
+	 * produced an alternating refuse/resume log — the exact signal an
+	 * operator is told to read to find out why the node went quiet.
 	 */
-	private noteDiskDecision(decision: AdmissionDecision): void {
-		if (!decision.admit && decision.dimension === 'disk') {
-			if (this.lastDiskRefusal !== decision.reason) {
-				this.lastDiskRefusal = decision.reason;
+	private noteDiskDecision(refusal: AdmissionDecision | null): void {
+		if (refusal) {
+			if (this.lastDiskRefusal !== refusal.reason) {
+				this.lastDiskRefusal = refusal.reason;
 				this.options.logger?.warn(
-					`Refusing to lease work: ${decision.reason}. Free space on the workspace volume (\`ever-works-node doctor\`, \`ever-works-node gc\`) or lower the floor with --min-free-disk.`
+					// Both remedies, because the refusal now has two causes:
+					// a volume that is genuinely full, and one whose free
+					// space cannot be read at all — where clearing space
+					// fixes nothing and only `--no-disk-floor` does.
+					`Refusing to lease work: ${refusal.reason}. Free space on the workspace volume (\`ever-works-node doctor\`, \`ever-works-node gc\`), lower the floor with --min-free-disk, or switch it off with --no-disk-floor.`
 				);
 			}
 			return;
 		}
-		if (this.lastDiskRefusal !== null && (decision.admit || decision.dimension !== 'disk')) {
+		if (this.lastDiskRefusal !== null) {
 			this.lastDiskRefusal = null;
 			this.options.logger?.info('Workspace volume is back above the disk floor — leasing resumes');
 		}

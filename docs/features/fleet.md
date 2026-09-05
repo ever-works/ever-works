@@ -187,7 +187,35 @@ node apps/node/dist/cli.js start --work
 
 `start` alone only heartbeats; **`--work`** is the separate consent that lets the machine lease and execute platform jobs. `pause` / `resume` drain and undrain it, `unenroll` retires it, `status` and `capabilities` inspect it. Until the package is published, the binary is `apps/node/dist/cli.js` — the unattended-install scripts (systemd unit, Windows service, container image, in `apps/node/packaging/README.md`) expect a command named `ever-works-node` on `PATH`. The full command reference, the config-file and keychain layout, and the capability tags a node reports are in `apps/node/README.md`.
 
-A node also looks after its own disk. It refuses to lease (and to provision) while the volume holding its workspace root has less than a **disk floor** free — 2 GiB by default, `--min-free-disk <mb>` to change it — and shows up as `throttled` with the reason, so a full machine stops taking work before a job fails halfway through a fetch. With `--work` it also runs a **workspace reaper** that removes Task worktrees it can prove are safe to remove (owned, not in use, clean, fully pushed, and with a branch that is gone from the remote or merged) once they are older than `--workspace-max-age` (14 days by default); anything it cannot prove stays. `ever-works-node doctor` prints the free space against the floor and what the reaper would do, `ever-works-node gc [--dry-run]` runs it by hand. Details and the exact rules: `apps/node/README.md`, "Disk floor and workspace GC".
+A node also looks after its own disk. It refuses to lease (and to provision) while the volume holding its workspace root has less than a **disk floor** free — 2 GiB by default, `--min-free-disk <mib>` (mebibytes) to change it — and shows up as `throttled` with the reason, so a full machine stops taking work before a job fails halfway through a fetch. With `--work` it also runs a **workspace reaper** that removes Task worktrees it can prove are safe to remove (owned, not in use, clean, fully pushed, and with a branch that is gone from the remote or merged) once they are older than `--workspace-max-age` (14 days by default); anything it cannot prove stays. `ever-works-node doctor` prints the free space against the floor and what the reaper would do, `ever-works-node gc [--dry-run]` runs it by hand. Details and the exact rules: `apps/node/README.md`, "Disk floor and workspace GC".
+
+The two gates around the floor are deliberately **asymmetric**, and an operator will notice the difference:
+
+- At the **lease**, a free-space reading the node cannot take never blocks. Refusing there would idle a whole machine indefinitely because of a broken `statfs`, and nothing has been spent yet.
+- Before **provisioning** — re-checked there because minutes can pass since the lease and that is where the space is actually consumed — the floor **fails closed**: if free space cannot be measured, the node refuses. That is the last check before a clone, a fetch and a model's whole budget land on a volume nobody can size, and there is no gate after it. The refusal is a _deferral_, not a failure: the job goes back unsettled and the platform re-offers it to a machine that can answer. `ever-works-node doctor` says so explicitly when the reading is unavailable.
+
+### What the platform can see about a node's disk
+
+The heartbeat carries the node's **housekeeping** alongside its free-space reading, so the Fleet node drawer can answer questions the free-space figure alone cannot:
+
+| Field                   | What it says                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| `minFreeDiskBytes`      | the floor this machine enforces on itself; `null` = the operator switched it off |
+| `workspaceCount`        | Task worktrees it was holding when its last sweep finished                       |
+| `workspaceBytes`        | what those worktrees occupy                                                      |
+| `lastReclaimAt`         | when its last sweep completed — **the node's own clock**                         |
+| `lastReclaimFreedBytes` | what that sweep freed (`0` is a real answer: it ran and found nothing)           |
+
+The drawer shows **Above floor** / **Below floor** / **Unknown** with both figures, the workspaces retained, and the last reclaim. Two readings worth knowing how to interpret:
+
+- **Below floor** on a node that reads `online` and holds no jobs is the explanation for a machine that has gone quiet. It is derived from the two reported numbers, so it can be visible before the node's `throttled` worker state catches up.
+- **"No reclaim reported yet"** on a node that _is_ reporting workspaces means its reaper has never completed a sweep on that machine — the state that ends with a full disk. A node running without `--work` has no reaper at all and reports no housekeeping; the drawer says "not reported" once rather than showing four blanks.
+
+**Unknown is never a verdict.** A node with plenty of space but no floor reported reads _Unknown_, not _Above floor_: with the floor off, or on a daemon older than these fields, there is no line to be above, and saying otherwise would be a reassurance nobody earned. Likewise `null` and "never reported" are indistinguishable for the floor by design — both mean there is nothing to compare the free-space figure against.
+
+These figures travel **upward only**. The limit is still evaluated entirely on the machine; the platform neither sets it, routes on it, nor assumes a node respects it. There is no path for pushing a floor, a workspace budget or a reclaim policy down to a node — those are set at that keyboard, with `--min-free-disk`, `--workspace-max-age` and `--workspace-max-count`. The CPU and memory ceilings are **not** reported at all: they have no companion reading on the wire, so a ceiling on its own would be a number with nothing to compare it against.
+
+`lastReclaimAt` is the one instant on a node row the platform does not stamp itself, so it is treated as untrusted: an unparseable value, or one implausibly far in the future, is recorded as unknown rather than rejected — rejecting it would fail the heartbeat, and a failed heartbeat is a live node swept `offline`. A node that has never reported a figure shows **unknown**, never `0`: "no workspaces" and "we have never been told" are different facts, and only the first is reassuring.
 
 ### Pin an agent to a node
 

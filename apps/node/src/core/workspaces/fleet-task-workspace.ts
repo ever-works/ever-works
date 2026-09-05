@@ -24,7 +24,12 @@ export type FleetTaskWorkspaceErrorCode =
 	| 'provision-failed'
 	| 'path-collision'
 	| 'git-failed'
-	/** The workspace volume is below the node's disk floor; nothing was written. */
+	/**
+	 * The workspace volume is below the node's disk floor, OR its free
+	 * space could not be measured at all; nothing was written either way.
+	 * The floor fails closed at provision time — see `assertDiskHeadroom`
+	 * for why this gate is stricter than the one at the lease.
+	 */
 	| 'disk-low'
 	/**
 	 * The worktree is being reclaimed by the workspace reaper right now;
@@ -258,10 +263,20 @@ export async function readWorkspaceUsage(gitDir: string): Promise<FleetWorkspace
 	};
 }
 
-export type WorkspaceLeaseAcquisition = { acquired: true } | { acquired: false; heldBy: FleetWorkspaceLease };
+export type WorkspaceLeaseAcquisition =
+	| { acquired: true }
+	| { acquired: false; heldBy: FleetWorkspaceLease }
+	/**
+	 * A lease file is PRESENT and this build cannot read it as a lease — a
+	 * future `version`, an unknown `purpose`, a link where a file belongs,
+	 * or a torn write left by a hard kill. Nobody can be named, and nobody
+	 * may be evicted either: see the fail-closed note on
+	 * {@link acquireWorkspaceLease}.
+	 */
+	| { acquired: false; unreadable: string };
 
 /**
- * Take the lease on a worktree with O_EXCL.
+ * Take the lease on a worktree, exclusively.
  *
  * An existing lease is replaced only when it is provably not in use: held
  * by a pid that is no longer running, or by THIS process for the SAME
@@ -269,6 +284,27 @@ export type WorkspaceLeaseAcquisition = { acquired: true } | { acquired: false; 
  * held by a live pid — or by this process for the OTHER purpose, which is
  * the in-process reaper and a job meeting on one worktree — is reported,
  * never overwritten.
+ *
+ * ## An unreadable lease is HELD, never reclaimable (review AO-3)
+ *
+ * This file is the only cross-process evidence that a job is running in a
+ * worktree, and the reaper's `removeWorktree` takes it immediately before
+ * `git worktree remove --force`. It used to delete any lease it could not
+ * PARSE and take the slot — so the one file that gates an irreversible
+ * delete opened when it became unreadable, which is the wrong side of
+ * every other rule in this slice ("unknown state means keep"). Two builds
+ * on one machine is the shipped pattern (the worker runs as a Windows
+ * service while an operator runs `ever-works-node gc` from a shell), so a
+ * lease this build does not recognise is a live job at least as often as
+ * it is litter.
+ *
+ * The write is made atomic for the same reason: the temp file is written
+ * in full and then hard-linked into place, so a crash mid-write can no
+ * longer leave a torn lease that this rule would then treat as held
+ * forever. `link` is the atomic-AND-exclusive primitive (`rename`, which
+ * the usage file uses, would clobber a live lease); where the filesystem
+ * has no hard links the exclusive create is used directly, exactly as
+ * before.
  */
 export async function acquireWorkspaceLease(
 	gitDir: string,
@@ -279,19 +315,29 @@ export async function acquireWorkspaceLease(
 	const content = `${JSON.stringify(lease)}\n`;
 	for (let attempt = 0; attempt < 3; attempt += 1) {
 		try {
-			await fs.writeFile(path, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+			await createLeaseFileExclusive(path, content);
 			return { acquired: true };
 		} catch (error) {
 			if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
 		}
 		const existing = await readWorkspaceLease(gitDir);
-		if (existing) {
-			const ours = existing.pid === lease.pid && existing.purpose === lease.purpose;
-			if (!ours && isProcessAlive(existing.pid)) {
-				return { acquired: false, heldBy: existing };
+		if (!existing) {
+			// Present but not a lease this build understands: fail closed.
+			// (Gone between the create and the read is a plain race — retry.)
+			const stats = await lstatOrNull(path);
+			if (stats) {
+				return {
+					acquired: false,
+					unreadable: `the lease file at '${path}' exists but could not be read as a lease of this version`
+				};
 			}
+			continue;
 		}
-		// Stale (dead pid), ours, or unreadable: replace it and try again.
+		const ours = existing.pid === lease.pid && existing.purpose === lease.purpose;
+		if (!ours && isProcessAlive(existing.pid)) {
+			return { acquired: false, heldBy: existing };
+		}
+		// Stale (dead pid) or ours: replace it and try again.
 		await fs.unlink(path).catch((error: NodeJS.ErrnoException) => {
 			if (error.code !== 'ENOENT') throw error;
 		});
@@ -299,6 +345,42 @@ export async function acquireWorkspaceLease(
 	const contended = await readWorkspaceLease(gitDir);
 	if (contended) return { acquired: false, heldBy: contended };
 	throw new Error(`workspace lease at '${path}' could not be taken`);
+}
+
+/**
+ * Create the lease file with its full content or fail with `EEXIST` —
+ * both properties at once. The content is written to a private temp file
+ * first, so the only thing that can appear at `path` is a complete lease.
+ */
+async function createLeaseFileExclusive(path: string, content: string): Promise<void> {
+	const temporary = `${path}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`;
+	try {
+		await fs.writeFile(temporary, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+	} catch {
+		// No temp file (a read-only or exotic filesystem): the direct
+		// exclusive create is still correct, just not crash-atomic.
+		await fs.writeFile(path, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+		return;
+	}
+	try {
+		await fs.link(temporary, path);
+	} catch (error) {
+		// EEXIST is the contention this function exists to report; anything
+		// else means hard links are unavailable here, not that we may skip
+		// the exclusivity.
+		if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw error;
+		await fs.writeFile(path, content, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
+	} finally {
+		await fs.unlink(temporary).catch(() => undefined);
+	}
+}
+
+async function lstatOrNull(path: string): Promise<Awaited<ReturnType<typeof fs.lstat>> | null> {
+	try {
+		return await fs.lstat(path);
+	} catch {
+		return null;
+	}
 }
 
 /** Drop a lease this process holds. A lease held by anyone else is left alone; a missing one is success. */
@@ -400,6 +482,60 @@ export function defaultFleetTaskWorkspaceRoot(
 ): string {
 	const configured = (env.EVER_WORKS_NODE_WORKSPACE_ROOT ?? env.EW_WORKSPACES_DIR ?? '').trim();
 	return configured || join(homePath, '.ever-works', 'fleet-workspaces');
+}
+
+/**
+ * Refuse to write into `targetPath`'s volume unless it can be PROVEN to
+ * have room. Fails closed: a floor that cannot be evaluated refuses.
+ *
+ * This is the LAST gate before a clone, a fetch and a model's whole
+ * budget go onto a volume, and there is no gate after it — so an
+ * unreadable reading refuses here, where a wrong guess costs a
+ * half-written worktree and the spend of a run that dies inside git or
+ * pnpm.
+ *
+ * That is no longer an asymmetry with the lease gate: `admitByResourceLimits`
+ * refuses the same unreadable reading (review AO-11). It had to. While it
+ * admitted, a host whose `statfs` cannot answer — a persistent condition,
+ * per `createDiskProbe` — leased every job it was offered and then
+ * deferred it here, burning one attempt per 300 s lapse until the platform
+ * failed the job with a message that never mentioned disk. Two gates only
+ * compose safely when the earlier one is at least as strict as the later.
+ *
+ * Refusing is cheap because it is a DEFERRAL, not a verdict: `disk-low`
+ * is in `DECLINED_PROVISION_CODES`, so the job goes back unsettled.
+ *
+ * The two early returns are not the same as an unknown reading. No probe
+ * wired, or a floor the operator explicitly switched off, means the
+ * control was never asked for — there is no limit to fail closed ON. An
+ * unknown reading means the control WAS asked for and could not be
+ * evaluated, which is exactly the case that must refuse.
+ */
+export async function assertWorkspaceDiskHeadroom(
+	diskProbe: DiskProbeIo | undefined,
+	minFreeDiskBytes: number | null,
+	targetPath: string,
+	signal?: AbortSignal
+): Promise<void> {
+	throwIfCancelled(signal);
+	if (!diskProbe || minFreeDiskBytes === null) return;
+	const free = await measureWorkspaceFreeBytes(diskProbe, targetPath);
+	throwIfCancelled(signal);
+	if (free === null) {
+		throw new FleetTaskWorkspaceError(
+			'disk-low',
+			`Refusing to provision: free space on the workspace volume (${targetPath}) could not be measured, so the ${formatBytes(
+				minFreeDiskBytes
+			)} floor cannot be checked. Run \`ever-works-node doctor\` on this node.`
+		);
+	}
+	if (free >= minFreeDiskBytes) return;
+	throw new FleetTaskWorkspaceError(
+		'disk-low',
+		`Refusing to provision: ${formatBytes(free)} free on the workspace volume (${targetPath}), below the ${formatBytes(
+			minFreeDiskBytes
+		)} floor. Run \`ever-works-node doctor\` on this node.`
+	);
 }
 
 /**
@@ -583,19 +719,10 @@ export class FleetTaskWorkspaceProvisioner {
 		}
 	}
 
-	/** Refuse to write when the workspace volume is below the floor; an unknown reading admits. */
+	/** @see assertWorkspaceDiskHeadroom — the shared gate, so every writer refuses on the same evidence. */
 	private async assertDiskHeadroom(signal?: AbortSignal): Promise<void> {
 		throwIfCancelled(signal);
-		if (!this.diskProbe || this.minFreeDiskBytes === null) return;
-		const free = await measureWorkspaceFreeBytes(this.diskProbe, this.rootPath);
-		throwIfCancelled(signal);
-		if (free === null || free >= this.minFreeDiskBytes) return;
-		throw new FleetTaskWorkspaceError(
-			'disk-low',
-			`Refusing to provision: ${formatBytes(free)} free on the workspace volume (${this.rootPath}), below the ${formatBytes(
-				this.minFreeDiskBytes
-			)} floor. Run \`ever-works-node doctor\` on this node.`
-		);
+		await assertWorkspaceDiskHeadroom(this.diskProbe, this.minFreeDiskBytes, this.rootPath, signal);
 	}
 
 	/**
@@ -629,6 +756,17 @@ export class FleetTaskWorkspaceProvisioner {
 			this.isProcessAlive
 		);
 		if (!acquisition.acquired) {
+			// An unreadable lease means a process this build cannot identify
+			// may be in this worktree right now. Refuse rather than write
+			// through it, and say exactly which file an operator must look
+			// at — this does not clear on its own and must not read as a
+			// transient the platform should retry forever.
+			if ('unreadable' in acquisition) {
+				throw new FleetTaskWorkspaceError(
+					'path-collision',
+					`Task workspace may be in use by another process: ${acquisition.unreadable}. The workspace was preserved; remove that file only once no job is running in it.`
+				);
+			}
 			// The reaper holding it is OUR housekeeping mid-removal: a transient
 			// the executor hands back rather than a verdict about the job. A
 			// live foreign job is an anomaly (two processes on one root) worth

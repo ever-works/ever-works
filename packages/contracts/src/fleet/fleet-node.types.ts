@@ -234,6 +234,50 @@ export interface FleetNodeSelfDescription {
 	 * sanitizes and caps it at {@link FLEET_MAX_WORKER_STATE_REASON_LENGTH}.
 	 */
 	workerStateReason?: string;
+	/**
+	 * Node housekeeping (EW-803) — the disk FLOOR this machine enforces on
+	 * itself, in bytes. `null` means the operator switched the floor off.
+	 *
+	 * Reported for VISIBILITY only, and that distinction is the whole
+	 * reason it is allowed to exist. The limit is still evaluated entirely
+	 * on the node; the platform neither sets it, nor consults it when
+	 * routing, nor may assume a node respects it — a lent machine stays
+	 * bounded from its own side. What the figure closes is an operator
+	 * question that {@link FleetNodeSelfDescription.diskFreeBytes} alone
+	 * cannot answer: "1.2 GB free" says nothing about whether that is
+	 * above or below the line at which this node stops taking work.
+	 *
+	 * Additive like {@link FleetNodeSelfDescription.cliVersion}, with ONE
+	 * difference: an explicit `null` is not the same as absent. Absent
+	 * means "this daemon said nothing" and leaves the stored value alone;
+	 * `null` means "there is no floor on this machine" and does overwrite,
+	 * because a floor that was switched off is a fact an operator needs.
+	 */
+	minFreeDiskBytes?: number | null;
+	/**
+	 * How many workspaces (Task worktrees) the node was holding when its
+	 * reclaim sweep last finished. Capped at {@link FLEET_MAX_WORKSPACE_COUNT}.
+	 *
+	 * The number that answers "is this machine accumulating?" — bytes
+	 * alone cannot tell one enormous checkout from four hundred small
+	 * ones, and only the second means the reaper is falling behind.
+	 */
+	workspaceCount?: number;
+	/** Bytes those retained workspaces occupy, as last measured by the sweep. */
+	workspaceBytes?: number;
+	/**
+	 * ISO-8601 instant at which the node's last reclaim sweep COMPLETED.
+	 *
+	 * The NODE's own clock, and therefore the one field here the platform
+	 * cannot corroborate — a machine with a stepped clock reports a wrong
+	 * instant and the server has no way to know. Stored anyway, because
+	 * "the reaper last ran three weeks ago" is exactly the fact that
+	 * explains a full disk; refused outright when it does not parse or
+	 * lands implausibly far in the future.
+	 */
+	lastReclaimAt?: string;
+	/** Bytes that sweep reclaimed. Zero is a real answer: it ran and found nothing to take. */
+	lastReclaimFreedBytes?: number;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -306,6 +350,19 @@ export interface FleetNodeView {
 	 * hundreds of beats that follow rather than resetting every 30s.
 	 */
 	workerStateChangedAt?: string | null;
+	/**
+	 * Node housekeeping (EW-803), as last reported. Every one of these is
+	 * null for a node that has never reported it — an older daemon, a
+	 * visibility-only node with no worker, or a worker whose first reclaim
+	 * sweep has not run yet. Null renders as "unknown", never as zero:
+	 * "0 workspaces" and "we have never been told" are different facts,
+	 * and only the first would be reassuring.
+	 */
+	minFreeDiskBytes?: number | null;
+	workspaceCount?: number | null;
+	workspaceBytes?: number | null;
+	lastReclaimAt?: string | null;
+	lastReclaimFreedBytes?: number | null;
 }
 
 /**
@@ -411,6 +468,18 @@ export const FLEET_MAX_DAILY_COST_CEILING_CENTS = 100_000 * 100;
  * make the runner widget render a machine with an exabyte free.
  */
 export const FLEET_MAX_DISK_FREE_BYTES = 2 ** 60;
+
+/**
+ * Ceiling on a node's reported workspace COUNT (EW-803).
+ *
+ * 100,000 Task worktrees is not a machine that needs a bigger reaper — a
+ * single checkout of the monorepo is tens of megabytes, so a hundred
+ * thousand of them cannot fit on any volume a node runs on. Like
+ * {@link FLEET_MAX_DISK_FREE_BYTES} this is the "certainly nonsense"
+ * line, not a policy: a count outside `[0, this]` is dropped rather than
+ * clamped, because a clamped figure is one an operator would believe.
+ */
+export const FLEET_MAX_WORKSPACE_COUNT = 100_000;
 
 /** Node display-name bounds, enforced by the DTO and re-checked in the service. */
 export const FLEET_MIN_NODE_NAME_LENGTH = 1;

@@ -496,6 +496,16 @@ export class FleetController {
             modelIdentity: body.modelIdentity,
             workerState: body.workerState,
             workerStateReason: body.workerStateReason,
+            // Node housekeeping (EW-803). Named here, like everything
+            // above, because this mapping is the thing that decides what
+            // actually reaches the service — a field added to the DTO and
+            // forgotten on this line is accepted at the edge and then
+            // silently dropped.
+            minFreeDiskBytes: body.minFreeDiskBytes,
+            workspaceCount: body.workspaceCount,
+            workspaceBytes: body.workspaceBytes,
+            lastReclaimAt: body.lastReclaimAt,
+            lastReclaimFreedBytes: body.lastReclaimFreedBytes,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -523,6 +533,16 @@ export class FleetController {
             modelIdentity: body.modelIdentity,
             workerState: body.workerState,
             workerStateReason: body.workerStateReason,
+            // Node housekeeping (EW-803). Named here, like everything
+            // above, because this mapping is the thing that decides what
+            // actually reaches the service — a field added to the DTO and
+            // forgotten on this line is accepted at the edge and then
+            // silently dropped.
+            minFreeDiskBytes: body.minFreeDiskBytes,
+            workspaceCount: body.workspaceCount,
+            workspaceBytes: body.workspaceBytes,
+            lastReclaimAt: body.lastReclaimAt,
+            lastReclaimFreedBytes: body.lastReclaimFreedBytes,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

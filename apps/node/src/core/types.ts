@@ -323,6 +323,24 @@ export interface NodeConfig {
 	 * byte-for-byte.
 	 */
 	workspaceGc?: NodeWorkspaceGcPolicy;
+	/**
+	 * The workspace root this node actually runs against, recorded by
+	 * `start --workspace-root` (node housekeeping, EW-803).
+	 *
+	 * Stored so that `doctor` and `gc` inspect the SAME tree the service
+	 * uses. They resolved it independently before — flag, else
+	 * `defaultFleetTaskWorkspaceRoot`, which falls back to `homedir()` —
+	 * and the Windows installer's preflight ERRORS unless the operator
+	 * passes `-WorkspaceRoot D:\...`, so `doctor` routinely reported
+	 * `0 worktree(s), 0 B` about an empty directory in the admin's own
+	 * profile while the node was refusing every job for want of space on
+	 * D:. Both disk-refusal messages send the operator to exactly those two
+	 * commands, so they have to land on the right tree.
+	 *
+	 * Absent means "never set on this machine" — the default applies, and
+	 * a config that never carried the key round-trips without it.
+	 */
+	workspaceRoot?: string;
 	/** Local display label; the authoritative name lives on the platform. */
 	name?: string;
 	heartbeatIntervalMs: number;
@@ -350,6 +368,8 @@ export interface RedactedNodeConfig {
 	capabilitySelection?: string[];
 	limits: NodeResourceLimits;
 	workspaceGc?: NodeWorkspaceGcPolicy;
+	/** Where this node keeps its worktrees; a path, never a credential. */
+	workspaceRoot?: string;
 	name?: string;
 	heartbeatIntervalMs: number;
 	enrolledAt: string;
@@ -382,6 +402,9 @@ export function redactConfig(config: NodeConfig): RedactedNodeConfig {
 	}
 	if (config.workspaceGc !== undefined) {
 		redacted.workspaceGc = clampWorkspaceGcPolicy(config.workspaceGc);
+	}
+	if (config.workspaceRoot !== undefined) {
+		redacted.workspaceRoot = config.workspaceRoot;
 	}
 	if (config.name !== undefined) {
 		redacted.name = config.name;

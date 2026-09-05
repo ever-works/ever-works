@@ -590,4 +590,230 @@ describe('FleetService node telemetry', () => {
             expect(patch.workerStateReason).toBeNull();
         });
     });
+
+    /**
+     * Node housekeeping (EW-803) — the disk floor a node enforces on
+     * itself, and what its reaper last reclaimed.
+     *
+     * Same additive contract as the telemetry above, with ONE deliberate
+     * exception that most of these cases exist to pin: an explicit `null`
+     * floor CLEARS the column, because "the operator switched the floor
+     * off" has no other way to be said, and a stale floor shown beside a
+     * node that no longer has one is worse than showing nothing.
+     *
+     * `lastReclaimAt` is the only instant on this row the NODE supplies
+     * rather than the server stamping, so it is handled as untrusted
+     * input rather than as data.
+     */
+    describe('housekeeping (EW-803)', () => {
+        const enrolling = (token: string) =>
+            repository.findByCredentialHash.mockResolvedValue(
+                node({
+                    status: 'enrolling',
+                    enrollmentTokenHash: sha256(token),
+                    credentialIssuedAt: new Date(),
+                }),
+            );
+
+        it('stores the floor and the last sweep from a heartbeat', async () => {
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                minFreeDiskBytes: 2 * 1024 ** 3,
+                workspaceCount: 12,
+                workspaceBytes: 40 * 1024 ** 3,
+                lastReclaimAt: '2026-09-05T09:30:00.000Z',
+                lastReclaimFreedBytes: 3 * 1024 ** 3,
+            });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch.minFreeDiskBytes).toBe(2 * 1024 ** 3);
+            expect(patch.workspaceCount).toBe(12);
+            expect(patch.workspaceBytes).toBe(40 * 1024 ** 3);
+            expect(patch.lastReclaimAt).toEqual(new Date('2026-09-05T09:30:00.000Z'));
+            expect(patch.lastReclaimFreedBytes).toBe(3 * 1024 ** 3);
+        });
+
+        it('leaves every housekeeping column alone when the beat says nothing', async () => {
+            // The whole backward-compatibility story: a daemon older than
+            // this slice sends none of these and must not blank them.
+            repository.findById.mockResolvedValue(
+                node({ minFreeDiskBytes: '2147483648', workspaceCount: 9 }),
+            );
+            const service = build();
+
+            const result = await service.heartbeat(NODE_ID, SECRET, { platform: 'linux/x64' });
+
+            const patch = repository.update.mock.calls[0][1];
+            for (const field of [
+                'minFreeDiskBytes',
+                'workspaceCount',
+                'workspaceBytes',
+                'lastReclaimAt',
+                'lastReclaimFreedBytes',
+            ]) {
+                expect(patch).not.toHaveProperty(field);
+            }
+            expect(result?.node.minFreeDiskBytes).toBe(2147483648);
+            expect(result?.node.workspaceCount).toBe(9);
+        });
+
+        it('CLEARS the floor on an explicit null — the one field where null differs from absent', async () => {
+            repository.findById.mockResolvedValue(node({ minFreeDiskBytes: '2147483648' }));
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, { minFreeDiskBytes: null });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch).toHaveProperty('minFreeDiskBytes');
+            expect(patch.minFreeDiskBytes).toBeNull();
+        });
+
+        it('drops a nonsense count or byte figure rather than clamping it', async () => {
+            // A clamped figure is a plausible number an operator would act
+            // on; "unknown" is the honest rendering of a broken probe.
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                workspaceCount: 999_999_999,
+                workspaceBytes: -1,
+                minFreeDiskBytes: Number.POSITIVE_INFINITY,
+            });
+
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch).not.toHaveProperty('workspaceCount');
+            expect(patch).not.toHaveProperty('workspaceBytes');
+            // A refused FLOOR is dropped too. Only an EXPLICIT null clears
+            // it, so a broken probe can never read as "the floor is off".
+            expect(patch).not.toHaveProperty('minFreeDiskBytes');
+        });
+
+        it('refuses a fractional workspace count', async () => {
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, { workspaceCount: 3.5 });
+
+            expect(repository.update.mock.calls[0][1]).not.toHaveProperty('workspaceCount');
+        });
+
+        it('refuses an unparseable reclaim instant without failing the beat', async () => {
+            // Rejecting it at the DTO would fail the whole request, and a
+            // failed heartbeat is a live node swept offline. Losing one
+            // cosmetic figure is the correct price.
+            const service = build();
+
+            const result = await service.heartbeat(NODE_ID, SECRET, {
+                platform: 'linux/x64',
+                lastReclaimAt: 'last Tuesday',
+                lastReclaimFreedBytes: 3 * 1024 ** 3,
+            });
+
+            expect(result).not.toBeNull();
+            const patch = repository.update.mock.calls[0][1];
+            expect(patch).not.toHaveProperty('lastReclaimAt');
+            // The bytes go with it: a freed figure written against the
+            // PREVIOUS sweep's timestamp would misdate a real reclaim.
+            expect(patch).not.toHaveProperty('lastReclaimFreedBytes');
+            expect(patch.platform).toBe('linux/x64');
+        });
+
+        it('refuses an instant implausibly far in the future, and accepts one far in the past', async () => {
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                lastReclaimAt: new Date(Date.now() + 6 * 60 * 60_000).toISOString(),
+            });
+            expect(repository.update.mock.calls[0][1]).not.toHaveProperty('lastReclaimAt');
+
+            // "Last reclaimed in March" is not implausible — it is the exact
+            // finding this field exists to surface, so it is accepted.
+            repository.update.mockClear();
+            await service.heartbeat(NODE_ID, SECRET, {
+                lastReclaimAt: '2026-03-01T00:00:00.000Z',
+            });
+            expect(repository.update.mock.calls[0][1].lastReclaimAt).toEqual(
+                new Date('2026-03-01T00:00:00.000Z'),
+            );
+        });
+
+        it('writes a zero-byte reclaim, because a sweep that took nothing is a real outcome', async () => {
+            const service = build();
+
+            await service.heartbeat(NODE_ID, SECRET, {
+                lastReclaimAt: '2026-09-05T09:30:00.000Z',
+                lastReclaimFreedBytes: 0,
+            });
+
+            expect(repository.update.mock.calls[0][1].lastReclaimFreedBytes).toBe(0);
+        });
+
+        it('stamps every housekeeping column on enroll, since the row is new', async () => {
+            const token = 'd'.repeat(43);
+            enrolling(token);
+            const service = build();
+
+            await service.enroll(token, {
+                minFreeDiskBytes: 2 * 1024 ** 3,
+                workspaceCount: 4,
+                workspaceBytes: 1024 ** 3,
+                lastReclaimAt: '2026-09-05T09:30:00.000Z',
+                lastReclaimFreedBytes: 0,
+            });
+
+            const patch = repository.consumeEnrollment.mock.calls[0][2];
+            expect(patch.minFreeDiskBytes).toBe(2 * 1024 ** 3);
+            expect(patch.workspaceCount).toBe(4);
+            expect(patch.workspaceBytes).toBe(1024 ** 3);
+            expect(patch.lastReclaimAt).toEqual(new Date('2026-09-05T09:30:00.000Z'));
+            expect(patch.lastReclaimFreedBytes).toBe(0);
+        });
+
+        it('nulls housekeeping an enrolling node does not report', async () => {
+            const token = 'e'.repeat(43);
+            enrolling(token);
+            const service = build();
+
+            await service.enroll(token, {});
+
+            const patch = repository.consumeEnrollment.mock.calls[0][2];
+            expect(patch.minFreeDiskBytes).toBeNull();
+            expect(patch.workspaceCount).toBeNull();
+            expect(patch.lastReclaimAt).toBeNull();
+        });
+
+        it('normalizes bigint columns onto the view the way each driver hands them back', async () => {
+            // Postgres returns `bigint` as a STRING, sqlite as a number.
+            // `toView` is the one place that difference is resolved.
+            repository.findById.mockResolvedValue(
+                node({
+                    minFreeDiskBytes: '2147483648',
+                    workspaceBytes: '42949672960',
+                    lastReclaimFreedBytes: 0,
+                    lastReclaimAt: new Date('2026-09-05T09:30:00.000Z'),
+                }),
+            );
+            const service = build();
+
+            const result = await service.heartbeat(NODE_ID, SECRET, {});
+
+            expect(result?.node.minFreeDiskBytes).toBe(2147483648);
+            expect(result?.node.workspaceBytes).toBe(42949672960);
+            expect(result?.node.lastReclaimFreedBytes).toBe(0);
+            expect(result?.node.lastReclaimAt).toBe('2026-09-05T09:30:00.000Z');
+        });
+
+        it('reports never-populated columns as null, never as zero', async () => {
+            // "0 workspaces" reads as a tidy machine; the truth is that we
+            // have never been told. The UI must be able to tell them apart.
+            const service = build();
+
+            const result = await service.heartbeat(NODE_ID, SECRET, {});
+
+            expect(result?.node.minFreeDiskBytes).toBeNull();
+            expect(result?.node.workspaceCount).toBeNull();
+            expect(result?.node.workspaceBytes).toBeNull();
+            expect(result?.node.lastReclaimAt).toBeNull();
+            expect(result?.node.lastReclaimFreedBytes).toBeNull();
+        });
+    });
 });

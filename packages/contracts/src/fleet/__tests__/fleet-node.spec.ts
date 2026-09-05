@@ -13,6 +13,7 @@ import {
 	FLEET_MAX_CLI_VERSION_LENGTH,
 	FLEET_MAX_DAILY_COST_CEILING_CENTS,
 	FLEET_MAX_DISK_FREE_BYTES,
+	FLEET_MAX_WORKSPACE_COUNT,
 	FLEET_MAX_MODEL_IDENTITY_LENGTH,
 	FLEET_MAX_NODE_NAME_LENGTH,
 	FLEET_MAX_PLATFORM_LENGTH,
@@ -47,6 +48,7 @@ function BOUNDS_AND_TUNABLES(): Array<[string, number]> {
 		['FLEET_MAX_MODEL_IDENTITY_LENGTH', FLEET_MAX_MODEL_IDENTITY_LENGTH],
 		['FLEET_MAX_DAILY_COST_CEILING_CENTS', FLEET_MAX_DAILY_COST_CEILING_CENTS],
 		['FLEET_MAX_DISK_FREE_BYTES', FLEET_MAX_DISK_FREE_BYTES],
+		['FLEET_MAX_WORKSPACE_COUNT', FLEET_MAX_WORKSPACE_COUNT],
 		['FLEET_MIN_NODE_NAME_LENGTH', FLEET_MIN_NODE_NAME_LENGTH],
 		['FLEET_MAX_NODE_NAME_LENGTH', FLEET_MAX_NODE_NAME_LENGTH],
 		['FLEET_CREDENTIAL_MIN_LENGTH', FLEET_CREDENTIAL_MIN_LENGTH],
@@ -425,5 +427,25 @@ describe('FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS', () => {
 
 	it('defaults to 30 minutes', () => {
 		expect(FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS).toBe(30 * 60_000);
+	});
+});
+
+describe('FLEET_MAX_WORKSPACE_COUNT', () => {
+	it('is the "certainly nonsense" line, not a policy on how many workspaces a node may hold', () => {
+		// A real machine that has gone unreaped for months holds hundreds,
+		// maybe a few thousand, Task worktrees. The cap has to sit far above
+		// anything legitimate, because a count at or under it is STORED and
+		// shown verbatim — the platform must never quietly turn a broken
+		// probe's figure into a plausible one.
+		expect(FLEET_MAX_WORKSPACE_COUNT).toBe(100_000);
+		expect(FLEET_MAX_WORKSPACE_COUNT).toBeGreaterThan(10_000);
+	});
+
+	it('stays a safe integer, unlike the byte ceiling beside it', () => {
+		// `FLEET_MAX_DISK_FREE_BYTES` is deliberately past MAX_SAFE_INTEGER;
+		// a COUNT has no such excuse, and an unsafe one would make `<=`
+		// comparisons in the DTO silently approximate.
+		expect(Number.isSafeInteger(FLEET_MAX_WORKSPACE_COUNT)).toBe(true);
+		expect(FLEET_MAX_WORKSPACE_COUNT).toBeLessThan(FLEET_MAX_DISK_FREE_BYTES);
 	});
 });

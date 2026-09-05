@@ -21,6 +21,7 @@ import {
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
     FLEET_MAX_WORKER_STATE_REASON_LENGTH,
+    FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
     normalizeFleetNodeWorkerState,
 } from '@ever-works/contracts';
@@ -159,6 +160,26 @@ export interface EnrollInput {
     workerState?: string;
     /** Why — quarantine message, throttle reason. Sanitized and capped. */
     workerStateReason?: string;
+    /**
+     * Node housekeeping (EW-803) — the free-space floor the node enforces
+     * on ITSELF, in bytes.
+     *
+     * The one field on this input where `undefined` and `null` mean
+     * different things. `undefined` is the usual "said nothing, leave the
+     * stored value alone"; an explicit `null` means "this machine has no
+     * floor" and DOES clear the column, because an operator switching the
+     * floor off is a change they need to see reflected rather than a
+     * silence that preserves a stale number.
+     */
+    minFreeDiskBytes?: number | null;
+    /** Workspaces retained by the node's last reclaim sweep. Same additive contract as {@link cliVersion}. */
+    workspaceCount?: number;
+    /** Bytes those workspaces occupy. */
+    workspaceBytes?: number;
+    /** ISO-8601 instant of that sweep, on the NODE's clock. Parsed and refused here if implausible. */
+    lastReclaimAt?: string;
+    /** Bytes that sweep freed. */
+    lastReclaimFreedBytes?: number;
 }
 
 export interface EnrollResult {
@@ -316,6 +337,14 @@ export class FleetService {
             workerStateReason:
                 enrolledWorkerState === null ? null : sanitizeWorkerStateReason(input),
             workerStateChangedAt: now,
+            // Node housekeeping (EW-803). Set (possibly to null) for the
+            // same reason as the telemetry above: the row is brand new, so
+            // there is no earlier reading that "leave alone" could protect.
+            minFreeDiskBytes: sanitizeByteCount(input.minFreeDiskBytes),
+            workspaceCount: sanitizeCount(input.workspaceCount, FLEET_MAX_WORKSPACE_COUNT),
+            workspaceBytes: sanitizeByteCount(input.workspaceBytes),
+            lastReclaimAt: sanitizeReportedInstant(input.lastReclaimAt, now),
+            lastReclaimFreedBytes: sanitizeByteCount(input.lastReclaimFreedBytes),
         };
         // CAS: single-use by construction — a raced duplicate enroll
         // matches zero rows and gets the same null as a bad token.
@@ -405,6 +434,7 @@ export class FleetService {
         // the telemetry above — and is distinct from a REPORTED value this
         // build does not recognise, which is stored as null / "unknown".
         const workerState = this.applyWorkerState(node, refresh, patch);
+        this.applyHousekeeping(refresh, patch);
         // Re-arm the offline notice markers on EVERY accepted beat, not
         // only on beats that happened to report a worker state. The beat
         // itself is the proof the machine is reachable, and the daemons
@@ -424,6 +454,48 @@ export class FleetService {
         // as the daily-ceiling notice does.
         await this.announceWorkerTransition(node, patch, workerState);
         return { node: this.toView({ ...node, ...patch }) };
+    }
+
+    /**
+     * Fold a heartbeat's housekeeping report into the update patch
+     * (EW-803).
+     *
+     * Every field follows the additive contract the telemetry above
+     * follows — absent leaves the stored value alone — with ONE deliberate
+     * exception, `minFreeDiskBytes`, where an explicit `null` clears the
+     * column. That asymmetry exists because "the operator switched the
+     * floor off" is a real state with no other way to say it, and a stale
+     * "2.0 GiB floor" shown next to a node that no longer has one would be
+     * worse than showing nothing.
+     *
+     * A figure the sanitizers refuse is dropped, not written as null: a
+     * broken probe must not wipe the last good reading an operator is
+     * looking at. The one exception is the pairing rule at the bottom —
+     * see there.
+     */
+    private applyHousekeeping(refresh: EnrollInput, patch: Partial<FleetNode>): void {
+        if (refresh.minFreeDiskBytes === null) {
+            patch.minFreeDiskBytes = null;
+        } else if (refresh.minFreeDiskBytes !== undefined) {
+            const floor = sanitizeByteCount(refresh.minFreeDiskBytes);
+            if (floor !== null) patch.minFreeDiskBytes = floor;
+        }
+        const workspaceCount = sanitizeCount(refresh.workspaceCount, FLEET_MAX_WORKSPACE_COUNT);
+        if (workspaceCount !== null) patch.workspaceCount = workspaceCount;
+        const workspaceBytes = sanitizeByteCount(refresh.workspaceBytes);
+        if (workspaceBytes !== null) patch.workspaceBytes = workspaceBytes;
+        // The instant and the bytes it describes move TOGETHER. "4.1 GB
+        // freed" is reassuring or alarming entirely depending on when, so a
+        // freed-bytes figure is never written against the previous sweep's
+        // timestamp: if the instant is refused, the bytes are dropped with
+        // it, and if the instant is accepted the bytes are written even
+        // when the node reported none (a sweep that freed nothing is a
+        // real, and reassuring, outcome).
+        const lastReclaimAt = sanitizeReportedInstant(refresh.lastReclaimAt, new Date());
+        if (lastReclaimAt !== null) {
+            patch.lastReclaimAt = lastReclaimAt;
+            patch.lastReclaimFreedBytes = sanitizeByteCount(refresh.lastReclaimFreedBytes);
+        }
     }
 
     /**
@@ -1049,6 +1121,14 @@ export class FleetService {
             workerStateChangedAt: node.workerStateChangedAt
                 ? toIso(node.workerStateChangedAt)
                 : null,
+            // Node housekeeping (EW-803). Three of these are `bigint`
+            // columns and go through the same driver normalization as
+            // `diskFreeBytes` — this method is the one place that happens.
+            minFreeDiskBytes: toOptionalNumber(node.minFreeDiskBytes),
+            workspaceCount: toOptionalNumber(node.workspaceCount),
+            workspaceBytes: toOptionalNumber(node.workspaceBytes),
+            lastReclaimAt: node.lastReclaimAt ? toIso(node.lastReclaimAt) : null,
+            lastReclaimFreedBytes: toOptionalNumber(node.lastReclaimFreedBytes),
         };
     }
 }
@@ -1094,6 +1174,59 @@ function sanitizeByteCount(value: unknown): number | null {
     if (value < 0 || value > FLEET_MAX_DISK_FREE_BYTES) return null;
     return Math.floor(value);
 }
+
+/**
+ * Accept a node-reported COUNT, or refuse it.
+ *
+ * Same doctrine as {@link sanitizeByteCount}, and the same reason: a
+ * clamped count is one an operator would believe. A machine reporting
+ * 4 billion workspaces has a broken probe, and "unknown" is the honest
+ * rendering of that — not `FLEET_MAX_WORKSPACE_COUNT`.
+ */
+function sanitizeCount(value: unknown, max: number): number | null {
+    if (typeof value !== 'number' || !Number.isInteger(value)) return null;
+    if (value < 0 || value > max) return null;
+    return value;
+}
+
+/**
+ * Accept an instant a NODE reported, or refuse it.
+ *
+ * Unlike every other timestamp on `fleet_nodes`, this one is not
+ * server-stamped — the platform learns a reclaim sweep happened only
+ * because a beat said so, and cannot derive the time itself. So it is
+ * treated as untrusted input:
+ *
+ *  - anything that is not a parseable date is refused, which is also why
+ *    the DTO admits it as a plain string: rejecting it at the pipe would
+ *    fail the whole beat and sweep a live node offline over a cosmetic
+ *    field;
+ *  - anything more than {@link REPORTED_INSTANT_FUTURE_SKEW_MS} ahead of
+ *    the server is refused. A little skew is ordinary on an unattended
+ *    PC; hours of it means the clock is wrong, and "last reclaimed in
+ *    four hours" is worse than no answer at all.
+ *
+ * A far-PAST instant is accepted deliberately. "Last reclaimed in March"
+ * is not implausible, it is the exact finding this field exists to
+ * surface.
+ */
+function sanitizeReportedInstant(value: unknown, now: Date): Date | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = new Date(trimmed);
+    const ms = parsed.getTime();
+    if (Number.isNaN(ms)) return null;
+    if (ms > now.getTime() + REPORTED_INSTANT_FUTURE_SKEW_MS) return null;
+    return parsed;
+}
+
+/**
+ * How far ahead of the server a node-reported instant may sit before it
+ * is refused: five minutes, comfortably more than the clock drift of an
+ * unattended machine and comfortably less than a timezone mistake.
+ */
+const REPORTED_INSTANT_FUTURE_SKEW_MS = 5 * 60_000;
 
 function sanitizeText(value: unknown, maxLength: number): string | null {
     if (typeof value !== 'string') return null;

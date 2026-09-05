@@ -27,6 +27,7 @@ import {
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
     FLEET_MAX_WORKER_STATE_REASON_LENGTH,
+    FLEET_MAX_WORKSPACE_COUNT,
     FLEET_MIN_NODE_NAME_LENGTH,
     FLEET_NODE_WORKER_STATES,
 } from '@ever-works/contracts';
@@ -51,6 +52,19 @@ import {
  * constraints in `./fleet-capability.validators`.
  */
 const ENROLLABLE_KINDS: readonly FleetEnrollableNodeKind[] = FLEET_ENROLLABLE_NODE_KINDS;
+
+/**
+ * Edge cap on a node-reported ISO-8601 instant (`lastReclaimAt`).
+ *
+ * Local rather than a shared contract constant on purpose: it is not a
+ * protocol bound both tiers must agree on, it is this edge refusing an
+ * oversized body before `FleetService` — the actual source of truth —
+ * parses the string. The longest legitimate form
+ * (`2026-09-05T14:03:07.123456789+05:30`) is 35 characters; 64 leaves
+ * room for every variant without leaving a heartbeat field usable as
+ * unbounded storage.
+ */
+const FLEET_MAX_INSTANT_LENGTH = 64;
 
 /**
  * Request body for `POST /api/fleet/nodes/enrollment-token` — issue a
@@ -308,6 +322,92 @@ export class FleetNodeSelfDescriptionDto {
     @IsString()
     @MaxLength(FLEET_MAX_WORKER_STATE_REASON_LENGTH)
     workerStateReason?: string;
+
+    /**
+     * Node housekeeping (EW-803) — the disk floor the node enforces on
+     * itself. Reported for visibility; the platform never sets it and
+     * never routes on it.
+     *
+     * `@IsOptional()` skips validation for `null` as well as `undefined`,
+     * which is what makes "the operator switched the floor off" (an
+     * explicit null) expressible without the pipe rejecting the beat.
+     * The service tells the two apart: absent leaves the stored value
+     * alone, null clears it.
+     */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        minimum: 0,
+        maximum: FLEET_MAX_DISK_FREE_BYTES,
+        description:
+            'Free-space floor the node refuses to lease or provision below, in bytes. Null means the operator switched the floor off. Enforced on the node; reported here for visibility only.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_DISK_FREE_BYTES)
+    minFreeDiskBytes?: number | null;
+
+    /** Workspaces the node retained after its last reclaim sweep. */
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        maximum: FLEET_MAX_WORKSPACE_COUNT,
+        description: 'Task worktrees the node was holding when its last reclaim sweep finished.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_WORKSPACE_COUNT)
+    workspaceCount?: number;
+
+    /** Bytes those retained workspaces occupy. */
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        maximum: FLEET_MAX_DISK_FREE_BYTES,
+        description: 'Bytes the node’s retained workspaces occupy.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_DISK_FREE_BYTES)
+    workspaceBytes?: number;
+
+    /**
+     * When the node's last reclaim sweep completed, on the NODE's clock.
+     *
+     * Bounded as a plain `@IsString()` and NOT `@IsISO8601()`, for
+     * exactly the reason `workerState` is not an `@IsIn`: the global pipe
+     * runs `whitelist + forbidNonWhitelisted`, so a value this build
+     * rejects fails the whole request — and a failed heartbeat is a node
+     * swept offline. A malformed instant must cost the operator that one
+     * figure, never the machine's liveness. `FleetService` parses it and
+     * refuses anything it cannot trust.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_MAX_INSTANT_LENGTH,
+        description:
+            'ISO-8601 instant at which the node’s last reclaim sweep completed (the node’s own clock). An unparseable value is recorded as unknown rather than rejected, so a node never loses its heartbeat to a bad timestamp.',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_MAX_INSTANT_LENGTH)
+    lastReclaimAt?: string;
+
+    /** Bytes that sweep reclaimed. Zero is a real answer. */
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        maximum: FLEET_MAX_DISK_FREE_BYTES,
+        description: 'Bytes the node’s last reclaim sweep freed.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_DISK_FREE_BYTES)
+    lastReclaimFreedBytes?: number;
 }
 
 /**

@@ -140,6 +140,28 @@ export interface AgentTaskScratchFs {
 export interface AgentTaskIo extends AcceptanceChecksIo {
 	/** Directory used when the job carries no `workspacePath`. */
 	defaultWorkspacePath?: string;
+	/**
+	 * The node's disk floor, applied to a workspace the PROVISIONER never
+	 * sees: a payload carrying `workspacePath`, or carrying neither field
+	 * (which runs in the node's own working directory).
+	 *
+	 * Absent means no floor is enforced on that path — the same "the
+	 * control was never asked for" case as an unwired probe. Present, it
+	 * throws a `FleetTaskWorkspaceError` with code `disk-low`, which
+	 * `isProvisionDeclined` treats as a deferral exactly like the
+	 * provisioner's own refusal.
+	 *
+	 * A deferral rather than a failure, deliberately, and unlike the
+	 * lease-gate case in `judgeDiskFloor` it cannot idle the node: the
+	 * lease gate measures the FLEET root's volume and cannot know about
+	 * this one, so a node whose payload volume is full keeps leasing. What
+	 * bounds it is the job's own attempt budget — it fails after
+	 * `maxAttempts` either way, and deferring at least saves three runs'
+	 * worth of model spend on a volume that was going to die inside the
+	 * first git or npm step. The reason reaches the node's log through
+	 * `settleDeferred`.
+	 */
+	checkWorkspaceHeadroom?: (path: string, signal?: AbortSignal) => Promise<void>;
 	/** Repository/worktree adapter supplied by the node composition root. */
 	provisionWorkspace?: (
 		taskId: string,
@@ -724,7 +746,13 @@ async function resolveAgentTaskWorkspace(
 		const descriptor = await io.provisionWorkspace(taskId, payload.workspace, signal);
 		return { path: resolveWorkspacePath(descriptor.path, io), descriptor };
 	}
-	return { path: resolveWorkspacePath(payload.workspacePath, io), descriptor: null };
+	// No provision, and therefore none of the provisioner's checks. The
+	// disk floor is the one that matters here: this path runs a model and
+	// spends its whole budget on a volume nothing has measured, and the
+	// lease gate measured a DIFFERENT one (the fleet workspace root).
+	const path = resolveWorkspacePath(payload.workspacePath, io);
+	await io.checkWorkspaceHeadroom?.(path, signal);
+	return { path, descriptor: null };
 }
 
 /**
