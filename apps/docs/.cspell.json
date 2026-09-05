@@ -65,6 +65,7 @@
 		"Dockerfile",
 		"/**/*.{svg,css,scss}",
 		"docs/i18n/**",
+		"i18n/**",
 		"docs/assets/**"
 	]
 }
