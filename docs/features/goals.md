@@ -19,7 +19,8 @@ Goals come in two **kinds**:
   [Delivery goals](#delivery-goals).
 
 A Goal does not build anything by itself. Its execution loop (the orchestrator) hands iterations to
-agents; the Goal is the finish line they work toward.
+agents; the Goal is the finish line they work toward. **One iteration at a time**, unless you raise
+[Concurrent iterations](#concurrent-iterations).
 
 ## When to use a Goal
 
@@ -103,6 +104,28 @@ pinned and none has worked it yet, the router falls back to the **eligible agent
 scope** (the same Organization / tenant ownership rule the rest of the platform applies) and
 round-robins over them, oldest first. It never picks an agent outside the Goal's scope, and a scope
 with no agent still leaves the loop **stuck** with `no-candidate-agent` until you create or assign one.
+
+## Concurrent iterations
+
+By default the loop runs **one iteration at a time**: while an iteration's run is queued or running,
+the next tick waits. That is deliberate — two iterations of the same Goal working the same branch race
+each other's workspace.
+
+**Concurrent iterations** in _Adjust limits_ raises that ceiling (1–10, default 1). At a ceiling of _N_
+a tick dispatches as many iterations as there are free slots — _N_ minus what is already in flight —
+each as its own Task with its own agent run, and the orchestrator log records one routing line naming
+all of them plus one dispatch line each.
+
+:::caution Raise it only when iterations do not share a branch
+Nothing here separates workspaces. A Goal whose iterations all edit the same repository on the same
+branch will have them overwrite each other. Raise this for a Goal whose iterations are genuinely
+independent — different repositories, different areas, research fan-out — and leave it at 1 otherwise.
+:::
+
+Every iteration still passes the same gates a single one does: the global stop flag, the concurrency
+valves, the plan entitlement, the credits precheck and the agent's own budget. Raising the ceiling asks
+for more parallelism; it does not grant more capacity. A Goal that never set it is unchanged, and every
+Goal that existed before this shipped is left at 1.
 
 ## The metric source
 

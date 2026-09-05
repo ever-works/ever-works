@@ -296,6 +296,7 @@ export class GoalsController {
                 spendCapCents: body.spendCapCents,
                 wallClockLimitHours: body.wallClockLimitHours,
                 stuckThresholdIterations: body.stuckThresholdIterations,
+                maxConcurrentIterations: body.maxConcurrentIterations,
                 sessionBudgetMinutes: body.sessionBudgetMinutes,
                 gracePeriodMinutes: body.gracePeriodMinutes,
                 executionTarget: body.executionTarget,

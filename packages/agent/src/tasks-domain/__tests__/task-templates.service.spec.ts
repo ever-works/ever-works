@@ -375,4 +375,215 @@ describe('TaskTemplatesService', () => {
             );
         });
     });
+
+    /**
+     * Multi-repo decomposition (self-build slice AH) — one template can
+     * span repositories: a step files its sub-task against its OWN Work
+     * and mounts its own extra repositories. Both are validated by the
+     * SAME rules the Task path uses, at write time and again at
+     * instantiation.
+     */
+    describe('per-step Work + extraRepos', () => {
+        const connection = (over: Record<string, unknown> = {}) => {
+            const id = typeof over.id === 'string' ? over.id : 'conn-1';
+            return {
+                id,
+                userId: 'u1',
+                name: id,
+                url: `https://github.com/ever-works/${id}.git`,
+                mountPath: null,
+                provider: 'github',
+                enabled: true,
+                ...over,
+            };
+        };
+        let repoConnections: { findByIdAndUser: jest.Mock };
+        let svcWithRegistry: TaskTemplatesService;
+
+        beforeEach(() => {
+            repoConnections = {
+                findByIdAndUser: jest.fn(async (id: string) => connection({ id })),
+            };
+            svcWithRegistry = new TaskTemplatesService(
+                templates as never,
+                counter,
+                agents,
+                works,
+                undefined,
+                missions,
+                ideas,
+                repoConnections as never,
+            );
+        });
+
+        function armTwoStepTemplate(stepOverrides: Record<string, unknown>) {
+            templates.findByIdAndUser.mockResolvedValue({
+                id: 'tpl-1',
+                userId: 'u1',
+                name: 'Cross-repo flow',
+                slug: 'cross-repo-flow',
+                labels: null,
+            });
+            templates.findStepsByTemplateId.mockResolvedValue([
+                {
+                    id: 's0',
+                    templateId: 'tpl-1',
+                    position: 0,
+                    title: 'Platform half',
+                    prompt: null,
+                    agentId: null,
+                    requiresApproval: false,
+                    dependsOn: null,
+                    workId: null,
+                    extraRepos: null,
+                },
+                {
+                    id: 's1',
+                    templateId: 'tpl-1',
+                    position: 1,
+                    title: 'Website half',
+                    prompt: null,
+                    agentId: null,
+                    requiresApproval: false,
+                    dependsOn: [0],
+                    ...stepOverrides,
+                },
+            ]);
+            const { manager, saved } = makeManager();
+            templates.withTransaction.mockImplementation(async (fn: any) => fn(manager));
+            return saved;
+        }
+
+        it('instantiates a step into ANOTHER Work, with its own mounts', async () => {
+            works.findById.mockImplementation(async (id: string) => ({ id, userId: 'u1' }));
+            const saved = armTwoStepTemplate({
+                workId: 'work-website',
+                extraRepos: [{ repoConnectionId: 'conn-docs', mountDir: 'docs' }],
+            });
+
+            await svcWithRegistry.instantiateTemplate('u1', 'tpl-1', {
+                title: 'Ship across repos',
+                workId: 'work-platform',
+            });
+
+            const tasks = saved.filter((s) => s.entity === Task).map((s) => s.row);
+            expect(tasks).toHaveLength(3);
+            // The parent and the step that named no Work stay on the tree's.
+            expect(tasks[0].workId).toBe('work-platform');
+            expect(tasks[1].workId).toBe('work-platform');
+            expect(tasks[1].extraRepos).toBeNull();
+            // The step that named one wins — that is the whole feature.
+            expect(tasks[2].workId).toBe('work-website');
+            expect(tasks[2].extraRepos).toEqual([
+                { repoConnectionId: 'conn-docs', mountDir: 'docs' },
+            ]);
+            // ...and mission/idea are NOT re-homed with it.
+            expect(tasks[2].missionId).toBeNull();
+        });
+
+        it("refuses a step naming ANOTHER user's Work, naming the step", async () => {
+            works.findById.mockImplementation(async (id: string) =>
+                id === 'work-foreign' ? { id, userId: 'someone-else' } : { id, userId: 'u1' },
+            );
+            armTwoStepTemplate({ workId: 'work-foreign', extraRepos: null });
+
+            await expect(
+                svcWithRegistry.instantiateTemplate('u1', 'tpl-1', {
+                    title: 'T',
+                    workId: 'work-platform',
+                }),
+            ).rejects.toThrow('Work work-foreign on step 1 is not reachable for this user.');
+            // Refused BEFORE the transaction opens — no half-built tree.
+            expect(templates.withTransaction).not.toHaveBeenCalled();
+        });
+
+        it('refuses a hostile step through THE Task extraRepos validator', async () => {
+            works.findById.mockImplementation(async (id: string) => ({ id, userId: 'u1' }));
+            armTwoStepTemplate({
+                workId: null,
+                extraRepos: [{ repoConnectionId: 'conn-docs', mountDir: '../etc' }],
+            });
+
+            await expect(
+                svcWithRegistry.instantiateTemplate('u1', 'tpl-1', { title: 'T' }),
+            ).rejects.toThrow(/Step 1: extraRepos mountDir '\.\.\/etc' must be a single directory/);
+        });
+
+        it('refuses a step whose connection was disabled after the template was saved', async () => {
+            works.findById.mockImplementation(async (id: string) => ({ id, userId: 'u1' }));
+            repoConnections.findByIdAndUser.mockImplementation(async (id: string) =>
+                connection({ id, enabled: false }),
+            );
+            armTwoStepTemplate({
+                workId: null,
+                extraRepos: [{ repoConnectionId: 'conn-docs' }],
+            });
+
+            await expect(
+                svcWithRegistry.instantiateTemplate('u1', 'tpl-1', { title: 'T' }),
+            ).rejects.toThrow('Step 1: Repository connection conn-docs is disabled');
+            expect(templates.withTransaction).not.toHaveBeenCalled();
+        });
+
+        it('refuses a step whose connection belongs to someone else', async () => {
+            works.findById.mockImplementation(async (id: string) => ({ id, userId: 'u1' }));
+            repoConnections.findByIdAndUser.mockResolvedValue(null);
+            armTwoStepTemplate({ workId: null, extraRepos: [{ repoConnectionId: 'conn-theirs' }] });
+
+            await expect(
+                svcWithRegistry.instantiateTemplate('u1', 'tpl-1', { title: 'T' }),
+            ).rejects.toThrow('Step 1: Repository connection conn-theirs not found.');
+        });
+
+        it('validates and canonicalises per-step scope at WRITE time too', async () => {
+            works.findById.mockImplementation(async (id: string) => ({ id, userId: 'u1' }));
+            templates.createWithSteps.mockResolvedValue({ id: 'tpl-new' });
+            templates.findByIdAndUser.mockResolvedValue({ id: 'tpl-new', userId: 'u1' });
+            templates.findStepsByTemplateId.mockResolvedValue([]);
+
+            await svcWithRegistry.create('u1', {
+                name: 'Cross-repo',
+                steps: [
+                    {
+                        title: 'Website half',
+                        workId: 'work-website',
+                        extraRepos: [
+                            { repoConnectionId: 'conn-docs', mountDir: 'docs', writable: false },
+                        ],
+                    },
+                ],
+            });
+
+            const [, steps] = templates.createWithSteps.mock.calls[0];
+            expect(steps[0]).toMatchObject({
+                workId: 'work-website',
+                extraRepos: [{ repoConnectionId: 'conn-docs', mountDir: 'docs', writable: false }],
+            });
+        });
+
+        it('refuses a step at write time when the repository registry is unavailable', async () => {
+            // `svc` (the outer fixture) has no registry bound. Extra
+            // repositories are refused, never silently accepted unchecked.
+            await expect(
+                svc.create('u1', {
+                    name: 'Cross-repo',
+                    steps: [
+                        { title: 'Website half', extraRepos: [{ repoConnectionId: 'conn-docs' }] },
+                    ],
+                }),
+            ).rejects.toThrow('Step 0: Extra repositories are not available');
+        });
+
+        it('refuses a foreign Work on a step at write time', async () => {
+            works.findById.mockResolvedValue({ id: 'work-foreign', userId: 'someone-else' });
+
+            await expect(
+                svcWithRegistry.create('u1', {
+                    name: 'Cross-repo',
+                    steps: [{ title: 'Website half', workId: 'work-foreign' }],
+                }),
+            ).rejects.toThrow('Work work-foreign on step 0 is not reachable for this user.');
+            expect(templates.createWithSteps).not.toHaveBeenCalled();
+        });
+    });
 });

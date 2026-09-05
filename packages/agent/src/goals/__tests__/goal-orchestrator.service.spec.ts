@@ -4,7 +4,7 @@ import { Goal, GoalOutcome, GoalStatus } from '../../entities/goal.entity';
 import type { GoalEvent } from '../../entities/goal-event.entity';
 import type { AgentRun } from '../../entities/agent-run.entity';
 import { Task } from '../../entities/task.entity';
-import { GoalOrchestratorService } from '../goal-orchestrator.service';
+import { GoalOrchestratorService, MAX_CONCURRENT_ITERATIONS } from '../goal-orchestrator.service';
 
 /**
  * Autonomy layer — orchestrator service (the I/O half).
@@ -100,6 +100,7 @@ function goalRow(overrides: Partial<Goal> = {}): AnyRow {
         spentCents: 0,
         wallClockLimitHours: null,
         stuckThresholdIterations: null,
+        maxConcurrentIterations: null,
         sessionBudgetMinutes: null,
         gracePeriodMinutes: null,
         executionTarget: null,
@@ -1737,5 +1738,205 @@ describe('GoalOrchestratorService — delivery Goals', () => {
         });
         await service.startLoop('u1', 'g1');
         expect(goals._rows[0].loopStatus).toBe('running');
+    });
+});
+
+/**
+ * Concurrent iterations (self-build slice AH) — the I/O half.
+ *
+ * `decideGoalLoop` decides HOW MANY slots to fill; this suite proves the
+ * service fills exactly those, with distinct dedup keys, and that a Goal
+ * that never opted in behaves exactly as it always did.
+ */
+describe('GoalOrchestratorService — concurrent iterations', () => {
+    it('persists and clears maxConcurrentIterations like every other limit', async () => {
+        const { service, goals, events } = build();
+
+        const raised = await service.updateLimits('u1', 'g1', { maxConcurrentIterations: 4 });
+        expect(raised.maxConcurrentIterations).toBe(4);
+        expect(goals._rows[0].maxConcurrentIterations).toBe(4);
+        expect(eventMessages(events)[0]).toContain('maxConcurrentIterations');
+
+        const cleared = await service.updateLimits('u1', 'g1', { maxConcurrentIterations: null });
+        expect(cleared.maxConcurrentIterations).toBeNull();
+    });
+
+    it('rejects a ceiling below 1 or above the cap', async () => {
+        const { service } = build();
+        await expect(
+            service.updateLimits('u1', 'g1', { maxConcurrentIterations: 0 }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            service.updateLimits('u1', 'g1', { maxConcurrentIterations: 99 }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('dispatches ONE iteration when the Goal never opted in', async () => {
+        const { service, tasksService, transitions, events } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(tasksService.create).toHaveBeenCalledTimes(1);
+        expect(transitions.dispatchAgentRun).toHaveBeenCalledTimes(1);
+        expect(eventKinds(events)).toEqual(['route', 'dispatch']);
+        // No plural fields on a serial Goal: every pre-AH reader sees the
+        // exact shape it saw before.
+        expect(result.taskIds).toBeUndefined();
+        expect(result.iterations).toBeUndefined();
+    });
+
+    it('dispatches N iterations at once with distinct dedup keys', async () => {
+        const { service, tasksService, transitions, events, goals } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                maxConcurrentIterations: 3,
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(tasksService.create).toHaveBeenCalledTimes(3);
+        expect(tasksService.create.mock.calls.map((call: any[]) => call[1].title)).toEqual([
+            '[Goal] Reach 1k signups — iteration 1',
+            '[Goal] Reach 1k signups — iteration 2',
+            '[Goal] Reach 1k signups — iteration 3',
+        ]);
+        // The dedup key stays iteration-keyed, so two overlapping ticks
+        // still cannot fire one iteration twice.
+        expect(
+            transitions.dispatchAgentRun.mock.calls.map((call: any[]) => call[2].dedupKey),
+        ).toEqual(['goal:g1:1', 'goal:g1:2', 'goal:g1:3']);
+
+        expect(result.iterations).toEqual([1, 2, 3]);
+        expect(result.taskIds).toHaveLength(3);
+        expect(result.runIds).toHaveLength(3);
+        // Scalars remain the first slot.
+        expect(result.iteration).toBe(1);
+        expect(result.taskId).toBe(result.taskIds?.[0]);
+
+        // ONE route line for the decision, one dispatch line per slot.
+        expect(eventKinds(events)).toEqual(['route', 'dispatch', 'dispatch', 'dispatch']);
+        // The counter ends at the LAST slot, so the next tick continues
+        // from 4 rather than re-firing 2 and 3.
+        expect(goals._rows[0].iteration).toBe(3);
+    });
+
+    it('only fills the FREE slots when iterations are already in flight', async () => {
+        const { service, tasksService, tasks, runs } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                iteration: 5,
+                maxConcurrentIterations: 3,
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+        // Two live iterations of this Goal.
+        for (const id of ['task-a', 'task-b']) {
+            tasks._rows.push({ id, goalId: 'g1', slug: id, createdAt: new Date(1) });
+            runs._rows.push({ id: `run-${id}`, taskId: id, status: 'running', costCents: 0 });
+        }
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(tasksService.create).toHaveBeenCalledTimes(1);
+        expect(result.iteration).toBe(6);
+    });
+
+    it('re-clamps a stored ceiling above the cap instead of trusting the row', async () => {
+        // The write path bounds this column, but a row can carry a larger
+        // value (direct DB write, restored backup). Reading it unclamped
+        // would make ONE tick create that many Tasks.
+        const { service, tasksService } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                maxConcurrentIterations: 250,
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+
+        await service.advance('u1', 'g1');
+
+        expect(tasksService.create).toHaveBeenCalledTimes(MAX_CONCURRENT_ITERATIONS);
+    });
+
+    it('keeps the slots that landed when a later one fails, so no iteration number is reused', async () => {
+        const { service, tasksService, transitions, goals } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                maxConcurrentIterations: 3,
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+        // Slot 1 lands, slot 2 explodes. Throwing out of applyDispatch here
+        // would leave iteration 1 dispatched while goal.iteration still said
+        // 0 — and the NEXT tick would create a second Task numbered 1.
+        let calls = 0;
+        const realCreate = tasksService.create.getMockImplementation() as (
+            ...args: unknown[]
+        ) => Promise<unknown>;
+        tasksService.create.mockImplementation(async (...args: unknown[]) => {
+            calls += 1;
+            if (calls === 2) throw new Error('slug counter exhausted');
+            return realCreate.apply(null, args);
+        });
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('dispatch');
+        expect(transitions.dispatchAgentRun).toHaveBeenCalledTimes(1);
+        expect(result.iterations).toBeUndefined();
+        expect(result.iteration).toBe(1);
+        // The counter covers the slot that actually landed.
+        expect(goals._rows[0].iteration).toBe(1);
+    });
+
+    it('still surfaces the failure when the FIRST slot cannot be created', async () => {
+        const { service, tasksService, goals } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                maxConcurrentIterations: 3,
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+        tasksService.create.mockRejectedValue(new Error('db down'));
+
+        // Nothing landed, so the caller sees exactly the failure a serial
+        // Goal has always raised — and the counter never moved.
+        await expect(service.advance('u1', 'g1')).rejects.toThrow('db down');
+        expect(goals._rows[0].iteration).toBe(0);
+    });
+
+    it('waits — and starts nothing — once the ceiling is saturated', async () => {
+        const { service, tasksService, transitions, tasks, runs } = build({
+            goal: {
+                loopStatus: 'running',
+                assignedAgentId: 'agent-7',
+                maxConcurrentIterations: 2,
+                dodCriteria: [{ id: 'a', text: 'Ship pricing', status: 'open' }],
+            },
+        });
+        for (const id of ['task-a', 'task-b']) {
+            tasks._rows.push({ id, goalId: 'g1', slug: id, createdAt: new Date(1) });
+            runs._rows.push({ id: `run-${id}`, taskId: id, status: 'queued', costCents: 0 });
+        }
+
+        const result = await service.advance('u1', 'g1');
+
+        expect(result.action).toBe('wait');
+        expect(result.reasonCode).toBe('run-in-flight');
+        expect(tasksService.create).not.toHaveBeenCalled();
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
     });
 });

@@ -1393,6 +1393,37 @@ export const config = {
             return Number.isFinite(raw) ? raw : 25;
         },
         /**
+         * Task-graph fan-out (self-build slice AH) — how many TODO Tasks
+         * `TaskGraphFanoutService` may START for ONE owner in a single
+         * tick.
+         *
+         * 🛑 READ THE ZERO THE OTHER WAY ROUND. For the concurrency valves
+         * above, `<= 0` means "no ceiling". Here `<= 0` means the driver
+         * is OFF and starts nothing — which is the DEFAULT, because this
+         * is the one knob on the platform that begins work nobody clicked.
+         * An operator opts in by setting a positive number.
+         *
+         * The bound is per OWNER per tick, not a concurrency limit: the
+         * real ceilings (the Work / org valves, the plan entitlement, the
+         * credits precheck, the global stop flag) still decide whether any
+         * given start is admitted, and a Task refused by them stays `todo`
+         * and is a candidate again next tick.
+         */
+        getTaskFanoutMaxStartsPerOwner() {
+            const raw = parseInt(process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER || '0', 10);
+            return Number.isFinite(raw) ? raw : 0;
+        },
+        /**
+         * How many TODO Tasks one fan-out tick SCANS (before blocker,
+         * agent and admission filtering). Bounds the tick's cost — the
+         * blocker check is one query per blocker row — not how much work
+         * starts; `getTaskFanoutMaxStartsPerOwner` does that.
+         */
+        getTaskFanoutScanLimit() {
+            const raw = parseInt(process.env.TASK_FANOUT_SCAN_LIMIT || '50', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 50;
+        },
+        /**
          * H2 kill-switch for the plan-driven concurrency ceiling
          * (`plan_entitlements.max-concurrent-runs`), folded into the org
          * valve above as a RAISE-ONLY adjustment.

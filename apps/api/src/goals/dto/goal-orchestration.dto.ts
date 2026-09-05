@@ -27,6 +27,7 @@ import {
     MAX_GRACE_PERIOD_MINUTES,
     MAX_MODEL_HINT_CHARS,
     MAX_NUDGE_CHARS,
+    MAX_CONCURRENT_ITERATIONS,
     MAX_SESSION_BUDGET_MINUTES,
     MAX_SPEND_CAP_CENTS,
     MAX_STUCK_THRESHOLD_ITERATIONS,
@@ -235,6 +236,19 @@ export class UpdateGoalLimitsDto {
     @IsInt()
     @Min(1)
     stuckThresholdIterations?: number | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        minimum: 1,
+        maximum: MAX_CONCURRENT_ITERATIONS,
+        description:
+            'How many iterations this Goal may run at once. `null` (the default) means ONE — the serial loop. Raise it only for a Goal whose iterations do not share a branch; concurrent iterations on one branch race each other.',
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    maxConcurrentIterations?: number | null;
 
     @ApiProperty({
         required: false,
