@@ -280,6 +280,71 @@ returns `200` with a degraded subset list when any check is
 A separate `/api/health/deep` (admin-only) actually pings the DB,
 cache, Sentry, PostHog, and Trigger.dev — used for incident response.
 
+### 10.1 External uptime monitor — alert presentation contract
+
+`.github/workflows/external-uptime-monitor.yml` probes the public
+surfaces every 15 minutes from a **GitHub-hosted** runner, i.e. from
+outside the homelab uplink that every in-cluster probe shares. Its
+header comment explains why that vantage point is load-bearing; this
+section covers only how a failure is **presented**, which is a separate
+concern and has its own failure mode.
+
+The monitor keeps exactly one open `uptime-alert` issue. Issue spam is
+the main reason monitors get muted, so a second issue is never opened.
+The cost of that choice — logged as EW-760 — is that a new, worse
+outage can fold into an issue a reader has already triaged. On
+2026-08-23 the entire web app went down while an alert issue stood open
+for `demo.ever.works`; the escalation was invisible for ~18 hours.
+Detection worked the whole time. Presentation did not.
+
+Four properties keep the single-issue design honest. All of them work by
+changing what the issue **says**, never by opening another one.
+
+1. **The title names the current failing set.** It is recomputed every
+   run from the failing URLs and re-applied when it differs from the
+   live title. A comment appended to a long-open issue is low-salience;
+   the title is what people re-read.
+2. **The title shouts for customer-facing surfaces.** A separate
+   `CRITICAL_URLS` list (the marketing site, the app login and health
+   routes, the API and its version endpoint) switches the title between
+   `🔴 Uptime: …` and `🚨 Uptime: CRITICAL — …`. It is a separate array,
+   not a fourth `TARGETS` field, because the target parser treats
+   everything after the second `|` as the body marker — a trailing
+   severity field would be swallowed and every target would read as
+   non-critical.
+3. **Duration escalates.** The workflow has no store, so the outage
+   clock rides in an HTML comment on the last report it wrote:
+   `<!-- uptime-state: fp=… since=… tier=… urls=… -->`. On a run where
+   the fingerprint still matches, `since` is carried forward; when the
+   failing set changes the clock restarts, because a different set is a
+   new event. At 60 minutes the alert reaches **tier 1** and at 240
+   minutes **tier 2**. Each escalation appends `(down 1h15m+)` to the
+   title (bucketed to the 15-minute probe interval so the title moves on
+   severity, not on every run), adds an `uptime-sev<tier>` label, and is
+   allowed past the one-comment-per-hour throttle exactly once.
+4. **A partial recovery is named.** The `urls=` field records the failing
+   set, so the next run can diff it and lead its comment with
+   `### ✅ Recovered since the last report`. Without this an issue lists
+   only what is broken now, and a reader cannot tell a partial recovery
+   from a target that was never mentioned. Full auto-close stays
+   all-or-nothing: the issue closes when every target is green.
+
+The state marker is written **alongside** the pre-existing
+`<!-- uptime-fingerprint: … -->` marker, never instead of it — the
+comment throttle greps for that marker verbatim.
+
+The parse-decide-reemit logic lives between the sentinels
+`# >>> uptime-escalation-state` and `# <<< uptime-escalation-state` and
+is pure text plus arithmetic: no `gh`, no `date`. That is what makes it
+testable. `apps/node/src/core/external-uptime-monitor.contract.spec.ts`
+lifts the block straight out of the YAML and runs it under the same Bash
+flags GitHub gives a `run:` step (`bash -e` plus `set -uo pipefail`),
+covering a fresh outage, each escalation threshold, a changed fingerprint
+resetting the clock, a partial recovery, a corrupt marker, and the empty
+input. The empty case is not hypothetical — an all-green run once failed
+the whole monitor because `grep` on an empty list returned non-zero under
+`pipefail`.
+
 ## 11. Sentry-PostHog Cross-Linking
 
 When both providers are enabled, the platform threads each Sentry
@@ -322,6 +387,8 @@ sends goes through them, regardless of caller.
     - `packages/monitoring/src/`
     - `packages/monitoring/src/sentry/sentry.config.ts`
     - `packages/monitoring/src/posthog/posthog.config.ts`
+    - `.github/workflows/external-uptime-monitor.yml` (see §10.1)
+    - `apps/node/src/core/external-uptime-monitor.contract.spec.ts`
 - Related specs:
     - [`activity-log`](./activity-log.md)
     - [`auth`](./auth.md)
