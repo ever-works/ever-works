@@ -37,7 +37,11 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  * `FleetRunnerStatusService` is the ONE composer behind both the
  * always-visible runner pill and the router's availability check, so
  * "3 of 4 runners online" and "there is a free runner, send the work
- * locally" can never disagree. The Task → (Work, Goal) lookup the
+ * locally" can never disagree. The router narrows that check to the
+ * runners that could take THE job (Agent affinity + required tags,
+ * self-build slice S), asking `FleetJobService` — exported by
+ * `AgentFleetModule` — the same affinity question the enqueue path
+ * asks. The Task → (Work, Goal) lookup the
  * execution preference is resolved against lives in
  * `fleet-task-scope.resolver.ts` but is PROVIDED by the api-side
  * `TasksModule`, which is the module that has `TaskRepository` — the

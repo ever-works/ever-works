@@ -49,6 +49,7 @@ import type { FleetJobKind, FleetJobStatus } from '@ever-works/contracts';
 @Index('idx_fleet_jobs_node_status', ['nodeId', 'status'])
 @Index('idx_fleet_jobs_target_status', ['targetNodeId', 'status'])
 @Index('idx_fleet_jobs_lease_expiry', ['status', 'leaseExpiresAt'])
+@Index('idx_fleet_jobs_queued_at', ['status', 'queuedAt'])
 export class FleetJob {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -135,6 +136,21 @@ export class FleetJob {
      */
     @Column({ type: 'varchar', length: 64, nullable: true })
     queuedReason?: string | null;
+
+    /**
+     * When the row last ENTERED `queued` (self-build slice S / EW-775).
+     * Set at enqueue, reset by reclaim and by a drain releasing the
+     * claim, NOT reset by a heartbeat promotion (clearing
+     * `queuedReason` does not make the job younger). The queue SLA
+     * (`FleetJobService.expireQueued`) is measured from it. Nullable so
+     * a row written by an older replica during rollout has an UNKNOWN
+     * age, and an unknown age is never destructively failed.
+     *
+     * Migration: `1788200000000-AddFleetJobQueuedAt` (backfills
+     * `createdAt` onto rows that were `queued` at upgrade time).
+     */
+    @PortableDateColumn({ nullable: true })
+    queuedAt?: Date | null;
 
     /**
      * Operator cancel request on an ACTIVE job (agent execution v2 /

@@ -42,6 +42,22 @@ export interface FleetAgentTaskPlan {
  */
 export interface FleetAgentTaskPlanner {
     plan(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskPlan | null>;
+    /**
+     * Self-build slice S — what the job WILL require, known before the
+     * plan is built: the capability tags, resolved from the tenant's
+     * execution settings alone (no Task / workspace reads, so a cloud
+     * run still never pays for planning). Fed to the router so
+     * availability is counted over the nodes that could lease the job.
+     * Optional and best-effort: absent or throwing, the router falls
+     * back to the operator's config tags (what a legacy `command` job is
+     * stamped with) and the queue SLA bounds a wrong "placed".
+     */
+    requirements?(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskRequirements>;
+}
+
+/** What {@link FleetAgentTaskPlanner.requirements} resolves. */
+export interface FleetAgentTaskRequirements {
+    requiredCapabilities: string[];
 }
 
 const logger = new Logger('FleetAwareAgentTaskExecuteDispatcher');
@@ -125,7 +141,12 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             let decision: FleetRunRoutingDecision = { target: 'cloud', mode: 'cloud' };
             try {
                 const scope = await resolveScope(deps.scopeResolver, payload.taskId);
-                decision = await router.routeAgentTask(payload, scope);
+                const requirements = await resolveRequirements(deps.planner, payload);
+                decision = await router.routeAgentTask(
+                    payload,
+                    scope,
+                    requirements ? { requiredCapabilities: requirements.requiredCapabilities } : {},
+                );
             } catch (err) {
                 logger.warn(
                     `Fleet routing check failed for task ${payload.taskId} — using the platform dispatcher: ${
@@ -151,16 +172,26 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             // here too, with no reason, and must stay silent.
             if (decision.fallbackReason && deps.notifications) {
                 try {
-                    await deps.notifications.notifyFleetRunnerFallback({
-                        userId: payload.userId,
-                        taskId: payload.taskId,
-                        reason: decision.fallbackReason,
-                        // The real count from the availability snapshot,
-                        // not a stand-in derived from the reason: an
-                        // owner with four busy runners must not read
-                        // "1" in a stored notification.
-                        runnerCount: decision.runnerCount ?? 0,
-                    });
+                    const notice: Parameters<NotificationService['notifyFleetRunnerFallback']>[0] =
+                        {
+                            userId: payload.userId,
+                            taskId: payload.taskId,
+                            reason: decision.fallbackReason,
+                            // The real count from the availability snapshot,
+                            // not a stand-in derived from the reason: an
+                            // owner with four busy runners must not read
+                            // "1" in a stored notification. Since slice S
+                            // this is the ELIGIBLE count; the whole fleet
+                            // and the pinned node ride alongside it.
+                            runnerCount: decision.runnerCount ?? 0,
+                        };
+                    if (typeof decision.fleetRunnerCount === 'number') {
+                        notice.fleetRunnerCount = decision.fleetRunnerCount;
+                    }
+                    if (decision.pinnedNodeId) {
+                        notice.pinnedNodeId = decision.pinnedNodeId;
+                    }
+                    await deps.notifications.notifyFleetRunnerFallback(notice);
                 } catch (err) {
                     // Best-effort by contract: the run is what matters,
                     // and a notification outage must never turn a
@@ -175,6 +206,30 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
             return delegate.enqueue(payload);
         },
     };
+}
+
+/**
+ * Best-effort requirements lookup (self-build slice S). A planner that
+ * throws here, or has no `requirements`, degrades to "the router counts
+ * against the operator's config tags" — never to a failed dispatch. The
+ * plan itself (built later, only for a fleet-bound run) keeps its loud
+ * failure semantics; this is the cheap settings-only preview of it.
+ */
+async function resolveRequirements(
+    planner: FleetAgentTaskPlanner | undefined,
+    payload: AgentTaskExecuteDispatchPayload,
+): Promise<FleetAgentTaskRequirements | null> {
+    if (!planner || typeof planner.requirements !== 'function') return null;
+    try {
+        return await planner.requirements(payload);
+    } catch (err) {
+        logger.debug(
+            `Fleet requirements lookup failed for task ${payload.taskId} — counting availability against the config tags: ${
+                err instanceof Error ? err.message : String(err)
+            }`,
+        );
+        return null;
+    }
 }
 
 /**

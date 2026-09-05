@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { FleetJobCompletedEvent, FleetJobLeasedEvent } from '@ever-works/agent/events';
+import { isQueueExpiredError } from '@ever-works/contracts';
 import type { FleetAgentTaskResult, FleetJobView } from '@ever-works/contracts';
 import {
     FleetAgentTaskReconcilerService,
@@ -384,6 +385,106 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(runs.markFailed).not.toHaveBeenCalled();
         expect(runs.markCompleted).not.toHaveBeenCalled();
         expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
+    });
+
+    describe('queue SLA — a job no node ever took (self-build slice S)', () => {
+        const PINNED = '22222222-2222-4222-8222-222222222222';
+        const expiredError = `queued-max-age-exceeded: no eligible runner took the job within 24h (pinned to node ${PINNED}) [requires claude-code]`;
+        const expiredJob = (): FleetJobView =>
+            job({
+                status: 'failed',
+                nodeId: null,
+                targetNodeId: PINNED,
+                requiredCapabilities: ['claude-code'],
+                queuedAt: '2026-09-01T00:00:00.000Z',
+                completedAt: '2026-09-02T00:00:00.000Z',
+            });
+
+        it('fails the run with the stable token and files exactly ONE "never started" Inbox notice', async () => {
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    expiredJob(),
+                    USER,
+                    'queue-expired',
+                    null,
+                    null,
+                    expiredError,
+                ),
+            );
+
+            // The machine token lands in `failureReason`, switchable later.
+            expect(runs.markFailed).toHaveBeenCalledWith(RUN, expiredError);
+            expect(isQueueExpiredError(runs.markFailed.mock.calls[0][1])).toBe(true);
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
+
+            expect(inbox!.notice).toHaveBeenCalledTimes(1);
+            const [userId, notice] = inbox!.notice.mock.calls[0];
+            expect(userId).toBe(USER);
+            expect(notice.title).toMatch(/^Fleet run never started: /);
+            // The owner reads a sentence with the facts they need to fix it.
+            expect(notice.body).toContain('within 24h');
+            expect(notice.body).toContain(`pinned to node ${PINNED}`);
+            expect(notice.body).toContain('claude-code');
+            expect(notice.body).toContain('Wake the runner');
+            expect(notice).toMatchObject({ taskId: TASK, agentRunId: RUN, workId: 'work-1' });
+
+            // Nothing ran, so nothing to push or finalize.
+            expect(taskWorkspace.finalizeRemotePush).not.toHaveBeenCalled();
+            expect(runs.markCompleted).not.toHaveBeenCalled();
+            expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
+        });
+
+        it('says "never started" in the Task chat rather than "failed"', async () => {
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    expiredJob(),
+                    USER,
+                    'queue-expired',
+                    null,
+                    null,
+                    expiredError,
+                ),
+            );
+
+            expect(taskChat.post).toHaveBeenCalledTimes(1);
+            expect(JSON.stringify(taskChat.post.mock.calls[0])).toContain(
+                'Fleet run never started',
+            );
+        });
+
+        it('keeps the stable token even when the event carries no error text', async () => {
+            await build().onCompleted(
+                new FleetJobCompletedEvent(expiredJob(), USER, 'queue-expired'),
+            );
+
+            expect(isQueueExpiredError(runs.markFailed.mock.calls[0][1])).toBe(true);
+            expect(inbox!.notice).toHaveBeenCalledTimes(1);
+        });
+
+        it('only mirrors the board when the run was already cancelled', async () => {
+            runs.findById.mockResolvedValue({
+                id: RUN,
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-1',
+                status: 'cancelled',
+            });
+
+            await build().onCompleted(
+                new FleetJobCompletedEvent(
+                    expiredJob(),
+                    USER,
+                    'queue-expired',
+                    null,
+                    null,
+                    expiredError,
+                ),
+            );
+
+            expect(runs.markFailed).not.toHaveBeenCalled();
+            expect(inbox!.notice).not.toHaveBeenCalled();
+            expect(runDenorm.recordTerminal).toHaveBeenCalledWith(TASK, RUN, 'failed');
+        });
     });
 
     // Cancellation reaches a node as a REFUSED HEARTBEAT, and

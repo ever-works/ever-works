@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Logger,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -103,6 +104,8 @@ const NODE_HISTORY_LIMIT = 25;
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard)
 export class FleetController {
+    private readonly logger = new Logger(FleetController.name);
+
     constructor(
         private readonly service: FleetService,
         private readonly jobs: FleetJobService,
@@ -410,6 +413,25 @@ export class FleetController {
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');
+        }
+        // Self-build slice S — an eligible runner is back: clear
+        // `waiting-for-runner` on the owner's queued jobs this node can
+        // take, so the Fleet UI stops saying "waiting" the moment it is
+        // no longer true (the node's own lease poll claims them next).
+        // Only for a beat that left the node ONLINE — a paused/disabled
+        // node keeps beating but will not lease — and never able to fail
+        // or refuse the beat: the service re-reads the node row itself
+        // and swallows its own errors; this guard is the belt.
+        if (result.node.status === 'online') {
+            try {
+                await this.jobs.promoteWaitingForNode(result.node.id);
+            } catch (err) {
+                this.logger.debug(
+                    `waiting-job promotion skipped for node ${result.node.id}: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
         }
         return { ok: true, node: result.node };
     }

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { config } from '@ever-works/agent/config';
 import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
-import { FleetExecutionPreferenceService } from '@ever-works/agent/fleet';
+import { FleetExecutionPreferenceService, FleetJobService } from '@ever-works/agent/fleet';
 import type { AgentTaskExecuteDispatchPayload } from '@ever-works/agent/tasks-domain';
 import { decideFleetRouting, DEFAULT_FLEET_EXECUTION_MODE } from '@ever-works/contracts';
 import type {
@@ -16,6 +16,7 @@ import type {
     NodeDispatcherFactory,
     NodeJobRuntimePlugin,
 } from '@ever-works/job-runtime-node-plugin';
+import { agentTaskRequiredCapabilities } from './fleet-agent-task-capabilities';
 import type { FleetAgentTaskPlan } from './fleet-agent-task.dispatcher';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
@@ -73,6 +74,17 @@ export function renderAgentTaskCommand(
 }
 
 /**
+ * What the dispatcher already knows about the job before the routing
+ * decision (self-build slice S). Today: the capability tags the planner
+ * resolved from the tenant's execution settings, so the router counts
+ * only the nodes that could lease the job. Absent = the operator's
+ * config tags alone, exactly what a legacy `command` job is stamped with.
+ */
+export interface FleetRunRoutingHints {
+    requiredCapabilities?: readonly string[];
+}
+
+/**
  * AUDIT A46/A24 — the missing PRODUCER for the fleet job queue.
  *
  * `FleetJobService.enqueue` is the server half of the `job-runtime-node`
@@ -126,6 +138,11 @@ export class FleetRunRouterService {
         private readonly preferences?: FleetExecutionPreferenceService,
         @Optional()
         private readonly runners?: FleetRunnerStatusService,
+        // Self-build slice S — the affinity question, asked BEFORE the job
+        // exists (see `FleetJobService.resolveAgentTaskTarget`). Same
+        // positional-arity rule; absent = every job is judged unpinned.
+        @Optional()
+        private readonly jobs?: FleetJobService,
     ) {}
 
     /**
@@ -191,14 +208,31 @@ export class FleetRunRouterService {
      *      is `resolveForUser` + `availability` fed into the pure
      *      {@link decideFleetRouting}.
      *
+     * "A runner" means a runner that could take THIS job (self-build
+     * slice S / EW-775). `FleetJobService.enqueue` pins an `agent-task`
+     * to the node its Agent is bound to and stamps the tags the lease
+     * scan filters on, so availability is asked the same two questions
+     * here, first: the affinity (through the same
+     * `resolveAgentTaskTarget` the enqueue path uses, so the two cannot
+     * disagree) and the required tags (`hints`, resolved by the planner
+     * from settings only — the plan itself is still built AFTER the
+     * decision so a cloud run never pays for it). Before this, a job
+     * pinned to a closed laptop was "placed" because five idle siblings
+     * made `free > 0`, and then sat queued forever with no reason and no
+     * notice.
+     *
      * Never throws: any failure below step 1 degrades to plain `fleet`,
      * which is byte-for-byte what this path did before preferences
      * existed. Deciding WHERE to run is infrastructure, and an
-     * infrastructure hiccup must not cost the user a run.
+     * infrastructure hiccup must not cost the user a run. An affinity
+     * lookup that fails is judged as UNPINNED and logged — the enqueue
+     * path re-asks and would fail loudly if the store is really down,
+     * and the queue SLA bounds a wrong "placed" either way.
      */
     async routeAgentTask(
         payload: AgentTaskExecuteDispatchPayload,
         scope: FleetExecutionScopeQuery = {},
+        hints: FleetRunRoutingHints = {},
     ): Promise<FleetRunRoutingDecision> {
         if (!(await this.shouldDispatchToFleet(payload.tenantId))) {
             // Not a fallback: this tenant was never routed to the fleet,
@@ -210,8 +244,23 @@ export class FleetRunRouterService {
         }
         try {
             const mode = await this.preferences.resolveForUser(payload.userId, scope);
-            const availability = await this.runners.availability(payload.userId);
-            return decideFleetRouting(mode, availability);
+            const targetNodeId = await this.resolveAffinity(payload);
+            const requiredCapabilities = hints.requiredCapabilities
+                ? [...hints.requiredCapabilities]
+                : agentTaskRequiredCapabilities(null);
+            const availability = await this.runners.availability(payload.userId, {
+                targetNodeId,
+                requiredCapabilities,
+            });
+            const decision = decideFleetRouting(mode, availability);
+            this.logger.debug(
+                `Fleet routing for task ${payload.taskId}: ${decision.target} (mode ${mode}, eligible ${
+                    availability.free
+                }/${availability.online}/${availability.total} of ${availability.fleetTotal ?? availability.total}${
+                    targetNodeId ? `, pinned to ${targetNodeId}` : ''
+                }${requiredCapabilities.length > 0 ? `, requires ${requiredCapabilities.join(',')}` : ''})`,
+            );
+            return decision;
         } catch (err) {
             this.logger.warn(
                 `Fleet execution-preference routing failed for task ${payload.taskId} — dispatching to the fleet: ${
@@ -219,6 +268,27 @@ export class FleetRunRouterService {
                 }`,
             );
             return { target: 'fleet', mode: DEFAULT_FLEET_EXECUTION_MODE };
+        }
+    }
+
+    /**
+     * The node this run's Agent is pinned to, or null. Best-effort by
+     * contract (see {@link routeAgentTask}): a lookup that throws is
+     * "unpinned" for the count, and the reason is logged.
+     */
+    private async resolveAffinity(
+        payload: AgentTaskExecuteDispatchPayload,
+    ): Promise<string | null> {
+        if (!this.jobs) return null;
+        try {
+            return await this.jobs.resolveAgentTaskTarget(payload.userId, payload.agentId);
+        } catch (err) {
+            this.logger.warn(
+                `Fleet affinity lookup failed for task ${payload.taskId} — judging availability fleet-wide: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return null;
         }
     }
 
@@ -275,12 +345,12 @@ export class FleetRunRouterService {
         // A model-CLI job may only be leased by a node that advertises the
         // CLI it needs: the tag is backed by a resolved executable on the
         // node, so requiring it here is what keeps a Claude job off a
-        // machine that only has Codex (and vice versa).
-        const requiredCapabilities = plan
-            ? Array.from(
-                  new Set([...config.fleetNode.getRequiredCapabilities(), plan.execution.provider]),
-              )
-            : config.fleetNode.getRequiredCapabilities();
+        // machine that only has Codex (and vice versa). ONE definition,
+        // shared with the routing decision above, so the row can never
+        // demand a tag the router did not count against.
+        const requiredCapabilities = agentTaskRequiredCapabilities(
+            plan ? plan.execution.provider : null,
+        );
 
         const leaseTtlSec = config.fleetNode.getLeaseTtlSeconds();
         const enqueueOptions: {

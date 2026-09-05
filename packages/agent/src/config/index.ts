@@ -1,4 +1,5 @@
 import {
+    clampQueuedMaxAgeSec,
     DEFAULT_FLEET_AGENT_EXECUTION_MODE,
     DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE,
     DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER,
@@ -16,6 +17,7 @@ import {
     type FleetAgentExecutionMode,
     type FleetAgentExecutionPermissionMode,
     type FleetAgentExecutionProvider,
+    type FleetJobKind,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
@@ -203,6 +205,31 @@ export const config = {
         getLeaseTtlSeconds(): number | undefined {
             const raw = parseInt(process.env.FLEET_NODE_LEASE_TTL_SECONDS || '', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+        },
+        /**
+         * Queue SLA (self-build slice S / EW-775): the longest a `queued`
+         * job of `kind` may wait for an eligible runner before
+         * `FleetJobService.expireQueued` fails it.
+         *
+         * `FLEET_NODE_QUEUE_MAX_AGE_SECONDS` sets every kind; the per-kind
+         * `FLEET_NODE_QUEUE_MAX_AGE_SECONDS_AGENT_TASK` /
+         * `_ACCEPTANCE_CHECKS` / `_BROWSER_CHECK` overrides it. Always
+         * passed through `clampQueuedMaxAgeSec`: unset or nonsense is the
+         * kind's default, out-of-range is clamped, and there is no value
+         * that means "wait forever" — a deploy-manifest typo must fail
+         * closed to the documented bound, not to an unbounded queue.
+         */
+        getQueuedMaxAgeSeconds(kind: FleetJobKind): number {
+            const suffix = kind.toUpperCase().replace(/-/g, '_');
+            const perKind = parseInt(
+                process.env[`FLEET_NODE_QUEUE_MAX_AGE_SECONDS_${suffix}`] || '',
+                10,
+            );
+            if (Number.isFinite(perKind) && perKind > 0) {
+                return clampQueuedMaxAgeSec(kind, perKind);
+            }
+            const all = parseInt(process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS || '', 10);
+            return clampQueuedMaxAgeSec(kind, Number.isFinite(all) && all > 0 ? all : undefined);
         },
         /**
          * Capability tags a node must advertise to be eligible for this
