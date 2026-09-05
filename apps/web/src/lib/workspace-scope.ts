@@ -85,6 +85,34 @@ export function buildWorkspaceHref(scope: WorkspaceScope, href: string): string 
 }
 
 /**
+ * Query-string carrier for BFF routes a browser NAVIGATES to.
+ *
+ * `<a href download>`, `<img src>`, `<video src>` and `<iframe src>` cannot
+ * carry `x-ever-workspace`, and Next middleware cannot add it because its
+ * matcher excludes `/api`. Those routes read the selector from `?scope=`
+ * instead — the SAME grammar as the header (`personal` | `org:<slug>`), so the
+ * two carriers cannot disagree about what a valid selector is.
+ */
+export const WORKSPACE_SCOPE_QUERY_PARAM = 'scope' as const;
+
+/**
+ * Put the workspace selector on a same-origin BFF href. Pure: the caller
+ * supplies the scope (from `useWorkspaceScope()` in a component), so this can
+ * run during server rendering without touching `window`.
+ *
+ * Same-origin relative hrefs only, on purpose — this is for BFF routes, and
+ * silently decorating a foreign URL would hide a bug rather than leak anything.
+ */
+export function withWorkspaceScopeQuery(href: string, scope: WorkspaceScope): string {
+    if (!href.startsWith('/') || href.startsWith('//')) {
+        throw new Error('Workspace scope query requires a same-origin relative href');
+    }
+    const url = new URL(href, 'http://n');
+    url.searchParams.set(WORKSPACE_SCOPE_QUERY_PARAM, serializeWorkspaceScope(scope));
+    return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/**
  * Return the sole supported compatibility redirect. It accepts exactly
  * `/{slug}/dashboard`, excludes locale and reserved app segments, and can only
  * construct a same-origin relative target.

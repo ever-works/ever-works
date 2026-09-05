@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
+import { applyBffWorkspaceScopeFromNavigation } from '@/lib/api/bff-scope';
 
 type RouteContext = { params: Promise<{ userId: string; filename: string }> };
 
@@ -15,6 +16,19 @@ type RouteContext = { params: Promise<{ userId: string; filename: string }> };
  * cookie → Authorization Bearer, then the upstream file is streamed
  * back with its Content-Type and security headers intact.
  *
+ * **Workspace scope.** Reached by `<a href>` / `<img src>`, which cannot
+ * carry `x-ever-workspace`, so the selector travels as `?scope=` and is
+ * turned into `X-Scope-Slug` here (`applyBffWorkspaceScopeFromNavigation`).
+ * The URLs are API-MINTED and live in stored chat text and attachment
+ * lists that predate any carrier, so a URL with no selector runs
+ * personal — exactly what it got before, owner-gated by `userId` upstream.
+ * A present-but-invalid selector is a 400. Upstream, `UploadsController.serve`
+ * resolves the row in the request scope and answers an opaque 404 for a
+ * same-user row that exists in another scope, so a client must only append
+ * `?scope=org:<slug>` once org-tab uploads are STAMPED with that
+ * Organization (the write proxies and the backfill) — until then this
+ * server side is inert.
+ *
  * Mirrors the sibling upload proxies (`../route.ts`, `../file/route.ts`)
  * for the auth + query-allowlist conventions.
  */
@@ -27,12 +41,20 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const headers = new Headers();
+    let headers = new Headers();
     headers.set('Authorization', `Bearer ${token}`);
+    try {
+        headers = applyBffWorkspaceScopeFromNavigation(request, headers);
+    } catch {
+        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
+    }
 
     // Security: allowlist only the documented query parameter (workId —
     // round-tripped for per-Work storage backends) and encode the path
-    // segments to prevent URL injection via crafted IDs.
+    // segments to prevent URL injection via crafted IDs. This is also what
+    // keeps the `scope` carrier OFF the upstream URL: the Nest handler
+    // takes `workId` only, and the global ValidationPipe rejects unknown
+    // query keys.
     const upstreamUrl = new URL(
         `${API_URL}/uploads/${encodeURIComponent(userId)}/${encodeURIComponent(filename)}`,
     );

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
     applyBffWorkspaceScope,
     applyBffWorkspaceScopeFromNavigation,
+    upstreamSearchWithoutScope,
     WORKSPACE_SCOPE_QUERY_PARAM,
 } from './bff-scope';
 
@@ -67,8 +68,31 @@ describe('applyBffWorkspaceScopeFromNavigation', () => {
         expect(headers.get('x-ever-workspace')).toBeNull();
     });
 
-    it('fails closed when NEITHER carrier is present — an old bookmark has no answer to "which workspace?"', () => {
-        expect(() => applyBffWorkspaceScopeFromNavigation(request(), base)).toThrow(
+    /**
+     * The fallback that makes this carrier safe to introduce. An old bookmark,
+     * a stored `<img src>`, an API-minted URL in chat history — none carries a
+     * selector, and every one of them ran personal before the carrier existed.
+     * Personal is userId-gated upstream, so this narrows and widens nothing;
+     * failing closed here would break every attachment tile in history.
+     */
+    it('runs PERSONAL when NEITHER carrier is present, instead of failing closed', () => {
+        const headers = applyBffWorkspaceScopeFromNavigation(request(), base);
+
+        expect(headers.get('x-scope-slug')).toBe('@personal');
+        expect(headers.get('x-ever-workspace')).toBeNull();
+    });
+
+    it('skips the Referer check for a DEFAULTED selector — an old <img src> inside an Organization page keeps resolving', () => {
+        const headers = applyBffWorkspaceScopeFromNavigation(
+            request({ referer: 'http://web.example/org/ever/memory' }),
+            base,
+        );
+
+        expect(headers.get('x-scope-slug')).toBe('@personal');
+    });
+
+    it('still fails closed on a PRESENT but empty ?scope= — that is a tampered value, not a missing one', () => {
+        expect(() => applyBffWorkspaceScopeFromNavigation(request({ query: '' }), base)).toThrow(
             'Invalid workspace scope',
         );
     });
@@ -142,5 +166,29 @@ describe('applyBffWorkspaceScope (header variant) is unchanged', () => {
 
         expect(headers.get('x-scope-slug')).toBe('ever');
         expect(headers.get('x-ever-workspace')).toBeNull();
+    });
+});
+
+/**
+ * The carrier is consumed at the BFF and never relayed: the API's global
+ * ValidationPipe runs with `forbidNonWhitelisted`, so a forwarded `scope`
+ * would be a 400 upstream on every route in this family.
+ */
+describe('upstreamSearchWithoutScope', () => {
+    it('drops only the carrier and keeps the rest of the query', () => {
+        expect(
+            upstreamSearchWithoutScope(new URLSearchParams('source=upload&scope=org:ever')),
+        ).toBe('?source=upload');
+    });
+
+    it('returns an empty string when the carrier was the only param', () => {
+        expect(upstreamSearchWithoutScope(new URLSearchParams('scope=personal'))).toBe('');
+    });
+
+    it('does not mutate the caller’s params', () => {
+        const params = new URLSearchParams('scope=personal&x=1');
+        upstreamSearchWithoutScope(params);
+
+        expect(params.get('scope')).toBe('personal');
     });
 });
