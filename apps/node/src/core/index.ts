@@ -9,6 +9,7 @@
  * runner), so both shells stay thin and the whole surface is unit-testable.
  */
 
+export * from './api-base';
 export * from './browser-probe';
 export * from './auth-client';
 export * from './capabilities';

@@ -154,6 +154,79 @@ jobs:
         run: python packages/agent-plugins/scripts/oracle-check.py packages/agent-plugins/fixtures
 
 
+  # W (EW-779, self-build finding OPS-21) — THE NODE-CONTRACT GATE.
+  #
+  # Six PCs build the platform that dispatches those six PCs. A regression in
+  # `/api/fleet/jobs/lease`, the heartbeat DTO or the reconciler takes ALL of
+  # them out at once — and the fix then has to travel develop -> stage -> main
+  # through `k8s-build` (measured at 215-243 minutes, with
+  # `cancel-in-progress: false`) on the very machines that just stopped. That
+  # is the outage this job exists to catch before a merge, not after one.
+  #
+  # It is a GATE, not an oracle: no `continue-on-error`, unlike `skills-oracle`
+  # above. And deliberately NO `if:` and no paths filter — in GitHub branch
+  # protection a SKIPPED job reports as SUCCESS, so any condition added here
+  # would be a hole a red run could be laundered through.
+  #
+  # The load-bearing half of "required" is not this job. These same specs run
+  # inside `pnpm test` under `lint-and-test`, which this file already documents
+  # as the ONLY required status check on main/develop/stage — so they gate from
+  # the moment they merge, with no branch-protection change. This job exists so
+  # the signal is a NAMED check in the checks list instead of three lines in a
+  # 40-package test log, and so the same commands run in front of a promotion
+  # (see promotion-gate.yml).
+  node-contract-gate:
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      # Resolve dependencies through the internal Verdaccio cache when this job runs
+      # on the in-network ARC pool, so the install does not re-pull the tree from the
+      # public registry. Falls back to npmjs automatically when the VIP does not answer.
+      - name: Configure Registry
+        uses: ./.github/actions/configure-registry
+        with:
+          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
+          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
+          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # No build step anywhere below, on purpose: apps/api's jest maps
+      # `@ever-works/contracts` to SOURCE (moduleNameMapper), so the suite
+      # judges the types as written rather than a stale dist — and the ARC pool
+      # is already tight enough that two matrix jobs skip on promotion pushes.
+      - name: Contracts — fleet wire types and the package inventory guard
+        run: pnpm --filter @ever-works/contracts test
+
+      - name: Platform side — the DTOs still accept what a deployed node sends
+        run: pnpm --filter ever-works-api exec jest --testPathPattern="fleet/__tests__/node-contract"
+
+      - name: Node side — the client still sends what the contract pins
+        run: pnpm --filter ever-works-node exec vitest run src/core/node-contract.conformance.spec.ts src/core/api-base.spec.ts
+
+
   lint-and-test:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 

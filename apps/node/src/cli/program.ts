@@ -53,6 +53,7 @@ import {
 	type NodeResourceLimits,
 	type NodeWorkspaceGcPolicy
 } from '../core/types';
+import { API_URL_ENV, describeApiBase, readApiUrlPin, resolveApiBase } from '../core/api-base';
 
 /**
  * `ever-works-node` CLI.
@@ -733,13 +734,77 @@ export async function runUnenroll(deps: CliDeps, options: { localOnly?: boolean 
 	deps.out(`Unenrolled node ${config.nodeId}. The registration and the local credential are both gone.`);
 }
 
+/**
+ * What every operator-facing surface says about the control plane.
+ *
+ * Never throws. `resolveApiBase` refuses a malformed `EVER_WORKS_NODE_API_URL`
+ * — which is right for the runtime (fail at startup, not at the first request)
+ * but wrong for `status` and `doctor`: the one command an operator is told to
+ * run when the fleet cannot reach the platform must still print, and must say
+ * plainly that the pin is what is broken.
+ */
+function describeControlPlane(config: Pick<NodeConfig, 'apiUrl'> | null): string {
+	if (config) {
+		try {
+			return describeApiBase(resolveApiBase(config));
+		} catch (error) {
+			return (
+				`${config.apiUrl} (from the enrolled config) — WARNING: ${API_URL_ENV} is set to an ` +
+				`invalid URL, so the node will refuse to start: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+	}
+	try {
+		const pinned = readApiUrlPin();
+		return pinned === null
+			? `not enrolled, nothing pinned (set ${API_URL_ENV} to choose a control plane up front)`
+			: `${pinned} (pinned via ${API_URL_ENV}; this machine is not enrolled yet)`;
+	} catch (error) {
+		return `INVALID ${API_URL_ENV}: ${error instanceof Error ? error.message : String(error)}`;
+	}
+}
+
+/** The same facts, for `doctor --json`. Never throws, for the same reason. */
+function controlPlaneJson(config: Pick<NodeConfig, 'apiUrl'> | null): Record<string, unknown> {
+	try {
+		if (config) {
+			const base = resolveApiBase(config);
+			return {
+				apiUrl: base.url,
+				apiUrlSource: base.source,
+				enrolledApiUrl: base.configuredUrl,
+				apiUrlPinMismatch: base.mismatch
+			};
+		}
+		const pinned = readApiUrlPin();
+		return {
+			apiUrl: pinned,
+			apiUrlSource: pinned === null ? 'none' : 'pin',
+			enrolledApiUrl: null,
+			apiUrlPinMismatch: false
+		};
+	} catch (error) {
+		return {
+			apiUrl: config ? config.apiUrl : null,
+			apiUrlSource: 'invalid-pin',
+			enrolledApiUrl: config ? config.apiUrl : null,
+			apiUrlPinMismatch: false,
+			apiUrlPinError: error instanceof Error ? error.message : String(error)
+		};
+	}
+}
+
 export async function runStatus(deps: CliDeps): Promise<void> {
 	const config = await requireConfig(deps);
 	const view = redactConfig(config);
 	deps.out(`node id      ${view.nodeId}`);
 	deps.out(`name         ${view.name ?? '(assigned by the platform)'}`);
 	deps.out(`kind         ${view.kind}`);
-	deps.out(`api          ${view.apiUrl}`);
+	// The EFFECTIVE control plane, and where it came from. Printing only the
+	// stored value made a pinned node indistinguishable from an unpinned one
+	// (EW-779) — and a pin that does not match the enrolled origin 401s every
+	// call, which is worth reading before anything else.
+	deps.out(`api          ${describeControlPlane(config)}`);
 	deps.out(`enrolled at  ${view.enrolledAt}`);
 	deps.out(`heartbeat    every ${view.heartbeatIntervalMs / 1000}s`);
 	deps.out(`capabilities ${view.capabilities.join(', ') || '(none)'}`);
@@ -846,6 +911,10 @@ async function gatherHousekeeping(deps: CliDeps, options: HousekeepingCommandOpt
 
 function printHousekeepingHeader(deps: CliDeps, report: HousekeepingReport, now: number): void {
 	deps.out(`enrolled     ${report.config ? `yes (node ${report.config.nodeId})` : 'no — defaults apply'}`);
+	// `doctor` printed nothing at all about the control plane before EW-779,
+	// which made "the fleet cannot reach the platform" undiagnosable from the
+	// one command an operator is told to run.
+	deps.out(`api          ${describeControlPlane(report.config)}`);
 	deps.out(`workspace    ${report.workspaceRoot}${report.inventory.exists ? '' : ' (not created yet)'}`);
 	const floorText = report.floor === null ? 'no floor' : `floor ${formatBytes(report.floor)}`;
 	if (report.freeBytes === null) {
@@ -927,6 +996,7 @@ function housekeepingJson(report: HousekeepingReport): Record<string, unknown> {
 	});
 	return {
 		enrolled: report.config !== null,
+		...controlPlaneJson(report.config),
 		workspaceRoot: report.workspaceRoot,
 		workspaceRootExists: report.inventory.exists,
 		diskFreeBytes: report.freeBytes,

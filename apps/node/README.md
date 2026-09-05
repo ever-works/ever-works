@@ -97,6 +97,32 @@ Exit codes: `0` ok, `1` failure, `3` not enrolled (so provisioning scripts can b
 
 `EVER_WORKS_NODE_CONFIG` overrides the path entirely.
 
+`EVER_WORKS_NODE_API_URL` overrides the **API origin** the node talks to, for every call after
+enrollment (heartbeat, lease, job heartbeat, complete, pause, unenroll). It exists so a bad build on
+the origin a fleet was enrolled against cannot orphan the machines: pin them at a stable origin,
+restart, and they keep working while the fix ships.
+
+```
+EVER_WORKS_NODE_API_URL=https://apistage.ever.works   # stage
+EVER_WORKS_NODE_API_URL=https://api.ever.works        # prod
+```
+
+Four rules, all deliberate:
+
+- **It does not affect `enroll`.** Enrollment mints a credential against the origin given with
+  `--api-url`, and that is the origin stored in the config. A pin that silently redirected it would
+  store a secret as belonging to a platform that never issued it.
+- **It is never written back to this file.** Unsetting the variable is a complete undo.
+- **Empty means unset.** `EVER_WORKS_NODE_API_URL=` in a unit file turns the override off; it never
+  means "no API".
+- **A malformed value stops the node at startup** with a URL error, rather than becoming a
+  mystifying 403/404 at the first request.
+
+A pin pointing at a platform this node did **not** enrol against will be refused with 401 on every
+call — the node has no credential there. `status` and `doctor` both print the effective origin, name
+where it came from, and warn explicitly about that mismatch. The full procedure is
+`docs/runbooks/FLEET_BREAK_GLASS.md`.
+
 **The credential does not live in this file when it does not have to.** With an OS keychain
 available (macOS Keychain, Windows Credential Manager, Linux Secret Service — all reached through
 the `@napi-rs/keyring` SDK) the secret is stored there and the file records only

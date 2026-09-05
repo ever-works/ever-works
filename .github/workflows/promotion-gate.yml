@@ -163,3 +163,101 @@ jobs:
             exit 0
           fi
           exit 1
+
+  # W (EW-779) — the node↔platform wire contract, re-run against the exact
+  # commit being promoted.
+  #
+  # Why a promotion needs its own copy of a check that already runs on every
+  # PR: the fleet that builds this repo is dispatched BY this repo. A contract
+  # regression that reaches production takes all six machines out at once, and
+  # the fix then has to travel develop -> stage -> main through `k8s-build`
+  # (215-243 minutes, `cancel-in-progress: false`) on the machines that just
+  # stopped. The commit on `stage` is not necessarily any commit CI has judged
+  # as a unit — merges happen — so the promotion asks the question again about
+  # the thing actually shipping.
+  #
+  # HOW THIS DIFFERS FROM `e2e-result` ABOVE, deliberately:
+  #
+  #   - No `override-e2e-gate` escape. That label exists because the E2E suite
+  #     carries chronic, unrelated failures, so a hard block would be routed
+  #     around within a week. This suite has no such problem: it is fast,
+  #     hermetic (no browser, no database, no network) and green by
+  #     construction. An override here would only ever be used to ship the
+  #     outage it exists to prevent.
+  #   - No `if:` at all. `e2e-result` gates only promotions from `stage`; this
+  #     runs on every PR into main, hotfixes included — a hotfix is exactly
+  #     when someone changes a fleet DTO in a hurry. And in branch protection a
+  #     SKIPPED job reports as SUCCESS, so every condition here is a hole: a
+  #     red run followed by a label toggle would flip the gate green.
+  #
+  # Like `e2e-result`, being red is only advisory until this check is added to
+  # the branch-protection list in repository settings. The genuinely-required
+  # half is that these same specs run inside `pnpm test` under `lint-and-test`
+  # (see ci.yml), which IS required today.
+  node-contract:
+    name: node contract must hold for the commit being promoted
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout the exact commit being promoted
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      # Same Verdaccio-or-npmjs resolution every other install job uses; the
+      # ARC pool image does not ship `gh`, but it does have node + pnpm once
+      # these two actions have run.
+      - name: Configure Registry
+        uses: ./.github/actions/configure-registry
+        with:
+          verdaccio-registry: ${{ vars.VERDACCIO_REGISTRY }}
+          verdaccio-token: ${{ secrets.VERDACCIO_TOKEN }}
+          force-public: ${{ vars.VERDACCIO_FORCE_PUBLIC }}
+          expect-vip: ${{ vars.RUNNER_LINUX_X64_4 != '' }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Contracts — fleet wire types and the package inventory guard
+        run: pnpm --filter @ever-works/contracts test
+
+      - name: Platform side — the DTOs still accept what a deployed node sends
+        run: pnpm --filter ever-works-api exec jest --testPathPattern="fleet/__tests__/node-contract"
+
+      - name: Node side — the client still sends what the contract pins
+        run: pnpm --filter ever-works-node exec vitest run src/core/node-contract.conformance.spec.ts src/core/api-base.spec.ts
+
+      - name: Explain a failure in the terms a promotion decision needs
+        if: failure()
+        run: |
+          echo "::error::NODE CONTRACT BROKEN on the commit being promoted."
+          echo "The failing case names the DIRECTION:"
+          echo "  PLATFORM TOO NEW - the API now requires something every deployed node"
+          echo "    omits. Promoting this stops the whole fleet at once, and the fix has"
+          echo "    to travel develop -> stage -> main through k8s-build (215-243 min)"
+          echo "    on the machines that just stopped. DO NOT PROMOTE."
+          echo "  NODE TOO OLD - a field a running node still sends was removed from a"
+          echo "    node-facing DTO. whitelist + forbidNonWhitelisted makes that a 400,"
+          echo "    not a silent drop, so it is equally fleet-wide."
+          echo ""
+          echo "There is no override label for this gate, on purpose. If the contract"
+          echo "change is intended, the fixture in packages/contracts/fixtures/ has to be"
+          echo "updated in the same PR that changes the DTO, and the break-glass runbook"
+          echo "(docs/runbooks/FLEET_BREAK_GLASS.md) tells you how to keep the fleet"
+          echo "working across the change."
+          exit 1
