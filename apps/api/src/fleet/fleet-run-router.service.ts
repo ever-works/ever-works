@@ -3,7 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { config } from '@ever-works/agent/config';
 import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
-import { FleetExecutionPreferenceService, FleetJobService } from '@ever-works/agent/fleet';
+import {
+    FleetExecutionPreferenceService,
+    FleetJobService,
+    FleetKillSwitchService,
+} from '@ever-works/agent/fleet';
 import type { AgentTaskExecuteDispatchPayload } from '@ever-works/agent/tasks-domain';
 import { decideFleetRouting, DEFAULT_FLEET_EXECUTION_MODE } from '@ever-works/contracts';
 import type {
@@ -18,6 +22,7 @@ import type {
 } from '@ever-works/job-runtime-node-plugin';
 import { agentTaskRequiredCapabilities } from './fleet-agent-task-capabilities';
 import type { FleetAgentTaskPlan } from './fleet-agent-task.dispatcher';
+import { FleetKillSwitchActiveError } from './fleet-kill-switch.error';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
     NODE_JOB_RUNTIME_DISPATCHER_FACTORY,
@@ -143,7 +148,32 @@ export class FleetRunRouterService {
         // positional-arity rule; absent = every job is judged unpinned.
         @Optional()
         private readonly jobs?: FleetJobService,
+        // Panic controls (EW-778) — the GLOBAL STOP FLAG. Same appended-
+        // LAST + @Optional() posture. Present, `routeAgentTask` and
+        // `enqueueAgentTask` REFUSE (typed error, never a cloud fallback)
+        // while the flag is set or cannot be read.
+        @Optional()
+        private readonly killSwitch?: FleetKillSwitchService,
     ) {}
+
+    /**
+     * True when no new work may be routed: the flag is set OR could not
+     * be read. The service folds read failures into `true` itself; the
+     * catch covers a stub or a future implementation that throws.
+     */
+    private async halted(): Promise<boolean> {
+        if (!this.killSwitch) return false;
+        try {
+            return await this.killSwitch.isStopped();
+        } catch (err) {
+            this.logger.error(
+                `Global stop flag could not be read — refusing to route (fail-closed): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return true;
+        }
+    }
 
     /**
      * The runtime id that should service work for `tenantId`. Mirrors
@@ -174,9 +204,13 @@ export class FleetRunRouterService {
     /**
      * True when this run should be enqueued onto the owner's fleet.
      *
-     * `FLEET_NODE_RUNTIME_ENABLED=false` is the kill switch and wins
-     * over the selector — an operator draining the fleet gets the
-     * platform default back without editing every tenant row.
+     * `FLEET_NODE_RUNTIME_ENABLED=false` is a ROUTING SELECTOR that wins
+     * over the tenant overlay — an operator taking the fleet runtime out
+     * of service gets the platform default back without editing every
+     * tenant row. It is NOT a panic control: work FALLS BACK TO THE
+     * CLOUD. The control that stops work is the DB-backed global stop
+     * flag (`FleetKillSwitchService`, EW-778), checked above this in
+     * {@link routeAgentTask}.
      */
     async shouldDispatchToFleet(tenantId?: string | null): Promise<boolean> {
         if ((await this.resolveRuntimeId(tenantId)) !== 'node') {
@@ -197,12 +231,15 @@ export class FleetRunRouterService {
      *
      * Two questions, in this order, and the order matters:
      *
+     *   0. **Is the platform STOPPED?** (EW-778) The global stop flag is
+     *      read first, outside every fallback. Set (or unreadable) ⇒
+     *      {@link FleetKillSwitchActiveError}, which the fleet-aware
+     *      dispatcher rethrows rather than falling back to the cloud.
      *   1. **Is the fleet even on the table?** {@link shouldDispatchToFleet}
-     *      answers that from the runtime selector and the operator kill
-     *      switch. A `no` here is final — an owner cannot opt INTO the
-     *      fleet with a preference row when their tenant is not on the
-     *      fleet runtime, and no preference outranks an operator
-     *      draining the fleet.
+     *      answers that from the runtime selector. A `no` here is final —
+     *      an owner cannot opt INTO the fleet with a preference row when
+     *      their tenant is not on the fleet runtime, and no preference
+     *      outranks an operator taking the runtime out of service.
      *   2. **Given the fleet is available, what does the owner want for
      *      THIS Work / Goal, and can a runner take it right now?** That
      *      is `resolveForUser` + `availability` fed into the pure
@@ -221,7 +258,9 @@ export class FleetRunRouterService {
      * made `free > 0`, and then sat queued forever with no reason and no
      * notice.
      *
-     * Never throws: any failure below step 1 degrades to plain `fleet`,
+     * Never throws below step 0 (the global stop flag, which REFUSES with
+     * a typed error rather than degrading): any failure after step 1
+     * degrades to plain `fleet`,
      * which is byte-for-byte what this path did before preferences
      * existed. Deciding WHERE to run is infrastructure, and an
      * infrastructure hiccup must not cost the user a run. An affinity
@@ -234,6 +273,9 @@ export class FleetRunRouterService {
         scope: FleetExecutionScopeQuery = {},
         hints: FleetRunRoutingHints = {},
     ): Promise<FleetRunRoutingDecision> {
+        if (await this.halted()) {
+            throw new FleetKillSwitchActiveError(payload.taskId);
+        }
         if (!(await this.shouldDispatchToFleet(payload.tenantId))) {
             // Not a fallback: this tenant was never routed to the fleet,
             // so there is nothing to notify anyone about.
@@ -319,6 +361,11 @@ export class FleetRunRouterService {
          */
         plan?: FleetAgentTaskPlan | null,
     ): Promise<{ runId: string }> {
+        // EW-778 — a direct caller (anything that skipped routeAgentTask)
+        // is refused on the same flag. Fail closed.
+        if (await this.halted()) {
+            throw new FleetKillSwitchActiveError(payload.taskId);
+        }
         const steps = plan ? [] : this.buildAgentTaskSteps(payload);
         const workspacePath = plan ? undefined : config.fleetNode.getAgentTaskWorkspacePath();
 

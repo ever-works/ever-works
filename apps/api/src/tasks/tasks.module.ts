@@ -63,6 +63,7 @@ import {
 // store; `FleetRunRouterService` decides per run whether the resolved
 // runtime is the owner's Fleet and, when it is, writes the lease-able
 // row an enrolled node polls for.
+import { FleetKillSwitchService } from '@ever-works/agent/fleet';
 import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetRunRouterService } from '../fleet/fleet-run-router.service';
 import { createFleetAwareAgentTaskExecuteDispatcher } from '../fleet/fleet-agent-task.dispatcher';
@@ -139,17 +140,23 @@ import { TaskChatController } from './task-chat.controller';
                 scopeResolver: FleetTaskScopeResolverService,
                 notifications: NotificationService,
                 planner: FleetAgentTaskPlannerService,
+                // Panic controls (EW-778) — the global stop flag, checked
+                // before routing so a stop can never become a cloud
+                // fallback. Resolves through FleetApiModule's re-export of
+                // the agent-side FleetModule.
+                killSwitch: FleetKillSwitchService,
             ) =>
                 createFleetAwareAgentTaskExecuteDispatcher(
                     agentTaskExecuteTriggerAdapter,
                     fleetRouter,
-                    { scopeResolver, notifications, planner },
+                    { scopeResolver, notifications, planner, killSwitch },
                 ),
             inject: [
                 FleetRunRouterService,
                 FleetTaskScopeResolverService,
                 NotificationService,
                 FleetAgentTaskPlannerService,
+                FleetKillSwitchService,
             ],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },

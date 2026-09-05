@@ -7,11 +7,16 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { ApiResponseError } from '@/lib/api/server-api';
 import {
     fleetAPI,
+    type CancelFleetInFlightPayload,
     type CreateFleetEnrollmentTokenPayload,
     type CreateFleetEnrollmentTokenResponse,
     type FleetAgentNodeAffinityView,
     type FleetCostCeilingView,
+    type FleetCancelInFlightResult,
+    type FleetDrainAllResult,
     type FleetEnrollmentTokenView,
+    type FleetKillSwitchChangeResult,
+    type FleetKillSwitchState,
     type FleetNodeDetailView,
     type FleetNodeDrainResult,
     type FleetExecutionPreferenceView,
@@ -240,6 +245,106 @@ export async function setFleetCostCeilingAction(
             success: false,
             data: null,
             error: errorMessage(error, 'Failed to update the fleet cost ceiling'),
+        };
+    }
+}
+
+/**
+ * Panic controls (EW-778) — drain EVERY node the caller owns. Nothing is
+ * cancelled; that is `cancelFleetInFlightAction`, a separate decision.
+ */
+export async function drainAllFleetNodesAction(): Promise<FleetActionResult<FleetDrainAllResult>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.drainAll();
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to drain the fleet'),
+        };
+    }
+}
+
+/**
+ * Panic controls (EW-778) — cancel the caller's running fleet work and
+ * the agent runs behind it. Explicit and separate from draining and from
+ * the stop flag, on purpose.
+ */
+export async function cancelFleetInFlightAction(
+    payload: CancelFleetInFlightPayload = {},
+): Promise<FleetActionResult<FleetCancelInFlightResult>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.cancelInFlight(payload);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to cancel in-flight work'),
+        };
+    }
+}
+
+/**
+ * Panic controls (EW-778) — is the platform-wide stop flag set? Polled by
+ * the fleet page banner, so like runner status it deliberately does NOT
+ * `revalidatePath`.
+ */
+export async function getFleetKillSwitchAction(): Promise<FleetActionResult<FleetKillSwitchState>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.killSwitchState();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to read the stop flag'),
+        };
+    }
+}
+
+/**
+ * Panic controls (EW-778) — set the platform-wide stop flag. Platform
+ * admins only: the API answers 403 for everyone else and this action
+ * simply surfaces that message.
+ */
+export async function stopFleetKillSwitchAction(
+    reason?: string | null,
+): Promise<FleetActionResult<FleetKillSwitchChangeResult>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.stopKillSwitch(reason ?? null);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to set the stop flag'),
+        };
+    }
+}
+
+/** Panic controls (EW-778) — clear the platform-wide stop flag (platform admins only). */
+export async function clearFleetKillSwitchAction(): Promise<
+    FleetActionResult<FleetKillSwitchChangeResult>
+> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.clearKillSwitch();
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to clear the stop flag'),
         };
     }
 }

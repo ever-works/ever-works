@@ -41,8 +41,9 @@
  * Note the layering: this preference decides FLEET-vs-CLOUD for a run
  * whose tenant already has the fleet available. It never turns the fleet
  * on for a tenant whose resolved runtime is not `node`, and it never
- * overrides the `FLEET_NODE_RUNTIME_ENABLED` kill switch — an operator
- * draining the fleet still wins over every preference row.
+ * overrides the `FLEET_NODE_RUNTIME_ENABLED` routing selector — an operator
+ * taking the fleet runtime out of service still wins over every preference
+ * row. (Stopping work outright is the DB-backed global stop flag, EW-778.)
  */
 
 /** Where a run should execute. */

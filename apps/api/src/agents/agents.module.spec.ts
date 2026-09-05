@@ -40,6 +40,8 @@ jest.mock('@ever-works/agent/agents', () => ({
     AGENT_MCP_TOOL_SOURCE: 'AGENT_MCP_TOOL_SOURCE',
     // Skill files (#2080) — the uploads-spine content-reader seam.
     SKILL_FILE_CONTENT_READER: 'SKILL_FILE_CONTENT_READER',
+    // Panic controls (EW-778) — the global stop flag seam.
+    RUN_KILL_SWITCH: 'RUN_KILL_SWITCH',
 }));
 jest.mock('@ever-works/agent/mcp', () => ({
     McpModule: class McpModule {},
@@ -90,6 +92,8 @@ jest.mock('@ever-works/agent/meetings', () => ({
 jest.mock('@ever-works/agent/fleet', () => ({
     FleetModule: class FleetModule {},
     FleetService: class FleetService {},
+    FleetJobService: class FleetJobService {},
+    FleetKillSwitchService: class FleetKillSwitchService {},
 }));
 jest.mock('@ever-works/agent/pr-review', () => ({
     PrReviewModule: class PrReviewModule {},
@@ -273,6 +277,22 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         );
         expect(provider).toBeDefined();
         expect(meta('exports')).toContain('SKILL_FILE_CONTENT_READER');
+    });
+
+    /**
+     * Panic controls (EW-778) — the dispatch gate reads the GLOBAL STOP
+     * FLAG through `@Optional() @Inject(RUN_KILL_SWITCH)`. Unbound, or
+     * bound but not exported from this @Global() module, it resolves to
+     * `undefined` and every new run sails through a set flag: the switch
+     * would exist, be flipped, be audited — and stop nothing.
+     */
+    it('binds + exports RUN_KILL_SWITCH to the fleet kill-switch service', () => {
+        const provider = (
+            meta('providers') as Array<{ provide?: unknown; useExisting?: unknown }>
+        ).find((p) => p && typeof p === 'object' && p.provide === 'RUN_KILL_SWITCH');
+        expect(provider).toBeDefined();
+        expect((provider?.useExisting as { name?: string })?.name).toBe('FleetKillSwitchService');
+        expect(meta('exports')).toContain('RUN_KILL_SWITCH');
     });
 
     it('binds all three Task membership repositories (the commentOnTask gate is fail-closed)', () => {

@@ -16,6 +16,11 @@ import { FleetAgentNodeAffinityService } from './fleet-agent-node-affinity.servi
 import { FleetCostPolicy } from '../entities/fleet-cost-policy.entity';
 import { FleetCostPolicyRepository } from './fleet-cost-policy.repository';
 import { FleetCostCeilingService } from './fleet-cost-ceiling.service';
+import { FleetKillSwitch } from '../entities/fleet-kill-switch.entity';
+import { FleetAudit } from '../entities/fleet-audit.entity';
+import { FleetKillSwitchRepository } from './fleet-kill-switch.repository';
+import { FleetKillSwitchService } from './fleet-kill-switch.service';
+import { FleetAuditService } from './fleet-audit.service';
 
 /**
  * Fleet (Wave 12, slice 1 + Desktop PRD M4) — agent-side module owning
@@ -41,6 +46,11 @@ import { FleetCostCeilingService } from './fleet-cost-ceiling.service';
  *     through the same disable + requeue pair the drain endpoint uses and
  *     files one Inbox notice per day (the `INBOX_PRODUCER` token is
  *     `@Optional()` — bound by the api-side @Global() InboxModule).
+ *   - `FleetKillSwitchService` (EW-778) — the GLOBAL STOP FLAG, read
+ *     fail-closed by the dispatch gate (via the `RUN_KILL_SWITCH` port
+ *     the api-side AgentsModule binds), the run router and every lease;
+ *     `FleetAuditService` is the one writer of the `fleet_audit` trail
+ *     every panic action records to.
  *
  * Both authenticate nodes through the SAME credential helper
  * (`fleet-node-credential.ts`), so enroll / heartbeat / lease can never
@@ -65,6 +75,8 @@ import { FleetCostCeilingService } from './fleet-cost-ceiling.service';
             FleetExecutionPreference,
             FleetAgentNodeAffinity,
             FleetCostPolicy,
+            FleetKillSwitch,
+            FleetAudit,
         ]),
     ],
     providers: [
@@ -73,11 +85,14 @@ import { FleetCostCeilingService } from './fleet-cost-ceiling.service';
         FleetExecutionPreferenceRepository,
         FleetAgentNodeAffinityRepository,
         FleetCostPolicyRepository,
+        FleetKillSwitchRepository,
         FleetService,
         FleetJobService,
         FleetExecutionPreferenceService,
         FleetAgentNodeAffinityService,
         FleetCostCeilingService,
+        FleetAuditService,
+        FleetKillSwitchService,
     ],
     exports: [
         FleetNodeRepository,
@@ -85,11 +100,14 @@ import { FleetCostCeilingService } from './fleet-cost-ceiling.service';
         FleetExecutionPreferenceRepository,
         FleetAgentNodeAffinityRepository,
         FleetCostPolicyRepository,
+        FleetKillSwitchRepository,
         FleetService,
         FleetJobService,
         FleetExecutionPreferenceService,
         FleetAgentNodeAffinityService,
         FleetCostCeilingService,
+        FleetAuditService,
+        FleetKillSwitchService,
     ],
 })
 export class FleetModule {}

@@ -38,13 +38,13 @@ import {
     type GateStatus,
     type TaskCheckResult,
 } from '@ever-works/contracts';
+import {
+    correlateAgentTaskJob,
+    type FleetAgentTaskCorrelation,
+} from './fleet-agent-task.correlation';
 
-/** What an `agent-task` job correlates to on the platform side. */
-export interface FleetAgentTaskCorrelation {
-    runId: string;
-    taskId: string;
-    agentId: string | null;
-}
+/** What an `agent-task` job correlates to on the platform side (declared in the leaf). */
+export type { FleetAgentTaskCorrelation };
 
 /** Longest run summary / chat body the reconciler will store. */
 const MAX_SUMMARY_CHARS = 4000;
@@ -140,19 +140,14 @@ export class FleetAgentTaskReconcilerService {
         @Optional() private readonly costCeiling?: FleetCostCeilingService,
     ) {}
 
-    /** The platform identities an `agent-task` job carries, or null for any other job. */
+    /**
+     * The platform identities an `agent-task` job carries, or null for
+     * any other job. The rule itself lives in the leaf
+     * `fleet-agent-task.correlation.ts` so the panic controls
+     * (cancel-in-flight, EW-778) share it without importing this graph.
+     */
     static correlate(job: FleetJobView): FleetAgentTaskCorrelation | null {
-        if (job.kind !== 'agent-task') return null;
-        const payload = job.payload;
-        if (!payload || typeof payload !== 'object') return null;
-        const runId = typeof payload.runId === 'string' ? payload.runId.trim() : '';
-        const taskId = typeof payload.taskId === 'string' ? payload.taskId.trim() : '';
-        if (!runId || !taskId) return null;
-        const agentId =
-            typeof payload.agentId === 'string' && payload.agentId.trim()
-                ? payload.agentId.trim()
-                : null;
-        return { runId, taskId, agentId };
+        return correlateAgentTaskJob(job);
     }
 
     @OnEvent(FleetJobLeasedEvent.EVENT_NAME, { async: true })

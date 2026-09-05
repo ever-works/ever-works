@@ -94,6 +94,9 @@ describe('FleetController', () => {
             runnerStub as never,
             preferenceStub as never,
             ceilingStub as never,
+            // EW-778 — the per-node drain now lives in FleetPanicService
+            // (shared with drain-all); its own spec covers it.
+            { drainNodeForUser: jest.fn(async () => null) } as never,
         );
     });
 

@@ -3467,6 +3467,41 @@
                             "helper": "Always uses the platform runtime, even when a local runner is free."
                         }
                     }
+                },
+                "killSwitch": {
+                    "stoppedTitle": "The platform is stopped",
+                    "stoppedBody": "An operator has set the global stop flag. No new agent runs are dispatched, routed or leased to your nodes until it is cleared. Work that is already running continues and keeps reporting.",
+                    "reason": "Reason: {reason}",
+                    "since": "Since {since}",
+                    "unverifiedTitle": "Dispatch is refusing new work: the stop flag could not be read",
+                    "unverifiedBody": "The platform could not read its global stop flag, so it refuses to start anything new (fail-closed). Nobody threw the switch — this usually means a database migration has not run yet or the database is unreachable.",
+                    "unknownTitle": "Stop flag status unavailable",
+                    "unknownBody": "This page could not read the global stop flag: {error}"
+                },
+                "panic": {
+                    "title": "Panic controls",
+                    "description": "Two separate decisions for a bad night: drain every node so nothing new starts on your machines, and — only if you also want to abort what is already running — cancel the in-flight work.",
+                    "drainAll": {
+                        "button": "Drain all nodes",
+                        "hint": "Disables every enrolled node and returns the claims they hold to the queue. Nothing is cancelled; the work waits for a node that may take it.",
+                        "none": "No node to drain.",
+                        "confirmTitle": "Drain all nodes?",
+                        "confirmBody": "{count, plural, one {# node} other {# nodes}} will be disabled and every claim they hold goes back to the queue. Running work is NOT aborted.",
+                        "confirm": "Drain all",
+                        "cancel": "Keep running",
+                        "done": "Drained {nodes, plural, one {# node} other {# nodes}}; {jobs, plural, one {# job} other {# jobs}} returned to the queue."
+                    },
+                    "cancelInFlight": {
+                        "button": "Cancel in-flight work",
+                        "hint": "Aborts the fleet jobs running right now and cancels the agent runs behind them. This is a separate, explicit step — draining never does it.",
+                        "confirmTitle": "Cancel in-flight work?",
+                        "confirmBody": "This ABORTS running work: every leased or running fleet job you own is cancelled and the agent run behind each is marked cancelled. A node learns of it on its next heartbeat, so a job that is about to finish may still report.",
+                        "includeQueued": "Also cancel queued jobs that have not started",
+                        "confirm": "Cancel in-flight work",
+                        "cancel": "Keep running",
+                        "done": "Cancel requested for {cancelled} of {requested} jobs ({runs} runs)."
+                    },
+                    "auditFailed": "The action succeeded, but its audit row could not be written — tell an operator."
                 }
             },
             "jobRuntime": {

@@ -199,8 +199,10 @@ export const config = {
      *
      * Nothing in this group turns the fleet runtime ON by itself — that
      * is still `EVER_WORKS_JOB_RUNTIME=node` (or a tenant overlay row).
-     * `FLEET_NODE_RUNTIME_ENABLED=false` is the kill switch that wins
-     * over both.
+     * `FLEET_NODE_RUNTIME_ENABLED=false` is a ROUTING SELECTOR that wins
+     * over both — work falls back to the cloud. It is NOT a panic control;
+     * the control that stops work is the DB-backed global stop flag
+     * (`FleetKillSwitchService`, EW-778).
      */
     fleetNode: {
         /**

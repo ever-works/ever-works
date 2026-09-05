@@ -31,6 +31,7 @@ import type {
     CreateFleetEnrollmentTokenResponse,
     FleetEnrollmentTokenView,
     FleetExecutionPreferenceView,
+    FleetKillSwitchState,
     FleetNodeDetailView,
     FleetNodeKind,
     FleetNodeView,
@@ -49,7 +50,9 @@ import { formatBytes } from '@/components/dashboard/runner-status.shared';
 import { FleetCostCeiling } from './FleetCostCeiling';
 import { FleetEnrollHandoff } from './FleetEnrollHandoff';
 import { FleetExecutionPreferences } from './FleetExecutionPreferences';
+import { FleetKillSwitchBanner } from './FleetKillSwitchBanner';
 import { FleetNodeDrawer } from './FleetNodeDrawer';
+import { FleetPanicControls } from './FleetPanicControls';
 import { FleetTokensSection } from './FleetTokensSection';
 
 interface FleetSettingsProps {
@@ -65,6 +68,9 @@ interface FleetSettingsProps {
     /** Execution routing preferences (account-wide + narrower overrides). */
     initialPreferences: FleetExecutionPreferenceView[];
     preferencesError: string | null;
+    /** Panic controls (EW-778) — the stop flag's first paint; polled afterwards. */
+    initialKillSwitch?: FleetKillSwitchState | null;
+    killSwitchError?: string | null;
 }
 
 const ENROLLABLE_KINDS: Exclude<FleetNodeKind, 'k8s'>[] = ['desktop-node', 'node'];
@@ -110,6 +116,8 @@ export function FleetSettings({
     nodeDownloadUrl,
     initialPreferences,
     preferencesError,
+    initialKillSwitch = null,
+    killSwitchError = null,
 }: FleetSettingsProps) {
     const t = useTranslations('dashboard.settings.fleet');
     const [nodes, setNodes] = useState<FleetNodeView[]>(initialNodes);
@@ -401,6 +409,9 @@ export function FleetSettings({
                 </Button>
             </div>
 
+            {/* Panic controls (EW-778) — visible the moment an operator stops the platform. */}
+            <FleetKillSwitchBanner initial={initialKillSwitch} initialError={killSwitchError} />
+
             {loadError && (
                 <div className="flex items-start gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
                     <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
@@ -630,6 +641,16 @@ export function FleetSettings({
                     </table>
                 </div>
             )}
+
+            {/* Panic controls (EW-778) — drain everything; cancel running work as a separate step. */}
+            <FleetPanicControls
+                nodes={nodes}
+                onNodesDrained={(drained) =>
+                    setNodes((prev) =>
+                        prev.map((entry) => drained.find((node) => node.id === entry.id) ?? entry),
+                    )
+                }
+            />
 
             <FleetExecutionPreferences
                 initialPreferences={initialPreferences}

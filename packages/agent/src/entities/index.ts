@@ -160,6 +160,9 @@ export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
 export * from './fleet-agent-node-affinity.entity';
+// Panic controls (EW-778) — the global stop flag + the fleet audit trail.
+export * from './fleet-kill-switch.entity';
+export * from './fleet-audit.entity';
 // Fleet local-runner routing — per Work / Goal / account execution
 // preference (local runner vs cloud) read by the fleet run router.
 export * from './fleet-execution-preference.entity';
