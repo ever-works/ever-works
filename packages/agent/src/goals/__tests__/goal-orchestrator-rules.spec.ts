@@ -258,6 +258,88 @@ describe('decideGoalLoop — routing', () => {
     });
 });
 
+describe('decideGoalLoop — cold start (scope fallback, self-build slice AG)', () => {
+    const scoped = [
+        candidate({ agentId: 'a', name: 'Alpha', source: 'scope' }),
+        candidate({ agentId: 'b', name: 'Beta', source: 'scope' }),
+    ];
+
+    it('dispatches to an in-scope agent and says so in the reasoning', () => {
+        const decision = decideGoalLoop(input({ iteration: 0, candidates: scoped }));
+        expect(decision.action).toBe('dispatch');
+        expect(decision.reasonCode).toBe('routed-scope-fallback');
+        expect(decision.nextIteration).toBe(1);
+        // nextIteration = 1, 1 % 2 = 1 → Beta.
+        expect(decision.agentId).toBe('b');
+        expect(decision.reasoning).toContain('Beta');
+        expect(decision.reasoning).toContain('no agent has worked it yet');
+        expect(decision.reasoning).toContain("2 eligible agent(s) in the Goal's scope");
+    });
+
+    it('round-robins over the scope pool by the persisted iteration counter alone', () => {
+        expect(decideGoalLoop(input({ iteration: 1, candidates: scoped })).agentId).toBe('a');
+        expect(decideGoalLoop(input({ iteration: 2, candidates: scoped })).agentId).toBe('b');
+        expect(decideGoalLoop(input({ iteration: 3, candidates: scoped })).agentId).toBe('a');
+    });
+
+    it('keeps the history reasoning untouched when the pool came from history', () => {
+        const decision = decideGoalLoop(
+            input({ candidates: [candidate({ agentId: 'h', name: 'Hist', source: 'history' })] }),
+        );
+        expect(decision.reasonCode).toBe('routed-round-robin');
+        expect(decision.reasoning).not.toContain('scope');
+    });
+
+    it('a pin still beats scope candidates', () => {
+        const decision = decideGoalLoop(
+            input({
+                candidates: [...scoped, candidate({ agentId: 'pin', source: 'assigned' })],
+            }),
+        );
+        expect(decision.agentId).toBe('pin');
+        expect(decision.reasonCode).toBe('routed-assigned-agent');
+    });
+
+    it('an empty pool is still an honest stuck, and points the operator at the Goal scope', () => {
+        const decision = decideGoalLoop(input({ candidates: [] }));
+        expect(decision.action).toBe('stuck');
+        expect(decision.reasonCode).toBe('no-candidate-agent');
+        expect(decision.reasoning).toContain("in this Goal's scope");
+    });
+
+    it('limits still beat routing: a spend cap pauses before any scope candidate is used', () => {
+        const decision = decideGoalLoop(
+            input({ candidates: scoped, spendCapCents: 100, spentCents: 500 }),
+        );
+        expect(decision.action).toBe('pause');
+        expect(decision.agentId).toBeUndefined();
+    });
+});
+
+describe('decideGoalLoop — Definition of Done approval (kind-agnostic)', () => {
+    it('does not complete on proposed-only criteria — the loop keeps dispatching', () => {
+        const decision = decideGoalLoop(
+            input({
+                dod: summarizeDoD([{ id: 'a', text: 'x', status: 'done', proposed: true }]),
+            }),
+        );
+        expect(decision.action).toBe('dispatch');
+    });
+
+    it('completes once every APPROVED criterion is closed, even with proposals pending', () => {
+        const decision = decideGoalLoop(
+            input({
+                dod: summarizeDoD([
+                    { id: 'a', text: 'x', status: 'done' },
+                    { id: 'p', text: 'y', status: 'open', proposed: true },
+                ]),
+            }),
+        );
+        expect(decision.action).toBe('complete');
+        expect(decision.reasonCode).toBe('dod-complete');
+    });
+});
+
 describe('formatUsd', () => {
     it('renders cents as dollars', () => {
         expect(formatUsd(0)).toBe('$0.00');

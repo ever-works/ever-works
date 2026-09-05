@@ -24,10 +24,13 @@ export interface GoalRoutingCandidate {
     /** Display name for the reasoning string; falls back to the id. */
     name?: string | null;
     /**
-     * Where the candidate came from — `assigned` (operator pin) or
-     * `history` (has already worked an iteration of this goal).
+     * Where the candidate came from — `assigned` (operator pin),
+     * `history` (has already worked an iteration of this goal), or
+     * `scope` (cold start: an eligible agent in the Goal's own
+     * Organization / tenant scope, offered only when there is no pin and
+     * no history — self-build slice AG, finding R1).
      */
-    source: 'assigned' | 'history';
+    source: 'assigned' | 'history' | 'scope';
 }
 
 export type GoalLoopAction =
@@ -55,7 +58,8 @@ export type GoalLoopReasonCode =
     | 'grace-period'
     | 'no-candidate-agent'
     | 'routed-assigned-agent'
-    | 'routed-round-robin';
+    | 'routed-round-robin'
+    | 'routed-scope-fallback';
 
 export interface GoalLoopDecision {
     action: GoalLoopAction;
@@ -110,7 +114,11 @@ const MS_PER_MINUTE = 60_000;
  *     the first one's workspace.
  *  7. **No candidate agent** → stuck. Honest degradation: a loop with
  *     nothing to route to is not "running", it is waiting on a human.
- *  8. Otherwise → dispatch, pinned agent first, else round-robin.
+ *     (The service already widened the pool to the Goal's scope for a
+ *     fresh Goal, so reaching here means the scope has no agent at all.)
+ *  8. Otherwise → dispatch, pinned agent first, else round-robin over
+ *     the history — or, for a fresh unpinned Goal, over the eligible
+ *     agents of its scope (`routed-scope-fallback`).
  *
  * `gracePeriodMinutes` extends the WALL-CLOCK limit only, and only while
  * an iteration is actually in flight: the point is to let a session that
@@ -219,8 +227,8 @@ export function decideGoalLoop(input: GoalLoopInput): GoalLoopDecision {
             action: 'stuck',
             reasonCode: 'no-candidate-agent',
             reasoning:
-                'No agent is available to run this Goal — assign an agent to the Goal (or run one ' +
-                'iteration manually) before the loop can route work.',
+                "No agent is available to run this Goal — create or assign an agent in this Goal's " +
+                'scope (or run one iteration manually) before the loop can route work.',
         };
     }
 
@@ -242,6 +250,23 @@ export function decideGoalLoop(input: GoalLoopInput): GoalLoopDecision {
     // iterations visit different agents and the sequence is reproducible
     // from the persisted counter alone (no hidden cursor to drift).
     const chosen = input.candidates[nextIteration % input.candidates.length];
+    if (chosen.source === 'scope') {
+        // Cold start: nobody has worked this Goal yet, so the service
+        // offered the eligible agents of the Goal's own scope. The log line
+        // says so explicitly — an operator must be able to tell "routed to
+        // the agent that already knows this Goal" from "routed to whoever
+        // is in the Organization".
+        return {
+            action: 'dispatch',
+            reasonCode: 'routed-scope-fallback',
+            agentId: chosen.agentId,
+            nextIteration,
+            reasoning:
+                `Routed iteration ${nextIteration} → ${label(chosen)}: the Goal pins no agent and no ` +
+                'agent has worked it yet, so the router round-robins over the ' +
+                `${input.candidates.length} eligible agent(s) in the Goal's scope.`,
+        };
+    }
     return {
         action: 'dispatch',
         reasonCode: 'routed-round-robin',

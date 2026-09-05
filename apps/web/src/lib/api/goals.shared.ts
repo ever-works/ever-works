@@ -16,6 +16,15 @@ export type GoalComparator = 'gte' | 'lte';
 export type GoalWindow = 'day' | 'week' | 'month' | 'total' | 'point';
 
 /**
+ * Goal KIND (self-build slice AG, EW-795). `metric` is the original Goal —
+ * a metrics-provider number measured against a target; `delivery` has no
+ * metric at all and completes on its approved Definition of Done alone.
+ * Mirrors `GOAL_KINDS` in `@ever-works/contracts`.
+ */
+export type GoalKind = 'metric' | 'delivery';
+export const GOAL_KINDS: GoalKind[] = ['metric', 'delivery'];
+
+/**
  * Spec FR-12: per-Goal evaluation frequency is clamped server-side to
  * a minimum of 15 minutes regardless of what the form submits. Mirror
  * of `MIN_CHECK_FREQUENCY_MINUTES` from the agent package so the form

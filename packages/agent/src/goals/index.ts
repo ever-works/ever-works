@@ -6,6 +6,7 @@ export * from './goal-evaluation.service';
 export * from './goal-orchestrator.service';
 export * from './goal-orchestrator-rules';
 export * from './goal-dod';
+export * from './goal-kind';
 export * from './goals.module';
 export * from './types';
 export * from './goal-criteria';
@@ -13,6 +14,8 @@ export {
     Goal,
     GoalStatus,
     GoalOutcome,
+    GOAL_KINDS,
+    type GoalKind,
     GOAL_CONSTRAINT_CATEGORIES,
     GOAL_DOD_STATUSES,
     GOAL_DOD_SOURCES,
