@@ -85,7 +85,7 @@ _Then_ they see a clear inline explanation ("You don't have any Missions yet —
 
 ### 2.2 Edge cases & failures
 
-**E1 — Wizard dead-end (the reported bug).** On `develop` today, selecting a non-`tenant` scope when the corresponding catalog is empty renders no parent `<select>` (it only renders when `parentOptions.length > 0`, [`NewAgentDialog.tsx:255`](../../../apps/web/src/components/agents/NewAgentDialog.tsx)), so `parentId` can never be set, `canAdvance` stays `false` ([`:173`](../../../apps/web/src/components/agents/NewAgentDialog.tsx)), and the **Next** button is permanently disabled with no feedback. The user perceives "clicking Next does nothing." **MUST be fixed** (FR-20).
+**E1 — Wizard dead-end (the reported bug).** On `develop` today, selecting a non-`tenant` scope when the corresponding catalog is empty renders no parent `<select>` (it only renders when `parentOptions.length > 0`, [`NewAgentDialog.tsx:255`](../../../../apps/web/src/components/agents/NewAgentDialog.tsx)), so `parentId` can never be set, `canAdvance` stays `false` ([`:173`](../../../../apps/web/src/components/agents/NewAgentDialog.tsx)), and the **Next** button is permanently disabled with no feedback. The user perceives "clicking Next does nothing." **MUST be fixed** (FR-20).
 
 **E2 — Catalog unreachable.** If `ever-works/agents` can't be fetched and the cache is cold, the chip row degrades to the built-in fallback list (still includes CEO/CTO/… so the feature is never empty) and `View All` shows only "Your templates". No error toast; a subtle "Showing built-in templates" note is acceptable. (Mirrors ADR-011 §Consequences/Negative mitigation.)
 

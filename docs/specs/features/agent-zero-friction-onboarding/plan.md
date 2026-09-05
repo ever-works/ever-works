@@ -42,8 +42,8 @@ flowchart LR
 - `pipeline` plugin family (existing work generation)
 - `WorksService.create*` and the Trigger.dev `work-import.task` (we wrap, not replace)
 - Better Auth account model (`auth-account.entity.ts`, `auth-session.entity.ts`)
-- Existing OpenAPI / Swagger / Scalar wiring in [`apps/api/src/main.ts`](../../../apps/api/src/main.ts)
-- Existing `github-app` integration ([`apps/api/src/integrations/github-app/`](../../../apps/api/src/integrations/github-app/)) for App-mode credentials and webhook signature verification helpers
+- Existing OpenAPI / Swagger / Scalar wiring in [`apps/api/src/main.ts`](../../../../apps/api/src/main.ts)
+- Existing `github-app` integration ([`apps/api/src/integrations/github-app/`](https://github.com/ever-works/ever-works/tree/develop/apps/api/src/integrations/github-app)) for App-mode credentials and webhook signature verification helpers
 
 **Net-new**:
 

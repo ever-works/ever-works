@@ -87,6 +87,7 @@ The background runtime is selected per instance under **Settings → Job Runtime
 | `web-template`                   | The **Website** template (Next.js) — the default for website, landing-page, and blog Works                                                                                                      |
 | `web-minimal-template`           | The **Website (Minimal)** template (Astro, static) — the opt-in general-purpose variant                                                                                                         |
 | `agents`                         | Ready-made Agent definitions (CEO, CTO, and more) used as Agent templates                                                                                                                       |
+| `ever-works/apps/docs`           | This documentation site, built from the platform monorepo                                                                                                                                       |
 
 The template registry lives in `packages/agent/src/generators/website-generator/config/website-template.config.ts`; see [Website Templates](./features/website-templates.md) for the full catalogue.
 
