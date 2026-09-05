@@ -1,6 +1,6 @@
 # Tenant job-runtime overlay — tenant admin runbook (EW-742)
 
-> Companion to [`docs/specs/features/tenant-job-runtime-overlay/`](../specs/features/tenant-job-runtime-overlay/).
+> Companion to [`docs/specs/features/tenant-job-runtime-overlay/spec.md`](../specs/features/tenant-job-runtime-overlay/spec.md).
 > ADR: [ADR-017](../specs/decisions/017-tenant-scoped-job-runtime-overlay.md).
 > Provider matrix: [`providers.md`](../specs/features/tenant-job-runtime-overlay/providers.md).
 > Operator counterpart: [`OPERATOR_JOB_RUNTIME_OVERLAY.md`](OPERATOR_JOB_RUNTIME_OVERLAY.md).

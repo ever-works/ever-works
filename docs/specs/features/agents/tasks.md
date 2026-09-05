@@ -144,7 +144,7 @@ Phases 1-3 land MVP (Agent entity + Instructions tab + heartbeat runtime). Phase
 - [ ] **T66**. Verify the new migrations apply cleanly on a staging DB snapshot.
 - [ ] **T67**. Beta-test with internal users for ≥3 days; gather budget-spike incidents and runaway-loop reports.
 - [ ] **T68**. Flip `FEATURE_AGENTS` default to `true`.
-- [ ] **T69**. Update [`built-in-plugins.md`](../../../docs/plugin-system/built-in-plugins.md) reference list (no new plugins, but mention the reserved `task-tracker` interface).
+- [ ] **T69**. Update [`built-in-plugins.md`](../../../plugin-system/built-in-plugins.md) reference list (no new plugins, but mention the reserved `task-tracker` interface).
 
 ## Definition of Done
 

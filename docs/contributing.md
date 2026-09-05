@@ -13,11 +13,11 @@ Thank you for your interest in contributing to Ever Works. This guide covers eve
 
 Ever Works is split across multiple repositories under the [ever-works](https://github.com/ever-works) GitHub organization:
 
-| Repository                                                                               | Description                                                     |
-| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| [ever-works](https://github.com/ever-works/ever-works)                                   | Platform monorepo (API, Web Dashboard, CLI, AI agents, plugins) |
-| [ever-works-website-template](https://github.com/ever-works/ever-works-website-template) | Standalone Next.js work website template                        |
-| [ever-works-docs](https://github.com/ever-works/ever-works-docs)                         | Documentation site (this site)                                  |
+| Repository                                                                              | Description                                                      |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| [ever-works](https://github.com/ever-works/ever-works)                                  | Platform monorepo (API, Web Dashboard, CLI, AI agents, plugins)  |
+| [directory-web-template](https://github.com/ever-works/directory-web-template)          | Standalone Next.js work website template                         |
+| [ever-works/apps/docs](https://github.com/ever-works/ever-works/tree/develop/apps/docs) | Documentation site (this site), built from the platform monorepo |
 
 Each repository has its own issue tracker. File issues in the repository most relevant to your contribution.
 
@@ -66,8 +66,8 @@ pnpm dev:web    # Next.js Web Dashboard on port 3000
 ### Template (Standalone)
 
 ```bash
-git clone https://github.com/ever-works/ever-works-website-template.git
-cd ever-works-website-template
+git clone https://github.com/ever-works/directory-web-template.git
+cd directory-web-template
 pnpm install
 
 # Copy environment file and configure

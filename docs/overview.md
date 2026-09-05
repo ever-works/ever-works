@@ -61,11 +61,11 @@ For the full step-by-step, see the [Founder Journey guide](/guides/founder-journ
 
 ## Key Repositories
 
-| Repository                    | Description                                                             |
-| ----------------------------- | ----------------------------------------------------------------------- |
-| `ever-works`                  | Platform monorepo — API, web dashboard, CLI, AI agents, shared packages |
-| `ever-works-website-template` | Next.js template used by generated work websites                        |
-| `ever-works-docs`             | This documentation site                                                 |
+| Repository               | Description                                                             |
+| ------------------------ | ----------------------------------------------------------------------- |
+| `ever-works`             | Platform monorepo — API, web dashboard, CLI, AI agents, shared packages |
+| `directory-web-template` | Next.js template used by generated work websites                        |
+| `ever-works/apps/docs`   | This documentation site, built from the platform monorepo               |
 
 ## AI Providers
 

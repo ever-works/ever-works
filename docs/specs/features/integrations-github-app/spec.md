@@ -612,7 +612,7 @@ false`. This prevents accidental cross-account linking via
       in `packages/agent/src/database/migrations/`.
 - [x] Tests accompany the change: ✅ — 22 controller-level + the
       three pre-existing service-level suites in
-      [`apps/api/src/integrations/github-app/`](../../../../apps/api/src/integrations/github-app/).
+      [`apps/api/src/integrations/github-app/`](https://github.com/ever-works/ever-works/tree/develop/apps/api/src/integrations/github-app).
       See PR [#502](https://github.com/ever-works/ever-works/pull/502).
 - [x] Secrets handled per `x-secret` rules: ✅ — App ID, client
       secret, private key, and webhook secret all read from env
@@ -626,13 +626,13 @@ false`. This prevents accidental cross-account linking via
 ## 10. References
 
 - Source:
-    - [`apps/api/src/integrations/github-app/`](../../../../apps/api/src/integrations/github-app/)
+    - [`apps/api/src/integrations/github-app/`](https://github.com/ever-works/ever-works/tree/develop/apps/api/src/integrations/github-app)
     - [`apps/api/src/integrations/github-app/github-app.module.ts`](../../../../apps/api/src/integrations/github-app/github-app.module.ts)
     - [`apps/api/src/integrations/github-app/github-app.service.ts`](../../../../apps/api/src/integrations/github-app/github-app.service.ts)
     - [`apps/api/src/integrations/github-app/github-app-onboarding.service.ts`](../../../../apps/api/src/integrations/github-app/github-app-onboarding.service.ts)
     - [`apps/api/src/integrations/github-app/github-app-sync.service.ts`](../../../../apps/api/src/integrations/github-app/github-app-sync.service.ts)
     - [`apps/api/src/integrations/github-app/github-app.controller.ts`](../../../../apps/api/src/integrations/github-app/github-app.controller.ts)
-    - [`apps/api/src/integrations/github-app/github-app-webhook.controller.ts`](../../../../apps/api/src/integrations/github-app/github-app-webhook.controller.ts)
+    - [`apps/api/src/ingest/github/github-app-webhook.controller.ts`](../../../../apps/api/src/ingest/github/github-app-webhook.controller.ts)
     - [`apps/api/src/integrations/github-app/dto/github-app.dto.ts`](../../../../apps/api/src/integrations/github-app/dto/github-app.dto.ts)
     - [`apps/api/src/config/constants.ts`](../../../../apps/api/src/config/constants.ts) (`config.githubApp`)
     - [`apps/api/src/auth/utils/github-email.utils.ts`](../../../../apps/api/src/auth/utils/github-email.utils.ts)

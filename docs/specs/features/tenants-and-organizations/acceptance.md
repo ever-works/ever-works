@@ -267,7 +267,7 @@ This file describes the **observable behavior** required for each phase to be co
 
 - [spec.md](spec.md) reflects any deviation discovered during implementation (treated as additive amendments — never silent reshapes).
 - [tasks.md](tasks.md) checkboxes are ticked as each item lands.
-- The companion Workspace note [2026-05-27-tenants-and-organizations-spec.md](../../../../../../Workspace/knowledge/notes/2026-05-27-tenants-and-organizations-spec.md) is kept in sync.
+- The companion Workspace note `knowledge/notes/2026-05-27-tenants-and-organizations-spec.md` (operator workspace repository) is kept in sync.
 
 ---
 
@@ -279,4 +279,4 @@ The Tenants & Organizations feature is **done** when:
 2. Every Acceptance Criterion above is observably true on `stage`.
 3. The Workspace companion note links to the Epic in JIRA and back to this spec.
 4. The implementation prompt (for fresh agents) in the conversation history has been superseded (or marked as completed in JIRA).
-5. The Missions/Ideas/Works spec ([2026-05-24-missions-ideas-works-spec.md](../../../../../../Workspace/knowledge/notes/2026-05-24-missions-ideas-works-spec.md)) is cross-referenced from this spec, and vice versa.
+5. The Missions/Ideas/Works spec (`knowledge/notes/2026-05-24-missions-ideas-works-spec.md`, operator workspace repository) is cross-referenced from this spec, and vice versa.

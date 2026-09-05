@@ -1,6 +1,6 @@
 # Feature Specification: Governance Policy Matrices (Merge Policy + Tool Grants)
 
-> Behaviour-first spec per [Constitution Principle IX](../../../../.specify/memory/constitution.md#ix-specs-are-behaviour-first).
+> Behaviour-first spec per [Constitution Principle IX](https://github.com/ever-works/ever-works/blob/develop/.specify/memory/constitution.md#ix-specs-are-behaviour-first).
 > Describe **what** the system does, not how it's structured. Implementation lives in [`./plan.md`](./plan.md).
 
 **Feature ID**: `policy-matrices`
