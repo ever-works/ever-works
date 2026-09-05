@@ -18,6 +18,7 @@ import {
 	FLEET_JOB_DEFAULT_MAX_ATTEMPTS,
 	FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC,
 	FLEET_JOB_KINDS,
+	FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON,
 	FLEET_JOB_MAX_ATTEMPTS_CEILING,
 	FLEET_JOB_MAX_ERROR_LENGTH,
 	FLEET_JOB_MAX_LEASE_BATCH,
@@ -29,6 +30,7 @@ import {
 	FLEET_JOB_MIN_LEASE_TTL_SEC,
 	FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC,
 	FLEET_JOB_QUEUE_EXPIRED_REASON,
+	FLEET_JOB_STALE_LEASE_REASON,
 	FLEET_JOB_STATUSES,
 	FLEET_JOB_TERMINAL_STATUSES,
 	isFleetJobActive,
@@ -260,6 +262,26 @@ describe('capability tag constants', () => {
 
 	it('keeps the two tags distinct', () => {
 		expect(FLEET_BROWSER_CAPABILITY).not.toBe(FLEET_GPU_CAPABILITY);
+	});
+});
+
+describe('suspend-safe lease reasons', () => {
+	// Both tokens are keyed on by code, not read by people: the node aborts
+	// on the 409 `reason`, and the run's error carries the suspend reason
+	// verbatim. The literal IS the contract.
+	it('pins the stale-lease reason the 409 body carries', () => {
+		expect(FLEET_JOB_STALE_LEASE_REASON).toBe('stale-lease');
+	});
+
+	it('pins the reason a node reports for a lease that lapsed during a suspend', () => {
+		expect(FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON).toBe('lease-lapsed-while-suspended');
+	});
+
+	it('keeps the two reasons distinct short machine tokens', () => {
+		expect(FLEET_JOB_STALE_LEASE_REASON).not.toBe(FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON);
+		for (const token of [FLEET_JOB_STALE_LEASE_REASON, FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON]) {
+			expect(token).toMatch(/^[a-z][a-z-]{1,63}$/);
+		}
 	});
 });
 

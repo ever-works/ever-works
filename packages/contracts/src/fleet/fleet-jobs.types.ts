@@ -293,6 +293,45 @@ export interface FleetJobView {
 	 * reports; the row then settles `failed`. Null / absent otherwise.
 	 */
 	cancelRequestedAt?: string | null;
+	/**
+	 * Identity of the CLAIM this view was minted under (suspend-safe
+	 * leases, self-build finding R7). Every successful lease — including a
+	 * re-lease after the previous claim lapsed — increments it, and the
+	 * node echoes it on every call that mutates the job (heartbeat,
+	 * complete). A call carrying any other value is refused with
+	 * `409 { reason: "stale-lease" }`, so a machine that slept through
+	 * its lease can never overwrite the state of whoever holds the job
+	 * now — even when that is the same machine on a later claim.
+	 *
+	 * Optional on the wire so an older API build that does not send it
+	 * still satisfies this type on a newer client; a node that receives
+	 * no generation simply omits it, and an API that requires one then
+	 * refuses that node — the safe direction.
+	 */
+	leaseGeneration?: number;
+}
+
+/**
+ * Machine-readable reason carried by the `409` a node receives when the
+ * generation it echoes is no longer the job's current one. Stable: the
+ * node keys its abort on this token (and on the status), never on the
+ * message text.
+ */
+export const FLEET_JOB_STALE_LEASE_REASON = 'stale-lease';
+
+/**
+ * Stable failure reason a node reports when it detects, on resume from a
+ * suspend, that its lease deadline passed while the machine slept. The
+ * job is aborted locally (model process killed, nothing pushed) and this
+ * token is what the report and the run's error carry.
+ */
+export const FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON = 'lease-lapsed-while-suspended';
+
+/** Body of the `409` returned for a stale lease generation. */
+export interface FleetJobStaleLeaseResponse {
+	statusCode: 409;
+	reason: typeof FLEET_JOB_STALE_LEASE_REASON;
+	message: string;
 }
 
 /** Owner-safe view of one active-Organization Agent-to-node binding. */
@@ -1111,6 +1150,12 @@ export interface FleetJobHeartbeatRequest {
 	secret: string;
 	/** Requested lease extension; clamped server-side. */
 	leaseTtlSec?: number;
+	/**
+	 * The `leaseGeneration` returned with the lease. Required: a beat whose
+	 * generation is not the job's current one is refused with
+	 * `409 { reason: "stale-lease" }` and the node must abort the run.
+	 */
+	leaseGeneration: number;
 }
 
 /** Response body for `POST /api/fleet/jobs/:id/heartbeat`. */
@@ -1129,6 +1174,12 @@ export interface FleetJobCompleteRequest {
 	result?: Record<string, unknown> | null;
 	/** Failure detail. Capped server-side. */
 	error?: string | null;
+	/**
+	 * The `leaseGeneration` returned with the lease. Required: a report
+	 * whose generation is not the job's current one is refused with
+	 * `409 { reason: "stale-lease" }` and never touches the row.
+	 */
+	leaseGeneration: number;
 }
 
 /** Response body for `POST /api/fleet/jobs/:id/complete`. */
