@@ -177,10 +177,21 @@ describe('WorkHintResolverService.verifyOwnedWorkId', () => {
         await expect(service.verifyOwnedWorkId('user-1', 'ghost')).resolves.toBeNull();
     });
 
-    it('fails OPEN on an infrastructure error — a flaky DB must not silently unroute events', async () => {
+    /**
+     * This assertion is the inverse of the one it replaces, deliberately.
+     *
+     * The old contract ("fail open on infrastructure") let a transient
+     * `findById` fault carry a caller-chosen `workId` through unverified,
+     * so a database blip was enough for an authenticated user to stamp
+     * another tenant's Work onto their own ingested events — and the
+     * Activity + Memory fan-out keyed off `event.workId` followed it. An
+     * ownership check is an identity check; identity checks fail closed.
+     * Unrouted is recoverable, cross-tenant is not.
+     */
+    it('fails CLOSED on an infrastructure error — an unverified workId never survives', async () => {
         const service = makeService({
             findById: jest.fn().mockRejectedValue(new Error('timeout')),
         });
-        await expect(service.verifyOwnedWorkId('user-1', 'w1')).resolves.toBe('w1');
+        await expect(service.verifyOwnedWorkId('user-1', 'w1')).resolves.toBeNull();
     });
 });

@@ -37,8 +37,28 @@ export const TRIAGE_SOURCE_TEXT_MAX_CHARS = 4000;
 export const TRIAGE_CELL_MAX_CHARS = 300;
 /** Board label every triage Task carries. */
 export const TRIAGE_LABEL = 'triage';
+/** Extra label on a Task filed because a closed issue / incident came back. */
+export const TRIAGE_REGRESSION_LABEL = 'regression';
 /** Fence tag for the quoted vendor text. */
 export const TRIAGE_SOURCE_CONTENT_TAG = 'source_content';
+
+/**
+ * Coalescing bucket for REPEAT-ALERT update comments, in milliseconds.
+ *
+ * A Task comment is not free: `TaskChatService.post` writes a
+ * `task_chat_messages` row AND a `TASK_COMMENTED` activity row, on top
+ * of the drain's own ingest activity row and a Memory write (which can
+ * mean a provider embedding call). Commenting on every single repeated
+ * alert therefore turns one flapping issue into thousands of rows and
+ * embedding calls on ONE Task, and the salience filter cannot shed any
+ * of it — it scores `incident` / `alert` / `issue` traffic UP.
+ *
+ * So repeated alerts (and ONLY those — see `isTriageRepeatAlert`) get at
+ * most one comment per bucket. Anything that actually changed — a state
+ * transition, a regression, a new title — comments immediately,
+ * whatever bucket it lands in.
+ */
+export const TRIAGE_UPDATE_BUCKET_MS = 15 * 60_000;
 
 /** Task priority buckets the intake files at (P0 is reserved for humans). */
 export type TriagePriority = 'p1' | 'p2' | 'p3' | 'p4';
@@ -262,10 +282,199 @@ export function triagePriorityOf(level: string | undefined): TriagePriority {
     return 'p3';
 }
 
-/** `[<key>] <title>`, inside the Task title cap. */
-export function renderTriageTitle(event: IngestedEvent): string {
+/* -------------------------------------------------------------------------
+ * Regression detection — the one case where dedup MUST yield.
+ * ---------------------------------------------------------------------- */
+
+/**
+ * `issues` actions that mean "this came back". GitHub has exactly one.
+ */
+export const GITHUB_ISSUE_REGRESSION_ACTIONS: readonly string[] = ['reopened'];
+
+/**
+ * Sentry `issue` lifecycle actions that mean "this came back".
+ * `unresolved` is what Sentry sends for a regression (an event landed in
+ * a release after the issue was marked resolved) AND for a human
+ * un-resolving it; `unarchived` is the same move out of the archive.
+ * An `event_alert` is deliberately NOT a regression signal on its own —
+ * a resolved issue that keeps alerting is a rule firing, not a
+ * regression, and treating it as one is exactly how 2000 alerts become
+ * 2000 Tasks.
+ */
+export const SENTRY_REGRESSION_ACTIONS: readonly string[] = ['unresolved', 'unarchived'];
+
+/** `dependabot_alert` actions that mean the vulnerability is back. */
+export const DEPENDABOT_REGRESSION_ACTIONS: readonly string[] = [
+    'reopened',
+    'reintroduced',
+    'auto_reopened',
+];
+
+/**
+ * Status NAMES Jira workflows use for a finished issue, lower-cased.
+ *
+ * Jira has no `reopened` event: the only regression signal on the wire
+ * is a status transition OUT of a done-ish status. Jira Cloud's webhook
+ * changelog carries the status' display name (`fromString` / `toString`)
+ * and not its status CATEGORY, so this list is the vocabulary check —
+ * deliberately conservative. A custom workflow with a done status that
+ * is not named here simply never re-files (the revision still lands as a
+ * comment on the existing Task); it never mis-fires the other way,
+ * because both halves must agree: out of a name on this list and into a
+ * name that is not.
+ */
+export const JIRA_DONE_STATUS_NAMES: readonly string[] = [
+    'done',
+    'closed',
+    'resolved',
+    'complete',
+    'completed',
+    'cancelled',
+    'canceled',
+    'released',
+    'shipped',
+    'fixed',
+    "won't do",
+    'wont do',
+    "won't fix",
+    'wont fix',
+    'duplicate',
+];
+
+/** A vendor event that says a previously-finished issue / incident is back. */
+export interface TriageRegressionSignal {
+    /** Machine-readable, `<vendor>.<action>` — logged and asserted on. */
+    readonly signal: string;
+    /** One line for the Task body / the comment on the superseded Task. */
+    readonly summary: string;
+}
+
+const isJiraDoneStatus = (value: string | undefined): boolean =>
+    value !== undefined && JIRA_DONE_STATUS_NAMES.includes(value.trim().toLowerCase());
+
+/**
+ * `payload.resource` value Sentry event-alert deliveries carry.
+ *
+ * An event alert says "this error just happened AGAIN"; the issue
+ * lifecycle resource says "somebody or something changed the issue's
+ * state". The two need opposite handling downstream, and this is the one
+ * field that separates them.
+ */
+export const INCIDENT_ALERT_RESOURCE = 'event_alert';
+
+/**
+ * True when the event is a REPEATED OCCURRENCE rather than a state
+ * change — the only intake traffic that can arrive thousands of times
+ * for one unchanged issue.
+ *
+ * Every other intake event (a GitHub issue action, a Jira transition, a
+ * Sentry issue lifecycle action) is materially different from the last
+ * one by construction and is never coalesced.
+ */
+export function isTriageRepeatAlert(event: IngestedEvent): boolean {
+    if (event.kind !== INCIDENT_EVENT_KIND) return false;
+    const payload = (event.payload ?? {}) as Record<string, unknown>;
+    return str(payload.resource) === INCIDENT_ALERT_RESOURCE;
+}
+
+/**
+ * "The issue is STILL HAPPENING" — a regression signal for a Task that
+ * was marked DONE, carried by an ordinary repeated alert.
+ *
+ * {@link triageRegressionOf} is a pure function of a single event, which
+ * makes the vendor's explicit "it came back" signal a ONE-SHOT: if the
+ * filer cannot act on it the moment it arrives (the Work claim was
+ * removed, the body was refused), no later event re-carries it and the
+ * closed Task can never be superseded — the regression is silently
+ * downgraded to a comment on a Task nobody reads, forever.
+ *
+ * This closes that: an error that is still firing after its Task was
+ * marked done IS a regression, whatever Sentry calls the delivery, and
+ * it is re-carried by every subsequent alert, so the moment the Work
+ * becomes available again the work re-opens.
+ *
+ * Deliberately NOT applied to a CANCELLED Task. `done` means "we fixed
+ * it" and a fresh occurrence contradicts that; `cancelled` means "we
+ * decided not to act on this", and re-filing would fight the human who
+ * decided. The caller enforces that half (it knows the Task status).
+ *
+ * Storm-safe by construction: the first alert re-opens work, so the Task
+ * is OPEN again and every following alert is an ordinary comment. Two
+ * thousand alerts still produce one Task.
+ */
+export function triageStillActiveOf(event: IngestedEvent): TriageRegressionSignal | null {
+    if (!isTriageRepeatAlert(event)) return null;
+    const payload = (event.payload ?? {}) as Record<string, unknown>;
+    const provider = str(payload.provider) ?? 'incident';
+    return {
+        signal: `${provider}.still-active`,
+        summary: 'the error is still being reported after the Task was marked done',
+    };
+}
+
+/**
+ * The regression signal an intake event carries, or `null`.
+ *
+ * PURE and per-vendor by design: every provider states "it came back" in
+ * its own vocabulary, and the filer must never guess. Nothing here looks
+ * at the platform Task — whether a regression actually opens NEW work is
+ * the filer's decision (it does so only when the existing Task is
+ * already closed), so this function stays a statement about the vendor
+ * event alone and is testable on its own.
+ */
+export function triageRegressionOf(event: IngestedEvent): TriageRegressionSignal | null {
+    const payload = (event.payload ?? {}) as Record<string, unknown>;
+    const action = str(payload.action);
+
+    if (event.kind === 'github.issue') {
+        if (!action || !GITHUB_ISSUE_REGRESSION_ACTIONS.includes(action)) return null;
+        return { signal: `github.${action}`, summary: `the GitHub issue was ${cell(action)}` };
+    }
+
+    if (event.kind === 'jira.issue') {
+        if (str(payload.changeType) !== 'transitioned') return null;
+        const from = str(payload.statusFrom);
+        const to = str(payload.statusTo);
+        if (!isJiraDoneStatus(from) || isJiraDoneStatus(to)) return null;
+        return {
+            signal: 'jira.transitioned',
+            summary: `the Jira issue moved back out of ${cell(from ?? '?')} into ${cell(to ?? '?')}`,
+        };
+    }
+
+    if (event.kind === INCIDENT_EVENT_KIND) {
+        const provider = str(payload.provider);
+        if (provider === 'sentry') {
+            if (!action || !SENTRY_REGRESSION_ACTIONS.includes(action)) return null;
+            return {
+                signal: `sentry.${action}`,
+                summary:
+                    action === 'unarchived'
+                        ? 'the Sentry issue was unarchived'
+                        : 'the Sentry issue regressed (resolved → unresolved)',
+            };
+        }
+        if (provider === 'dependabot') {
+            if (!action || !DEPENDABOT_REGRESSION_ACTIONS.includes(action)) return null;
+            return {
+                signal: `dependabot.${action}`,
+                summary: `the Dependabot alert was ${cell(action)}`,
+            };
+        }
+        return null;
+    }
+
+    return null;
+}
+
+/**
+ * `[<key>] <title>`, inside the Task title cap. A regression re-file adds
+ * a `Regression:` marker so the board does not show two identically
+ * titled Tasks for the same issue.
+ */
+export function renderTriageTitle(event: IngestedEvent, regressed = false): string {
     const facts = triageFactsOf(event);
-    const prefix = `[${facts.externalKey ?? facts.sourceLabel}]`;
+    const prefix = `[${facts.externalKey ?? facts.sourceLabel}]${regressed ? ' Regression:' : ''}`;
     return cap(`${prefix} ${facts.title}`.replace(/\s+/g, ' ').trim(), TRIAGE_TASK_TITLE_MAX_CHARS);
 }
 
@@ -299,12 +508,26 @@ function factRows(facts: TriageFacts): Array<readonly [string, string]> {
     return rows;
 }
 
+/** Why a Task is being filed, when it is not the first sight of the issue. */
+export interface TriageFileContext {
+    /** Set when this Task exists because a closed one's issue came back. */
+    readonly regression?: TriageRegressionSignal;
+    /** Human reference (slug or id) of the closed Task this one supersedes. */
+    readonly supersedesTaskRef?: string;
+    /** How many times this external issue has re-opened work, including now. */
+    readonly regressionCount?: number;
+}
+
 /**
  * The Task body: a facts table (link, culprit, level, last-seen release,
  * environment, project, …), then the vendor text inside the neutralized
  * `<source_content>` fence.
+ *
+ * `context` is set only on a REGRESSION re-file, where the opening
+ * paragraph has to say why a second Task exists for an issue the dedup
+ * key already knew about.
  */
-export function renderTriageBody(event: IngestedEvent): string {
+export function renderTriageBody(event: IngestedEvent, context: TriageFileContext = {}): string {
     const facts = triageFactsOf(event);
     const occurredAt =
         event.occurredAt instanceof Date && !Number.isNaN(event.occurredAt.getTime())
@@ -312,10 +535,24 @@ export function renderTriageBody(event: IngestedEvent): string {
             : undefined;
 
     const blocks: string[] = [];
-    blocks.push(
-        `**Filed automatically** from a ${facts.sourceLabel} by the issue / incident intake. ` +
-            `Later activity on the same ${facts.sourceLabel} lands as comments on this Task — a re-fired webhook, a re-label or a repeated alert never files a second one.`,
-    );
+    if (context.regression) {
+        const nth = context.regressionCount;
+        blocks.push(
+            `**Filed automatically as a regression** — ${context.regression.summary}, ` +
+                `and the previous triage Task${
+                    context.supersedesTaskRef ? ` \`${cell(context.supersedesTaskRef)}\`` : ''
+                } was already closed.` +
+                (typeof nth === 'number' && Number.isFinite(nth)
+                    ? ` This is re-opening #${nth} for this ${facts.sourceLabel}.`
+                    : '') +
+                ` Later activity lands as comments here — the dedup key now points at THIS Task.`,
+        );
+    } else {
+        blocks.push(
+            `**Filed automatically** from a ${facts.sourceLabel} by the issue / incident intake. ` +
+                `Later activity on the same ${facts.sourceLabel} lands as comments on this Task — a re-fired webhook, a re-label or a repeated alert never files a second one.`,
+        );
+    }
 
     const rows = factRows(facts);
     if (occurredAt) {
@@ -364,6 +601,11 @@ export function renderTriageUpdate(
     const lines: string[] = [];
     lines.push(`**${facts.sourceLabel} update**${facts.action ? ` — ${facts.action}` : ''}`);
 
+    const regression = triageRegressionOf(event);
+    if (regression) {
+        lines.push(`- **Regression** — ${regression.summary}.`);
+    }
+
     const previousTitle = str(previous.title ?? undefined);
     if (previousTitle && previousTitle !== facts.title) {
         lines.push(`- Title: ${quoted(facts.title)} (was ${quoted(previousTitle)})`);
@@ -379,6 +621,36 @@ export function renderTriageUpdate(
     if (facts.labels.length > 0) lines.push(`- Labels: ${cell(facts.labels.join(', '))}`);
     if (facts.assignees.length > 0) lines.push(`- Assignees: ${cell(facts.assignees.join(', '))}`);
     for (const [label, value] of facts.extra) lines.push(`- ${label}: ${cell(value)}`);
+    if (facts.url) lines.push(`- Link: ${facts.url}`);
+    lines.push(`_Seen ${occurredAt ?? 'now'} · ingested event ${event.id}_`);
+
+    return lines.join('\n');
+}
+
+/**
+ * The comment left on the CLOSED Task a regression supersedes, so the
+ * trail is not one-way: the closed Task names the Task that took over,
+ * and the new Task's body names the closed one.
+ */
+export function renderTriageSupersededNote(
+    event: IngestedEvent,
+    input: { readonly regression: TriageRegressionSignal; readonly newTaskRef: string },
+): string {
+    const facts = triageFactsOf(event);
+    const occurredAt =
+        event.occurredAt instanceof Date && !Number.isNaN(event.occurredAt.getTime())
+            ? event.occurredAt.toISOString()
+            : undefined;
+
+    const lines: string[] = [];
+    lines.push(
+        `**${facts.sourceLabel} regressed** — ${input.regression.summary}, after this Task was closed.`,
+    );
+    lines.push(
+        `- A new triage Task \`${cell(input.newTaskRef)}\` now carries it; the dedup key for ${
+            facts.externalKey ? `\`${cell(facts.externalKey)}\`` : 'this issue'
+        } points there.`,
+    );
     if (facts.url) lines.push(`- Link: ${facts.url}`);
     lines.push(`_Seen ${occurredAt ?? 'now'} · ingested event ${event.id}_`);
 

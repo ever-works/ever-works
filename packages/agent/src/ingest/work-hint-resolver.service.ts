@@ -77,9 +77,18 @@ export class WorkHintResolverService {
      * could stamp another tenant's Work onto their own events and have
      * the spine write Activity rows + Memory observations against it.
      *
-     * Returns the id when it checks out, null when it provably does not.
-     * A lookup FAILURE keeps the id (fail-open on infrastructure, closed
-     * on identity) — same posture as the rest of the spine.
+     * Returns the id when it checks out, null in every other case —
+     * including when the lookup itself FAILED.
+     *
+     * This is an identity check, and identity checks fail CLOSED. The
+     * method used to keep the caller's id on a lookup error, which meant
+     * a transient database fault was all it took for a caller-chosen
+     * `workId` to survive unverified: the `ingested_events` row, its
+     * Activity fan-out and the Memory observations derived from
+     * `event.workId` would all be written against another tenant's Work.
+     * The cost of failing closed is that the event ingests UNROUTED
+     * (`workId: null`) during the fault — recoverable, visible in the
+     * feed, and nothing crosses a tenant boundary.
      */
     async verifyOwnedWorkId(userId: string, workId: string): Promise<string | null> {
         try {
@@ -88,11 +97,11 @@ export class WorkHintResolverService {
             return work.userId === userId ? workId : null;
         } catch (error) {
             this.logger.warn(
-                `workId ownership check failed for ${workId} — keeping the caller's value: ${
+                `workId ownership check failed for ${workId} — dropping the caller's value (identity checks fail closed): ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
-            return workId;
+            return null;
         }
     }
 
