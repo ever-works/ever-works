@@ -15,6 +15,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import type { FleetJobView, FleetNodeDetailView, FleetNodeView } from '@/lib/api/fleet';
+import { formatBytes } from '@/components/dashboard/runner-status.shared';
 import { centsToUsdInput, formatCeilingCents, usdInputToCents } from './fleet-cost-ceiling.shared';
 import {
     FLEET_JOB_FILTERS,
@@ -22,9 +23,12 @@ import {
     fleetJobDurationMs,
     fleetJobOutcomeKey,
     fleetJobOutcomeText,
+    fleetNodeDiskBadgeClass,
+    fleetNodeDiskState,
     fleetWorkerStateBadgeClass,
     fleetWorkerStateKey,
     formatFleetJobDuration,
+    hasFleetNodeHousekeeping,
     type FleetJobFilter,
 } from './fleet-node-drawer.shared';
 
@@ -171,6 +175,9 @@ export function FleetNodeDrawer({
     // reported — never `idle`, which would claim a readiness nobody has
     // told us about.
     const workerStateKey = fleetWorkerStateKey(node);
+    // Node housekeeping (EW-803).
+    const diskState = fleetNodeDiskState(node);
+    const hasHousekeeping = hasFleetNodeHousekeeping(node);
 
     const addTag = () => {
         const tag = draft.trim().slice(0, MAX_TAG_LENGTH);
@@ -273,6 +280,89 @@ export function FleetNodeDrawer({
                                         {t('workerStateSince', {
                                             time: formatMoment(node.workerStateChangedAt),
                                         })}
+                                    </span>
+                                ) : null}
+                            </dd>
+                        </div>
+                        {/* Node housekeeping (EW-803): the disk floor this
+                            machine enforces on ITSELF, read against the free
+                            space it reports, plus what its reaper last
+                            reclaimed. `online` + `below the floor` is the
+                            pair that used to be invisible — a node that
+                            looks healthy and quietly leases nothing. */}
+                        <div className="col-span-2 sm:col-span-4">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('housekeeping.title')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark"
+                                data-testid="fleet-node-drawer-housekeeping"
+                            >
+                                <span
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${fleetNodeDiskBadgeClass(diskState)}`}
+                                    data-testid="fleet-node-drawer-disk-state"
+                                >
+                                    {t(`housekeeping.disk.${diskState}` as never)}
+                                </span>{' '}
+                                <span data-testid="fleet-node-drawer-disk-figures">
+                                    {t('housekeeping.diskFigures', {
+                                        free:
+                                            formatBytes(node.diskFreeBytes) ??
+                                            t('housekeeping.unknownValue'),
+                                        floor:
+                                            typeof node.minFreeDiskBytes === 'number'
+                                                ? (formatBytes(node.minFreeDiskBytes) ??
+                                                  t('housekeeping.unknownValue'))
+                                                : t('housekeeping.noFloor'),
+                                    })}
+                                </span>
+                                {hasHousekeeping ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-workspaces"
+                                    >
+                                        {t('housekeeping.workspaces', {
+                                            count:
+                                                typeof node.workspaceCount === 'number'
+                                                    ? node.workspaceCount
+                                                    : t('housekeeping.unknownValue'),
+                                            size:
+                                                formatBytes(node.workspaceBytes) ??
+                                                t('housekeeping.unknownValue'),
+                                        })}
+                                    </span>
+                                ) : (
+                                    // Said ONCE. Four dashes would read as
+                                    // four separate faults rather than one
+                                    // daemon that predates the fields.
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-housekeeping-unreported"
+                                    >
+                                        {t('housekeeping.notReported')}
+                                    </span>
+                                )}
+                                {node.lastReclaimAt ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-last-reclaim"
+                                    >
+                                        {t('housekeeping.lastReclaim', {
+                                            time: formatMoment(node.lastReclaimAt),
+                                            freed:
+                                                formatBytes(node.lastReclaimFreedBytes) ??
+                                                t('housekeeping.unknownValue'),
+                                        })}
+                                    </span>
+                                ) : hasHousekeeping ? (
+                                    // The finding this field exists for: a
+                                    // machine reporting workspaces but no
+                                    // sweep is one whose reaper has never run.
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-never-reclaimed"
+                                    >
+                                        {t('housekeeping.neverReclaimed')}
                                     </span>
                                 ) : null}
                             </dd>

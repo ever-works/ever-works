@@ -381,8 +381,85 @@ describe('FleetController', () => {
                 modelIdentity: undefined,
                 workerState: undefined,
                 workerStateReason: undefined,
+                // Node housekeeping (EW-803).
+                minFreeDiskBytes: undefined,
+                workspaceCount: undefined,
+                workspaceBytes: undefined,
+                lastReclaimAt: undefined,
+                lastReclaimFreedBytes: undefined,
             });
+            // …and the KEY SET, because the assertion above does not check
+            // it (review AO-12). `toHaveBeenCalledWith` uses the same
+            // recursive equality as `toEqual`, which treats `{a: undefined}`
+            // and `{}` as equal — so every `x: undefined` line above would
+            // still pass with all five mappings deleted from the controller.
+            // A field added to the DTO and forgotten in the controller's map
+            // has to fail HERE, on a call that carries no values at all,
+            // rather than only in the sibling case below.
+            expect(Object.keys(service.enroll.mock.calls[0][1] as object).sort()).toEqual(
+                [
+                    'platform',
+                    'version',
+                    'capabilities',
+                    'cliVersion',
+                    'diskFreeBytes',
+                    'modelIdentity',
+                    'workerState',
+                    'workerStateReason',
+                    'minFreeDiskBytes',
+                    'workspaceCount',
+                    'workspaceBytes',
+                    'lastReclaimAt',
+                    'lastReclaimFreedBytes',
+                ].sort(),
+            );
             expect(result.secret).toBe('node-secret');
+        });
+
+        it('forwards the housekeeping report on BOTH enroll and heartbeat (EW-803)', async () => {
+            // Same trap as the worker state below: the mapping, not the DTO,
+            // is what decides whether a field ever reaches the service.
+            service.enroll.mockResolvedValue({
+                nodeId: nodeView.id,
+                secret: 'node-secret',
+                node: nodeView,
+            });
+            await controller.enroll({
+                token: 'x'.repeat(43),
+                minFreeDiskBytes: 2 * 1024 ** 3,
+                workspaceCount: 12,
+                workspaceBytes: 40 * 1024 ** 3,
+                lastReclaimAt: '2026-09-05T09:30:00.000Z',
+                lastReclaimFreedBytes: 3 * 1024 ** 3,
+            } as EnrollFleetNodeDto);
+            expect(service.enroll).toHaveBeenCalledWith(
+                'x'.repeat(43),
+                expect.objectContaining({
+                    minFreeDiskBytes: 2 * 1024 ** 3,
+                    workspaceCount: 12,
+                    workspaceBytes: 40 * 1024 ** 3,
+                    lastReclaimAt: '2026-09-05T09:30:00.000Z',
+                    lastReclaimFreedBytes: 3 * 1024 ** 3,
+                }),
+            );
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat({
+                nodeId: nodeView.id,
+                secret: 'x'.repeat(43),
+                // The explicit null the node sends when the operator turned
+                // the floor off. It has to survive the mapping as `null`,
+                // not be normalized to `undefined` on the way through —
+                // `undefined` means "said nothing" and would leave a floor
+                // on screen that no longer exists.
+                minFreeDiskBytes: null,
+                workspaceCount: 0,
+            } as FleetHeartbeatDto);
+            expect(service.heartbeat).toHaveBeenCalledWith(
+                nodeView.id,
+                'x'.repeat(43),
+                expect.objectContaining({ minFreeDiskBytes: null, workspaceCount: 0 }),
+            );
         });
 
         it('forwards the worker state on BOTH enroll and heartbeat (EW-776)', async () => {

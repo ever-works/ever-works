@@ -290,6 +290,57 @@ export class FleetNode {
     @PortableDateColumn({ nullable: true })
     quarantineNoticedAt?: Date | null;
 
+    /**
+     * Node housekeeping (EW-803) — the free-space FLOOR the node enforces
+     * on itself, in bytes, as last reported. NULL means either "never
+     * reported" or "the operator switched the floor off"; the two are
+     * indistinguishable here on purpose, because both answer the
+     * operator's question the same way: there is no floor to compare
+     * {@link diskFreeBytes} against.
+     *
+     * Stored for DISPLAY. Nothing on the platform routes on it, and no
+     * path exists to push a value back down — the limit stays enforced on
+     * the machine, which is the invariant the node's `types.ts` states.
+     *
+     * `bigint` for the same reason as {@link diskFreeBytes}, and with the
+     * same warning: a STRING on Postgres, a number on sqlite, normalized
+     * only in `FleetService.toView`.
+     * Migration: `1789500000000-AddFleetNodeHousekeeping`.
+     */
+    @Column({ type: 'bigint', nullable: true })
+    minFreeDiskBytes?: string | number | null;
+
+    /**
+     * Task worktrees the node was holding when its last reclaim sweep
+     * finished. NULL = never reported, which is NOT the same as 0 and must
+     * never be rendered as it: "no workspaces" is reassuring, "we have
+     * never been told" is not.
+     */
+    @Column({ type: 'int', nullable: true })
+    workspaceCount?: number | null;
+
+    /** Bytes those retained workspaces occupy. `bigint`; see {@link diskFreeBytes}. */
+    @Column({ type: 'bigint', nullable: true })
+    workspaceBytes?: string | number | null;
+
+    /**
+     * When the node's last reclaim sweep completed, on the NODE's clock.
+     *
+     * The only node-supplied instant on this row — everything else
+     * temporal here is server-stamped — because the platform cannot
+     * derive it: it learns a sweep happened only when a beat says so. A
+     * machine with a stepped clock therefore reports a wrong instant and
+     * we cannot tell. Kept anyway: "last reclaimed three weeks ago" is
+     * the fact that explains a full disk, and `FleetService` refuses a
+     * value that does not parse or lands implausibly in the future.
+     */
+    @PortableDateColumn({ nullable: true })
+    lastReclaimAt?: Date | null;
+
+    /** Bytes that sweep freed. 0 is a real answer — it ran and found nothing to take. */
+    @Column({ type: 'bigint', nullable: true })
+    lastReclaimFreedBytes?: string | number | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

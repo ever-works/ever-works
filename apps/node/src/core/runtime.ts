@@ -5,16 +5,11 @@ import {
 	type CommandRunner,
 	type SelfDescriptionTelemetry
 } from './capabilities';
-import {
-	cacheProbe,
-	detectAgentCliVersion,
-	detectDiskFreeBytes,
-	detectModelIdentity,
-	type DiskProbeIo
-} from './telemetry-probe';
+import { cacheProbe, detectAgentCliVersion, detectModelIdentity, type DiskProbeIo } from './telemetry-probe';
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
+import { NodeHousekeepingReporter } from './housekeeping-report';
 import type { ResourceProbe } from './resource-limits';
 import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
@@ -23,7 +18,12 @@ import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
 import type { ModelCliPaths } from './executors/model-cli';
-import { defaultFleetTaskWorkspaceRoot, FleetTaskWorkspaceProvisioner } from './workspaces/fleet-task-workspace';
+import {
+	assertWorkspaceDiskHeadroom,
+	defaultFleetTaskWorkspaceRoot,
+	FleetTaskWorkspaceProvisioner
+} from './workspaces/fleet-task-workspace';
+import { measureWorkspaceFreeBytes } from './workspaces/disk-headroom';
 import type { Logger } from './logger';
 import {
 	clampResourceLimits,
@@ -96,7 +96,15 @@ export function buildSelfDescriptionTelemetry(io: NodeIo): SelfDescriptionTeleme
 	if (io.diskProbe) {
 		const probe = io.diskProbe;
 		const path = io.workspacePath ?? process.cwd();
-		telemetry.diskFreeBytes = () => detectDiskFreeBytes(probe, path);
+		// The SAME measurement both gates use — walking to the nearest
+		// existing ancestor — not the raw probe (review AO-8). The raw probe
+		// answers null for a workspace root that does not exist yet, which
+		// is every freshly enrolled node until its first provision: the beat
+		// then omitted `diskFreeBytes` while reporting `minFreeDiskBytes`
+		// beside it, so the drawer showed a floor with no reading to compare
+		// it against and could never say "below" — on exactly the machines
+		// whose lease gate was already enforcing against the parent volume.
+		telemetry.diskFreeBytes = () => measureWorkspaceFreeBytes(probe, path);
 	}
 	return telemetry;
 }
@@ -247,6 +255,15 @@ export interface NodeRuntime {
 	 * process is using right now (belt and braces over the on-disk lease).
 	 */
 	workspaceProvisioner?: FleetWorkspaceProvisionerLike;
+	/**
+	 * Node housekeeping reporting (EW-803), present with `worker`.
+	 *
+	 * Already wired into the heartbeat's `describe` closure. Exposed so
+	 * the shell can hand each completed reaper cycle to it — the reaper
+	 * timer is started out there, after this runtime exists, so the two
+	 * meet through this object rather than through a constructor.
+	 */
+	housekeeping?: NodeHousekeepingReporter;
 }
 
 /** The provisioner surface the runtime composes over; the real one and every test double satisfy it. */
@@ -401,6 +418,33 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// to report, and the platform shows "unknown" rather than a
 		// fabricated `idle`.
 		telemetry.workerHealth = () => describeWorkerHealth(worker.getState());
+		// Node housekeeping (EW-803), onto the SAME telemetry object and
+		// for the same reason. Only with a worker: a visibility-only node
+		// enforces no floor and runs no reaper, so it has nothing to say
+		// and must not claim otherwise.
+		//
+		// The floor here is `effectiveMinFreeDiskBytes(limits)` — the very
+		// value the lease gate and the provisioner were handed above — so
+		// what Fleet displays is what this machine actually enforces,
+		// rather than a second reading of the config that could drift.
+		//
+		// With one condition, and it is the whole point of the sentence
+		// above (review AO-9): BOTH gates switch themselves off when no
+		// `diskProbe` is wired — `wantsDisk` requires one, and
+		// `assertWorkspaceDiskHeadroom` returns before it measures. An
+		// embedder that builds a `NodeIo` without a probe therefore
+		// enforces nothing, and reporting a floor anyway would put a
+		// control on the operator's screen that does nothing. `null` on the
+		// wire is "no floor in force", which is exactly true here, and
+		// `hasFleetNodeHousekeeping` deliberately does not count a null
+		// floor as a report — so the drawer says "not reported" rather than
+		// "Above floor".
+		const housekeeping = new NodeHousekeepingReporter({
+			minFreeDiskBytes: io.diskProbe ? effectiveMinFreeDiskBytes(limits) : null,
+			...(io.now ? { now: io.now } : {})
+		});
+		telemetry.housekeeping = () => housekeeping.describe();
+		runtime.housekeeping = housekeeping;
 		const workspaceProvisioner: FleetWorkspaceProvisionerLike =
 			options.workspaceProvisioner ??
 			new FleetTaskWorkspaceProvisioner({
@@ -473,6 +517,18 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 							}
 						: {}),
 					modelCli,
+					// The disk floor on the OTHER workspace path (review
+					// AO-10). A payload that carries `workspacePath` — or
+					// neither field, which falls back to the node's own
+					// working directory — never reaches the provisioner, so
+					// neither of the slice's two gates looked at the volume
+					// it is about to run on. The lease gate had already
+					// passed, because it measures the FLEET root's volume,
+					// which in the installer's own recommended layout is a
+					// different drive. Same floor, same fail-closed rule,
+					// applied to the path the steps actually run in.
+					checkWorkspaceHeadroom: (path, signal) =>
+						assertWorkspaceDiskHeadroom(io.diskProbe, effectiveMinFreeDiskBytes(limits), path, signal),
 					...(options.agentTaskScratchRoot !== undefined
 						? { scratchRoot: options.agentTaskScratchRoot }
 						: {}),

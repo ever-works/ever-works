@@ -7,6 +7,7 @@ import {
 	formatBytes,
 	hasAdmissionCeilings,
 	hasDiskFloor,
+	judgeDiskFloor,
 	type ResourceSample
 } from './resource-limits';
 import {
@@ -18,6 +19,7 @@ import {
 	MIN_MIN_FREE_DISK_BYTES
 } from './types';
 import { WorkerLoop, type JobLeaseCapableClient } from './worker-loop';
+import { assertWorkspaceDiskHeadroom } from './workspaces/fleet-task-workspace';
 
 /**
  * Resource limits (A16) and pause/resume (A18).
@@ -438,7 +440,7 @@ describe('admitByResourceLimits — disk floor', () => {
 		);
 		expect(decision.admit).toBe(false);
 		expect(decision.dimension).toBe('disk');
-		expect(decision.reason).toContain('38 MB');
+		expect(decision.reason).toContain('38 MiB');
 		expect(decision.reason).toContain('2.0 GiB');
 	});
 
@@ -457,14 +459,52 @@ describe('admitByResourceLimits — disk floor', () => {
 		expect(decision.reason).toContain(formatBytes(DEFAULT_MIN_FREE_DISK_BYTES));
 	});
 
-	it('admits when the reading is missing, null or NaN — an unreadable volume must not idle the node', () => {
+	it('admits when the disk was never sampled — a dimension nobody asked about cannot refuse', () => {
+		// `checkResourceAdmission` only sets `diskFreeBytes` when a floor is
+		// in force AND a probe is wired, so an ABSENT field means "not
+		// measured on this poll" and must stay silent.
 		expect(admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: 2 * GIB }, sample())).toEqual(ADMIT);
+		expect(judgeDiskFloor({ minFreeDiskBytes: 2 * GIB }, sample())).toBeNull();
+	});
+
+	it('REFUSES a reading that was taken and came back unreadable (review AO-11)', () => {
+		// This assertion is the reverse of the one it replaces, and the
+		// reversal is the fix. The old contract — "null admits, an
+		// unreadable volume must not idle the node" — did not compose with
+		// `assertWorkspaceDiskHeadroom`, which REFUSES the identical null
+		// from the identical probe because it is the last gate before a
+		// model's whole budget lands on the volume. While this gate
+		// admitted, a host whose `statfs` cannot answer (a persistent
+		// condition per `createDiskProbe`) leased every job it was offered
+		// and then declined it at provision time; the deferral reports
+		// nothing, so the claim lapsed over the full lease TTL and burned
+		// one of the job's attempts, until the platform failed it with a
+		// message that never mentioned disk. Refusing here throttles the
+		// node instead, with a reason an operator can read.
+		for (const free of [null, Number.NaN]) {
+			const decision = admitByResourceLimits(
+				{ ...noCeilings, minFreeDiskBytes: 2 * GIB },
+				sample({ diskFreeBytes: free })
+			);
+			expect(decision.admit).toBe(false);
+			expect(decision.dimension).toBe('disk');
+			expect(decision.reason).toContain('could not be measured');
+		}
+		// Still silent when the operator switched the floor off.
 		expect(
-			admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: 2 * GIB }, sample({ diskFreeBytes: null }))
+			admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: null }, sample({ diskFreeBytes: null }))
 		).toEqual(ADMIT);
-		expect(
-			admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: 2 * GIB }, sample({ diskFreeBytes: Number.NaN }))
-		).toEqual(ADMIT);
+	});
+
+	it('judgeDiskFloor answers about DISK alone, whatever CPU and memory did (review AO-7)', () => {
+		// `admitByResourceLimits` reports only the first refusing dimension,
+		// so the worker loop's refuse/resume latch cannot be driven from it:
+		// a CPU refusal would read as "the disk recovered".
+		const limits = { maxCpuPercent: 50, maxMemoryMb: null, minFreeDiskBytes: 2 * GIB };
+		const bothOver = sample({ cpuPercent: 90, diskFreeBytes: 190 * MIB });
+		expect(admitByResourceLimits(limits, bothOver).dimension).toBe('cpu');
+		expect(judgeDiskFloor(limits, bothOver)?.reason).toContain('below the 2.0 GiB floor');
+		expect(judgeDiskFloor(limits, sample({ cpuPercent: 90, diskFreeBytes: 10 * GIB }))).toBeNull();
 	});
 
 	it('never blocks when the floor is switched off', () => {
@@ -481,10 +521,15 @@ describe('admitByResourceLimits — disk floor', () => {
 		expect(decision.dimension).toBe('cpu');
 	});
 
-	it('formats bytes the way an operator reads them', () => {
-		expect(formatBytes(38 * MIB)).toBe('38 MB');
+	it('formats bytes in binary units and LABELS them binary (review AO-14)', () => {
+		// It divided by 1024 and printed "MB"/"KB", so one refusal line read
+		// `524 MB free ... below the 2.0 GiB floor` — two unit systems in one
+		// sentence, only one of them named correctly. The Fleet drawer is
+		// deliberately decimal (it agrees with Explorer/Finder); the two only
+		// reconcile if each says which it is.
+		expect(formatBytes(38 * MIB)).toBe('38 MiB');
 		expect(formatBytes(2 * GIB)).toBe('2.0 GiB');
-		expect(formatBytes(1_536)).toBe('2 KB');
+		expect(formatBytes(1_536)).toBe('2 KiB');
 		expect(formatBytes(-1)).toBe('unknown');
 	});
 });
@@ -539,7 +584,13 @@ describe('WorkerLoop honours the disk floor', () => {
 		await loop.stop();
 	});
 
-	it('leases anyway when the disk probe throws or answers null', async () => {
+	it('refuses to lease when the disk probe throws or answers null (review AO-11)', async () => {
+		// Composition, not preference. The provisioner's
+		// `assertWorkspaceDiskHeadroom` refuses this same unreadable reading;
+		// if the lease gate admitted it, the node would take every job and
+		// then defer it, silently spending one attempt per lapsed lease until
+		// the platform failed the job for "attempt budget exhausted" — a
+		// message that never mentions disk. Throttling here says why.
 		for (const freeBytes of [
 			() => {
 				throw new Error('statfs unsupported');
@@ -557,10 +608,76 @@ describe('WorkerLoop honours the disk floor', () => {
 			});
 
 			await loop.start();
-			expect(client.leaseRequests).toHaveLength(1);
-			expect(loop.getState().state).not.toBe('throttled');
+			expect(client.leaseRequests).toHaveLength(0);
+			expect(loop.getState().state).toBe('throttled');
+			expect(loop.getState().throttleReason).toContain('could not be measured');
 			await loop.stop();
 		}
+	});
+
+	it('the two disk gates agree on an unreadable volume, so nothing loops (review AO-11)', async () => {
+		// The composition itself, asserted in one place: ONE probe, both
+		// gates. Neither test on its own could see the defect — the lease
+		// side only checked that admission succeeded, the provision side only
+		// that the provisioner threw.
+		const probe = { freeBytes: () => null };
+		const client = recordingClient([[]]);
+		const scheduler = controllableScheduler();
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			limits: clampResourceLimits({ maxConcurrentJobs: 1 }),
+			diskProbe: probe,
+			workspacePath: process.cwd()
+		});
+		await loop.start();
+		// The lease never happens, so the provisioner is never reached...
+		expect(client.leaseRequests).toHaveLength(0);
+		await loop.stop();
+		// ...and had it been reached, it would have refused the same reading.
+		await expect(assertWorkspaceDiskHeadroom(probe, 2 * GIB, process.cwd())).rejects.toMatchObject({
+			code: 'disk-low'
+		});
+	});
+
+	it('does not claim the volume recovered when CPU refuses first (review AO-7)', async () => {
+		// `admitByResourceLimits` returns only the FIRST refusing dimension.
+		// Driving the latch from it logged "Workspace volume is back above
+		// the disk floor — leasing resumes" the moment CPU also went over,
+		// about a machine still at 190 MB and still leasing nothing; when CPU
+		// dropped the warning re-fired, so a permanently full disk produced
+		// an alternating refuse/resume log.
+		const lines: string[] = [];
+		const logger = {
+			info: (message: string) => lines.push(`info ${message}`),
+			warn: (message: string) => lines.push(`warn ${message}`),
+			error: (message: string) => lines.push(`error ${message}`),
+			debug: () => undefined,
+			protect: () => undefined,
+			redact: (value: string) => value
+		};
+		const client = recordingClient([[], []]);
+		const scheduler = controllableScheduler();
+		let cpuPercent = 40;
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			logger: logger as never,
+			limits: clampResourceLimits({ maxConcurrentJobs: 1, maxCpuPercent: 80 }),
+			resourceProbe: { sample: () => sample({ cpuPercent }) },
+			diskProbe: { freeBytes: () => 190 * MIB },
+			workspacePath: process.cwd()
+		});
+
+		await loop.start();
+		expect(lines.filter((line) => line.startsWith('warn Refusing to lease work'))).toHaveLength(1);
+
+		// Same poll cadence, now with CPU over the ceiling as well.
+		cpuPercent = 85;
+		scheduler.runNext();
+		await vi.waitFor(() => expect(loop.getState().throttleReason).toContain('CPU'));
+		expect(lines.some((line) => line.includes('back above the disk floor'))).toBe(false);
+		await loop.stop();
 	});
 
 	it('takes no reading at all when the floor is switched off', async () => {

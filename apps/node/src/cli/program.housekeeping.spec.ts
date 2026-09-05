@@ -112,6 +112,8 @@ function record(overrides: Partial<WorkspaceRecord> = {}): WorkspaceRecord {
 		intentPending: false,
 		lease: null,
 		mountLinks: [],
+		mountsDir: 'absent',
+		excludedOutput: false,
 		...overrides
 	};
 }
@@ -278,7 +280,7 @@ describe('disk floor flags', () => {
 			)
 		).toBe(EXIT_OK);
 		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)?.limits?.minFreeDiskBytes).toBe(512 * MIB);
-		expect(h.output()).toContain('disk floor 512 MB');
+		expect(h.output()).toContain('disk floor 512 MiB');
 	});
 
 	it('status shows the default floor and the default reaper policy', async () => {
@@ -379,12 +381,12 @@ describe('ever-works-node doctor', () => {
 		const out = h.output();
 		expect(out).toContain(`enrolled     yes (node ${NODE_ID})`);
 		expect(out).toContain('workspace    /srv/fleet');
-		expect(out).toContain('disk free    38 MB on the workspace volume (floor 2.0 GiB) — BELOW FLOOR');
+		expect(out).toContain('disk free    38 MiB on the workspace volume (floor 2.0 GiB) — BELOW FLOOR');
 		expect(out).toContain('workspace gc max age 14 d, no count budget');
-		expect(out).toContain('workspaces   2 worktree(s), 0 pool(s), 420 MB, oldest unused for 30 d');
-		expect(out).toMatch(/REMOVE\s+fleet-abc\s+task\/abc\s+30 d\s+300 MB\s+clean, branch gone from the remote/);
-		expect(out).toMatch(/KEEP\s+fleet-dirty\s+task\/dirty\s+3 d\s+120 MB\s+uncommitted changes/);
-		expect(out).toContain('gc would remove 1 worktree(s) and 0 pool(s) (300 MB), keep 1 worktree(s)');
+		expect(out).toContain('workspaces   2 worktree(s), 0 pool(s), 420 MiB, oldest unused for 30 d');
+		expect(out).toMatch(/REMOVE\s+fleet-abc\s+task\/abc\s+30 d\s+300 MiB\s+clean, branch gone from the remote/);
+		expect(out).toMatch(/KEEP\s+fleet-dirty\s+task\/dirty\s+3 d\s+120 MiB\s+uncommitted changes/);
+		expect(out).toContain('gc would remove 1 worktree(s) and 0 pool(s) (300 MiB), keep 1 worktree(s)');
 		expect(h.reap).not.toHaveBeenCalled();
 	});
 
@@ -448,6 +450,77 @@ describe('ever-works-node doctor', () => {
 		const h = harness();
 		expect(await runCli(['doctor', '--workspace-root', 'relative/dir'], h.deps)).toBe(EXIT_FAILURE);
 	});
+
+	it('explains an unreadable volume, in both floor states (review AO-13)', async () => {
+		// This line is the only place `doctor` explains why jobs are being
+		// deferred on a machine with no visible disk problem, and neither of
+		// its two branches was executed by any test. Both halves matter and
+		// they differ: with a floor in force the node refuses at the lease
+		// AND at provision; with the floor switched off nothing refuses.
+		const withFloor = harness({ files: { [CONFIG_PATH]: storedConfig }, freeBytes: null });
+		expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], withFloor.deps)).toBe(EXIT_OK);
+		expect(withFloor.output()).toContain(
+			'disk free    unknown on the workspace volume (floor 2.0 GiB) — this node will not lease or provision'
+		);
+
+		const noFloor = harness({
+			files: {
+				[CONFIG_PATH]: JSON.stringify({
+					...(JSON.parse(storedConfig) as Record<string, unknown>),
+					limits: { maxConcurrentJobs: 1, maxCpuPercent: null, maxMemoryMb: null, minFreeDiskBytes: null }
+				})
+			},
+			freeBytes: null
+		});
+		expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], noFloor.deps)).toBe(EXIT_OK);
+		expect(noFloor.output()).toContain('disk free    unknown on the workspace volume (no floor)');
+		expect(noFloor.output()).not.toContain('will not lease');
+	});
+
+	it('inspects the root the SERVICE recorded, and says where the root came from (review AO-6)', async () => {
+		// `doctor` and `gc` resolved the root independently of the running
+		// node — flag, else `homedir()`. The Windows installer's preflight
+		// ERRORS unless the operator passes an explicit `-WorkspaceRoot`, and the
+		// service runs as its own account, so an admin following the disk
+		// refusal's own advice landed on an empty directory in their profile
+		// and was told `0 worktree(s), 0 B` about a machine whose real root
+		// was full and refusing every job.
+		const started = harness({ files: { [CONFIG_PATH]: storedConfig } });
+		started.deps.waitForShutdown = () => Promise.resolve();
+		expect(await runCli(['start', '--workspace-root', '/srv/fleet'], started.deps)).toBe(EXIT_OK);
+		expect(parseConfig(started.files.get(CONFIG_PATH) ?? null)?.workspaceRoot).toBe('/srv/fleet');
+
+		// Now `doctor`, with NO flag, on that same machine's config.
+		const later = harness({
+			files: { [CONFIG_PATH]: started.files.get(CONFIG_PATH) ?? '' },
+			inventory: inventory([record()])
+		});
+		expect(await runCli(['doctor'], later.deps)).toBe(EXIT_OK);
+		expect(later.scan).toHaveBeenCalledWith('/srv/fleet', expect.objectContaining({ refreshRemote: true }));
+		expect(later.output()).toContain("workspace    /srv/fleet (from this node's last `start`)");
+		// And `gc` reaps that tree, not a guess.
+		const collected = harness({
+			files: { [CONFIG_PATH]: started.files.get(CONFIG_PATH) ?? '' },
+			inventory: inventory([record()])
+		});
+		expect(await runCli(['gc'], collected.deps)).toBe(EXIT_OK);
+		expect(collected.scan.mock.calls[0][0]).toBe('/srv/fleet');
+	});
+
+	it('warns when the root is only a guess (review AO-6)', async () => {
+		// Nothing recorded and no flag: the answer may be about a completely
+		// different tree, and an operator reading "0 worktree(s)" has to be
+		// able to tell that from "this machine is tidy".
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig } });
+		expect(await runCli(['doctor'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('(default — NOT recorded by any `start`');
+		expect(h.output()).toContain('pass --workspace-root');
+
+		// The flag says so too, so all three provenances are distinguishable.
+		const flagged = harness({ files: { [CONFIG_PATH]: storedConfig } });
+		expect(await runCli(['doctor', '--workspace-root', '/srv/fleet'], flagged.deps)).toBe(EXIT_OK);
+		expect(flagged.output()).toContain('workspace    /srv/fleet (from --workspace-root)');
+	});
 });
 
 describe('ever-works-node gc', () => {
@@ -468,9 +541,9 @@ describe('ever-works-node gc', () => {
 		expect(await runCli(['gc', '--workspace-root', '/srv/fleet'], h.deps)).toBe(EXIT_OK);
 		expect(h.reap).toHaveBeenCalledOnce();
 		expect(h.reap.mock.calls[0][0].remove.map((verdict) => verdict.record.bindingKey)).toEqual(['fleet-abc']);
-		expect(h.output()).toContain('removed fleet-abc (300 MB)');
+		expect(h.output()).toContain('removed fleet-abc (300 MiB)');
 		expect(h.output()).toContain('kept    fleet-young: used 24 h ago');
-		expect(h.output()).toContain('Removed 1 worktree(s) and 0 pool(s), freed 300 MB; kept 1 worktree(s).');
+		expect(h.output()).toContain('Removed 1 worktree(s) and 0 pool(s), freed 300 MiB; kept 1 worktree(s).');
 	});
 
 	it('exits with a failure code when a removal errored, naming it', async () => {

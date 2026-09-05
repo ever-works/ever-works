@@ -43,8 +43,8 @@ pointing at that checkout.
 ## Commands
 
 ```bash
-ever-works-node enroll --api-url <url> --token <one-time-token> [--name <label>] [-i <seconds>] [--min-free-disk <mb>] [--workspace-max-age <days>]
-ever-works-node start [-i <seconds>] [--work] [--concurrency <count>] [--claude-path <file>] [--codex-path <file>] [--workspace-root <dir>] [--min-free-disk <mb> | --no-disk-floor] [--workspace-max-age <days>] [--workspace-max-count <n>]
+ever-works-node enroll --api-url <url> --token <one-time-token> [--name <label>] [-i <seconds>] [--min-free-disk <mib>] [--workspace-max-age <days>]
+ever-works-node start [-i <seconds>] [--work] [--concurrency <count>] [--claude-path <file>] [--codex-path <file>] [--workspace-root <dir>] [--min-free-disk <mib> | --no-disk-floor] [--workspace-max-age <days>] [--workspace-max-count <n>]
 ever-works-node pause [--local-only]
 ever-works-node resume [--local-only]
 ever-works-node unenroll [--local-only]
@@ -79,6 +79,11 @@ ever-works-node gc [--workspace-root <dir>] [--max-age <days>] [--max-count <n>]
 - **`doctor`** is read-only: free space on the workspace volume against the disk floor, the workspace
   root, how many Task worktrees and repository pools it holds, and — per worktree — what `gc` would do
   and why. `--json` emits one object for scripts. Works whether or not the machine is enrolled.
+  Both `doctor` and `gc` inspect the root the node's last `start --workspace-root` recorded in the
+  config, and the header says where the root came from — `--workspace-root`, the config, or the
+  process default. That matters when the service runs as its own account: the default resolves under
+  the account running the CLI, so a bare `doctor` there would answer about an empty directory that is
+  not the node's tree at all. Pass `--workspace-root` when the header says the root is only a default.
 - **`gc`** runs the workspace reaper (see "Disk floor and workspace GC" below). `--dry-run` prints the
   plan and removes nothing; `--max-age` / `--max-count` override the stored policy for that run only.
   Exit `1` when a planned removal failed — nothing is ever force-deleted.
@@ -259,7 +264,7 @@ Two node-side guards keep a machine from filling its disk with Task worktrees (s
 §6, findings OPS-12 and R8).
 
 **Disk floor.** A node refuses to lease work while the volume that holds its workspace root has fewer
-free bytes than the floor — **2 GiB by default**, set with `--min-free-disk <mb>` (persisted by
+free bytes than the floor — **2 GiB by default**, set with `--min-free-disk <mib>` in **mebibytes** (persisted by
 `enroll`, process-only on `start`, like `--max-cpu`), switched off with `--no-disk-floor`. The floor is
 measured on the **workspace root's volume** (the nearest existing ancestor of it), never on the system
 drive, and it is checked twice: at the lease, and again by the provisioner right before it writes
@@ -267,9 +272,25 @@ anything — once before the primary worktree and once before every mount, becau
 the two. A refused lease shows the node as `throttled` with the reason in the status window and one
 warning in the log (one more line when it clears); a provision refused for disk (`disk-low`) is not a
 verdict about the work — the node hands the job back **unsettled**, its claim lapses and the platform
-re-offers it to a node with room, and the very next poll throttles this one. An unreadable volume never blocks anything: the
-heartbeat simply carries no `diskFreeBytes`, which is now measured on the same volume, so the Fleet
-runner pill finally shows the number that matters.
+re-offers it to a node with room, and the very next poll throttles this one.
+
+Both checks treat an **unreadable** volume the same way: they refuse. The floor fails closed, because
+the provision-time check is the last one before a clone, a fetch and a model's whole budget land on a
+volume nobody can size — and the lease check has to be at least as strict, or the node takes every job
+it is offered and then defers it here, spending one of the job's attempts per lapsed lease until the
+platform fails it with a message that never mentions disk. The node therefore goes `throttled` with a
+reason instead, in the log, in the drawer and in `doctor`; `--no-disk-floor` is the explicit way to
+switch the control off on a host whose `statfs` cannot answer. The heartbeat's `diskFreeBytes` is taken
+with the same measurement as the gates (the nearest existing ancestor of the root), so a node that has
+never provisioned still reports a figure to compare the floor against.
+
+**What the platform sees (EW-803).** The heartbeat also reports the floor in force
+(`minFreeDiskBytes`; `null` when `--no-disk-floor` is set), what the last sweep retained
+(`workspaceCount`, `workspaceBytes`) and when it ran and what it took (`lastReclaimAt`,
+`lastReclaimFreedBytes`). These travel **upward only** — the platform never sets them and never routes
+on them; the limit stays enforced here. The CPU and memory ceilings are not reported at all: there is no
+CPU or memory reading beside them to make a ceiling meaningful. A node without `--work` enforces no
+floor and runs no reaper, so it reports none of this and Fleet shows "not reported" rather than zeros.
 
 **Workspace reaper.** With `--work`, the node runs a reaper over its workspace root a minute after start
 and then every six hours (skipped, and retried in half an hour, while a job is running); `ever-works-node
@@ -280,6 +301,9 @@ gc` runs the same reaper by hand. It removes a Task worktree only when it can **
 2. no provisioning intent is pending for it;
 3. no live process holds its lease (see below), and this process is not using it;
 4. `git status --porcelain --untracked-files=all` is empty and no `index.lock` / `HEAD.lock` exists;
+   plus the two things that command structurally cannot see, because the node excludes them itself:
+   `.mounts` is a plain directory (not a junction someone put there), and `.ever-works/` — the
+   owner-question channel — is empty or absent;
 5. no commit on `HEAD` is missing from every remote-tracking ref;
 6. the remote was reachable, **and** the branch is gone from it or merged into its default branch — a
    branch still open on the remote keeps the worktree, however old;
@@ -302,15 +326,19 @@ first — a junction there points at **another** Task's worktree — then the pr
 re-proves ownership and runs `git worktree remove --force` (which also deletes ignored files such as
 `node_modules`; that is intended, the worktree was proven clean, pushed and closed) and `git worktree
 prune`. A bare repository pool is deleted only once Git lists no worktree for it, no intent is pending,
-its remote was refreshed by this scan, **and** no commit on any of its _local_ branches is missing from
-every remote-tracking ref — `git worktree remove` leaves the branch behind, so an emptied pool can still
-hold the only copy of unpushed work (a branch-change re-cut, a manual clean-up), and that keeps it. A
+its remote was refreshed by this scan, **and** nothing it can still reach — branches, tags, the stash,
+the **reflog** — carries a commit missing from every remote-tracking ref (`rev-list --count --all
+--reflog --not --remotes`). `git worktree remove` leaves the branch behind and the provider's `worktree
+add -B` force-resets one into its reflog, so an emptied pool can still hold the only copy of unpushed
+work, and that keeps it. A
 pool is dated by its `worktrees/` and intents directories, never by `FETCH_HEAD`, which the scan itself
 rewrites. Anything the reaper does not recognise under the root is reported and left alone.
 
 Two files in each worktree's **private gitdir** (`<pool>/worktrees/<id>/`, never in the working tree,
 gone with the worktree) carry the evidence: `ew-workspace-lease.json` (`{purpose: job|gc, pid, taskId}`,
-created with `O_EXCL`; a lease held by a dead pid is reclaimable; one held by a live foreign job is a
+created atomically and exclusively; a lease held by a dead pid is reclaimable; one this build cannot
+PARSE — a future `version`, an unknown `purpose`, a torn write — is treated as HELD, never reclaimed;
+one held by a live foreign job is a
 `path-collision` that preserves the worktree and fails the job naming the holder; one held by the reaper
 mid-removal is a transient `workspace-busy` that hands the job back unsettled, and the retry lands on a
 fresh checkout) and

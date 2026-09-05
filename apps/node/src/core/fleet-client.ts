@@ -367,6 +367,26 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	if (source.workerStateReason !== undefined) {
 		out.workerStateReason = source.workerStateReason;
 	}
+	// Node housekeeping (EW-803). `minFreeDiskBytes` is the ONE field in
+	// this whole projection that may legitimately go out as `null` — the
+	// server reads absent as "leave alone", so an operator who switched
+	// the floor off needs an explicit null to say so, and `!== undefined`
+	// (not a truthiness test) is what lets it through.
+	if (source.minFreeDiskBytes !== undefined) {
+		out.minFreeDiskBytes = source.minFreeDiskBytes;
+	}
+	if (source.workspaceCount !== undefined) {
+		out.workspaceCount = source.workspaceCount;
+	}
+	if (source.workspaceBytes !== undefined) {
+		out.workspaceBytes = source.workspaceBytes;
+	}
+	if (source.lastReclaimAt !== undefined) {
+		out.lastReclaimAt = source.lastReclaimAt;
+	}
+	if (source.lastReclaimFreedBytes !== undefined) {
+		out.lastReclaimFreedBytes = source.lastReclaimFreedBytes;
+	}
 	return out;
 }
 

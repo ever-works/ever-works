@@ -104,7 +104,10 @@ const NODE_EXPORTS = [
 	'FLEET_NODE_WORKER_STATES',
 	'normalizeFleetNodeWorkerState',
 	'FLEET_MAX_WORKER_STATE_REASON_LENGTH',
-	'FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS'
+	'FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS',
+	// Node housekeeping visibility (EW-803): the cap on a reported
+	// workspace count. Covered in `fleet-node.spec.ts`.
+	'FLEET_MAX_WORKSPACE_COUNT'
 ] as const;
 
 /** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
@@ -230,7 +233,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 118 runtime symbols', () => {
+	it('exposes exactly these 119 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -238,8 +241,12 @@ describe('fleet barrel', () => {
 		// four cost-accounting helpers, each pinned in its own spec.
 		// 114 → 118 with fleet health signals (EW-776): the worker-state
 		// list, its normaliser, the reason cap and the long-offline window.
+		// 118 → 119 with node housekeeping visibility (EW-803): the cap on
+		// a reported workspace count. The other four housekeeping fields
+		// are TYPES on `FleetNodeSelfDescription` / `FleetNodeView`, which
+		// are erased at runtime and so do not appear here.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(118);
+		expect(Object.keys(fleet)).toHaveLength(119);
 	});
 
 	it.each([
