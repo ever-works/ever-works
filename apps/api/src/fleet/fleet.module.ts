@@ -13,6 +13,7 @@ import { FleetKillSwitchController } from './fleet-kill-switch.controller';
 import { FleetPanicController } from './fleet-panic.controller';
 import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunRouterService } from './fleet-run-router.service';
+import { FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import {
     buildNodeJobRuntimeProviders,
@@ -47,8 +48,8 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  *     whose better-auth runtime would otherwise ride into every module
  *     that imports this one).
  *   - `FleetJobsController` — the node work channel (lease / job
- *     heartbeat / complete), node-secret authenticated, public,
- *     fail-closed to one undifferentiated 401.
+ *     heartbeat / complete / env-files), node-secret authenticated,
+ *     public, fail-closed to one undifferentiated 401.
  *
  * `FleetPanicService` holds the per-node drain that `FleetController`
  * and drain-all BOTH call (one implementation, two routes), and the
@@ -117,6 +118,13 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         FleetRunnerStatusService,
         FleetRunRouterService,
         FleetPanicService,
+        // Run secrets (self-build slice Y): the resolution half of the
+        // node-authenticated env-file fetch. Provided HERE rather than in
+        // the agent-side fleet module on purpose — it needs
+        // `RepoConnectionRepository`, and pulling DatabaseModule into the
+        // agent fleet graph would widen that module's dependency surface
+        // for a route only this app exposes.
+        FleetRunSecretsService,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetNodeAuthGuard,

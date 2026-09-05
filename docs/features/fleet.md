@@ -292,6 +292,78 @@ directory is excluded from the primary repository's Git, so nothing about the la
 A repository the platform cannot describe (a URL that is not `owner/repository`, a default branch it
 cannot read) fails the plan naming the attachment rather than silently running without it.
 
+### Giving a repository its environment
+
+Most real work needs configuration the repository does not carry: a database URL for the API suite, a
+`GH_TOKEN` for `gh`, an S3 bucket for an upload test. A fleet node deliberately runs every command in
+a **built-from-scratch environment** — an allowlist of toolchain and locale names, nothing inherited —
+so by default none of that is there. Two knobs fill the gap, and they are different in kind.
+
+**Seed `.env` files.** Settings → Repositories → _(a repository)_ → Env files stores files by
+repository-relative path (`.env`, `apps/api/.env`, at most 8, 32 KB each). They are
+envelope-encrypted at rest and only ever decrypted for you. When a run is planned, the fleet job
+records **which repository's files are needed and at which paths** — never their contents. The node
+then fetches the decrypted content over the same credential-verified channel it uses to lease,
+heartbeat and complete, and only while it still holds the lease on that job. On disk the files are:
+
+- written **owner-only** (`0600` on macOS/Linux; an explicit ACL on Windows, where mode bits are not
+  a real permission) inside the checkout, at the path the repository declared;
+- **excluded from Git**, the same way `.mounts/` and `.ever-works/` are, before any content is
+  written — so a concurrent `git add -A` in another Task cannot stage one;
+- **deleted before the run's first Git command**, and again when the run ends, however it ends:
+  success, failure, a crash in the model step, an operator cancel, a lease that lapsed while the
+  machine slept. The early deletion matters because the Git exclusion above is written to
+  `info/exclude`, which is the lowest-precedence ignore source Git has — a `.gitignore` the model
+  wrote would override it — so the files are simply gone by the time anything is committed or
+  pushed. The one case cleanup cannot cover is the machine being killed outright (power loss,
+  `SIGKILL`); those files stay Git-excluded and are swept before the next run reuses that checkout.
+
+A reference the platform cannot resolve — the repository was deleted or disabled, the path is no
+longer stored, the value cannot be decrypted — **fails the run** with a stable reason instead of
+starting it with half an environment. That is deliberate: a suite that runs without its database
+config goes red in a way that looks like a code problem.
+
+Production note: env files are encrypted with `PLUGIN_SECRET_ENCRYPTION_KEY`. **Set it.** Without it
+the platform stores them in plain text (a development convenience), and this feature now carries them
+to every machine in your fleet.
+
+**Env grants.** Some variables are not files — they are already set on the machine, and the node's
+scrub refuses whole families of names outright (`DATABASE_`, `AWS_`, `S3_`, `REDIS_`, `STRIPE_`,
+`GH_`, `SENTRY_`, `POSTHOG_` …) because they usually belong to the platform, not to the run. A
+repository's **env grants** list opens that refusal for names you bind explicitly.
+
+Read this before you add one:
+
+> Naming a variable in a repository's env grants lets **agent-driven code running on your machines
+> read that variable's value from the node's own environment**. The agent is model-driven and runs
+> with edits accepted; a prompt injection in a Task description, an issue body or a dependency's
+> README reaches whatever you grant. Grant the narrowest name that makes the work possible.
+
+The rules that make that trade survivable:
+
+- A grant is **one exact name**. `DATABASE_URL` admits `DATABASE_URL` and not `DATABASE_URL_REPLICA`,
+  not `DATABASE_HOST`, not `DATABASE_PASSWORD`. There is **no wildcard and no prefix form**, and
+  attempts to save one are refused.
+- Some names can **never** be granted, however explicitly you ask: `FLEET_`, `EVER_WORKS_`,
+  `PLUGIN_`, `AUTH_`, `BETTER_AUTH_` and `PLATFORM_`. Those are the node's own credential, the key
+  that decrypts every tenant's env files, and the platform's session signing — granting them would
+  turn "read one secret" into "become the platform".
+- Grants carry **names only**. The value is read from the machine's own environment and scrubbed out
+  of everything the node reports back, exactly as CLI credentials already are.
+- A run is **one process tree over one workspace**, so grants from every repository of that run are
+  unioned for its duration. Bind a grant to the repository that justifies it and expect the run to
+  see it everywhere.
+- Grants are read when a run is **planned**, so revoking one takes effect on the next run. A run
+  already in flight keeps what it was planned with.
+- Grants are stored in plain text and returned unmasked by the API. That is on purpose: a permission
+  you cannot read, grep or diff is a permission nobody reviews.
+- The instance-wide `FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH` keeps working exactly as before for
+  everything already relying on it, and still cannot open the platform-owned families. Grants apply
+  to model-CLI runs; the legacy `FLEET_NODE_AGENT_TASK_COMMAND` step lane has no repository context
+  and is unchanged.
+- `FLEET_NODE_RUN_ENV_FILES=false` switches env-file delivery off for the whole instance. A run that
+  needs files then fails closed rather than starting without them.
+
 ### When the agent needs you
 
 The agent on your machine has no platform tools — it cannot message you mid-run. What it can do is
@@ -300,9 +372,10 @@ requirement, a risky or irreversible step, a choice between materially different
 writes `.ever-works/QUESTION.md` in the repository root — the first line (or a `# ` heading) is the
 question, the rest is optional context and options — and stops. The node reports the question and
 removes the file. It is never committed: the `.ever-works/` directory is excluded from Git — at the
-repository root and in any subdirectory — the same way `.mounts/` is, in every repository of the
-workspace, and a stale file from an earlier attempt is discarded before the model starts. Only a
-plain file is read: a link, a directory or a pipe at that path is removed without being opened.
+repository root and in any subdirectory — the same way `.mounts/` and any delivered `.env` file are,
+in every repository of the workspace, and a stale file from an earlier attempt is discarded before
+the model starts. Only a plain file is read: a link, a directory or a pipe at that path is removed
+without being opened.
 
 What happens next:
 
