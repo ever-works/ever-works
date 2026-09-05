@@ -20,6 +20,10 @@ import {
     FLEET_JOB_FILTERS,
     filterFleetJobs,
     fleetJobDurationMs,
+    fleetJobOutcomeKey,
+    fleetJobOutcomeText,
+    fleetWorkerStateBadgeClass,
+    fleetWorkerStateKey,
     formatFleetJobDuration,
     type FleetJobFilter,
 } from './fleet-node-drawer.shared';
@@ -163,6 +167,11 @@ export function FleetNodeDrawer({
             ? t('jobs.queuedReasons.waitingForRunner')
             : reason;
 
+    // Fleet health signals (EW-776). `unknown` for a node that has never
+    // reported — never `idle`, which would claim a readiness nobody has
+    // told us about.
+    const workerStateKey = fleetWorkerStateKey(node);
+
     const addTag = () => {
         const tag = draft.trim().slice(0, MAX_TAG_LENGTH);
         if (!tag || tags.includes(tag) || tags.length >= MAX_TAGS) {
@@ -226,6 +235,46 @@ export function FleetNodeDrawer({
                             </dt>
                             <dd className="text-text dark:text-text-dark">
                                 {formatMoment(node.lastHeartbeatAt)}
+                            </dd>
+                        </div>
+                        {/* Fleet health signals (EW-776): what the MACHINE
+                            says about itself, next to what the platform
+                            infers from heartbeats. `online` + `quarantined`
+                            is the pair that used to be invisible. */}
+                        <div className="col-span-2">
+                            <dt className="text-text-muted dark:text-text-muted-dark text-xs">
+                                {t('table.worker')}
+                            </dt>
+                            <dd
+                                className="text-text dark:text-text-dark"
+                                data-testid="fleet-node-drawer-worker"
+                            >
+                                <span
+                                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${fleetWorkerStateBadgeClass(workerStateKey)}`}
+                                    data-testid="fleet-node-drawer-worker-state"
+                                >
+                                    {t(`workerStates.${workerStateKey}` as never)}
+                                </span>
+                                {node.workerStateReason ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark break-words"
+                                        data-testid="fleet-node-drawer-worker-reason"
+                                    >
+                                        {t('workerStateReason', {
+                                            reason: node.workerStateReason,
+                                        })}
+                                    </span>
+                                ) : null}
+                                {node.workerStateChangedAt ? (
+                                    <span
+                                        className="block text-xs text-text-muted dark:text-text-muted-dark"
+                                        data-testid="fleet-node-drawer-worker-since"
+                                    >
+                                        {t('workerStateSince', {
+                                            time: formatMoment(node.workerStateChangedAt),
+                                        })}
+                                    </span>
+                                ) : null}
                             </dd>
                         </div>
                         {/* Fleet cost accounting (EW-777): the seat this
@@ -479,7 +528,12 @@ export function FleetNodeDrawer({
                         ) : (
                             <ul className="space-y-1.5">
                                 {visibleJobs.map((job) => {
-                                    const failed = job.status === 'failed';
+                                    const outcome = fleetJobOutcomeKey(job);
+                                    // Red on the RECONCILED verdict, not on
+                                    // the job status: a job the node called
+                                    // done whose run failed is a failure.
+                                    const failed = outcome === 'failed';
+                                    const outcomeText = fleetJobOutcomeText(job);
                                     const durationMs = fleetJobDurationMs(job, now);
                                     const duration = formatFleetJobDuration(durationMs);
                                     return (
@@ -503,6 +557,25 @@ export function FleetNodeDrawer({
                                                         data-testid={`fleet-node-job-status-${job.id}`}
                                                     >
                                                         {t(`jobs.statuses.${job.status}` as never)}
+                                                    </span>
+                                                    {/* What actually happened to the WORK
+                                                        (EW-776) — the reconciled run
+                                                        outcome, which can disagree with the
+                                                        job status above and is the answer
+                                                        the operator came for. */}
+                                                    <span
+                                                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium ${jobStatusBadgeClass(
+                                                            outcome === 'completed'
+                                                                ? 'done'
+                                                                : outcome === 'failed'
+                                                                  ? 'failed'
+                                                                  : outcome === 'running'
+                                                                    ? 'running'
+                                                                    : 'queued',
+                                                        )}`}
+                                                        data-testid={`fleet-node-job-outcome-${job.id}`}
+                                                    >
+                                                        {t(`jobs.outcomes.${outcome}` as never)}
                                                     </span>
                                                     {job.targetNodeId === node.id && (
                                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] bg-primary/10 text-primary">
@@ -583,6 +656,52 @@ export function FleetNodeDrawer({
                                                     {t('jobs.queuedReason', {
                                                         reason: queuedReasonLabel(job.queuedReason),
                                                     })}
+                                                </p>
+                                            ) : null}
+                                            {/* The one sentence that explains the row:
+                                                the run's error, else the job's, else the
+                                                run's summary. Never the payload. */}
+                                            {outcomeText ? (
+                                                <p
+                                                    className={`mt-1 text-xs break-words ${
+                                                        failed
+                                                            ? 'text-danger'
+                                                            : 'text-text-muted dark:text-text-muted-dark'
+                                                    }`}
+                                                    data-testid={`fleet-node-job-outcome-text-${job.id}`}
+                                                >
+                                                    {t('jobs.outcomeText', { text: outcomeText })}
+                                                </p>
+                                            ) : null}
+                                            {/* IDs only. `job.payload` is executor input
+                                                composed from user content and is never
+                                                rendered here — the API sends it as null. */}
+                                            {job.summary?.taskId || job.summary?.runId ? (
+                                                <p
+                                                    className="mt-1 flex flex-wrap gap-x-3 text-[11px] font-mono text-text-muted dark:text-text-muted-dark"
+                                                    data-testid={`fleet-node-job-summary-${job.id}`}
+                                                >
+                                                    {job.summary?.taskId ? (
+                                                        <span>
+                                                            {t('jobs.summaryTask', {
+                                                                id: job.summary.taskId,
+                                                            })}
+                                                        </span>
+                                                    ) : null}
+                                                    {job.summary?.runId ? (
+                                                        <span>
+                                                            {t('jobs.summaryRun', {
+                                                                id: job.summary.runId,
+                                                            })}
+                                                        </span>
+                                                    ) : null}
+                                                    {job.summary?.agentId ? (
+                                                        <span>
+                                                            {t('jobs.summaryAgent', {
+                                                                id: job.summary.agentId,
+                                                            })}
+                                                        </span>
+                                                    ) : null}
                                                 </p>
                                             ) : null}
                                         </li>

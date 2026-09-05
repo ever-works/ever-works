@@ -11,6 +11,7 @@ import type {
     FleetJobKind,
     FleetJobStatus,
     FleetJobView,
+    FleetNodeJobHistoryEntry,
     FleetNodeLoadView,
 } from '@ever-works/contracts';
 import {
@@ -371,6 +372,11 @@ export class FleetJobService {
                 // being true, so it is the claim that clears the token.
                 queuedReason: null,
                 leaseGeneration,
+                // ...and the moment the PREVIOUS attempt's clock stops
+                // being meaningful. The next job heartbeat re-stamps it, so
+                // the drawer's duration is "how long this attempt has run"
+                // rather than the age of an attempt that ended hours ago.
+                startedAt: null,
             });
             if (!won) {
                 // Another node won the race. Not an error — just skip it.
@@ -384,6 +390,7 @@ export class FleetJobService {
                 attempts,
                 queuedReason: null,
                 leaseGeneration,
+                startedAt: null,
             } as FleetJob);
             leased.push(view);
             this.emit(
@@ -941,13 +948,17 @@ export class FleetJobService {
      * Owner-scoped in the query itself, not just by convention at the
      * edge — a node id is a travelling value.
      */
-    async historyForNode(userId: string, nodeId: string, limit = 20): Promise<FleetJobView[]> {
+    async historyForNode(
+        userId: string,
+        nodeId: string,
+        limit = 20,
+    ): Promise<FleetNodeJobHistoryEntry[]> {
         const rows = await this.jobs.findByNodeForUser(
             userId,
             nodeId,
             Math.min(Math.max(limit, 1), 100),
         );
-        return rows.map(toJobView);
+        return rows.map(toJobHistoryView);
     }
 
     /**
@@ -1036,6 +1047,24 @@ export function toJobView(job: FleetJob): FleetJobView {
         queuedReason: job.queuedReason ?? null,
         cancelRequestedAt: job.cancelRequestedAt ? toIso(job.cancelRequestedAt) : null,
         leaseGeneration: job.leaseGeneration ?? 0,
+    };
+}
+
+/**
+ * Entity → node-drawer history row (fleet health signals, EW-776).
+ *
+ * The only difference from {@link toJobView} is `error`: the verdict text
+ * the node reported was on the row all along and never left the server,
+ * so the drawer showed a red "failed" badge with no way to find out why —
+ * the operator's next step was to open a database. Deliberately a
+ * SEPARATE projection rather than a field added to `toJobView`, because
+ * that view is also the LEASE payload handed to nodes, and a node has no
+ * business being told the error text of a job it is only now picking up.
+ */
+export function toJobHistoryView(job: FleetJob): FleetNodeJobHistoryEntry {
+    return {
+        ...toJobView(job),
+        error: job.error ?? null,
     };
 }
 

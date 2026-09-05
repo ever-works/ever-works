@@ -1,5 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
-import type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
+import type { FleetNodeKind, FleetNodeStatus, FleetNodeWorkerState } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -51,7 +51,7 @@ import { PortableDateColumn } from './_types';
  *
  * `k8s` is list-time only — never persisted as a row.
  */
-export type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
+export type { FleetNodeKind, FleetNodeStatus, FleetNodeWorkerState } from '@ever-works/contracts';
 /**
  * Statuses in which the platform will NOT lease new work onto a node.
  *
@@ -217,6 +217,78 @@ export class FleetNode {
      */
     @Column({ type: 'varchar', length: 10, nullable: true })
     dailyCostTrippedOn?: string | null;
+
+    /**
+     * Fleet health signals (EW-776) — what the node's WORKER last
+     * reported doing: `idle | working | paused | quarantined | throttled`.
+     *
+     * NULL means the node has never reported one (a daemon predating the
+     * field, a visibility-only node with its worker disabled, or a value
+     * this build did not recognise). Rendered as "unknown", never as
+     * `idle`: the whole reason this column exists is that `status:
+     * 'online'` was being read as "healthy" by a machine that had
+     * self-quarantined and was refusing every job.
+     *
+     * Never stored verbatim from the wire — `FleetService` runs every
+     * incoming value through `normalizeFleetNodeWorkerState` first.
+     * Same additive contract as {@link cliVersion}: a beat that omits the
+     * field leaves the stored value alone.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    workerState?: FleetNodeWorkerState | null;
+
+    /**
+     * Why the worker is in that state — the quarantine's own message, the
+     * resource ceiling that throttled the lease — sanitized and capped at
+     * `FLEET_MAX_WORKER_STATE_REASON_LENGTH`. NULL when the state carries
+     * no reason worth reading.
+     */
+    @Column({ type: 'varchar', length: 500, nullable: true })
+    workerStateReason?: string | null;
+
+    /**
+     * When {@link workerState} last CHANGED. Stamped only on a transition,
+     * not on every beat: "quarantined since 03:14" is the fact an operator
+     * needs, and re-stamping it twice a minute would erase it.
+     */
+    @PortableDateColumn({ nullable: true })
+    workerStateChangedAt?: Date | null;
+
+    /**
+     * Dedup marker: set when the online → offline notice for the CURRENT
+     * outage was filed, cleared by the beat that brings the node back.
+     *
+     * The marker lives on the row rather than in the Inbox because
+     * `InboxService.notice` files unconditionally — it has no dedup of its
+     * own — so "exactly one notice per transition" has to be a CAS
+     * somewhere, and the node row is the only thing both the sweep and the
+     * heartbeat already touch. Written by
+     * `FleetNodeRepository.markOfflineIfStale`, which is a conditional
+     * UPDATE on `status = 'online'`: two API replicas sweeping the same
+     * owner at once produce one notice, not two.
+     */
+    @PortableDateColumn({ nullable: true })
+    offlineNoticedAt?: Date | null;
+
+    /**
+     * Dedup marker for the SECOND, louder notice: this machine has now
+     * been gone longer than `FLEET_NODE_OFFLINE_NOTICE_AFTER_MS` (default
+     * 30 minutes). One per outage — the sweep runs on every list read, and
+     * without this the owner would get a notice every 30 seconds for as
+     * long as the PC stayed off. Cleared by the beat that brings it back,
+     * so the NEXT outage notifies again.
+     */
+    @PortableDateColumn({ nullable: true })
+    offlineLongNoticedAt?: Date | null;
+
+    /**
+     * Dedup marker for the online → quarantined notice, set on the FIRST
+     * beat that reports the quarantine and cleared by the first beat that
+     * reports anything else. That re-arm is what makes a second
+     * quarantine, hours later, news again.
+     */
+    @PortableDateColumn({ nullable: true })
+    quarantineNoticedAt?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;

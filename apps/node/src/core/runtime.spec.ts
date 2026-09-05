@@ -215,6 +215,102 @@ describe('createNodeRuntime', () => {
 		await runtime.worker?.stop();
 	});
 
+	/**
+	 * Fleet health signals (EW-776) — end to end on the node side.
+	 *
+	 * The wiring is the risky part, not the mapping: `describe` is closed
+	 * over the telemetry object at line ~345, BEFORE the worker loop is
+	 * constructed. A naive "pass the worker into describeSelf" would have
+	 * required reordering that construction, and the heartbeat would have
+	 * silently reported nothing. So these drive the REAL beat body.
+	 */
+	describe('worker state on the heartbeat', () => {
+		const beatBodies = (bodies: Record<string, unknown>[]): FetchLike => {
+			return async (url, init) => {
+				if (url.endsWith('/api/fleet/heartbeat')) {
+					bodies.push(JSON.parse(init.body) as Record<string, unknown>);
+					return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, node: nodeFromApi }) };
+				}
+				return { ok: true, status: 200, text: async () => JSON.stringify({ jobs: [] }) };
+			};
+		};
+
+		const baseConfig = (over: Partial<NodeConfig> = {}): NodeConfig => ({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			kind: 'node',
+			capabilities: ['os:linux'],
+			heartbeatIntervalMs: 30_000,
+			enrolledAt: '2026-07-25T10:00:00.000Z',
+			...over
+		});
+
+		it('reports a restored quarantine, with the reason that was persisted', async () => {
+			// The whole defect, in one test: a machine whose durable safety
+			// marker survived a restart used to beat as a healthy, idle
+			// `online` node while refusing every job.
+			const bodies: Record<string, unknown>[] = [];
+			const { io: deps } = io(beatBodies(bodies));
+			const runtime = createNodeRuntime(
+				baseConfig({
+					unsafe: { since: '2026-08-22T23:00:00.000Z', reason: 'unverified process tree' }
+				}),
+				deps,
+				{ workerEnabled: true }
+			);
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0].workerState).toBe('quarantined');
+			expect(bodies[0].workerStateReason).toBe('unverified process tree');
+		});
+
+		it('reports a node started drained as paused', async () => {
+			const bodies: Record<string, unknown>[] = [];
+			const { io: deps } = io(beatBodies(bodies));
+			const runtime = createNodeRuntime(baseConfig(), deps, {
+				workerEnabled: true,
+				startPaused: true
+			});
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0].workerState).toBe('paused');
+		});
+
+		it('reports idle for a worker that is simply up', async () => {
+			const bodies: Record<string, unknown>[] = [];
+			const { io: deps } = io(beatBodies(bodies));
+			const runtime = createNodeRuntime(baseConfig(), deps, { workerEnabled: true });
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0].workerState).toBe('idle');
+			expect(bodies[0]).not.toHaveProperty('workerStateReason');
+		});
+
+		it('reports NOTHING on a visibility-only node with no worker', async () => {
+			// Absent, not `idle`: there is no worker, so there is no
+			// capacity, and the platform shows "unknown" rather than a
+			// fabricated readiness.
+			const bodies: Record<string, unknown>[] = [];
+			const { io: deps } = io(beatBodies(bodies));
+			const runtime = createNodeRuntime(baseConfig(), deps);
+
+			await runtime.loop.start();
+			runtime.loop.stop();
+
+			expect(bodies[0]).not.toHaveProperty('workerState');
+			expect(bodies[0]).not.toHaveProperty('workerStateReason');
+			// The rest of the description is unaffected.
+			expect(bodies[0].platform).toBe('linux/x64');
+		});
+	});
+
 	it('wires a client and a loop against the stored config, protecting the secret', async () => {
 		const {
 			io: deps,

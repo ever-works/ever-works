@@ -23,7 +23,7 @@
  */
 
 import type { FleetJobKind } from './fleet-jobs.types.js';
-import type { FleetNodeKind, FleetNodeStatus } from './fleet-node.types.js';
+import type { FleetNodeKind, FleetNodeStatus, FleetNodeWorkerState } from './fleet-node.types.js';
 
 /**
  * How often the pill re-reads runner status. Shipped in the payload
@@ -72,6 +72,18 @@ export interface FleetRunnerNodeView {
 	activeJobCount: number;
 	/** Kind of the oldest live claim, or null when idle. */
 	currentJobKind: FleetJobKind | null;
+	/**
+	 * What the node's WORKER last reported doing, or null when unknown.
+	 *
+	 * `status` alone cannot answer "will this machine take my job": a
+	 * self-quarantined node keeps beating and reads `online` while
+	 * refusing every lease. That is why availability counts a node as
+	 * FREE only when its worker state is not one of the refusing ones —
+	 * see `FleetRunnerStatusService.availability`.
+	 */
+	workerState?: FleetNodeWorkerState | null;
+	/** Why the worker is in that state (quarantine / throttle reason), or null. */
+	workerStateReason?: string | null;
 }
 
 /** `GET /api/fleet/runner-status` — the whole pill payload. */

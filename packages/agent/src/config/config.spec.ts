@@ -232,6 +232,33 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet.getNodeOfflineNoticeAfterMs (health signals, EW-776)', () => {
+        it('defaults to 30 minutes', () => {
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(30 * 60_000);
+        });
+
+        it('honours an operator override', () => {
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = String(2 * 3600_000);
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(2 * 3600_000);
+        });
+
+        it('is floored at the offline sweep window it escalates', () => {
+            // A "still offline after N" notice that could fire before the
+            // node is even considered offline would be two notices for one
+            // event — so the floor is the sweep window, not a constant.
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = '1000';
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(
+                config.fleet.getNodeOfflineAfterMs(),
+            );
+        });
+
+        it('tracks a RAISED offline window, so the pair can never invert', () => {
+            process.env.FLEET_NODE_OFFLINE_AFTER_MS = String(45 * 60_000);
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = String(10 * 60_000);
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(45 * 60_000);
+        });
+    });
+
     describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {
         describe('getApiUrl', () => {
             it('returns undefined when unset', () => {
