@@ -2,6 +2,7 @@ import type { Logger } from './logger';
 import type { SecretStore } from './secret-store';
 import {
 	clampResourceLimits,
+	clampWorkspaceGcPolicy,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
 	isFleetEnrollableNodeKind,
 	MAX_HEARTBEAT_INTERVAL_MS,
@@ -171,6 +172,12 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 	}
 	if (typeof candidate.name === 'string' && candidate.name) {
 		config.name = candidate.name;
+	}
+	// Present only once an operator set it: a config that never carried the
+	// key keeps round-tripping without it (the default policy applies), and
+	// an out-of-range stored value is clamped rather than refused.
+	if (candidate.workspaceGc && typeof candidate.workspaceGc === 'object') {
+		config.workspaceGc = clampWorkspaceGcPolicy(candidate.workspaceGc);
 	}
 	if (
 		candidate.unsafe &&

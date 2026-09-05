@@ -1,8 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { FleetJobView } from '@ever-works/contracts';
 import type { Scheduler } from './heartbeat';
-import { ADMIT, admitByResourceLimits, hasAdmissionCeilings, type ResourceSample } from './resource-limits';
-import { clampResourceLimits, DEFAULT_RESOURCE_LIMITS } from './types';
+import {
+	ADMIT,
+	admitByResourceLimits,
+	formatBytes,
+	hasAdmissionCeilings,
+	hasDiskFloor,
+	type ResourceSample
+} from './resource-limits';
+import {
+	clampResourceLimits,
+	DEFAULT_MIN_FREE_DISK_BYTES,
+	DEFAULT_RESOURCE_LIMITS,
+	effectiveMinFreeDiskBytes,
+	MAX_MIN_FREE_DISK_BYTES,
+	MIN_MIN_FREE_DISK_BYTES
+} from './types';
 import { WorkerLoop, type JobLeaseCapableClient } from './worker-loop';
 
 /**
@@ -371,6 +385,219 @@ describe('WorkerLoop pause/resume', () => {
 		loop.resume();
 		expect(client.leaseRequests.length).toBe(after);
 
+		await loop.stop();
+	});
+});
+
+/**
+ * Disk floor (self-build program note §6, OPS-12). `diskFreeBytes` was
+ * heart-beated, stored and rendered — and consulted by nothing. A node
+ * with 200 MB free kept leasing and failed deep inside git or pnpm.
+ */
+const GIB = 1024 ** 3;
+const MIB = 1024 ** 2;
+
+describe('clampResourceLimits — disk floor', () => {
+	it('leaves the key absent when the operator never set it, so the default floor applies', () => {
+		const limits = clampResourceLimits({ maxConcurrentJobs: 2 });
+		expect('minFreeDiskBytes' in limits).toBe(false);
+		expect(effectiveMinFreeDiskBytes(limits)).toBe(DEFAULT_MIN_FREE_DISK_BYTES);
+		expect(hasDiskFloor(limits)).toBe(true);
+		// The three-key default shape is unchanged — desktop-node and the
+		// capability-selection spec assert on it exhaustively.
+		expect(clampResourceLimits(undefined)).toEqual(DEFAULT_RESOURCE_LIMITS);
+	});
+
+	it('keeps an explicit null — the operator switched the floor off', () => {
+		const limits = clampResourceLimits({ minFreeDiskBytes: null });
+		expect(limits.minFreeDiskBytes).toBeNull();
+		expect(effectiveMinFreeDiskBytes(limits)).toBeNull();
+		expect(hasDiskFloor(limits)).toBe(false);
+	});
+
+	it('clamps a number into the supported range', () => {
+		expect(clampResourceLimits({ minFreeDiskBytes: 1 }).minFreeDiskBytes).toBe(MIN_MIN_FREE_DISK_BYTES);
+		expect(clampResourceLimits({ minFreeDiskBytes: 2 ** 50 }).minFreeDiskBytes).toBe(MAX_MIN_FREE_DISK_BYTES);
+		expect(clampResourceLimits({ minFreeDiskBytes: 4 * GIB }).minFreeDiskBytes).toBe(4 * GIB);
+	});
+
+	it('drops nonsense so the DEFAULT floor applies — never "off"', () => {
+		const limits = clampResourceLimits({ minFreeDiskBytes: Number.NaN });
+		expect('minFreeDiskBytes' in limits).toBe(false);
+		expect(effectiveMinFreeDiskBytes(limits)).toBe(DEFAULT_MIN_FREE_DISK_BYTES);
+	});
+});
+
+describe('admitByResourceLimits — disk floor', () => {
+	const noCeilings = { maxCpuPercent: null, maxMemoryMb: null };
+
+	it('refuses below the floor, naming the reading and the floor', () => {
+		const decision = admitByResourceLimits(
+			{ ...noCeilings, minFreeDiskBytes: 2 * GIB },
+			sample({ diskFreeBytes: 38 * MIB })
+		);
+		expect(decision.admit).toBe(false);
+		expect(decision.dimension).toBe('disk');
+		expect(decision.reason).toContain('38 MB');
+		expect(decision.reason).toContain('2.0 GiB');
+	});
+
+	it('admits at or above the floor', () => {
+		expect(
+			admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: 2 * GIB }, sample({ diskFreeBytes: 2 * GIB }))
+		).toEqual(ADMIT);
+		expect(
+			admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: 2 * GIB }, sample({ diskFreeBytes: 500 * GIB }))
+		).toEqual(ADMIT);
+	});
+
+	it('applies the default floor when the key is absent', () => {
+		const decision = admitByResourceLimits(noCeilings, sample({ diskFreeBytes: 100 * MIB }));
+		expect(decision.admit).toBe(false);
+		expect(decision.reason).toContain(formatBytes(DEFAULT_MIN_FREE_DISK_BYTES));
+	});
+
+	it('admits when the reading is missing, null or NaN — an unreadable volume must not idle the node', () => {
+		expect(admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: 2 * GIB }, sample())).toEqual(ADMIT);
+		expect(
+			admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: 2 * GIB }, sample({ diskFreeBytes: null }))
+		).toEqual(ADMIT);
+		expect(
+			admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: 2 * GIB }, sample({ diskFreeBytes: Number.NaN }))
+		).toEqual(ADMIT);
+	});
+
+	it('never blocks when the floor is switched off', () => {
+		expect(admitByResourceLimits({ ...noCeilings, minFreeDiskBytes: null }, sample({ diskFreeBytes: 0 }))).toEqual(
+			ADMIT
+		);
+	});
+
+	it('reports the first dimension hit, CPU and memory before disk', () => {
+		const decision = admitByResourceLimits(
+			{ maxCpuPercent: 50, maxMemoryMb: null, minFreeDiskBytes: 2 * GIB },
+			sample({ cpuPercent: 90, diskFreeBytes: 0 })
+		);
+		expect(decision.dimension).toBe('cpu');
+	});
+
+	it('formats bytes the way an operator reads them', () => {
+		expect(formatBytes(38 * MIB)).toBe('38 MB');
+		expect(formatBytes(2 * GIB)).toBe('2.0 GiB');
+		expect(formatBytes(1_536)).toBe('2 KB');
+		expect(formatBytes(-1)).toBe('unknown');
+	});
+});
+
+describe('WorkerLoop honours the disk floor', () => {
+	it('refuses to lease below the floor, says why, and resumes once space is freed', async () => {
+		const client = recordingClient([[], []]);
+		const scheduler = controllableScheduler();
+		let free = 100 * MIB;
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			limits: clampResourceLimits({ maxConcurrentJobs: 2 }),
+			diskProbe: { freeBytes: () => free },
+			workspacePath: process.cwd()
+		});
+
+		await loop.start();
+
+		expect(client.leaseRequests).toHaveLength(0);
+		expect(loop.getState().state).toBe('throttled');
+		expect(loop.getState().throttleReason).toContain('floor');
+
+		free = 10 * GIB;
+		scheduler.runNext();
+		await vi.waitFor(() => expect(client.leaseRequests.length).toBe(1));
+		expect(loop.getState().throttleReason).toBeNull();
+
+		await loop.stop();
+	});
+
+	it('takes the reading on the workspace root, not on the service cwd', async () => {
+		const client = recordingClient([[]]);
+		const scheduler = controllableScheduler();
+		const probed: string[] = [];
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			limits: clampResourceLimits({ maxConcurrentJobs: 1 }),
+			diskProbe: {
+				freeBytes: (path) => {
+					probed.push(path);
+					return 10 * GIB;
+				}
+			},
+			workspacePath: process.cwd()
+		});
+
+		await loop.start();
+		expect(probed).toEqual([process.cwd()]);
+		expect(client.leaseRequests).toHaveLength(1);
+		await loop.stop();
+	});
+
+	it('leases anyway when the disk probe throws or answers null', async () => {
+		for (const freeBytes of [
+			() => {
+				throw new Error('statfs unsupported');
+			},
+			() => null
+		]) {
+			const client = recordingClient([[]]);
+			const scheduler = controllableScheduler();
+			const loop = new WorkerLoop({
+				client,
+				scheduler,
+				limits: clampResourceLimits({ maxConcurrentJobs: 1 }),
+				diskProbe: { freeBytes },
+				workspacePath: process.cwd()
+			});
+
+			await loop.start();
+			expect(client.leaseRequests).toHaveLength(1);
+			expect(loop.getState().state).not.toBe('throttled');
+			await loop.stop();
+		}
+	});
+
+	it('takes no reading at all when the floor is switched off', async () => {
+		const client = recordingClient([[]]);
+		const scheduler = controllableScheduler();
+		const probe = { freeBytes: vi.fn(() => 0) };
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			limits: clampResourceLimits({ maxConcurrentJobs: 1, minFreeDiskBytes: null }),
+			diskProbe: probe,
+			workspacePath: process.cwd()
+		});
+
+		await loop.start();
+		expect(probe.freeBytes).not.toHaveBeenCalled();
+		expect(client.leaseRequests).toHaveLength(1);
+		await loop.stop();
+	});
+
+	it('still skips the host sampler when no CPU/memory ceiling is set, even while sampling the disk', async () => {
+		const client = recordingClient([[]]);
+		const scheduler = controllableScheduler();
+		const hostProbe = { sample: vi.fn(() => sample()) };
+		const diskProbe = { freeBytes: vi.fn(() => 10 * GIB) };
+		const loop = new WorkerLoop({
+			client,
+			scheduler,
+			limits: clampResourceLimits({ maxConcurrentJobs: 2 }),
+			resourceProbe: hostProbe,
+			diskProbe,
+			workspacePath: process.cwd()
+		});
+
+		await loop.start();
+		expect(hostProbe.sample).not.toHaveBeenCalled();
+		expect(diskProbe.freeBytes).toHaveBeenCalledOnce();
 		await loop.stop();
 	});
 });
