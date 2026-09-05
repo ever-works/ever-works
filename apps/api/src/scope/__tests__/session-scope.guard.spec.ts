@@ -1,7 +1,7 @@
 jest.mock('@ever-works/agent/database', () => ({}));
 jest.mock('@ever-works/agent/entities', () => ({}));
 
-import { ExecutionContext, NotFoundException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ScopeContextService } from '../scope-context.service';
 import { SessionScopeGuard } from '../session-scope.guard';
 
@@ -13,6 +13,7 @@ import { SessionScopeGuard } from '../session-scope.guard';
 function makeContext(request: {
     user?: unknown;
     headers?: Record<string, string | string[] | undefined>;
+    fleetRunCredential?: unknown;
 }): ExecutionContext {
     return {
         getType: () => 'http',
@@ -361,5 +362,131 @@ describe('SessionScopeGuard + ScopeOwnershipGuard pipeline (EW-664 regression)',
                 return ownershipGuard.canActivate(ctx);
             }),
         ).rejects.toThrow();
+    });
+});
+
+/**
+ * Self-build slice Z (EW-796) — a fleet-run credential pins the scope.
+ *
+ * The token carries the Organization the PLATFORM chose when it minted
+ * it, taken from the job row. That is authorization, not a preference,
+ * so it has to beat anything the caller can influence:
+ *
+ *   - a resolved slug pointing somewhere else is a 403, never a silent
+ *     widening or a silent narrowing;
+ *   - no slug at all does NOT fall back to personal scope — it seeds the
+ *     bound Organization, so the MCP server does not have to send
+ *     `x-scope-slug` at all for the tools to act in the right place;
+ *   - a token bound to personal scope refuses an Organization slug.
+ *
+ * The Organization is still authorized the ordinary way
+ * (`requireActiveOrganization`), so a token whose Organization has been
+ * deleted or moved tenants gets the same opaque 404 as anyone else.
+ */
+describe('SessionScopeGuard — fleet-run credential (slice Z)', () => {
+    let scopeContext: ScopeContextService;
+    let findById: jest.Mock;
+    let guard: SessionScopeGuard;
+
+    const runCredential = {
+        jobId: 'job-1',
+        nodeId: 'node-1',
+        runId: 'run-1',
+        organizationId: 'o-mine',
+    };
+
+    beforeEach(() => {
+        scopeContext = new ScopeContextService();
+        findById = jest
+            .fn()
+            .mockResolvedValue({ tenantId: 't-mine', lastScopeOrganizationId: null });
+        guard = makeGuard(scopeContext, { findById } as never);
+    });
+
+    it('seeds the bound Organization when no slug resolved a scope', async () => {
+        const ctx = makeContext({ user: { userId: 'u-1' }, fleetRunCredential: runCredential });
+
+        await scopeContext.runWith({ tenantId: null, organizationId: null }, async () => {
+            await expect(guard.canActivate(ctx)).resolves.toBe(true);
+            expect(scopeContext.getScope()).toEqual({
+                tenantId: 't-mine',
+                organizationId: 'o-mine',
+            });
+        });
+    });
+
+    it('accepts a slug that resolved the SAME Organization', async () => {
+        const ctx = makeContext({ user: { userId: 'u-1' }, fleetRunCredential: runCredential });
+
+        await scopeContext.runWith({ tenantId: 't-mine', organizationId: 'o-mine' }, async () => {
+            await expect(guard.canActivate(ctx)).resolves.toBe(true);
+            expect(scopeContext.getScope()).toEqual({
+                tenantId: 't-mine',
+                organizationId: 'o-mine',
+            });
+        });
+    });
+
+    it('REFUSES a slug that resolved a different Organization', async () => {
+        const ctx = makeContext({ user: { userId: 'u-1' }, fleetRunCredential: runCredential });
+
+        await scopeContext.runWith({ tenantId: 't-other', organizationId: 'o-other' }, async () => {
+            await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+        });
+    });
+
+    it('refuses an Organization slug for a token bound to PERSONAL scope', async () => {
+        const ctx = makeContext({
+            user: { userId: 'u-1' },
+            fleetRunCredential: { ...runCredential, organizationId: null },
+        });
+
+        await scopeContext.runWith({ tenantId: 't-mine', organizationId: 'o-mine' }, async () => {
+            await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+        });
+    });
+
+    it('a personal-scope token with no slug behaves exactly like an unprefixed request', async () => {
+        const ctx = makeContext({
+            user: { userId: 'u-1' },
+            fleetRunCredential: { ...runCredential, organizationId: null },
+        });
+
+        await scopeContext.runWith({ tenantId: null, organizationId: null }, async () => {
+            await expect(guard.canActivate(ctx)).resolves.toBe(true);
+            expect(scopeContext.getScope()).toEqual({ tenantId: 't-mine', organizationId: null });
+        });
+    });
+
+    it('refuses an Organization-pinned token whose owner has no Tenant', async () => {
+        findById.mockResolvedValue({ tenantId: null, lastScopeOrganizationId: null });
+        const ctx = makeContext({ user: { userId: 'u-1' }, fleetRunCredential: runCredential });
+
+        await scopeContext.runWith({ tenantId: null, organizationId: null }, async () => {
+            await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+        });
+    });
+
+    it('still authorizes the bound Organization the ordinary way', async () => {
+        // A token whose Organization belongs to somebody else's Tenant is
+        // the same opaque 404 every other caller gets — the token pins the
+        // scope, it does not exempt it from authorization.
+        const ctx = makeContext({
+            user: { userId: 'u-1' },
+            fleetRunCredential: { ...runCredential, organizationId: 'o-other' },
+        });
+
+        await scopeContext.runWith({ tenantId: null, organizationId: null }, async () => {
+            await expect(guard.canActivate(ctx)).rejects.toThrow(NotFoundException);
+        });
+    });
+
+    it('changes nothing for a request with no run credential', async () => {
+        const ctx = makeContext({ user: { userId: 'u-1' } });
+
+        await scopeContext.runWith({ tenantId: null, organizationId: null }, async () => {
+            await expect(guard.canActivate(ctx)).resolves.toBe(true);
+            expect(scopeContext.getScope()).toEqual({ tenantId: 't-mine', organizationId: null });
+        });
     });
 });

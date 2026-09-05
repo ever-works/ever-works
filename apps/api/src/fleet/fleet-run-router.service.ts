@@ -388,6 +388,14 @@ export class FleetRunRouterService {
             jobPayload.workspace = plan.workspace;
             jobPayload.acceptanceChecks = plan.acceptanceChecks;
             jobPayload.git = plan.git;
+            // Self-build slice Z (EW-796) — only when the planner actually
+            // enabled the bridge. The node reads THIS field to decide
+            // whether to mint a credential, and `FleetRunCredentialService`
+            // re-reads it at mint time, so a job whose plan never asked for
+            // tools can never be talked into having them.
+            if (plan.mcp) {
+                jobPayload.mcp = plan.mcp;
+            }
         }
         // A model-CLI job may only be leased by a node that advertises the
         // CLI it needs: the tag is backed by a resolved executable on the

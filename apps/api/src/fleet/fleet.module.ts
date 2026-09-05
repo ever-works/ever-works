@@ -12,6 +12,7 @@ import { FleetAgentAffinityController } from './fleet-agent-affinity.controller'
 import { FleetKillSwitchController } from './fleet-kill-switch.controller';
 import { FleetPanicController } from './fleet-panic.controller';
 import { FleetPanicService } from './fleet-panic.service';
+import { FleetMcpCredentialListener } from './fleet-mcp-credential.listener';
 import { FleetRunRouterService } from './fleet-run-router.service';
 import { FleetRunSecretsService } from './fleet-run-secrets.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
@@ -125,6 +126,11 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
         // agent fleet graph would widen that module's dependency surface
         // for a route only this app exposes.
         FleetRunSecretsService,
+        // Self-build slice Z (EW-796) — revokes a job's run-scoped MCP
+        // credentials on EVERY terminal path, by subscribing to the one
+        // completion event they all emit. Additive: no edit to
+        // `FleetJobService` was needed to make revocation guaranteed.
+        FleetMcpCredentialListener,
         // Guards are ordinary providers so Nest can inject them.
         FleetEnabledGuard,
         FleetNodeAuthGuard,

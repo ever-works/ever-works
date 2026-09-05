@@ -46,6 +46,37 @@ This means tool descriptions, parameter names, types, and validation rules are a
 
 Every whitelisted route is unprefixed, so without `EVER_WORKS_SCOPE_SLUG` each call runs in the caller's personal scope: lists show personal Tasks / Goals / Agents only, and the Organization-only tools (Fleet node affinity) answer `400`. Set the variable to an Organization slug to run under that Organization; the API resolves and authorises the slug exactly as it does for the web client, so it selects a scope the caller already has and cannot widen one. In HTTP mode the value applies to every caller of the server.
 
+### From a fleet run
+
+A fleet run on one of your own machines can reach this server too — that is the **MCP bridge**
+(see [Fleet](./fleet.md#platform-tools-from-a-fleet-run-mcp-bridge)). The model never holds a
+credential: the node mints a short-lived, run-scoped token from the platform, keeps it in memory,
+and proxies the model's calls through `127.0.0.1`, adding the token as `x-ever-works-jwt` on the way
+out — the same per-caller channel a per-user JWT uses.
+
+Two deployment facts follow, and neither is optional:
+
+- **Auth mode must accept a per-caller credential.** Run `EVER_WORKS_MCP_AUTH_MODE=per-user-jwt`
+  (or `hybrid` in development). `shared-key` and `shared-key-jwt` cannot be satisfied by a node,
+  which holds no shared key.
+- **`EVER_WORKS_SCOPE_SLUG` must be unset, or equal to the Organization the runs belong to.** A run
+  token carries its own Organization, decided by the platform when it was minted; the token's scope
+  wins, and a mismatched `x-scope-slug` is refused with a `403` for every tool call.
+
+A run token is narrower than a personal API key on every axis: it expires with the fleet job's
+lease, it dies when the job settles or moves to another machine, it is pinned to one Organization,
+and it reaches only the tool surface below — never `/api/auth/**` (so it cannot mint another
+credential), never the fleet lease protocol (so a run cannot report a verdict on itself), and never
+the fleet mutations `drain_fleet_node` / `set_agent_node_affinity` / `clear_agent_node_affinity`
+(so a run cannot drain the machine it is running on). Fleet is read-only for a run.
+
+Routes that share a prefix with a tool family but are not tools are carved out explicitly: the Agent
+run **terminal** (`/api/agents/{id}/runs/{runId}/terminal/**`, whose `attach-token` mints a signed
+WebSocket credential and whose `start` opens the owner's worker shell), the per-Agent
+**`mcp-servers`**, **`repos`** and **`collaborators`** bindings, and **`/api/plugins/composio/**`**.
+`apps/mcp/test/whitelist-fleet-run-surface.spec.ts` walks the real whitelist against the allowlist in
+both directions, so neither list can drift out from under the other.
+
 ### Build
 
 ```bash
@@ -324,6 +355,7 @@ The tool's description, parameters, and validation are derived automatically fro
 - **Whitelist filtering** — only explicitly allowed endpoints are exposed as tools
 - **Human gates stay human** — the routes that answer an approval, resolve an escalation, approve a definition of done, force a Task past its approvers or switch its approver policy off (`requireAllApprovers`) are not tools, so an Agent bound to this server cannot approve its own work; never bind the server to an Agent with the owner's credentials
 - **Scope selection, not widening** — `EVER_WORKS_SCOPE_SLUG` is forwarded as `x-scope-slug` and the API authorises the caller against it the same way it does for the web client
+- **Fleet run tokens are the narrowest credential here** — a run on one of your machines authenticates with an `ew_run_…` token bound to one job, one run, one Organization and one machine, expiring with that job's lease and revoked when it settles. It reaches the tool surface only: not `/api/auth/**`, not the fleet lease protocol, and not the fleet mutations. See [From a fleet run](#from-a-fleet-run)
 - **Request timeout** — API calls time out after 2 minutes
 
 ## Use it from any Agent Plugins client

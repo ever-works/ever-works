@@ -7,6 +7,7 @@ import type {
 import type {
     FleetAgentModelExecution,
     FleetAgentTaskGitPolicy,
+    FleetAgentTaskMcpBridge,
     FleetExecutionScopeQuery,
     FleetRunRoutingDecision,
     FleetTaskWorkspaceSpec,
@@ -30,6 +31,14 @@ export interface FleetAgentTaskPlan {
     workspace: FleetTaskWorkspaceSpec;
     acceptanceChecks: TaskAcceptanceCheck[];
     git: FleetAgentTaskGitPolicy;
+    /**
+     * Self-build slice Z (EW-796) — the platform-MCP bridge for this run,
+     * present ONLY when the operator switch, a configured server URL and
+     * the Agent's `canCallExternalTools` permission all say yes. Absent
+     * (the overwhelmingly common case) the job payload carries no `mcp`
+     * block at all and the node runs exactly as it always has.
+     */
+    mcp?: FleetAgentTaskMcpBridge;
 }
 
 /**
