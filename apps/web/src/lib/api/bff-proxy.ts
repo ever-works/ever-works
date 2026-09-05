@@ -81,11 +81,20 @@ export interface BffProxyOptions {
     readonly reason?: string;
     /**
      * Response for a request with no auth cookie. Defaults to
-     * `401 { error: 'Unauthorized' }`. Some routes deliberately soften this (the
-     * org-templates catalogue answers `[]` so its modal skips a step rather than
-     * erroring), which is why it is overridable.
+     * `401 { error: 'Unauthorized' }`.
+     *
+     * Routes differ here and the difference is on the wire, so it is
+     * overridable: the org-templates catalogue answers `[]`/200 so its modal
+     * skips a step rather than erroring, and the Memory routes answer a
+     * PLAIN-TEXT `Unauthorized` rather than JSON.
+     *
+     * Typed as `Response`, not `NextResponse`, so a plain `new Response(...)`
+     * can be preserved verbatim. Narrowing it would force those routes to
+     * change their wire format merely to adopt the wrapper — a silent
+     * behaviour change smuggled in by a refactor, which is exactly what this
+     * wrapper exists to prevent.
      */
-    readonly onUnauthorized?: () => NextResponse;
+    readonly onUnauthorized?: () => Response;
 }
 
 const unauthorized = () => NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -756,10 +756,13 @@ test.describe('Org RBAC — end-to-end org-admin journey', () => {
 
         // 1. Create a team and staff it: an agent LEAD + the human owner as a MEMBER.
         const team = await createTeam(request, ctx, { name: `Ops ${stamp()}` });
-        // Created IN org A. An agent created with no workspace selector is
-        // tenant-wide (organizationId NULL), and the org-chart deliberately
-        // projects tenant-wide agents into every org of the tenant (spec §5) —
-        // which is exactly what the disjointness check below must not see.
+        // Created IN org A's scope (X-Scope-Slug), exactly like the org-A Work in
+        // step 2 — so the row is stamped `organizationId = ctx.orgId`. A bare-Bearer
+        // create is the PERSONAL contract and lands `organizationId: null`, and the
+        // org-chart deliberately also lists the tenant's org-LESS agents, so a null
+        // stamp would surface this agent in EVERY org of the tenant (OrgChartService
+        // `tenantAgents`). Note `scope: 'tenant'` is the agent's TARGET (no mission/
+        // idea/work FK) — orthogonal to the Organization that owns the row.
         const agent = await createAgentViaAPI(
             request,
             ctx.token,
