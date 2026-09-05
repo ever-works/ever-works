@@ -12,6 +12,7 @@ import {
 } from './mcp-server-config.service';
 import { createHash } from 'node:crypto';
 import { isSafeWebhookUrl } from '../utils/ssrf-guard';
+import { stdioConnectionUrl } from '../mcp/mcp-stdio-launcher';
 
 /**
  * Bridges package-declared MCP servers into the EXISTING MCP connection
@@ -45,7 +46,7 @@ import { isSafeWebhookUrl } from '../utils/ssrf-guard';
 /** `mcp_server_connections.name` is varchar(80) and the pattern caps at 80. */
 const MAX_CONNECTION_NAME = 80;
 
-/** Only remote transports can become a connection; the row is URL-shaped. */
+/** Remote transports carry a real URL; stdio carries an opaque pointer. */
 const REMOTE_TRANSPORTS = new Set(['streamable-http', 'sse']);
 
 export interface ReconcileResult {
@@ -202,13 +203,10 @@ export class PackageMcpReconcilerService {
         | { kind: 'created' | 'updated' | 'unchanged'; name: string }
         | { kind: 'skipped'; reason: string; code: SkippedMcpReason; enableable: boolean }
     > {
-        if (!REMOTE_TRANSPORTS.has(server.transport)) {
+        if (server.transport !== 'stdio' && !REMOTE_TRANSPORTS.has(server.transport)) {
             return {
                 kind: 'skipped',
-                reason:
-                    `Transport "${server.transport}" cannot become a connection — a ` +
-                    `connection row is URL-shaped. A stdio server is launched as a ` +
-                    `subprocess and never becomes a connection at all.`,
+                reason: `Transport "${server.transport}" is not one this platform can consume.`,
                 code: 'unsupported-transport',
                 enableable: false,
             };
@@ -238,7 +236,18 @@ export class PackageMcpReconcilerService {
             };
         }
 
-        const url = (server.config as { url?: string }).url;
+        // A stdio server has no URL, so the row carries an opaque
+        // `stdio:<package>/<server>` pointer instead (AP-14). Nothing dials
+        // it — `McpToolSource` reads it back to know WHICH package server to
+        // launch. What guards a stdio row is not the URL checks below but
+        // that only this reconciler can create one (the manual-create DTO
+        // refuses the transport), that it is created disabled and unbound
+        // like every package server, and that the launcher re-resolves the
+        // declaration from disk under `AGENT_PLUGINS_STDIO` before spawning.
+        const isStdio = server.transport === 'stdio';
+        const url = isStdio
+            ? stdioConnectionUrl(server.provenance.packageName, server.name)
+            : (server.config as { url?: string }).url;
         if (!url) {
             return {
                 kind: 'skipped',
@@ -257,7 +266,7 @@ export class PackageMcpReconcilerService {
         // written into a connection row that looks ordinary; the row is
         // created disabled, but an operator enabling something plausible
         // would then point the client at a private address.
-        if (!isSafeWebhookUrl(url)) {
+        if (!isStdio && !isSafeWebhookUrl(url)) {
             return {
                 kind: 'skipped',
                 reason:
@@ -305,11 +314,30 @@ export class PackageMcpReconcilerService {
             return { kind: 'unchanged', name };
         }
 
-        // The package changed where its server lives. Update the address, but
-        // leave `enabled` and any bindings exactly as the operator set them —
-        // a new URL is not a reason to re-authorise, nor to revoke.
+        // The package changed where its server lives. A new URL is not a
+        // reason to re-authorise, nor to revoke — but a new TRANSPORT is.
+        //
+        // What an operator authorised when they enabled a `streamable-http`
+        // row is an agent reaching a remote API. If a package update turns
+        // that same row into `stdio`, carrying the enable forward would
+        // convert that decision into permission to execute local code, with
+        // no human action anywhere in the sequence — the package author's
+        // release is the only input. So a transport change forces the row
+        // back to disabled and the operator decides again. Bindings are left
+        // alone deliberately: they are inert while the row is disabled
+        // (`resolveEffectiveConnections` requires the connection enabled),
+        // and dropping them would lose configuration the operator may well
+        // want to keep once they have re-approved.
+        const transportChanged = existing.transport !== server.transport;
         existing.url = url;
         existing.transport = server.transport as McpServerConnection['transport'];
+        if (transportChanged && existing.enabled) {
+            existing.enabled = false;
+            this.logger.warn(
+                `Connection "${name}" changed transport to "${server.transport}" and was ` +
+                    `DISABLED pending re-authorisation.`,
+            );
+        }
         await this.connections.save(existing);
         return { kind: 'updated', name };
     }

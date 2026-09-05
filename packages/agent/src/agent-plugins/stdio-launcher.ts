@@ -49,7 +49,18 @@ export interface LaunchPlan {
     /** Absolute path to the executable, or a bare name to resolve through PATH. */
     readonly command: string;
     readonly args: readonly string[];
-    /** Complete environment. NOT merged with `process.env` by the caller. */
+    /**
+     * The environment this platform contributes: built from nothing, never
+     * merged with `process.env` here.
+     *
+     * Not the child's COMPLETE environment, which the earlier wording claimed.
+     * The SDK spreads its own `getDefaultEnvironment()` underneath whatever it
+     * is given, so a small allow-list (`HOME`/`PATH`/`SHELL`/`TERM`/`USER` on
+     * POSIX, `APPDATA`/`LOCALAPPDATA`/`TEMP`/`USERNAME`/… on Windows) reaches
+     * the child regardless. Every key set here wins over it, and no secret is
+     * in that list — but the guarantee is "nothing of ours leaks in", not
+     * "nothing at all does".
+     */
     readonly env: Readonly<Record<string, string>>;
     readonly cwd: string;
     /** True when `command` is a bare name the OS resolves through PATH. */

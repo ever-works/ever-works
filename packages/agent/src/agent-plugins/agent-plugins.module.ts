@@ -18,6 +18,8 @@ import { McpServerConfigService } from './mcp-server-config.service';
 import { PackageMcpReconcilerService } from './package-mcp-reconciler.service';
 import { AgentPluginPackageDataDirService } from './package-data-dir.service';
 import { AgentPluginStdioServerService } from './stdio-server.service';
+import { AgentPluginStdioLauncherService } from './stdio-launcher.service';
+import { MCP_STDIO_LAUNCHER } from '../mcp/mcp-stdio-launcher';
 import { AgentPluginExportService } from './export.service';
 import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
 
@@ -61,6 +63,7 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
         PackageMcpReconcilerService,
         AgentPluginPackageDataDirService,
         AgentPluginStdioServerService,
+        AgentPluginStdioLauncherService,
         AgentPluginExportService,
         // Provided locally rather than by importing `McpModule`, which would
         // pull ActivityLogModule and its transitive imports into what the
@@ -77,6 +80,15 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
             provide: AGENT_PLUGIN_SKILL_SOURCE,
             useExisting: AgentPluginPackageCatalogService,
         },
+        {
+            // AP-14. `McpToolSource` consumes this @Optional(), so a runtime
+            // that never imports this module keeps behaving exactly as it did
+            // — stdio connections simply contribute no tools. Only the TOKEN
+            // and the pointer helpers come from `mcp/`; no Nest module is
+            // imported, so this stays the leaf module its docstring promises.
+            provide: MCP_STDIO_LAUNCHER,
+            useExisting: AgentPluginStdioLauncherService,
+        },
     ],
     exports: [
         AgentPluginPackageCatalogService,
@@ -92,8 +104,10 @@ import { AGENT_PLUGIN_SKILL_SOURCE } from './skill-source.token';
         PackageMcpReconcilerService,
         AgentPluginPackageDataDirService,
         AgentPluginStdioServerService,
+        AgentPluginStdioLauncherService,
         AgentPluginExportService,
         AGENT_PLUGIN_SKILL_SOURCE,
+        MCP_STDIO_LAUNCHER,
     ],
 })
 export class AgentPluginsModule {}
