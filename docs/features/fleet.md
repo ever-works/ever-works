@@ -168,6 +168,24 @@ When the node reports, the platform reconciles the result the same way a cloud r
 
 Routing preferences (**Settings → Fleet → Execution routing**) decide what happens when no runner is free: wait for one (`local-wait`), fall back to the cloud with a notice (`local-fallback`), or always use the cloud. An Agent can be pinned to one specific node (`PUT /api/fleet/agents/:agentId/node-affinity`); a pinned Agent never runs elsewhere.
 
+### Suspend safety (lease generations)
+
+Desk PCs sleep. A node that is suspended mid-run stops heart-beating, its lease (300 s by default) lapses, and the platform re-offers the job — possibly to the same machine once it wakes and polls again — while the first model run (up to 1200 s by default) is still going and, on its own, would only learn it lost the claim on its next heartbeat. Left alone that produces two runs against the same Task branch, and either the loser's push is rejected after full model spend or it lands first and the winner's is.
+
+What the platform does:
+
+- Every successful lease, including a re-lease after a lapse, increments the job's `leaseGeneration` and returns it with the lease.
+- Every heartbeat and every completion report must carry that generation. A call whose generation is not the job's current one is refused with `409 { "reason": "stale-lease" }`, before anything is written and before any lifecycle event fires — a stale holder can never flip the status, land a result, or cause a pull request to be opened for its branch. The repository guards pin the generation next to the node id in the same conditional `UPDATE`, so the guarantee holds against the same node re-leasing its own lapsed job, which a node-id check alone cannot see.
+- The `409` is the one differentiated answer in the node work channel, and it is reachable only by the node that is the recorded holder of an active job; every other refusal stays the undifferentiated `401`.
+
+What the node does:
+
+- It watches for a resume. The worker's own timers record when they were armed on both the wall clock and a monotonic clock, and each lease poll records when it began; a timer that fires far later than it was armed for (30 s beyond schedule, or the wall clock advancing 30 s more than the monotonic one), or a poll whose span is that long, is a suspend/resume. On resume every in-flight job is re-checked at once: if its lease deadline passed while the machine slept, the job is aborted — the model process is killed, nothing is committed or pushed, the in-memory workspace serialisation releases as the abort propagates — and the failure is reported with the reason `lease-lapsed-while-suspended`; if the lease is still valid, one immediate heartbeat re-confirms it with the platform instead of trusting a local deadline that saw nothing.
+- It aborts immediately on `stale-lease`, whether the answer comes from a heartbeat, from the publish-time confirmation that precedes every push, or from the final report. No follow-up failure report is sent for that job: the platform has already moved on to the claim that superseded it.
+- It keeps the two claims apart when it is handed its own job back. Reclaim runs inline on the node's own lease poll, so the first poll after a resume can re-lease the very job the node slept through while the lapsed run is still killing its model process. The old run is treated as void (nothing is reported for it), the fresh claim starts only once it has stopped — never beside it in the same workspace — and nothing the old run does on its way out can abort or silence the new one.
+
+Compatibility: a node built before this release sends no generation and is refused on heartbeat and complete (`400` at the edge); rows that were leased when the platform was upgraded carry generation 0, which is never accepted, so their in-flight runs abort at the node's next lapse and the jobs are re-offered under generation 1. Upgrade the node apps together with the platform.
+
 ### Tasks that span several repositories
 
 A Task keeps one primary Work and branch. When the run agent has **repository attachments** (Agent →

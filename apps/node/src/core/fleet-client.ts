@@ -34,7 +34,13 @@ export type FleetErrorKind =
 	| 'rate-limited'
 	| 'server'
 	| 'network'
-	| 'malformed';
+	| 'malformed'
+	/**
+	 * 409 from a job heartbeat/complete: the platform holds a NEWER lease on
+	 * the job than the one this node is renewing or finalizing (suspend-safe
+	 * leases). The claim is void; the worker aborts the run at once.
+	 */
+	| 'stale-lease';
 
 export class FleetClientError extends Error {
 	readonly kind: FleetErrorKind;

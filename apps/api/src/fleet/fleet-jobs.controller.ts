@@ -34,6 +34,15 @@ import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
  * 401. That is deliberate — a differentiated error here would let an
  * attacker with a random uuid enumerate which nodes and jobs exist.
  *
+ * The ONE differentiated answer is `409 { reason: 'stale-lease' }`
+ * (suspend-safe leases, self-build finding R7), and it is reachable only
+ * by an authenticated node that IS the recorded holder of an active job
+ * but echoes a `leaseGeneration` that is no longer current — its claim
+ * lapsed while the machine slept and was re-issued. Nothing a foreign,
+ * unknown or superseded node sends can produce it, so it reveals nothing
+ * the 401 posture was protecting. The service throws it; nothing here
+ * catches it.
+ *
  *   POST /api/fleet/jobs/lease          atomic CAS claim, capability-filtered
  *   POST /api/fleet/jobs/:id/heartbeat  extend the claim (leased → running)
  *   POST /api/fleet/jobs/:id/complete   report success or failure
@@ -89,7 +98,7 @@ export class FleetJobsController {
     @Post(':id/heartbeat')
     @ApiOperation({
         summary:
-            'Extend the lease on a job this node holds (public, node-secret-authenticated). The first beat also acknowledges the claim, moving the job from leased to running.',
+            'Extend the lease on a job this node holds (public, node-secret-authenticated). The first beat also acknowledges the claim, moving the job from leased to running. Carries the leaseGeneration returned with the lease; a stale generation is refused with 409 stale-lease.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 600, ttl: 60_000 } })
@@ -97,7 +106,13 @@ export class FleetJobsController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: FleetJobHeartbeatDto,
     ): Promise<FleetJobHeartbeatResponse> {
-        const job = await this.service.heartbeatJob(body.nodeId, body.secret, id, body.leaseTtlSec);
+        const job = await this.service.heartbeatJob(
+            body.nodeId,
+            body.secret,
+            id,
+            body.leaseTtlSec,
+            body.leaseGeneration,
+        );
         if (!job) {
             throw new UnauthorizedException('Invalid node credential');
         }
@@ -108,7 +123,7 @@ export class FleetJobsController {
     @Post(':id/complete')
     @ApiOperation({
         summary:
-            'Report the terminal outcome of a job this node holds (public, node-secret-authenticated). A reported failure is recorded as failed and NOT auto-retried — only lapsed leases (no verdict at all) go back to the pool.',
+            'Report the terminal outcome of a job this node holds (public, node-secret-authenticated). A reported failure is recorded as failed and NOT auto-retried — only lapsed leases (no verdict at all) go back to the pool. Carries the leaseGeneration returned with the lease; a stale generation is refused with 409 stale-lease and writes nothing.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 240, ttl: 60_000 } })
@@ -123,6 +138,7 @@ export class FleetJobsController {
             success: body.success,
             result: body.result ?? null,
             error: body.error ?? null,
+            leaseGeneration: body.leaseGeneration,
         });
         if (!job) {
             throw new UnauthorizedException('Invalid node credential');

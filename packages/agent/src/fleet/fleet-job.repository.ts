@@ -35,6 +35,14 @@ export interface ClaimJobPatch {
      * stale.
      */
     queuedReason: null;
+    /**
+     * The generation being MINTED by this claim — always the value the
+     * service observed on the candidate plus one. `claim()` pins the
+     * observed value (`leaseGeneration - 1`) in its WHERE clause, so a
+     * read-then-claim that straddles another node's lease-and-lapse of
+     * the same row matches zero rows instead of minting a duplicate.
+     */
+    leaseGeneration: number;
 }
 
 /** Exact claim snapshot observed by an expiry scan. */
@@ -42,6 +50,8 @@ export interface ObservedFleetJobLease {
     status: FleetJobStatus;
     nodeId: string;
     leaseExpiresAt: Date;
+    /** Generation of the claim being reclaimed; a newer claim is never touched. */
+    leaseGeneration: number;
 }
 
 /**
@@ -126,41 +136,63 @@ export class FleetJobRepository {
      * instead of requeuing them, but this is the invariant itself rather
      * than one caller remembering it — any future path that queues a
      * flagged row is refused here.
+     *
+     * `leaseGeneration` is pinned to the value this claim advances FROM
+     * (suspend-safe leases): the service reads the candidate, computes
+     * `previous + 1`, and this CAS refuses to mint that value unless the
+     * row still carries `previous`. Without it, a candidate read before
+     * another node leased and lost the same row would stamp a generation
+     * the platform had already issued once.
      */
     async claim(id: string, patch: ClaimJobPatch): Promise<boolean> {
         const result = await this.repository.update(
-            { id, status: 'queued', cancelRequestedAt: IsNull() },
+            {
+                id,
+                status: 'queued',
+                cancelRequestedAt: IsNull(),
+                leaseGeneration: patch.leaseGeneration - 1,
+            },
             patch,
         );
         return (result.affected ?? 0) === 1;
     }
 
     /**
-     * Extend the lease of a job this node still holds. The WHERE clause
-     * pins both the node id and the active statuses, so a node cannot
-     * extend someone else's claim or resurrect a terminal job.
+     * Extend the lease of a job this node still holds UNDER THIS CLAIM.
+     * The WHERE clause pins the node id, the active statuses AND the
+     * lease generation: it identifies the claim, not merely the holder.
+     * A node cannot extend someone else's claim, resurrect a terminal
+     * job, or — the suspend case — renew a NEWER claim on the same job
+     * from an older run that never learned it lost the first one.
+     *
+     * `leaseGeneration` is required, positioned last so every earlier
+     * positional caller stays readable; there is no fail-open form.
      */
     async extendLease(
         id: string,
         nodeId: string,
         leaseExpiresAt: Date,
-        startedAt?: Date,
+        startedAt: Date | undefined,
+        leaseGeneration: number,
     ): Promise<boolean> {
         const patch: Partial<FleetJob> = { leaseExpiresAt, status: 'running' };
         if (startedAt) {
             patch.startedAt = startedAt;
         }
         const result = await this.repository.update(
-            { id, nodeId, status: In([...FLEET_JOB_ACTIVE_STATUSES]) },
+            { id, nodeId, status: In([...FLEET_JOB_ACTIVE_STATUSES]), leaseGeneration },
             patch,
         );
         return (result.affected ?? 0) === 1;
     }
 
     /**
-     * Terminal transition for a job this node still holds. Same pinned
-     * WHERE clause as `extendLease` — completing a job twice, or
-     * completing another node's job, matches zero rows.
+     * Terminal transition for a job this node still holds UNDER THIS
+     * CLAIM. Same pinned WHERE clause as `extendLease` — completing a job
+     * twice, completing another node's job, or completing a claim that
+     * has since been re-issued (even to this node) matches zero rows, so
+     * a stale holder can never write a status, result or error over the
+     * current holder's.
      */
     async complete(
         id: string,
@@ -171,9 +203,10 @@ export class FleetJobRepository {
             error?: string | null;
             completedAt: Date;
         },
+        leaseGeneration: number,
     ): Promise<boolean> {
         const updated = await this.repository.update(
-            { id, nodeId, status: In([...FLEET_JOB_ACTIVE_STATUSES]) },
+            { id, nodeId, status: In([...FLEET_JOB_ACTIVE_STATUSES]), leaseGeneration },
             { ...patch, leaseExpiresAt: null },
         );
         return (updated.affected ?? 0) === 1;
@@ -337,7 +370,10 @@ export class FleetJobRepository {
     /**
      * Return one lapsed claim to the pool. Pins the previous status so a
      * job that completed between the scan and the write is never
-     * resurrected.
+     * resurrected, and the observed generation so a claim re-issued
+     * between the scan and the write is never requeued underneath its
+     * new holder. The generation itself is left as it is: the NEXT claim
+     * advances it, which is what invalidates the lapsed run.
      */
     async reclaim(id: string, observed: ObservedFleetJobLease): Promise<boolean> {
         const result = await this.repository.update(
@@ -346,6 +382,7 @@ export class FleetJobRepository {
                 status: observed.status,
                 nodeId: observed.nodeId,
                 leaseExpiresAt: observed.leaseExpiresAt,
+                leaseGeneration: observed.leaseGeneration,
             },
             // Reclaim returns the row to the pool as an ORDINARY queued
             // job: the reason it originally waited (no free runner) is
@@ -364,7 +401,7 @@ export class FleetJobRepository {
         return (result.affected ?? 0) === 1;
     }
 
-    /** Fail a lapsed claim that has exhausted its attempt budget. */
+    /** Fail a lapsed claim that has exhausted its attempt budget (same pinned tuple as `reclaim`). */
     async failExhausted(
         id: string,
         observed: ObservedFleetJobLease,
@@ -377,6 +414,7 @@ export class FleetJobRepository {
                 status: observed.status,
                 nodeId: observed.nodeId,
                 leaseExpiresAt: observed.leaseExpiresAt,
+                leaseGeneration: observed.leaseGeneration,
             },
             { status: 'failed', leaseExpiresAt: null, error, completedAt },
         );
@@ -439,6 +477,11 @@ export class FleetJobRepository {
      * the node re-asking (`heartbeat` → 401 → abort) immediately before
      * any irreversible write, which is why `apps/node` confirms the claim
      * at the moment it publishes rather than trusting its own deadline.
+     *
+     * `leaseGeneration` is deliberately NOT advanced here: a drain is not
+     * a claim. The next `claim()` advances it, and that is the moment the
+     * drained node's in-flight run — should it ever report — is refused
+     * even if the same node is re-enabled and re-leases the job itself.
      */
     async releaseClaimsForNode(userId: string, nodeId: string): Promise<number> {
         const result = await this.repository.update(

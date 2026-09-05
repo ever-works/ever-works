@@ -66,7 +66,10 @@ const JOB_EXPORTS = [
 	'FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC',
 	'clampQueuedMaxAgeSec',
 	'FLEET_JOB_QUEUE_EXPIRED_REASON',
-	'isQueueExpiredError'
+	'isQueueExpiredError',
+	// Suspend-safe leases (self-build finding R7).
+	'FLEET_JOB_STALE_LEASE_REASON',
+	'FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON'
 ] as const;
 
 const NODE_EXPORTS = [
@@ -219,14 +222,14 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 112 runtime symbols', () => {
+	it('exposes exactly these 114 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		// 92 → 98 with fleet cost accounting (EW-777): two node bounds and
 		// four cost-accounting helpers, each pinned in its own spec.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(112);
+		expect(Object.keys(fleet)).toHaveLength(114);
 	});
 
 	it.each([

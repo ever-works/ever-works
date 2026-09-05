@@ -588,7 +588,12 @@ describe('FleetJobRepository — queue SLA writes', () => {
     });
 
     it('re-stamps queuedAt when reclaim and drain return a row to the pool', async () => {
-        const observed = { status: 'running' as const, nodeId: NODE_A, leaseExpiresAt: new Date() };
+        const observed = {
+            status: 'running' as const,
+            nodeId: NODE_A,
+            leaseExpiresAt: new Date(),
+            leaseGeneration: 1,
+        };
         await repository.reclaim('job-1', observed);
         expect(typeorm.update.mock.calls[0][1]).toMatchObject({
             status: 'queued',
