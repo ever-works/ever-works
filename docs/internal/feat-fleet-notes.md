@@ -131,6 +131,82 @@ becoming "offline" gets through, because that is news.
 Best-effort by contract — a notification outage cannot turn a successful
 fallback into a failed dispatch.
 
+### 5. Eligibility-aware routing + queue SLA (self-build slice S, EW-775)
+
+**The defect.** `decideFleetRouting` judged a FLEET-WIDE `{ total, online,
+free }` while `FleetJobService.enqueue` pinned an `agent-task` to ONE node (the
+Agent affinity) and stamped capability tags the lease scan filters on. An Agent
+pinned to a closed laptop with five idle siblings made `free > 0`, the decision
+was `fleet`, `local-fallback` never fired, and the row sat `queued` forever with
+`queuedReason` null and no notice. Nothing bounded a queued row's age either —
+reclaim only scans ACTIVE statuses.
+
+**Routing over the eligible set.** `FleetRunRouterService.routeAgentTask` now
+asks, BEFORE the job exists, the same two questions the enqueue path asks:
+
+- the affinity, through `FleetJobService.resolveAgentTaskTarget` (the same
+  method enqueue uses, so the two cannot disagree; a lookup that throws is
+  judged "unpinned" and logged);
+- the required tags, through the planner's new settings-only `requirements()`
+  (`agentTaskRequiredCapabilities(provider)` in
+  `fleet-agent-task-capabilities.ts` — ONE definition shared with
+  `enqueueAgentTask`, so the row can never demand a tag the router did not count
+  against). The plan itself is still built AFTER the decision.
+
+`FleetRunnerStatusService.availability(userId, { targetNodeId,
+requiredCapabilities })` counts only nodes the lease scan would accept and adds
+`fleetTotal` + `pinnedNodeId`. Without a filter the result is the legacy
+three-field shape. `decideFleetRouting` gains two reasons —
+`no-eligible-runners` (fleet non-empty, eligible set empty: pinned node
+unenrolled, or no node advertises the tags) and `pinned-runner-offline` — and
+echoes `fleetRunnerCount` / `pinnedNodeId` on a fallback decision only when the
+snapshot carried them. `FLEET_FALLBACK_REASONS` is the canonical list.
+
+**Precise `runnerCount`** (follow-up 4, closed): the notice's `runnerCount` is
+now the ELIGIBLE count, with `fleetRunnerCount` and `pinnedNodeId` alongside it
+in `metadata`; the copy explains both new reasons. Dedup key unchanged.
+
+**Queue SLA.** New `fleet_jobs.queuedAt` (when the row last ENTERED `queued`:
+enqueue, reclaim, drain release; NOT reset by promotion) and
+`FleetJobService.expireQueued(userId?)`: per kind, rows older than
+`config.fleetNode.getQueuedMaxAgeSeconds(kind)` are failed through a CAS pinned
+to `queued` + the observed `queuedAt` + not-cancelled (a claim / reclaim / cancel
+that lands first wins, no event), with `error` =
+`queued-max-age-exceeded: …` (`FLEET_JOB_QUEUE_EXPIRED_REASON`,
+`isQueueExpiredError`) and ONE `fleet.job.completed` (source `queue-expired`).
+The reconciler marks the run failed with that reason and files exactly one Inbox
+notice titled **Fleet run never started: <task>** (body: how long it waited, the
+pin, the tags, the three fixes). Rows with `queuedAt IS NULL` (written before the
+column existed) are never touched. Runs inline on every lease poll (owner-scoped,
+best-effort) and on the `fleet-job-lease-sweeper` cron (global — the only path
+that reaches an owner whose every runner is offline).
+
+| Env                                                  | Default                                              |
+| ---------------------------------------------------- | ---------------------------------------------------- |
+| `FLEET_NODE_QUEUE_MAX_AGE_SECONDS`                   | per kind: `agent-task` 86400 (24h), checks 7200 (2h) |
+| `FLEET_NODE_QUEUE_MAX_AGE_SECONDS_AGENT_TASK`        | overrides the above for that kind                    |
+| `FLEET_NODE_QUEUE_MAX_AGE_SECONDS_ACCEPTANCE_CHECKS` | idem                                                 |
+| `FLEET_NODE_QUEUE_MAX_AGE_SECONDS_BROWSER_CHECK`     | idem                                                 |
+
+Clamped to `[60s, 7d]` by `clampQueuedMaxAgeSec`; unset / nonsense is the kind
+default. **Deliberately not disableable** — this changes the documented
+`local-wait` guarantee from "waits forever" to "waits up to the bound, then the
+run FAILS (never falls back)". A tenant that wants longer raises the variable up
+to the 7-day ceiling. The AgentRun sweeper's queued-too-long ESCALATION (60 min)
+still fires first; the fleet SLA files the terminal NOTICE later — two Inbox
+artefacts over one stuck run, by design.
+
+**Promotion on heartbeat** (follow-up 3, closed): after a beat that leaves the
+node `online`, `FleetController.heartbeat` calls
+`FleetJobService.promoteWaitingForNode(nodeId)`, which re-reads the node row and
+clears `waiting-for-runner` on the owner's queued rows this node could lease
+(unbound or pinned to it, every tag advertised) — only when the node holds no
+claim (a busy runner cannot take it, so the token stays true). Never throws,
+never slows a rejected beat, leaves `queuedAt` alone.
+
+Non-`agent-task` kinds have no run correlation and no notice producer; a queue
+expiry on them settles the row (`error`, drawer failure entry) and nothing else.
+
 ---
 
 ## Data model
@@ -139,6 +215,8 @@ fallback into a failed dispatch.
 fleet_nodes                 + cliVersion varchar(64) NULL
                             + diskFreeBytes bigint NULL
 fleet_jobs                  + queuedReason varchar(64) NULL
+                            + queuedAt timestamp NULL        (slice S; idx_fleet_jobs_queued_at (status, queuedAt);
+                                                              backfilled from createdAt for rows queued at upgrade)
 
 fleet_execution_preferences   id uuid pk
                               userId uuid            → FK users ON DELETE CASCADE
@@ -162,7 +240,8 @@ behind by a deleted Work simply stops matching.
 
 Migration: `apps/api/src/migrations/1786920000000-FleetRunnerTelemetryAndRouting.ts`
 — forward-only, per-step guards, portable DDL (`Table`/`TableIndex`/
-`TableForeignKey`), full `down()`.
+`TableForeignKey`), full `down()`. Slice S adds
+`1788200000000-AddFleetJobQueuedAt.ts` (same shape, spec on better-sqlite3).
 
 ---
 
@@ -192,20 +271,26 @@ new optional self-description fields.
 
 ## Tests
 
-| Command                                                                                    | Covers                                                                               |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| `cd packages/contracts && npx vitest run src/__tests__/fleet-execution-preference.spec.ts` | 16 — narrowest-wins resolution, the full `decideFleetRouting` matrix, pill summary   |
-| `cd packages/agent && npx jest --testPathPattern='fleet-node-telemetry'`                   | 14 — heartbeat backward-compat (old payload), refuse-not-clamp, bigint normalization |
-| `cd packages/agent && npx jest --testPathPattern='fleet-execution-preference'`             | 14 — scope/id validation, owner scoping, degradation                                 |
-| `cd packages/agent && npx jest --testPathPattern='fleet-runner-fallback'`                  | 8 — notification producer, event key, dedup, sanitization                            |
-| `cd packages/agent && npx jest --testPathPattern='fleet'`                                  | 61 — plus the pre-existing suites and the module pin                                 |
-| `cd apps/api && npx jest --testPathPattern='fleet-run-routing'`                            | 15 — the routing matrix end-to-end through the dispatch seam                         |
-| `cd apps/api && npx jest --testPathPattern='fleet-runner-status'`                          | 6 — composition + degradation + availability                                         |
-| `cd apps/api && npx jest --testPathPattern='fleet-runner-routes'`                          | 18 — endpoint authz scoping + DTO validation                                         |
-| `cd apps/api && npx jest --testPathPattern='FleetRunnerTelemetryAndRouting'`               | 6 — migration up/down/idempotency on better-sqlite3                                  |
-| `cd apps/node && npx vitest run src/core/telemetry-probe.spec.ts`                          | 24 — probes, parsing, never-fail-the-beat                                            |
-| `cd apps/web && npx vitest run src/components/dashboard/runner-status.unit.spec.ts`        | 9 — row state, byte + relative-time formatting                                       |
-| `cd packages/plugins/job-runtime-node && npx vitest run`                                   | 21 — existing suite, still green                                                     |
+| Command                                                                                              | Covers                                                                               |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `cd packages/contracts && npx vitest run src/__tests__/fleet-execution-preference.spec.ts`           | 16 — narrowest-wins resolution, the full `decideFleetRouting` matrix, pill summary   |
+| `cd packages/agent && npx jest --testPathPattern='fleet-node-telemetry'`                             | 14 — heartbeat backward-compat (old payload), refuse-not-clamp, bigint normalization |
+| `cd packages/agent && npx jest --testPathPattern='fleet-execution-preference'`                       | 14 — scope/id validation, owner scoping, degradation                                 |
+| `cd packages/agent && npx jest --testPathPattern='fleet-runner-fallback'`                            | 8 — notification producer, event key, dedup, sanitization                            |
+| `cd packages/agent && npx jest --testPathPattern='fleet'`                                            | 61 — plus the pre-existing suites and the module pin                                 |
+| `cd apps/api && npx jest --testPathPattern='fleet-run-routing'`                                      | 15 — the routing matrix end-to-end through the dispatch seam                         |
+| `cd apps/api && npx jest --testPathPattern='fleet-runner-status'`                                    | 6 — composition + degradation + availability                                         |
+| `cd apps/api && npx jest --testPathPattern='fleet-runner-routes'`                                    | 18 — endpoint authz scoping + DTO validation                                         |
+| `cd apps/api && npx jest --testPathPattern='FleetRunnerTelemetryAndRouting'`                         | 6 — migration up/down/idempotency on better-sqlite3                                  |
+| `cd apps/node && npx vitest run src/core/telemetry-probe.spec.ts`                                    | 24 — probes, parsing, never-fail-the-beat                                            |
+| `cd apps/web && npx vitest run src/components/dashboard/runner-status.unit.spec.ts`                  | 9 — row state, byte + relative-time formatting                                       |
+| `cd packages/plugins/job-runtime-node && npx vitest run`                                             | 21 — existing suite, still green                                                     |
+| `cd packages/contracts && npx vitest run src/fleet src/__tests__/fleet-execution-preference.spec.ts` | slice S — eligibility-aware rule shapes, `clampQueuedMaxAgeSec`, barrel (99 symbols) |
+| `cd packages/agent && npx jest --testPathPattern='fleet-job.queue-expiry'`                           | slice S — queue SLA (CAS, once-only event, per-kind cutoffs), heartbeat promotion    |
+| `cd apps/api && npx jest --testPathPattern='fleet-run-routing\|fleet-runner-status'`                 | slice S — R5 pinned-to-offline routes to fallback / visible wait; eligible counts    |
+| `cd apps/api && npx jest --testPathPattern='fleet-agent-task-reconciler\|fleet.controller'`          | slice S — "never started" notice exactly once; promotion only on an online beat      |
+| `cd apps/api && npx jest --testPathPattern='AddFleetJobQueuedAt'`                                    | slice S — migration up/backfill/index/down on better-sqlite3                         |
+| `cd apps/web && npx playwright test e2e/flow-fleet-runner-pill.spec.ts`                              | slice S — the pill against a real enrolled node (written; validated on CI)           |
 
 `apps/web/e2e/api-public-contract.spec.ts` gains `/api/fleet/runner-status` and
 `/api/fleet/execution-preferences` to the unauthenticated-401 matrix. The pill
@@ -258,13 +343,11 @@ unrelated feature PR.
 2. **Surface `fleet_jobs.queuedReason` in the node detail drawer.** It is on the
    row and in `FleetJobView`; the drawer's history list does not render it yet, so
    "waiting for a free runner" is currently visible via the API but not the UI.
-3. **Promote a waiting fleet job when a runner comes online.** Not needed for
-   correctness — a `local-wait` job sits `queued` and the next lease poll takes
-   it — but a nudge would shorten the wait after a laptop wakes up.
-4. **`runnerCount` in the fallback notification is coarse** (0 vs 1). The reason
-   token carries the actionable information; a precise count would mean threading
-   the whole availability snapshot through the dispatcher for a number the copy
-   does not currently use.
-5. **e2e coverage for the pill itself.** The data endpoint's authz is pinned in
-   `api-public-contract.spec.ts`; a rendering spec would need a seeded enrolled
-   node, which is a heavier fixture than this branch warrants.
+3. ~~**Promote a waiting fleet job when a runner comes online.**~~ Done in slice S
+   (`FleetJobService.promoteWaitingForNode`, called from the heartbeat edge).
+4. ~~**`runnerCount` in the fallback notification is coarse**~~ Done in slice S:
+   `runnerCount` is the eligible count; `fleetRunnerCount` / `pinnedNodeId` ride
+   alongside it.
+5. ~~**e2e coverage for the pill itself.**~~ Written in slice S
+   (`apps/web/e2e/flow-fleet-runner-pill.spec.ts`, enrolls a real node through the
+   public protocol); runs on CI.

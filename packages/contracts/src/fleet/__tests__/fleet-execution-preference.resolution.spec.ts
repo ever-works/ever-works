@@ -5,6 +5,7 @@ import {
 	decideFleetRouting,
 	FLEET_EXECUTION_MODES,
 	FLEET_EXECUTION_SCOPE_TYPES,
+	FLEET_FALLBACK_REASONS,
 	isFleetExecutionMode,
 	isLocalExecutionMode,
 	QUEUED_REASON_WAITING_FOR_RUNNER,
@@ -437,5 +438,77 @@ describe('decideFleetRouting — the whole 3 x 4 grid', () => {
 		// on purpose — the detail assertions live in the describes above and in
 		// the upstream spec, and duplicating them here would just add noise.
 		expect(decideFleetRouting(mode, availability).target).toBe(expected);
+	});
+});
+
+describe('decideFleetRouting — eligibility-aware decision shapes (self-build slice S)', () => {
+	const PINNED = '22222222-2222-4222-8222-222222222222';
+
+	it('adds fleetRunnerCount only when the snapshot carried fleetTotal', () => {
+		// Exact keys, both ways: the legacy three-field snapshot must yield
+		// the legacy four-key decision (every `toEqual` above depends on
+		// it), and a fleet-aware snapshot must carry the count through.
+		expect(Object.keys(decideFleetRouting('local-fallback', ALL_BUSY)).sort()).toEqual(
+			['fallbackReason', 'mode', 'runnerCount', 'target'].sort()
+		);
+		expect(Object.keys(decideFleetRouting('local-fallback', { ...ALL_BUSY, fleetTotal: 2 })).sort()).toEqual(
+			['fallbackReason', 'fleetRunnerCount', 'mode', 'runnerCount', 'target'].sort()
+		);
+	});
+
+	it('adds pinnedNodeId only when the snapshot carried a pin, and treats null as unpinned', () => {
+		const unpinned = decideFleetRouting('local-fallback', { ...ALL_OFFLINE, fleetTotal: 2, pinnedNodeId: null });
+		expect(unpinned).not.toHaveProperty('pinnedNodeId');
+		expect(unpinned.fallbackReason).toBe('runners-offline');
+
+		const pinned = decideFleetRouting('local-fallback', { total: 1, online: 0, free: 0, pinnedNodeId: PINNED });
+		expect(pinned.pinnedNodeId).toBe(PINNED);
+		expect(pinned.fallbackReason).toBe('pinned-runner-offline');
+		// No fleetTotal on the snapshot: no fleetRunnerCount on the decision.
+		expect(pinned).not.toHaveProperty('fleetRunnerCount');
+	});
+
+	it('never leaks fleetRunnerCount / pinnedNodeId onto a waiting or placed decision', () => {
+		const snapshot = { ...ALL_BUSY, fleetTotal: 9, pinnedNodeId: PINNED };
+		expect(decideFleetRouting('local-wait', snapshot)).toEqual({
+			target: 'fleet-waiting',
+			mode: 'local-wait',
+			queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER
+		});
+		expect(decideFleetRouting('local-wait', { ...FREE, fleetTotal: 9, pinnedNodeId: PINNED })).toEqual({
+			target: 'fleet',
+			mode: 'local-wait'
+		});
+		expect(decideFleetRouting('cloud', snapshot)).toEqual({ target: 'cloud', mode: 'cloud' });
+	});
+
+	it('no-eligible-runners needs the fleet to be non-empty; total<=0 alone stays no-runners', () => {
+		expect(decideFleetRouting('local-fallback', { total: 0, online: 0, free: 0 }).fallbackReason).toBe(
+			'no-runners'
+		);
+		expect(
+			decideFleetRouting('local-fallback', { total: 0, online: 0, free: 0, fleetTotal: 0 }).fallbackReason
+		).toBe('no-runners');
+		expect(
+			decideFleetRouting('local-fallback', { total: 0, online: 0, free: 0, fleetTotal: 1 }).fallbackReason
+		).toBe('no-eligible-runners');
+		// A negative eligible total with a live fleet is still "none could take it".
+		expect(
+			decideFleetRouting('local-fallback', { total: -1, online: 0, free: 0, fleetTotal: 1 }).fallbackReason
+		).toBe('no-eligible-runners');
+	});
+
+	it('every reason the rule can emit is in FLEET_FALLBACK_REASONS, which has five unique members', () => {
+		expect(new Set(FLEET_FALLBACK_REASONS).size).toBe(5);
+		const emitted = new Set(
+			[
+				decideFleetRouting('local-fallback', NONE),
+				decideFleetRouting('local-fallback', ALL_OFFLINE),
+				decideFleetRouting('local-fallback', ALL_BUSY),
+				decideFleetRouting('local-fallback', { total: 0, online: 0, free: 0, fleetTotal: 1 }),
+				decideFleetRouting('local-fallback', { total: 1, online: 0, free: 0, pinnedNodeId: PINNED })
+			].map((decision) => decision.fallbackReason)
+		);
+		expect([...emitted].sort()).toEqual([...FLEET_FALLBACK_REASONS].sort());
 	});
 });

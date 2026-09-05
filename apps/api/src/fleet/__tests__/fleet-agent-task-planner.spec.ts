@@ -177,6 +177,54 @@ describe('FleetAgentTaskPlannerService', () => {
         expect(taskWorkspace.describeFleetWorkspace).not.toHaveBeenCalled();
     });
 
+    describe('requirements — the tags the job will need, known BEFORE the plan (slice S)', () => {
+        beforeEach(() => {
+            delete process.env.FLEET_NODE_REQUIRED_CAPABILITIES;
+        });
+
+        it('is the operator config tags alone in command mode, and reads no Task or workspace', async () => {
+            process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace,git';
+
+            await expect(build().requirements(payload)).resolves.toEqual({
+                requiredCapabilities: ['workspace', 'git'],
+            });
+            expect(tasks.findById).not.toHaveBeenCalled();
+            expect(taskWorkspace.describeFleetWorkspace).not.toHaveBeenCalled();
+        });
+
+        it('adds the provider tag in model-cli mode, de-duplicated against the config tags', async () => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'codex';
+            process.env.FLEET_NODE_REQUIRED_CAPABILITIES = 'workspace,codex';
+
+            await expect(build().requirements(payload)).resolves.toEqual({
+                requiredCapabilities: ['workspace', 'codex'],
+            });
+        });
+
+        it('honours the tenant provider overlay, so the router counts the machines that have THAT CLI', async () => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'claude-code';
+            pluginSettings.getResolvedSettings.mockResolvedValue({
+                agentExecutionProvider: { value: 'codex', source: 'user' },
+            });
+
+            await expect(build().requirements(payload)).resolves.toEqual({
+                requiredCapabilities: ['codex'],
+            });
+        });
+
+        it('falls back to the instance env when the settings lookup fails', async () => {
+            process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
+            process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'claude-code';
+            pluginSettings.getResolvedSettings.mockRejectedValue(new Error('settings down'));
+
+            await expect(build().requirements(payload)).resolves.toEqual({
+                requiredCapabilities: ['claude-code'],
+            });
+        });
+    });
+
     it('builds a full model-cli plan from the instance env', async () => {
         process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'model-cli';
         process.env.FLEET_NODE_AGENT_EXECUTION_MODEL = 'claude-opus-5';

@@ -268,6 +268,49 @@ describe('agent/config', () => {
             );
         });
 
+        describe('getQueuedMaxAgeSeconds (queue SLA, self-build slice S)', () => {
+            const KINDS = ['agent-task', 'acceptance-checks', 'browser-check'] as const;
+
+            it('defaults per kind — a day for agent-task, two hours for the checks — never "forever"', () => {
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(24 * 3600);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('acceptance-checks')).toBe(2 * 3600);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(2 * 3600);
+            });
+
+            it('applies FLEET_NODE_QUEUE_MAX_AGE_SECONDS to every kind', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '3600';
+                for (const kind of KINDS) {
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds(kind)).toBe(3600);
+                }
+            });
+
+            it('lets the per-kind variable win over the all-kinds one', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '3600';
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_AGENT_TASK = '7200';
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_ACCEPTANCE_CHECKS = '900';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(7200);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('acceptance-checks')).toBe(900);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(3600);
+            });
+
+            it('clamps into [60s, 7d] rather than honouring an absurd value', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '5';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(60);
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '999999999';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(7 * 86400);
+            });
+
+            it.each(['0', '-5', 'soon', ''])(
+                "falls back to the kind default for nonsense value '%s' (fail closed)",
+                (raw) => {
+                    process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = raw;
+                    process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_BROWSER_CHECK = raw;
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(24 * 3600);
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(2 * 3600);
+                },
+            );
+        });
+
         describe('getRequiredCapabilities', () => {
             it('defaults to an empty list (any enrolled node is eligible)', () => {
                 expect(config.fleetNode.getRequiredCapabilities()).toEqual([]);

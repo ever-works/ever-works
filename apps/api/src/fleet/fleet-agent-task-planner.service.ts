@@ -37,7 +37,12 @@ import {
     type FleetTaskWorkspaceSpec,
     type TaskAcceptanceCheck,
 } from '@ever-works/contracts';
-import type { FleetAgentTaskPlan, FleetAgentTaskPlanner } from './fleet-agent-task.dispatcher';
+import { agentTaskRequiredCapabilities } from './fleet-agent-task-capabilities';
+import type {
+    FleetAgentTaskPlan,
+    FleetAgentTaskPlanner,
+    FleetAgentTaskRequirements,
+} from './fleet-agent-task.dispatcher';
 
 /** Plugin id whose per-tenant settings overlay the instance defaults. */
 export const FLEET_NODE_RUNTIME_PLUGIN_ID = 'job-runtime-node';
@@ -233,6 +238,25 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         const skip = read('agentExecutionSkipPermissions');
         if (typeof skip === 'boolean') settings.skipPermissions = skip;
         return settings;
+    }
+
+    /**
+     * Self-build slice S — the capability tags the job WILL be stamped
+     * with, from settings alone (no Task / workspace reads), so the
+     * router can count only the nodes that could lease it. Mirrors what
+     * {@link plan} + `enqueueAgentTask` produce through the ONE shared
+     * `agentTaskRequiredCapabilities`: the provider tag in `model-cli`
+     * mode, the operator's config tags otherwise.
+     */
+    async requirements(
+        payload: AgentTaskExecuteDispatchPayload,
+    ): Promise<FleetAgentTaskRequirements> {
+        const settings = await this.resolveSettings(payload.userId);
+        return {
+            requiredCapabilities: agentTaskRequiredCapabilities(
+                settings.mode === 'model-cli' ? settings.provider : null,
+            ),
+        };
     }
 
     async plan(payload: AgentTaskExecuteDispatchPayload): Promise<FleetAgentTaskPlan | null> {

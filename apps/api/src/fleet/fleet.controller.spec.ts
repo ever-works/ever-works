@@ -37,7 +37,7 @@ describe('FleetController', () => {
         enroll: jest.Mock;
         heartbeat: jest.Mock;
     };
-    let jobs: { loadByNodeForUser: jest.Mock };
+    let jobs: { loadByNodeForUser: jest.Mock; promoteWaitingForNode: jest.Mock };
     let controller: FleetController;
 
     // Appended constructor deps (runner status + execution preferences).
@@ -64,7 +64,10 @@ describe('FleetController', () => {
             enroll: jest.fn(async () => null),
             heartbeat: jest.fn(async () => null),
         };
-        jobs = { loadByNodeForUser: jest.fn(async () => ({})) };
+        jobs = {
+            loadByNodeForUser: jest.fn(async () => ({})),
+            promoteWaitingForNode: jest.fn(async () => 0),
+        };
         controller = new FleetController(
             service as never,
             jobs as never,
@@ -183,6 +186,41 @@ describe('FleetController', () => {
                 secret: 'x'.repeat(43),
             } as FleetHeartbeatDto);
             expect(result).toEqual({ ok: true, node: nodeView });
+        });
+
+        it('promotes waiting jobs after a beat that leaves the node online, and never otherwise (slice S)', async () => {
+            const beat = { nodeId: nodeView.id, secret: 'x'.repeat(43) } as FleetHeartbeatDto;
+
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            await controller.heartbeat(beat);
+            expect(jobs.promoteWaitingForNode).toHaveBeenCalledWith(nodeView.id);
+
+            // A drained node keeps beating (observability) but will not
+            // lease, so nothing may be promoted on its account.
+            for (const status of ['paused', 'disabled', 'offline'] as const) {
+                jobs.promoteWaitingForNode.mockClear();
+                service.heartbeat.mockResolvedValue({ node: { ...nodeView, status } });
+                await controller.heartbeat(beat);
+                expect(jobs.promoteWaitingForNode).not.toHaveBeenCalled();
+            }
+
+            // A rejected credential promotes nothing either.
+            jobs.promoteWaitingForNode.mockClear();
+            service.heartbeat.mockResolvedValue(null);
+            await expect(controller.heartbeat(beat)).rejects.toBeInstanceOf(UnauthorizedException);
+            expect(jobs.promoteWaitingForNode).not.toHaveBeenCalled();
+        });
+
+        it('a promotion failure never fails the beat', async () => {
+            service.heartbeat.mockResolvedValue({ node: nodeView });
+            jobs.promoteWaitingForNode.mockRejectedValue(new Error('db down'));
+
+            await expect(
+                controller.heartbeat({
+                    nodeId: nodeView.id,
+                    secret: 'x'.repeat(43),
+                } as FleetHeartbeatDto),
+            ).resolves.toEqual({ ok: true, node: nodeView });
         });
 
         it('enroll and heartbeat are @Public (token/secret ARE the auth)', () => {

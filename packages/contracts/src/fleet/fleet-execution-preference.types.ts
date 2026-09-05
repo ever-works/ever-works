@@ -147,14 +147,41 @@ export function resolveFleetExecutionMode(
  */
 export type FleetRunTarget = 'fleet' | 'fleet-waiting' | 'cloud';
 
-/** Why a run that asked for the fleet ended up somewhere else. */
+/**
+ * Why a run that asked for the fleet ended up somewhere else.
+ *
+ * The first three describe the owner's fleet as a whole. The last two
+ * exist because a job is not judged against the whole fleet (self-build
+ * slice S / EW-775): an `agent-task` may be PINNED to one node by an
+ * Agent affinity, and every job carries capability tags. Availability is
+ * computed over the ELIGIBLE set — the nodes that could actually take
+ * this job — so five idle siblings can no longer make a job pinned to a
+ * closed laptop look placeable.
+ */
 export type FleetFallbackReason =
 	/** No enrolled runner at all. */
 	| 'no-runners'
 	/** Runners exist, but none is online. */
 	| 'runners-offline'
 	/** Every online runner is already holding work. */
-	| 'runners-busy';
+	| 'runners-busy'
+	/**
+	 * Runners are enrolled, but none could take THIS job: the Agent is
+	 * pinned to a node that is no longer enrolled, or no node advertises
+	 * the capability tags the job requires.
+	 */
+	| 'no-eligible-runners'
+	/** The Agent is pinned to one node and that node is not online. */
+	| 'pinned-runner-offline';
+
+/** Canonical fallback-reason list — one source of truth for notices, sanitizers and tests. */
+export const FLEET_FALLBACK_REASONS: readonly FleetFallbackReason[] = [
+	'no-runners',
+	'runners-offline',
+	'runners-busy',
+	'no-eligible-runners',
+	'pinned-runner-offline'
+];
 
 /** The router's verdict for one dispatch. */
 export interface FleetRunRoutingDecision {
@@ -170,18 +197,44 @@ export interface FleetRunRoutingDecision {
 	 * guessed count in a stored notification is worse than none.
 	 */
 	runnerCount?: number;
+	/**
+	 * Every enrolled runner the owner had, when {@link runnerCount} was
+	 * computed over an eligible subset. Set alongside {@link fallbackReason}
+	 * only when the availability snapshot carried `fleetTotal`; equal to
+	 * `runnerCount` when the counts were already fleet-wide.
+	 */
+	fleetRunnerCount?: number;
+	/** The node the job was pinned to, when the decision was taken against one. Fallback decisions only. */
+	pinnedNodeId?: string;
 	/** Set only when `target === 'fleet-waiting'`. */
 	queuedReason?: typeof QUEUED_REASON_WAITING_FOR_RUNNER;
 }
 
-/** Snapshot of runner availability the routing rule reads. */
+/**
+ * Snapshot of runner availability the routing rule reads.
+ *
+ * The three counts describe the runners that could take THE JOB BEING
+ * ROUTED. With no eligibility filter that is the whole fleet, and the
+ * shape is exactly the three-field one it always was. When the caller
+ * narrowed the set — an Agent affinity pins the job to one node, or the
+ * job requires capability tags — the counts are over that subset and
+ * `fleetTotal` / `pinnedNodeId` say so, which is what lets the fallback
+ * reason and the stored notice be precise instead of "1 of 6 offline".
+ */
 export interface FleetRunnerAvailability {
-	/** Enrolled runners this owner has. */
+	/** Eligible runners this owner has (every enrolled runner when unfiltered). */
 	total: number;
 	/** Of those, currently online. */
 	online: number;
 	/** Online runners with no live job claim. */
 	free: number;
+	/**
+	 * Every enrolled runner the owner has, regardless of eligibility.
+	 * Absent when the counts above are already fleet-wide.
+	 */
+	fleetTotal?: number;
+	/** The node the job is pinned to, when an affinity narrowed the set to one. */
+	pinnedNodeId?: string | null;
 }
 
 /**
@@ -201,8 +254,7 @@ export function decideFleetRouting(
 	if (availability.free > 0) {
 		return { target: 'fleet', mode };
 	}
-	const fallbackReason: FleetFallbackReason =
-		availability.total <= 0 ? 'no-runners' : availability.online <= 0 ? 'runners-offline' : 'runners-busy';
+	const fallbackReason = classifyFallback(availability);
 	if (mode === 'local-wait') {
 		// The whole point of the mode: hold the work for the machine that
 		// is supposed to run it, and make the waiting visible instead of
@@ -210,5 +262,41 @@ export function decideFleetRouting(
 		// executes.
 		return { target: 'fleet-waiting', mode, queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER };
 	}
-	return { target: 'cloud', mode, fallbackReason, runnerCount: availability.total };
+	const decision: FleetRunRoutingDecision = {
+		target: 'cloud',
+		mode,
+		fallbackReason,
+		runnerCount: availability.total
+	};
+	// Only echoed when the snapshot carried them, so an unfiltered
+	// (fleet-wide) snapshot yields exactly the decision it always did.
+	if (typeof availability.fleetTotal === 'number') {
+		decision.fleetRunnerCount = availability.fleetTotal;
+	}
+	if (availability.pinnedNodeId) {
+		decision.pinnedNodeId = availability.pinnedNodeId;
+	}
+	return decision;
+}
+
+/**
+ * Name the reason nothing could take the job. Precedence is the original
+ * one (`total`, then `online`, then busy) with the two eligibility-aware
+ * refinements slotted in where they are the more precise statement:
+ *
+ *   - no eligible runner while the fleet has runners at all is
+ *     `no-eligible-runners`, not `no-runners` — "enrol a machine" would be
+ *     the wrong advice for an owner with six of them;
+ *   - the eligible set being exactly the pinned node, and it being down,
+ *     is `pinned-runner-offline` — the actionable fact is WHICH machine.
+ */
+function classifyFallback(availability: FleetRunnerAvailability): FleetFallbackReason {
+	const fleetTotal = typeof availability.fleetTotal === 'number' ? availability.fleetTotal : availability.total;
+	if (availability.total <= 0) {
+		return fleetTotal > 0 ? 'no-eligible-runners' : 'no-runners';
+	}
+	if (availability.online <= 0) {
+		return availability.pinnedNodeId ? 'pinned-runner-offline' : 'runners-offline';
+	}
+	return 'runners-busy';
 }

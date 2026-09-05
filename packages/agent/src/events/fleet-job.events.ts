@@ -38,7 +38,13 @@ export type FleetJobCompletionSource =
     /** The reclaim sweep exhausted the attempt budget without a verdict. */
     | 'lease-exhausted'
     /** An operator cancelled a job that no node had claimed yet. */
-    | 'cancelled';
+    | 'cancelled'
+    /**
+     * The queue SLA failed a job no eligible runner took within its
+     * kind's max queued age (self-build slice S). `error` carries the
+     * stable `queued-max-age-exceeded` prefix.
+     */
+    | 'queue-expired';
 
 /**
  * A job reached `done` or `failed`.

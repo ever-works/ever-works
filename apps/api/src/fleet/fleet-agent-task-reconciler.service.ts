@@ -17,6 +17,7 @@ import {
 import { redactSecrets } from '@ever-works/agent/utils';
 import {
     FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS,
+    FLEET_JOB_QUEUE_EXPIRED_REASON,
     INBOX_MAX_BODY_CHARS,
     normalizeFleetAgentTaskQuestion,
     normalizeFleetTaskWorkspaceMounts,
@@ -259,12 +260,20 @@ export class FleetAgentTaskReconcilerService {
 
         const succeeded = event.succeeded && result?.status === 'succeeded';
         if (!succeeded) {
+            // Self-build slice S — the queue SLA settled a job NO node ever
+            // took. Same failure path (the run must settle either way; the
+            // stable `queued-max-age-exceeded` prefix lands in
+            // `failureReason`), but the notice says "never started" rather
+            // than "failed": the owner's fix is a runner, not the code.
+            const queueExpired = event.source === 'queue-expired';
             const reason = truncate(
                 result?.failureReason ||
                     event.error ||
                     (event.source === 'lease-exhausted'
                         ? 'The fleet node stopped reporting; lease budget exhausted'
-                        : 'Fleet job failed without a reason'),
+                        : queueExpired
+                          ? `${FLEET_JOB_QUEUE_EXPIRED_REASON}: no eligible fleet runner took the job within its max queued age`
+                          : 'Fleet job failed without a reason'),
                 MAX_SUMMARY_CHARS,
             );
             await this.runs.markFailed(ctx.runId, reason);
@@ -300,12 +309,22 @@ export class FleetAgentTaskReconcilerService {
                     );
                 }
             }
-            await this.postChat(task, event.userId, agentId, composeFailureMessage(reason, result));
+            await this.postChat(
+                task,
+                event.userId,
+                agentId,
+                composeFailureMessage(reason, result, queueExpired),
+            );
+            // Exactly ONE Inbox notice per settled job: this is the single
+            // producer, and the emitting CAS fires the event once.
             await this.bestEffort('inbox notice', async () => {
                 if (!this.inbox) return;
+                const taskLabel = task?.title ? truncate(task.title, 120) : ctx.taskId;
                 await this.inbox.notice(event.userId, {
-                    title: `Fleet run failed: ${task?.title ? truncate(task.title, 120) : ctx.taskId}`,
-                    body: reason,
+                    title: queueExpired
+                        ? `Fleet run never started: ${taskLabel}`
+                        : `Fleet run failed: ${taskLabel}`,
+                    body: queueExpired ? composeQueueExpiryBody(event.job) : reason,
                     agentId,
                     agentRunId: ctx.runId,
                     taskId: ctx.taskId,
@@ -1035,8 +1054,55 @@ function composeQuestionMessage(
     return lines.join('\n');
 }
 
-function composeFailureMessage(reason: string, result: FleetAgentTaskResult | null): string {
-    const lines = ['**Fleet run failed** (executed on one of your own machines).', '', reason];
+/**
+ * The human body of the "never started" notice (self-build slice S): how
+ * long it waited, what narrowed the eligible set to nothing, and the
+ * three fixes. The stable machine token stays on the run row; the owner
+ * reads a sentence.
+ */
+function composeQueueExpiryBody(job: FleetJobView): string {
+    const waited = describeQueuedAge(job);
+    const lines = [
+        `No eligible runner on your machines took this run${waited ? ` within ${waited}` : ''}.`,
+    ];
+    if (job.targetNodeId) {
+        lines.push(`It was pinned to node ${truncate(job.targetNodeId, MAX_QUOTED_CHARS)}.`);
+    }
+    if (job.requiredCapabilities.length > 0) {
+        lines.push(
+            `It required: ${job.requiredCapabilities
+                .map((tag) => truncate(tag, MAX_QUOTED_CHARS))
+                .join(', ')}.`,
+        );
+    }
+    lines.push(
+        'Wake the runner, bind the Agent to another machine, or set the Work to "Local runner (fall back to cloud)".',
+    );
+    return truncate(lines.join(' '), INBOX_MAX_BODY_CHARS);
+}
+
+/** "24h" / "90m" from the job's own timestamps; empty when either is missing. */
+function describeQueuedAge(job: FleetJobView): string {
+    if (!job.queuedAt || !job.completedAt) return '';
+    const ms = new Date(job.completedAt).getTime() - new Date(job.queuedAt).getTime();
+    if (!Number.isFinite(ms) || ms <= 0) return '';
+    const minutes = Math.round(ms / 60_000);
+    if (minutes >= 120) return `${Math.round(minutes / 60)}h`;
+    return `${Math.max(minutes, 1)}m`;
+}
+
+function composeFailureMessage(
+    reason: string,
+    result: FleetAgentTaskResult | null,
+    neverStarted = false,
+): string {
+    const lines = [
+        neverStarted
+            ? '**Fleet run never started** (no eligible runner among your own machines took it).'
+            : '**Fleet run failed** (executed on one of your own machines).',
+        '',
+        reason,
+    ];
     const failing = result?.checks?.filter((check) => check.status !== 'green') ?? [];
     if (failing.length > 0) {
         lines.push('', 'Failing checks:');

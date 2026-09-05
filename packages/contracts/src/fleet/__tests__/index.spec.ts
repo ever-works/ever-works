@@ -32,7 +32,8 @@ const EXECUTION_PREFERENCE_EXPORTS = [
 	'FLEET_EXECUTION_SCOPE_TYPES',
 	'QUEUED_REASON_WAITING_FOR_RUNNER',
 	'resolveFleetExecutionMode',
-	'decideFleetRouting'
+	'decideFleetRouting',
+	'FLEET_FALLBACK_REASONS'
 ] as const;
 
 const JOB_EXPORTS = [
@@ -59,7 +60,13 @@ const JOB_EXPORTS = [
 	'clampMaxAttempts',
 	'nodeSatisfiesCapabilities',
 	'FLEET_AGENT_TASK_MAX_STEPS',
-	'isNodeBusy'
+	'isNodeBusy',
+	'FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC',
+	'FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC',
+	'FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC',
+	'clampQueuedMaxAgeSec',
+	'FLEET_JOB_QUEUE_EXPIRED_REASON',
+	'isQueueExpiredError'
 ] as const;
 
 const NODE_EXPORTS = [
@@ -159,6 +166,8 @@ const FUNCTION_EXPORTS = [
 	'isFleetJobKind',
 	'clampLeaseTtlSec',
 	'clampMaxAttempts',
+	'clampQueuedMaxAgeSec',
+	'isQueueExpiredError',
 	'nodeSatisfiesCapabilities',
 	'isNodeBusy',
 	'isFleetEnrollableNodeKind',
@@ -188,12 +197,12 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 92 runtime symbols', () => {
+	it('exposes exactly these 99 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(92);
+		expect(Object.keys(fleet)).toHaveLength(99);
 	});
 
 	it.each([
