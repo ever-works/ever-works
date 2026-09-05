@@ -499,7 +499,7 @@ test.describe('Mission ↔ Ideas — deep cross-user / cross-mission isolation &
         expect((await survived.json()).status).toBe('pending');
     });
 
-    test('org-context is INERT on /api/me/missions: the x-organization-id header neither changes the DTO nor adds a tenant/org column, and the row lists under the plain owner GET', async ({
+    test('org-context is INERT on /api/me/missions: the x-organization-id header stamps no Organization (organizationId stays null, tenantId is the session tenant either way), and the row lists under the plain owner GET', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -516,15 +516,19 @@ test.describe('Mission ↔ Ideas — deep cross-user / cross-mission isolation &
         expect(org.tenantId).toMatch(UUID_RE);
 
         // …then create a Mission WITH the org header set. /api/me/missions is
-        // strictly user-scoped: the header is inert, the DTO carries no
-        // tenantId/organizationId, and the row is the user's regardless of org.
+        // strictly user-scoped: the header is not the scope carrier, so the row
+        // gets no Organization. Every row does carry a tenantId now — the
+        // SESSION's tenant, seeded per request by SessionScopeGuard — so the
+        // inertness proof is: same tenant as a plain create, no org stamped.
+        const plain = await createMission(request, headers, { title: `Plain ${stamp('pl')}` });
         const orgScoped = await createMission(
             request,
             { ...headers, 'x-organization-id': org.id },
             { title: `OrgHeader ${stamp('oh')}` },
         );
-        expect(orgScoped.raw).not.toHaveProperty('tenantId');
-        expect(orgScoped.raw).not.toHaveProperty('organizationId');
+        expect(orgScoped.raw.tenantId).toMatch(UUID_RE);
+        expect(orgScoped.raw.tenantId).toBe(plain.raw.tenantId);
+        expect(orgScoped.raw.organizationId ?? null).toBeNull();
         expect(orgScoped.raw).not.toHaveProperty('orgId');
 
         // It lists under the PLAIN owner GET (no org header) — proving the list
