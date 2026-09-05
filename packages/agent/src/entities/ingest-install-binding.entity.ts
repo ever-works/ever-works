@@ -56,8 +56,20 @@ import {
  * throws EntityMetadataNotFoundError on first query.
  */
 
-/** Inbound receiver this binding belongs to. */
-export type IngestInstallProvider = 'slack' | 'github';
+/**
+ * Inbound receiver this binding belongs to.
+ *
+ *   * `jira`   — Jira Cloud webhooks, keyed `site:<host>`;
+ *   * `sentry` — Sentry integration webhooks, keyed
+ *                `installation:<uuid>`; written by an authenticated
+ *                claim rather than by a signature-verified delivery
+ *                (Sentry signs with a platform-level client secret that
+ *                cannot tell installations apart).
+ *
+ * Type-only widening: the column is an unconstrained varchar(32), so no
+ * schema change accompanies a new provider.
+ */
+export type IngestInstallProvider = 'slack' | 'github' | 'jira' | 'sentry';
 
 @Entity({ name: 'ingest_install_bindings' })
 @Index('idx_ingest_install_bindings_workspace', ['provider', 'externalWorkspaceId'], {
