@@ -26,6 +26,8 @@ import type {
     SourceRepository as ContractSourceRepository,
     WorksConfigSnapshot as ContractWorksConfigSnapshot,
 } from '@ever-works/contracts/api';
+// Release promotion lane (self-build slice AI, EW-808).
+import type { ReleaseLadder } from '@ever-works/contracts';
 import type { PRUpdate } from '@src/generators/data-generator';
 import { WorkGenerationHistory } from './work-generation-history.entity';
 import { TimestampColumn } from './_types';
@@ -428,6 +430,27 @@ export class Work {
     /** `'on-merge' | 'manual'` — when the Task branch is deleted. */
     @Column({ type: 'varchar', length: 16, default: 'on-merge' })
     taskBranchCleanup: string;
+
+    // ── Release promotion lane (self-build slice AI, EW-808) ─────────
+
+    /**
+     * The `integration → staging → production` branch ladder this Work's
+     * releases move along, as PLATFORM STATE.
+     *
+     * NULL — the default, and the value on every existing Work — means
+     * this Work has no release lane and `POST /promotions` refuses. That
+     * is deliberate: a Work whose ladder nobody has declared has no
+     * business opening a pull request into a branch the platform guessed.
+     * `taskIsolationBaseBranch` above is a DIFFERENT thing (where Task
+     * branches fork from and merge back to) and is not a substitute — it
+     * names one branch and a ladder needs three.
+     *
+     * Read through `sanitizeReleaseLadder` on every use, never raw: the
+     * column is `simple-json` and therefore holds whatever was written to
+     * it, and the branch names end up in a pull request's `head`/`base`.
+     */
+    @Column('simple-json', { nullable: true })
+    releaseLadder?: ReleaseLadder | null;
 
     // ── Memory recall (memory upgrades M3) ───────────────────────────
 

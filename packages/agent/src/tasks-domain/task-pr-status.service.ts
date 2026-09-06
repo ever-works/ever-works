@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import type { GitDiffResult, GitPullRequestStatus } from '@ever-works/plugin';
 import { DEFAULT_DIFF_MAX_BYTES, DEFAULT_DIFF_MAX_FILES, capChecks } from '@ever-works/plugin';
 import { normalizeCommitSha } from '@ever-works/contracts';
@@ -10,6 +10,10 @@ import { TaskTransitionService } from './task-transition.service';
 import { TaskMergeGateService } from './task-merge-gate.service';
 import { TaskCiAutoResumeService } from './task-ci-auto-resume.service';
 import { classifyCheckResult, computeCiFailureKey } from './task-ci-auto-resume';
+import {
+    PROMOTION_LANE_WATCHER,
+    type PromotionLaneWatcher,
+} from '../policy/promotion-merge-guard.port';
 
 /**
  * PR insights (kanban run cockpit, plan 04 M5 + M6 + the merged half of
@@ -118,6 +122,15 @@ export class TaskPrStatusService {
         // meaning, and an install without the fix loop polls exactly as
         // it did before.
         @Optional() private readonly autoResume?: TaskCiAutoResumeService,
+        // Release promotion lane (self-build slice AI, EW-808) — the
+        // watcher that records what `promotion-gate.yml` said about this
+        // Task's pull request. Appended LAST + @Optional() per the
+        // positional-spec arity rule, and injected by TOKEN so
+        // `TasksDomainModule` does not have to import the module that
+        // imports it. Absent, promotions simply are not watched.
+        @Optional()
+        @Inject(PROMOTION_LANE_WATCHER)
+        private readonly promotionLane?: PromotionLaneWatcher,
     ) {}
 
     // ── Read paths ────────────────────────────────────────────────────
@@ -415,6 +428,25 @@ export class TaskPrStatusService {
                 Object.assign(task, { branchState: 'merged' });
             }
             Object.assign(task, patch);
+
+            // Release promotion lane (slice AI) — runs BEFORE the merge
+            // gate, and deliberately runs whatever CI says: a promotion
+            // has to be legible even when it can never merge, so an
+            // operator watching a red promotion sees the gate's actual
+            // verdict instead of silence. The merge gate below then reads
+            // what this just recorded, for the same live head.
+            if (this.promotionLane) {
+                await this.promotionLane
+                    .onPullRequestStatusRefreshed(task, status)
+                    .catch((error: unknown) => {
+                        this.logger.warn(
+                            `Task ${task.id}: promotion lane threw after a PR status refresh: ${
+                                error instanceof Error ? error.message : String(error)
+                            }`,
+                        );
+                        return undefined;
+                    });
+            }
 
             // Merge approval (self-build slice AE) — THIS is the moment
             // the merge question can finally be answered: the provider has
