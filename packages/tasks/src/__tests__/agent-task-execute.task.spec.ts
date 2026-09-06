@@ -744,6 +744,13 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 runId: 'run-1',
                 policy: 'required',
                 attempt: 1,
+                // EW-807 gave the gate runner a setup phase, and this is an
+                // EXACT-match assertion, so the new field has to be named here
+                // even when it is empty. Kept exact rather than relaxed to
+                // `objectContaining`: the point of this assertion is that a red
+                // gate is handed precisely what it should be, and loosening it
+                // would stop it noticing the next field that appears.
+                setup: [],
             });
             expect(runs.markCompleted).toHaveBeenCalledTimes(1);
             expect(runs.markCompleted.mock.calls[0][1]).toContain('build');
