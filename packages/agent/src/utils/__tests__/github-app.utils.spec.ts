@@ -157,6 +157,102 @@ describe('requestGitHubAppInstallationAccessTokenDetails', () => {
             json: jest.fn().mockResolvedValue(body),
         }) as unknown as Response;
 
+    /**
+     * Scoped installation tokens (self-build slice AM, EW-810).
+     *
+     * Every mint in this repository before that slice sent an EMPTY body,
+     * and an empty body means "every repository in the installation, with
+     * every permission the App holds". That is fine for the read-shaped
+     * callers and exactly wrong for a WRITE credential handed to an
+     * unattended fleet machine, so the narrowing is optional, appended
+     * last, and provably absent for every pre-existing caller.
+     */
+    describe('scope narrowing', () => {
+        it('sends NO body at all when no scope is given (every existing caller)', async () => {
+            fetchSpy = jest
+                .spyOn(globalThis, 'fetch')
+                .mockResolvedValue(makeResponse({ token: 'ghs_xxx' }));
+
+            await requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials);
+
+            const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+            expect(init.body).toBeUndefined();
+            expect(init.headers).not.toHaveProperty('Content-Type');
+        });
+
+        it('narrows to repository_ids and permissions when a scope is given', async () => {
+            fetchSpy = jest
+                .spyOn(globalThis, 'fetch')
+                .mockResolvedValue(makeResponse({ token: 'ghs_xxx' }));
+
+            await requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials, {
+                repositoryIds: ['556677', 778899],
+                permissions: { contents: 'write' },
+            });
+
+            const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+            expect(JSON.parse(String(init.body))).toEqual({
+                // NUMBERS on the wire: GitHub rejects string ids, and the
+                // platform stores them as varchar.
+                repository_ids: [556677, 778899],
+                permissions: { contents: 'write' },
+            });
+            expect(init.headers).toMatchObject({ 'Content-Type': 'application/json' });
+        });
+
+        it('REFUSES a malformed repository id rather than silently dropping it', async () => {
+            // A silently shortened id list produces a token valid for fewer
+            // repositories than the caller asked for, and the failure then
+            // lands at the push of whichever one fell off the end.
+            fetchSpy = jest
+                .spyOn(globalThis, 'fetch')
+                .mockResolvedValue(makeResponse({ token: 'ghs_xxx' }));
+
+            await expect(
+                requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials, {
+                    repositoryIds: ['not-a-number'],
+                }),
+            ).rejects.toThrow(/Invalid GitHub repository id/);
+            expect(fetchSpy).not.toHaveBeenCalled();
+        });
+
+        // `1e30` and `556677abc` are the reason this validator does not use
+        // `parseInt`: both parse to a DIFFERENT repository than the caller
+        // named, which is a token scoped to the wrong thing.
+        it.each([[['0']], [['-4']], [['1e30']], [['556677abc']], [[' ']], [['']]])(
+            'refuses the id %s',
+            async (repositoryIds) => {
+                fetchSpy = jest
+                    .spyOn(globalThis, 'fetch')
+                    .mockResolvedValue(makeResponse({ token: 'ghs_xxx' }));
+
+                await expect(
+                    requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials, {
+                        repositoryIds,
+                    }),
+                ).rejects.toThrow(/Invalid GitHub repository id/);
+            },
+        );
+
+        it('treats an EMPTY scope as no scope, so an accidental [] cannot widen the token', async () => {
+            // Reading `{ repository_ids: [] }` as "no narrowing" is
+            // GitHub's behaviour; sending it would be a full-installation
+            // token dressed up as a scoped one. Omitting the key entirely
+            // keeps the two cases textually distinguishable in review.
+            fetchSpy = jest
+                .spyOn(globalThis, 'fetch')
+                .mockResolvedValue(makeResponse({ token: 'ghs_xxx' }));
+
+            await requestGitHubAppInstallationAccessTokenDetails('inst-77', credentials, {
+                repositoryIds: [],
+                permissions: {},
+            });
+
+            const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+            expect(init.body).toBeUndefined();
+        });
+    });
+
     it('POSTs to /app/installations/<id>/access_tokens with App-JWT headers', async () => {
         fetchSpy = jest
             .spyOn(globalThis, 'fetch')

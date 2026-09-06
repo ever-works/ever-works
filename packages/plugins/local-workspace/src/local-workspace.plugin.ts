@@ -10,7 +10,8 @@ import type {
 	WorkspaceFinalizeOptions,
 	WorkspaceFinalizeResult,
 	WorkspaceMergeSimulation,
-	WorkspacePublishFence
+	WorkspacePublishFence,
+	WorkspacePushCredential
 } from '@ever-works/plugin';
 import { WorkspaceNotProvisionedError } from '@ever-works/plugin';
 import { execFile, type ChildProcess } from 'node:child_process';
@@ -409,13 +410,22 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed', signal);
 		const dirty = status.stdout.trim().length > 0;
 		if (dirty) {
+			// Committer identity stays in `-c` flags — transient, never
+			// written to the shared pool config a linked worktree's
+			// `--local` would land in. The literals are the FALLBACK now
+			// rather than the only answer: a caller that knows which
+			// machine and which agent produced the change says so
+			// (self-build slice AM), and `--author` carries the agent while
+			// `user.*` carries the machine, so `git log` answers both.
+			const identity = opts.identity;
 			await this.gitOrThrow(
 				[
 					'-c',
-					'user.name=Ever Works Agent',
+					`user.name=${identity?.committerName || 'Ever Works Agent'}`,
 					'-c',
-					'user.email=agent@ever.works',
+					`user.email=${identity?.committerEmail || 'agent@ever.works'}`,
 					'commit',
+					...(identity ? [`--author=${identity.authorName} <${identity.authorEmail}>`] : []),
 					'-m',
 					opts.commitMessage
 				],
@@ -457,13 +467,84 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			const repoUrl = (
 				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing', signal)
 			).stdout.trim();
-			await this.gitOrThrow(
-				['push', this.authedUrl(repoUrl, opts.auth), `HEAD:refs/heads/${handle.branch}`],
-				dir,
-				opts.auth,
-				'git push failed',
-				signal
-			);
+			const credential = this.resolvePushCredential(opts.pushCredential, repoUrl);
+			if (credential) {
+				// Fail closed BEFORE the write, twice: once because a
+				// credential already sitting in this repository's config
+				// could answer the push instead of ours, and once after,
+				// because the whole promise of an environment-carried
+				// credential is that nothing of it survives the command.
+				await this.assertNoPersistedCredential(dir, signal);
+			}
+			let pushFailure: unknown = null;
+			try {
+				await this.gitOrThrow(
+					[
+						'push',
+						// A credentialed push runs NO hooks. Git hands a
+						// `pre-push` hook the whole child environment, which
+						// is where the scoped credential rides — a hook can
+						// simply print `GIT_CONFIG_VALUE_<n>` and read the
+						// base64 basic-auth form of a live `contents: write`
+						// token, then `exit 0` so the run looks clean.
+						//
+						// The hook does not even have to be in the checkout:
+						// hooks resolve through the COMMON dir, so a file
+						// planted at `<poolDir>/hooks/pre-push` is untracked,
+						// invisible to `git add -A`, missed by
+						// `assertNoPersistedCredential`'s config probe,
+						// survives worktree teardown, and then fires on the
+						// push of EVERY later Task on that repository on that
+						// machine, harvesting each run's freshly minted token.
+						// The model holds acceptEdits over the checkout and can
+						// resolve the pool from the worktree's `.git` pointer,
+						// so writing that file is within its reach.
+						//
+						// Nothing legitimate is lost: the pool is a bare repo
+						// this plugin creates with `init --bare`, and the fleet
+						// never installs a hook into it. `core.hooksPath` is
+						// reset in `credentialEnv` as well, so neutralising the
+						// hooks does not depend on this one flag being right.
+						...(credential ? ['--no-verify'] : []),
+						this.authedUrl(repoUrl, opts.auth),
+						`HEAD:refs/heads/${handle.branch}`
+					],
+					dir,
+					opts.auth,
+					'git push failed',
+					signal,
+					credential
+				);
+			} catch (error) {
+				pushFailure = error;
+			}
+			// The proof runs whether or not the push succeeded — a REJECTED
+			// push is precisely when Git walks the helper list's `erase`
+			// path — but not after a cancellation, where the next Git call
+			// would only re-raise the abort and hide it.
+			//
+			// Its own failure NEVER replaces the push's. This probe used to
+			// run bare, so a throw here discarded `pushFailure` and an
+			// operator reading `refusing to publish: … persisted credential
+			// settings` went hunting for a config problem instead of the
+			// `remote rejected` that actually failed the run.
+			if (credential && !signal?.aborted) {
+				try {
+					await this.assertNoPersistedCredential(dir, signal, pushFailure === null);
+				} catch (probeFailure) {
+					if (pushFailure === null) throw probeFailure;
+					// The push already failed and is the more useful answer.
+					// The probe's finding is appended rather than dropped: a
+					// credential persisted into the shared pool config is a
+					// security event, not a footnote.
+					throw new Error(
+						`${pushFailure instanceof Error ? pushFailure.message : String(pushFailure)} (additionally: ${
+							probeFailure instanceof Error ? probeFailure.message : String(probeFailure)
+						})`
+					);
+				}
+			}
+			if (pushFailure) throw pushFailure;
 			pushed = true;
 		}
 
@@ -784,10 +865,218 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		}
 	}
 
+	/**
+	 * The scoped credential this publish may use, or null.
+	 *
+	 * REFUSES — rather than degrading to the ambient helper — when the
+	 * checkout's `origin` is not byte-identical to the remote the caller
+	 * scoped the credential to. A credential is issued for a named set of
+	 * repositories; a checkout pointing anywhere else is either a bug or
+	 * an attempt to aim a write token somewhere the platform never
+	 * authorised, and "push it with whatever the machine's own helper
+	 * answers" is the exact hole this slice closes.
+	 *
+	 * A caller that supplied no credential at all keeps the pre-slice
+	 * behaviour: this provider also serves the cloud runner, which
+	 * authenticates through {@link WorkspaceProvisionSpec.auth}. Requiring
+	 * a scoped credential is the FLEET's rule and is enforced by the node,
+	 * which is the only side that can tell a fleet job from a cloud one.
+	 */
+	private resolvePushCredential(
+		credential: WorkspacePushCredential | undefined,
+		repoUrl: string
+	): WorkspacePushCredential | null {
+		if (!credential?.token) return null;
+		if (!credential.remoteUrl || credential.remoteUrl !== repoUrl) {
+			throw new Error(
+				'scoped push credential does not cover this checkout: the origin remote is not the one it was issued for'
+			);
+		}
+		return credential;
+	}
+
+	/**
+	 * Install a scoped credential for ONE `git` invocation, through the
+	 * child ENVIRONMENT.
+	 *
+	 * Two variables, and both are load-bearing:
+	 *
+	 *  - `credential.helper` with an EMPTY value resets Git's helper list
+	 *    to nothing. Without it the machine's system-level helper (Git
+	 *    Credential Manager on the fleet's Windows nodes) answers first
+	 *    and the long-lived machine PAT authenticates the push exactly as
+	 *    before — a fallback that would leave this slice's gap open.
+	 *  - `core.askpass` with an EMPTY value closes the OTHER fallback.
+	 *    `GIT_TERMINAL_PROMPT=0` disables only the TERMINAL prompt; Git
+	 *    consults `GIT_ASKPASS`, then `core.askpass`, then `SSH_ASKPASS`
+	 *    FIRST, and none of those is a credential helper, so resetting
+	 *    `credential.helper` does not displace them. Measured with git
+	 *    2.53: `GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=./a.sh` plus this
+	 *    module's exact `credential.helper` reset still returned a
+	 *    username and password from the askpass helper, exit 0 — so any
+	 *    rejected header (an expired token, a `401`) silently fell back to
+	 *    the machine's own long-lived credentials and the push succeeded
+	 *    anyway, leaving no trace in the run. Both halves are needed: this
+	 *    config reset for a configured `core.askpass`, and the deletion of
+	 *    `GIT_ASKPASS`/`SSH_ASKPASS` from the child env (see
+	 *    {@link credentialEnvRemovals}) for the environment ones. With
+	 *    both, the same command dies `could not read Username … terminal
+	 *    prompts disabled`, which is the fail-closed behaviour this
+	 *    paragraph used to merely claim.
+	 *  - `core.hooksPath` with an EMPTY value stops Git running any hook
+	 *    for this command. A `pre-push` hook is a child of the push and
+	 *    inherits `GIT_CONFIG_VALUE_<n>`, i.e. the base64 basic-auth form
+	 *    of the token; hooks resolve through the COMMON dir, so one
+	 *    planted at `<poolDir>/hooks/pre-push` is outside the checkout,
+	 *    untracked, survives teardown, and harvests every later run's
+	 *    token on that repository. `--no-verify` on the push covers the
+	 *    same ground; both are here because either one alone is a single
+	 *    edit away from being lost.
+	 *  - `http.<remote>.extraheader` carries the credential itself, keyed
+	 *    to the exact remote URL, so Git never offers it to another host.
+	 *
+	 * Why the environment and not `git -c` or a config file:
+	 *
+	 *  - `-c` puts the credential in the process ARGV, where any local
+	 *    account can read it out of a process listing for the life of the
+	 *    push. That is how the cloud path's URL-userinfo form leaks, and
+	 *    it is named in this slice's brief as a hazard.
+	 *  - `git config --local` inside a LINKED WORKTREE writes the shared
+	 *    pool config: the credential would be visible to every other
+	 *    Task's worktree of that repository on that machine, and would
+	 *    survive a crash. There is no per-worktree config here
+	 *    (`extensions.worktreeConfig` is never set).
+	 *  - The environment of a child process dies with the child. Nothing
+	 *    has to be cleaned up on a crash, a cancel or a lapsed lease,
+	 *    because nothing was ever written down.
+	 */
+	private credentialEnv(credential: WorkspacePushCredential, inherited: NodeJS.ProcessEnv): Record<string, string> {
+		const basic = Buffer.from(`${credential.username}:${credential.token}`, 'utf8').toString('base64');
+		// APPEND, never overwrite. `GIT_CONFIG_COUNT` may already be set by
+		// whoever started this process — an operator pinning a setting, a
+		// harness rewriting remotes with `url.<x>.insteadOf` — and writing
+		// index 0 would silently drop their entry AND ours would not be the
+		// last word. Appending also keeps the `credential.helper` reset at
+		// the END of the config order, which is what makes it win over
+		// everything the system and global files set.
+		const parsed = Number.parseInt(String(inherited.GIT_CONFIG_COUNT ?? ''), 10);
+		const base = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0;
+		return {
+			GIT_CONFIG_COUNT: String(base + 4),
+			[`GIT_CONFIG_KEY_${base}`]: 'credential.helper',
+			[`GIT_CONFIG_VALUE_${base}`]: '',
+			[`GIT_CONFIG_KEY_${base + 1}`]: 'core.askpass',
+			[`GIT_CONFIG_VALUE_${base + 1}`]: '',
+			[`GIT_CONFIG_KEY_${base + 2}`]: 'core.hooksPath',
+			[`GIT_CONFIG_VALUE_${base + 2}`]: '',
+			[`GIT_CONFIG_KEY_${base + 3}`]: `http.${credential.remoteUrl}.extraheader`,
+			[`GIT_CONFIG_VALUE_${base + 3}`]: `Authorization: Basic ${basic}`
+		};
+	}
+
+	/**
+	 * Environment variables that must NOT reach a credentialed `git`
+	 * child, whatever the node process happened to inherit.
+	 *
+	 * `git()` splats `...process.env` into every child, so each of these
+	 * is a credential source that outranks — or entirely bypasses — the
+	 * config resets {@link credentialEnv} installs:
+	 *
+	 *  - `GIT_ASKPASS` / `SSH_ASKPASS`: consulted BEFORE any credential
+	 *    helper, and unaffected by resetting `credential.helper`. See the
+	 *    measurement in {@link credentialEnv}.
+	 *  - `GIT_CONFIG_PARAMETERS`: the transport `git -c` uses, and it is
+	 *    read AFTER `GIT_CONFIG_COUNT`, so it WINS. Measured: with our
+	 *    exact reset plus `GIT_CONFIG_PARAMETERS="'credential.helper=X'"`,
+	 *    `git config --get-all credential.helper` ends with `X` — the
+	 *    reset is overridden and an inherited helper answers the push.
+	 *
+	 * Applied only to a credentialed command: every other Git call this
+	 * plugin makes (fetch, status, config probes) keeps whatever the
+	 * operator configured, because none of them carries a write token.
+	 */
+	private static readonly credentialEnvRemovals = ['GIT_ASKPASS', 'SSH_ASKPASS', 'GIT_CONFIG_PARAMETERS'] as const;
+
+	/**
+	 * Prove that nothing in this repository's own Git configuration can
+	 * answer for — or redirect — a credentialed push.
+	 *
+	 * `--name-only` so the check can never print a value it found; `--local`
+	 * because that is where a linked worktree's config writes land, i.e.
+	 * the shared pool config every other Task's worktree of this
+	 * repository reads, and it is the scope a model with acceptEdits over
+	 * the checkout can reach through the worktree's `.git` pointer. Exit 1
+	 * (no match) is the healthy answer.
+	 *
+	 * Three families, and the third is not about credential STORAGE:
+	 *
+	 *  - `credential.*` — a helper configured here would answer the push
+	 *    instead of the header we install, which is the ambient machine PAT
+	 *    this slice exists to stop using.
+	 *  - `http.<url>.extraheader` — the form this plugin itself uses. One
+	 *    persisted on disk is a write credential that outlived its run.
+	 *  - `url.<x>.insteadOf` / `url.<x>.pushInsteadOf` — REDIRECTS. Git
+	 *    rewrites the URL it actually connects to, including an explicit
+	 *    one given on the push command line (measured: with
+	 *    `url.<B>.pushInsteadOf = <A>`, `git push <A>` writes to B). The
+	 *    `insteadOf` half is visible to `git remote get-url origin`, so the
+	 *    node's host check sees it and refuses; the `pushInsteadOf` half is
+	 *    NOT — `get-url` reports the unrewritten URL and only
+	 *    `get-url --push` reveals it — so without this probe a rewrite
+	 *    planted in the pool config could aim the publish at another host
+	 *    with every upstream check still passing. Git lower-cases the
+	 *    variable name in the config, hence `insteadof` here.
+	 *
+	 * `afterSuccessfulPush` only changes the WORDING. A probe that fires
+	 * after the remote has already accepted the ref must say so, or the
+	 * operator reads `refusing to publish` and goes looking for a branch
+	 * that is in fact on the remote while the run reports `pushed: false`.
+	 * The refusal itself stands either way: this control fails closed.
+	 */
+	private async assertNoPersistedCredential(
+		dir: string,
+		signal?: AbortSignal,
+		afterSuccessfulPush = false
+	): Promise<void> {
+		const probe = await this.git(
+			[
+				'config',
+				'--local',
+				'--name-only',
+				'--get-regexp',
+				'^(credential\\.|http\\..*\\.extraheader$|url\\..*\\.(insteadof|pushinsteadof)$)'
+			],
+			dir,
+			undefined,
+			signal
+		);
+		if (probe.code === 0 && probe.stdout.trim().length > 0) {
+			const found = probe.stdout.trim().split(/\r?\n/).join(', ');
+			throw new Error(
+				afterSuccessfulPush
+					? `the push completed, but this repository's Git config now carries persisted credential or remote-rewrite settings (${found}); the branch IS on the remote`
+					: `refusing to publish: this repository's Git config carries persisted credential or remote-rewrite settings (${found})`
+			);
+		}
+	}
+
 	/** Remove any credential material from text before it can be logged. */
-	private scrub(text: string, auth: WorkspaceProvisionSpec['auth']): string {
+	private scrub(
+		text: string,
+		auth: WorkspaceProvisionSpec['auth'],
+		credential?: WorkspacePushCredential | null
+	): string {
 		let out = text;
 		if (auth?.token) out = out.split(auth.token).join('***');
+		if (credential?.token) {
+			out = out.split(credential.token).join('***');
+			// The header form too: Git quotes what it sent when a transport
+			// error names the request, and base64 of the token is still the
+			// token.
+			out = out
+				.split(Buffer.from(`${credential.username}:${credential.token}`, 'utf8').toString('base64'))
+				.join('***');
+		}
 		// Belt-and-braces: strip userinfo from any URL that slipped through.
 		out = out.replace(/(https?:\/\/)[^/@\s]+@/g, '$1***@');
 		return out;
@@ -797,12 +1086,27 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		args: string[],
 		cwd: string | undefined,
 		auth: WorkspaceProvisionSpec['auth'],
-		signal?: AbortSignal
+		signal?: AbortSignal,
+		// Appended LAST and optional: every existing call site keeps its
+		// arity, and only the publish ever passes one.
+		credential?: WorkspacePushCredential | null
 	): Promise<GitResult> {
 		throwIfAborted(signal);
+		const inherited: NodeJS.ProcessEnv = { ...process.env };
+		if (credential) {
+			// DELETE, not set-to-empty: an empty `GIT_ASKPASS` is still a
+			// set variable and Git would try to run "" as a program. See
+			// `credentialEnvRemovals` for what each of these would
+			// otherwise do to a credentialed push.
+			for (const name of LocalWorkspacePlugin.credentialEnvRemovals) delete inherited[name];
+		}
 		return execFileWithVerifiedCancellation('git', args, {
 			...(cwd ? { cwd } : {}),
-			env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+			env: {
+				...inherited,
+				GIT_TERMINAL_PROMPT: '0',
+				...(credential ? this.credentialEnv(credential, inherited) : {})
+			},
 			maxBuffer: 16 * 1024 * 1024,
 			windowsHide: true,
 			...(signal ? { signal } : {}),
@@ -817,8 +1121,12 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 						: 0;
 			return {
 				code,
-				stdout: String(stdout ?? ''),
-				stderr: this.scrub(String(stderr ?? ''), auth)
+				// stdout is scrubbed too when a credential is in play: the
+				// push is the one command whose output a caller forwards
+				// into a job result, and `git push` writes remote messages
+				// there.
+				stdout: credential ? this.scrub(String(stdout ?? ''), auth, credential) : String(stdout ?? ''),
+				stderr: this.scrub(String(stderr ?? ''), auth, credential)
 			};
 		});
 	}
@@ -828,9 +1136,10 @@ export class LocalWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		cwd: string | undefined,
 		auth: WorkspaceProvisionSpec['auth'],
 		what: string,
-		signal?: AbortSignal
+		signal?: AbortSignal,
+		credential?: WorkspacePushCredential | null
 	): Promise<GitResult> {
-		const result = await this.git(args, cwd, auth, signal);
+		const result = await this.git(args, cwd, auth, signal, credential);
 		if (result.code !== 0) {
 			throw new Error(`${what}: ${result.stderr.trim() || `git exited ${result.code}`}`);
 		}

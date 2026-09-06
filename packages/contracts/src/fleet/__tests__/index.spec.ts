@@ -228,6 +228,43 @@ const RUN_CREDENTIAL_EXPORTS = [
 	'fleetRunTokenExpiryFromLease'
 ] as const;
 
+/**
+ * Self-build slice AM (EW-810) — fleet-push-credential.types.ts.
+ *
+ * The scoped push credential and the attribution that rides with it: the
+ * `git-push` capability tag both ends agree on, the basic-auth username
+ * and the fixed revoke endpoint, the reserved `Ever-Works-` trailer
+ * namespace and its anti-forgery predicates, the remote/repository
+ * normalizers the node checks the credential's scope with (including the
+ * single HOST those normalizers pin the credential to), and the three
+ * stable refusal tokens a mint can answer with.
+ */
+const PUSH_CREDENTIAL_EXPORTS = [
+	'FLEET_PUSH_CAPABILITY',
+	'FLEET_PUSH_MIN_GIT_VERSION',
+	'FLEET_PUSH_CREDENTIAL_USERNAME',
+	'FLEET_PUSH_CREDENTIAL_REVOKE_URL',
+	'FLEET_PUSH_CREDENTIAL_HOST',
+	'FLEET_PUSH_TRAILER_NAMESPACE',
+	'FLEET_PUSH_TRAILER_KEYS',
+	'FLEET_PUSH_CREDENTIAL_MAX_REPOSITORIES',
+	'FLEET_PUSH_CREDENTIAL_NOT_CONFIGURED_REASON',
+	'FLEET_PUSH_CREDENTIAL_UNRESOLVED_REASON',
+	'FLEET_PUSH_CREDENTIAL_MINT_FAILED_REASON',
+	'FLEET_PUSH_CREDENTIAL_REASONS',
+	'FLEET_PUSH_DEFAULT_AUTHOR_NAME',
+	'FLEET_PUSH_DEFAULT_AUTHOR_EMAIL',
+	'describeFleetPushCredentialRefusal',
+	'isFleetPushTrailerLine',
+	'containsReservedFleetPushTrailer',
+	'normalizeFleetPushRepositoryId',
+	'fleetPushRemoteRepositoryId',
+	'sanitizeFleetPushIdentityText',
+	'fleetPushCommitIdentity',
+	'composeFleetPushCommitMessage',
+	'FleetPushAttributionError'
+] as const;
+
 const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
@@ -238,7 +275,8 @@ const ALL_EXPORTS = [
 	...WORKSPACE_EXPORTS,
 	...RUN_SECRETS_EXPORTS,
 	...QUESTION_EXPORTS,
-	...RUN_CREDENTIAL_EXPORTS
+	...RUN_CREDENTIAL_EXPORTS,
+	...PUSH_CREDENTIAL_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -279,7 +317,16 @@ const FUNCTION_EXPORTS = [
 	'normalizeFleetAgentTaskQuestion',
 	'normalizeFleetNodeWorkerState',
 	'isFleetRunTokenRouteAllowed',
-	'fleetRunTokenExpiryFromLease'
+	'fleetRunTokenExpiryFromLease',
+	'describeFleetPushCredentialRefusal',
+	'isFleetPushTrailerLine',
+	'containsReservedFleetPushTrailer',
+	'normalizeFleetPushRepositoryId',
+	'fleetPushRemoteRepositoryId',
+	'sanitizeFleetPushIdentityText',
+	'fleetPushCommitIdentity',
+	'composeFleetPushCommitMessage',
+	'FleetPushAttributionError'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -294,7 +341,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 153 runtime symbols', () => {
+	it('exposes exactly these 176 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -316,8 +363,16 @@ describe('fleet barrel', () => {
 		// → 153 with acceptance checks that mean something (EW-807): the
 		// four setup-phase bounds. All three groups live in existing
 		// modules, so the witness table below needs no new row.
+		// → 175 with scoped push credentials (EW-810): the twenty-two
+		// symbols of `fleet-push-credential.types.ts` — a NEW module, so
+		// the witness table below gains a row as well.
+		// → 176 when that slice's review found the scope check never read
+		// the remote's HOST: `FLEET_PUSH_CREDENTIAL_HOST` is the one host a
+		// GitHub installation token may ever be offered to, and it is a
+		// named export precisely so the node, the plugin and this guard
+		// cannot disagree about it.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(153);
+		expect(Object.keys(fleet)).toHaveLength(176);
 	});
 
 	it.each([
@@ -329,7 +384,8 @@ describe('fleet barrel', () => {
 		['fleet-run-secrets.types.js', 'FLEET_RUN_ENV_FILE_MAX_COUNT'],
 		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
 		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS'],
-		['fleet-run-credential.types.js', 'FLEET_RUN_TOKEN_PREFIX']
+		['fleet-run-credential.types.js', 'FLEET_RUN_TOKEN_PREFIX'],
+		['fleet-push-credential.types.js', 'FLEET_PUSH_CAPABILITY']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up
