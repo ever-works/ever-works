@@ -12,6 +12,7 @@ import { TaskWatcher } from '../entities/task-watcher.entity';
 import { TaskKbMention } from '../entities/task-kb-mention.entity';
 import { TaskTemplate } from '../entities/task-template.entity';
 import { TaskTemplateStep } from '../entities/task-template-step.entity';
+import { TaskCiAutoResumeAttempt } from '../entities/task-ci-auto-resume-attempt.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
@@ -21,6 +22,7 @@ import { Team } from '../entities/team.entity';
 import { Goal } from '../entities/goal.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { TaskCiAutoResumeAttemptRepository } from '../database/repositories/task-ci-auto-resume-attempt.repository';
 import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
 import { TaskTemplateRepository } from '../database/repositories/task-template.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
@@ -54,6 +56,7 @@ import { TaskMergeGateService } from './task-merge-gate.service';
 import { TaskGitLinkService } from './task-git-link.service';
 import { TaskWorkspaceService } from './task-workspace.service';
 import { TaskPrStatusService } from './task-pr-status.service';
+import { TaskCiAutoResumeService } from './task-ci-auto-resume.service';
 import { FacadesModule } from '../facades/facades.module';
 import { PolicyModule } from '../policy/policy.module';
 import { MergeApprovalModule } from '../agent-approvals/merge-approval.module';
@@ -87,6 +90,11 @@ import { DatabaseModule } from '../database/database.module';
             // `_entities-inventory.ts` (no autoLoadEntities in this repo).
             TaskTemplate,
             TaskTemplateStep,
+            // CI feedback + autonomous fix loop (slice AC, EW-806) — the
+            // durable attempt ledger that IS the retry budget. ALSO
+            // registered in `_entities-inventory.ts` (no autoLoadEntities
+            // in this repo) and in `_entity-names.ts`.
+            TaskCiAutoResumeAttempt,
             UserTaskCounter,
             WorkKnowledgeUpload,
             Work,
@@ -128,6 +136,7 @@ import { DatabaseModule } from '../database/database.module';
     ],
     providers: [
         TaskRepository,
+        TaskCiAutoResumeAttemptRepository,
         AgentRepoAttachmentRepository,
         TaskAssigneeRepository,
         TaskReviewerRepository,
@@ -178,6 +187,15 @@ import { DatabaseModule } from '../database/database.module';
         // diff reads. Uses the git facade (FacadesModule, imported above)
         // and TaskTransitionService for the merged-PR -> done landing.
         TaskPrStatusService,
+        // CI feedback + autonomous fix loop (slice AC, EW-806) — the
+        // decision layer behind the GitHub check receiver. Reads the
+        // attempt ledger above, `AgentRunRepository` +
+        // `TaskReviewRejectionRepository` (AgentsModule, imported above)
+        // and `TaskGitLinkService`; resumes through the RUN_STEERING_PORT
+        // the api-side @Global() AgentsModule binds. Every one of those
+        // tokens is @Optional() at the injection site, so an install
+        // without them files nothing and resumes nothing.
+        TaskCiAutoResumeService,
         // Wave 3 M2 — acceptance-check runner (quality gates). Needs only
         // AgentRunRepository (exported by AgentsModule above) to persist
         // per-run gate results.
@@ -190,6 +208,7 @@ import { DatabaseModule } from '../database/database.module';
     ],
     exports: [
         TaskRepository,
+        TaskCiAutoResumeAttemptRepository,
         TaskAssigneeRepository,
         TaskReviewerRepository,
         TaskApproverRepository,
@@ -218,6 +237,7 @@ import { DatabaseModule } from '../database/database.module';
         TaskMergeGateService,
         TaskGitLinkService,
         TaskPrStatusService,
+        TaskCiAutoResumeService,
         TaskGateRunnerService,
         TaskGateJudgeService,
     ],

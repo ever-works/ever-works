@@ -38,6 +38,15 @@ import {
     catalogCreditsMarginPercent,
     catalogPaygMaxMonthlyCapCredits,
 } from '../subscriptions/billing/stripe-catalog';
+// CI feedback + autonomous fix loop (slice AC, EW-806). Concrete file
+// import, not the tasks-domain barrel: `task-ci-auto-resume.ts` is a pure
+// leaf (its only import is `node:crypto`) and pulling the barrel here
+// would drag the Nest service graph into config resolution.
+import {
+    DEFAULT_CI_AUTO_RESUME_ATTEMPTS,
+    MAX_CI_AUTO_RESUME_ATTEMPTS,
+    clampAutoResumeAttempts,
+} from '../tasks-domain/task-ci-auto-resume';
 type AppType = 'cli' | 'api';
 
 /**
@@ -1516,6 +1525,37 @@ export const config = {
         getTaskFanoutScanLimit() {
             const raw = parseInt(process.env.TASK_FANOUT_SCAN_LIMIT || '50', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : 50;
+        },
+        /**
+         * CI feedback + autonomous fix loop (self-build slice AC, EW-806) —
+         * how many times ONE Task may be auto-resumed, over its whole life,
+         * because CI went red or a reviewer rejected its pull request.
+         *
+         * 💸 THIS KNOB SPENDS MONEY. Each attempt is a full
+         * `agent-task-execute` run on a fleet PC — the same order of model
+         * spend as the run that opened the pull request. The default of
+         * TWO therefore caps what this feature can add to any one Task at
+         * two extra runs, forever, not two per push and not two per day.
+         *
+         * `0` switches the loop OFF: check results are still ingested and
+         * the board still goes red, nothing is resumed. Values are clamped
+         * to 0..5; an unparseable value falls back to the default rather
+         * than silently disabling a shipped loop.
+         *
+         * The COUNTER is not here — it is rows in
+         * `task_ci_auto_resume_attempts`. This is only the ceiling.
+         */
+        getCiAutoResumeMaxAttempts() {
+            // `clampAutoResumeAttempts` rather than the local
+            // `clampedIntEnv`: the clamp that decides how much money this
+            // loop may spend has its own unit tests next to the constants
+            // it clamps against, and those tests are only worth anything
+            // if this is the function actually shipped. `parseInt` of an
+            // absent or unparseable value yields NaN, which the clamp maps
+            // to DEFAULT_CI_AUTO_RESUME_ATTEMPTS.
+            return clampAutoResumeAttempts(
+                parseInt(process.env.TASK_CI_AUTO_RESUME_MAX_ATTEMPTS ?? '', 10),
+            );
         },
         /**
          * H2 kill-switch for the plan-driven concurrency ceiling

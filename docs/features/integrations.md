@@ -108,9 +108,18 @@ Deliveries for an installation nobody has claimed are a 200 no-op that files not
 - Repeated `event_alert` deliveries for the **same issue** collapse into **one event per five minutes**. A Sentry issue is one fingerprint, so alerts inside a window are one revision of it: a flapping issue lands ~12 events an hour instead of one per occurrence, which is what keeps it out of everyone else's ingest queue. A genuinely later alert still lands as a new revision, and the newest facts (release, level, culprit) travel with whichever delivery opens a window.
 - Work routing: claim the Sentry **project slug** under **Tracker team** on the Work; `event_alert` deliveries carry only the numeric project id, so claim that too if you route alert-rule fires. Raw bodies are never logged — event alerts carry stack frames and user context.
 
+### CI check results
+
+Subscribe the GitHub App (or the repository webhook) to **Check runs**, **Check suites** and **Workflow runs**, and every result becomes a `github.check` event on the same spine, verified and attributed exactly like a pull request.
+
+- Identity carries the head commit plus the provider's own run id, status and conclusion, so an exact redelivery dedupes to nothing while a re-run of the same commit is a new result.
+- The head commit and a RED `ciState` are written onto the Task from the delivery, rather than waiting for the two-minute PR status poll. Green is never written from a webhook — one green check is not a green gate.
+- A completed **failure** can resume the Task's run automatically, under a durable per-Task retry budget (default two attempts, `TASK_CI_AUTO_RESUME_MAX_ATTEMPTS=0` to switch it off). Read [CI Auto-Fix](ci-auto-resume.md) before turning it up: every attempt is a full Agent run.
+- Match them in a trigger with `{ "source": "github", "kind": "github.check" }`.
+
 ### The `incident` kind
 
-An incident is "something broke and somebody should look". Every incident source normalizes into the one `kind: incident` envelope with the same payload block (`provider`, `externalId`, `title`, `url`, `culprit`, `level`, `release`, `environment`, `project`, `status`, `action`), so a trigger with `eventMatcher: { kind: 'incident' }` matches all of them and `source` narrows to a vendor. Adding a source means implementing the small `IncidentSource` interface (`apps/api/src/ingest/incidents/`) behind whichever receiver verifies that vendor's signature — a CI-flake source over GitHub `workflow_run` / `check_run` deliveries is the documented next seam.
+An incident is "something broke and somebody should look". Every incident source normalizes into the one `kind: incident` envelope with the same payload block (`provider`, `externalId`, `title`, `url`, `culprit`, `level`, `release`, `environment`, `project`, `status`, `action`), so a trigger with `eventMatcher: { kind: 'incident' }` matches all of them and `source` narrows to a vendor. Adding a source means implementing the small `IncidentSource` interface (`apps/api/src/ingest/incidents/`) behind whichever receiver verifies that vendor's signature. GitHub's `check_run` / `check_suite` / `workflow_run` deliveries are handled — but as their own `github.check` kind rather than as incidents, because a red build on your own pull request is work to finish, not an incident to triage; see [CI Auto-Fix](ci-auto-resume.md). A CI-**flake** source (the same job going red and green across unrelated commits) remains the documented next seam here.
 
 ### Triage Tasks
 

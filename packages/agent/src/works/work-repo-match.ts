@@ -37,12 +37,47 @@ export function matchWorkByRepo<T extends Work>(
     owner: string,
     repo: string,
 ): T | null {
+    return matchWorkRepoRole(works, owner, repo)?.work ?? null;
+}
+
+/**
+ * The repo role a Task's own branch and pull request live in.
+ *
+ * `data`, not `work`: `TaskWorkspaceService` clones `work.getDataRepo()`
+ * for every isolated Task worktree and opens the pull request there, and
+ * `TaskPrStatusService.resolveRepo` polls the same repository. So
+ * `tasks.branchRef` and `tasks.prNumber` are only unique inside the DATA
+ * repository — a pull request #7 in the Work's `work` or `website` repo
+ * is a different pull request that happens to share a number.
+ */
+export const WORK_TASK_REPO_ROLE: WorkRepoRole = 'data';
+
+/**
+ * The same match, but it also says WHICH repo roles hit — all of them,
+ * because a Work whose `relatedRepositories` does not name a role falls
+ * back to a default name and two roles can legitimately resolve to the
+ * SAME repository (see `markdown-generator.service.ts`: "`getMainRepo()`
+ * and `work.getDataRepo()` can be the SAME repo").
+ *
+ * Callers that merely decorate an ingested event do not care. Callers
+ * that key on a Task's own coordinates — `tasks.prNumber`,
+ * `tasks.branchRef` — must check for {@link WORK_TASK_REPO_ROLE}, or a
+ * pull request #7 in the Work's website repo resolves to whatever Task
+ * opened #7 in the data repo, and anything done on that Task's behalf
+ * (rewriting its CI head, resuming its run) lands on the wrong Task and
+ * the wrong repository. `matchWorkByRepo` keeps the role-blind behaviour
+ * its existing callers were written against.
+ */
+export function matchWorkRepoRole<T extends Work>(
+    works: readonly T[],
+    owner: string,
+    repo: string,
+): { work: T; roles: readonly WorkRepoRole[] } | null {
     const target = `${owner}/${repo}`.trim().toLowerCase();
     if (!target || target === '/') return null;
     for (const work of works) {
-        for (const role of WORK_REPO_ROLES) {
-            if (getWorkRepoFullName(work, role) === target) return work;
-        }
+        const roles = WORK_REPO_ROLES.filter((role) => getWorkRepoFullName(work, role) === target);
+        if (roles.length > 0) return { work, roles };
     }
     return null;
 }

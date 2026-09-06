@@ -310,6 +310,47 @@ export class Task {
     /** Stable refusal code of that refusal (or `not-merged` when untyped). */
     @Column({ type: 'varchar', length: 64, nullable: true })
     mergeRefusedCode?: string | null;
+    // ── CI feedback + autonomous fix loop (slice AC, EW-806) ─────────
+    // Written from the git provider's OWN `check_run` / `check_suite` /
+    // `workflow_run` deliveries, not from the every-2-minutes poll that
+    // fills the three columns above. They sit here for the same reason
+    // those do: the pull request belongs to the Task's branch, which
+    // outlives any single run.
+
+    /**
+     * Head commit the last CI result was reported against, straight from
+     * the provider delivery.
+     *
+     * This is the column that makes "is this check result for the head we
+     * still care about?" answerable at all — `baseSha` is where the branch
+     * was cut FROM, and the per-entry `headSha` inside
+     * `linkedPullRequests` only covers non-primary repositories. Without
+     * it the fix loop could not tell a fresh red from CI catching up on a
+     * revision that has already been force-pushed away.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    ciHeadSha?: string | null;
+
+    /**
+     * When `ciHeadSha` was observed. Written as a PAIR with it, and used
+     * only to order two different head commits — a delivery reporting a
+     * commit older than this one is stale and never resumes anything.
+     */
+    @PortableDateColumn({ nullable: true })
+    ciHeadSeenAt?: Date | null;
+
+    /**
+     * One-shot marker for the "automatic retries stopped" Inbox notice.
+     *
+     * Compare-and-set from NULL exactly once per Task
+     * (`TaskRepository.casMarkCiAutoResumeNoticed`), the same shape
+     * `fleet_nodes.dailyCostTrippedOn` uses: a single pull request emits
+     * dozens of check deliveries and every one of them re-discovers a
+     * spent budget, so without this marker the owner would get one Inbox
+     * row per delivery instead of one per Task.
+     */
+    @PortableDateColumn({ nullable: true })
+    ciAutoResumeNoticedAt?: Date | null;
 
     // ── Latest-run denorm (kanban run cockpit, Wave 2) ───────────────
     // Maintained by `TaskRunDenormService` on queued creation, claim and

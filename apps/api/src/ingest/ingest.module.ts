@@ -14,6 +14,7 @@ import { GitHubAppWebhookController } from './github/github-app-webhook.controll
 import { GitHubPrReviewBridgeService } from './github/github-pr-review-bridge.service';
 import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatcher.service';
 import { GitHubIssueIntakeService } from './github/github-issue-intake.service';
+import { GitHubCheckIntakeService } from './github/github-check-intake.service';
 import { DependabotIncidentSource } from './incidents/dependabot-incident.source';
 import { JiraEventsController } from './jira/jira-events.controller';
 import { JiraIssueBridgeService } from './jira/jira-issue-bridge.service';
@@ -86,6 +87,18 @@ import { TriageTaskFilerService } from './triage/triage-task-filer.service';
  *     authenticated `SentryBindingsController`
  *     (`/api/ingest/sentry/bindings`).
  *
+ * ## CI feedback and the autonomous fix loop (§6, R17)
+ *
+ * `GitHubCheckIntakeService` is the SECOND registered consumer on the one
+ * dispatcher. `check_run` / `check_suite` / `workflow_run` deliveries —
+ * which had no handling anywhere before — become `github.check` events on
+ * the same spine, and a completed FAILURE is offered to
+ * `TaskCiAutoResumeService` (TasksDomainModule), which resumes the Task's
+ * run under a durable, per-attempt retry budget. It also sees the
+ * reviewer deliveries, purely to act on the durable rejection the review
+ * bridge has already recorded for them — the dispatcher awaits the review
+ * leg before the intake leg, so the row exists by then.
+ *
  * `TriageTaskFilerService` is a kind processor on the spine
  * (`github.issue`, `jira.issue`, `incident`): one Task per
  * `(source, external id)` in the bound Work, dedup key persisted in
@@ -120,6 +133,14 @@ import { TriageTaskFilerService } from './triage/triage-task-filer.service';
         // Issue + incident intake (§6, R2/R23).
         DependabotIncidentSource,
         GitHubIssueIntakeService,
+        // CI feedback + autonomous fix loop (slice AC, EW-806, R17) — a
+        // SECOND registered consumer on the same one dispatcher, for the
+        // `check_run` / `check_suite` / `workflow_run` deliveries nothing
+        // handled before, plus the reviewer deliveries whose durable
+        // rejection the bridge has already recorded by the time the
+        // intake leg runs. It resumes through `TaskCiAutoResumeService`
+        // (TasksDomainModule, imported above).
+        GitHubCheckIntakeService,
         JiraIssueBridgeService,
         SentryIncidentSource,
         SentryInstallBindingService,

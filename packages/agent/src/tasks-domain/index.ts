@@ -61,6 +61,19 @@ export * from './task-review-rejection.service';
 // Merge approval (self-build slice AE, EW-805).
 export * from './task-review-approval.service';
 export * from './task-merge-gate.service';
+// CI feedback + autonomous fix loop (slice AC, EW-806) — the pure policy
+// helpers and the decision layer the GitHub check receiver calls.
+export * from './task-ci-auto-resume';
+export * from './task-ci-auto-resume.service';
+export {
+    TaskCiAutoResumeAttempt,
+    TASK_AUTO_RESUME_TRIGGERS,
+    type TaskAutoResumeTrigger,
+} from '../entities/task-ci-auto-resume-attempt.entity';
+export {
+    TaskCiAutoResumeAttemptRepository,
+    type ClaimAutoResumeAttemptInput,
+} from '../database/repositories/task-ci-auto-resume-attempt.repository';
 // Git activity ingestion (audit item j) — branch/PR → Task resolver.
 export * from './task-git-link.service';
 export {
