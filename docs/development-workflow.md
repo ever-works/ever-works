@@ -16,8 +16,9 @@ All commands are run from the **monorepo root** unless otherwise noted. Turborep
 ### Starting Dev Servers
 
 ```bash
-# Start everything (API + Web + packages in watch mode)
-pnpm dev
+# Start every app in watch mode -- API, Web and MCP in parallel
+# (all of apps/* except docs, desktop, desktop-node and node)
+pnpm dev:apps
 
 # Start only the API (NestJS, port 3100)
 pnpm dev:api
@@ -25,20 +26,24 @@ pnpm dev:api
 # Start only the Web dashboard (Next.js, port 3000)
 pnpm dev:web
 
-# Start individual apps
-pnpm dev:apps          # All apps/* in parallel
+# Start only the documentation site (Docusaurus)
+pnpm dev:docs
 
 # Start the Trigger.dev dev server (background jobs)
 pnpm dev:trigger
 ```
 
+There is no root `pnpm dev` script -- pick the target you want from the list above.
+
 Under the hood, these map to Turborepo filters:
 
-| Command            | Turborepo Equivalent                                   |
-| ------------------ | ------------------------------------------------------ |
-| `pnpm dev:api`     | `turbo dev --filter=ever-works-api`                    |
-| `pnpm dev:web`     | `turbo dev --filter=ever-works-web`                    |
-| `pnpm dev:trigger` | `turbo dev:trigger --filter=@ever-works/trigger-tasks` |
+| Command            | Turborepo Equivalent                                                                                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev:apps`    | `turbo dev --filter=./apps/* --filter=!./apps/docs --filter=!./apps/desktop --filter=!./apps/desktop-node --filter=!./apps/node` |
+| `pnpm dev:api`     | `turbo dev --filter=ever-works-api`                                                                                              |
+| `pnpm dev:web`     | `turbo dev --filter=ever-works-web`                                                                                              |
+| `pnpm dev:docs`    | `turbo dev --filter=ever-works-docs`                                                                                             |
+| `pnpm dev:trigger` | `turbo dev:trigger --filter=@ever-works/trigger-tasks`                                                                           |
 
 ### Building
 
@@ -110,7 +115,7 @@ When editing a shared package (e.g., `@ever-works/contracts`) while apps are run
 
     Then restart the consuming app.
 
-2. **Option B** -- Run everything with `pnpm dev`, which starts all packages in dev/watch mode simultaneously.
+2. **Option B** -- Run the apps together with `pnpm dev:apps`, which starts every app except docs, desktop, desktop-node and node in watch mode. Note that this starts the _apps_, not the shared packages: a changed workspace package still needs the `turbo build --filter=...` from Option A unless that package has its own `dev` script (`@ever-works/agent` does -- see [Working with Multiple Packages](#working-with-multiple-packages)).
 
 ## Debugging with VS Code
 

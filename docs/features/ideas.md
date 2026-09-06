@@ -54,6 +54,10 @@ Two ways an Idea turns into a Work:
 
 The `Build` button on an IdeaCard is the primary CTA. `Accept` lives on the Mission detail page for Ideas spawned by a Mission, when you want to link to a Work you built outside the queue.
 
+**Neither always means a human pressed something.** When the spawning Mission has **auto-build Works** turned on, every Idea that Mission spawns is queued for build into its own Work on the same tick that created it — nobody clicks **Build**. It is the same Build path with the same per-Mission and account-wide budget caps: when a cap is hit the build is skipped, not retried. See [Auto-build Works](./missions.md#auto-build-works).
+
+Pressed or automatic, every build runs through one gate (**Accept** does not — it only links a Work you already have): **Enable Work agent** on `/settings/work-agent` is unchecked on every new account, and while it is off the API answers `400 "Work agent is disabled."` — the Idea still commits its `PENDING → QUEUED` transition, but no build request is created and nothing generates. See [Autonomous Operation](./autonomous-operation.md) for all three gates, or [Build a Site Fully Autonomously from a Template](../guides/autonomous-site-from-template.md) for the walkthrough.
+
 ## Refreshing Ideas
 
 The **Suggest more** button on `/ideas` triggers the AI research job to generate fresh proposals based on your account context (existing Works, accepted Ideas, dismissed Ideas — the model uses all three to lean adjacent to wins, away from rejections).
@@ -85,6 +89,8 @@ Ideas spawned by a [Mission](./missions) carry a `missionId` back-reference and 
 - On the Mission's detail page, filtered to just that Mission's Ideas.
 
 Use the Mission detail page when you want context — you can see the Mission's description and the Ideas it produced side-by-side. Use `/ideas` when you want to triage everything at once.
+
+If that Mission has [auto-build Works](./missions.md#auto-build-works) on, its Ideas do not wait for you at `PENDING` — each one is queued for build as soon as it is spawned, so you will meet most of them already `QUEUED`, `BUILDING` or `ACCEPTED`.
 
 ## Cost & budget
 
