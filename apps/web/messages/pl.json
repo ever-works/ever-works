@@ -623,6 +623,7 @@
                 "schedule_task": "Zaplanuj zadanie",
                 "send_message": "Wyślij wiadomość",
                 "budget_override": "Nadpisanie budżetu",
+                "merge_pull_request": "Scal pull request",
                 "other": "Działanie"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Działanie odrzucone",
                 "bulkApproved": "Zatwierdzono {count} działań",
                 "bulkApprovedSkipped": "Zatwierdzono {approved} działań, {skipped} już rozstrzygnięto",
+                "bulkApprovedExcluded": "Zatwierdzono {approved} akcji; {excluded} wymaga osobnej decyzji",
                 "error": "Coś poszło nie tak. Spróbuj ponownie."
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "Zaplanuj zadanie",
                     "send_message": "Wyślij wiadomość",
                     "budget_override": "Nadpisanie budżetu",
+                    "merge_pull_request": "Scal pull request",
                     "other": "Inne"
                 },
                 "save": "Zapisz bariery",

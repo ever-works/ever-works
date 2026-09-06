@@ -623,6 +623,7 @@
                 "schedule_task": "작업 예약",
                 "send_message": "메시지 보내기",
                 "budget_override": "예산 재정의",
+                "merge_pull_request": "풀 리퀘스트 병합",
                 "other": "작업"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "작업이 거부되었습니다",
                 "bulkApproved": "{count}개 작업이 승인되었습니다",
                 "bulkApprovedSkipped": "{approved}개 작업 승인, {skipped}개는 이미 결정됨",
+                "bulkApprovedExcluded": "{approved}개 작업을 승인했습니다. {excluded}개는 개별 결정이 필요합니다",
                 "error": "문제가 발생했습니다. 다시 시도해 주세요."
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "작업 예약",
                     "send_message": "메시지 보내기",
                     "budget_override": "예산 재정의",
+                    "merge_pull_request": "풀 리퀘스트 병합",
                     "other": "기타"
                 },
                 "save": "가드레일 저장",

@@ -623,6 +623,7 @@
                 "schedule_task": "Jadwalkan tugas",
                 "send_message": "Kirim pesan",
                 "budget_override": "Penggantian anggaran",
+                "merge_pull_request": "Gabungkan pull request",
                 "other": "Tindakan"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Tindakan ditolak",
                 "bulkApproved": "{count} tindakan disetujui",
                 "bulkApprovedSkipped": "{approved} tindakan disetujui, {skipped} sudah diputuskan",
+                "bulkApprovedExcluded": "{approved} tindakan disetujui; {excluded} masih perlu diputuskan satu per satu",
                 "error": "Terjadi kesalahan. Silakan coba lagi."
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "Jadwalkan tugas",
                     "send_message": "Kirim pesan",
                     "budget_override": "Penggantian anggaran",
+                    "merge_pull_request": "Gabungkan pull request",
                     "other": "Lainnya"
                 },
                 "save": "Simpan pagar pengaman",

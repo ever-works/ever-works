@@ -87,4 +87,23 @@ describe('RISK_SCORER (pure)', () => {
         const input = { actionType: 'spawn_agent' as const, payload: { spawnDepth: 3 } };
         expect(RISK_SCORER(input)).toEqual(RISK_SCORER(input));
     });
+
+    // ── merge approval (self-build slice AE, EW-805) ─────────────────
+
+    it('flags a merge as destructive from the ACTION TYPE, not from the payload', () => {
+        // Read off the payload instead and a caller that forgot
+        // `destructive: true` would mint an unflagged — and therefore
+        // guardrail-auto-approvable — merge proposal.
+        expect(RISK_SCORER({ actionType: 'merge_pull_request' })).toEqual(['destructive']);
+        expect(RISK_SCORER({ actionType: 'merge_pull_request', payload: {} })).toEqual([
+            'destructive',
+        ]);
+        expect(
+            RISK_SCORER({ actionType: 'merge_pull_request', payload: { destructive: false } }),
+        ).toEqual(['destructive']);
+    });
+
+    it('does not flag other action types as destructive by accident', () => {
+        expect(RISK_SCORER({ actionType: 'schedule_task', payload: {} })).toEqual([]);
+    });
 });

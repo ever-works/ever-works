@@ -623,6 +623,7 @@
                 "schedule_task": "กำหนดเวลางาน",
                 "send_message": "ส่งข้อความ",
                 "budget_override": "แทนที่งบประมาณ",
+                "merge_pull_request": "ผสานพูลรีเควสต์",
                 "other": "การดำเนินการ"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "ปฏิเสธการดำเนินการแล้ว",
                 "bulkApproved": "อนุมัติแล้ว {count} รายการ",
                 "bulkApprovedSkipped": "อนุมัติแล้ว {approved} รายการ, {skipped} รายการมีการตัดสินแล้ว",
+                "bulkApprovedExcluded": "อนุมัติ {approved} รายการ; {excluded} ต้องตัดสินใจแยกรายการ",
                 "error": "เกิดข้อผิดพลาด โปรดลองอีกครั้ง"
             }
         },
@@ -1111,6 +1113,7 @@
                     "schedule_task": "กำหนดเวลางาน",
                     "send_message": "ส่งข้อความ",
                     "budget_override": "แก้ไขงบประมาณ",
+                    "merge_pull_request": "ผสานพูลรีเควสต์",
                     "other": "อื่น ๆ"
                 },
                 "save": "บันทึกการ์ดเรล",

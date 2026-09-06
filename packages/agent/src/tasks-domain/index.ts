@@ -58,6 +58,9 @@ export {
     UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
 export * from './task-review-rejection.service';
+// Merge approval (self-build slice AE, EW-805).
+export * from './task-review-approval.service';
+export * from './task-merge-gate.service';
 // Git activity ingestion (audit item j) — branch/PR → Task resolver.
 export * from './task-git-link.service';
 export {

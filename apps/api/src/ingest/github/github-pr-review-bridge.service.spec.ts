@@ -98,6 +98,11 @@ describe('GitHubPrReviewBridgeService', () => {
             findByBranch: jest.fn().mockResolvedValue(null),
             findByPullRequest: jest.fn().mockResolvedValue(null),
         };
+        // Merge approval (slice AE) - the durable HUMAN approval recorder.
+        const approvals = {
+            recordPullRequestApproval: jest.fn().mockResolvedValue(true),
+            clearPullRequestApproval: jest.fn().mockResolvedValue(true),
+        };
         const service = new GitHubPrReviewBridgeService(
             userPluginRepository as any,
             pluginSettingsService as any,
@@ -106,6 +111,7 @@ describe('GitHubPrReviewBridgeService', () => {
             installBindings as any,
             rejections as any,
             taskLinks as any,
+            approvals as any,
         );
         return {
             service,
@@ -116,6 +122,7 @@ describe('GitHubPrReviewBridgeService', () => {
             installBindings,
             rejections,
             taskLinks,
+            approvals,
         };
     }
 
@@ -929,12 +936,30 @@ describe('GitHubPrReviewBridgeService', () => {
             expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
         });
 
-        it('ignores an approval - only a rejection carries feedback for the next run', async () => {
+        // CONTRACT NARROWED (merge approval, slice AE). This used to read
+        // "ignores an approval - only a rejection carries feedback for the
+        // next run" and assert that nothing at all happened. The claim
+        // about REJECTION FEEDBACK is still exactly right and is still
+        // pinned here; what was wrong was the consequence, because
+        // dropping the delivery entirely left the platform unable to
+        // answer "has a person read this pull request?" - the first thing
+        // somebody authorising a merge wants to know. An approval is now
+        // recorded on its own path, and still never becomes rejection
+        // feedback for the next run.
+        it('does not turn an approval into rejection feedback for the next run', async () => {
             const { service, rejections } = createService();
             await service.handleEvent(
                 BINDING,
                 'pull_request_review',
-                reviewBody({ review: { id: 1, state: 'approved', body: 'ship it' } }),
+                reviewBody({
+                    review: {
+                        id: 1,
+                        state: 'approved',
+                        body: 'ship it',
+                        commit_id: 'a'.repeat(40),
+                        user: { login: 'octocat', type: 'User' },
+                    },
+                }),
             );
             expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
         });
@@ -973,6 +998,260 @@ describe('GitHubPrReviewBridgeService', () => {
             rejections.recordPullRequestRejection.mockRejectedValue(new Error('db down'));
             await expect(
                 service.handleEvent(BINDING, 'pull_request_review', reviewBody()),
+            ).resolves.toEqual({ ingested: null });
+        });
+    });
+
+    describe('pull_request_review -> human review approval (merge approval, slice AE)', () => {
+        function approvalBody(over: Record<string, unknown> = {}) {
+            return {
+                action: 'submitted',
+                repository: { full_name: 'octo/site' },
+                pull_request: {
+                    number: 9,
+                    html_url: 'https://github.com/octo/site/pull/9',
+                    head: { sha: 'b'.repeat(40) },
+                },
+                review: {
+                    id: 1,
+                    state: 'approved',
+                    body: 'looks right',
+                    commit_id: 'a'.repeat(40),
+                    submitted_at: '2026-09-01T10:00:00Z',
+                    user: { login: 'octocat', type: 'User' },
+                },
+                ...over,
+            };
+        }
+
+        it('records a human approval against the commit the reviewer actually saw', async () => {
+            const { service, approvals } = createService();
+            await service.handleEvent(BINDING, 'pull_request_review', approvalBody());
+            expect(approvals.recordPullRequestApproval).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: BINDING.userId,
+                    owner: 'octo',
+                    repo: 'site',
+                    prNumber: 9,
+                    // review.commit_id, NOT pull_request.head.sha - recording
+                    // the branch head "now" would launder a review of an old
+                    // diff into a review of whatever was pushed since.
+                    headSha: 'a'.repeat(40),
+                    reviewerLabel: 'octocat',
+                    approvedAt: new Date('2026-09-01T10:00:00Z'),
+                }),
+            );
+        });
+
+        // CONTRACT REVERSAL (AE review). This used to be "falls back to
+        // the pull request head only when the review names no commit", and
+        // it pinned exactly the laundering the two docblocks either side
+        // of it forbid: `TaskReviewApprovalService` says headSha "is the
+        // review's own commit_id - the commit the reviewer actually looked
+        // at, not the branch head now. Storing the branch head instead
+        // would silently launder an approval of an old diff into an
+        // approval of whatever was pushed since." `pull_request.head.sha`
+        // IS the branch head now, and on a redelivered, trimmed or GHES
+        // payload it can be several commits past what the reviewer read.
+        //
+        // An unattributable approval is dropped instead - which is what
+        // the consuming service's own no-commit-id branch already did, so
+        // the fallback was only ever producing a WRONG record where the
+        // alternative was no record.
+        it('records NOTHING when the review names no commit — it never guesses the head', async () => {
+            const { service, approvals } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                approvalBody({
+                    review: {
+                        id: 1,
+                        state: 'approved',
+                        user: { login: 'octocat', type: 'User' },
+                    },
+                }),
+            );
+            expect(approvals.recordPullRequestApproval).toHaveBeenCalledWith(
+                expect.objectContaining({ headSha: null }),
+            );
+            // Emphatically not the branch head, which is what the Inbox
+            // would otherwise show as "octocat reviewed this commit".
+            expect(approvals.recordPullRequestApproval).not.toHaveBeenCalledWith(
+                expect.objectContaining({ headSha: 'b'.repeat(40) }),
+            );
+        });
+
+        it('IGNORES the platform own bot approving its own pull request', async () => {
+            const { service, approvals } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                approvalBody({
+                    review: {
+                        id: 1,
+                        state: 'approved',
+                        commit_id: 'a'.repeat(40),
+                        user: { login: 'ever-works[bot]', type: 'Bot' },
+                    },
+                }),
+            );
+            expect(approvals.recordPullRequestApproval).not.toHaveBeenCalled();
+        });
+
+        it('IGNORES an allow-listed reviewer bot approving - its rejections count, its blessings do not', async () => {
+            const { service, approvals } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                approvalBody({
+                    review: {
+                        id: 1,
+                        state: 'approved',
+                        commit_id: 'a'.repeat(40),
+                        user: { login: 'coderabbitai[bot]', type: 'Bot' },
+                    },
+                }),
+            );
+            expect(approvals.recordPullRequestApproval).not.toHaveBeenCalled();
+        });
+
+        it.each(['commented', 'dismissed'])(
+            'records no APPROVAL for a %s review',
+            async (state) => {
+                const { service, approvals, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review',
+                    approvalBody({
+                        review: {
+                            id: 1,
+                            state,
+                            commit_id: 'a'.repeat(40),
+                            user: { login: 'octocat', type: 'User' },
+                        },
+                    }),
+                );
+                expect(approvals.recordPullRequestApproval).not.toHaveBeenCalled();
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+            },
+        );
+
+        // A recorded approval that is never revoked (AE review). The
+        // head-SHA binding answers "did the code change under the
+        // approval?"; it says nothing about the reviewer changing their
+        // mind about the SAME commit — which is precisely the case where
+        // a person read the diff again and decided against it. Without
+        // this, the merge proposal goes on telling whoever is authorising
+        // it that "alice reviewed this" after alice explicitly withdrew.
+
+        it('WITHDRAWS the recorded approval when its author dismisses the review', async () => {
+            const { service, approvals } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                approvalBody({
+                    action: 'dismissed',
+                    review: {
+                        id: 1,
+                        state: 'dismissed',
+                        commit_id: 'a'.repeat(40),
+                        user: { login: 'octocat', type: 'User' },
+                    },
+                }),
+            );
+            expect(approvals.clearPullRequestApproval).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: BINDING.userId,
+                    owner: 'octo',
+                    repo: 'site',
+                    prNumber: 9,
+                    reviewerLabel: 'octocat',
+                }),
+            );
+        });
+
+        it('WITHDRAWS it when the same person replaces their approval with changes_requested', async () => {
+            const { service, approvals } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                approvalBody({
+                    review: {
+                        id: 2,
+                        state: 'changes_requested',
+                        body: 'actually, no',
+                        commit_id: 'a'.repeat(40),
+                        user: { login: 'octocat', type: 'User' },
+                    },
+                }),
+            );
+            expect(approvals.clearPullRequestApproval).toHaveBeenCalledWith(
+                expect.objectContaining({ reviewerLabel: 'octocat' }),
+            );
+        });
+
+        it('does not attempt a withdrawal for a BOT review', async () => {
+            // A bot never wrote one of these records, so it can never
+            // clear one — the same rule as the writer, from the other side.
+            const { service, approvals } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                approvalBody({
+                    review: {
+                        id: 1,
+                        state: 'dismissed',
+                        commit_id: 'a'.repeat(40),
+                        user: { login: 'coderabbitai[bot]', type: 'Bot' },
+                    },
+                }),
+            );
+            expect(approvals.clearPullRequestApproval).not.toHaveBeenCalled();
+        });
+
+        it('does not attempt a withdrawal on an APPROVED review', async () => {
+            const { service, approvals } = createService();
+            await service.handleEvent(BINDING, 'pull_request_review', approvalBody());
+            expect(approvals.clearPullRequestApproval).not.toHaveBeenCalled();
+        });
+
+        it('a withdrawal failure never fails the delivery', async () => {
+            const { service, approvals } = createService();
+            approvals.clearPullRequestApproval.mockRejectedValue(new Error('db down'));
+            await expect(
+                service.handleEvent(
+                    BINDING,
+                    'pull_request_review',
+                    approvalBody({
+                        review: {
+                            id: 1,
+                            state: 'dismissed',
+                            commit_id: 'a'.repeat(40),
+                            user: { login: 'octocat', type: 'User' },
+                        },
+                    }),
+                ),
+            ).resolves.toEqual({ ingested: null });
+        });
+
+        it('never enters the review loop', async () => {
+            const { service, prReviewService, eventIngestService } = createService();
+            const result = await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                approvalBody(),
+            );
+            expect(result.ingested).toBeNull();
+            expect(eventIngestService.ingest).not.toHaveBeenCalled();
+            await flush();
+            expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('a recorder failure never fails the delivery', async () => {
+            const { service, approvals } = createService();
+            approvals.recordPullRequestApproval.mockRejectedValue(new Error('db down'));
+            await expect(
+                service.handleEvent(BINDING, 'pull_request_review', approvalBody()),
             ).resolves.toEqual({ ingested: null });
         });
     });

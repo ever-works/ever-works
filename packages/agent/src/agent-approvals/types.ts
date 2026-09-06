@@ -22,6 +22,13 @@ export interface AgentActionProposalDto {
     title: string;
     payload: AgentActionProposalPayload;
     riskFlags: AgentActionRiskFlag[];
+    /**
+     * Merge approval (slice AE) — the canonical subject an approved
+     * `merge_pull_request` row is consumed by. NULL for every other type.
+     * On the wire so the queue UI can tell two merge proposals for the
+     * same Task apart by the commit they name.
+     */
+    subjectKey: string | null;
     status: AgentActionProposalStatus;
     decidedById: string | null;
     decidedAt: Date | null;
@@ -42,6 +49,7 @@ export function toAgentActionProposalDto(row: AgentActionProposal): AgentActionP
         title: row.title,
         payload: row.payload ?? {},
         riskFlags: row.riskFlags ?? [],
+        subjectKey: row.subjectKey ?? null,
         status: row.status,
         decidedById: row.decidedById ?? null,
         decidedAt: row.decidedAt ?? null,

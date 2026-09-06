@@ -623,6 +623,7 @@
                 "schedule_task": "Programar tarea",
                 "send_message": "Enviar mensaje",
                 "budget_override": "Anulación de presupuesto",
+                "merge_pull_request": "Fusionar pull request",
                 "other": "Acción"
             },
             "riskFlags": {
@@ -636,6 +637,7 @@
                 "rejected": "Acción rechazada",
                 "bulkApproved": "{count} acciones aprobadas",
                 "bulkApprovedSkipped": "{approved} acciones aprobadas, {skipped} ya decididas",
+                "bulkApprovedExcluded": "Se aprobaron {approved} acciones; {excluded} necesitan una decisión individual",
                 "error": "Algo salió mal. Inténtalo de nuevo."
             }
         },
@@ -1160,6 +1162,7 @@
                     "schedule_task": "Programar tarea",
                     "send_message": "Enviar mensaje",
                     "budget_override": "Anulación de presupuesto",
+                    "merge_pull_request": "Fusionar pull request",
                     "other": "Otro"
                 },
                 "save": "Guardar salvaguardas",

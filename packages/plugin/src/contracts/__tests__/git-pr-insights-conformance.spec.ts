@@ -16,8 +16,13 @@
  *      degrades to "no pill", it does not show an error.
  *   3. `merged` and `state` agree: `state === 'merged'` iff `merged`.
  *   4. The check list is bounded by `MAX_PR_CHECKS`.
- *   5. `ciState` matches `deriveCiState(checks)` — a provider may not
- *      invent its own rollup (one red check is never reported green).
+ *   5. `ciState` never contradicts the checks it returned (a red one you
+ *      can see is never reported green), and equals `deriveCiState` on
+ *      the nose whenever nothing was dropped. It is deliberately NOT
+ *      "equals `deriveCiState(checks)`" — `checks` is a bounded DISPLAY
+ *      sample and `ciState` is the verdict for the whole head commit, so
+ *      a provider that rolled up its own truncated list would satisfy
+ *      that and merge red work (merge approval, slice AE).
  *   6. `getPullRequestDiff` honours `maxFiles` and flags `truncated`.
  *   7. `getPullRequestDiff` honours `maxBytes`: returned patch text never
  *      exceeds the budget, and dropping a patch sets `truncated`.
@@ -148,10 +153,39 @@ export function runGitPrInsightsContractSuite(
 				expect(status!.checks.length).toBeLessThanOrEqual(MAX_PR_CHECKS);
 			});
 
-			it('derives ciState from the checks with the shared rule', async () => {
+			// CONTRACT REVERSAL (merge approval, slice AE). This used to
+			// assert `ciState === deriveCiState(status.checks)` — the
+			// roll-up over the CAPPED display list. That is the wrong
+			// invariant and it actively hid a hole: `checks` is bounded by
+			// MAX_PR_CHECKS while `ciState` is documented as the verdict
+			// for the whole head commit, so a provider with 25 checks
+			// satisfied the old assertion precisely by rolling up the
+			// first 20 and reporting a red pull request green. Slice AE
+			// then made `ciState` an authorization input, which turned a
+			// wrong display value into an unapproved merge.
+			//
+			// The suite cannot see the provider's full set, so it asserts
+			// the two halves it CAN:
+			//   • the sample may never contradict the verdict (a failure
+			//     you can see must be reported as failing), and
+			//   • when nothing was dropped — the sample is short of the
+			//     cap and the provider says the read was complete — the
+			//     verdict must equal the shared rule exactly.
+			it('never reports a verdict its own check sample contradicts', async () => {
 				const subject = await createSubject();
 				if (!subject.getPullRequestStatus) return;
 				const status = await subject.getPullRequestStatus(cfg.owner, cfg.repo, cfg.prNumber, cfg.token);
+				if (deriveCiState(status!.checks) === 'failing') {
+					expect(status!.ciState).toBe('failing');
+				}
+			});
+
+			it('derives ciState with the shared rule when nothing was dropped', async () => {
+				const subject = await createSubject();
+				if (!subject.getPullRequestStatus) return;
+				const status = await subject.getPullRequestStatus(cfg.owner, cfg.repo, cfg.prNumber, cfg.token);
+				const nothingDropped = status!.checks.length < MAX_PR_CHECKS && status!.checksComplete !== false;
+				if (!nothingDropped) return;
 				expect(status!.ciState).toBe(deriveCiState(status!.checks));
 			});
 		});

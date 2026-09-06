@@ -225,8 +225,8 @@ export class FleetAgentTaskReconcilerService {
         // the event arrives as an ordinary `node-report`.
         //
         // Falling through from there ran the whole success path:
-        // `finalizeRemotePush` OPENED A PULL REQUEST — and can auto-merge it
-        // — for a Task the user had explicitly cancelled, then posted a
+        // `finalizeRemotePush` OPENED A PULL REQUEST for a Task the user had
+        // explicitly cancelled, then posted a
         // "run finished" chat message contradicting the cancellation.
         //
         // The terminal write itself was always safe: `markCompleted` CASes
