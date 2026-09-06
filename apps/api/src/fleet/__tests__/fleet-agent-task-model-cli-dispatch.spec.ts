@@ -128,6 +128,46 @@ describe('fleet agent-task dispatch — model-cli plan wiring', () => {
         expect(request.payload.workspacePath).toBeUndefined();
     });
 
+    // Acceptance checks that mean something (EW-807). This assignment IS
+    // the freeze: both phases are embedded in the immutable enqueued
+    // payload here, and the node reads them from nowhere else — which is
+    // what makes "a model rewriting .works/works.yml mid-run cannot widen
+    // what runs" a property of the system rather than a promise.
+    it('carries the frozen SETUP phase into the job payload, apart from the checks', async () => {
+        const planner = {
+            plan: jest.fn().mockResolvedValue({
+                ...plan,
+                setup: [
+                    {
+                        id: 'repo/setup-1',
+                        name: 'pnpm install --frozen-lockfile',
+                        kind: 'custom',
+                        command: 'pnpm install --frozen-lockfile',
+                        required: true,
+                        phase: 'setup',
+                    },
+                ],
+            }),
+        };
+        await buildDispatcher(planner).enqueue(payload());
+        const request = store.enqueue.mock.calls[0][0];
+        expect(request.payload.setup).toEqual([
+            expect.objectContaining({
+                id: 'repo/setup-1',
+                command: 'pnpm install --frozen-lockfile',
+            }),
+        ]);
+        // The install is NOT also a check: a red install must never be able
+        // to read as a red gate.
+        expect(request.payload.acceptanceChecks).toEqual(plan.acceptanceChecks);
+    });
+
+    it('omits the setup key entirely for a plan that declares no setup phase', async () => {
+        const planner = { plan: jest.fn().mockResolvedValue(plan) };
+        await buildDispatcher(planner).enqueue(payload());
+        expect('setup' in store.enqueue.mock.calls[0][0].payload).toBe(false);
+    });
+
     it('writes the exact legacy job when the planner returns null', async () => {
         const planner = { plan: jest.fn().mockResolvedValue(null) };
         await buildDispatcher(planner).enqueue(payload());

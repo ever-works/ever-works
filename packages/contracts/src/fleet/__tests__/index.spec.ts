@@ -60,6 +60,11 @@ const JOB_EXPORTS = [
 	'clampMaxAttempts',
 	'nodeSatisfiesCapabilities',
 	'FLEET_AGENT_TASK_MAX_STEPS',
+	// Setup phase (EW-807) — the install's own ceiling, budget and log cap.
+	'FLEET_AGENT_TASK_MAX_SETUP_STEPS',
+	'FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC',
+	'FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC',
+	'FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES',
 	'isNodeBusy',
 	'FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC',
 	'FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC',
@@ -289,7 +294,7 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 149 runtime symbols', () => {
+	it('exposes exactly these 153 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
@@ -304,10 +309,15 @@ describe('fleet barrel', () => {
 		// helpers of `fleet-run-secrets.types.ts`.
 		// → 148 with the node MCP bridge (EW-782): the run-credential
 		// symbols, pinned in `fleet-run-credential.spec.ts`.
+		// → 148 with the node MCP bridge (EW-782): the run-credential
+		// symbols, pinned in `fleet-run-credential.spec.ts`.
 		// → 149 with node housekeeping visibility (EW-803): the cap on a
-		// reported workspace count, in an existing module.
+		// reported workspace count.
+		// → 153 with acceptance checks that mean something (EW-807): the
+		// four setup-phase bounds. All three groups live in existing
+		// modules, so the witness table below needs no new row.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(149);
+		expect(Object.keys(fleet)).toHaveLength(153);
 	});
 
 	it.each([

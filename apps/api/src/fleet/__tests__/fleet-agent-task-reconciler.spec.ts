@@ -617,6 +617,50 @@ describe('FleetAgentTaskReconcilerService', () => {
         expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
     });
 
+    // Acceptance checks that mean something (EW-807). A failed install is
+    // not a failed test, and the message a human reads must say so — the
+    // fix for one is nothing like the fix for the other.
+    it('reports a failed SETUP as setup, with no failing checks to hunt for', async () => {
+        const failed: FleetAgentTaskResult = {
+            ...successResult,
+            status: 'failed',
+            // The gate did not fail. It never ran.
+            gateStatus: 'none',
+            checks: null,
+            setup: [
+                {
+                    id: 'repo/setup-1',
+                    status: 'red',
+                    exitCode: 1,
+                    durationMs: 90_000,
+                    logTail: 'ERR_PNPM_OUTDATED_LOCKFILE',
+                },
+            ],
+            setupStatus: 'red',
+            model: null,
+            failureReason:
+                "SETUP FAILED: 'repo/setup-1' exited 1. The workspace was never prepared, so the model, " +
+                'the steps and the acceptance checks did not run — this is not a failing test.',
+        };
+        await build().onCompleted(
+            new FleetJobCompletedEvent(
+                job({ status: 'failed' }),
+                USER,
+                'node-report',
+                NODE,
+                failed as unknown as Record<string, unknown>,
+            ),
+        );
+        const body: string = taskChat.post.mock.calls[0][1].body;
+        expect(body).toContain('Setup failed — the workspace was never prepared');
+        expect(body).toContain('- repo/setup-1: red (exit 1)');
+        expect(body).toContain('ERR_PNPM_OUTDATED_LOCKFILE');
+        expect(body).not.toContain('Failing checks:');
+        expect(runs.markFailed).toHaveBeenCalledWith(RUN, expect.stringContaining('SETUP FAILED'));
+        // And the gate is never recorded as red for it.
+        expect(runs.updateGateResults).not.toHaveBeenCalled();
+    });
+
     it('uses the job error when the node reported no structured result', async () => {
         await build().onCompleted(
             new FleetJobCompletedEvent(
@@ -1775,6 +1819,34 @@ describe('parseAgentTaskResult', () => {
         })!.question!;
         expect(parsed.text).toBe('Use [redacted secret]?');
         expect(parsed.context).toBe('token [redacted secret] again');
+    });
+
+    it('keeps well-formed setup verdicts, drops malformed ones, and coerces setupStatus (EW-807)', () => {
+        const parsed = parseAgentTaskResult({
+            status: 'failed',
+            taskId: TASK,
+            setup: [
+                { id: 'install', status: 'red', exitCode: 1, durationMs: 10 },
+                { status: 'red', exitCode: 1, durationMs: 10 },
+                'pnpm install',
+                null,
+            ],
+            setupStatus: 'red',
+        })!;
+        expect(parsed.setup).toEqual([
+            { id: 'install', status: 'red', exitCode: 1, durationMs: 10 },
+        ]);
+        expect(parsed.setupStatus).toBe('red');
+        // A non-array, or a status word the contract does not define, is
+        // null rather than a value anything downstream could branch on.
+        const garbage = parseAgentTaskResult({
+            status: 'failed',
+            taskId: TASK,
+            setup: 'pnpm install',
+            setupStatus: 'exploded',
+        })!;
+        expect(garbage.setup).toBeNull();
+        expect(garbage.setupStatus).toBeNull();
     });
 
     it('rejects anything without a status', () => {

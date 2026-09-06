@@ -369,6 +369,47 @@ export interface FleetAcceptanceChecksPayload {
 export const FLEET_AGENT_TASK_MAX_STEPS = 16;
 
 /**
+ * Setup phase (acceptance checks that mean something, EW-807).
+ *
+ * A node-provisioned Task worktree is a fresh `git worktree`: it has the
+ * repository's files and NOTHING else. No `node_modules`, no `.venv`, no
+ * build cache. Every acceptance check a Work could declare therefore
+ * failed on its first line — and the run reported a red gate, which reads
+ * as "the model's change broke the tests" when it actually means "nobody
+ * installed the dependencies".
+ *
+ * The setup phase is the install, and it is a separate phase rather than
+ * one more step because it needs to be budgeted, capped and REPORTED
+ * differently:
+ *
+ *   - an install is an order of magnitude slower than a test run, so the
+ *     per-check ceiling (30 min) is the wrong shape for it;
+ *   - an install prints tens of thousands of lines, so a 4 KiB tail is
+ *     usually all resolver noise and none of the error;
+ *   - and a failed install is NOT a failed test. It is reported as
+ *     `setupStatus`, never as a check, and never as a red gate.
+ */
+export const FLEET_AGENT_TASK_MAX_SETUP_STEPS = 8;
+
+/** Budget applied to a setup step that declares no `timeoutSec`. */
+export const FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC = 1800;
+
+/**
+ * Hard ceiling on one setup step. Higher than a check's (1800s) because a
+ * cold `pnpm install` on a fresh machine legitimately takes tens of
+ * minutes; still finite, because an install that hangs must not hold a
+ * node's only worker until the lease lapses.
+ */
+export const FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC = 5400;
+
+/**
+ * Last-N-bytes window kept from a setup step. Larger than a check's 4 KiB:
+ * package managers print a long success epilogue after the error that
+ * actually mattered, and a 4 KiB tail routinely contained none of it.
+ */
+export const FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES = 8192;
+
+/**
  * One command the node runs for an `agent-task` job. Deliberately the
  * same shape as a `TaskAcceptanceCheck` so the node executes both kinds
  * through ONE command runner (same env scrub, same timeout policy, same
@@ -381,6 +422,18 @@ export interface FleetAgentTaskStep {
 	command: string;
 	/** Directory relative to the job's `workspacePath`. */
 	cwd?: string;
+	/**
+	 * WHICH repository of a multi-repo run this command executes in
+	 * (EW-807): the `mountDir` of a mount the run actually provisioned, or
+	 * absent for the primary worktree.
+	 *
+	 * A NAME, never a path. The node looks it up in the provisioned
+	 * workspace descriptor and refuses a name that is not there — it never
+	 * joins the value onto a directory, because `.mounts/<dir>` is a
+	 * junction and a mount's real worktree is a COUSIN of the primary
+	 * under the fleet root, not a descendant of it.
+	 */
+	mountDir?: string;
 	/** Wall-clock budget; the node clamps it to its own ceiling. */
 	timeoutSec?: number;
 	/** `false` means a nonzero exit does not fail the job. Default true. */
@@ -398,6 +451,15 @@ export interface FleetAgentTaskStep {
 	 * Names, not values: the VALUE is read from the node's own environment
 	 * and scrubbed out of everything the node reports back, exactly as
 	 * `envPassthrough` values already are.
+	 *
+	 * NOT HONOURED PER COMMAND (EW-807). The node reads a run's grants from
+	 * `FleetAgentModelExecution.envGrants` ONLY and stamps that one list
+	 * onto every step, setup step and acceptance check. A per-entry list on
+	 * the wire is ignored, because `acceptanceChecks` never read one and a
+	 * setup step that honoured a grant a check refuses would be the more
+	 * privileged of the two phases — the one that runs first, before the
+	 * model, at the largest ceiling. Nothing on the platform populates this
+	 * field; it is kept so an older payload still validates.
 	 */
 	envGrants?: string[];
 }
@@ -439,6 +501,20 @@ export interface FleetAgentTaskPayload {
 	workspace?: FleetTaskWorkspaceSpec | null;
 	/** Ordered commands the node executes for this run. */
 	steps?: FleetAgentTaskStep[];
+	/**
+	 * Dispatch-frozen SETUP phase (EW-807): dependency installs and
+	 * environment preparation, run BEFORE the model and before everything
+	 * else, in the workspace the run provisioned.
+	 *
+	 * Same wire shape as a step so the node executes it through the one
+	 * command runner, but a different BUDGET (`FLEET_AGENT_TASK_SETUP_*`)
+	 * and a different report: results land in `FleetAgentTaskResult.setup`
+	 * with their own `setupStatus`, never in `checks`, and a red setup is
+	 * never a red gate. When a required setup step fails the node stops —
+	 * no model call, no steps, no checks — because every verdict after a
+	 * failed install describes the install, not the change.
+	 */
+	setup?: FleetAgentTaskStep[] | null;
 	/**
 	 * Model-CLI execution (agent execution v2). When present the node runs
 	 * a local agent CLI (Claude Code / Codex) in the provisioned workspace
@@ -1097,6 +1173,25 @@ export interface FleetAgentTaskResult extends Record<string, unknown> {
 	workspace: FleetTaskWorkspaceDescriptor | null;
 	/** Verdicts of the legacy command steps, in declared order. */
 	steps: TaskCheckResult[];
+	/**
+	 * Verdicts of the SETUP phase (EW-807), in declared order. Present only
+	 * when the job carried a `setup` block.
+	 *
+	 * Deliberately its OWN key rather than entries in `steps` or `checks`:
+	 * "the install failed" and "a test failed" are different facts about a
+	 * run, and the whole point of the phase is that a reader (and the
+	 * reconciler, and the pull request) can tell them apart without
+	 * pattern-matching a command string.
+	 */
+	setup?: TaskCheckResult[] | null;
+	/**
+	 * Roll-up over `setup`: `green` when every required setup step passed,
+	 * `red` when one did not, `none` when the job carried no setup phase.
+	 *
+	 * A `red` here means the model, the steps and the checks did NOT run,
+	 * and `gateStatus` is `none` — the gate did not fail, it never ran.
+	 */
+	setupStatus?: 'green' | 'red' | 'none' | null;
 	/** Present when the job carried an `execution` block. */
 	model?: FleetAgentTaskModelResult | null;
 	/** Verdicts of the acceptance checks, when the job carried any. */

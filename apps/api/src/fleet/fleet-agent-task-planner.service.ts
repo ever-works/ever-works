@@ -12,6 +12,8 @@ import { SkillsService } from '@ever-works/agent/skills';
 import { PluginSettingsService } from '@ever-works/agent/plugins';
 import {
     resolveAcceptanceChecks,
+    resolveChecksPolicy,
+    resolveSetupSteps,
     TaskRepository,
     TaskStatus,
     TaskWorkspaceService,
@@ -327,7 +329,59 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         }
 
         const work = task.workId ? await this.works.findById(task.workId) : null;
-        const acceptanceChecks = safeResolveChecks(task, work);
+        // Owner-authored, from the Work's defaults and the Task's own list.
+        // `safeResolveChecks` swallows a read failure to `[]` deliberately:
+        // an unreadable Work grades nothing, and that was true before this
+        // slice. It is NOT the posture for the repository-declared set
+        // below, which refuses instead — see `readFleetRepoDeclaredCommands`.
+        // `checksPolicy: 'off'` is documented as "checks never run", and it
+        // is the switch an owner reaches for when something in their
+        // repository misbehaves. The cloud path honours it; until EW-807
+        // the fleet path did not consult it at all, so an owner who turned
+        // their gate off kept executing check commands on their own PCs —
+        // and, once `repoDeclaredCommands` is on, kept executing commands
+        // written by anyone who can land a commit. A control that reads as
+        // the off switch and is inert on the only path where these commands
+        // run at all fails OPEN, so it is honoured here.
+        //
+        // What `off` stops, precisely: the acceptance checks, and READING
+        // `.works/works.yml` for commands at all — so no repository-authored
+        // command of either phase is planned. What it does NOT stop: the
+        // owner's OWN setup steps. Those are the dependency install that
+        // makes the model's work possible rather than a judgement on it, an
+        // owner authored them, and killing them would turn "stop grading me"
+        // into "break every run".
+        const checksPolicy = resolveChecksPolicy(work);
+        const checksOff = checksPolicy === 'off';
+        const ownerChecks = checksOff ? [] : safeResolveChecks(task, work);
+        const ownerSetup = safeResolveSetup(task, work);
+
+        // Repository-declared commands (EW-807). Read here and nowhere else:
+        // this is the one point where the Task, the Work and the RESOLVED
+        // workspace (mounts included) are all in hand, a throw still lands
+        // loudly on the run row, and the result is about to be sealed into
+        // an immutable job payload. Anything earlier has no mounts;
+        // anything later has no loud failure path — and anything on the
+        // NODE could be re-read after the model had edited the file.
+        //
+        // Deliberately NOT wrapped in a try/catch. A repository that
+        // declares commands this Work does not admit, or a config that
+        // cannot be read, fails the plan; the alternative is a run that
+        // reports green having verified less than the repository asked for.
+        const repoDeclared = checksOff
+            ? { setup: [] as TaskAcceptanceCheck[], checks: [] as TaskAcceptanceCheck[] }
+            : await this.taskWorkspace.readFleetRepoDeclaredCommands({
+                  task,
+                  userId: payload.userId,
+                  workspace,
+              });
+
+        // Owner-authored entries come FIRST in both phases, and repository
+        // ids carry a `repo/` prefix that owner ids cannot spell, so a
+        // repository can never replace or suppress a command the owner
+        // wrote — it can only add to it.
+        const acceptanceChecks = [...ownerChecks, ...repoDeclared.checks];
+        const setup = [...ownerSetup, ...repoDeclared.setup];
         const ownerMessages = await this.resolveOwnerMessages(payload);
         // Self-build slice Z (EW-796) — resolved BEFORE the instructions
         // because the instructions have to tell the model whether it has
@@ -341,6 +395,7 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             task,
             workspace,
             acceptanceChecks,
+            setup,
             ownerMessages,
             settings,
             mcp,
@@ -375,6 +430,7 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
             execution,
             workspace,
             acceptanceChecks,
+            ...(setup.length > 0 ? { setup } : {}),
             git: {
                 commit: canCommit,
                 push: canCommit,
@@ -448,12 +504,14 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
         task: Task;
         workspace: FleetTaskWorkspaceSpec;
         acceptanceChecks: TaskAcceptanceCheck[];
+        /** The dispatch-frozen SETUP phase (EW-807), described so the model knows it ran. */
+        setup: TaskAcceptanceCheck[];
         ownerMessages: string[];
         settings: FleetAgentExecutionSettings;
         /** Slice Z — present only when the run actually gets platform tools. */
         mcp?: FleetAgentTaskMcpBridge | null;
     }): Promise<string> {
-        const { agent, task, workspace, acceptanceChecks, ownerMessages, settings } = input;
+        const { agent, task, workspace, acceptanceChecks, setup, ownerMessages, settings } = input;
         // `plan` maps to `--permission-mode plan` / Codex `--sandbox
         // read-only` on the node: the CLI cannot write the question file,
         // so telling it to would only produce a summary that never
@@ -490,18 +548,32 @@ export class FleetAgentTaskPlannerService implements FleetAgentTaskPlanner {
                 .join('\n\n');
         }
 
-        const checksSection =
-            acceptanceChecks.length === 0
-                ? 'No acceptance checks are declared for this Task.'
+        // EW-807: a check can now name WHICH repository it runs in, and the
+        // install that makes any of them meaningful runs before the model.
+        // Both have to be described, or the model is told the gate runs in
+        // "the repository root" when half of it runs somewhere else — and
+        // is left guessing whether dependencies are present.
+        const describeCommand = (check: TaskAcceptanceCheck): string =>
+            `- ${neutralizeControlTokens(check.name || check.id)}: \`${neutralizeControlTokens(check.command)}\`` +
+            (check.mountDir ? ` (in \`.mounts/${neutralizeControlTokens(check.mountDir)}\`)` : '') +
+            (check.cwd ? ` (in ${neutralizeControlTokens(check.cwd)})` : '') +
+            (check.required === false ? ' — informational' : '');
+
+        const checksSection = [
+            ...(setup.length > 0
+                ? [
+                      'The node already ran this setup before starting you, so the workspace is installed:',
+                      ...setup.map(describeCommand),
+                      '',
+                  ]
+                : []),
+            ...(acceptanceChecks.length === 0
+                ? ['No acceptance checks are declared for this Task.']
                 : [
-                      'After you finish, the node runs these commands in the repository root; every required one must exit 0:',
-                      ...acceptanceChecks.map(
-                          (check) =>
-                              `- ${neutralizeControlTokens(check.name || check.id)}: \`${neutralizeControlTokens(check.command)}\`${
-                                  check.cwd ? ` (in ${neutralizeControlTokens(check.cwd)})` : ''
-                              }${check.required === false ? ' — informational' : ''}`,
-                      ),
-                  ].join('\n');
+                      'After you finish, the node runs these commands in the repository they name (the primary worktree unless a mount is given); every required one must exit 0:',
+                      ...acceptanceChecks.map(describeCommand),
+                  ]),
+        ].join('\n');
 
         const outputContract = [
             `Your final message is recorded as the run summary. State what you changed, which files${
@@ -618,6 +690,23 @@ function safeResolveChecks(
 ): TaskAcceptanceCheck[] {
     try {
         return resolveAcceptanceChecks(task, work);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Same posture for the owner-authored SETUP phase (EW-807): a Work whose
+ * column cannot be read installs nothing, which is what every Work did
+ * before the phase existed. A repository-declared setup step is a
+ * different matter and refuses — see `readFleetRepoDeclaredCommands`.
+ */
+function safeResolveSetup(
+    task: Task,
+    work: Parameters<typeof resolveSetupSteps>[1],
+): TaskAcceptanceCheck[] {
+    try {
+        return resolveSetupSteps(task, work);
     } catch {
         return [];
     }

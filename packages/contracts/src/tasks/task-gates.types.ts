@@ -52,6 +52,28 @@ export type TaskCheckLevel = 'L0' | 'L1';
 export const TASK_CHECK_LEVELS: readonly TaskCheckLevel[] = ['L0', 'L1'];
 
 /**
+ * Which PHASE of a run a declared command belongs to (EW-807).
+ *
+ * `check` is the acceptance check every entry has always been. `setup` is
+ * the dependency install / environment preparation an isolated worktree
+ * needs before ANY command in it can mean anything — a freshly provisioned
+ * worktree has no `node_modules`, so the first test command fails for a
+ * reason that says nothing about the change under test.
+ *
+ * The two are separate values rather than a boolean because they are
+ * reported separately, budgeted separately, and graded separately: a red
+ * gate says "the change is wrong", a red setup says "the machine was not
+ * ready". Collapsing them is the defect this vocabulary removes.
+ */
+export type TaskCheckPhase = 'setup' | 'check';
+
+/** Canonical list — one source of truth for `@IsIn` validators and pins. */
+export const TASK_CHECK_PHASES: readonly TaskCheckPhase[] = ['setup', 'check'];
+
+/** A command with no explicit phase is an acceptance check, as it always was. */
+export const DEFAULT_TASK_CHECK_PHASE: TaskCheckPhase = 'check';
+
+/**
  * One acceptance check: a named command whose exit code decides green/red.
  */
 export interface TaskAcceptanceCheck {
@@ -69,6 +91,39 @@ export interface TaskAcceptanceCheck {
 	command: string;
 	/** Working directory relative to the checkout root; omitted = root. */
 	cwd?: string;
+	/**
+	 * WHICH repository of a multi-repo run this command executes in
+	 * (acceptance checks that mean something, EW-807).
+	 *
+	 * Omitted = the primary worktree, which is what every check did before
+	 * this field existed. Otherwise the `mountDir` of one of the mounts the
+	 * run actually provisioned (`FleetTaskWorkspaceMountSpec.mountDir`) —
+	 * a NAME, never a path. The runner resolves it by looking the name up
+	 * in the provisioned descriptor and refuses a name that is not there;
+	 * it never joins the value onto a directory. See
+	 * `resolveCommandRoot` in the node executor.
+	 *
+	 * Why it exists: a run can edit three repositories, and until this
+	 * field every check ran in the primary worktree — so two of the three
+	 * changes were never verified by anything.
+	 */
+	mountDir?: string;
+	/**
+	 * WHEN this command runs, and how its failure is reported (EW-807).
+	 *
+	 * - `check` (the default, and every entry authored before this field) —
+	 *   an acceptance check. Runs after the model; its verdict is the gate.
+	 * - `setup`  — a dependency install / environment preparation step. Runs
+	 *   BEFORE the model, has its own (much larger) timeout ceiling and log
+	 *   cap, and is reported in its own block. A failed setup step is
+	 *   `setupStatus: 'red'` and NEVER a red gate: "the packages are not
+	 *   installed" is not "the tests failed", and presenting it as one is
+	 *   what made a fleet pull request's checks meaningless.
+	 *
+	 * Setup entries are deliberately NOT returned by
+	 * `resolveAcceptanceChecks` — see `tasks-domain/task-gates.ts`.
+	 */
+	phase?: TaskCheckPhase;
 	/**
 	 * Judgment level (G2). Omitted = `L1` — the post-run acceptance check
 	 * every existing check already is. Only `L0` checks are eligible for
@@ -145,6 +200,18 @@ export type GateStatus = 'green' | 'red' | 'skipped' | 'none';
  *                untouched by the feature landing);
  * - `warn`     — checks run and report, but red does not block;
  * - `required` — red blocks the Task from completing.
+ *
+ * `off` IS AN EXECUTION SWITCH, NOT ONLY A GRADING ONE (EW-807). It stops
+ * the check commands from running on every runtime, and on the fleet path
+ * it additionally stops `.works/works.yml` being read for commands at all
+ * — so a Work with `repoDeclaredCommands.mode: 'allowlist'` executes no
+ * repository-authored command of either phase while its checks are off.
+ * An owner who turns this off to stop something running must not have to
+ * know about a second switch to make that true.
+ *
+ * What `off` does NOT stop is the owner's own `phase: 'setup'` steps: that
+ * is the dependency install the model's work needs, authored by the owner,
+ * not a judgement on the change.
  */
 export type WorkChecksPolicy = 'off' | 'warn' | 'required';
 
