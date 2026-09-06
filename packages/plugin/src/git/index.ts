@@ -39,7 +39,10 @@ export type {
 	GitPullRequestStatus,
 	GitDiffOptions,
 	GitDiffFile,
-	GitDiffResult
+	GitDiffResult,
+	// Release promotion lane (self-build slice AI) — one named workflow's
+	// verdict for one commit.
+	GitWorkflowRun
 } from '../contracts/capabilities/git-provider.interface.js';
 
 export { isGitProviderPlugin } from '../contracts/capabilities/git-provider.interface.js';

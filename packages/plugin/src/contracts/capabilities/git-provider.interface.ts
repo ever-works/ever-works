@@ -221,6 +221,19 @@ export interface GitPullRequest {
 	readonly updatedAt: string;
 	readonly body?: string;
 	readonly author?: GitPullRequestAuthor;
+	/**
+	 * Provider-side labels on the pull request, when the read that
+	 * produced this object carried them.
+	 *
+	 * OPTIONAL and ABSENCE-AMBIGUOUS by construction: `undefined` means
+	 * "this read did not report labels", never "there are none". A caller
+	 * that treats a label as permission must therefore never infer safety
+	 * from its absence — the release promotion lane reads
+	 * `override-e2e-gate` off this to tell a human that a gate leg may
+	 * have been WAIVED rather than green, which is a warning it adds, not
+	 * a permission it grants.
+	 */
+	readonly labels?: readonly string[];
 }
 
 export interface GitRepositoryPermissions {
@@ -334,6 +347,66 @@ export interface GitPullRequestStatus {
 	readonly checksComplete?: boolean;
 	readonly url?: string;
 	readonly title?: string;
+}
+
+// ── Workflow runs (release promotion lane, self-build slice AI) ─────
+//
+// One OPTIONAL read capability, deliberately narrow: the verdict of ONE
+// named workflow file for ONE commit.
+//
+// This is not the same question as `getPullRequestStatus`. That answers
+// "should the board's dot be green?" by rolling up every check on the
+// head commit, and that roll-up treats `skipped`, `neutral`, `stale` and
+// `cancelled` as non-blocking — correct for a dot, and unusable as a
+// release gate, where a gate that skipped itself is precisely the case
+// that must not read as a pass. It also cannot prove ABSENCE: the
+// `checks[]` it returns is a capped sample, so a named check missing from
+// it may simply have sorted past the cap.
+//
+// A provider without workflows simply omits this, and the caller treats
+// the absence as "the gate is unreadable", which is not a pass.
+
+/**
+ * One run of one workflow file against one commit.
+ *
+ * `status` / `conclusion` reuse the check vocabulary above on purpose:
+ * providers already map their own words onto it, and a second vocabulary
+ * for the same idea is a second place for a mapping to go wrong.
+ */
+export interface GitWorkflowRun {
+	/** Provider-side run id — for the operator, not for logic. */
+	readonly id: number;
+	/**
+	 * Workflow file this run belongs to, as the provider reports it
+	 * (e.g. `.github/workflows/promotion-gate.yml`). Echoed back so a
+	 * caller can assert it got the workflow it asked for.
+	 */
+	readonly workflowPath: string;
+	/** The commit the run was for. */
+	readonly headSha: string;
+	readonly status: GitCheckStatus;
+	/** `null` while the run has not completed. */
+	readonly conclusion?: GitCheckConclusion | null;
+	/** Deep link for the human who has to read the log. */
+	readonly url?: string;
+	/** Re-runs bump this; the newest attempt is the one reported. */
+	readonly runAttempt?: number;
+	/**
+	 * Pull requests this run was triggered for, by number, when the
+	 * provider reports them.
+	 *
+	 * A workflow run is keyed by COMMIT, and one commit can head more
+	 * than one pull request — `stage` can be the head of both a
+	 * `stage -> main` promotion and somebody's hotfix comparison. A run
+	 * adopted off the commit alone therefore need not be the run for the
+	 * pull request being judged, and the two can differ in exactly the
+	 * way that matters (a per-pull-request override label).
+	 *
+	 * `undefined` means the provider did not say, which is NOT a licence
+	 * to assume a match: the release promotion lane treats a run that
+	 * names pull requests NOT including its own as no run at all.
+	 */
+	readonly pullRequestNumbers?: readonly number[];
 }
 
 /** Hard caps a diff request may ask for. */
@@ -510,6 +583,29 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		opts: GitDiffOptions | undefined,
 		token: string
 	): Promise<GitDiffResult>;
+
+	/**
+	 * Release promotion lane (slice AI) — the MOST RECENT run of one
+	 * named workflow file for one commit, or `null` when that workflow has
+	 * no run for that commit.
+	 *
+	 * `null` and a throw mean different things and both matter: `null` is
+	 * a real answer ("the gate never ran on this commit"), a throw is a
+	 * broken lookup. Implementations MUST NOT collapse a failed read into
+	 * `null` — the caller renders them differently and refuses on both,
+	 * but sends the operator to different places.
+	 *
+	 * `workflowPath` may be given as a bare file name (`promotion-gate.yml`)
+	 * or a repository path (`.github/workflows/promotion-gate.yml`);
+	 * implementations match on the file name.
+	 */
+	getWorkflowRunForCommit?(
+		owner: string,
+		repo: string,
+		workflowPath: string,
+		headSha: string,
+		token: string
+	): Promise<GitWorkflowRun | null>;
 
 	/**
 	 * Same shape for a branch that has no PR yet (`base...head`). Cheap

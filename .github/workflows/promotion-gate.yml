@@ -22,9 +22,21 @@ name: Promotion Gate
 # the `override-e2e-gate` label to proceed. The override is deliberate,
 # attributable, and visible in the PR timeline.
 
+# On BOTH rungs of the cascade, not just the last one (self-build slice AI,
+# EW-808). `develop -> stage` used to run nothing at all, so the release
+# promotion lane had no verdict to read for the first rung and treated it
+# as `absent`, which is not a pass — a lane that could never advance.
+#
+# What each rung actually gets, stated plainly because it is easy to
+# over-read: on a PR into `stage` the `e2e-result` job below SKIPS (its
+# `if:` requires a `stage` head), so a green gate there means the NODE
+# CONTRACT held and nothing more. That is not an oversight: e2e.yml runs on
+# push to `develop` only, so the develop -> stage PR shows zero e2e shards
+# BY DESIGN and there is no e2e signal to gate on. The first e2e result for
+# a batch arrives on `stage` and is what the SECOND rung gates on.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, stage]
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
@@ -38,7 +50,16 @@ jobs:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
     timeout-minutes: 10
     # Only gate promotions from stage. Hotfix branches targeting main directly
-    # are a different conversation and are not covered here.
+    # are a different conversation and are not covered here, and so is the
+    # develop -> stage rung, which has no e2e result to consult (e2e.yml runs
+    # on push to `develop` only).
+    #
+    # This job SKIPS in both those cases, and a skipped job reports as SUCCESS
+    # in branch protection. The release promotion lane does not read job
+    # conclusions for that exact reason — it reads this WORKFLOW's run
+    # conclusion, and treats `skipped`, `cancelled` and `absent` as
+    # not-a-pass. `node-contract` below has no `if:`, so the run always has at
+    # least one job that really evaluated.
     if: github.event.pull_request.head.ref == 'stage'
 
     steps:
@@ -209,7 +230,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v3
         with:
           version: 10.33.3
 
