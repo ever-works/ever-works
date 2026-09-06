@@ -1,4 +1,4 @@
-import type { NodeResourceLimits } from './types';
+import { effectiveMinFreeDiskBytes, type NodeResourceLimits } from './types';
 
 /**
  * Host resource sampling + the admission decision the worker loop makes
@@ -18,7 +18,17 @@ export interface ResourceSample {
 	usedMemoryMb: number;
 	/** Total host memory, in MB. Informational — used for log lines. */
 	totalMemoryMb: number;
+	/**
+	 * Free bytes on the volume that holds the workspace root — NOT the
+	 * system drive, which may be a different volume. Absent / null / NaN
+	 * means the reading was unavailable, which never blocks (see the rules
+	 * on {@link admitByResourceLimits}).
+	 */
+	diskFreeBytes?: number | null;
 }
+
+/** Which ceiling (or floor) refused admission. Set on refusals only. */
+export type AdmissionDimension = 'cpu' | 'memory' | 'disk';
 
 /**
  * Sampling seam. `sample()` may be async because a meaningful CPU reading
@@ -33,6 +43,8 @@ export interface AdmissionDecision {
 	admit: boolean;
 	/** Operator-facing reason when `admit` is false; null otherwise. */
 	reason: string | null;
+	/** The dimension that refused; present on refusals only. */
+	dimension?: AdmissionDimension;
 }
 
 export const ADMIT: AdmissionDecision = { admit: true, reason: null };
@@ -53,9 +65,15 @@ export const ADMIT: AdmissionDecision = { admit: true, reason: null };
  * while CPU/memory are enforced here as an admission gate on a noisy
  * observation. Treating a noisy reading as a hard cap would let one
  * unrelated process on the machine wedge the node permanently.
+ *
+ * The disk FLOOR follows the same three rules, with one difference in
+ * defaults: it is on unless the operator switched it off (see
+ * `effectiveMinFreeDiskBytes`). A node with 200 MB free that keeps leasing
+ * fails deep inside git or pnpm, after the lease and the plan are already
+ * spent — refusing up front hands the job to a machine with room.
  */
 export function admitByResourceLimits(
-	limits: Pick<NodeResourceLimits, 'maxCpuPercent' | 'maxMemoryMb'>,
+	limits: Pick<NodeResourceLimits, 'maxCpuPercent' | 'maxMemoryMb' | 'minFreeDiskBytes'>,
 	sample: ResourceSample | null | undefined
 ): AdmissionDecision {
 	if (!sample) {
@@ -67,7 +85,8 @@ export function admitByResourceLimits(
 		if (sample.cpuPercent >= maxCpuPercent) {
 			return {
 				admit: false,
-				reason: `host CPU ${Math.round(sample.cpuPercent)}% is at or above the ${maxCpuPercent}% ceiling`
+				reason: `host CPU ${Math.round(sample.cpuPercent)}% is at or above the ${maxCpuPercent}% ceiling`,
+				dimension: 'cpu'
 			};
 		}
 	}
@@ -76,7 +95,20 @@ export function admitByResourceLimits(
 		if (sample.usedMemoryMb >= maxMemoryMb) {
 			return {
 				admit: false,
-				reason: `host memory ${Math.round(sample.usedMemoryMb)}MB in use is at or above the ${maxMemoryMb}MB ceiling`
+				reason: `host memory ${Math.round(sample.usedMemoryMb)}MB in use is at or above the ${maxMemoryMb}MB ceiling`,
+				dimension: 'memory'
+			};
+		}
+	}
+
+	const floor = effectiveMinFreeDiskBytes(limits);
+	const free = sample.diskFreeBytes;
+	if (typeof floor === 'number' && typeof free === 'number' && Number.isFinite(free)) {
+		if (free < floor) {
+			return {
+				admit: false,
+				reason: `workspace volume has ${formatBytes(free)} free, below the ${formatBytes(floor)} floor`,
+				dimension: 'disk'
 			};
 		}
 	}
@@ -87,4 +119,24 @@ export function admitByResourceLimits(
 /** True when at least one CPU/memory ceiling is set (i.e. probing is worth it). */
 export function hasAdmissionCeilings(limits: Pick<NodeResourceLimits, 'maxCpuPercent' | 'maxMemoryMb'>): boolean {
 	return typeof limits.maxCpuPercent === 'number' || typeof limits.maxMemoryMb === 'number';
+}
+
+/** True when the disk floor is in force (i.e. a free-space reading is worth taking). */
+export function hasDiskFloor(limits: Pick<NodeResourceLimits, 'minFreeDiskBytes'>): boolean {
+	return typeof effectiveMinFreeDiskBytes(limits) === 'number';
+}
+
+/**
+ * Human-readable byte count for log lines and the CLI: `38 MB`, `2.0 GiB`.
+ * Binary units above the MB mark because that is what the floor is set in
+ * and what an operator compares against a disk-usage dialog.
+ */
+export function formatBytes(bytes: number): string {
+	if (!Number.isFinite(bytes) || bytes < 0) return 'unknown';
+	const gib = 1024 ** 3;
+	const mib = 1024 ** 2;
+	if (bytes >= gib) return `${(bytes / gib).toFixed(1)} GiB`;
+	if (bytes >= mib) return `${Math.round(bytes / mib)} MB`;
+	if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+	return `${Math.round(bytes)} B`;
 }

@@ -122,7 +122,7 @@ function mcpDescriptor(name: string, invoke = jest.fn(async () => ({ ok: true })
 }
 
 function sourceReturning(...tools: AgentToolDescriptor[]): AgentMcpToolSource {
-    return { buildTools: jest.fn(async () => tools) };
+    return { buildTools: jest.fn(async () => tools), releaseRun: jest.fn(async () => undefined) };
 }
 
 describe('AgentToolService — MCP tool source (Agent Plugins T26)', () => {
@@ -145,6 +145,7 @@ describe('AgentToolService — MCP tool source (Agent Plugins T26)', () => {
         // model-supplied identity.
         expect(source.buildTools).toHaveBeenCalledWith(
             expect.objectContaining({ id: 'a-7', userId: 'owner-9' }),
+            { runId: 'no-run' },
         );
     });
 
@@ -193,6 +194,7 @@ describe('AgentToolService — MCP tool source (Agent Plugins T26)', () => {
     it('never fails run assembly when the MCP source throws', async () => {
         const source: AgentMcpToolSource = {
             buildTools: jest.fn().mockRejectedValue(new Error('mcp registry exploded')),
+            releaseRun: jest.fn(async () => undefined),
         };
         const svc = makeSvc({ mcpTools: source });
 
@@ -219,5 +221,43 @@ describe('AgentToolService — MCP tool source (Agent Plugins T26)', () => {
         // Unresolvable → refused BEFORE the outbound call happens.
         expect(invoke).not.toHaveBeenCalled();
         expect(result.error).toContain(`${ENV_CREDENTIAL_PREFIX}API_TOKEN`);
+    });
+});
+
+describe('AgentToolService — MCP run lifecycle (AP-14 prerequisite)', () => {
+    it('hands the run id to the source when building, so acquisitions are keyed by run', async () => {
+        const source = sourceReturning(mcpDescriptor('mcp__github__create_issue'));
+        const svc = makeSvc({ mcpTools: source });
+
+        await svc.resolveGrantedTools(makeAgent(), {
+            runId: 'run-42',
+            editsThisRunByFile: new Set(),
+        });
+
+        expect(source.buildTools).toHaveBeenCalledWith(expect.anything(), { runId: 'run-42' });
+    });
+
+    it('releaseMcpRun hands the same run id back to the source', async () => {
+        const source = sourceReturning();
+        const svc = makeSvc({ mcpTools: source });
+
+        await svc.releaseMcpRun('run-42');
+
+        expect(source.releaseRun).toHaveBeenCalledWith('run-42');
+    });
+
+    it('releaseMcpRun is a no-op without a source', async () => {
+        await expect(makeSvc().releaseMcpRun('run-42')).resolves.toBeUndefined();
+    });
+
+    it('releaseMcpRun never throws when the source cannot clean up — the run already ended', async () => {
+        const source: AgentMcpToolSource = {
+            buildTools: jest.fn(async () => []),
+            releaseRun: jest.fn().mockRejectedValue(new Error('process already gone')),
+        };
+        const svc = makeSvc({ mcpTools: source });
+
+        await expect(svc.releaseMcpRun('run-42')).resolves.toBeUndefined();
+        expect(source.releaseRun).toHaveBeenCalledWith('run-42');
     });
 });

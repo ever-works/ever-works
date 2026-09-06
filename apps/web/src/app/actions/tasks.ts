@@ -1,5 +1,6 @@
 'use server';
 
+import type { TaskExtraRepo } from '@ever-works/contracts';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { DecisionConflictReportDto, TaskAcceptanceCheck } from '@ever-works/contracts';
@@ -43,6 +44,8 @@ export async function createTaskAction(input: {
     /** Quality gates (Wave 3 M6) — acceptance checks declared at create. */
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     maxGateAttempts?: number | null;
+    /** Multi-repo: extra repositories by registry connection. */
+    extraRepos?: TaskExtraRepo[] | null;
 }): Promise<Task> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
@@ -71,6 +74,7 @@ export async function updateTaskAction(
             | 'missionId'
             | 'ideaId'
             | 'agentId'
+            | 'extraRepos'
         >
     >,
 ): Promise<Task> {
@@ -628,11 +632,12 @@ export async function unscheduleTaskAction(id: string): Promise<Task> {
     return task;
 }
 
-// FU-5 — attachment server actions. The actual upload (multipart →
-// /api/uploads) happens client-side via the proxy route at
-// `apps/web/src/app/api/uploads/route.ts`; once the client has the
-// returned uploadId, it calls `attachUploadAction` to wire it into the
-// Task via the existing `POST /api/tasks/:id/attachments` endpoint.
+// FU-5 — attachment server actions. The actual upload happens client-side
+// through the Work KB proxy (`TaskAttachmentsSection` hands an `uploader`
+// that posts to `/api/works/:workId/kb/uploads`), NOT through
+// `app/api/uploads/route.ts`; once the client has the returned uploadId,
+// it calls `attachUploadAction` to wire it into the Task via the existing
+// `POST /api/tasks/:id/attachments` endpoint.
 
 export async function attachUploadAction(
     taskId: string,

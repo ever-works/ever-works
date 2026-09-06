@@ -122,6 +122,7 @@ describe('summarizeRunnerStatus — precedence, boundaries and defensive input',
 					daemonVersion: null,
 					cliVersion: null,
 					diskFreeBytes: null,
+					modelIdentity: null,
 					busy: true,
 					activeJobCount: 7,
 					currentJobKind: 'agent-task'

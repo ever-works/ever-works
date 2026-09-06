@@ -55,7 +55,20 @@ const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
 // USER_SELECTABLE_WORK_KINDS in work.entity.ts). Each of these persists
 // verbatim; general-purpose kinds additionally drive the kind-aware `web`
 // website template downstream.
+//
+// `repo` (self-build slice D, EW-766) is selectable too but is NOT in this
+// loop: registering a Repository Work is verified against the caller's own
+// connected GitHub account (the API probes that it can read the repository
+// and refuses otherwise), and the fresh API-registered users these tests
+// use have no such connection. Its contract is pinned by the dedicated
+// `repo` tests below, and the happy path by the lifecycle unit spec.
 const USER_SELECTABLE_KINDS = ['website', 'landing-page', 'blog', 'directory', 'awesome-repo'];
+
+// Self-build slice D (EW-766) — a `repo` Work wraps an EXISTING code
+// repository and REQUIRES `repositoryUrl` (400 without it); every other
+// kind ignores the field. Public repo so no credentials are involved in
+// PARSING it — access is still verified with the caller's connection.
+const REPO_KIND_URL = 'https://github.com/ever-works/ever-works';
 
 function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -156,6 +169,59 @@ test.describe('Work-kind template activation — create persists the chip', () =
             expect(work.kind, `kind '${kind}' persists verbatim`).toBe(kind);
             expect(work.websiteTemplateId ?? null, `kind '${kind}' template deferred`).toBeNull();
         }
+    });
+
+    // Self-build slice D (EW-766) — the Repository kind's create contract.
+    // Every case below is a refusal BEFORE any row exists: the happy path
+    // needs a connected GitHub account, which is unit-covered in
+    // `work-lifecycle.create-defaults.spec.ts` with a mocked git facade.
+    test("a 'repo' Work without repositoryUrl is rejected (400) naming the missing field", async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const res = await createWorkRaw(
+            request,
+            user.access_token,
+            workBody('repo-no-url', { kind: 'repo' }),
+        );
+        expect(res.status, `body=${res.text.slice(0, 300)}`).toBe(400);
+        expect(res.text).toContain('repositoryUrl');
+    });
+
+    test("a 'repo' Work with a non-GitHub or unparseable repositoryUrl is rejected (400)", async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        for (const repositoryUrl of [
+            'https://gitlab.com/group/project',
+            'git@github.com:ever-works/ever-works.git',
+            'https://github.com/ever-works',
+        ]) {
+            const res = await createWorkRaw(
+                request,
+                user.access_token,
+                workBody('repo-bad-url', { kind: 'repo', repositoryUrl }),
+            );
+            expect(res.status, `url=${repositoryUrl} body=${res.text.slice(0, 300)}`).toBe(400);
+            expect(res.text).toContain('repositoryUrl');
+        }
+    });
+
+    test("a 'repo' Work is refused (400) when the caller has no connected git account to verify access with", async ({
+        request,
+    }) => {
+        // A freshly API-registered user has no GitHub connection, so the
+        // access probe cannot run; the platform refuses to register a
+        // repository it cannot vouch for rather than persisting a Work no
+        // Task could clone.
+        const user = await registerUserViaAPI(request);
+        const res = await createWorkRaw(
+            request,
+            user.access_token,
+            workBody('repo-no-connection', { kind: 'repo', repositoryUrl: REPO_KIND_URL }),
+        );
+        expect(res.status, `body=${res.text.slice(0, 300)}`).toBe(400);
+        expect(res.text).toMatch(/verify access|not accessible/);
     });
 
     test("the 'landing' alias normalizes to the canonical 'landing-page'", async ({ request }) => {

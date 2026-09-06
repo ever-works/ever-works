@@ -65,9 +65,31 @@ const RETRY_SAFE_REMOTE_METHODS: ReadonlySet<string> = new Set<string>([
     'CreditsSweepService.runDailySweep',
     // Each row is sent once (`markSent`), and the provider de-duplicates on the identifier.
     'PaygService.flushPending',
-    // Explicit already-marked guard / absolute SET recomputed from the anchor.
-    'WorkScheduleService.markRunCompleted',
+    // Explicit already-marked guard (`isAlreadyMarkedFailed`) inside the method,
+    // plus an absolute SET recomputed from the anchor. Nothing accumulates.
     'WorkScheduleService.markRunFailed',
+
+    // ── DELIBERATELY ABSENT ─────────────────────────────────────────
+    // `WorkScheduleService.markRunCompleted` was listed here until it was
+    // found to be a re-billing hazard. It is NOT idempotent:
+    //
+    //   markRunCompleted -> UsageLedgerService.recordUsage
+    //                    -> UsageLedgerRepository.record()      (plain INSERT)
+    //                    -> BillingProvider.recordUsageCharge() (real charge)
+    //
+    // There is no already-completed guard (`isAlreadyMarkedFailed` is called
+    // only from `markRunFailed`), no pre-read on `generationHistoryId`, and no
+    // UNIQUE constraint on that column. So a 504 raised AFTER the API pod ran
+    // the write — precisely the case a retry exists for, since nginx answers
+    // 504 while the work continues server-side — inserted a SECOND ledger row
+    // and charged a `billingMode: USAGE` customer twice for one generation.
+    //
+    // Per this file's own rule ("Omitting a method costs at most one lost
+    // retry; adding the wrong one silently doubles a charge"), it is omitted.
+    // A lost retry only leaves `nextRunAt` unadvanced, which the existing
+    // schedule sweep (`SCHEDULE_STUCK_TIMEOUT_MINUTES`, default 180) already
+    // recovers. Re-list it only once `recordUsage` deduplicates on
+    // `generationHistoryId` behind a UNIQUE index.
 ]);
 
 @Injectable()

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "remote": {
+      "type": "streamable-http",
+      "url": "https://x.example.com/mcp"
+    },
+    "legacy": {
+      "type": "sse",
+      "url": "https://x.example.com/sse"
+    },
+    "local": {
+      "type": "stdio",
+      "command": "./bin/server"
+    }
+  }
+}

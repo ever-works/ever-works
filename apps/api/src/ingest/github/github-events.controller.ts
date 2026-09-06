@@ -38,7 +38,7 @@ export class GitHubEventsController {
     @Post('github/events')
     @ApiOperation({
         summary:
-            'GitHub webhook receiver — signature-verified; PR opened/synchronize + @ever-works mention ingest, AI review trigger, GitHub App installation sync.',
+            'GitHub webhook receiver — signature-verified; PR opened/synchronize + @ever-works mention ingest, AI review trigger, issue + Dependabot intake, GitHub App installation sync.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 300, ttl: 60_000 } })
@@ -54,8 +54,15 @@ export class GitHubEventsController {
             body: req.body,
         });
 
+        // The issue / Dependabot intake leg is a sibling of the review
+        // leg on this route (same verified delivery, same owner), so its
+        // failure surfaces the same way — GitHub redelivers, and the
+        // spine's dedupe makes the retry free.
         if (result.errors.review) {
             throw result.errors.review;
+        }
+        if (result.errors.intake) {
+            throw result.errors.intake;
         }
 
         return result.ignored ? { ok: true, ignored: result.ignored } : { ok: true };

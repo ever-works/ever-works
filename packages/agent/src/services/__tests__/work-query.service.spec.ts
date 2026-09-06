@@ -55,6 +55,21 @@ describe('WorkQueryService', () => {
         );
     });
 
+    it('workItems answers a Repository Work with an empty list — no clone of the wrapped code repository', async () => {
+        // Self-build slice D (EW-766): a read is not refused, it is simply
+        // empty; what must not happen is `getItems` cloning somebody's code
+        // repository into the shared checkout to discover there are no items.
+        const work = { id: 'w-repo', kind: 'repo', userId: user.id } as any;
+        ownershipService.ensureCanView = jest.fn().mockResolvedValue({ work });
+        dataGenerator.getItems = jest.fn();
+
+        const result = await service.workItems('w-repo', user);
+
+        expect(result).toEqual({ status: 'success', items: [] });
+        expect(ownershipService.ensureCanView).toHaveBeenCalledWith('w-repo', user.id);
+        expect(dataGenerator.getItems).not.toHaveBeenCalled();
+    });
+
     it('recovers the last known positive items count for errored works', async () => {
         const work = {
             id: 'dir-1',

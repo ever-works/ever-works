@@ -47,7 +47,7 @@ Once a Task has a branch, the panel replaces the selector with the branch cockpi
 - the **branch name** with a copy button, and the short **base SHA** it was cut from,
 - a **state** pill — `created` → `pushed` → `pr-open` → `merged`, plus `conflict`, `discarded` and `cleaned`,
 - a link to the **pull request** when one is open,
-- **Discard branch**, which deletes the remote branch and resets the Task's workspace identity so the next run starts clean. This is irreversible and asks for confirmation.
+- **Discard branch**, which deletes the remote branch and resets the Task's workspace identity so the next run starts clean. On a Task that spans several repositories it discards the branch in _every_ repository the Task pushed, not only the primary, and clears the linked pull requests with it. A repository whose branch could not be deleted — a refused token, a protected branch, or a plain `git` remote, which has no delete-branch API — keeps its entry, marked `failed`, so the branch and the pull request it left open are still on the record. This is irreversible and asks for confirmation.
 
 The same branch state appears as a chip on the Task's card on the [board](../api/tasks.md).
 
@@ -60,11 +60,11 @@ If the base branch moves on and the Task branch can no longer merge, the branch 
 | Action            | API                                     | Result                                                                                         |
 | ----------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | Resolve conflicts | `POST /api/tasks/:id/resolve-conflicts` | 200 — branch back to `pushed`, Task back to `in_progress`. 409 if the Task is not in conflict. |
-| Discard branch    | `POST /api/tasks/:id/discard-branch`    | 200 — branch deleted, workspace identity reset. Idempotent.                                    |
+| Discard branch    | `POST /api/tasks/:id/discard-branch`    | 200 — branch deleted in every repository the Task spans, workspace identity reset. Idempotent. |
 
 ## Cleanup
 
-With `taskBranchCleanup: on-merge`, a nightly sweep deletes the remote branches of Tasks that reached a terminal state (done or cancelled), plus any abandoned branch past a hard staleness cutoff. With `manual`, branches are never auto-deleted — use **Discard branch**.
+With `taskBranchCleanup: on-merge`, a nightly sweep deletes the remote branches of Tasks that reached a terminal state (done or cancelled), plus any abandoned branch past a hard staleness cutoff — in every repository the Task spans, so a multi-repo Task does not leave one branch behind per extra repository. With `manual`, branches are never auto-deleted — use **Discard branch**.
 
 ## Related
 

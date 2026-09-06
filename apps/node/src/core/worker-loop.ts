@@ -1,10 +1,26 @@
+import { performance } from 'node:perf_hooks';
 import type { FleetJobKind, FleetJobView } from '@ever-works/contracts';
-import { clampLeaseTtlSec, FLEET_JOB_DEFAULT_LEASE_TTL_SEC, FLEET_JOB_MAX_LEASE_BATCH } from '@ever-works/contracts';
+import {
+	clampLeaseTtlSec,
+	FLEET_JOB_DEFAULT_LEASE_TTL_SEC,
+	FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON,
+	FLEET_JOB_MAX_LEASE_BATCH,
+	FLEET_JOB_STALE_LEASE_REASON
+} from '@ever-works/contracts';
 import type { Logger } from './logger';
 import type { Scheduler } from './heartbeat';
 import { systemScheduler } from './heartbeat';
-import { admitByResourceLimits, hasAdmissionCeilings, type ResourceProbe } from './resource-limits';
+import {
+	admitByResourceLimits,
+	hasAdmissionCeilings,
+	hasDiskFloor,
+	type AdmissionDecision,
+	type ResourceProbe,
+	type ResourceSample
+} from './resource-limits';
+import type { DiskProbeIo } from './telemetry-probe';
 import { clampResourceLimits, type NodeResourceLimits } from './types';
+import { measureWorkspaceFreeBytes } from './workspaces/disk-headroom';
 import type { WorkerSafetyGate } from './worker-safety-store';
 
 /**
@@ -25,7 +41,12 @@ import type { WorkerSafetyGate } from './worker-safety-store';
  * - **A job always produces a verdict.** An executor that throws is
  *   reported as a job FAILURE, and a kind with no registered executor is
  *   failed immediately naming the kind. Dropping it silently would leave
- *   the job to expire and retry forever on the same incapable node.
+ *   the job to expire and retry forever on the same incapable node. The
+ *   one exception is deliberate and narrow: an executor that DECLINED to
+ *   finish — it withheld an irreversible write it may no longer be
+ *   entitled to make — hands the job back through `JobLeaseHandle.defer`
+ *   and nothing is reported, because both terminal states would be a lie
+ *   about work nobody ran to a conclusion.
  * - **Graceful shutdown drains.** `stop()` stops leasing at once, then
  *   awaits in-flight jobs so their results are REPORTED rather than
  *   abandoned to a lease expiry. A second stop while draining is a no-op.
@@ -35,6 +56,29 @@ import type { WorkerSafetyGate } from './worker-safety-store';
  *   Pausing is a state a running node is in, not a way to kill it.
  * - **Backoff is exponential with a ceiling**, so an API outage produces
  *   a slow retry rather than a hot loop against a dead endpoint.
+ * - **A machine that slept through its lease stops itself** (suspend-safe
+ *   leases, self-build finding R7). Desk PCs sleep; a suspended node
+ *   stops beating, its lease lapses and the platform re-issues the job —
+ *   while the model here keeps running and, without help, would push a
+ *   branch against a claim it no longer holds. Two defences, both keyed
+ *   on stable reasons from `@ever-works/contracts`:
+ *     1. every timer this loop arms records when it was armed on BOTH
+ *        clocks, and every lease poll records when it began; a tick that
+ *        fires far later than armed, or a poll whose span is far longer
+ *        than any awake request ({@link SUSPEND_GAP_THRESHOLD_MS}), is a
+ *        resume, and every in-flight lease is re-checked: lapsed on the
+ *        wall clock → the job is aborted (model process killed, nothing
+ *        pushed, reported as `lease-lapsed-while-suspended`); still inside
+ *        its claim → one immediate heartbeat re-confirms it with the
+ *        platform;
+ *     2. every heartbeat and report echoes the `leaseGeneration` the lease
+ *        came with, and a `409 stale-lease` answer aborts the run at once
+ *        and suppresses the follow-up report, which would only be refused
+ *        again.
+ *   Both are keyed on the RUN, not the job id: the first poll after a
+ *   resume reclaims and re-leases the very job this node slept through
+ *   (reclaim runs inline on the lease path), so the same id can be in
+ *   flight twice — see {@link JobRun}.
  *
  * Timers and the transport are injected so the whole state machine is
  * testable without waiting on wall time or opening a socket.
@@ -60,8 +104,83 @@ export const MIN_KEEPALIVE_MS = 5_000;
  */
 export const LEASE_TERMINATION_SAFETY_MS = 8_000;
 
+/**
+ * DEFAULT lease a job must have left before it may START publishing.
+ *
+ * Deliberately NOT {@link LEASE_TERMINATION_SAFETY_MS}: that eight seconds
+ * budgets a Windows process-tree kill, and killing `git push` does not
+ * retract a ref the remote already accepted. This budgets the push itself.
+ *
+ * Read what it does and does not buy. It bounds the START of a publish,
+ * never its completion: a push that begins with the margin in hand and then
+ * runs longer than the whole remaining claim still straddles the deadline,
+ * and is stopped only by the job signal firing at
+ * {@link LEASE_TERMINATION_SAFETY_MS} — which kills the process without
+ * retracting whatever the remote already took. Sixty seconds covers an
+ * ordinary push of an agent's diff on the uplinks these machines have; a
+ * node that habitually pushes a large first diff over a slow link should be
+ * given a bigger budget through `publishFenceMarginMs` rather than trusting
+ * this number, because the honest answer is repository- and link-specific
+ * and no single constant can be right for all six machines.
+ *
+ * Clamped by {@link WorkerLoop} into `[LEASE_TERMINATION_SAFETY_MS, ttl/3]`
+ * so a floor-length lease is still able to publish at all.
+ */
+export const PUBLISH_FENCE_MARGIN_MS = 60_000;
+
 /** Maximum shutdown wait for a lease transport that ignores cancellation. */
 export const DEFAULT_LEASE_POLL_DRAIN_TIMEOUT_MS = 5_000;
+
+/**
+ * How much later than armed a timer may fire before the gap is read as a
+ * suspend/resume rather than scheduler jitter.
+ *
+ * Thirty seconds is far above anything an awake Node process produces —
+ * this process mostly awaits child processes and never blocks its event
+ * loop for more than milliseconds — and far below the 300 s default lease,
+ * so a resume is noticed with most of the claim still decidable. A false
+ * positive (a wall-clock step forward, a debugger pause) costs one extra
+ * heartbeat; it never aborts a job whose lease is still valid.
+ */
+export const SUSPEND_GAP_THRESHOLD_MS = 30_000;
+
+/** What a timer observed when it finally fired, on both clocks. */
+export interface TimerGap {
+	/** The delay the timer was armed with. */
+	armedForMs: number;
+	/** Wall-clock milliseconds between arming and firing. */
+	wallElapsedMs: number;
+	/** Monotonic milliseconds between arming and firing. */
+	monotonicElapsedMs: number;
+}
+
+/**
+ * Did the machine suspend between a timer being armed and it firing?
+ *
+ * Two clauses, because the two clocks disagree about a suspend in
+ * platform-specific ways and neither is trusted alone:
+ *
+ * - the wall clock advanced far more than the monotonic one — a monotonic
+ *   source that stops through S3/S4 (CLOCK_MONOTONIC on Linux, macOS) sees
+ *   the gap only in the difference;
+ * - the timer fired far later than it was armed for, on the wall clock —
+ *   covers a monotonic source that DOES advance across a suspend
+ *   (Windows QPC) and a wall clock stepped forward on wake, where both
+ *   elapsed values grow together and the difference says nothing.
+ *
+ * Non-finite inputs never detect: a broken clock must degrade to "no
+ * resume noticed", which is exactly the behaviour before this existed.
+ */
+export function isSuspendGap(gap: TimerGap): boolean {
+	if (!Number.isFinite(gap.wallElapsedMs) || !Number.isFinite(gap.armedForMs)) return false;
+	if (
+		Number.isFinite(gap.monotonicElapsedMs) &&
+		gap.wallElapsedMs - gap.monotonicElapsedMs > SUSPEND_GAP_THRESHOLD_MS
+	) {
+		return true;
+	}
+	return gap.wallElapsedMs - gap.armedForMs > SUSPEND_GAP_THRESHOLD_MS;
+}
 
 /**
  * Exponential backoff for `n` consecutive failures, capped.
@@ -79,21 +198,108 @@ export function nextBackoffMs(consecutiveFailures: number): number {
 	return Math.min(WORKER_BACKOFF_BASE_MS * 2 ** exponent, WORKER_BACKOFF_MAX_MS);
 }
 
-/** Just enough of {@link FleetJobClient} for the loop — keeps tests tiny. */
+/**
+ * Just enough of {@link FleetJobClient} for the loop — keeps tests tiny.
+ *
+ * `leaseGeneration` is passed to `heartbeat` / `complete` ONLY when the
+ * lease view carried one; a lease from an older API has none, and the
+ * call is then made with its original arity. A `409` from either call is
+ * expected to surface as an error whose `kind` is `'stale-lease'`.
+ */
 export interface JobLeaseCapableClient {
 	lease(
 		request: { max?: number; leaseTtlSec?: number; capabilities?: string[] },
 		signal?: AbortSignal
 	): Promise<FleetJobView[]>;
-	heartbeat(jobId: string, leaseTtlSec?: number): Promise<FleetJobView | null>;
+	heartbeat(jobId: string, leaseTtlSec?: number, leaseGeneration?: number): Promise<FleetJobView | null>;
 	complete(
 		jobId: string,
-		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null }
+		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null },
+		leaseGeneration?: number
 	): Promise<boolean>;
 }
 
-/** One registered executor: "this is how a job of kind X gets run here". */
-export type JobExecutor = (job: FleetJobView, signal: AbortSignal) => Promise<Record<string, unknown> | void>;
+/**
+ * Live view of the claim this node still holds on a running job.
+ *
+ * Handed to executors that produce SIDE EFFECTS the platform cannot undo —
+ * a pushed branch, above all. The abort signal says "stop"; this says "how
+ * long you may still be trusted", which is the question a node has to
+ * answer for itself when the platform is unreachable.
+ */
+export interface JobLeaseHandle {
+	/**
+	 * Epoch ms, on THIS node's clock, of the last lease expiry the platform
+	 * confirmed. Read it LATE: the keep-alive advances it on every
+	 * successful renewal, so the value the job was leased with is several
+	 * renewals stale by the time a twenty-minute model step finishes.
+	 *
+	 * The platform mints that expiry on the SERVER's clock, and this node
+	 * compares it against its own. Nothing measures the difference, so the
+	 * value is additionally capped by an independent monotonic budget: a
+	 * node clock that runs slow, or that w32time steps backwards after a
+	 * wake-up, cannot hand a caller more claim than the platform granted.
+	 * The two clocks catch different faults and neither is trusted alone:
+	 * only the monotonic one survives an NTP step, and a suspend shows up
+	 * as the two disagreeing (or as a timer firing far later than armed),
+	 * which is what {@link isSuspendGap} reads and the loop acts on.
+	 */
+	deadlineAt(): number;
+	/** How much of that claim a publish must have left before it may start. */
+	readonly publishMarginMs: number;
+	/**
+	 * Re-confirm the claim with the platform RIGHT NOW, then report the
+	 * deadline to fence an irreversible write against.
+	 *
+	 * Called immediately before a publish, every time — not only when the
+	 * local deadline looks thin. A claim can be taken away while its
+	 * deadline is still minutes in the future (an operator drains the node;
+	 * `releaseClaimsForNode` requeues the job at once), and the local
+	 * deadline cannot see that. One extra request per finalize buys the
+	 * answer whenever the platform is reachable.
+	 *
+	 * Never rejects, because the interesting failure is the silent one:
+	 *
+	 * - renewed → the fresh expiry, and the publish proceeds.
+	 * - refused (401 — drained, reassigned, terminal) → the current instant,
+	 *   and the job is cancelled. Nothing may be published.
+	 * - unreachable → the last confirmed expiry, unchanged. This is the
+	 *   partition the local fence exists for: the node cannot ask who owns
+	 *   the job, so it falls back to what it last knew.
+	 */
+	confirmDeadline(): Promise<number>;
+	/**
+	 * Hand this job back UNSETTLED: the node produced no verdict about the
+	 * work, it declined to finish it.
+	 *
+	 * The loop then reports nothing at all. A settled job is TERMINAL on the
+	 * platform, and terminal is exactly wrong for a run whose whole output —
+	 * a pushed branch — was withheld: the commit would be stranded on one
+	 * machine while the Fleet row read "done". Saying nothing lets the claim
+	 * lapse so `reclaimExpired` re-offers the job inside its attempt budget.
+	 */
+	defer(reason: string): void;
+}
+
+/** The keep-alive as the LOOP sees it: the executor's half, plus control. */
+interface JobKeepAlive {
+	stop(): void;
+	/** Why the executor handed the job back unsettled, or null. */
+	deferral(): string | null;
+	handle: JobLeaseHandle;
+}
+
+/**
+ * One registered executor: "this is how a job of kind X gets run here".
+ *
+ * `lease` is optional so a kind with no irreversible side effect (a check,
+ * a probe) registers as `(job, signal) => …` exactly as before.
+ */
+export type JobExecutor = (
+	job: FleetJobView,
+	signal: AbortSignal,
+	lease?: JobLeaseHandle
+) => Promise<Record<string, unknown> | void>;
 
 /**
  * `draining` is the state a paused-but-still-busy node is in: leasing
@@ -149,6 +355,16 @@ export interface WorkerLoopOptions {
 	limits?: NodeResourceLimits;
 	/** Host sampler backing the admission gate. Absent = no ceilings. */
 	resourceProbe?: ResourceProbe;
+	/**
+	 * Free-space probe backing the disk floor. Both this and `workspacePath`
+	 * are needed for the floor to be enforced at the lease: the reading has
+	 * to be taken on the volume that actually holds the worktrees, which is
+	 * not necessarily the one the service's cwd is on. Absent = the floor is
+	 * enforced only at provision time (by the workspace provisioner).
+	 */
+	diskProbe?: DiskProbeIo;
+	/** The workspace ROOT whose volume `diskProbe` measures. */
+	workspacePath?: string;
 	client: JobLeaseCapableClient;
 	/** Max jobs in flight on this node at once. */
 	concurrency?: number;
@@ -158,6 +374,21 @@ export interface WorkerLoopOptions {
 	scheduler?: Scheduler;
 	/** Wall clock paired with the scheduler for lease-expiry enforcement. */
 	now?: () => number;
+	/**
+	 * Monotonic milliseconds, paired with `now`. Used only to bound a lease
+	 * against a wall clock that drifts against the platform's or gets
+	 * stepped by an NTP resync; injected so that bound is testable without
+	 * waiting on real time.
+	 */
+	monotonicNow?: () => number;
+	/**
+	 * Lease an executor must have left before it may START publishing.
+	 * Defaults to {@link PUBLISH_FENCE_MARGIN_MS}; clamped into
+	 * `[LEASE_TERMINATION_SAFETY_MS, ttl/3]` either way. Raise it on a node
+	 * whose pushes are slow — the right budget is a property of the repo and
+	 * the uplink, not of the fleet.
+	 */
+	publishFenceMarginMs?: number;
 	logger?: Logger;
 	/** Capability tags advertised per poll; omitted uses the node's stored tags. */
 	capabilities?: string[];
@@ -176,7 +407,10 @@ export interface WorkerLoopOptions {
 export class WorkerLoop {
 	private readonly executors = new Map<FleetJobKind, JobExecutor>();
 	private readonly inFlight = new Map<string, Promise<void>>();
-	private readonly jobControllers = new Map<string, AbortController>();
+	/** The run currently holding each in-flight job id — see {@link JobRun}. */
+	private readonly runs = new Map<string, JobRun>();
+	/** One per in-flight keep-alive: "the machine just woke up, re-check your claim". */
+	private readonly resumeHandlers = new Set<() => void>();
 	private readonly activePolls = new Set<Promise<void>>();
 	private readonly pollControllers = new Set<AbortController>();
 	private readonly listeners = new Set<(state: WorkerLoopState) => void>();
@@ -186,8 +420,14 @@ export class WorkerLoop {
 	private readonly idlePollMs: number;
 	private readonly limits: NodeResourceLimits;
 	private readonly resourceProbe: ResourceProbe | undefined;
+	private readonly diskProbe: DiskProbeIo | undefined;
+	private readonly workspacePath: string | undefined;
+	/** Last disk refusal reason logged, so the warning fires once per episode. */
+	private lastDiskRefusal: string | null = null;
 	private readonly now: () => number;
+	private readonly monotonicNow: () => number;
 	private readonly leasePollDrainTimeoutMs: number;
+	private readonly publishFenceMarginMs: number;
 
 	private running = false;
 	private stopping = false;
@@ -214,14 +454,30 @@ export class WorkerLoop {
 		this.leaseTtlSec = clampLeaseTtlSec(options.leaseTtlSec ?? FLEET_JOB_DEFAULT_LEASE_TTL_SEC);
 		this.idlePollMs = options.idlePollMs ?? DEFAULT_IDLE_POLL_MS;
 		this.now = options.now ?? (() => Date.now());
+		this.monotonicNow = options.monotonicNow ?? (() => performance.now());
 		this.leasePollDrainTimeoutMs =
 			Number.isFinite(options.leasePollDrainTimeoutMs) && (options.leasePollDrainTimeoutMs ?? 0) > 0
 				? Math.floor(options.leasePollDrainTimeoutMs!)
 				: DEFAULT_LEASE_POLL_DRAIN_TIMEOUT_MS;
+		// A publish needs room inside the lease, but never so much room that
+		// a short lease can never publish: at the 30s TTL floor a flat 60s
+		// margin would refuse every push forever, which trades a rare
+		// double-write for a permanent outage. The floor is the termination
+		// budget — below that the abort would land after the reclaim anyway.
+		const requestedMargin =
+			Number.isFinite(options.publishFenceMarginMs) && (options.publishFenceMarginMs ?? 0) > 0
+				? Math.floor(options.publishFenceMarginMs!)
+				: PUBLISH_FENCE_MARGIN_MS;
+		this.publishFenceMarginMs = Math.max(
+			LEASE_TERMINATION_SAFETY_MS,
+			Math.min(requestedMargin, Math.floor((this.leaseTtlSec * 1000) / 3))
+		);
 		// `limits` wins over the legacy `concurrency` option so there is
 		// exactly one number in play once an operator has set limits.
 		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
 		this.resourceProbe = options.resourceProbe;
+		this.diskProbe = options.diskProbe;
+		this.workspacePath = options.workspacePath;
 		this.paused = options.startPaused === true;
 		this.unsafe = options.startUnsafe != null;
 		this.state.paused = this.paused;
@@ -247,6 +503,11 @@ export class WorkerLoop {
 	/** Max jobs this loop will ever run at once. */
 	get maxConcurrency(): number {
 		return this.limits.maxConcurrentJobs;
+	}
+
+	/** Lease an executor must have left before it may publish (clamped). */
+	get publishFenceMargin(): number {
+		return this.publishFenceMarginMs;
 	}
 
 	get registeredKinds(): FleetJobKind[] {
@@ -389,9 +650,9 @@ export class WorkerLoop {
 	 * model process. A settled or unknown job has no live controller.
 	 */
 	cancelJob(jobId: string, reason = 'Fleet job was cancelled'): boolean {
-		const controller = this.jobControllers.get(jobId);
-		if (!controller || controller.signal.aborted) return false;
-		controller.abort(new Error(reason));
+		const run = this.runs.get(jobId);
+		if (!run || run.controller.signal.aborted) return false;
+		run.controller.abort(new Error(reason));
 		return true;
 	}
 
@@ -432,12 +693,28 @@ export class WorkerLoop {
 			return;
 		}
 
+		// The loop timer is not pending from here until the lease call has
+		// settled, so a suspend that lands inside this poll would escape the
+		// detector in `scheduleNext` until a keep-alive beat happens to fire.
+		// Read the poll's own span for the gap as well: nothing awake in it
+		// takes thirty seconds (the lease request times out well before),
+		// so `armedForMs` is simply zero.
+		const pollBeganWall = this.now();
+		const pollBeganMonotonic = this.monotonicNow();
+		const noticeResumeDuringPoll = (): void =>
+			this.noticeResume({
+				armedForMs: 0,
+				wallElapsedMs: this.now() - pollBeganWall,
+				monotonicElapsedMs: this.monotonicNow() - pollBeganMonotonic
+			});
+
 		// Admission gate: CPU / memory ceilings. Evaluated BEFORE the lease
 		// call so an over-loaded machine never claims work it then has to
 		// run badly — the platform re-offers it to a node with headroom.
 		const admission = await this.checkResourceAdmission();
 		if (!this.running || this.stopping) return;
 		if (!admission.admit) {
+			noticeResumeDuringPoll();
 			this.patch({
 				state: this.inFlight.size > 0 ? 'working' : 'throttled',
 				throttleReason: admission.reason
@@ -463,20 +740,26 @@ export class WorkerLoop {
 			jobs = await this.options.client.lease(request, pollController.signal);
 		} catch (error) {
 			if (pollController.signal.aborted || this.stopping || !this.running) return;
+			noticeResumeDuringPoll();
 			this.onPollFailure(error);
 			this.scheduleNext(nextBackoffMs(this.state.consecutiveFailures));
 			return;
 		} finally {
 			this.pollControllers.delete(pollController);
 		}
+		noticeResumeDuringPoll();
 
 		if (!this.running || this.stopping) {
 			await Promise.allSettled(
 				jobs.map((job) =>
-					this.report(job.id, {
-						success: false,
-						error: 'Fleet worker stopped before execution; no command was started'
-					})
+					this.report(
+						job.id,
+						{
+							success: false,
+							error: 'Fleet worker stopped before execution; no command was started'
+						},
+						leaseGenerationOf(job)
+					)
 				)
 			);
 			return;
@@ -489,10 +772,14 @@ export class WorkerLoop {
 		if (this.unsafe) {
 			await Promise.allSettled(
 				jobs.map((job) =>
-					this.report(job.id, {
-						success: false,
-						error: 'Fleet worker quarantined before execution; no command was started'
-					})
+					this.report(
+						job.id,
+						{
+							success: false,
+							error: 'Fleet worker quarantined before execution; no command was started'
+						},
+						leaseGenerationOf(job)
+					)
 				)
 			);
 			this.patch({ state: 'unsafe' });
@@ -509,10 +796,14 @@ export class WorkerLoop {
 
 		for (const job of jobs) {
 			if (!this.running || this.stopping || this.unsafe) {
-				await this.report(job.id, {
-					success: false,
-					error: 'Fleet worker stopped or quarantined before execution; no command was started'
-				});
+				await this.report(
+					job.id,
+					{
+						success: false,
+						error: 'Fleet worker stopped or quarantined before execution; no command was started'
+					},
+					leaseGenerationOf(job)
+				);
 				continue;
 			}
 			this.startJob(job);
@@ -524,13 +815,52 @@ export class WorkerLoop {
 	}
 
 	private startJob(job: FleetJobView): void {
-		const controller = new AbortController();
-		this.jobControllers.set(job.id, controller);
-		const task = this.executeJob(job, controller.signal).finally(() => {
-			this.inFlight.delete(job.id);
-			if (this.jobControllers.get(job.id) === controller) {
-				this.jobControllers.delete(job.id);
+		const run: JobRun = {
+			job,
+			generation: leaseGenerationOf(job),
+			controller: new AbortController(),
+			stale: false
+		};
+		// The same job id can already be in flight here: reclaim runs inline
+		// on this node's OWN lease poll, so the first poll after a resume
+		// hands the job it slept through straight back — while the lapsed
+		// run is still killing its model process. Being handed the job again
+		// proves the claim behind that run is void (reclaimed, or drained),
+		// so it is voided as stale — its report would only be refused — and
+		// the fresh claim starts once it has torn down, never beside it in
+		// the same workspace.
+		const previous = this.runs.get(job.id);
+		const previousTask = this.inFlight.get(job.id);
+		if (previous) {
+			this.options.logger?.warn(
+				`Fleet job ${job.id} was leased again while an earlier claim was still running here — that run is void (${FLEET_JOB_STALE_LEASE_REASON}); the new claim starts once it has stopped`
+			);
+			voidRun(previous);
+		}
+		this.runs.set(job.id, run);
+		const execute = async (): Promise<void> => {
+			// A claim that waited behind an earlier run gets the same answer a
+			// freshly leased one gets from `pollOnce` if the loop stopped or
+			// quarantined itself in the meantime: fail it without starting.
+			if (previousTask && (!this.running || this.stopping || this.unsafe)) {
+				await this.report(
+					job.id,
+					{
+						success: false,
+						error: 'Fleet worker stopped or quarantined before execution; no command was started'
+					},
+					run.generation,
+					run
+				);
+				return;
 			}
+			await this.executeJob(run);
+		};
+		const task: Promise<void> = (previousTask ? previousTask.then(execute, execute) : execute()).finally(() => {
+			// Identity-guarded: a later run of the same id may have replaced
+			// these entries while this one was tearing down.
+			if (this.inFlight.get(job.id) === task) this.inFlight.delete(job.id);
+			if (this.runs.get(job.id) === run) this.runs.delete(job.id);
 			this.patch({
 				activeJobIds: [...this.inFlight.keys()],
 				state: this.nextIdleState()
@@ -546,20 +876,62 @@ export class WorkerLoop {
 	 * A probe that throws or is absent ADMITS: the ceilings are a courtesy to
 	 * the machine's owner, and a broken sampler must degrade to "behave like
 	 * there were no ceiling", never to "this node is permanently idle".
+	 *
+	 * The disk floor is sampled on the workspace root's volume and folded
+	 * into the same decision. It is sampled ONLY when a floor is in force,
+	 * so the "skips sampling entirely when no ceiling is set" contract for
+	 * CPU/memory keeps holding for its own probe; a null floor takes no
+	 * reading at all.
 	 */
-	private async checkResourceAdmission(): Promise<{ admit: boolean; reason: string | null }> {
-		if (!this.resourceProbe || !hasAdmissionCeilings(this.limits)) {
+	private async checkResourceAdmission(): Promise<AdmissionDecision> {
+		const wantsHost = this.resourceProbe !== undefined && hasAdmissionCeilings(this.limits);
+		const wantsDisk = this.diskProbe !== undefined && this.workspacePath !== undefined && hasDiskFloor(this.limits);
+		if (!wantsHost && !wantsDisk) {
 			return { admit: true, reason: null };
 		}
-		try {
-			const sample = await this.resourceProbe.sample();
-			return admitByResourceLimits(this.limits, sample);
-		} catch (error) {
-			const raw = error instanceof Error ? error.message : String(error);
-			this.options.logger?.warn(
-				`Resource probe failed, admitting work anyway: ${this.options.logger?.redact(raw) ?? raw}`
-			);
-			return { admit: true, reason: null };
+		// NaN never blocks (see `admitByResourceLimits`), so a dimension that
+		// is not sampled cannot refuse.
+		let sample: ResourceSample = { cpuPercent: Number.NaN, usedMemoryMb: Number.NaN, totalMemoryMb: Number.NaN };
+		if (wantsHost) {
+			try {
+				sample = { ...(await this.resourceProbe!.sample()) };
+			} catch (error) {
+				const raw = error instanceof Error ? error.message : String(error);
+				this.options.logger?.warn(
+					`Resource probe failed, admitting work anyway: ${this.options.logger?.redact(raw) ?? raw}`
+				);
+			}
+		}
+		if (wantsDisk) {
+			// Measured on the nearest EXISTING ancestor of the root (a fresh
+			// node has not created it yet). A throwing / nonsense probe maps
+			// to null, and null admits: an unreadable volume is reported (the
+			// heartbeat carries no figure) rather than idling the node.
+			sample.diskFreeBytes = await measureWorkspaceFreeBytes(this.diskProbe!, this.workspacePath!);
+		}
+		const decision = admitByResourceLimits(this.limits, sample);
+		this.noteDiskDecision(decision);
+		return decision;
+	}
+
+	/**
+	 * One warning when the floor starts refusing, one info line when it
+	 * clears — not a line per poll, which at the idle cadence would be a
+	 * log entry every five seconds for as long as the disk stays full.
+	 */
+	private noteDiskDecision(decision: AdmissionDecision): void {
+		if (!decision.admit && decision.dimension === 'disk') {
+			if (this.lastDiskRefusal !== decision.reason) {
+				this.lastDiskRefusal = decision.reason;
+				this.options.logger?.warn(
+					`Refusing to lease work: ${decision.reason}. Free space on the workspace volume (\`ever-works-node doctor\`, \`ever-works-node gc\`) or lower the floor with --min-free-disk.`
+				);
+			}
+			return;
+		}
+		if (this.lastDiskRefusal !== null && (decision.admit || decision.dimension !== 'disk')) {
+			this.lastDiskRefusal = null;
+			this.options.logger?.info('Workspace volume is back above the disk floor — leasing resumes');
 		}
 	}
 
@@ -579,31 +951,50 @@ export class WorkerLoop {
 	 * blows up is reported as a job failure, because a job whose node
 	 * silently swallowed the error is indistinguishable from a hung one.
 	 */
-	private async executeJob(job: FleetJobView, signal: AbortSignal): Promise<void> {
+	private async executeJob(run: JobRun): Promise<void> {
+		const { job, generation, controller } = run;
+		const signal = controller.signal;
 		const executor = this.executors.get(job.kind);
 		if (!executor) {
 			this.options.logger?.warn(
 				`Leased job ${job.id} of kind '${job.kind}' has no executor on this node — reporting failure`
 			);
-			await this.report(job.id, {
-				success: false,
-				error: `No executor registered for fleet job kind '${job.kind}' on this node`
-			});
+			await this.report(
+				job.id,
+				{
+					success: false,
+					error: `No executor registered for fleet job kind '${job.kind}' on this node`
+				},
+				generation,
+				run
+			);
 			return;
 		}
 
-		const keepAlive = this.startKeepAlive(job);
+		const keepAlive = this.startKeepAlive(run);
 		let successAccepted = false;
 		try {
-			this.options.logger?.info(`Executing fleet job ${job.id} (${job.kind})`);
-			const result = await executor(job, signal);
+			this.options.logger?.info(
+				`Executing fleet job ${job.id} (${job.kind}${generation === undefined ? '' : `, lease #${generation}`})`
+			);
+			const result = await executor(job, signal, keepAlive.handle);
 			throwIfJobAborted(signal);
-			const accepted = await this.report(job.id, {
-				success: true,
-				result: (result as Record<string, unknown> | undefined) ?? null
-			});
+			if (this.settleDeferred(job.id, keepAlive.deferral())) return;
+			const accepted = await this.report(
+				job.id,
+				{
+					success: true,
+					result: (result as Record<string, unknown> | undefined) ?? null
+				},
+				generation,
+				run
+			);
 			if (!accepted) {
-				throw new Error('Fleet job success settlement was rejected; the lease may no longer be owned');
+				throw new Error(
+					run.stale
+						? `Fleet job success settlement was refused: ${FLEET_JOB_STALE_LEASE_REASON} — the platform holds a newer lease on this job`
+						: 'Fleet job success settlement was rejected; the lease may no longer be owned'
+				);
 			}
 			// The server's accepted terminal transition is authoritative. Stop
 			// heartbeat delivery before any late response can abort/count failure.
@@ -618,12 +1009,41 @@ export class WorkerLoop {
 			if (isProcessTreeTerminationError(error)) {
 				await this.quarantine(message);
 			}
-			await this.report(job.id, { success: false, error: message });
+			// Checked before the failure report too: an executor that withheld
+			// its publish and THEN hit the lease abort must not have that
+			// abort recorded as a terminal `failed`, which would retire a job
+			// nobody has run to a result.
+			if (this.settleDeferred(job.id, keepAlive.deferral())) return;
+			await this.report(job.id, { success: false, error: message }, generation, run);
 			this.patch({ failed: this.state.failed + 1, lastError: message });
 			this.options.logger?.warn(`Fleet job ${job.id} failed: ${message}`);
 		} finally {
 			keepAlive.stop();
 		}
+	}
+
+	/**
+	 * Record a job the executor handed back UNSETTLED, and report nothing.
+	 *
+	 * Every terminal transition the platform accepts is final: `complete`
+	 * writes `done` (or `failed`) and clears the lease, and `reclaimExpired`
+	 * only ever requeues claims that LAPSED. So a job whose only output — a
+	 * pushed branch — was withheld must not be settled at all, in either
+	 * direction: `success` would leave the agent's commit stranded on this
+	 * machine with the Fleet row reading "done", and `failure` would retire
+	 * work that nobody ever ran to a verdict. Silence lets the claim lapse
+	 * so the platform re-offers it inside its attempt budget.
+	 *
+	 * Counted as a local failure because that is what it is from this node's
+	 * side: it took work and produced nothing.
+	 */
+	private settleDeferred(jobId: string, reason: string | null): boolean {
+		if (reason === null) return false;
+		this.patch({ failed: this.state.failed + 1, lastError: reason });
+		this.options.logger?.warn(
+			`Fleet job ${jobId} was handed back unsettled (${reason}) — its claim will lapse and the platform will re-offer it`
+		);
+		return true;
 	}
 
 	private async quarantine(reason: string): Promise<void> {
@@ -673,91 +1093,341 @@ export class WorkerLoop {
 	 * job, so abort the shared job signal before another node can execute
 	 * the same work. Transport errors remain non-fatal because they do not
 	 * prove the lease was lost.
+	 *
+	 * The handle it returns is the same claim seen from the executor's
+	 * side: `deadlineAt` publishes the `confirmedUntil` the abort timer is
+	 * armed from, so an executor about to do something irreversible has no
+	 * second, drifting source of truth; `confirmDeadline` re-asks the
+	 * platform at the moment of the write; `defer` hands the job back
+	 * unsettled when the executor declined to finish it.
 	 */
-	private startKeepAlive(job: FleetJobView): { stop(): void } {
+	private startKeepAlive(run: JobRun): JobKeepAlive {
+		// Bound to THIS run's controller, never looked up by job id: after a
+		// resume the same id can be re-leased to this node while the lapsed
+		// run is still tearing down, and this keep-alive must only ever
+		// stop the run it belongs to.
+		const { job, generation, controller } = run;
 		const jobId = job.id;
-		const everyMs = Math.max(Math.floor((this.leaseTtlSec * 1000) / 3), MIN_KEEPALIVE_MS);
-		const localExpiry = this.now() + this.leaseTtlSec * 1000;
+		const ttlMs = this.leaseTtlSec * 1000;
+		const everyMs = Math.max(Math.floor(ttlMs / 3), MIN_KEEPALIVE_MS);
 		const wireExpiry = job.leaseExpiresAt ? Date.parse(job.leaseExpiresAt) : Number.NaN;
-		let confirmedUntil = Number.isFinite(wireExpiry) ? wireExpiry : localExpiry;
+		let confirmedUntil = Number.isFinite(wireExpiry) ? wireExpiry : this.now() + ttlMs;
+		let monotonicUntil = 0;
 		let beatTimer: unknown = null;
+		/** When the pending beat was armed, so its firing can be read for a suspend. */
+		let beatArmed: { wall: number; monotonic: number; forMs: number } | null = null;
 		let deadlineTimer: unknown = null;
 		let stopped = false;
+		let inFlightBeat: Promise<void> | null = null;
+		let deferral: string | null = null;
 
+		/**
+		 * Record one confirmed expiry against BOTH clocks.
+		 *
+		 * The monotonic budget is the smaller of the TTL this node asked for
+		 * and the grant it actually observed, so a wall clock sitting behind
+		 * the platform's — which makes every expiry look further away than it
+		 * is — cannot inflate the claim. A clock AHEAD of the platform's only
+		 * shortens it, and refusing to publish slightly early is the harmless
+		 * direction.
+		 */
+		const confirm = (expiry: number): void => {
+			confirmedUntil = expiry;
+			monotonicUntil = this.monotonicNow() + Math.min(ttlMs, Math.max(0, expiry - this.now()));
+		};
+		confirm(confirmedUntil);
+
+		const deadlineAt = (): number => {
+			const now = this.now();
+			return now + Math.min(confirmedUntil - now, monotonicUntil - this.monotonicNow());
+		};
+		/**
+		 * Any abort of this run ends the claim's usefulness, whichever way it
+		 * arrived — a refused beat, a lapse, an operator cancel, or `startJob`
+		 * voiding it because the platform handed this node the same job back
+		 * under a newer generation. Only the first of those reaches
+		 * `confirm()` on its own; the rest abort straight through the
+		 * controller while the local deadline may still read minutes ahead.
+		 * `confirmDeadline` deliberately stops re-asking the platform once the
+		 * signal is aborted, so without this collapse it would answer a
+		 * publish fence with that healthy-looking figure. Fail closed instead:
+		 * from the abort on, `deadlineAt` says the claim is spent.
+		 */
+		const onAbort = (): void => {
+			if (stopped) return;
+			confirm(this.now());
+		};
+
+		/**
+		 * `stopped`, not `inFlight`, is what says this keep-alive is finished.
+		 *
+		 * `startJob` registers the job in `inFlight` only AFTER `executeJob`
+		 * has run to its first await — which is inside the executor. An
+		 * executor that asks about its claim on its very first tick would
+		 * therefore be told it does not exist, and a renewal answering that
+		 * question would be discarded. `stop()` runs in `executeJob`'s
+		 * `finally`, so this flag is set no later than the map entry is
+		 * cleared and is true for exactly the window that matters.
+		 */
 		const stop = (): void => {
 			if (stopped) return;
 			stopped = true;
+			this.resumeHandlers.delete(onResume);
+			controller.signal.removeEventListener('abort', onAbort);
 			if (beatTimer !== null) this.scheduler.clearTimeout(beatTimer);
 			if (deadlineTimer !== null) this.scheduler.clearTimeout(deadlineTimer);
 			beatTimer = null;
 			deadlineTimer = null;
+		};
+		const abortForLapsedLease = (reason = 'Fleet job lease confirmation expired'): void => {
+			this.options.logger?.warn(
+				`Fleet job ${jobId} reached its last confirmed lease deadline — aborting before server reclaim (${reason})`
+			);
+			abortRun(run, reason);
+		};
+		/**
+		 * Stop the job when this node's own WALL clock says the claim is
+		 * spent, and report whether it did. `reason` is what the abort — and
+		 * so the failure report — carries; a caller that KNOWS the lapse
+		 * happened across a suspend passes the stable suspend reason.
+		 *
+		 * Asked on the wall clock rather than left to `deadlineTimer` because
+		 * a timer's base clock does not advance while a machine is suspended:
+		 * a lid closed for an hour mid-run wakes with the deadline long gone
+		 * and the timer still counting down awake seconds. Six PCs that get
+		 * shut mid-run is the ordinary case on this fleet, not the exotic one.
+		 */
+		const expireIfLapsed = (reason?: string): boolean => {
+			if (stopped) return false;
+			if (this.now() < confirmedUntil - LEASE_TERMINATION_SAFETY_MS) return false;
+			abortForLapsedLease(reason);
+			return true;
+		};
+		/**
+		 * The claim is void: the platform answered `stale-lease`, meaning it
+		 * re-issued this job after our lease lapsed. Collapse the local
+		 * deadline so nothing asking "may I still publish?" is told yes, abort
+		 * the run, and make sure no report follows — the platform would only
+		 * refuse it again, and the row now belongs to another claim.
+		 */
+		const voidClaim = (): void => {
+			if (stopped) return;
+			this.options.logger?.warn(
+				`Fleet job ${jobId}: the platform holds a newer lease (${FLEET_JOB_STALE_LEASE_REASON}) — aborting; nothing will be published or reported`
+			);
+			confirm(this.now());
+			voidRun(run);
+		};
+		/**
+		 * The loop noticed the machine resume from a suspend. The pending
+		 * beat timer is still counting down AWAKE milliseconds and may not
+		 * fire for most of a keep-alive interval, so decide now: lapsed on the
+		 * wall clock → abort with the suspend reason; otherwise the platform
+		 * may still have re-issued the claim during the sleep, so re-confirm
+		 * at once rather than trusting a local deadline that saw nothing.
+		 */
+		const onResume = (): void => {
+			if (stopped || controller.signal.aborted) return;
+			if (expireIfLapsed(FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON)) return;
+			this.options.logger?.warn(
+				`Fleet job ${jobId}: machine resumed inside the lease — re-confirming the claim with the platform now`
+			);
+			void runBeat();
 		};
 		const scheduleDeadline = (): void => {
 			if (deadlineTimer !== null) this.scheduler.clearTimeout(deadlineTimer);
 			const remaining = Math.max(0, confirmedUntil - LEASE_TERMINATION_SAFETY_MS - this.now());
 			deadlineTimer = this.scheduler.setTimeout(() => {
 				deadlineTimer = null;
-				if (stopped || !this.inFlight.has(jobId)) return;
-				this.options.logger?.warn(
-					`Fleet job ${jobId} reached its last confirmed lease deadline — aborting before server reclaim`
-				);
-				this.cancelJob(jobId, 'Fleet job lease confirmation expired');
+				if (stopped) return;
+				// Fires unconditionally, without re-checking the wall clock:
+				// a clock stepped BACKWARDS since this timer was armed would
+				// make the check say "not yet" with nothing left to re-arm it,
+				// and an abort that never happens is the worse failure.
+				abortForLapsedLease();
 			}, remaining);
 		};
 		const scheduleBeat = (): void => {
 			if (stopped) return;
+			if (beatTimer !== null) {
+				this.scheduler.clearTimeout(beatTimer);
+				beatTimer = null;
+			}
+			// Re-arming past the deadline is how a partitioned node used to
+			// spin: `remaining` collapses to zero, the beat fails against a
+			// dead endpoint in milliseconds, and `finally` re-arms at zero
+			// delay for the rest of the run. There is nothing left to renew
+			// at that point, so stop the job instead — and never re-arm
+			// faster than the keep-alive floor, which no lease can undercut.
+			if (expireIfLapsed()) return;
 			const remaining = Math.max(0, confirmedUntil - LEASE_TERMINATION_SAFETY_MS - this.now());
-			beatTimer = this.scheduler.setTimeout(beat, Math.min(everyMs, remaining));
+			const forMs = Math.max(MIN_KEEPALIVE_MS, Math.min(everyMs, remaining));
+			beatArmed = { wall: this.now(), monotonic: this.monotonicNow(), forMs };
+			beatTimer = this.scheduler.setTimeout(beat, forMs);
 		};
-		const beat = (): void => {
-			beatTimer = null;
-			if (stopped || !this.inFlight.has(jobId) || this.jobControllers.get(jobId)?.signal.aborted) return;
-			void this.options.client
-				.heartbeat(jobId, this.leaseTtlSec)
-				.then((renewed) => {
-					if (stopped || !this.inFlight.has(jobId)) return;
-					if (!renewed) {
-						this.options.logger?.warn(
-							`Lost the lease on fleet job ${jobId} — the platform may re-offer it to another node`
-						);
-						this.cancelJob(jobId, 'Fleet job lease was lost');
-						return;
-					}
-					if (this.jobControllers.get(jobId)?.signal.aborted) return;
-					const renewedExpiry = renewed.leaseExpiresAt ? Date.parse(renewed.leaseExpiresAt) : Number.NaN;
-					if (
-						renewed.id !== jobId ||
-						!Number.isFinite(renewedExpiry) ||
-						renewedExpiry <= this.now() + LEASE_TERMINATION_SAFETY_MS
-					) {
-						this.cancelJob(jobId, 'Fleet job heartbeat returned an invalid lease expiry');
-						return;
-					}
-					confirmedUntil = renewedExpiry;
-					scheduleDeadline();
-				})
+		const applyRenewal = (renewed: FleetJobView | null): void => {
+			if (stopped) return;
+			if (!renewed) {
+				this.options.logger?.warn(
+					`Lost the lease on fleet job ${jobId} — the platform may re-offer it to another node`
+				);
+				// The claim is gone NOW, not at the deadline it was granted:
+				// collapse it so anything asking "may I still publish?" is
+				// told the truth even if it never observes the abort.
+				confirm(this.now());
+				abortRun(run, 'Fleet job lease was lost');
+				return;
+			}
+			if (controller.signal.aborted) return;
+			const renewedExpiry = renewed.leaseExpiresAt ? Date.parse(renewed.leaseExpiresAt) : Number.NaN;
+			if (
+				renewed.id !== jobId ||
+				!Number.isFinite(renewedExpiry) ||
+				renewedExpiry <= this.now() + LEASE_TERMINATION_SAFETY_MS
+			) {
+				abortRun(run, 'Fleet job heartbeat returned an invalid lease expiry');
+				return;
+			}
+			// Belt and braces on the generation: an accepted renewal is by
+			// construction for OUR claim, so a view naming another one is a
+			// protocol fault and the safe reading is "not ours".
+			const renewedGeneration = leaseGenerationOf(renewed);
+			if (generation !== undefined && renewedGeneration !== undefined && renewedGeneration !== generation) {
+				abortRun(run, 'Fleet job heartbeat returned a different lease generation');
+				return;
+			}
+			confirm(renewedExpiry);
+			scheduleDeadline();
+		};
+		/**
+		 * One beat, at most one in flight. A publish that asks for a fresh
+		 * confirmation while the scheduled beat is already out joins that
+		 * request rather than doubling it.
+		 *
+		 * A `stale-lease` answer is the one transport error that IS a
+		 * protocol outcome: it proves the claim is void, so it aborts here
+		 * rather than being logged and retried like a network fault.
+		 */
+		const runBeat = (): Promise<void> => {
+			if (inFlightBeat) return inFlightBeat;
+			const renewal =
+				generation === undefined
+					? this.options.client.heartbeat(jobId, this.leaseTtlSec)
+					: this.options.client.heartbeat(jobId, this.leaseTtlSec, generation);
+			const attempt = renewal
+				.then(applyRenewal)
 				.catch((error: unknown) => {
+					if (isStaleLeaseError(error)) {
+						voidClaim();
+						return;
+					}
 					const raw = error instanceof Error ? error.message : String(error);
 					this.options.logger?.warn(
 						`Job heartbeat failed for ${jobId}: ${this.options.logger?.redact(raw) ?? raw}`
 					);
 				})
 				.finally(() => {
-					if (!this.jobControllers.get(jobId)?.signal.aborted) scheduleBeat();
+					inFlightBeat = null;
 				});
+			inFlightBeat = attempt;
+			return attempt;
+		};
+		const beat = (): void => {
+			beatTimer = null;
+			if (stopped || controller.signal.aborted) return;
+			// Read the firing against the arming on both clocks: a beat that
+			// arrives long after it was due is the machine waking up, and a
+			// lapse found then is reported as such rather than as a bare
+			// expiry, so the run's error says what actually happened.
+			const suspended =
+				beatArmed !== null &&
+				isSuspendGap({
+					armedForMs: beatArmed.forMs,
+					wallElapsedMs: this.now() - beatArmed.wall,
+					monotonicElapsedMs: this.monotonicNow() - beatArmed.monotonic
+				});
+			beatArmed = null;
+			if (expireIfLapsed(suspended ? FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON : undefined)) return;
+			void runBeat().finally(() => {
+				if (!controller.signal.aborted) scheduleBeat();
+			});
+		};
+		const confirmDeadline = async (): Promise<number> => {
+			if (!stopped && !controller.signal.aborted) {
+				await runBeat();
+			}
+			return deadlineAt();
 		};
 		scheduleBeat();
 		scheduleDeadline();
-		return { stop };
+		this.resumeHandlers.add(onResume);
+		// A run voided while it waited behind an earlier claim on the same
+		// job arrives here already aborted; the listener would never fire.
+		if (controller.signal.aborted) onAbort();
+		else controller.signal.addEventListener('abort', onAbort, { once: true });
+		return {
+			stop,
+			deferral: () => deferral,
+			handle: {
+				deadlineAt,
+				publishMarginMs: this.publishFenceMarginMs,
+				confirmDeadline,
+				// First reason wins: it is the one that actually stopped the
+				// publish, and a later one would only describe the fallout.
+				defer: (reason: string) => {
+					if (deferral === null) deferral = reason;
+				}
+			}
+		};
 	}
 
+	/**
+	 * The loop's own timer fired far later than it was armed for: the
+	 * machine was suspended in between. Hand every in-flight keep-alive the
+	 * chance to abort (lease lapsed while asleep) or to re-confirm (still
+	 * inside the claim, but the platform may have moved on regardless).
+	 */
+	private noticeResume(gap: TimerGap): void {
+		if (this.resumeHandlers.size === 0 || !isSuspendGap(gap)) return;
+		this.options.logger?.warn(
+			`Fleet worker resumed after a ${Math.round(gap.wallElapsedMs / 1000)}s gap (timer armed for ${Math.round(
+				gap.armedForMs / 1000
+			)}s) — re-checking ${this.resumeHandlers.size} in-flight lease(s)`
+		);
+		for (const handler of [...this.resumeHandlers]) handler();
+	}
+
+	/**
+	 * `run` is the claim this report belongs to, when there is one (a job
+	 * refused before any executor started has none). A run the platform
+	 * has already answered `stale-lease` for — or that this node re-leased
+	 * over — reports nothing: the platform has moved on to the claim that
+	 * superseded it and would only refuse again.
+	 */
 	private async report(
 		jobId: string,
-		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null }
+		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null },
+		leaseGeneration?: number,
+		run?: JobRun
 	): Promise<boolean> {
+		if (run?.stale) {
+			this.options.logger?.warn(
+				`Not reporting fleet job ${jobId}: this node's lease is stale (${FLEET_JOB_STALE_LEASE_REASON})`
+			);
+			return false;
+		}
 		try {
-			return await this.options.client.complete(jobId, outcome);
+			return await (leaseGeneration === undefined
+				? this.options.client.complete(jobId, outcome)
+				: this.options.client.complete(jobId, outcome, leaseGeneration));
 		} catch (error) {
+			if (isStaleLeaseError(error)) {
+				this.options.logger?.warn(
+					`Fleet job ${jobId}: report refused — the platform holds a newer lease (${FLEET_JOB_STALE_LEASE_REASON}); aborting and not retrying`
+				);
+				if (run) voidRun(run);
+				return false;
+			}
 			// The lease will expire and the job will be reclaimed — the
 			// protocol survives an unreportable result by construction.
 			const raw = error instanceof Error ? error.message : String(error);
@@ -804,8 +1474,19 @@ export class WorkerLoop {
 
 	private scheduleNext(delayMs: number): void {
 		if (!this.running || this.stopping) return;
+		// Record the arming on both clocks: the loop timer is the one timer
+		// guaranteed to be pending whenever the loop is running (busy, idle,
+		// paused or backing off), which makes it the resume detector. A
+		// suspend shows up as this callback firing far later than `delayMs`.
+		const armedWall = this.now();
+		const armedMonotonic = this.monotonicNow();
 		this.timer = this.scheduler.setTimeout(() => {
 			this.timer = null;
+			this.noticeResume({
+				armedForMs: delayMs,
+				wallElapsedMs: this.now() - armedWall,
+				monotonicElapsedMs: this.monotonicNow() - armedMonotonic
+			});
 			void this.tick();
 		}, delayMs);
 	}
@@ -836,6 +1517,63 @@ function throwIfJobAborted(signal: AbortSignal): void {
 
 function isProcessTreeTerminationError(error: unknown): boolean {
 	return error instanceof Error && error.name === 'ProcessTreeTerminationError';
+}
+
+/**
+ * Duck-typed like the `unauthorized` check in `onPollFailure`: the client
+ * is injected, and a test double that answers a 409 should not have to
+ * construct the real error class to be believed.
+ */
+function isStaleLeaseError(error: unknown): boolean {
+	return (
+		typeof error === 'object' &&
+		error !== null &&
+		(error as { kind?: unknown }).kind === FLEET_JOB_STALE_LEASE_REASON
+	);
+}
+
+/**
+ * One claim being executed on this node. Everything a keep-alive or a
+ * report decides is keyed on the RUN, never on the job id alone: after a
+ * suspend the node's own poll reclaims and re-leases the job it slept
+ * through, so the same id can be in flight twice — the lapsed run tearing
+ * down and the fresh claim starting — and nothing the old one does on its
+ * way out may abort or silence the new one.
+ */
+interface JobRun {
+	readonly job: FleetJobView;
+	/** The claim identity the lease carried, or undefined from an older platform. */
+	readonly generation: number | undefined;
+	/** Shared by workspace provisioning, the model process and the keep-alive. */
+	readonly controller: AbortController;
+	/**
+	 * Set once this claim is known to be void — the platform answered
+	 * `stale-lease` for it, or re-issued the job to this node while it was
+	 * still running. No report is sent for a stale run.
+	 */
+	stale: boolean;
+}
+
+/** Abort one run with a stable reason; a no-op once it has already been aborted. */
+function abortRun(run: JobRun, reason: string): void {
+	if (run.controller.signal.aborted) return;
+	run.controller.abort(new Error(reason));
+}
+
+/** The platform holds a newer claim than this run: abort it and never report it. */
+function voidRun(run: JobRun): void {
+	run.stale = true;
+	abortRun(run, FLEET_JOB_STALE_LEASE_REASON);
+}
+
+/**
+ * The claim identity a lease view carries, or undefined when the platform
+ * that issued it predates lease generations (the call is then made with
+ * its original arity, which is also what that platform accepts).
+ */
+function leaseGenerationOf(job: FleetJobView): number | undefined {
+	const value = job.leaseGeneration;
+	return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : undefined;
 }
 
 function errorDetail(error: unknown): string {

@@ -20,6 +20,7 @@ import { TaskIsolationSettings } from './TaskIsolationSettings';
 import { QualityGatesSettings } from './QualityGatesSettings';
 import { MergePolicySettings } from './MergePolicySettings';
 import { ExternalRefsSettings } from './ExternalRefsSettings';
+import { isRepositoryWorkKind } from '@ever-works/contracts';
 interface SettingsFormProps {
     work: Work;
     user: AuthUser;
@@ -28,6 +29,10 @@ interface SettingsFormProps {
 
 export function SettingsForm({ work, user, initialRepositories }: SettingsFormProps) {
     const t = useTranslations('dashboard.workDetail.settings');
+    // A Repository Work wraps a repository the platform did not create: the
+    // API refuses to flip its visibility or to run community-PR intake on
+    // it, so the two cards are not offered rather than shown to fail.
+    const wrapsExistingRepository = isRepositoryWorkKind(work.kind);
 
     return (
         <SettingsProvider work={work} user={user}>
@@ -42,11 +47,13 @@ export function SettingsForm({ work, user, initialRepositories }: SettingsFormPr
                 <ReadmeConfiguration />
 
                 {/* Repository Visibility Settings */}
-                <RepoVisibilitySettings initialRepositories={initialRepositories} />
+                {!wrapsExistingRepository && (
+                    <RepoVisibilitySettings initialRepositories={initialRepositories} />
+                )}
 
                 {/* Community PR Processing Settings */}
                 <ProviderRepositorySettings />
-                <CommunityPrSettings />
+                {!wrapsExistingRepository && <CommunityPrSettings />}
 
                 {/* Wave 2 M7 — worktree-per-Task isolation */}
                 <TaskIsolationSettings />

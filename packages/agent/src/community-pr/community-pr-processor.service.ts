@@ -14,6 +14,7 @@ import { DataRepository } from '../generators/data-generator/data-repository';
 import { GenerateStatusType } from '../entities/types';
 import { WorkHistoryActivityType, type WorkHistoryChangeEntry } from '@ever-works/contracts/api';
 import { buildWorkChangelog } from '../utils/work-changelog.utils';
+import { assertNotRepositoryWork, isRepositoryWork } from '../works/repository-work-guard';
 
 const MAX_PROCESSED_PR_NUMBERS = 500;
 const MAX_CHANGE_CONTEXT_LENGTH = 50_000;
@@ -304,6 +305,17 @@ export class CommunityPrProcessorService {
         const result: CommunityPrProcessingResult = { processed: 0, errors: [] };
 
         for (const work of works) {
+            // A Repository Work's "main repo" resolves to the wrapped code
+            // repository (the derived `<slug>` fallback). Listing, commenting
+            // on and closing pull requests THERE is not community intake, so
+            // the schedule skips the kind quietly rather than logging an
+            // error every tick; the API path below refuses it out loud.
+            if (isRepositoryWork(work)) {
+                this.logger.debug(
+                    `Skipping community PR processing for Repository Work ${work.id} (kind repo)`,
+                );
+                continue;
+            }
             try {
                 const state: CommunityPrState = work.communityPrState || {
                     processedPrNumbers: [],
@@ -331,6 +343,7 @@ export class CommunityPrProcessorService {
         autoClose?: boolean,
         triggeredBy: CommunityPrTriggerSource = 'api',
     ): Promise<number> {
+        assertNotRepositoryWork(work, 'community pull-request processing');
         const lockResult = await this.taskLockService.runExclusive(
             this.workLockKey(work.id),
             async () => {

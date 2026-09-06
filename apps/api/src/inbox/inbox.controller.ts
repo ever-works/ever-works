@@ -23,7 +23,8 @@ import { ListInboxQueryDto, ReplyInboxItemDto, SetInboxReadStateDto } from './dt
 /**
  * Inbox (operator message center) — API surface.
  *
- *   GET    /api/inbox                 my messages (?status= filter; default = active view) + unread count
+ *   GET    /api/inbox                 my messages (?status= filter; default = active view;
+ *                                     ?taskId= narrows to one Task) + unread count
  *   GET    /api/inbox/unread-count    badge count (polled by the sidebar)
  *   GET    /api/inbox/:id             one message
  *   POST   /api/inbox/:id/reply       answer it — routed per kind (steer/resume run,
@@ -47,7 +48,7 @@ export class InboxController {
     @Get()
     @ApiOperation({
         summary:
-            'List my inbox — questions, approvals, escalations and notices addressed to me, newest first.',
+            'List my inbox — questions, approvals, escalations and notices addressed to me, newest first. `taskId` narrows the list to one Task (the open question a parked fleet run is waiting on).',
     })
     @HttpCode(HttpStatus.OK)
     async list(
@@ -63,6 +64,9 @@ export class InboxController {
             status: query.status,
             limit,
             offset,
+            // Conditional so the default call shape stays byte-identical
+            // for every caller that never sends a Task filter.
+            ...(query.taskId ? { taskId: query.taskId } : {}),
         });
         return { data: items, meta: { total, limit, offset, unreadCount } };
     }

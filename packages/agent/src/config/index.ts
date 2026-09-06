@@ -1,11 +1,34 @@
 import {
+    clampQueuedMaxAgeSec,
+    DEFAULT_FLEET_AGENT_EXECUTION_MODE,
+    DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE,
+    DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER,
     FLEET_AGENT_CREDENTIAL_ENV_NAMES,
+    FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC,
+    FLEET_AGENT_EXECUTION_MAX_BUDGET_USD,
+    FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
+    FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC,
+    FLEET_AGENT_EXECUTION_MODEL_PATTERN,
+    isFleetAgentExecutionEffort,
+    isFleetAgentExecutionMode,
+    isFleetAgentExecutionPermissionMode,
+    isFleetAgentExecutionProvider,
+    type FleetAgentExecutionEffort,
+    type FleetAgentExecutionMode,
+    type FleetAgentExecutionPermissionMode,
+    type FleetAgentExecutionProvider,
+    type FleetJobKind,
+    FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+    FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
     FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
     FLEET_MAX_CAPABILITY_TAGS_CEILING,
+    FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
+    FLEET_MAX_DAILY_COST_CEILING_CENTS,
+    FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
     FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
     FLEET_MIN_NODE_OFFLINE_AFTER_MS,
 } from '@ever-works/contracts';
@@ -16,6 +39,21 @@ import {
     catalogPaygMaxMonthlyCapCredits,
 } from '../subscriptions/billing/stripe-catalog';
 type AppType = 'cli' | 'api';
+
+/**
+ * Fleet cost accounting (EW-777) — parse a dollar env var into whole
+ * cents, or null when unset. Unlike the clamped knobs, a nonsense value
+ * (non-numeric, zero, negative, above the contract cap) is `null` = "no
+ * ceiling", NOT a clamped one: a ceiling nobody typed correctly must not
+ * silently become a ceiling nobody chose. The service logs which value is
+ * in force, and the settings page shows it.
+ */
+function usdEnvToCents(raw: string | undefined): number | null {
+    const usd = parseFloat(raw || '');
+    if (!Number.isFinite(usd) || usd <= 0) return null;
+    const cents = Math.round(usd * 100);
+    return cents >= 1 && cents <= FLEET_MAX_DAILY_COST_CEILING_CENTS ? cents : null;
+}
 
 /**
  * Parse an integer env var into a clamped range, falling back to
@@ -165,8 +203,10 @@ export const config = {
      *
      * Nothing in this group turns the fleet runtime ON by itself — that
      * is still `EVER_WORKS_JOB_RUNTIME=node` (or a tenant overlay row).
-     * `FLEET_NODE_RUNTIME_ENABLED=false` is the kill switch that wins
-     * over both.
+     * `FLEET_NODE_RUNTIME_ENABLED=false` is a ROUTING SELECTOR that wins
+     * over both — work falls back to the cloud. It is NOT a panic control;
+     * the control that stops work is the DB-backed global stop flag
+     * (`FleetKillSwitchService`, EW-778).
      */
     fleetNode: {
         /**
@@ -187,6 +227,31 @@ export const config = {
         getLeaseTtlSeconds(): number | undefined {
             const raw = parseInt(process.env.FLEET_NODE_LEASE_TTL_SECONDS || '', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+        },
+        /**
+         * Queue SLA (self-build slice S / EW-775): the longest a `queued`
+         * job of `kind` may wait for an eligible runner before
+         * `FleetJobService.expireQueued` fails it.
+         *
+         * `FLEET_NODE_QUEUE_MAX_AGE_SECONDS` sets every kind; the per-kind
+         * `FLEET_NODE_QUEUE_MAX_AGE_SECONDS_AGENT_TASK` /
+         * `_ACCEPTANCE_CHECKS` / `_BROWSER_CHECK` overrides it. Always
+         * passed through `clampQueuedMaxAgeSec`: unset or nonsense is the
+         * kind's default, out-of-range is clamped, and there is no value
+         * that means "wait forever" — a deploy-manifest typo must fail
+         * closed to the documented bound, not to an unbounded queue.
+         */
+        getQueuedMaxAgeSeconds(kind: FleetJobKind): number {
+            const suffix = kind.toUpperCase().replace(/-/g, '_');
+            const perKind = parseInt(
+                process.env[`FLEET_NODE_QUEUE_MAX_AGE_SECONDS_${suffix}`] || '',
+                10,
+            );
+            if (Number.isFinite(perKind) && perKind > 0) {
+                return clampQueuedMaxAgeSec(kind, perKind);
+            }
+            const all = parseInt(process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS || '', 10);
+            return clampQueuedMaxAgeSec(kind, Number.isFinite(all) && all > 0 ? all : undefined);
         },
         /**
          * Capability tags a node must advertise to be eligible for this
@@ -271,6 +336,91 @@ export const config = {
                 .map((name) => name.trim())
                 .filter((name) => name.length > 0);
         },
+
+        // ── Agent execution v2 — model CLIs on the node ─────────────
+        //
+        // Instance-level DEFAULTS for how a fleet node executes an
+        // `agent-task`. A tenant overrides them through the
+        // `job-runtime-node` plugin's settings (same keys, resolved per
+        // user by the planner); these getters are the floor that applies
+        // when no tenant setting is present.
+
+        /**
+         * `command` (legacy template, the default) or `model-cli` (the
+         * platform assembles the agent's instructions and the node runs
+         * a local Claude Code / Codex on them). Unknown values fall back
+         * to the default so a typo can never silently switch modes.
+         */
+        getAgentExecutionMode(): FleetAgentExecutionMode {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_MODE || '').trim();
+            return isFleetAgentExecutionMode(raw) ? raw : DEFAULT_FLEET_AGENT_EXECUTION_MODE;
+        },
+        /** Which local CLI the node drives in `model-cli` mode. */
+        getAgentExecutionProvider(): FleetAgentExecutionProvider {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER || '').trim();
+            return isFleetAgentExecutionProvider(raw)
+                ? raw
+                : DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER;
+        },
+        /**
+         * Model id handed to the CLI (`--model`). Unset = the CLI's own
+         * default. Refused (→ undefined) unless it is an opaque
+         * identifier, because it ends up on a command line.
+         */
+        getAgentExecutionModel(): string | undefined {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_MODEL || '').trim();
+            return raw && FLEET_AGENT_EXECUTION_MODEL_PATTERN.test(raw) ? raw : undefined;
+        },
+        /** Claude Code `--effort`. Unset = the CLI's default. */
+        getAgentExecutionEffort(): FleetAgentExecutionEffort | undefined {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_EFFORT || '').trim();
+            return isFleetAgentExecutionEffort(raw) ? raw : undefined;
+        },
+        /** What the CLI may do without asking. Default `acceptEdits`. */
+        getAgentExecutionPermissionMode(): FleetAgentExecutionPermissionMode {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE || '').trim();
+            return isFleetAgentExecutionPermissionMode(raw)
+                ? raw
+                : DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE;
+        },
+        /**
+         * Wall-clock budget for one model run, clamped into the node's
+         * supported range. Default 20 minutes.
+         */
+        getAgentExecutionTimeoutSeconds(): number {
+            const raw = parseInt(process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS || '', 10);
+            if (!Number.isFinite(raw) || raw <= 0) {
+                return FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC;
+            }
+            return Math.min(
+                Math.max(raw, FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC),
+                FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC,
+            );
+        },
+        /**
+         * Per-run dollar cap handed to the CLI. Unset/nonsense = no cap
+         * (the CLI's own limits and the platform budgets still apply).
+         */
+        getAgentExecutionMaxBudgetUsd(): number | undefined {
+            const raw = parseFloat(process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD || '');
+            // Same ceiling the wire contract enforces (`normalizeFleetAgentModelExecution`):
+            // a value the node would refuse must never be planned in the first place.
+            return Number.isFinite(raw) && raw > 0 && raw <= FLEET_AGENT_EXECUTION_MAX_BUDGET_USD
+                ? raw
+                : undefined;
+        },
+        /**
+         * Whether runs may bypass the CLI's permission prompts entirely
+         * (`--dangerously-skip-permissions`). Default OFF; an unattended
+         * node usually needs it, which is exactly why it is an explicit
+         * operator decision recorded on every job.
+         */
+        isAgentExecutionSkipPermissionsEnabled(): boolean {
+            const raw = (process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS || '')
+                .trim()
+                .toLowerCase();
+            return raw === 'true' || raw === '1';
+        },
     },
 
     /**
@@ -312,6 +462,27 @@ export const config = {
             );
         },
         /**
+         * Credential lifecycle (EW-799) — how long BOTH credentials are
+         * accepted after a node rotates itself
+         * (`FLEET_CREDENTIAL_ROTATION_OVERLAP_MS`, default 15 minutes,
+         * floor 30s, ceiling 24h).
+         *
+         * The window exists so a machine can finish the job it is holding
+         * and persist its new secret before the old one dies. It closes on
+         * a clock, never on a callback: a node that never comes back still
+         * loses its old credential on time. Long enough to survive a
+         * restart; the 24h ceiling is where a handover window would stop
+         * being a handover and become a second permanent credential.
+         */
+        getCredentialRotationOverlapMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS,
+                FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS,
+            );
+        },
+        /**
          * Silence after which an `online` node is swept to `offline` by
          * the next owner-scoped list read. Default 5 minutes.
          *
@@ -324,6 +495,25 @@ export const config = {
                 process.env.FLEET_NODE_OFFLINE_AFTER_MS,
                 FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
                 FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Fleet health signals (EW-776) — how long an already-offline node
+         * stays gone before its owner gets a SECOND, louder Inbox notice.
+         * Default 30 minutes (`FLEET_NODE_OFFLINE_NOTICE_AFTER_MS`).
+         *
+         * Floored at {@link getNodeOfflineAfterMs}, not at a constant: a
+         * window shorter than the sweep window would fire the escalation
+         * before the node is even considered offline, i.e. two notices for
+         * one event. The floor is read live so lowering it below a raised
+         * `FLEET_NODE_OFFLINE_AFTER_MS` still cannot invert the pair.
+         */
+        getNodeOfflineNoticeAfterMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS,
+                FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS,
+                this.getNodeOfflineAfterMs(),
                 Number.MAX_SAFE_INTEGER,
             );
         },
@@ -344,6 +534,27 @@ export const config = {
                 1,
                 FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
             );
+        },
+        /**
+         * Fleet cost accounting (EW-777) — deployment-default DAILY (UTC
+         * day) model-spend ceiling for ONE node, in cents, or null for no
+         * ceiling. `FLEET_NODE_DAILY_COST_CEILING_USD`; a node's own
+         * `dailyCostCeilingCents` column overrides it. Unset (the default)
+         * means no ceiling and zero behaviour change — enabling one is an
+         * explicit decision, and crossing it DRAINS the node until its
+         * owner re-enables it.
+         */
+        getDefaultNodeDailyCostCeilingCents(): number | null {
+            return usdEnvToCents(process.env.FLEET_NODE_DAILY_COST_CEILING_USD);
+        },
+        /**
+         * Deployment-default FLEET-WIDE daily ceiling (every node of one
+         * owner, summed), in cents, or null. `FLEET_DAILY_COST_CEILING_USD`;
+         * the owner's `fleet_cost_policies` row overrides it. Same
+         * unset-means-none rule as the per-node default.
+         */
+        getDefaultFleetDailyCostCeilingCents(): number | null {
+            return usdEnvToCents(process.env.FLEET_DAILY_COST_CEILING_USD);
         },
     },
 
@@ -869,6 +1080,90 @@ export const config = {
         },
     },
 
+    /**
+     * Agent Plugins standard interop — support for the open, cross-vendor
+     * package format at <https://github.com/agentplugins/agent-plugins-spec>.
+     *
+     * Lives HERE, in the agent package, rather than in `apps/api`'s config,
+     * and that is not a stylistic choice: the first consumer is
+     * `SkillsFacadeService` in `packages/agent/src/facades/`, which has no
+     * import path to `apps/api`. Putting the flag in the API-tier constants
+     * would strand it from its own reader.
+     */
+    agentPlugins: {
+        /**
+         * Master switch. Default `false`, so every existing deployment keeps
+         * behaving exactly as it does today: no package registry is read, no
+         * additional catalog source is consulted, nothing changes.
+         */
+        isEnabled() {
+            return (process.env.FEATURE_AGENT_PLUGINS ?? 'false').toLowerCase() === 'true';
+        },
+
+        /**
+         * Directories scanned for locally-installed packages.
+         *
+         * Three deliberate decisions:
+         *
+         * 1. `||`, not `??`. `envsubst` renders a variable that a manifest
+         *    references but the deploy workflow does not export as an EMPTY
+         *    STRING, and `??` passes an empty string straight through as if
+         *    it were a real value. `||` falls back to the default, which is
+         *    what an operator means by "I did not set this".
+         * 2. The default is NOT `/app/plugins`. That path holds the ~66
+         *    native plugins baked into the image, and an emptyDir mounted
+         *    over it once took out every AI, search and deploy capability in
+         *    production because the loader then discovered zero plugins.
+         * 3. Nothing creates the default directory — no Dockerfile mkdir, no
+         *    volume mount. It will not exist on any current deployment, so
+         *    the scanner treats a missing directory as an empty registry
+         *    rather than an error. Turning this flag on must never be able to
+         *    fail a boot.
+         */
+        getPackageDirs(): string {
+            return process.env.AGENT_PLUGINS_DIR || '/app/agent-plugins';
+        },
+
+        /**
+         * Whether stdio MCP servers declared by packages may be LAUNCHED.
+         *
+         * A second switch, deliberately separate from `isEnabled()`, because
+         * the two authorise very different things. The master flag lets
+         * packages contribute documents and remote server declarations —
+         * inert data. This one lets the platform execute a subprocess from a
+         * package's contents, which is a categorically larger grant, and one
+         * a deployment may never want even while using packages happily.
+         *
+         * Default `false`, and SaaS keeps it off: no sandbox is built in this
+         * feature, so a stdio server would run with the API pod's own
+         * privileges. Self-hosted operators who control what they install can
+         * turn it on.
+         *
+         * A stdio server on a deployment with this off is reported as
+         * "present, disabled by policy" (AP-19) rather than hidden, so the
+         * operator can see what a package would run if they allowed it.
+         */
+        isStdioEnabled(): boolean {
+            return (process.env.AGENT_PLUGINS_STDIO ?? 'false').toLowerCase() === 'true';
+        },
+
+        /**
+         * Root for per-package writable data (`${PLUGIN_DATA}`).
+         *
+         * Deliberately NOT under `getPackageDirs()`. Package contents are
+         * read-only and replaced wholesale on update; data must survive that,
+         * and a writable directory inside a scanned tree would also be walked
+         * by the package scanner. `||` for the same envsubst reason as above.
+         *
+         * Nothing creates this directory either — the launcher creates the
+         * per-package subdirectory it needs, so turning the flag on cannot
+         * fail a boot.
+         */
+        getDataDir(): string {
+            return process.env.AGENT_PLUGINS_DATA_DIR || '/app/agent-plugins-data';
+        },
+    },
+
     // EW-120 Activity Feed pull-mode plumbing — per-Work HMAC secret is
     // encrypted at rest with this key. AES-256-GCM expects a 32-byte key;
     // the consumer service decodes hex / base64 / utf8 in that order.
@@ -1122,6 +1417,37 @@ export const config = {
             return Number.isFinite(raw) ? raw : 25;
         },
         /**
+         * Task-graph fan-out (self-build slice AH) — how many TODO Tasks
+         * `TaskGraphFanoutService` may START for ONE owner in a single
+         * tick.
+         *
+         * 🛑 READ THE ZERO THE OTHER WAY ROUND. For the concurrency valves
+         * above, `<= 0` means "no ceiling". Here `<= 0` means the driver
+         * is OFF and starts nothing — which is the DEFAULT, because this
+         * is the one knob on the platform that begins work nobody clicked.
+         * An operator opts in by setting a positive number.
+         *
+         * The bound is per OWNER per tick, not a concurrency limit: the
+         * real ceilings (the Work / org valves, the plan entitlement, the
+         * credits precheck, the global stop flag) still decide whether any
+         * given start is admitted, and a Task refused by them stays `todo`
+         * and is a candidate again next tick.
+         */
+        getTaskFanoutMaxStartsPerOwner() {
+            const raw = parseInt(process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER || '0', 10);
+            return Number.isFinite(raw) ? raw : 0;
+        },
+        /**
+         * How many TODO Tasks one fan-out tick SCANS (before blocker,
+         * agent and admission filtering). Bounds the tick's cost — the
+         * blocker check is one query per blocker row — not how much work
+         * starts; `getTaskFanoutMaxStartsPerOwner` does that.
+         */
+        getTaskFanoutScanLimit() {
+            const raw = parseInt(process.env.TASK_FANOUT_SCAN_LIMIT || '50', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 50;
+        },
+        /**
          * H2 kill-switch for the plan-driven concurrency ceiling
          * (`plan_entitlements.max-concurrent-runs`), folded into the org
          * valve above as a RAISE-ONLY adjustment.
@@ -1171,6 +1497,53 @@ export const config = {
      * filter input, so an unbounded knob would be a denial-of-service
      * surface, and a zero/NaN TTL would expire every token instantly.
      */
+
+    /**
+     * Saved workflow graphs (judgment layer G5) — the `workflow_runs`
+     * stuck-row sweep.
+     *
+     * `POST /api/workflows/:id/run` inserts the row `queued` and the
+     * Trigger.dev `workflow-run` task owns it from `markStarted` onward.
+     * That task runs `maxAttempts: 1`, so if its machine dies without
+     * reaching a terminal write — OOM, node eviction, a
+     * `release-trigger-prod` deploy, or `maxDuration` expiry — nothing
+     * re-delivers it and the row stays `queued`/`running` forever. A
+     * `queued` row is equally strandable: an enqueue that parks in
+     * `PENDING_VERSION` across an API/worker deploy skew may never run.
+     */
+    workflows: {
+        /** Kill switch for the `workflow_runs` stuck-row sweeper. Default on. */
+        getRunSweeperEnabled() {
+            return process.env.WORKFLOW_RUN_SWEEPER_ENABLED !== 'false';
+        },
+        /**
+         * Age past which a `queued`/`running` workflow run is considered
+         * abandoned, measured from `COALESCE(startedAt, createdAt)`.
+         *
+         * The two error costs are asymmetric in the same way
+         * `agents.getStuckTimeoutMinutes` documents, so this is deliberately
+         * generous. Sweeping LATE leaves a status field wrong for a few extra
+         * hours. Sweeping EARLY marks a LIVE walk `failed`; the worker's own
+         * `markCompleted` then no-ops against the terminal CAS and the real
+         * result is lost, which is unrecoverable.
+         *
+         * The floor is the task's own ceiling: `workflow-run.task.ts` pins
+         * `maxDuration: 60 * 60`, so a legitimate walk can occupy 60 minutes.
+         * 90 leaves half an hour of margin. A value at or below 60 would reap
+         * healthy long walks, so it is clamped up.
+         */
+        getRunStuckTimeoutMinutes() {
+            const raw = parseInt(process.env.WORKFLOW_RUN_STUCK_TIMEOUT_MINUTES || '90', 10);
+            const minutes = Number.isFinite(raw) && raw > 0 ? raw : 90;
+            // `maxDuration` is 60 minutes; never reap inside a walk's own budget.
+            return Math.max(minutes, 61);
+        },
+        /** Upper bound on rows reaped per sweep tick. */
+        getRunSweeperMaxBatch() {
+            const raw = parseInt(process.env.WORKFLOW_RUN_SWEEPER_MAX_BATCH || '100', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 100;
+        },
+    },
 
     /**
      * Streaming-terminal M9 / founder decision D1 — persisted terminal

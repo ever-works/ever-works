@@ -52,6 +52,7 @@ import { AgentsModule } from './agents/agents.module';
 import { EnvironmentsApiModule } from './environments/environments.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
+import { AgentPluginsApiModule } from './agent-plugins/agent-plugins.module';
 import { McpConnectionsModule } from './mcp-connections/mcp-connections.module';
 import { RepoConnectionsModule } from './repo-connections/repo-connections.module';
 import { TasksModule } from './tasks/tasks.module';
@@ -195,6 +196,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Phase 8 — Skills read-only API + SkillsFacadeService.
         // Write paths + bindings ship with Phase 9.
         SkillsModule,
+        AgentPluginsApiModule,
         // Agent Plugins MCP slice — manual external MCP connections +
         // per-agent bindings (docs/specs/features/agent-plugins §2.3).
         McpConnectionsModule,
@@ -309,10 +311,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // EW-664 (Phase 12) — runs AFTER AuthSessionGuard (guard order
         // matches providers-array order) so request.user is set, and
         // BEFORE ScopeOwnershipGuard so the ownership check sees the
-        // seeded scope. Falls back to the authenticated user's default
-        // scope (their Tenant + last-active Org) on legacy un-prefixed
-        // routes where no slug resolved a scope. No-op for slug routes
-        // (scope already set) and unauthenticated requests.
+        // seeded scope. On unprefixed routes where no slug resolved a
+        // scope it seeds the authenticated user's Tenant and leaves the
+        // Organization NULL — since 8f28edca0 it deliberately does not
+        // fall back to their last-active Org, so an unprefixed request is
+        // the personal contract. No-op for slug routes (scope already set)
+        // and unauthenticated requests.
         {
             provide: APP_GUARD,
             useClass: SessionScopeGuard,

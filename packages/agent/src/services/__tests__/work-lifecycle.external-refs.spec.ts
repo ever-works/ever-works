@@ -24,6 +24,7 @@ import { WebsiteGeneratorService } from '@src/generators/website-generator/websi
 import { WebsiteUpdateService } from '@src/generators/website-generator/website-update.service';
 import { WorkOwnershipService } from '../work-ownership.service';
 import { DeployFacadeService } from '@src/facades/deploy.facade';
+import { GitFacadeService } from '@src/facades/git.facade';
 import { TemplateCatalogService } from '@src/template-catalog/template-catalog.service';
 import { WorkWebsiteRepositoryStateService } from '../work-website-repository-state.service';
 import {
@@ -105,6 +106,9 @@ describe('WorkLifecycleService — externalRefs claim map', () => {
                     },
                 },
                 { provide: DeployFacadeService, useValue: { getAvailableProviders: () => [] } },
+                // Self-build slice D (EW-766): only the Repository Work create
+                // path probes the git facade; this spec never takes it.
+                { provide: GitFacadeService, useValue: {} },
                 { provide: TemplateCatalogService, useValue: {} },
                 { provide: WorkWebsiteRepositoryStateService, useValue: {} },
                 { provide: EverWorksDeployQuotaService, useValue: {} },
@@ -116,6 +120,36 @@ describe('WorkLifecycleService — externalRefs claim map', () => {
         }).compile();
 
         service = module.get(WorkLifecycleService);
+    });
+
+    /**
+     * Review finding (Major, data integrity): a Repository Work's `owner` is
+     * the GitHub owner of the wrapped repository, and
+     * `WorkRepository.findRepositoryWorksWrapping` filters duplicate
+     * registrations on that column. Letting an update change it would hide the
+     * existing Work from that check and let a second account register the same
+     * repository.
+     */
+    it('refuses to change the owner of a Repository Work', async () => {
+        work = buildWork({ kind: 'repo', owner: 'ever-works' } as Partial<Work>);
+
+        await expect(service.updateWork(WORK_ID, { owner: 'someone-else' }, user)).rejects.toThrow(
+            BadRequestException,
+        );
+        expect(workRepository.update).not.toHaveBeenCalled();
+    });
+
+    it('still allows an owner change on every other kind, and a no-op owner on a repo Work', async () => {
+        work = buildWork({ kind: 'repo', owner: 'ever-works' } as Partial<Work>);
+        const sameOwner = await service.updateWork(WORK_ID, { owner: 'ever-works' }, user);
+        expect(sameOwner.status).toBe('success');
+
+        work = buildWork({ owner: 'acme' });
+        const otherKind = await service.updateWork(WORK_ID, { owner: 'acme-renamed' }, user);
+        expect(otherKind.status).toBe('success');
+        expect(workRepository.update.mock.calls.at(-1)?.[1]).toMatchObject({
+            owner: 'acme-renamed',
+        });
     });
 
     it('round-trips a claim map through the update path', async () => {

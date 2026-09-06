@@ -160,7 +160,18 @@ describe('AgentActivityClient deep links', () => {
         // Still in flight, so nothing is pinned yet.
         expect(runRow('run-55')).toBeNull();
 
-        await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+        // Queried by text, not by role: `getByRole` resolves the accessibility
+        // tree for every node, and a 25-row feed is ~780 of them, to find the
+        // two pagination buttons. Measured in this suite: 959 ms for the role
+        // query against 53 ms for the text query, which made this the only
+        // test here to outgrow the 30 s limit on a runner shared with the 33
+        // e2e shards (CI 2026-09-03, PR #2297: "Test timed out in 30000ms").
+        // The tag and enabled assertions below keep what the role query
+        // implied — an operable pagination button — without that cost.
+        const next = screen.getByText('Next');
+        expect(next).toBeInstanceOf(HTMLButtonElement);
+        expect(next).toBeEnabled();
+        await userEvent.click(next);
         await waitFor(() => {
             expect(screen.getByText('summary for run 25')).toBeInTheDocument();
         });

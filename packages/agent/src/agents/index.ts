@@ -21,6 +21,7 @@ export * from './run-capture';
 export {
     composeRunAdmission,
     creditsAdmission,
+    killSwitchAdmission,
     orgConcurrencyAdmission,
     workConcurrencyAdmission,
     DEFAULT_RUN_ADMISSION_CHAIN,
@@ -51,6 +52,8 @@ export * from './sub-agent-delegation.port';
 export * from './sub-agent-delegation.service';
 export * from './run-steering.service';
 export * from './run-credits-precheck';
+// Panic controls (EW-778) — the global stop flag port the gate consults.
+export * from './run-kill-switch';
 export * from './seat-guard';
 export * from './run-plan-limits';
 export * from './terminal-session-dispatcher';

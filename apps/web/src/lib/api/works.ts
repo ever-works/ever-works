@@ -21,7 +21,7 @@ export interface QuickCreateWorkRequest {
     readonly storageProvider?: string;
     readonly websiteTemplateId?: string;
     /** Work-kind chip value (website, landing-page, blog, directory,
-     *  awesome-repo). Drives the kind-aware default website template;
+     *  awesome-repo, repo). Drives the kind-aware default website template;
      *  the API coerces unknown values to 'default'. */
     readonly kind?: string;
     readonly model?: string;

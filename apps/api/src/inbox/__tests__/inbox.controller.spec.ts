@@ -78,6 +78,15 @@ describe('InboxController', () => {
             });
             expect(result.meta.limit).toBe(50);
         });
+
+        it('forwards a taskId filter (the Task page open-question lookup, slice Q)', async () => {
+            await controller.list(auth, { taskId: 't1', status: 'open', limit: 5 });
+
+            expect(service.list).toHaveBeenCalledWith(
+                'u1',
+                expect.objectContaining({ taskId: 't1', status: 'open', limit: 5 }),
+            );
+        });
     });
 
     describe('GET /api/inbox/:id', () => {
@@ -154,6 +163,18 @@ describe('inbox DTO validation', () => {
         expect(await errorsFor(ListInboxQueryDto, { status: 'deleted' })).toEqual(['status']);
         expect(await errorsFor(ListInboxQueryDto, { limit: '500' })).toEqual(['limit']);
         expect(await errorsFor(ListInboxQueryDto, { offset: '-1' })).toEqual(['offset']);
+    });
+
+    it('accepts a UUID Task id filter and rejects anything else — the column is uuid (review SR-4)', async () => {
+        expect(
+            await errorsFor(ListInboxQueryDto, { taskId: '3f2b6c1e-4d5a-4b7c-9e8f-0a1b2c3d4e5f' }),
+        ).toEqual([]);
+        // A slug, an empty string or an oversize string would reach the
+        // query as `item.taskId = :taskId` and come back from Postgres as
+        // 22P02 — a 500 for a client typo; the DTO turns it into a 400.
+        expect(await errorsFor(ListInboxQueryDto, { taskId: 'task-1' })).toEqual(['taskId']);
+        expect(await errorsFor(ListInboxQueryDto, { taskId: '' })).toEqual(['taskId']);
+        expect(await errorsFor(ListInboxQueryDto, { taskId: 'x'.repeat(65) })).toEqual(['taskId']);
     });
 
     it('rejects unknown fields — forbidNonWhitelisted is on globally', async () => {

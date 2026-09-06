@@ -7,8 +7,9 @@
 // must still render when the meetings fetch failed or returned nothing.
 
 import React, { type ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { BROWSER_WORKSPACE_SCOPE_HEADER } from '@/lib/workspace-scope';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
@@ -121,5 +122,80 @@ describe('MemoryShell — Meetings block', () => {
         render(<MemoryShell initial={initial} meetings={meetingsData({ meetings: [] })} />);
         expect(screen.getByTestId('memory-shell')).not.toBeNull();
         expect(screen.getByTestId('meetings-empty')).not.toBeNull();
+    });
+});
+
+/**
+ * EW-786 — the client half of the Memory BFF scope contract.
+ *
+ * `/api/memory` and `/api/memory/consolidate` now mint `X-Scope-Slug` from
+ * the per-tab `x-ever-workspace` selector and answer 400 without it, so both
+ * of this shell's calls have to go through `browserApiFetch`. With a raw
+ * `fetch()` the search/filter refetch and the consolidation pass both ran in
+ * personal scope, where the API returns an empty feed / a zeroed report with
+ * HTTP 200 — silently wrong rather than visibly broken.
+ */
+describe('MemoryShell BFF transport', () => {
+    beforeEach(() => {
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(
+                async () =>
+                    new Response(
+                        JSON.stringify({
+                            documents: [],
+                            counts: { documents: 0, indexed: 0 },
+                            facets: { types: [], works: [], statuses: [], sources: [] },
+                            scanned: 0,
+                            promoted: 0,
+                            synthesized: 0,
+                            superseded: 0,
+                            dryRun: true,
+                            notes: [],
+                            details: {
+                                promotedIds: [],
+                                supersededPairs: [],
+                                synthesizedIds: [],
+                            },
+                        }),
+                        { status: 200, headers: { 'content-type': 'application/json' } },
+                    ),
+            ),
+        );
+    });
+
+    afterEach(() => {
+        cleanup();
+        vi.unstubAllGlobals();
+        window.history.replaceState({}, '', '/');
+    });
+
+    it.each([
+        ['/org/ever/memory', 'org:ever'],
+        ['/memory', 'personal'],
+    ])('refetches the feed from %s with the workspace selector', async (pathname, selector) => {
+        window.history.replaceState({}, '', pathname);
+        render(<MemoryShell initial={initial} />);
+
+        fireEvent.change(screen.getByTestId('memory-search'), { target: { value: 'cortex' } });
+
+        // The refetch is debounced by 300ms; waitFor's 1s budget covers it.
+        await waitFor(() => expect(fetch).toHaveBeenCalled());
+        const [url, init] = vi.mocked(fetch).mock.calls[0];
+        expect(String(url)).toContain('/api/memory?');
+        expect(new Headers(init?.headers).get(BROWSER_WORKSPACE_SCOPE_HEADER)).toBe(selector);
+    });
+
+    it('posts the consolidation dry-run with the workspace selector', async () => {
+        window.history.replaceState({}, '', '/org/ever/memory');
+        render(<MemoryShell initial={initial} />);
+
+        fireEvent.click(screen.getByTestId('memory-consolidate-button'));
+
+        await waitFor(() => expect(fetch).toHaveBeenCalled());
+        const [url, init] = vi.mocked(fetch).mock.calls[0];
+        expect(url).toBe('/api/memory/consolidate');
+        expect(init?.method).toBe('POST');
+        expect(new Headers(init?.headers).get(BROWSER_WORKSPACE_SCOPE_HEADER)).toBe('org:ever');
     });
 });

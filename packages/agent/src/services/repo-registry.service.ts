@@ -83,6 +83,8 @@ export interface ResolvedAgentRepo {
     branch: string | null;
     mountDir: string;
     envFiles: RepoConnectionEnvFile[];
+    /** Which git-provider family the connection belongs to (fleet mounts open PRs through it). */
+    provider: RepoConnectionProvider;
 }
 
 export interface CreateRepoConnectionInput {
@@ -238,6 +240,7 @@ export function mapAttachmentEdgesToRepos(
             // `/workspace/<dir>` in every path-building consumer.
             mountDir: resolveMountDir(repo.mountPath, repo.name),
             envFiles: envFilesFromRecord(repo.envFiles).files,
+            provider: repo.provider,
         });
     }
     return resolved;

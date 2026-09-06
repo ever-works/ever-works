@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { ChevronDown, ChevronRight, ListChecks } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { TaskAcceptanceCheck, TaskExtraRepo } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils/cn';
@@ -14,6 +14,7 @@ import type { Task, TaskPriority } from '@/lib/api/tasks';
 import { TASK_PRIORITY_PRESENTATION } from '@/lib/task-priorities/catalog';
 import { ChecksEditor } from './ChecksEditor';
 import { WorkSelect } from './WorkSelect';
+import { TaskExtraReposPicker } from './TaskExtraReposPicker';
 // PASS-4 review fix (CRITICAL): templates dead end. Pre-fill from
 // ?from=<slug> when the user clicked "Use template" on /tasks/templates.
 import { listAstTemplates } from '@/lib/api/agent-templates';
@@ -35,6 +36,8 @@ type CreateTaskFn = (input: {
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
+    /** Multi-repo: extra repositories by registry connection (slice C, PR C2). */
+    extraRepos?: TaskExtraRepo[] | null;
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     maxGateAttempts?: number | null;
 }) => Promise<Task>;
@@ -130,6 +133,8 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     // Quality gates (Wave 3 M6) — optional acceptance-checks declaration.
     const [checksOpen, setChecksOpen] = useState(false);
     const [checks, setChecks] = useState<TaskAcceptanceCheck[]>([]);
+    // Multi-repo: repositories the Task spans besides its Work's (slice C, PR C2).
+    const [extraRepos, setExtraRepos] = useState<TaskExtraRepo[]>([]);
     const [maxGateAttempts, setMaxGateAttempts] = useState<string>('inherit');
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -295,6 +300,7 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         workId: workChoice || null,
                         missionId: scopeCount === 1 ? missionId : null,
                         ideaId: scopeCount === 1 ? ideaId : null,
+                        extraRepos: extraRepos.length > 0 ? extraRepos : undefined,
                         // Quality gates — only declared rows with a command
                         // count; empty declaration = inherit Work defaults.
                         acceptanceChecks: (() => {
@@ -488,6 +494,22 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         {t('workHint')}
                     </p>
                 </div>
+                {mode === 'blank' && (
+                    <div>
+                        <label className="block text-xs text-text-secondary mb-1">
+                            {t('extraRepos')}
+                        </label>
+                        <TaskExtraReposPicker
+                            value={extraRepos}
+                            onChange={setExtraRepos}
+                            disabled={pending}
+                            testId="new-task-extra-repos"
+                        />
+                        <p className="mt-1 text-[11px] text-text-muted dark:text-text-muted-dark">
+                            {t('extraReposHint')}
+                        </p>
+                    </div>
+                )}
                 {/* Priority / labels / acceptance checks are blank-task
                     controls: a template instantiation takes its priority
                     and labels from the template itself. */}

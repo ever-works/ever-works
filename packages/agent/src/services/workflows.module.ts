@@ -6,6 +6,7 @@ import { WorkflowRepository } from '../database/repositories/workflow.repository
 import { WorkflowRunRepository } from '../database/repositories/workflow-run.repository';
 import { WorkflowsService } from './workflows.service';
 import { WorkflowRunsService } from './workflow-runs.service';
+import { WorkflowRunSweeperService } from './workflow-run-sweeper.service';
 
 /**
  * Saved workflow graphs (judgment layer G5).
@@ -34,7 +35,22 @@ import { WorkflowRunsService } from './workflow-runs.service';
  */
 @Module({
     imports: [TypeOrmModule.forFeature([Workflow, WorkflowRun])],
-    providers: [WorkflowRepository, WorkflowRunRepository, WorkflowsService, WorkflowRunsService],
-    exports: [WorkflowRepository, WorkflowRunRepository, WorkflowsService, WorkflowRunsService],
+    providers: [
+        WorkflowRepository,
+        WorkflowRunRepository,
+        WorkflowsService,
+        WorkflowRunsService,
+        // Backstop for runs abandoned by a dead worker. Cheap to provide
+        // here — it needs only `WorkflowRunRepository` — and doing so keeps
+        // the sweeper's worker module lean.
+        WorkflowRunSweeperService,
+    ],
+    exports: [
+        WorkflowRepository,
+        WorkflowRunRepository,
+        WorkflowsService,
+        WorkflowRunsService,
+        WorkflowRunSweeperService,
+    ],
 })
 export class WorkflowsModule {}

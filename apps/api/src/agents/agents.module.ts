@@ -14,6 +14,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_MCP_TOOL_SOURCE,
     SKILL_FILE_CONTENT_READER,
+    RUN_KILL_SWITCH,
     AgentEscalationService,
     RunSteeringService,
     WorkflowGraphExecutorService,
@@ -77,7 +78,13 @@ import {
 import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/ingest';
 import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
-import { FleetModule, FleetService } from '@ever-works/agent/fleet';
+import {
+    FleetJobService,
+    FleetKillSwitchService,
+    FleetModule,
+    FleetService,
+} from '@ever-works/agent/fleet';
+import { createFleetAwareAgentRunCanceller } from '../fleet/fleet-agent-run-canceller';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
 import {
     PolicyModule,
@@ -210,8 +217,17 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         { provide: AGENT_HEARTBEAT_TRIGGER, useValue: agentHeartbeatTriggerAdapter },
         {
             provide: AGENT_RUN_CANCELLER,
-            inject: [TriggerService],
-            useFactory: createAgentRunCancellerAdapter,
+            // Agent execution v2 (slice B) — a run's remote id is a fleet
+            // job id when the fleet executed it; the composite adapter
+            // tries the fleet for uuid-shaped ids and falls through to
+            // Trigger.dev otherwise. `FleetModule` (imported above) exports
+            // FleetJobService.
+            inject: [TriggerService, FleetJobService],
+            useFactory: (trigger: TriggerService, fleetJobs: FleetJobService) =>
+                createFleetAwareAgentRunCanceller(
+                    createAgentRunCancellerAdapter(trigger),
+                    fleetJobs,
+                ),
         },
         {
             provide: AGENT_RUN_CHAT_BACK_POSTER,
@@ -254,6 +270,15 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // TasksDomainModule, and neither package gains a runtime import of
         // the other.
         { provide: RUN_STEERING_PORT, useExisting: RunSteeringService },
+        // Panic controls (EW-778) — bind the GLOBAL STOP FLAG port the
+        // dispatch gate consults. Same @Global() reasoning as
+        // RUN_CREDITS_PRECHECK in SubscriptionsModule: the gate lives in
+        // the agent-side AgentsModule and reads this token through an
+        // @Optional() @Inject(), which would silently resolve to undefined
+        // — and leave the stop flag dark for every new run — if this
+        // binding were not global AND exported. `FleetModule` (imported
+        // above) exports FleetKillSwitchService.
+        { provide: RUN_KILL_SWITCH, useExisting: FleetKillSwitchService },
         // Streaming terminal — the two halves of the session dispatch.
         //
         // TERMINAL_SESSION_DISPATCHER is the job-runtime producer for the
@@ -928,6 +953,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         RUN_STEERING_PORT,
         TERMINAL_SESSION_DISPATCHER,
         TERMINAL_SESSION_STARTER,
+        RUN_KILL_SWITCH,
     ],
 })
 export class AgentsModule {}

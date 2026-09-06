@@ -471,6 +471,71 @@ export class TaskRepository {
     }
 
     /**
+     * Task-graph fan-out (self-build slice AH) — candidate rows for one
+     * bounded driver tick: Tasks sitting in `todo` that a fan-out may
+     * start once their blockers clear.
+     *
+     * The filters are deliberately conservative, each one excluding work
+     * that ANOTHER driver already owns or that a human deliberately kept
+     * off the board:
+     *  - `isRecurring = false` — a recurring row is a TEMPLATE; the
+     *    recurrence scan spawns its instances and those instances are
+     *    ordinary Tasks that appear here.
+     *  - `scheduledAt IS NULL` — a one-shot belongs to the schedule scan,
+     *    which fires it at its instant. Starting it early would defeat the
+     *    schedule.
+     *  - `hiddenFromBoard = false` — automation-produced rows a trigger
+     *    hid stay hidden; the fan-out is the board's driver, not a way
+     *    around that flag.
+     *  - `goalId IS NULL` — a Goal's iteration Tasks belong to the GOAL
+     *    LOOP, which creates them `todo`, dispatches them itself
+     *    (`GoalOrchestratorService.applyDispatch` calls `dispatchAgentRun`
+     *    directly and never transitions the row) and bounds them with
+     *    `maxConcurrentIterations`. Without this filter the fan-out would
+     *    re-start every finished iteration Task and drive a serial Goal
+     *    past its own ceiling.
+     *  - `parentRecurringTaskId IS NULL` — likewise, a recurrence INSTANCE
+     *    is spawned `todo` and dispatched by `dispatchDue`, which also
+     *    never transitions it. Its occurrence is the recurrence scan's to
+     *    decide, not this driver's.
+     *  - `startedAt IS NULL` AND `latestRunId IS NULL` — the row has never
+     *    been run. Three shipped paths dispatch a run and deliberately
+     *    LEAVE the Task in `todo` (board "Run" / `TasksService.runTask`,
+     *    the recurrence scan, the Goal loop), so "still todo" does not
+     *    mean "never started"; without these the fan-out would silently
+     *    re-run work as soon as the first run went terminal. `startedAt`
+     *    additionally excludes a Task a human pulled back to `todo` after
+     *    it ran — a re-run is a human decision, not an automatic one.
+     *
+     * Ordering is DETERMINISTIC — `priority ASC` (the column is a
+     * varchar(4) `P0`..`P3`, so ASC is highest-priority-first),
+     * `createdAt ASC`, then `id ASC` as the final tiebreak — so two
+     * identical ticks consider the same Tasks in the same order and a
+     * per-owner bound always spends its budget on the same work.
+     *
+     * @internal CRON-ONLY — fetches across ALL tenants/users by design.
+     * Do NOT call from user-facing request handlers; doing so would expose
+     * tasks across tenant boundaries.
+     */
+    async findFanoutCandidates(limit: number): Promise<Task[]> {
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.status = :status', { status: TaskStatus.TODO })
+            .andWhere('task.isRecurring = :recurring', { recurring: false })
+            .andWhere('task.scheduledAt IS NULL')
+            .andWhere('task.hiddenFromBoard = :hidden', { hidden: false })
+            .andWhere('task.goalId IS NULL')
+            .andWhere('task.parentRecurringTaskId IS NULL')
+            .andWhere('task.startedAt IS NULL')
+            .andWhere('task.latestRunId IS NULL')
+            .orderBy('task.priority', 'ASC')
+            .addOrderBy('task.createdAt', 'ASC')
+            .addOrderBy('task.id', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    /**
      * CAS-claim a due one-shot for dispatch. Atomic: stamps
      * `scheduleClaimedAt` only while the row still carries the expected
      * `scheduledAt` AND is unclaimed, so two concurrent dispatcher ticks

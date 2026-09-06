@@ -54,14 +54,16 @@ export const systemScheduler: Scheduler = {
 
 /** Just enough of {@link FleetClient} for the loop — keeps tests tiny. */
 export interface HeartbeatCapableClient {
-	heartbeat(request: {
-		nodeId: string;
-		secret: string;
-		platform?: string;
-		version?: string;
-		capabilities?: string[];
-	}): Promise<HeartbeatResponse>;
+	heartbeat(request: NodeSelfDescription & { nodeId: string; secret: string }): Promise<HeartbeatResponse>;
 }
+
+/**
+ * Self-description fields a heartbeat may drop and still be a valid beat.
+ *
+ * Today: the worker state (EW-776). See {@link HeartbeatLoop} for why
+ * dropping them is ever the right move.
+ */
+const OPTIONAL_DESCRIPTION_FIELDS = ['workerState', 'workerStateReason'] as const;
 
 export interface HeartbeatLoopOptions {
 	client: HeartbeatCapableClient;
@@ -101,6 +103,14 @@ export class HeartbeatLoop {
 	private timer: unknown = null;
 	private running = false;
 	private inFlight: Promise<void> | null = null;
+	/**
+	 * Latched once this platform has proven it predates the worker-state
+	 * fields; from then on the beat carries liveness only. Process-scoped
+	 * on purpose — a platform upgrade is a restart-shaped event for the
+	 * node, and re-probing on every beat would mean one wasted round trip
+	 * per beat, forever, against an API that will never accept them.
+	 */
+	private legacyDescription = false;
 	private state: HeartbeatState = {
 		state: 'idle',
 		lastHeartbeatAt: null,
@@ -176,17 +186,60 @@ export class HeartbeatLoop {
 
 		try {
 			const description = await this.options.describe();
-			const result = await this.options.client.heartbeat({
-				nodeId: this.options.nodeId,
-				secret: this.options.secret,
-				...description
-			});
-			this.onSuccess(result);
+			this.onSuccess(await this.beat(description));
 		} catch (error) {
 			this.onFailure(error);
 		}
 
 		this.scheduleNext();
+	}
+
+	/**
+	 * Send one beat, tolerating a platform that predates the worker-state
+	 * fields (EW-776).
+	 *
+	 * The API validates heartbeats with `whitelist + forbidNonWhitelisted`,
+	 * so a field an older build does not know is not ignored — it 400s the
+	 * whole request. A 400 is a FAILED beat, a failed beat backs off, and
+	 * enough of them sweep the node to `offline`. Which would mean shipping
+	 * a health-reporting feature whose failure mode is "every node in a
+	 * mixed-version fleet goes dark": the exact class of outage this slice
+	 * was written to end.
+	 *
+	 * So a 400 on a beat that CARRIED those fields is retried once,
+	 * immediately, without them. If that succeeds the platform is simply
+	 * older than this daemon; we latch, say so once, and keep reporting
+	 * liveness. The retry costs one request, once per process.
+	 *
+	 * Inferring "the field was rejected" from a bare 400 is deliberate and
+	 * has a cost worth stating: `FleetClient` never surfaces server bodies
+	 * (fixed client-authored messages only), so a 400 caused by something
+	 * else on such a beat also latches, and this node reports liveness only
+	 * until it restarts. That is the safe direction — the node stays
+	 * observable either way, and only the extra signal is lost.
+	 */
+	private async beat(description: NodeSelfDescription): Promise<HeartbeatResponse> {
+		const credential = { nodeId: this.options.nodeId, secret: this.options.secret };
+		if (this.legacyDescription) {
+			return this.options.client.heartbeat({ ...credential, ...stripOptionalFields(description) });
+		}
+
+		try {
+			return await this.options.client.heartbeat({ ...credential, ...description });
+		} catch (error) {
+			if (!carriesOptionalFields(description) || !isFieldRejection(error)) {
+				throw error;
+			}
+			const result = await this.options.client.heartbeat({
+				...credential,
+				...stripOptionalFields(description)
+			});
+			this.legacyDescription = true;
+			this.options.logger?.warn(
+				'Platform rejected the worker-state fields; it predates them. Reporting liveness only until this node restarts.'
+			);
+			return result;
+		}
 	}
 
 	private onSuccess(result: HeartbeatResponse): void {
@@ -248,4 +301,31 @@ export class HeartbeatLoop {
 			listener(snapshot);
 		}
 	}
+}
+
+/** True when this description carries a field an older API would refuse. */
+function carriesOptionalFields(description: NodeSelfDescription): boolean {
+	return OPTIONAL_DESCRIPTION_FIELDS.some((field) => description[field] !== undefined);
+}
+
+/** The same description with the droppable fields removed. */
+function stripOptionalFields(description: NodeSelfDescription): NodeSelfDescription {
+	const out = { ...description };
+	for (const field of OPTIONAL_DESCRIPTION_FIELDS) {
+		delete out[field];
+	}
+	return out;
+}
+
+/**
+ * Is this the shape of "the API refused a field I sent"?
+ *
+ * A literal 400 only. A 401 is a credential problem, a 403 is an edge
+ * refusal, a 429 backs off, and a 5xx or a network error is transient —
+ * retrying any of those without the fields would learn nothing and, for
+ * the transient ones, would latch this node into liveness-only reporting
+ * over a blip.
+ */
+function isFieldRejection(error: unknown): boolean {
+	return error instanceof FleetClientError && error.kind === 'invalid-request' && error.status === 400;
 }

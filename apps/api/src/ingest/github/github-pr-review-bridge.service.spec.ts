@@ -7,6 +7,13 @@ jest.mock('@ever-works/agent/plugins', () => ({
     PluginSettingsService: class {},
     UserPluginRepository: class {},
 }));
+// The bridge injects two tasks-domain services by class. Mocking the
+// subpath keeps this unit suite from loading TasksDomainModule's entire
+// import graph (facades → agent-plugins → …) just to obtain two tokens.
+jest.mock('@ever-works/agent/tasks-domain', () => ({
+    TaskGitLinkService: class {},
+    TaskReviewRejectionService: class {},
+}));
 
 import {
     GITHUB_PUSH_COMMITS_MAX,
@@ -829,6 +836,507 @@ describe('GitHubPrReviewBridgeService', () => {
             await expect(
                 service.handleEvent(BINDING, 'pull_request_review', reviewBody()),
             ).resolves.toEqual({ ingested: null });
+        });
+    });
+
+    /**
+     * Trusted review bots (self-build fleet, finding R16).
+     *
+     * The bridge used to drop EVERY bot-authored review and comment. That
+     * kept the loop from echoing itself — and also kept CodeRabbit,
+     * Copilot, Codex and Greptile verdicts from ever becoming Task
+     * feedback, so a human relayed each finding by hand. Now an
+     * allow-listed reviewer bot's `changes_requested` review, inline
+     * findings and summary comments are recorded exactly as a human's
+     * would be, while the platform's own identity and unknown bots are
+     * still dropped at the door. Bodies below are the literal shapes the
+     * bots post on this repository (captured with `gh api`).
+     */
+    describe('trusted review bots (R16)', () => {
+        const ORIGINAL_TRUSTED = process.env.GITHUB_TRUSTED_REVIEW_BOTS;
+        const ORIGINAL_SLUG = process.env.GITHUB_APP_SLUG;
+
+        beforeEach(() => {
+            delete process.env.GITHUB_TRUSTED_REVIEW_BOTS;
+            delete process.env.GITHUB_APP_SLUG;
+        });
+
+        afterAll(() => {
+            if (ORIGINAL_TRUSTED === undefined) delete process.env.GITHUB_TRUSTED_REVIEW_BOTS;
+            else process.env.GITHUB_TRUSTED_REVIEW_BOTS = ORIGINAL_TRUSTED;
+            if (ORIGINAL_SLUG === undefined) delete process.env.GITHUB_APP_SLUG;
+            else process.env.GITHUB_APP_SLUG = ORIGINAL_SLUG;
+        });
+
+        /** A CodeRabbit inline finding, as posted on ever-works/ever-works#2344. */
+        const CODERABBIT_MAJOR_FINDING = [
+            '_🗄️ Data Integrity & Integration_ | _🟠 Major_ | _🏗️ Heavy lift_',
+            '',
+            '<details>',
+            '<summary>🔎 Supported by static analysis</summary>',
+            '',
+            '🤖 get_repo_knowledge executed:',
+            '',
+            'Length of output: 33708',
+            '',
+            '</details>',
+            '',
+            'The migration drops the column without a guard, so a partially applied database cannot converge.',
+        ].join('\n');
+
+        function botReview(login: string, over: Record<string, unknown> = {}) {
+            return {
+                action: 'submitted',
+                repository: { full_name: 'octo/site' },
+                pull_request: { number: 9, html_url: 'https://github.com/octo/site/pull/9' },
+                review: {
+                    id: 1,
+                    state: 'changes_requested',
+                    body: '**Actionable comments posted: 2**\n\n<details>\n<summary>🧹 Nitpick comments (1)</summary>\n\nx\n\n</details>',
+                    user: { login, type: 'Bot' },
+                },
+                ...over,
+            };
+        }
+
+        function botReviewComment(login: string, body: string, over: Record<string, unknown> = {}) {
+            return {
+                action: 'created',
+                repository: { full_name: 'octo/site' },
+                pull_request: {
+                    number: 9,
+                    title: 'Add severity',
+                    html_url: 'https://github.com/octo/site/pull/9',
+                },
+                comment: {
+                    id: 501,
+                    body,
+                    html_url: 'https://github.com/octo/site/pull/9#discussion_r501',
+                    path: 'apps/api/src/migrations/1788100000000-AddSeverity.ts',
+                    line: 144,
+                    original_line: 60,
+                    pull_request_review_id: 1,
+                    user: { login, type: 'Bot' },
+                },
+                ...over,
+            };
+        }
+
+        function botIssueComment(login: string, body: string, over: Record<string, unknown> = {}) {
+            return {
+                action: 'created',
+                repository: { full_name: 'octo/site' },
+                issue: {
+                    number: 9,
+                    title: 'Add severity',
+                    html_url: 'https://github.com/octo/site/pull/9',
+                    pull_request: { url: 'https://example.com/api/pulls/9' },
+                },
+                comment: {
+                    id: 601,
+                    body,
+                    html_url: 'https://github.com/octo/site/pull/9#issuecomment-601',
+                    user: { login, type: 'Bot' },
+                },
+                ...over,
+            };
+        }
+
+        describe('pull_request_review', () => {
+            it('⭐ records a changes_requested review from an allow-listed bot as rejection feedback', async () => {
+                const { service, rejections } = createService();
+                const result = await service.handleEvent(
+                    BINDING,
+                    'pull_request_review',
+                    botReview('coderabbitai[bot]'),
+                );
+                expect(result).toEqual({ ingested: null });
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        userId: BINDING.userId,
+                        owner: 'octo',
+                        repo: 'site',
+                        prNumber: 9,
+                        reviewerLabel: 'coderabbitai[bot]',
+                        reviewerKind: 'bot',
+                        feedback: '**Actionable comments posted: 2**',
+                    }),
+                );
+            });
+
+            it('still drops a bot that is not on the list', async () => {
+                for (const login of ['github-actions[bot]', 'dependabot[bot]']) {
+                    const { service, rejections } = createService();
+                    await service.handleEvent(BINDING, 'pull_request_review', botReview(login));
+                    expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                }
+            });
+
+            it('⭐ still drops the platform identity — even when an operator lists it as trusted', async () => {
+                // THE security property of this slice: the loop must never
+                // read its own output as reviewer feedback, and the
+                // allow-list cannot be used to make it.
+                process.env.GITHUB_TRUSTED_REVIEW_BOTS = 'ever-works[bot],coderabbitai[bot]';
+                const { service, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review',
+                    botReview('ever-works[bot]'),
+                );
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                // The same list still works for everyone else on it.
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review',
+                    botReview('coderabbitai[bot]'),
+                );
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledTimes(1);
+            });
+
+            it('derives the self identity from GITHUB_APP_SLUG', async () => {
+                process.env.GITHUB_APP_SLUG = 'acme';
+                process.env.GITHUB_TRUSTED_REVIEW_BOTS = 'acme[bot]';
+                const { service, rejections } = createService();
+                await service.handleEvent(BINDING, 'pull_request_review', botReview('acme[bot]'));
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+            });
+
+            it('leaves a human review exactly as before, tagged human with no severity', async () => {
+                const { service, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review',
+                    botReview('octocat', {
+                        review: {
+                            id: 1,
+                            state: 'changes_requested',
+                            body: 'the migration has no down()',
+                            user: { login: 'octocat', type: 'User' },
+                        },
+                    }),
+                );
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        feedback: 'the migration has no down()',
+                        reviewerLabel: 'octocat',
+                        reviewerKind: 'human',
+                        severity: null,
+                    }),
+                );
+            });
+
+            it('ignores a trusted bot that merely COMMENTED — its findings arrive as inline comments', async () => {
+                const { service, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review',
+                    botReview('coderabbitai[bot]', {
+                        review: {
+                            id: 1,
+                            state: 'commented',
+                            body: '**Actionable comments posted: 2**',
+                            user: { login: 'coderabbitai[bot]', type: 'Bot' },
+                        },
+                    }),
+                );
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+            });
+
+            it('GITHUB_TRUSTED_REVIEW_BOTS=none restores the drop-every-bot posture', async () => {
+                process.env.GITHUB_TRUSTED_REVIEW_BOTS = 'none';
+                const { service, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review',
+                    botReview('coderabbitai[bot]'),
+                );
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('platform identity (adversarial)', () => {
+            it('⭐ still drops the platform identity on BOTH comment paths — even when listed as trusted', async () => {
+                process.env.GITHUB_TRUSTED_REVIEW_BOTS = 'ever-works[bot],coderabbitai[bot]';
+                const { service, rejections, eventIngestService, prReviewService } =
+                    createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment('ever-works[bot]', CODERABBIT_MAJOR_FINDING),
+                );
+                await service.handleEvent(
+                    BINDING,
+                    'issue_comment',
+                    botIssueComment('Ever-Works[bot]', '@ever-works please rebase.'),
+                );
+                await flush();
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+            });
+
+            it('a slug misconfigured as `ever-works[bot]` or `@ever-works` still names the platform identity', async () => {
+                for (const slug of ['ever-works[bot]', '@Ever-Works', ' ever-works ']) {
+                    process.env.GITHUB_APP_SLUG = slug;
+                    process.env.GITHUB_TRUSTED_REVIEW_BOTS = 'ever-works[bot]';
+                    const { service, rejections } = createService();
+                    await service.handleEvent(
+                        BINDING,
+                        'pull_request_review',
+                        botReview('ever-works[bot]'),
+                    );
+                    expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                }
+            });
+
+            it('drops look-alikes of the platform identity that nobody listed', async () => {
+                for (const login of [
+                    'ever-works-bot[bot]',
+                    'everworks[bot]',
+                    'ever-works-ai[bot]',
+                ]) {
+                    const { service, rejections, eventIngestService } = createService();
+                    await service.handleEvent(BINDING, 'pull_request_review', botReview(login));
+                    await service.handleEvent(
+                        BINDING,
+                        'issue_comment',
+                        botIssueComment(login, '@ever-works please rebase.'),
+                    );
+                    expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                    expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                }
+            });
+
+            it('still drops an @ever-works mention from an unlisted bot — neither feedback nor a review', async () => {
+                const { service, rejections, eventIngestService, prReviewService } =
+                    createService();
+                await service.handleEvent(
+                    BINDING,
+                    'issue_comment',
+                    botIssueComment('dependabot[bot]', '@ever-works is this migration safe?'),
+                );
+                await flush();
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+            });
+
+            it('records an allow-listed bot finding that carries no severity marker — unstated, never dropped', async () => {
+                const { service, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment(
+                        'coderabbitai[bot]',
+                        'The migration drops the column without a guard.',
+                    ),
+                );
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({ reviewerKind: 'bot', severity: null }),
+                );
+            });
+        });
+
+        describe('pull_request_review_comment (inline findings)', () => {
+            it('⭐ records a CodeRabbit Major finding with severity, location, and no static-analysis dump', async () => {
+                const { service, rejections, eventIngestService } = createService();
+                const result = await service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment('coderabbitai[bot]', CODERABBIT_MAJOR_FINDING),
+                );
+                expect(result).toEqual({ ingested: null });
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledTimes(1);
+                const [input] = rejections.recordPullRequestRejection.mock.calls[0];
+                expect(input).toMatchObject({
+                    userId: BINDING.userId,
+                    owner: 'octo',
+                    repo: 'site',
+                    prNumber: 9,
+                    reviewerLabel: 'coderabbitai[bot]',
+                    reviewerKind: 'bot',
+                    severity: 'major',
+                    prUrl: 'https://github.com/octo/site/pull/9#discussion_r501',
+                });
+                expect(input.feedback).toMatch(
+                    /^apps\/api\/src\/migrations\/1788100000000-AddSeverity\.ts:144 — /,
+                );
+                expect(input.feedback).toContain('cannot converge');
+                expect(input.feedback).not.toContain('Length of output');
+                expect(input.feedback).not.toContain('<details>');
+            });
+
+            it('maps Codex P1 → critical and Greptile P2 → major', async () => {
+                const codex = createService();
+                await codex.service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment(
+                        'chatgpt-codex-connector[bot]',
+                        '**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Cast metadata before using JSON operator**\n\nThe JSON operator is applied to a text column.',
+                    ),
+                );
+                expect(codex.rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        severity: 'critical',
+                        reviewerLabel: 'chatgpt-codex-connector[bot]',
+                        feedback: expect.stringContaining(
+                            'Cast metadata before using JSON operator',
+                        ),
+                    }),
+                );
+
+                const greptile = createService();
+                await greptile.service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment(
+                        'greptile-apps[bot]',
+                        '<a href="#"><img alt="P2" src="https://greptile-static-assets.s3.amazonaws.com/badges/p2.svg?v=9" align="top"></a> The `import type` statement appears after the export block.',
+                    ),
+                );
+                expect(greptile.rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        severity: 'major',
+                        reviewerLabel: 'greptile-apps[bot]',
+                        feedback: expect.stringContaining('The `import type` statement'),
+                    }),
+                );
+            });
+
+            it('records a Copilot inline comment (login `Copilot`, no marker) with severity null', async () => {
+                const { service, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment(
+                        'Copilot',
+                        'The retry loop never backs off, so a flaky provider is hammered.',
+                    ),
+                );
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        reviewerLabel: 'Copilot',
+                        reviewerKind: 'bot',
+                        severity: null,
+                    }),
+                );
+            });
+
+            it('never reviews its reviewers — a bot comment stays out of the mention loop even when it says @ever-works', async () => {
+                const { service, rejections, prReviewService, eventIngestService } =
+                    createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment('coderabbitai[bot]', '@ever-works please rebase.'),
+                );
+                await flush();
+                expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledTimes(1);
+            });
+
+            it('drops an edited bot comment — only `created` carries a new finding', async () => {
+                const { service, rejections, eventIngestService } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment('coderabbitai[bot]', CODERABBIT_MAJOR_FINDING, {
+                        action: 'edited',
+                    }),
+                );
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+            });
+
+            it('still drops an inline comment from an unlisted bot', async () => {
+                const { service, rejections, eventIngestService } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'pull_request_review_comment',
+                    botReviewComment('github-actions[bot]', CODERABBIT_MAJOR_FINDING),
+                );
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                expect(eventIngestService.ingest).not.toHaveBeenCalled();
+            });
+
+            it('a recorder failure on the bot path still answers the webhook', async () => {
+                const { service, rejections } = createService();
+                rejections.recordPullRequestRejection.mockRejectedValue(new Error('db down'));
+                await expect(
+                    service.handleEvent(
+                        BINDING,
+                        'pull_request_review_comment',
+                        botReviewComment('coderabbitai[bot]', CODERABBIT_MAJOR_FINDING),
+                    ),
+                ).resolves.toEqual({ ingested: null });
+            });
+        });
+
+        describe('issue_comment (summaries)', () => {
+            it('records the CodeRabbit summary comment on a pull request', async () => {
+                const { service, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'issue_comment',
+                    botIssueComment(
+                        'coderabbitai[bot]',
+                        '<!-- This is an auto-generated comment: summarize by coderabbit.ai -->\n\n## Summary by CodeRabbit\n\n- Adds severity to rejections.\n\n<!-- end of auto-generated comment: summarize by coderabbit.ai -->',
+                    ),
+                );
+                expect(rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        prNumber: 9,
+                        reviewerLabel: 'coderabbitai[bot]',
+                        reviewerKind: 'bot',
+                        severity: null,
+                        feedback: '## Summary by CodeRabbit\n\n- Adds severity to rejections.',
+                        prUrl: 'https://github.com/octo/site/pull/9#issuecomment-601',
+                    }),
+                );
+            });
+
+            it('drops rate-limit and status chatter — there is nothing in it to fix', async () => {
+                for (const body of [
+                    '<!-- This is an auto-generated comment: rate limited by coderabbit.ai -->\n\n> [!WARNING]\n> ## Review limit reached\n>\n> **Next included review available in 34 minutes.**',
+                    '<!-- greptile-status -->\nToo many files changed for review.',
+                    'You have reached your Codex usage limits for code reviews.',
+                ]) {
+                    const { service, rejections } = createService();
+                    await service.handleEvent(
+                        BINDING,
+                        'issue_comment',
+                        botIssueComment('coderabbitai[bot]', body),
+                    );
+                    expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+                }
+            });
+
+            it('drops a bot comment on a plain issue — only PR threads carry review feedback', async () => {
+                const { service, rejections } = createService();
+                const body = botIssueComment(
+                    'coderabbitai[bot]',
+                    '## Summary by CodeRabbit\n\n- x',
+                );
+                (body.issue as any).pull_request = undefined;
+                await service.handleEvent(BINDING, 'issue_comment', body);
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+            });
+
+            it('drops a comment that is nothing but markup once stripped', async () => {
+                const { service, rejections } = createService();
+                await service.handleEvent(
+                    BINDING,
+                    'issue_comment',
+                    botIssueComment(
+                        'coderabbitai[bot]',
+                        '<!-- walkthrough_start -->\n<details>\n<summary>x</summary>\ny\n</details>\n<!-- walkthrough_end -->',
+                    ),
+                );
+                expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+            });
         });
     });
 

@@ -55,6 +55,7 @@ describe('InboxApiModule — INBOX_PRODUCER binding', () => {
             escalationRaised: jest.fn(async () => undefined),
             proposalPending: jest.fn(async () => undefined),
             notice: jest.fn(async () => undefined),
+            questionRaised: jest.fn(async () => undefined),
         };
         const get = jest.fn(() => inbox);
         const factory = provider.useFactory as (ref: unknown) => InboxProducer;
@@ -77,6 +78,13 @@ describe('InboxApiModule — INBOX_PRODUCER binding', () => {
             actionType: 'send_message',
         });
         await producer.notice('u1', { title: 't', body: 'b' });
+        // Self-build slice Q — the fleet reconciler's question path rides
+        // the same lazy pass-through.
+        await producer.questionRaised({
+            userId: 'u1',
+            agentRunId: 'r1',
+            question: 'Use Postgres?',
+        });
 
         expect(get).toHaveBeenCalledWith(InboxService, { strict: false });
         expect(inbox.escalationRaised).toHaveBeenCalledWith(
@@ -86,6 +94,9 @@ describe('InboxApiModule — INBOX_PRODUCER binding', () => {
             expect.objectContaining({ proposalId: 'p1' }),
         );
         expect(inbox.notice).toHaveBeenCalledWith('u1', expect.objectContaining({ title: 't' }));
+        expect(inbox.questionRaised).toHaveBeenCalledWith(
+            expect.objectContaining({ agentRunId: 'r1' }),
+        );
     });
 
     it('the cyclic graph shape boots (this hangs with useExisting)', async () => {

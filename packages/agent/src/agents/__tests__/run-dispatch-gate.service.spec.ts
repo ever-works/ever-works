@@ -205,7 +205,9 @@ describe('RunDispatchGateService', () => {
 
     describe('drainForWork', () => {
         it('promotes the oldest parked run: claims it and dispatches with its runId', async () => {
-            runs.findOldestQueuedForConcurrency.mockResolvedValueOnce(parkedRun());
+            runs.findOldestQueuedForConcurrency.mockResolvedValueOnce(
+                parkedRun({ tenantId: 'tenant-1', organizationId: 'org-1' }),
+            );
             const result = await makeGate().drainForWork('work-1');
             expect(runs.findOldestQueuedForConcurrency).toHaveBeenCalledWith(
                 'work-1',
@@ -221,6 +223,10 @@ describe('RunDispatchGateService', () => {
                     userId: 'user-1',
                     taskId: 'task-1',
                     runId: 'run-parked',
+                    // Scope carriers (slice Q): a drained run may be a
+                    // resumed FLEET run, and the router routes by tenant.
+                    tenantId: 'tenant-1',
+                    organizationId: 'org-1',
                 }),
             );
             expect(runs.setTriggerRunId).toHaveBeenCalledWith('run-parked', 'trd-1');

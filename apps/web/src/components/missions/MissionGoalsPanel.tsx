@@ -22,6 +22,7 @@ import { StatusPill } from '@/components/work-agent';
 // Direct module path (not the `@/components/goals` barrel) so this
 // client panel pulls in only the presentational helpers.
 import { COMPARATOR_GLYPH, formatMetricValue } from '@/components/goals/goal-ui';
+import { DodRollup } from '@/components/goals/goal-loop-ui';
 import {
     linkGoalToMissionAction,
     unlinkGoalFromMissionAction,
@@ -218,14 +219,30 @@ export function MissionGoalsPanel({
                                         Goal it is the whole point of the row,
                                         so it now sits under the title where it
                                         survives narrow widths. */}
-                                    {l.goal && (
+                                    {l.goal && l.goal.goalKind === 'delivery' ? (
+                                        /* A delivery Goal has no metric — its
+                                           progress is the Definition of Done
+                                           rollup (self-build slice AG). */
+                                        <DodRollup
+                                            summary={l.goal.dodSummary}
+                                            className="block truncate text-[11px] tabular-nums"
+                                        />
+                                    ) : l.goal ? (
                                         <span className="block truncate text-[11px] text-text-muted dark:text-text-muted-dark tabular-nums">
-                                            {formatMetricValue(l.goal.currentValue, l.goal.unit)}
+                                            {formatMetricValue(
+                                                l.goal.currentValue,
+                                                l.goal.unit ?? undefined,
+                                            )}
                                             {' / '}
-                                            {COMPARATOR_GLYPH[l.goal.comparator]}{' '}
-                                            {formatMetricValue(l.goal.targetValue, l.goal.unit)}
+                                            {l.goal.comparator
+                                                ? COMPARATOR_GLYPH[l.goal.comparator]
+                                                : '—'}{' '}
+                                            {formatMetricValue(
+                                                l.goal.targetValue,
+                                                l.goal.unit ?? undefined,
+                                            )}
                                         </span>
-                                    )}
+                                    ) : null}
                                 </span>
                             </Link>
                             {l.isPrimary && (

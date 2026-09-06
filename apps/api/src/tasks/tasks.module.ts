@@ -5,6 +5,7 @@ import {
     AGENT_CHAT_REPLY_DISPATCHER,
 } from '@ever-works/agent/tasks-domain';
 import { DatabaseModule } from '@ever-works/agent/database';
+import { UsageModule } from '@ever-works/agent/usage';
 // Review-fix I5 (second-pass NEW-2): AgentsModule re-exports
 // AgentRepository so the TasksController + TaskChatController can
 // inject it for mention-lookup population. Without this import the
@@ -30,6 +31,21 @@ import { SubAgentDelegationDepthResolverService } from '../agents/sub-agent-dele
 // without it the API fails to boot with an
 // `UnknownDependenciesException: TasksController (..., ?)`.
 import { KnowledgeBaseModule } from '@ever-works/agent/services';
+// Agent execution v2 — the ONLY module that provides + exports
+// `SkillsService` (and `SkillBindingRepository` behind it).
+// `FleetAgentTaskPlannerService` (provided below) injects the SERVICE
+// `@Optional()` to assemble the fleet system prompt's `# ACTIVE SKILLS`
+// segment — the service is the grant-aware wrapper, so the fleet prompt
+// drops the same skills the cloud path drops. The agent-side
+// `AgentsModule` imports this module for `AgentRunService` but does NOT
+// re-export it, and neither does the @Global() api-side AgentsModule
+// (token list only) — so without this import the planner's dependency
+// silently resolved to `undefined` and every fleet run shipped a prompt
+// with no skills, while the SAME agent honoured them on the cloud path.
+// Same reason (and same import) `apps/api/src/agents` and
+// `.../organizations` already carry it; SkillsModule is a leaf here, so
+// no cycle.
+import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
 // Tasks upgrades — the per-Task activity feed endpoint injects
 // ActivityLogService, which TasksDomainModule imports but does not
 // re-export; the controller resolves it against THIS module's imports.
@@ -47,9 +63,12 @@ import {
 // store; `FleetRunRouterService` decides per run whether the resolved
 // runtime is the owner's Fleet and, when it is, writes the lease-able
 // row an enrolled node polls for.
+import { FleetKillSwitchService } from '@ever-works/agent/fleet';
 import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetRunRouterService } from '../fleet/fleet-run-router.service';
 import { createFleetAwareAgentTaskExecuteDispatcher } from '../fleet/fleet-agent-task.dispatcher';
+import { FleetAgentTaskPlannerService } from '../fleet/fleet-agent-task-planner.service';
+import { FleetAgentTaskReconcilerService } from '../fleet/fleet-agent-task-reconciler.service';
 import { FleetTaskScopeResolverService } from '../fleet/fleet-task-scope.resolver';
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
@@ -79,7 +98,15 @@ import { TaskChatController } from './task-chat.controller';
     imports: [
         TasksDomainModule,
         DatabaseModule,
+        // Fleet cost accounting (EW-777): `PluginUsageService`, so the
+        // fleet reconciler below can record a fleet run's model spend as
+        // the same `plugin_usage_events` row the cloud facades write.
+        UsageModule,
         AgentsModule,
+        // Supplies SkillsService to FleetAgentTaskPlannerService — see the
+        // import comment above; without it the fleet prompt carries no
+        // ACTIVE SKILLS.
+        AgentSkillsModule,
         KnowledgeBaseModule,
         FleetApiModule,
         AgentActivityLogModule,
@@ -96,19 +123,41 @@ import { TaskChatController } from './task-chat.controller';
         // module does not import — the same split
         // `SubAgentDelegationDepthResolverService` already uses.
         FleetTaskScopeResolverService,
+        // Agent execution v2 — builds the model-CLI job for a fleet-bound
+        // run. Provided HERE (not in FleetApiModule) for the same reason
+        // the scope resolver is: it needs the Task / Agent / workspace
+        // services this module already has.
+        FleetAgentTaskPlannerService,
+        // Agent execution v2 (slice B) — listens for `fleet.job.leased` /
+        // `fleet.job.completed` and mirrors the node's verdict onto the
+        // AgentRun, the Task board, the pull request and the Task chat.
+        // Same placement rationale as the planner.
+        FleetAgentTaskReconcilerService,
         {
             provide: AGENT_TASK_EXECUTE_DISPATCHER,
             useFactory: (
                 fleetRouter: FleetRunRouterService,
                 scopeResolver: FleetTaskScopeResolverService,
                 notifications: NotificationService,
+                planner: FleetAgentTaskPlannerService,
+                // Panic controls (EW-778) — the global stop flag, checked
+                // before routing so a stop can never become a cloud
+                // fallback. Resolves through FleetApiModule's re-export of
+                // the agent-side FleetModule.
+                killSwitch: FleetKillSwitchService,
             ) =>
                 createFleetAwareAgentTaskExecuteDispatcher(
                     agentTaskExecuteTriggerAdapter,
                     fleetRouter,
-                    { scopeResolver, notifications },
+                    { scopeResolver, notifications, planner, killSwitch },
                 ),
-            inject: [FleetRunRouterService, FleetTaskScopeResolverService, NotificationService],
+            inject: [
+                FleetRunRouterService,
+                FleetTaskScopeResolverService,
+                NotificationService,
+                FleetAgentTaskPlannerService,
+                FleetKillSwitchService,
+            ],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
         // Judgment layers G5 + G9 — the two runner seams the agents module

@@ -221,6 +221,57 @@ describe('Work creation honours the managed Ever Works Git storage choice', () =
                 storageProvider: 'ever-works-git',
             });
         });
+
+        // Self-build slice D (EW-766): a Repository Work is verified against
+        // the caller's OWN connected account on the API, so managed storage
+        // is no shortcut for the kind — the gate asks for a personal
+        // connection so the form can say "connect GitHub" up front.
+        it('createWork with kind=repo still requires a connected personal provider under managed storage', async () => {
+            checkGitProviderConnectionMock.mockResolvedValue({ success: true, connected: false });
+            const { createWork } = await import('./works');
+
+            const result = await createWork({
+                slug: 'platform',
+                name: 'Platform',
+                description: 'The platform monorepo.',
+                organization: false,
+                gitProvider: 'github',
+                kind: 'repo',
+                repositoryUrl: 'https://github.com/ever-works/ever-works',
+            });
+
+            expect(result.success).toBe(false);
+            expect(result.requiresGitProvider).toBe(true);
+            expect(checkGitProviderConnectionMock).toHaveBeenCalledWith('github');
+            expect(workAPICreateMock).not.toHaveBeenCalled();
+        });
+
+        it('createWork with kind=repo reaches the API with kind + repositoryUrl once the provider is connected', async () => {
+            checkGitProviderConnectionMock.mockResolvedValue({
+                success: true,
+                connected: true,
+                username: 'qa-user',
+                organizations: [],
+            });
+            const { createWork } = await import('./works');
+
+            const result = await createWork({
+                slug: 'platform',
+                name: 'Platform',
+                description: 'The platform monorepo.',
+                organization: false,
+                gitProvider: 'github',
+                kind: 'repo',
+                repositoryUrl: 'https://github.com/ever-works/ever-works',
+            });
+
+            expect(result.success).toBe(true);
+            expect(workAPICreateMock.mock.calls[0]![0]).toMatchObject({
+                kind: 'repo',
+                repositoryUrl: 'https://github.com/ever-works/ever-works',
+                gitProvider: 'github',
+            });
+        });
     });
 
     describe('personal storage still requires a connected provider', () => {

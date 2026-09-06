@@ -96,6 +96,17 @@ export const MAX_HEARTBEAT_INTERVAL_MS = 15 * 60_000;
  *   work re-offered to the same over-loaded machine.
  *
  * `null` means "no ceiling for this dimension".
+ *
+ * `minFreeDiskBytes` is the one FLOOR, and the one dimension that is on by
+ * default: a node below it does not lease, and re-checks right before it
+ * provisions a workspace (self-build program note §6, OPS-12). The key is
+ * OPTIONAL rather than always present so that a config written by an older
+ * build — and the exhaustive three-key `toEqual` assertions in
+ * `apps/desktop-node` and `capability-selection.spec.ts` that pass through
+ * `clampResourceLimits` — keep their shape: absent means "the default floor
+ * applies", an explicit `null` means "the operator switched the floor off".
+ * Do NOT move it into {@link DEFAULT_RESOURCE_LIMITS}; that is exactly what
+ * would red those assertions.
  */
 export interface NodeResourceLimits {
 	maxConcurrentJobs: number;
@@ -103,6 +114,12 @@ export interface NodeResourceLimits {
 	maxCpuPercent: number | null;
 	/** Refuse to lease while host memory IN USE exceeds this many MB, or null. */
 	maxMemoryMb: number | null;
+	/**
+	 * Refuse to lease (and to provision) while the workspace volume has fewer
+	 * free bytes than this. Absent = {@link DEFAULT_MIN_FREE_DISK_BYTES};
+	 * `null` = no floor.
+	 */
+	minFreeDiskBytes?: number | null;
 }
 
 /** Concurrency bounds. The upper bound matches the server's max lease batch. */
@@ -116,6 +133,17 @@ export const MAX_CPU_PERCENT = 100;
 /** Memory ceiling bounds, in MB of host memory in use. */
 export const MIN_MEMORY_MB = 256;
 export const MAX_MEMORY_MB = 1_024 * 1_024;
+
+/**
+ * Disk floor: the default is 2 GiB, which is comfortably more than a git
+ * fetch plus a `pnpm install` of this monorepo needs to fail gracefully
+ * rather than half-way through, and small enough that a laptop lending
+ * its spare capacity is not idled by it. Bounded below at 128 MiB (a
+ * smaller floor cannot protect anything) and above at 4 TiB.
+ */
+export const DEFAULT_MIN_FREE_DISK_BYTES = 2 * 1024 ** 3;
+export const MIN_MIN_FREE_DISK_BYTES = 128 * 1024 ** 2;
+export const MAX_MIN_FREE_DISK_BYTES = 2 ** 42;
 
 /**
  * Conservative default: one job at a time, no CPU/memory admission gate. A
@@ -154,7 +182,7 @@ export function clampResourceLimits(input: Partial<NodeResourceLimits> | null | 
 	if (!input || typeof input !== 'object') {
 		return { ...DEFAULT_RESOURCE_LIMITS };
 	}
-	return {
+	const limits: NodeResourceLimits = {
 		maxConcurrentJobs: clampInt(
 			input.maxConcurrentJobs,
 			MIN_CONCURRENT_JOBS,
@@ -163,6 +191,86 @@ export function clampResourceLimits(input: Partial<NodeResourceLimits> | null | 
 		),
 		maxCpuPercent: clampOptional(input.maxCpuPercent, MIN_CPU_PERCENT, MAX_CPU_PERCENT),
 		maxMemoryMb: clampOptional(input.maxMemoryMb, MIN_MEMORY_MB, MAX_MEMORY_MB)
+	};
+	// The floor is carried through only when the operator actually said
+	// something about it. An absent key stays absent (default floor); an
+	// explicit null stays null (floor off); a number is clamped. Nonsense
+	// (`"2GB"`, NaN) drops the key rather than becoming null — for a floor
+	// the safe fallback is the DEFAULT, not "off".
+	const floor = clampDiskFloor(input.minFreeDiskBytes);
+	if (floor !== undefined) {
+		limits.minFreeDiskBytes = floor;
+	}
+	return limits;
+}
+
+function clampDiskFloor(value: unknown): number | null | undefined {
+	if (value === null) {
+		return null;
+	}
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		return undefined;
+	}
+	return Math.min(Math.max(Math.round(value), MIN_MIN_FREE_DISK_BYTES), MAX_MIN_FREE_DISK_BYTES);
+}
+
+/**
+ * The disk floor a node actually enforces: the default when the operator
+ * never set one, `null` when they switched it off, their number otherwise.
+ */
+export function effectiveMinFreeDiskBytes(limits: Pick<NodeResourceLimits, 'minFreeDiskBytes'>): number | null {
+	if (limits.minFreeDiskBytes === undefined) {
+		return DEFAULT_MIN_FREE_DISK_BYTES;
+	}
+	return limits.minFreeDiskBytes;
+}
+
+// ---------------------------------------------------------------------------
+// Workspace housekeeping (self-build program note §6 — R8: nothing ever
+// reclaimed the per-Task worktrees, so every Task on every repository
+// accumulated on every machine forever)
+// ---------------------------------------------------------------------------
+
+/**
+ * When the node's workspace reaper may remove a Task worktree it has PROVEN
+ * safe to remove (see `workspaces/workspace-reaper.ts` for the proof). Age
+ * is measured from the workspace's last provision; the count budget, when
+ * set, additionally trims the least-recently-used ELIGIBLE workspaces beyond
+ * it. Neither ever overrides a safety rule.
+ */
+export interface NodeWorkspaceGcPolicy {
+	/** Workspaces unused for longer than this are candidates. */
+	maxAgeDays: number;
+	/** Keep at most this many workspaces (LRU among candidates), or null for no count budget. */
+	maxCount: number | null;
+}
+
+export const DEFAULT_WORKSPACE_MAX_AGE_DAYS = 14;
+export const MIN_WORKSPACE_MAX_AGE_DAYS = 1;
+export const MAX_WORKSPACE_MAX_AGE_DAYS = 365;
+export const MIN_WORKSPACE_COUNT = 1;
+export const MAX_WORKSPACE_COUNT = 10_000;
+
+export const DEFAULT_WORKSPACE_GC_POLICY: NodeWorkspaceGcPolicy = {
+	maxAgeDays: DEFAULT_WORKSPACE_MAX_AGE_DAYS,
+	maxCount: null
+};
+
+/** Coerce a stored / flag-supplied policy into a coherent one; nonsense collapses to the default. */
+export function clampWorkspaceGcPolicy(
+	input: Partial<NodeWorkspaceGcPolicy> | null | undefined
+): NodeWorkspaceGcPolicy {
+	if (!input || typeof input !== 'object') {
+		return { ...DEFAULT_WORKSPACE_GC_POLICY };
+	}
+	return {
+		maxAgeDays: clampInt(
+			input.maxAgeDays,
+			MIN_WORKSPACE_MAX_AGE_DAYS,
+			MAX_WORKSPACE_MAX_AGE_DAYS,
+			DEFAULT_WORKSPACE_MAX_AGE_DAYS
+		),
+		maxCount: clampOptional(input.maxCount, MIN_WORKSPACE_COUNT, MAX_WORKSPACE_COUNT)
 	};
 }
 
@@ -208,6 +316,13 @@ export interface NodeConfig {
 	capabilitySelection?: string[];
 	/** Ceilings this machine enforces on itself (wizard step 4). */
 	limits?: NodeResourceLimits;
+	/**
+	 * Workspace reaper policy (`start --workspace-max-age` / `enroll
+	 * --workspace-max-age`). Absent means the default policy; the key is
+	 * only written once an operator sets it, so older configs round-trip
+	 * byte-for-byte.
+	 */
+	workspaceGc?: NodeWorkspaceGcPolicy;
 	/** Local display label; the authoritative name lives on the platform. */
 	name?: string;
 	heartbeatIntervalMs: number;
@@ -234,6 +349,7 @@ export interface RedactedNodeConfig {
 	capabilities: string[];
 	capabilitySelection?: string[];
 	limits: NodeResourceLimits;
+	workspaceGc?: NodeWorkspaceGcPolicy;
 	name?: string;
 	heartbeatIntervalMs: number;
 	enrolledAt: string;
@@ -263,6 +379,9 @@ export function redactConfig(config: NodeConfig): RedactedNodeConfig {
 	};
 	if (config.capabilitySelection !== undefined) {
 		redacted.capabilitySelection = [...config.capabilitySelection];
+	}
+	if (config.workspaceGc !== undefined) {
+		redacted.workspaceGc = clampWorkspaceGcPolicy(config.workspaceGc);
 	}
 	if (config.name !== undefined) {
 		redacted.name = config.name;

@@ -7,6 +7,7 @@ import {
     type TaskSubtaskRow,
 } from '@/lib/api/tasks';
 import { agentsAPI } from '@/lib/api/agents';
+import { inboxAPI } from '@/lib/api/inbox';
 import { TaskDetailClient } from '@/components/tasks/TaskDetailClient';
 
 function errorMessage(err: unknown, fallback: string): string {
@@ -39,34 +40,46 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     const task = await tasksAPI.get(id);
     if (!task) notFound();
 
-    const [chatResult, attachmentResult, gateRunResult, subtaskResult, activityResult] =
-        await Promise.allSettled([
-            tasksAPI.listChat(id, { limit: 50 }),
-            // FU-5 — list initial attachments alongside the chat thread so
-            // the detail page hydrates in one round-trip and the panel
-            // renders without a client-side flash of "no attachments".
-            tasksAPI.listAttachments(id),
-            // Quality gates (Wave 3 M6) — the Task's runs, newest first.
-            // `[0]` carries the gate columns (resolvedChecks / checkResults /
-            // gateStatus / gateAttempts) for the Checks section and the run
-            // controls; the rest is the Runs history (kanban M7). ONE call
-            // for both — they read the same projection, so fetching twice
-            // would be pure waste. Best-effort: a miss just renders the
-            // pre-dispatch declared checks and no history.
-            //
-            // 25 (up from 10) now that the Runs section pages its rows in
-            // tabs of 7 instead of rendering the whole list — the same page
-            // size the Agent Activity feed uses.
-            agentsAPI.listSessions({ taskId: id, limit: 25 }),
-            // Tasks upgrades — the Subtasks checklist and the per-Task
-            // activity feed hydrate with the rest of the page. Both are
-            // ONE call each (the API batches the side tables / filters the
-            // activity log server-side), and both are best-effort: a miss
-            // renders the section empty with an inline error rather than
-            // failing the whole Task page.
-            tasksAPI.listSubtasks(id),
-            tasksAPI.listActivity(id, { limit: 25 }),
-        ]);
+    const [
+        chatResult,
+        attachmentResult,
+        gateRunResult,
+        subtaskResult,
+        activityResult,
+        openQuestionResult,
+    ] = await Promise.allSettled([
+        tasksAPI.listChat(id, { limit: 50 }),
+        // FU-5 — list initial attachments alongside the chat thread so
+        // the detail page hydrates in one round-trip and the panel
+        // renders without a client-side flash of "no attachments".
+        tasksAPI.listAttachments(id),
+        // Quality gates (Wave 3 M6) — the Task's runs, newest first.
+        // `[0]` carries the gate columns (resolvedChecks / checkResults /
+        // gateStatus / gateAttempts) for the Checks section and the run
+        // controls; the rest is the Runs history (kanban M7). ONE call
+        // for both — they read the same projection, so fetching twice
+        // would be pure waste. Best-effort: a miss just renders the
+        // pre-dispatch declared checks and no history.
+        //
+        // 25 (up from 10) now that the Runs section pages its rows in
+        // tabs of 7 instead of rendering the whole list — the same page
+        // size the Agent Activity feed uses.
+        agentsAPI.listSessions({ taskId: id, limit: 25 }),
+        // Tasks upgrades — the Subtasks checklist and the per-Task
+        // activity feed hydrate with the rest of the page. Both are
+        // ONE call each (the API batches the side tables / filters the
+        // activity log server-side), and both are best-effort: a miss
+        // renders the section empty with an inline error rather than
+        // failing the whole Task page.
+        tasksAPI.listSubtasks(id),
+        tasksAPI.listActivity(id, { limit: 25 }),
+        // Self-build slice Q — the OPEN Inbox question a fleet run parked
+        // this Task on, if any. One extra call because the run row only
+        // says "awaiting input"; it cannot name its question (the Inbox
+        // item points at the run, not the other way round). Best-effort
+        // like the rest: a miss renders the classic resume form.
+        inboxAPI.list({ taskId: id, status: 'open', limit: 5 }),
+    ]);
 
     const chat =
         chatResult.status === 'fulfilled' ? chatResult.value : { data: [] as TaskChatMessage[] };
@@ -81,6 +94,12 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         activityResult.status === 'fulfilled'
             ? activityResult.value
             : { data: [] as TaskActivityRow[], meta: { total: 0 } };
+    // Newest first is the API's order; the first open QUESTION is the one
+    // the parked run waits on (approvals / notices on the Task are not).
+    const openQuestion =
+        openQuestionResult.status === 'fulfilled'
+            ? (openQuestionResult.value?.data ?? []).find((item) => item.kind === 'question')
+            : undefined;
 
     return (
         <TaskDetailClient
@@ -88,6 +107,9 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             initialChat={chat.data ?? []}
             initialAttachments={attachments}
             initialGateRun={gateRun}
+            initialOpenQuestion={
+                openQuestion ? { id: openQuestion.id, title: openQuestion.title } : null
+            }
             initialRuns={runs}
             initialSubtasks={subtasks.data ?? []}
             initialSubtasksMeta={subtasks.meta ?? { total: 0, doneCount: 0 }}

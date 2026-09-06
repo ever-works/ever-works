@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
+
+type RouteContext = { params: Promise<{ id: string }> };
 
 /**
  * PR-6 (domain-model evolution) — web BFF proxy for
@@ -13,13 +14,13 @@ import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
  * service enforces that the caller belongs to the Organization's
  * Tenant; error statuses (400 validation, 403/404 scope) pass through
  * so the settings form can render the right copy.
+ *
+ * Auth and workspace scope come from {@link bffProxy}: no auth cookie is
+ * `401 Unauthorized`, a missing or malformed per-tab selector is
+ * `400 Invalid workspace scope`, and the handler is handed headers that
+ * already carry the bearer and the Organization scope.
  */
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export const PATCH = bffProxy<RouteContext>(async ({ request, headers }, { params }) => {
     const { id } = await params;
     if (!id) {
         return NextResponse.json({ error: 'Missing organization id' }, { status: 400 });
@@ -32,15 +33,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
+    headers.set('Content-Type', 'application/json');
 
     try {
         const upstream = await fetch(`${API_URL}/organizations/${encodeURIComponent(id)}`, {
@@ -61,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         console.error('Failed to proxy PATCH /api/organizations/:id:', error);
         return NextResponse.json({ error: 'Failed to update organization' }, { status: 500 });
     }
-}
+});
 
 function safeParse(text: string): unknown {
     try {

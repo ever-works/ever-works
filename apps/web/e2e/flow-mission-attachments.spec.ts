@@ -53,9 +53,10 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   DELETE malformed attachmentId        -> 400 "Validation failed (uuid is
  *                                         expected)" (ParseUUIDPipe)
  *   anon list/attach/delete              -> 401 "Unauthorized"
- *   uppercase-hex uploadId               -> 201 (regex is /i); stored verbatim
- *                                         so it is a DISTINCT row from the
- *                                         lowercase form (case-sensitive index)
+ *   uppercase-hex uploadId               -> 201 (regex is /i); canonicalised
+ *                                         to lowercase before persistence, so
+ *                                         it COLLAPSES onto the lowercase row
+ *                                         (same edge id, list stays length 1)
  *
  * NON-DUPLICATION:
  *   - missions.spec.ts owns the Mission CRUD + lifecycle (pause/resume/
@@ -311,7 +312,7 @@ test.describe('FLOW: mission attachments — validation + ownership', () => {
         expect(messages.some((m) => m.includes('must match'))).toBe(true);
     });
 
-    test('uppercase-hex uploadId is accepted (regex /i) and stored verbatim as a distinct row', async ({
+    test('uppercase-hex uploadId is accepted (regex /i) and canonicalised onto the lowercase row', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request);
@@ -326,19 +327,29 @@ test.describe('FLOW: mission attachments — validation + ownership', () => {
             data: { uploadId: lower },
         });
         expect(a.status()).toBe(201);
+        const lowerEdge = await a.json();
+
         const b = await request.post(`${API_BASE}/api/me/missions/${missionId}/attachments`, {
             headers,
             data: { uploadId: upper },
         });
-        // Same /i regex passes; the stored varchar(64) differs by case, so the
-        // unique (missionId, uploadId) index does NOT collapse them.
+        // The same /i regex passes, but MissionsService.addAttachment folds the
+        // input with `uploadId.toLowerCase()` before BOTH the upload-ownership
+        // lookup and persistence: `user_uploads.sha256` is stored lowercase, so
+        // an uppercase edge would be one the upload join could never resolve.
+        // The canonical value therefore collides with the lowercase row on the
+        // unique (missionId, uploadId) index and takes the idempotent
+        // re-attach path — 201 with the SAME edge, not a second row.
         expect(b.status(), `uppercase attach body=${await b.text()}`).toBe(201);
-        expect((await b.json()).uploadId).toBe(upper);
+        const upperEdge = await b.json();
+        expect(upperEdge.uploadId).toBe(lower);
+        expect(upperEdge.id).toBe(lowerEdge.id);
 
         const list = await (
             await request.get(`${API_BASE}/api/me/missions/${missionId}/attachments`, { headers })
         ).json();
-        expect(list).toHaveLength(2);
+        expect(list).toHaveLength(1);
+        expect(list[0].uploadId).toBe(lower);
     });
 
     test('malformed missionId on attach -> 400 ParseUUIDPipe (uuid expected)', async ({

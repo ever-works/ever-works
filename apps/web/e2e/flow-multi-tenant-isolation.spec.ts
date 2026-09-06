@@ -1,5 +1,11 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from './helpers/api';
+import {
+    API_BASE,
+    authedHeaders,
+    orgScopedHeaders,
+    registerUserViaAPI,
+    createWorkViaAPI,
+} from './helpers/api';
 import { createOrganizationViaAPI } from './helpers/organizations';
 import { createAgentViaAPI, createTaskViaAPI } from './helpers/agents-tasks';
 
@@ -49,10 +55,20 @@ import { createAgentViaAPI, createTaskViaAPI } from './helpers/agents-tasks';
  *     - A fresh user's works/tasks are born tenantId:null, organizationId:null.
  *     - Creating the user's FIRST organization lazily mints a Tenant. Minting
  *       RETROACTIVELY backfills that tenantId onto the user's pre-existing
- *       scoped rows (work + task) — but leaves their organizationId null (the
- *       org becomes the active scope only for NEW writes, not a retro member).
- *     - Every subsequent scoped write (work, task) is auto-stamped with that
- *       org's tenantId AND organizationId.
+ *       scoped rows (work + task) — but leaves their organizationId null: the
+ *       backfill covers tenantId only, nothing is retro-joined to an Org.
+ *     - Every subsequent scoped write inherits the SCOPE OF THE REQUEST, and
+ *       an unprefixed bare-Bearer call is the PERSONAL contract — tenantId
+ *       stamped, organizationId null. To land a row inside an Organization the
+ *       write must carry that Org's scope explicitly, via `X-Scope-Slug:
+ *       <org-slug>` (see `orgScopedHeaders`) or an `/api/<slug>/…` path. The
+ *       API deliberately refuses to infer one from the user's last-active
+ *       Organization — that refusal is what keeps two tabs on different Orgs
+ *       isolated. See `apps/api/src/scope/session-scope.guard.ts`.
+ *     - Reads follow the same rule: `TasksService.getOne` filters by the active
+ *       scope (`ownershipScopeMatches`), so an Org-stamped Task is a 404 to a
+ *       bare-Bearer read. `GET /api/works/:id` is owner-gated rather than
+ *       scope-filtered, but is still read here under the Org it belongs to.
  *     - A user has exactly ONE Tenant: a 2nd org reuses the same tenantId.
  *     - Two distinct users get two distinct tenantIds.
  *
@@ -60,6 +76,14 @@ import { createAgentViaAPI, createTaskViaAPI } from './helpers/agents-tasks';
  * registerUserViaAPI() users (never the shared seeded user) so the in-memory
  * DB stays clean for other specs, and list assertions tolerate pre-existing
  * rows (toContain / not.toContain on ids), never exact global counts.
+ *
+ * Scope discipline: most requests here are bare-Bearer ON PURPOSE. Flows 1
+ * and 2 prove that per-USER ownership holds inside one shared personal scope
+ * (two users, identical request shape, neither sees the other's rows), and
+ * flow 3's pre-tenant and post-backfill probes are personal-scope reads by
+ * definition. Only the writes/reads whose subject IS Organization membership
+ * carry `X-Scope-Slug`. Do not add scope headers to the rest: it would swap
+ * the isolation boundary under test for a different one.
  *
  * Filename uses the safe `flow-` prefix (NOT matched by the no-auth testIgnore
  * regex in playwright.config.ts) and is fully API-orchestrated, so it does not
@@ -88,6 +112,37 @@ async function createMission(
     expect(body.id).toMatch(UUID_RE);
     expect(body.status).toBe('active');
     return body.id as string;
+}
+
+/**
+ * Create a Work that lands INSIDE the given Organization.
+ *
+ * The shared `createWorkViaAPI` helper sends a bare Bearer, which is the
+ * personal contract — the row would be stamped `organizationId: null`. An
+ * Organization write has to name its Org, so this posts the identical body
+ * with {@link orgScopedHeaders}. Same shape as the sibling org-scoped create
+ * in `flow-kb-lifecycle-consolidate-memory-chain.spec.ts`.
+ */
+async function createWorkInOrgViaAPI(
+    request: APIRequestContext,
+    token: string,
+    orgSlug: string,
+    payload: { name: string; slug: string },
+): Promise<string> {
+    const res = await request.post(`${API_BASE}/api/works`, {
+        headers: orgScopedHeaders(token, orgSlug),
+        data: {
+            name: payload.name,
+            slug: payload.slug,
+            description: `e2e ${payload.name}`,
+            organization: false,
+        },
+    });
+    expect(res.status(), `org-scoped work create body=${await res.text()}`).toBe(200);
+    const body = await res.json();
+    const id = body?.work?.id ?? body?.id ?? '';
+    expect(id).toMatch(UUID_RE);
+    return id as string;
 }
 
 /** GET /api/works and return the parsed page (status:'success', works:[…]). */
@@ -141,7 +196,11 @@ async function buildTenant(request: APIRequestContext, label: string): Promise<T
     const token = user.access_token;
     const s = stamp();
 
-    // First org → lazily mints the Tenant and makes it the active scope.
+    // First org → lazily mints the Tenant. It does NOT become the ambient
+    // scope: every write below is bare-Bearer, i.e. the PERSONAL contract
+    // (tenantId stamped, organizationId null), which is exactly the shared
+    // scope this test wants both users in so the boundary it proves is
+    // per-USER ownership rather than per-Organization partitioning.
     const org = await createOrganizationViaAPI(request, token, `${label} Org ${s}`);
     expect(org.tenantId).toMatch(UUID_RE);
 
@@ -328,26 +387,41 @@ test.describe('Multi-tenant isolation (deep)', () => {
         const tenantId = org.tenantId;
         expect(tenantId).toMatch(UUID_RE);
 
-        // ── 3. POST-tenant scoped writes are auto-stamped with tenantId +
-        //       organizationId (the active scope). Probed: BOTH works AND
-        //       tasks expose these fields and carry the org's tenant. ───────
-        const { id: postWorkId } = await createWorkViaAPI(request, token, {
+        // ── 3. A write that CARRIES the org's scope is auto-stamped with that
+        //       org's tenantId + organizationId. The scope must be explicit —
+        //       `X-Scope-Slug: <org-slug>` — because a bare-Bearer call is the
+        //       personal contract and would stamp organizationId:null. Probed:
+        //       BOTH works AND tasks expose these fields. ──────────────────
+        const orgHeaders = orgScopedHeaders(token, org.slug);
+        const postWorkId = await createWorkInOrgViaAPI(request, token, org.slug, {
             name: `Post Work ${s}`,
             slug: `post-work-${s}`,
         });
-        const postTask = await createTaskViaAPI(request, token, { title: `Post Task ${s}` });
+        const postTask = await createTaskViaAPI(
+            request,
+            token,
+            { title: `Post Task ${s}` },
+            org.slug,
+        );
 
-        // Read each back via GET-by-id and assert tenant consistency.
+        // Read each back via GET-by-id — under the SAME org scope they were
+        // written in. `TasksService.getOne` filters by the active scope, so an
+        // org-stamped Task is a deliberate 404 to a bare-Bearer read.
         const postWorkBody = await (
-            await request.get(`${API_BASE}/api/works/${postWorkId}`, { headers })
+            await request.get(`${API_BASE}/api/works/${postWorkId}`, { headers: orgHeaders })
         ).json();
         const postWork = postWorkBody.work ?? postWorkBody;
         expect(postWork.tenantId).toBe(tenantId);
         expect(postWork.organizationId).toBe(org.id);
 
-        const postTaskBody = await (
-            await request.get(`${API_BASE}/api/tasks/${postTask.id}`, { headers })
-        ).json();
+        const postTaskRead = await request.get(`${API_BASE}/api/tasks/${postTask.id}`, {
+            headers: orgHeaders,
+        });
+        expect(
+            postTaskRead.status(),
+            `org-scoped task read body=${await postTaskRead.text().catch(() => '')}`,
+        ).toBe(200);
+        const postTaskBody = await postTaskRead.json();
         expect(postTaskBody.tenantId).toBe(tenantId);
         expect(postTaskBody.organizationId).toBe(org.id);
 
@@ -369,8 +443,10 @@ test.describe('Multi-tenant isolation (deep)', () => {
         // ── 5. Minting the tenant RETROACTIVELY backfills tenantId onto the
         //       user's pre-existing work (probed) so the whole tenant shares
         //       ONE namespace — but organizationId stays null on that earlier
-        //       row (the org is the active scope for NEW writes, not a retro
-        //       membership). This is the truthful, probed behavior. ─────────
+        //       row: the backfill covers tenantId only, and a row joins an
+        //       Organization solely when the write itself carried that org's
+        //       scope. Read back bare-Bearer ON PURPOSE — the personal scope
+        //       is exactly where an organizationId:null row belongs. ────────
         const preWorkAfter = await (
             await request.get(`${API_BASE}/api/works/${preWorkId}`, { headers })
         ).json();

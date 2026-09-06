@@ -65,6 +65,12 @@ export function createFleetJobStore(
             const row = await repository.findById(jobId);
             return row ? toJobView(row) : null;
         },
+        // Agent execution v2 (slice B) — before this the port's optional
+        // `cancel` was simply absent, so `NodeJobRuntimePlugin.cancel`
+        // answered `false` for every fleet job and a cancelled run kept
+        // executing on the PC. A queued job is dropped; an active one is
+        // flagged and the node aborts on its next refused heartbeat.
+        cancel: async (jobId: string) => (await jobs.cancel(jobId)).cancelled,
     };
 }
 

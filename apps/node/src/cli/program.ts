@@ -1,6 +1,8 @@
 import { Command, CommanderError } from 'commander';
+import { posix, win32 } from 'node:path';
 import { describeSelf } from '../core/capabilities';
 import { clearConfig, loadConfig, saveConfig, type ConfigFileSystem } from '../core/config-store';
+import { resolveModelCliPaths } from '../core/model-cli-probe';
 import { FleetClientError } from '../core/fleet-client';
 import {
 	createNodeRuntime,
@@ -12,21 +14,44 @@ import {
 	type SignalSource
 } from '../core/runtime';
 import type { SecretStore } from '../core/secret-store';
-import type { ResourceProbe } from '../core/resource-limits';
+import { formatBytes, type ResourceProbe } from '../core/resource-limits';
 import { createConfigWorkerSafetyGate } from '../core/worker-safety-store';
+import { measureWorkspaceFreeBytes } from '../core/workspaces/disk-headroom';
+import { defaultFleetTaskWorkspaceRoot } from '../core/workspaces/fleet-task-workspace';
+import { scanWorkspaceRoot, type WorkspaceInventory } from '../core/workspaces/workspace-inventory';
+import {
+	describeAge,
+	planWorkspaceReap,
+	policyFromConfig,
+	runWorkspaceReap,
+	startWorkspaceReaperTimer,
+	type WorkspaceReapPlan,
+	type WorkspaceReapResult
+} from '../core/workspaces/workspace-reaper';
 import {
 	clampResourceLimits,
+	clampWorkspaceGcPolicy,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
+	DEFAULT_WORKSPACE_GC_POLICY,
+	DEFAULT_WORKSPACE_MAX_AGE_DAYS,
+	effectiveMinFreeDiskBytes,
 	MAX_CONCURRENT_JOBS,
 	MAX_CPU_PERCENT,
 	MAX_HEARTBEAT_INTERVAL_MS,
+	MAX_MIN_FREE_DISK_BYTES,
+	MAX_WORKSPACE_COUNT,
+	MAX_WORKSPACE_MAX_AGE_DAYS,
 	MIN_CONCURRENT_JOBS,
 	MIN_CPU_PERCENT,
 	MIN_HEARTBEAT_INTERVAL_MS,
 	MIN_MEMORY_MB,
+	MIN_MIN_FREE_DISK_BYTES,
+	MIN_WORKSPACE_COUNT,
+	MIN_WORKSPACE_MAX_AGE_DAYS,
 	redactConfig,
 	type NodeConfig,
-	type NodeResourceLimits
+	type NodeResourceLimits,
+	type NodeWorkspaceGcPolicy
 } from '../core/types';
 
 /**
@@ -40,6 +65,8 @@ import {
  *   unenroll     retire this node and erase the local credential
  *   status       show the local enrollment, credentials redacted
  *   capabilities print the tags this machine would report
+ *   doctor       disk headroom vs the floor, and what the workspace reaper would do
+ *   gc           run the workspace reaper (age / LRU, fail-closed; --dry-run to look)
  *
  * Built as `buildProgram(deps)` over injected IO so argument parsing and every
  * command body are unit-testable without a network, a disk or a real process.
@@ -84,6 +111,22 @@ export interface CliDeps {
 	 * only the concurrency ceiling is enforced.
 	 */
 	resourceProbe?: ResourceProbe;
+	/**
+	 * Executable-file probe for the `--claude-path` / `--codex-path` pins.
+	 * Optional: a shell without it trusts the operator's path as given.
+	 */
+	fileExists?: (path: string) => boolean;
+	/**
+	 * Workspace housekeeping seam — the inventory scan and the reaper
+	 * executor behind `doctor`, `gc` and the in-process timer. Defaults to
+	 * the real filesystem-and-git implementations; tests inject fakes.
+	 */
+	workspaceHousekeeping?: {
+		scan: typeof scanWorkspaceRoot;
+		reap: typeof runWorkspaceReap;
+	};
+	/** Wall clock for ages and stamps; defaults to `Date.now`. */
+	now?: () => number;
 }
 
 /**
@@ -142,6 +185,12 @@ export interface EnrollCommandOptions {
 	concurrency?: string;
 	maxCpu?: string;
 	maxMemory?: string;
+	/** Disk floor in MB (`--min-free-disk`); `--no-disk-floor` sets `diskFloor: false`. */
+	minFreeDisk?: string;
+	diskFloor?: boolean;
+	/** Workspace reaper policy (`--workspace-max-age <days>`, `--workspace-max-count <n>`). */
+	workspaceMaxAge?: string;
+	workspaceMaxCount?: string;
 }
 
 /** Parse `--capabilities a,b,c` into a tag list; blank entries are dropped. */
@@ -170,11 +219,15 @@ function parseBounded(raw: string | undefined, flag: string, min: number, max: n
 	return value;
 }
 
+const MIB = 1024 ** 2;
+
 /** Build the resource-limit overrides implied by the CLI flags, if any. */
 export function parseLimitFlags(options: {
 	concurrency?: string;
 	maxCpu?: string;
 	maxMemory?: string;
+	minFreeDisk?: string;
+	diskFloor?: boolean;
 }): Partial<NodeResourceLimits> | undefined {
 	const maxConcurrentJobs = parseBounded(
 		options.concurrency,
@@ -184,25 +237,68 @@ export function parseLimitFlags(options: {
 	);
 	const maxCpuPercent = parseBounded(options.maxCpu, '--max-cpu', MIN_CPU_PERCENT, MAX_CPU_PERCENT);
 	const maxMemoryMb = parseBounded(options.maxMemory, '--max-memory', MIN_MEMORY_MB, Number.MAX_SAFE_INTEGER);
+	const minFreeDiskMb = parseBounded(
+		options.minFreeDisk,
+		'--min-free-disk',
+		MIN_MIN_FREE_DISK_BYTES / MIB,
+		MAX_MIN_FREE_DISK_BYTES / MIB
+	);
+	if (minFreeDiskMb !== undefined && options.diskFloor === false) {
+		throw new CliError('--min-free-disk and --no-disk-floor contradict each other');
+	}
 
 	const limits: Partial<NodeResourceLimits> = {};
 	if (maxConcurrentJobs !== undefined) limits.maxConcurrentJobs = maxConcurrentJobs;
 	if (maxCpuPercent !== undefined) limits.maxCpuPercent = maxCpuPercent;
 	if (maxMemoryMb !== undefined) limits.maxMemoryMb = maxMemoryMb;
+	if (minFreeDiskMb !== undefined) limits.minFreeDiskBytes = minFreeDiskMb * MIB;
+	// `--no-disk-floor` is the only way to switch the floor OFF: an explicit
+	// null, distinct from "not mentioned" (which keeps the default floor).
+	if (options.diskFloor === false) limits.minFreeDiskBytes = null;
 	return Object.keys(limits).length > 0 ? limits : undefined;
+}
+
+/** Build the workspace-reaper policy overrides implied by the CLI flags, if any. */
+export function parseWorkspaceGcFlags(options: {
+	workspaceMaxAge?: string;
+	workspaceMaxCount?: string;
+}): Partial<NodeWorkspaceGcPolicy> | undefined {
+	const maxAgeDays = parseBounded(
+		options.workspaceMaxAge,
+		'--workspace-max-age',
+		MIN_WORKSPACE_MAX_AGE_DAYS,
+		MAX_WORKSPACE_MAX_AGE_DAYS
+	);
+	const maxCount = parseBounded(
+		options.workspaceMaxCount,
+		'--workspace-max-count',
+		MIN_WORKSPACE_COUNT,
+		MAX_WORKSPACE_COUNT
+	);
+	const policy: Partial<NodeWorkspaceGcPolicy> = {};
+	if (maxAgeDays !== undefined) policy.maxAgeDays = maxAgeDays;
+	if (maxCount !== undefined) policy.maxCount = maxCount;
+	return Object.keys(policy).length > 0 ? policy : undefined;
 }
 
 function describeLimits(limits: NodeResourceLimits): string {
 	const parts = [`${limits.maxConcurrentJobs} concurrent job(s)`];
 	parts.push(limits.maxCpuPercent === null ? 'no CPU ceiling' : `CPU < ${limits.maxCpuPercent}%`);
 	parts.push(limits.maxMemoryMb === null ? 'no memory ceiling' : `memory < ${limits.maxMemoryMb}MB`);
+	const floor = effectiveMinFreeDiskBytes(limits);
+	parts.push(floor === null ? 'no disk floor' : `disk floor ${formatBytes(floor)}`);
 	return parts.join(', ');
+}
+
+function describeWorkspaceGc(policy: NodeWorkspaceGcPolicy): string {
+	return `max age ${policy.maxAgeDays} d, ${policy.maxCount === null ? 'no count budget' : `at most ${policy.maxCount}`}`;
 }
 
 export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): Promise<void> {
 	const heartbeatIntervalMs = parseIntervalSeconds(options.heartbeatInterval);
 	const capabilitySelection = parseCapabilityList(options.capabilities);
 	const limits = parseLimitFlags(options);
+	const workspaceGc = parseWorkspaceGcFlags(options);
 	const config = await enrollNode({
 		...deps.io,
 		apiUrl: options.apiUrl,
@@ -213,6 +309,9 @@ export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): P
 		...(capabilitySelection !== undefined ? { capabilitySelection } : {}),
 		...(limits !== undefined ? { limits } : {})
 	});
+	if (workspaceGc !== undefined) {
+		config.workspaceGc = clampWorkspaceGcPolicy({ ...DEFAULT_WORKSPACE_GC_POLICY, ...workspaceGc });
+	}
 
 	await saveConfig(deps.fs, deps.configPath, config, {
 		platform: deps.platform,
@@ -225,6 +324,7 @@ export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): P
 	deps.out(`  api          ${config.apiUrl}`);
 	deps.out(`  capabilities ${config.capabilities.join(', ') || '(none detected)'}`);
 	deps.out(`  limits       ${describeLimits(clampResourceLimits(config.limits))}`);
+	deps.out(`  workspace gc ${describeWorkspaceGc(config.workspaceGc ?? DEFAULT_WORKSPACE_GC_POLICY)}`);
 	deps.out(`  config       ${deps.configPath}`);
 	deps.out(`  credential   ${deps.secrets ? deps.secrets.label : 'config file (no OS keychain available)'}`);
 	deps.out('');
@@ -238,12 +338,98 @@ export interface StartCommandOptions {
 	concurrency?: string;
 	maxCpu?: string;
 	maxMemory?: string;
+	/** Disk floor override for this process (MB); `--no-disk-floor` switches it off. */
+	minFreeDisk?: string;
+	diskFloor?: boolean;
+	/**
+	 * Workspace reaper policy. Unlike the ceilings above these are PERSISTED
+	 * when given on `start` (the brief asks for it, and `install-service.ps1`
+	 * re-applies `start` flags on every re-install — a policy that only lived
+	 * for one process would silently revert on the next reboot).
+	 */
+	workspaceMaxAge?: string;
+	workspaceMaxCount?: string;
+	/** Agent execution v2 — pin the Claude Code executable for this process. */
+	claudePath?: string;
+	/** Agent execution v2 — pin the Codex executable for this process. */
+	codexPath?: string;
+	/**
+	 * Persistent worktree root for repository-backed agent Tasks (absolute).
+	 * Default: `EVER_WORKS_NODE_WORKSPACE_ROOT`, then `~/.ever-works/fleet-workspaces`.
+	 */
+	workspaceRoot?: string;
+}
+
+/**
+ * Parse `--workspace-root`: the directory the node keeps its bare-repository
+ * cache and per-Task worktrees under.
+ *
+ * It must be ABSOLUTE. The node runs as a service whose working directory
+ * is whatever the service manager happened to set (`%ProgramData%`,
+ * `/`, the unit's `WorkingDirectory`), so a relative root would land
+ * every checkout somewhere the operator did not choose — and a
+ * filesystem root is refused for the same reason the provisioner refuses
+ * it: the node deletes stale worktrees under this directory.
+ *
+ * Absoluteness is judged by the HOST platform (injected, so the rule is
+ * testable for both shapes): `C:\fleet` is absolute on Windows and not
+ * on POSIX, and `/srv/fleet` is absolute on both.
+ *
+ * On Windows "absolute" additionally means DRIVE- or UNC-ROOTED. Node's
+ * `path.win32.isAbsolute` accepts a rooted-but-driveless `\fleet` (and
+ * `/fleet`, `\\fleet`, `\\nas\`), all of which `path.win32.resolve` then
+ * completes with the drive of the CURRENT directory — exactly the
+ * service-manager-chosen location this flag exists to avoid. So a Windows
+ * root must start with `<drive>:\` (or `/`), or be a UNC path naming both
+ * a server and a share. `install-service.ps1` applies the same rule.
+ */
+const WIN32_DRIVE_OR_UNC_ROOTED = /^(?:[a-zA-Z]:[\\/]|[\\/]{2}[^\\/]+[\\/]+[^\\/]+)/;
+
+export function parseWorkspaceRoot(raw: string | undefined, platform: string): string | undefined {
+	if (raw === undefined) {
+		return undefined;
+	}
+	const value = raw.trim();
+	if (value.length === 0) {
+		throw new CliError('--workspace-root must not be empty');
+	}
+	const path = platform === 'win32' ? win32 : posix;
+	if (!path.isAbsolute(value) || (platform === 'win32' && !WIN32_DRIVE_OR_UNC_ROOTED.test(value))) {
+		throw new CliError(`--workspace-root must be an absolute directory (got "${raw}")`);
+	}
+	const normalized = path.resolve(value);
+	if (normalized === path.parse(normalized).root) {
+		throw new CliError(`--workspace-root cannot be a filesystem root (got "${raw}")`);
+	}
+	return normalized;
 }
 
 export async function runStart(deps: CliDeps, options: StartCommandOptions): Promise<void> {
 	const override = parseIntervalSeconds(options.heartbeatInterval);
+	// Usage errors first, before the config is even read.
+	const workspaceRoot = parseWorkspaceRoot(options.workspaceRoot, deps.platform);
+	const workspaceGcOverrides = parseWorkspaceGcFlags(options);
 	const stored = await requireConfig(deps);
-	const config: NodeConfig = override === undefined ? stored : { ...stored, heartbeatIntervalMs: override };
+	// The reaper policy is persisted on `start` (see `StartCommandOptions`),
+	// onto the STORED config — the heartbeat-interval override above is
+	// process-only and must not be written along with it.
+	const workspaceGc = clampWorkspaceGcPolicy({
+		...(stored.workspaceGc ?? DEFAULT_WORKSPACE_GC_POLICY),
+		...(workspaceGcOverrides ?? {})
+	});
+	if (workspaceGcOverrides !== undefined) {
+		await saveConfig(
+			deps.fs,
+			deps.configPath,
+			{ ...stored, workspaceGc },
+			{ platform: deps.platform, secrets: deps.secrets ?? null, logger: deps.io.logger }
+		);
+	}
+	const config: NodeConfig = {
+		...stored,
+		workspaceGc,
+		...(override === undefined ? {} : { heartbeatIntervalMs: override })
+	};
 
 	const workerEnabled = options.work === true;
 	// A node paused by `ever-works-node pause` comes back paused: the
@@ -260,10 +446,45 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		...(config.limits ?? {}),
 		...(limitOverrides ?? {})
 	});
-	const { loop, worker } = createNodeRuntime(config, deps.io, {
+	// Agent execution v2 — which model CLIs this process may spawn. The
+	// flags re-run the probe with the operator's pins; a pin that does not
+	// resolve DISABLES that CLI rather than falling back to PATH.
+	const modelCli =
+		options.claudePath || options.codexPath
+			? resolveModelCliPaths(
+					{
+						env: {},
+						platform: deps.platform,
+						fileExists: deps.fileExists ?? (() => true),
+						lookupAllOnPath: () => []
+					},
+					{
+						'claude-code': options.claudePath ?? deps.io.environment.modelCli?.['claude-code'] ?? null,
+						codex: options.codexPath ?? deps.io.environment.modelCli?.codex ?? null
+					}
+				)
+			: { paths: deps.io.environment.modelCli ?? {}, notes: deps.io.environment.modelCliNotes ?? [] };
+	if (workerEnabled) {
+		for (const note of modelCli.notes) {
+			deps.io.logger.info(`Model CLI — ${note}`);
+		}
+	}
+	// The SAME resolution feeds both the executor and the capability tags:
+	// a pin that adds a CLI advertises it, a pin that disables one withdraws
+	// it — otherwise the node could run jobs it does not advertise, or be
+	// offered jobs it cannot run.
+	const io: NodeIo = {
+		...deps.io,
+		environment: { ...deps.io.environment, modelCli: modelCli.paths, modelCliNotes: modelCli.notes }
+	};
+	const runtime = createNodeRuntime(config, io, {
 		workerEnabled,
 		startPaused,
 		limits: effectiveLimits,
+		modelCli: modelCli.paths,
+		// Written directly (not via a conditional spread) so excess-property
+		// checking keeps this name tied to the runtime option it feeds.
+		agentTaskWorkspaceRoot: workspaceRoot,
 		persistUnsafe: async (unsafe) =>
 			saveConfig(
 				deps.fs,
@@ -278,6 +499,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		workerSafetyGate: createConfigWorkerSafetyGate(deps.fs, deps.configPath, { platform: deps.platform }),
 		...(deps.resourceProbe ? { resourceProbe: deps.resourceProbe } : {})
 	});
+	const { loop, worker } = runtime;
 	loop.onChange((state) => {
 		if (state.state === 'connected') {
 			deps.io.logger.info(`Heartbeat accepted — node ${config.nodeId} is online`);
@@ -306,6 +528,23 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	if (worker) {
 		await worker.start();
 	}
+	// The workspace reaper rides with the worker: it is the process that
+	// creates worktrees, so it is the one that reclaims them. A
+	// heartbeat-only node runs `ever-works-node gc` by hand.
+	const reaper =
+		worker && runtime.workspaceRoot
+			? startWorkspaceReaperTimer({
+					rootPath: runtime.workspaceRoot,
+					policy: policyFromConfig(workspaceGc),
+					logger: deps.io.logger,
+					activeBindings: () => runtime.workspaceProvisioner?.activeBindingKeys?.() ?? new Set<string>(),
+					isBusy: () => worker.getState().activeJobIds.length > 0,
+					...(deps.io.scheduler ? { scheduler: deps.io.scheduler } : {}),
+					...(deps.workspaceHousekeeping ? { scan: deps.workspaceHousekeeping.scan } : {}),
+					...(deps.workspaceHousekeeping ? { reap: deps.workspaceHousekeeping.reap } : {}),
+					...(deps.now ? { now: deps.now } : {})
+				})
+			: null;
 	if (worker?.getState().state === 'unsafe') {
 		deps.out(
 			'Worker host QUARANTINED — leasing is disabled across restarts. Verify every prior process tree is stopped, then run `ever-works-node clear-quarantine --confirm-process-tree-stopped`.'
@@ -319,7 +558,11 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		deps.out(
 			`Worker host enabled — leasing [${worker.registeredKinds.join(', ')}] within ${describeLimits(effectiveLimits)}`
 		);
-	} else {
+	}
+	if (worker && runtime.workspaceRoot) {
+		deps.out(`Workspace reaper — ${describeWorkspaceGc(workspaceGc)}, root ${runtime.workspaceRoot}`);
+	}
+	if (!worker) {
 		// Say so explicitly: an operator who expected this machine to run
 		// work should not have to infer it from an absence of log lines.
 		deps.out('Worker host disabled — reporting liveness only (pass --work to execute platform work)');
@@ -330,6 +573,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	// wake us, so fall straight through instead of hanging forever.
 	await (deps.waitForShutdown?.() ?? (deps.signals ? signalled : Promise.resolve()));
 
+	reaper?.stop();
 	loop.stop();
 	await loop.settled();
 	if (worker) {
@@ -508,9 +752,248 @@ export async function runStatus(deps: CliDeps): Promise<void> {
 		`offering     ${view.capabilitySelection ? view.capabilitySelection.join(', ') || '(identity only)' : '(everything detected)'}`
 	);
 	deps.out(`limits       ${describeLimits(view.limits)}`);
+	deps.out(`workspace gc ${describeWorkspaceGc(view.workspaceGc ?? DEFAULT_WORKSPACE_GC_POLICY)}`);
 	// The secret itself is never printed — only whether one is stored.
 	deps.out(`credential   ${view.hasSecret ? 'stored' : 'MISSING'}`);
 	deps.out(`config       ${deps.configPath}`);
+}
+
+// ---------------------------------------------------------------------------
+// doctor / gc — disk headroom and the workspace reaper (self-build §6)
+// ---------------------------------------------------------------------------
+
+export interface HousekeepingCommandOptions {
+	/** Same rule as `start --workspace-root`: absolute, never a filesystem root. */
+	workspaceRoot?: string;
+	/** Override the stored max age, in days, for this invocation only. */
+	maxAge?: string;
+	/** Override the stored count budget for this invocation only. */
+	maxCount?: string;
+	/** Do not consult remotes. Nothing is ever removed offline — every remote fact reads as unknown. */
+	offline?: boolean;
+}
+
+export interface DoctorCommandOptions extends HousekeepingCommandOptions {
+	json?: boolean;
+}
+
+export interface GcCommandOptions extends HousekeepingCommandOptions {
+	dryRun?: boolean;
+}
+
+interface HousekeepingReport {
+	config: NodeConfig | null;
+	workspaceRoot: string;
+	floor: number | null;
+	freeBytes: number | null;
+	policy: NodeWorkspaceGcPolicy;
+	workerSessionActive: boolean;
+	inventory: WorkspaceInventory;
+	plan: WorkspaceReapPlan;
+}
+
+/**
+ * Everything `doctor` prints and `gc` acts on, gathered once. Works whether
+ * or not the machine is enrolled: the config only supplies the floor and
+ * the reaper policy, and an un-enrolled node has defaults for both.
+ */
+async function gatherHousekeeping(deps: CliDeps, options: HousekeepingCommandOptions): Promise<HousekeepingReport> {
+	// Usage errors first, before anything is read.
+	const workspaceRoot =
+		parseWorkspaceRoot(options.workspaceRoot, deps.platform) ?? defaultFleetTaskWorkspaceRoot(process.env);
+	const maxAgeDays = parseBounded(
+		options.maxAge,
+		'--max-age',
+		MIN_WORKSPACE_MAX_AGE_DAYS,
+		MAX_WORKSPACE_MAX_AGE_DAYS
+	);
+	const maxCount = parseBounded(options.maxCount, '--max-count', MIN_WORKSPACE_COUNT, MAX_WORKSPACE_COUNT);
+	const now = deps.now ?? (() => Date.now());
+
+	const config = await loadConfig(deps.fs, deps.configPath, loadOptions(deps));
+	const limits = clampResourceLimits(config?.limits);
+	const floor = effectiveMinFreeDiskBytes(limits);
+	const policy = clampWorkspaceGcPolicy({
+		...(config?.workspaceGc ?? DEFAULT_WORKSPACE_GC_POLICY),
+		...(maxAgeDays !== undefined ? { maxAgeDays } : {}),
+		...(maxCount !== undefined ? { maxCount } : {})
+	});
+	const freeBytes = deps.io.diskProbe ? await measureWorkspaceFreeBytes(deps.io.diskProbe, workspaceRoot) : null;
+
+	// A worker-session marker means a worker MAY be alive on this config.
+	// Its jobs lease their worktrees, so the reaper still knows which ones
+	// are busy — except a worktree from before leases existed, which is
+	// kept while the marker stands (`requireUsageRecord`). An unreadable
+	// marker counts as present: that is the fail-closed side.
+	let workerSessionActive = false;
+	try {
+		workerSessionActive =
+			(await createConfigWorkerSafetyGate(deps.fs, deps.configPath, { platform: deps.platform }).inspect()) !==
+			null;
+	} catch {
+		workerSessionActive = true;
+	}
+
+	const scan = deps.workspaceHousekeeping?.scan ?? scanWorkspaceRoot;
+	const inventory = await scan(workspaceRoot, { refreshRemote: options.offline !== true, now });
+	const plan = planWorkspaceReap(
+		inventory,
+		{ ...policyFromConfig(policy), requireUsageRecord: workerSessionActive },
+		now()
+	);
+	return { config, workspaceRoot, floor, freeBytes, policy, workerSessionActive, inventory, plan };
+}
+
+function printHousekeepingHeader(deps: CliDeps, report: HousekeepingReport, now: number): void {
+	deps.out(`enrolled     ${report.config ? `yes (node ${report.config.nodeId})` : 'no — defaults apply'}`);
+	deps.out(`workspace    ${report.workspaceRoot}${report.inventory.exists ? '' : ' (not created yet)'}`);
+	const floorText = report.floor === null ? 'no floor' : `floor ${formatBytes(report.floor)}`;
+	if (report.freeBytes === null) {
+		deps.out(
+			`disk free    unknown on the workspace volume (${floorText}) — an unreadable volume never blocks leasing`
+		);
+	} else if (report.floor !== null && report.freeBytes < report.floor) {
+		deps.out(
+			`disk free    ${formatBytes(report.freeBytes)} on the workspace volume (${floorText}) — BELOW FLOOR: this node will not lease or provision`
+		);
+	} else {
+		deps.out(`disk free    ${formatBytes(report.freeBytes)} on the workspace volume (${floorText})`);
+	}
+	deps.out(
+		`workspace gc ${describeWorkspaceGc(report.policy)}${report.inventory.remoteRefreshed ? '' : ' (offline: nothing is removable)'}`
+	);
+	if (report.workerSessionActive) {
+		deps.out('worker       session marker present — workspaces without a usage record are kept');
+	}
+	const worktrees = report.inventory.repositories.flatMap((repository) => repository.worktrees);
+	const pools = report.inventory.repositories.flatMap((repository) => repository.pools);
+	const oldest = worktrees.reduce<number | null>(
+		(age, tree) => (tree.lastUsedAt === null ? age : Math.max(age ?? 0, now - tree.lastUsedAt)),
+		null
+	);
+	deps.out(
+		`workspaces   ${worktrees.length} worktree(s), ${pools.length} pool(s), ${formatBytes(report.inventory.totalBytes)}${
+			oldest === null ? '' : `, oldest unused for ${describeAge(oldest)}`
+		}`
+	);
+	const unrecognised = [
+		...report.inventory.unrecognised,
+		...report.inventory.repositories.flatMap((repository) => repository.unrecognised)
+	];
+	for (const path of unrecognised) {
+		deps.out(`unrecognised ${path} (left alone)`);
+	}
+}
+
+function printPlan(deps: CliDeps, plan: WorkspaceReapPlan, now: number): void {
+	const row = (verdict: 'REMOVE' | 'KEEP', record: WorkspaceReapPlan['remove'][number]['record'], reason: string) => {
+		const age = record.lastUsedAt === null ? 'age ?' : describeAge(now - record.lastUsedAt);
+		deps.out(
+			`  ${verdict.padEnd(6)} ${(record.bindingKey ?? record.path).padEnd(38)} ${(record.branch ?? '?').padEnd(32)} ${age.padStart(7)} ${formatBytes(record.sizeBytes).padStart(9)}  ${reason}`
+		);
+	};
+	for (const verdict of plan.remove) row('REMOVE', verdict.record, verdict.reason);
+	for (const verdict of plan.keep) row('KEEP', verdict.record, verdict.reason);
+	for (const verdict of plan.removePools) {
+		deps.out(
+			`  REMOVE pool ${verdict.pool.path} ${formatBytes(verdict.pool.sizeBytes).padStart(9)}  ${verdict.reason}`
+		);
+	}
+	for (const verdict of plan.keepPools) {
+		deps.out(
+			`  KEEP   pool ${verdict.pool.path} ${formatBytes(verdict.pool.sizeBytes).padStart(9)}  ${verdict.reason}`
+		);
+	}
+	deps.out(
+		`gc would remove ${plan.remove.length} worktree(s) and ${plan.removePools.length} pool(s) (${formatBytes(
+			plan.reclaimableBytes
+		)}), keep ${plan.keep.length} worktree(s) and ${plan.keepPools.length} pool(s)`
+	);
+}
+
+function housekeepingJson(report: HousekeepingReport): Record<string, unknown> {
+	const verdict = (entry: { record: WorkspaceReapPlan['remove'][number]['record']; reason: string }) => ({
+		path: entry.record.path,
+		bindingKey: entry.record.bindingKey,
+		branch: entry.record.branch,
+		lastUsedAt: entry.record.lastUsedAt === null ? null : new Date(entry.record.lastUsedAt).toISOString(),
+		sizeBytes: entry.record.sizeBytes,
+		reason: entry.reason
+	});
+	const poolVerdict = (entry: { pool: WorkspaceReapPlan['removePools'][number]['pool']; reason: string }) => ({
+		path: entry.pool.path,
+		sizeBytes: entry.pool.sizeBytes,
+		reason: entry.reason
+	});
+	return {
+		enrolled: report.config !== null,
+		workspaceRoot: report.workspaceRoot,
+		workspaceRootExists: report.inventory.exists,
+		diskFreeBytes: report.freeBytes,
+		minFreeDiskBytes: report.floor,
+		belowFloor: report.floor !== null && report.freeBytes !== null && report.freeBytes < report.floor,
+		workspaceGc: report.policy,
+		remoteRefreshed: report.inventory.remoteRefreshed,
+		workerSessionActive: report.workerSessionActive,
+		totalBytes: report.inventory.totalBytes,
+		reclaimableBytes: report.plan.reclaimableBytes,
+		remove: report.plan.remove.map(verdict),
+		keep: report.plan.keep.map(verdict),
+		removePools: report.plan.removePools.map(poolVerdict),
+		keepPools: report.plan.keepPools.map(poolVerdict),
+		unrecognised: [
+			...report.inventory.unrecognised,
+			...report.inventory.repositories.flatMap((repository) => repository.unrecognised)
+		]
+	};
+}
+
+/** `doctor`: read-only. Exit 0 even when below the floor — the finding IS the output. */
+export async function runDoctor(deps: CliDeps, options: DoctorCommandOptions): Promise<void> {
+	const report = await gatherHousekeeping(deps, options);
+	const now = (deps.now ?? (() => Date.now()))();
+	if (options.json === true) {
+		deps.out(JSON.stringify(housekeepingJson(report), null, 2));
+		return;
+	}
+	printHousekeepingHeader(deps, report, now);
+	printPlan(deps, report.plan, now);
+}
+
+/** `gc`: plan, then reap — unless `--dry-run`, which prints the plan and writes nothing. */
+export async function runGc(deps: CliDeps, options: GcCommandOptions): Promise<void> {
+	const report = await gatherHousekeeping(deps, options);
+	const now = deps.now ?? (() => Date.now());
+	printHousekeepingHeader(deps, report, now());
+	if (options.dryRun === true) {
+		printPlan(deps, report.plan, now());
+		deps.out('Dry run — nothing was removed.');
+		return;
+	}
+	const reap = deps.workspaceHousekeeping?.reap ?? runWorkspaceReap;
+	const result: WorkspaceReapResult = await reap(report.plan, { logger: deps.io.logger, now });
+	for (const removed of result.removed) {
+		deps.out(`  removed ${removed.record.bindingKey ?? removed.record.path} (${formatBytes(removed.freedBytes)})`);
+	}
+	for (const removed of result.removedPools) {
+		deps.out(`  removed pool ${removed.pool.path} (${formatBytes(removed.freedBytes)})`);
+	}
+	for (const kept of result.kept) {
+		deps.out(`  kept    ${kept.record.bindingKey ?? kept.record.path}: ${kept.reason}`);
+	}
+	for (const kept of result.keptPools) {
+		deps.out(`  kept    pool ${kept.pool.path}: ${kept.reason}`);
+	}
+	deps.out(
+		`Removed ${result.removed.length} worktree(s) and ${result.removedPools.length} pool(s), freed ${formatBytes(
+			result.freedBytes
+		)}; kept ${result.kept.length} worktree(s).`
+	);
+	if (result.errors.length > 0) {
+		throw new CliError(
+			`${result.errors.length} removal(s) failed — nothing was force-deleted:\n  ${result.errors.join('\n  ')}`
+		);
+	}
 }
 
 export async function runCapabilities(deps: CliDeps): Promise<void> {
@@ -577,6 +1060,21 @@ export function buildProgram(deps: CliDeps): Command {
 			'--max-memory <mb>',
 			`Refuse new work while host memory in use is at or above this many MB (min ${MIN_MEMORY_MB})`
 		)
+		.option(
+			'--min-free-disk <mb>',
+			`Refuse new work while the workspace volume has fewer free MB than this (default ${formatBytes(
+				effectiveMinFreeDiskBytes({}) ?? 0
+			)}, min ${MIN_MIN_FREE_DISK_BYTES / MIB})`
+		)
+		.option('--no-disk-floor', 'Switch the disk floor off entirely (not recommended)')
+		.option(
+			'--workspace-max-age <days>',
+			`Remove Task worktrees proven safe and unused for longer than this (default ${DEFAULT_WORKSPACE_MAX_AGE_DAYS})`
+		)
+		.option(
+			'--workspace-max-count <count>',
+			'Additionally keep at most this many worktrees (least recently used go first)'
+		)
 		.action(async (options: EnrollCommandOptions) => {
 			await runEnroll(deps, options);
 		});
@@ -592,6 +1090,25 @@ export function buildProgram(deps: CliDeps): Command {
 		)
 		.option('--max-cpu <percent>', 'Override the stored CPU admission ceiling, in percent')
 		.option('--max-memory <mb>', 'Override the stored memory admission ceiling, in MB')
+		.option('--min-free-disk <mb>', 'Override the stored disk floor for this process, in MB')
+		.option('--no-disk-floor', 'Switch the disk floor off for this process (not recommended)')
+		.option(
+			'--workspace-max-age <days>',
+			'Set (and persist) the max age after which safe, unused Task worktrees are removed'
+		)
+		.option('--workspace-max-count <count>', 'Set (and persist) a count budget for Task worktrees')
+		.option(
+			'--claude-path <file>',
+			'Claude Code executable used for model-cli agent tasks (default: EVER_WORKS_NODE_CLAUDE_PATH, then PATH)'
+		)
+		.option(
+			'--codex-path <file>',
+			'Codex executable used for model-cli agent tasks (default: EVER_WORKS_NODE_CODEX_PATH, then PATH)'
+		)
+		.option(
+			'--workspace-root <dir>',
+			'Absolute directory for the persistent per-Task worktrees of agent tasks (default: EVER_WORKS_NODE_WORKSPACE_ROOT, then ~/.ever-works/fleet-workspaces)'
+		)
 		.action(async (options: StartCommandOptions) => {
 			await runStart(deps, options);
 		});
@@ -643,6 +1160,30 @@ export function buildProgram(deps: CliDeps): Command {
 		.description('Print the capability tags this machine reports')
 		.action(async () => {
 			await runCapabilities(deps);
+		});
+
+	program
+		.command('doctor')
+		.description('Report disk headroom against the floor and what the workspace reaper would do (read-only)')
+		.option('--workspace-root <dir>', 'Absolute workspace root to inspect (default: the same as `start`)')
+		.option('--max-age <days>', 'Judge against this max age instead of the stored one')
+		.option('--max-count <count>', 'Judge against this count budget instead of the stored one')
+		.option('--offline', 'Do not consult remotes (every remote fact then reads as unknown)')
+		.option('--json', 'Emit the report as one JSON object')
+		.action(async (options: DoctorCommandOptions) => {
+			await runDoctor(deps, options);
+		});
+
+	program
+		.command('gc')
+		.description('Run the workspace reaper: remove Task worktrees proven safe to remove and older than the max age')
+		.option('--workspace-root <dir>', 'Absolute workspace root to reap (default: the same as `start`)')
+		.option('--max-age <days>', 'Use this max age instead of the stored one')
+		.option('--max-count <count>', 'Use this count budget instead of the stored one')
+		.option('--dry-run', 'Print the plan and remove nothing')
+		.option('--offline', 'Do not consult remotes — nothing is removable offline; useful with --dry-run')
+		.action(async (options: GcCommandOptions) => {
+			await runGc(deps, options);
 		});
 
 	return program;

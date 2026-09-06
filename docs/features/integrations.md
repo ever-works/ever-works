@@ -2,7 +2,6 @@
 id: integrations
 title: Integrations (Slack, GitHub, connectors, meetings)
 sidebar_label: Integrations
-description: The event envelope every integration produces, the Slack app and GitHub pull-request receivers, the eleven native connectors, and the Meetings API.
 ---
 
 # Integrations
@@ -52,88 +51,95 @@ Security: every delivery — events and slash commands alike — is verified wit
 
 Point a repository webhook at `POST /api/ingest/github/events` and Agents review your pull requests.
 
-On `pull_request` opened/synchronize — and on `@ever-works` mentions in PR comments — the reviewer matches the repository to a Work (across all three repo roles), builds a byte-capped diff, adds Knowledge-Base context and memory recall, makes one structured AI call, and posts the review. The review is keyed on the head SHA, so each pushed revision is reviewed exactly once and bot comments are never re-ingested.
+On `pull_request` opened/synchronize — and on `@ever-works` mentions in PR comments — the reviewer matches the repository to a Work (across all three repo roles), builds a byte-capped diff, adds Knowledge-Base context and memory recall, makes one structured AI call, and posts the review. The review is keyed on the head SHA, so each pushed revision is reviewed exactly once.
+
+The platform's own replies and unknown bots are never ingested — the loop must not echo its own output. Reviews, inline findings and summary comments from **trusted reviewer bots** (CodeRabbit, Copilot, Codex and Greptile by default; `GITHUB_TRUSTED_REVIEW_BOTS` to change the list, `none` to disable) become Task rejection feedback with a severity (`critical | major | minor`, mapped from CodeRabbit's Major/Minor/Critical and Codex/Greptile P1–P3) so the next resumed run fixes P2+ first. A `changes_requested` review from a trusted bot is recorded exactly as a human's would be; a bot comment is recorded, never reviewed. The platform's own `<GITHUB_APP_SLUG>[bot]` identity stays excluded even if it is listed. A trusted-bot finding with no recognisable marker is stored with no severity and the resumed run is told to treat it as major — an unrecognised marker is never read as a nit.
 
 Deliveries are verified with the configured webhook secret (HMAC SHA-256 over the raw body, constant-time compare) and the endpoint fails closed the same way. A missing `x-github-event` header is rejected outright.
 
 > This per-repository receiver is distinct from the platform **GitHub App** webhook (`/api/github-app/webhooks`), which handles installation and push sync.
 
+## Issue and incident intake
+
+_"File an issue, the fleet picks it up."_ Four inbound sources turn issues and incidents into ingested events that any event-sourced Task Trigger can match, and that the **triage filer** turns into exactly one Task each.
+
+| Source                | Endpoint                         | Verified with (the vendor's own scheme)                                                          | Event                                                         |
+| --------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| **GitHub issues**     | `POST /api/ingest/github/events` | `X-Hub-Signature-256` — GitHub App / repository webhook secret (same path as PR review)          | `github.issue` (`source: github`)                             |
+| **Dependabot alerts** | `POST /api/ingest/github/events` | same                                                                                             | `incident` (`source: github`, `payload.provider: dependabot`) |
+| **Jira Cloud**        | `POST /api/ingest/jira/events`   | `X-Hub-Signature` = `sha256=` HMAC-SHA256 over the raw body with the Jira webhook secret         | `jira.issue` (`source: jira-connector`)                       |
+| **Sentry**            | `POST /api/ingest/sentry/events` | `Sentry-Hook-Signature` = hex HMAC-SHA256 over the raw body with the integration's client secret | `incident` (`source: sentry`)                                 |
+
+Every receiver **fails closed**. A delivery whose signature cannot be verified with the vendor's own scheme is rejected (401) and nothing is filed; a receiver with no secret configured rejects everything; and no source ever falls back to "unsigned but trusted". Which account — and therefore which Organization and Work — an event lands in comes from the **install binding** (the same `ingest_install_bindings` table Slack and GitHub use), never from anything in the payload. The generic trigger fire URL cannot serve these vendors: it is signed with a per-trigger platform secret over `timestamp.body`, which no third party can reproduce.
+
+### GitHub issues and Dependabot alerts
+
+Subscribe the GitHub App (or the repository webhook) to **Issues** and **Dependabot alerts** — with the App, grant _Dependabot alerts: read_. Deliveries ride the existing GitHub receiver, so they are verified and attributed exactly like pull requests.
+
+- `issues` actions `opened`, `reopened`, `closed`, `labeled`, `unlabeled`, `assigned`, `unassigned` and `edited` (title edits only — body edits are noise) become `github.issue` events. Pull-request threads (which GitHub also reports as issues) are skipped; the PR path owns them.
+- The stable identity is `subject.externalId = owner/repo#number`; `sourceEventId` carries the action and timestamp, so a re-label is a new revision while an exact redelivery dedupes to zero.
+- `dependabot_alert` actions (`created`, `reopened`, `reintroduced`, `auto_reopened`, `fixed`, `dismissed`, `auto_dismissed`) become `incident` events with `payload.provider: dependabot`, identity `owner/repo#dependabot-<alert number>`, the package as `culprit` and the advisory severity as `level`.
+- Work routing uses the repository (`workHint: repo`), like every other GitHub event.
+
+### Jira Cloud
+
+The **jira-connector** plugin gains an inbound surface. In the connector's settings set a **Webhook secret**, then in Jira create a webhook (_Settings → System → Webhooks_) for `Issue: created / updated / deleted` pointing at `POST /api/ingest/jira/events` **with that same secret**. Jira then signs every delivery in `X-Hub-Signature`; a webhook created without a secret sends no signature and is rejected — there is no unsigned mode.
+
+- `jira:issue_created` / `jira:issue_updated` / `jira:issue_deleted` become `jira.issue` events; an update whose changelog moves `status` is reported as a **transition** with `statusFrom` / `statusTo`. Descriptions arrive as wiki text or ADF and are flattened either way.
+- The event shape is the same one the connector's pull sweep emits (`source: jira-connector`, identity `issue.id`, `sourceEventId = <id>:<updated>`), so a webhook and a later sweep of the same change dedupe against each other.
+- Attribution is **per site**: the delivery's API self-links name the Jira site, which selects the platform user whose install is configured for that `baseUrl`; the delivery must then verify with that install's secret. A forged host can at most pick a secret the signature will not match. Unknown or ambiguous sites are refused as a clean no-op, never guessed.
+- Work routing: claim the Jira **project key** under **Tracker team** in the Work's external references.
+
+### Sentry
+
+Create an **internal integration** in Sentry (_Settings → Developer Settings_) with a webhook URL of `POST /api/ingest/sentry/events`, enable **Alert Rule Action** and the **Issue** webhooks, and add it as the action of the alert rules you care about. Put the integration's **Client Secret** in `SENTRY_WEBHOOK_CLIENT_SECRET` on the API; Sentry signs every delivery with it (`Sentry-Hook-Signature`). Unset, the receiver answers 401 to everything.
+
+Sentry signs with one platform-level secret, so a verified delivery proves it came from Sentry but not **whose** it is. The owner therefore claims the installation once, authenticated:
+
+| Endpoint                                               | What it does                                                                                                                                 |
+| ------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/ingest/sentry/bindings`                     | Claim `{ installationUuid, label? }` (the uuid from the integration's installation page). First claim wins; another account's uuid is a 409. |
+| `GET /api/ingest/sentry/bindings`                      | Your claims.                                                                                                                                 |
+| `DELETE /api/ingest/sentry/bindings/:installationUuid` | Release one.                                                                                                                                 |
+
+Deliveries for an installation nobody has claimed are a 200 no-op that files nothing; a signed `installation.deleted` removes the claim.
+
+- `issue` (`created`, `resolved`, `unresolved`, `assigned`, `ignored`, `archived`, `unarchived`) and `event_alert` deliveries become `incident` events with `payload.provider: sentry`, identity = the Sentry **issue id**, and the issue link, `culprit`, `title`, `level`, last-seen `release`, `environment` and `project` on the payload. `error`, `comment` and `metric_alert` resources are acknowledged and dropped.
+- Work routing: claim the Sentry **project slug** under **Tracker team** on the Work; `event_alert` deliveries carry only the numeric project id, so claim that too if you route alert-rule fires. Raw bodies are never logged — event alerts carry stack frames and user context.
+
+### The `incident` kind
+
+An incident is "something broke and somebody should look". Every incident source normalizes into the one `kind: incident` envelope with the same payload block (`provider`, `externalId`, `title`, `url`, `culprit`, `level`, `release`, `environment`, `project`, `status`, `action`), so a trigger with `eventMatcher: { kind: 'incident' }` matches all of them and `source` narrows to a vendor. Adding a source means implementing the small `IncidentSource` interface (`apps/api/src/ingest/incidents/`) behind whichever receiver verifies that vendor's signature — a CI-flake source over GitHub `workflow_run` / `check_run` deliveries is the documented next seam.
+
+### Triage Tasks
+
+The **triage filer** consumes `github.issue`, `jira.issue` and `incident` events from the spine and keeps **one Task per `(source, external id)`** in the Work the event routed to:
+
+- First sight files a Task in that Work (under its tenant / organization) titled `[<key>] <title>` with the `triage` and `source:<source>` labels, a priority from the vendor severity (`fatal`/`critical`/`Highest` → P1, `error`/`high` → P2, `low`/`info` → P4, else P3), and a body carrying the link, culprit, level, last-seen release, environment, project, status, labels and assignees, plus the original text inside a neutralized `<source_content>` block (data, never instructions).
+- The dedup key is persisted as an `external_issue_links` row (`UNIQUE (user, source, externalIssueId)`) pointing at the Task. A re-fired webhook, a re-label, a transition or a repeated Sentry alert finds that row and posts **one comment** with the delta on the existing Task — it never files a second one. An exact redelivery dedupes in the spine and produces nothing at all.
+- Events that routed to no Work are left alone (a trigger may still act on them); a Work the owner does not hold is refused. Filing happens in the ingest drain (`event-ingest-tick`), so a Task appears seconds to a minute after the webhook.
+- The filer matches on the event **kind**, not on how the event arrived. The jira-connector's poll sweep emits the same `jira.issue` kind, so issues it picks up are triaged too — which is the point, but it means turning on the connector's optional `backfillDays` window files a Task for every issue updated inside it whose project is claimed on a Work. Leave the backfill at its default (`0`, off) unless you want that history as Tasks.
+
+### Matching intake in triggers
+
+Any event-sourced Task Trigger sees these kinds with no extra wiring — for example `{ "source": "github", "kind": "github.issue" }` to hand new issues to an agent, `{ "kind": "incident" }` for every vendor's incidents, or `{ "source": "sentry", "kind": "incident" }` for Sentry only.
+
 ## Native connectors
 
-Eleven connectors ship today, all in the `connector` plugin category. Each one declares up to two
-independent legs, and the difference is what the two middle columns below record:
+| Connector   | Direction          | Brings in                                                         |
+| ----------- | ------------------ | ----------------------------------------------------------------- |
+| **Slack**   | inbound + outbound | Channel messages, mentions; posts replies                         |
+| **Discord** | inbound + outbound | Channel messages; posts replies                                   |
+| **Linear**  | inbound + outbound | Issue activity; posts comments                                    |
+| **Jira**    | inbound + outbound | Issue activity (poll + Cloud webhooks, see above); posts comments |
+| **Notion**  | inbound + outbound | Page activity; appends comments                                   |
+| **Zoom**    | inbound            | Completed cloud recordings → Meetings                             |
 
-- the **`connector` capability** — the messaging leg, whose `direction` is `outbound`, `inbound` or
-  `bidirectional`;
-- the **`event-source` capability** — the ingest leg, a `pullEvents` sweep that feeds the event spine
-  on the `event-ingest-tick` cron.
-
-They are genuinely independent. A connector can be `direction: 'outbound'` and still pull a rich
-event stream — Linear, Jira, HubSpot, Pipedrive, Bluesky and Mastodon are all exactly that.
-
-| Connector            | Plugin id                    | `connector` direction | `event-source` | Brings in                                                                  | Pushes out                                          |
-| -------------------- | ---------------------------- | --------------------- | -------------- | -------------------------------------------------------------------------- | --------------------------------------------------- |
-| **Slack**            | `slack-connector`            | bidirectional         | yes            | Channel messages and bot mentions from the configured channels             | Channel messages and threaded replies, Block Kit    |
-| **Discord**          | `discord-connector`          | **outbound**          | **no**         | Nothing — this connector has no ingest leg                                 | Channel messages with embeds, via `discord.js` REST |
-| **Linear**           | `linear-connector`           | outbound              | yes            | Issues created/updated, and comments                                       | Comments on Linear issues                           |
-| **Notion**           | `notion-connector`           | outbound              | yes            | Pages created or edited — workspace-wide, or per database                  | Comments appended to Notion pages                   |
-| **Jira**             | `jira-connector`             | outbound              | yes            | Issues created/updated, and comments                                       | Comments on Jira issues                             |
-| **HubSpot**          | `hubspot-connector`          | outbound              | yes            | Contacts, companies, deals and custom objects                              | Notes appended to CRM records, and new records      |
-| **Pipedrive**        | `pipedrive-connector`        | outbound              | yes            | Deals, persons and organizations                                           | Notes on those records, and new records             |
-| **Zoom**             | `zoom-connector`             | inbound               | yes            | Completed cloud recordings, with transcripts when available → Meetings     | Nothing — ingest only                               |
-| **Google Workspace** | `google-workspace-connector` | inbound               | yes            | Drive file changes, Calendar events, Meet recording transcripts → Meetings | Nothing — ingest only                               |
-| **Bluesky**          | `bluesky-connector`          | outbound              | yes            | Mentions and replies, plus the connected account's own posts               | Posts and threaded replies over AT Protocol         |
-| **Mastodon**         | `mastodon-connector`         | outbound              | yes            | Mention notifications and the account's own statuses                       | Statuses and threaded replies on your own instance  |
-
-Every connector talks to its provider through that provider's own official SDK — `@slack/web-api`,
-`discord.js`, `@linear/sdk`, `@notionhq/client`, `jira.js`, `@hubspot/api-client`, the `pipedrive`
-Node SDK, `@zoom/rivet`, the Google API Node.js clients, `@atproto/api` and `masto`.
-
-:::caution Discord is outbound only
-The Discord connector's manifest declares `direction: 'outbound'` with `inbound: false` and
-`reply: false`, and it does **not** declare the `event-source` capability. It posts into a channel;
-it does not read one, and nothing from Discord reaches your Activity feed. Inbound Interactions API
-routing is a documented follow-up — the connector's **Application public key** setting exists for
-it and is unused today.
-:::
-
-[Connectors](./connectors.md) is the full catalog: every credential each one needs, the event kinds
-it emits, how its events are routed to a Work, and what each connector deliberately does not do.
-
-### How to enable a connector
-
-1. Open **Sidebar → Plugins** (`/plugins`), or go straight to **Settings → Plugins → Connectors**
-   (`/settings/plugins/connector`).
-2. Press **Enable** on the connector's card, leave **Also enable for all works** ticked in the
-   dialog, and press **Enable** again to commit — account-level _on_ does not cascade to your Works
-   on its own.
-3. Open the connector's settings form, paste its credentials, and press **Save Settings**.
-4. Narrow the sweep with the scoping fields on the same form (`eventChannelIds`, `teamIds`,
-   `databaseIds`, `projectKeys`, `objectTypes`, `entityTypes`, `driveFolderIds`, `calendarIds`).
-   Empty usually means "everything".
-5. Wait for the next sweep — `event-ingest-tick` runs every 5 minutes; there is no "sync now"
-   button — then check **Sidebar → Activity** (`/activity`) or a Work's **Activity** tab
-   (`/works/:id/activity`).
-
-:::note There is no Settings → Integrations index page
-`/settings/integrations` has no index page and soft-404s: the settings navigation deliberately omits
-a bare **Integrations** tab. Only its two children exist — **Channels**
-(`/settings/integrations/channels`) and **Emails** (`/settings/integrations/emails`), both of which
-belong to [Notifications](./notifications.md). Connectors live under **Plugins**. Bare
-`/settings/plugins` redirects to `/settings/plugins/ai-provider`, so link to
-`/settings/plugins/connector` when you mean the connector catalog.
-:::
-
-:::tip Connectors are not notification channels
-If what you want is routine outbound delivery — alerts, digests, run results pushed into a channel —
-reach for a [notification channel](./notifications.md) instead. Slack, Discord, Telegram, WhatsApp
-and Novu ship as a separate outbound-only plugin family with their own Settings screen and a
-test-send button.
-:::
+Enable them like any other [plugin](../plugin-system/index.md), under **Settings → Integrations**.
 
 ## Meetings
 
-A **Meeting** is a first-class record: title, start/end, source, participants, a deep link, and optionally a transcript. This section is the API surface; [Meetings](./meetings.md) covers the record itself — every field, the transcript enrichment fan-out, and the screens you create and read meetings on.
+A **Meeting** is a first-class record: title, start/end, source, participants, a deep link, and optionally a transcript.
 
 :::note Where to find it
 Meetings have no sidebar entry of their own — a meeting is a _memory source_, so the catalog renders as the **Meetings** block on **Sidebar → Memory** (anchor `/memory#meetings`), right under the agent-memory panel. The source and Work filters, pagination and **New meeting** button are unchanged. The old `/meetings` link still works: it redirects to that block and carries its filters across. `/meetings/new` and the meeting detail pages (`/meetings/:id`) are unchanged.
@@ -157,8 +163,3 @@ List rows omit the transcript body; the detail endpoint includes it.
 ## Related
 
 - [Plugin System](../plugin-system/index.md) · [Knowledge Base & Memory](./knowledge-base.md) · [Agents](./agents.md)
-- [Connectors](./connectors.md) — the full eleven-connector catalog: credentials, event kinds, work-routing claims
-- [Meetings](./meetings.md) — the Meeting record, transcripts, AI summaries and the Memory fan-out
-- [Notifications](./notifications.md) — outbound channels (Slack, Discord, Telegram, WhatsApp, Novu) and event subscriptions
-- [Plugins](./plugins.md) — enabling plugins, account-level vs work-level, the Settings → Plugins screens
-- [Activity](./activity.md) — where ingested events land, and the Schedules view

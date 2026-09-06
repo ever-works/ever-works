@@ -31,6 +31,29 @@ describe('AgentsSkillsTasksImportService — Task settings round-trip', () => {
         return { svc, agentExport, skillsService, tasksService };
     }
 
+    /**
+     * Same shape, but with the repository registry bound. `extraRepos` names
+     * connections by an ACCOUNT-LOCAL id, so restoring one is gated on the
+     * IMPORTING account owning it — the rule skill files already follow.
+     */
+    function makeSvcWithRepos(connections: Record<string, { enabled: boolean } | undefined>) {
+        const agentExport = { importOne: jest.fn().mockResolvedValue({}) };
+        const skillsService = { create: jest.fn().mockResolvedValue({}) };
+        const tasksService = { create: jest.fn().mockResolvedValue({ id: 't-new' }) };
+        const repoConnections = {
+            findByIdAndUser: jest.fn(async (id: string) => connections[id] ?? null),
+        };
+        const svc = new AgentsSkillsTasksImportService(
+            agentExport as any,
+            skillsService as any,
+            tasksService as any,
+            undefined,
+            undefined,
+            repoConnections as any,
+        );
+        return { svc, tasksService, repoConnections };
+    }
+
     function makeTask(overrides: Partial<ExportedTask> = {}): ExportedTask {
         return {
             __kind: 'task',
@@ -68,6 +91,76 @@ describe('AgentsSkillsTasksImportService — Task settings round-trip', () => {
             required: true,
         },
     ];
+
+    describe('extraRepos ("Also work in")', () => {
+        const EXTRA = [{ repoConnectionId: 'conn-1', mountDir: 'docs', writable: true }];
+
+        it('restores an entry the importing account owns', async () => {
+            const { svc, tasksService, repoConnections } = makeSvcWithRepos({
+                'conn-1': { enabled: true },
+            });
+
+            await svc.importTail(
+                'u-1',
+                { tasks: [makeTask({ extraRepos: EXTRA })] } as any,
+                { importTasks: true } as any,
+            );
+
+            expect(repoConnections.findByIdAndUser).toHaveBeenCalledWith('conn-1', 'u-1');
+            expect(tasksService.create.mock.calls[0][1].extraRepos).toEqual([
+                { repoConnectionId: 'conn-1', mountDir: 'docs', writable: true },
+            ]);
+        });
+
+        it('drops an entry the importing account does not own, and still imports the Task', async () => {
+            // The cross-account case. `repoConnectionId` is a uuid in the
+            // EXPORTING registry, so it resolves to nothing here. Passing it
+            // through would be worse than useless: `normalizeExtraRepos`
+            // THROWS on an unresolvable connection, and the importer's
+            // per-Task catch would drop the whole Task — its title, labels
+            // and chat with it.
+            const { svc, tasksService } = makeSvcWithRepos({});
+
+            const summary = await svc.importTail(
+                'u-1',
+                { tasks: [makeTask({ extraRepos: EXTRA })] } as any,
+                { importTasks: true } as any,
+            );
+
+            expect(summary.tasks.imported).toBe(1);
+            expect(summary.tasks.errors).toEqual([]);
+            expect('extraRepos' in tasksService.create.mock.calls[0][1]).toBe(false);
+        });
+
+        it('drops a disabled connection', async () => {
+            // `normalizeExtraRepos` refuses a disabled connection on the write
+            // path too, so keeping it would only move the failure to the next edit.
+            const { svc, tasksService } = makeSvcWithRepos({ 'conn-1': { enabled: false } });
+
+            await svc.importTail(
+                'u-1',
+                { tasks: [makeTask({ extraRepos: EXTRA })] } as any,
+                { importTasks: true } as any,
+            );
+
+            expect('extraRepos' in tasksService.create.mock.calls[0][1]).toBe(false);
+        });
+
+        it('imports the Task unchanged when the registry is not bound', async () => {
+            // Trailing @Optional() dependency: unbound behaves exactly as
+            // before the field round-tripped at all.
+            const { svc, tasksService } = makeSvc();
+
+            const summary = await svc.importTail(
+                'u-1',
+                { tasks: [makeTask({ extraRepos: EXTRA })] } as any,
+                { importTasks: true } as any,
+            );
+
+            expect(summary.tasks.imported).toBe(1);
+            expect('extraRepos' in tasksService.create.mock.calls[0][1]).toBe(false);
+        });
+    });
 
     it('applies isolationMode, acceptanceChecks and maxGateAttempts', async () => {
         const { svc, tasksService } = makeSvc();

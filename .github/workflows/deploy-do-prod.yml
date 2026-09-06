@@ -222,6 +222,17 @@ jobs:
           CAPTCHA_PROVIDER: ${{ secrets.CAPTCHA_PROVIDER }}
           CAPTCHA_SECRET: ${{ secrets.CAPTCHA_SECRET }}
 
+          # EW-772 — Agent Plugins v1.0.0 standard interop. Repository
+          # VARIABLES rather than secrets: neither value is sensitive, and a
+          # variable is visible in the deploy log where a secret is masked —
+          # which matters when diagnosing why packages are not appearing.
+          # Both are safe to leave unset: the flag defaults to off and the
+          # directory to /app/agent-plugins.
+          FEATURE_AGENT_PLUGINS: ${{ vars.FEATURE_AGENT_PLUGINS }}
+          AGENT_PLUGINS_DIR: ${{ vars.AGENT_PLUGINS_DIR }}
+          AGENT_PLUGINS_STDIO: ${{ vars.AGENT_PLUGINS_STDIO }}
+          AGENT_PLUGINS_DATA_DIR: ${{ vars.AGENT_PLUGINS_DATA_DIR }}
+
       # we need this step because for now we just use :latest tag
       # note: for production we will use different strategy later
       - name: Restart Pods to pick up :latest tag version

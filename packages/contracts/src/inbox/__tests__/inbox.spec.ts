@@ -6,7 +6,9 @@ import {
 	INBOX_MAX_OPTIONS,
 	INBOX_MAX_OPTION_ID_CHARS,
 	INBOX_MAX_OPTION_LABEL_CHARS,
-	normalizeInboxOptions
+	INBOX_SOURCE_META_MAX_FIELD_CHARS,
+	normalizeInboxOptions,
+	normalizeInboxSourceMeta
 } from '../inbox.types.js';
 
 /**
@@ -99,5 +101,71 @@ describe('closed value sets', () => {
 		expect(Math.max(...INBOX_ITEM_KINDS.map((v) => v.length))).toBeLessThanOrEqual(16);
 		expect(Math.max(...INBOX_ITEM_STATUSES.map((v) => v.length))).toBeLessThanOrEqual(16);
 		expect(Math.max(...INBOX_ITEM_SOURCE_TYPES.map((v) => v.length))).toBeLessThanOrEqual(24);
+	});
+
+	it('lists fleet-run as a source type, appended last', () => {
+		// Self-build slice Q. Appended, not inserted: the web mirror of this
+		// list pins the order, and a fleet question must stay distinguishable
+		// from the in-process `agent-run` one (different resume message).
+		expect(INBOX_ITEM_SOURCE_TYPES).toEqual(['agent-run', 'escalation', 'proposal', 'system', 'work', 'fleet-run']);
+		expect(INBOX_ITEM_SOURCE_TYPES[INBOX_ITEM_SOURCE_TYPES.length - 1]).toBe('fleet-run');
+	});
+});
+
+/**
+ * `normalizeInboxSourceMeta` guards the one column a FLEET NODE indirectly
+ * feeds (through the reconciler): the chips the Inbox renders next to a
+ * fleet question. Same trust posture as the options: declared string
+ * fields only, trimmed, capped, nothing else stored.
+ */
+describe('normalizeInboxSourceMeta', () => {
+	it('returns null for non-objects, empty objects and all-blank fields', () => {
+		expect(normalizeInboxSourceMeta(undefined)).toBeNull();
+		expect(normalizeInboxSourceMeta(null)).toBeNull();
+		expect(normalizeInboxSourceMeta('node-1')).toBeNull();
+		expect(normalizeInboxSourceMeta(['node-1'])).toBeNull();
+		expect(normalizeInboxSourceMeta({})).toBeNull();
+		expect(normalizeInboxSourceMeta({ nodeId: '   ', branch: '', taskTitle: null, prUrl: undefined })).toBeNull();
+	});
+
+	it('keeps the six declared fields and drops unknown keys', () => {
+		expect(
+			normalizeInboxSourceMeta({
+				nodeId: 'node-1',
+				nodeName: 'everdesk2',
+				branch: 'task/tsk-1',
+				taskTitle: 'Fix the thing',
+				prUrl: 'https://github.com/ever-works/ever-works/pull/1',
+				mountDir: 'template',
+				userId: 'smuggled',
+				agentRunId: 'smuggled'
+			})
+		).toEqual({
+			nodeId: 'node-1',
+			nodeName: 'everdesk2',
+			branch: 'task/tsk-1',
+			taskTitle: 'Fix the thing',
+			prUrl: 'https://github.com/ever-works/ever-works/pull/1',
+			mountDir: 'template'
+		});
+	});
+
+	it('trims every field, slices it to the cap and ignores non-strings', () => {
+		const result = normalizeInboxSourceMeta({
+			nodeName: '  everdesk2  ',
+			taskTitle: 't'.repeat(INBOX_SOURCE_META_MAX_FIELD_CHARS + 50),
+			branch: 42,
+			prUrl: { href: 'x' }
+		});
+		expect(result).toEqual({
+			nodeName: 'everdesk2',
+			taskTitle: 't'.repeat(INBOX_SOURCE_META_MAX_FIELD_CHARS)
+		});
+		expect(Object.keys(result!)).toEqual(['nodeName', 'taskTitle']);
+	});
+
+	it('is idempotent — normalizing its own output changes nothing', () => {
+		const once = normalizeInboxSourceMeta({ nodeId: 'n', branch: 'b' });
+		expect(normalizeInboxSourceMeta(once)).toEqual(once);
 	});
 });

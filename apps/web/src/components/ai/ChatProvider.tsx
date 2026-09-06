@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner';
 import { DEFAULT_AI_PROVIDER } from '@/lib/constants';
 import { useLocalStorage } from '@/lib/hooks/use-local-storage';
+import { applyBrowserWorkspaceScope } from '@/lib/api/browser-api';
 
 import type { ConversationSummary } from '@/lib/api/conversations';
 import {
@@ -65,8 +66,56 @@ interface ChatContextValue {
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
-// Stable transport — created once outside the component
-const transport = new DefaultChatTransport({ api: '/api/chat' });
+// Stable transport — created once outside the component.
+//
+// `prepareSendMessagesRequest` stamps the per-tab workspace selector on every
+// send. This is NOT optional and it is NOT only about Organizations: the tool
+// loop inside `/api/chat` reaches the platform through `serverFetch`, which
+// derives its scope from this header and THROWS `Invalid workspace scope` when
+// it is absent (`lib/api/server-api.ts` → `parseWorkspaceSelector`). Without it
+// every data action the assistant attempts fails before a request leaves the
+// web tier, in personal scope as well as org scope.
+//
+// The middleware cannot supply it — `proxy.ts`'s matcher deliberately excludes
+// `/api`, so a BFF route only ever receives the selector when the client sends
+// it. We re-derive from `window.location.pathname` per request, exactly as
+// `browserApiFetch` does, so a second tab on another Organization cannot leak
+// its scope into this one.
+export function prepareChatRequest({
+    id,
+    messages,
+    trigger,
+    messageId,
+    body,
+    headers,
+}: {
+    id: string;
+    messages: UIMessage[];
+    trigger: 'submit-message' | 'regenerate-message';
+    messageId: string | undefined;
+    body?: Record<string, unknown>;
+    headers?: HeadersInit;
+}): { body: object; headers: Headers } {
+    // `body` is ONLY the extra fields — the transport's `body` merged with the
+    // per-call one. The SDK hands id/messages/trigger/messageId to this callback
+    // as SEPARATE arguments, and when the callback returns a `body` the SDK
+    // POSTs that object VERBATIM instead of re-adding them (it only re-adds them
+    // on the no-callback path). So returning `body` alone sends a request with
+    // no `messages`, and /api/chat's schema rejects it with 400 before any model
+    // is reached — i.e. every send fails. Restate the four fields here.
+    return {
+        body: { ...(body ?? {}), id, messages, trigger, messageId },
+        headers: applyBrowserWorkspaceScope(headers),
+    };
+}
+
+// Exported only so a unit spec can pin that the transport is actually WIRED to
+// `prepareChatRequest`. Testing the function alone would not catch someone
+// dropping the option here, which is precisely the regression this fixes.
+export const transport = new DefaultChatTransport({
+    api: '/api/chat',
+    prepareSendMessagesRequest: prepareChatRequest,
+});
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const t = useTranslations('dashboard.aiChat');

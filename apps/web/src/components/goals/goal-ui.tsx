@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
-import type { GoalComparator, GoalOutcome } from '@/lib/api/goals';
+import type { GoalComparator, GoalKind, GoalOutcome } from '@/lib/api/goals';
 
 /**
  * Goals & Metrics — PR-8. Shared presentational helpers for the Goals
@@ -70,6 +70,29 @@ export function OutcomeBadge({ outcome, className }: { outcome: GoalOutcome; cla
             )}
         >
             {t(`outcomes.${outcome}`)}
+        </span>
+    );
+}
+
+/**
+ * Goal KIND badge (self-build slice AG, EW-795) — `metric` vs `delivery`.
+ * Neutral by design: the kind is a fact about the Goal, not a state, so
+ * the colour budget stays with the status pill and the outcome badge.
+ * Labels come from `dashboard.goalsPage.kinds` so the list card, the
+ * detail header and the Mission panel agree on the wording.
+ */
+export function GoalKindBadge({ kind, className }: { kind: GoalKind; className?: string }) {
+    const t = useTranslations('dashboard.goalsPage');
+    return (
+        <span
+            data-testid="goal-kind-badge"
+            className={cn(
+                'inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                'border-border/70 dark:border-border-dark/70 bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark',
+                className,
+            )}
+        >
+            {t(`kinds.${kind}`)}
         </span>
     );
 }

@@ -73,6 +73,40 @@ describe('SkillFilesService', () => {
             expect(files.create).not.toHaveBeenCalled();
         });
 
+        /**
+         * EW-798. `assertOwnedSkill` checks ownership only — deliberately, since
+         * every Skill read works that way — so a personal-scope request may
+         * legitimately add a file to an Organization-scoped Skill. Left to the
+         * ambient stamp, the row would then contradict its own parent and be
+         * indistinguishable from a genuinely personal file.
+         */
+        it('stamps the file from its parent Skill, not from the ambient request scope', async () => {
+            skills.findByIdAndUser.mockResolvedValueOnce({
+                id: 'sk1',
+                userId: 'u1',
+                tenantId: 'tenant-a',
+                organizationId: 'org-1',
+            });
+
+            await svc.add('u1', addInput());
+
+            expect(files.create).toHaveBeenCalledWith(
+                expect.objectContaining({ tenantId: 'tenant-a', organizationId: 'org-1' }),
+            );
+        });
+
+        it('writes an explicit personal stamp for a personal Skill rather than leaving it to the subscriber', async () => {
+            // `undefined` is what makes ScopeStampingSubscriber fill a column,
+            // so a personal parent has to produce nulls, not absent keys.
+            skills.findByIdAndUser.mockResolvedValueOnce({ id: 'sk1', userId: 'u1' });
+
+            await svc.add('u1', addInput());
+
+            const stamped = files.create.mock.calls[0][0];
+            expect(stamped.tenantId).toBeNull();
+            expect(stamped.organizationId).toBeNull();
+        });
+
         it('defaults the kind by extension and honors an explicit kind', async () => {
             await svc.add('u1', addInput());
             expect(files.create).toHaveBeenCalledWith(expect.objectContaining({ kind: 'script' }));

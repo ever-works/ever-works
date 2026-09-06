@@ -81,14 +81,21 @@ export class ScopeContextService {
      * EW-664 (Tenants & Organizations Phase 12) — re-seed the active
      * scope IN PLACE within the current `runWith` frame.
      *
-     * Used by [`SessionScopeGuard`](./session-scope.guard.ts) to fall
-     * back to an authenticated user's default scope (their Tenant +
-     * last-active Org) on legacy un-prefixed routes, where the Phase 7
+     * Used by [`SessionScopeGuard`](./session-scope.guard.ts) to seed the
+     * authenticated user's Tenant — and ONLY their Tenant — on unprefixed
+     * routes, where the Phase 7
      * [`ScopeResolverMiddleware`](./scope-resolver.middleware.ts) ran
      * the request under `EMPTY_SCOPE` because no slug was present. The
      * middleware can't do this itself — it runs BEFORE `AuthSessionGuard`
-     * populates `request.user`, so it has no user to read a default
-     * scope from.
+     * populates `request.user`, so it has no user to read a Tenant from.
+     *
+     * It does NOT seed an Organization. Since 8f28edca0 the guard
+     * deliberately refuses to read the user's mutable last-Organization
+     * preference: that value is a fresh-login navigation default, not
+     * request authorization, and reading it here would let two tabs on
+     * different Orgs act on each other's data. An Organization scope comes
+     * only from an explicit `X-Scope-Slug` header or an `/api/<slug>/…`
+     * path, so an unprefixed request is the PERSONAL contract.
      *
      * Mutates the holder the middleware created via `runWith`, so every
      * later reader in the same async context (the controller, the

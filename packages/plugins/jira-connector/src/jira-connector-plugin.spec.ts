@@ -83,6 +83,16 @@ describe('JiraConnectorPlugin', () => {
 		expect(props.backfillDays.maximum).toBe(90);
 	});
 
+	it('declares the inbound webhookSecret as a user-scoped secret (never required — inbound is opt-in)', () => {
+		const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+		expect(props.webhookSecret.type).toBe('string');
+		expect(props.webhookSecret['x-secret']).toBe(true);
+		expect(props.webhookSecret['x-scope']).toBe('user');
+		expect(props.webhookSecret['x-widget']).toBe('password');
+		expect(plugin.settingsSchema.required).not.toContain('webhookSecret');
+		expect(String(props.webhookSecret.description)).toContain('/api/ingest/jira/events');
+	});
+
 	it('clampBackfillDays clamps to the 0–90 range and treats garbage as off', () => {
 		expect(clampBackfillDays(0)).toBe(0);
 		expect(clampBackfillDays(-5)).toBe(0);

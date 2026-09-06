@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: (ns: string) => (key: string) => `${ns}.${key}`,
@@ -25,8 +25,9 @@ vi.mock('sonner', () => ({
     toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+const startFromPromptMock = vi.fn();
 vi.mock('@/lib/hooks/use-start-from-prompt', () => ({
-    useStartFromPrompt: () => vi.fn(),
+    useStartFromPrompt: () => startFromPromptMock,
 }));
 
 // The entry view (creationMode === null) never renders these, but they are
@@ -37,6 +38,13 @@ vi.mock('@/components/works/WorkAICreator', () => ({
 }));
 vi.mock('@/components/works/WorkImportForm', () => ({
     WorkImportForm: () => null,
+}));
+// The Repository form IS reached from the entry view (the Repository chip
+// routes in-page), so stub it as a probe that exposes the seeded URL.
+vi.mock('@/components/works/RepositoryWorkForm', () => ({
+    RepositoryWorkForm: ({ initialRepositoryUrl }: { initialRepositoryUrl?: string }) => (
+        <div data-testid="repository-work-form" data-url={initialRepositoryUrl ?? ''} />
+    ),
 }));
 vi.mock('./git-provider-selector', () => ({
     GitProviderSelector: () => null,
@@ -152,5 +160,62 @@ describe('NewWorkClient chip seeding', () => {
             expect(soon?.getAttribute('aria-disabled')).toBe('true');
         }
         expect(getTextarea(container).value).toBe('');
+    });
+});
+
+describe('NewWorkClient Repository chip routing', () => {
+    function getSubmit(container: HTMLElement): HTMLButtonElement {
+        const el = container.querySelector('button[data-testid="new-work-prompt-submit"]');
+        if (!el) throw new Error('submit button not found');
+        return el as HTMLButtonElement;
+    }
+
+    function clickChip(container: HTMLElement, value: string) {
+        const chip = container.querySelector(`button[data-testid="new-work-kind-${value}"]`);
+        if (!chip) throw new Error(`chip ${value} not found`);
+        fireEvent.click(chip);
+    }
+
+    it('renders the Repository form in-page, seeded with the text, and opens NO chat turn', async () => {
+        // Self-build slice D (EW-766): on /works/new the Repository chip
+        // switches to the manual form right here instead of navigating —
+        // the composer text (a repo URL) becomes the form's URL seed.
+        startFromPromptMock.mockClear();
+        const { container } = render(<NewWorkClient {...BASE_PROPS} />);
+        clickChip(container, 'repo');
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'https://github.com/ever-works/ever-works' },
+        });
+        fireEvent.click(getSubmit(container));
+
+        await waitFor(() =>
+            expect(container.querySelector('[data-testid="repository-work-form"]')).not.toBeNull(),
+        );
+        expect(
+            container
+                .querySelector('[data-testid="repository-work-form"]')
+                ?.getAttribute('data-url'),
+        ).toBe('https://github.com/ever-works/ever-works');
+        expect(startFromPromptMock).not.toHaveBeenCalled();
+        // The entry-view composer is gone — the form replaced it.
+        expect(container.querySelector('textarea[data-testid="new-work-prompt"]')).toBeNull();
+    });
+
+    it('a `?mode=manual&kind=repo&prompt=…` arrival (from /new or the Works composer) lands on the seeded form directly', () => {
+        const { container } = render(
+            <NewWorkClient
+                {...BASE_PROPS}
+                initialMode="manual"
+                initialKind="repo"
+                initialPrompt="https://github.com/ever-works/directory-web-template"
+            />,
+        );
+
+        const form = container.querySelector('[data-testid="repository-work-form"]');
+        expect(form).not.toBeNull();
+        expect(form?.getAttribute('data-url')).toBe(
+            'https://github.com/ever-works/directory-web-template',
+        );
+        expect(startFromPromptMock).not.toHaveBeenCalled();
     });
 });

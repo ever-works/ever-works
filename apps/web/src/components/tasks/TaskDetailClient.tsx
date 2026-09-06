@@ -28,13 +28,15 @@ import { TaskActivitySection } from './TaskActivitySection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
-import { TaskRunControls } from './TaskRunControls';
+import { TaskRunControls, type TaskRunOpenQuestion } from './TaskRunControls';
 import { TaskRunsHistory } from './TaskRunsHistory';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
 import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 import { TaskDeleteButton } from './TaskDeleteButton';
 import { WorkSelect } from './WorkSelect';
 import { AgentSelect } from './AgentSelect';
+import { TaskExtraReposPicker } from './TaskExtraReposPicker';
+import type { TaskExtraRepo } from '@ever-works/contracts';
 import { MissionSelect } from './MissionSelect';
 import { IdeaSelect } from './IdeaSelect';
 // Skills feature — invocation slugs. Task chat is the surface whose
@@ -110,6 +112,7 @@ export function TaskDetailClient({
     initialChatError = null,
     initialAttachmentsError = null,
     initialGateRun = null,
+    initialOpenQuestion = null,
     initialRuns = [],
     initialSubtasks = [],
     initialSubtasksMeta = { total: 0, doneCount: 0 },
@@ -139,6 +142,14 @@ export function TaskDetailClient({
      * be pure waste.
      */
     initialGateRun?: AgentRunSession | null;
+    /**
+     * Self-build slice Q — the OPEN Inbox question the latest run is parked
+     * on, when a fleet node asked one (`GET /api/inbox?taskId=&status=open`,
+     * newest question). The run row cannot name its question, so the page
+     * looks it up; the run controls then show it and send the human to the
+     * Inbox instead of offering a free-text Resume the answer never reaches.
+     */
+    initialOpenQuestion?: TaskRunOpenQuestion | null;
     /**
      * Run-driven lifecycle (kanban M7) — the Task's run HISTORY, newest
      * first, server-fetched from the same `listSessions({ taskId })`
@@ -239,6 +250,31 @@ export function TaskDetailClient({
                     setConflictKey((prev) => prev + 1);
                 } catch (err) {
                     setDescError(err instanceof Error ? err.message : t('saveDescriptionError'));
+                }
+            })();
+        });
+    };
+    // Multi-repo: repositories the Task spans besides its Work's (slice C, PR C2).
+    const [extraRepos, setExtraRepos] = useState<TaskExtraRepo[]>(task.extraRepos ?? []);
+    const [extraReposError, setExtraReposError] = useState<string | null>(null);
+    const [pendingExtraRepos, startExtraRepos] = useTransition();
+    const handleExtraReposChange = (next: TaskExtraRepo[]) => {
+        const previous = extraRepos;
+        setExtraRepos(next);
+        setExtraReposError(null);
+        startExtraRepos(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, {
+                        extraRepos: next.length > 0 ? next : null,
+                    });
+                    setExtraRepos(updated.extraRepos ?? []);
+                    router.refresh();
+                } catch (err) {
+                    setExtraRepos(previous);
+                    setExtraReposError(
+                        err instanceof Error ? err.message : t('extraReposUpdateError'),
+                    );
                 }
             })();
         });
@@ -496,8 +532,10 @@ export function TaskDetailClient({
 
                     {/* Run steering (Wave 4 M5) + attach action (M8) — steer /
                         interrupt / resume the Task's latest run. Renders
-                        nothing when there is no actionable run. */}
-                    <TaskRunControls run={initialGateRun} />
+                        nothing when there is no actionable run. Slice Q: a
+                        run parked on a fleet question shows the question +
+                        Inbox link instead of the Resume form. */}
+                    <TaskRunControls run={initialGateRun} openQuestion={initialOpenQuestion} />
 
                     {/* Quality gates (Wave 3 M6) — Checks section */}
                     <TaskChecksSection task={task} initialGateRun={initialGateRun} />
@@ -720,6 +758,24 @@ export function TaskDetailClient({
                                     testId="task-detail-agent"
                                 />
                             </AssignmentRow>
+                            <DetailRow label={t('extraRepos')}>
+                                <div className="space-y-1">
+                                    <TaskExtraReposPicker
+                                        value={extraRepos}
+                                        onChange={handleExtraReposChange}
+                                        disabled={pendingExtraRepos}
+                                        testId="task-detail-extra-repos"
+                                    />
+                                    {extraReposError && (
+                                        <p
+                                            className="text-xs text-danger"
+                                            data-testid="task-detail-extra-repos-error"
+                                        >
+                                            {extraReposError}
+                                        </p>
+                                    )}
+                                </div>
+                            </DetailRow>
                             <DetailRow label={t('created')}>
                                 <span className="text-xs text-text-secondary">
                                     {formatDate(task.createdAt)}

@@ -1045,7 +1045,7 @@ export class GitFacadeService implements IGitFacade {
             cloneOptions.repo,
             cloneOptions.branch ?? '',
             cloneOptions.autoSwitchToMainBranch === false ? 'no-switch' : 'switch',
-        ].join(' ');
+        ].join('\0');
 
         const inFlight = this.cloneOrPullRequests.get(key);
         if (inFlight) {

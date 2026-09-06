@@ -144,9 +144,10 @@ export class CreateWorkDto {
 
     @ApiPropertyOptional({
         description:
-            'Work kind the user picked at creation (website, landing-page, blog, directory, awesome-repo). ' +
+            'Work kind the user picked at creation (website, landing-page, blog, directory, awesome-repo, repo). ' +
             'Drives the kind-aware default website template. Unknown values are coerced to "default"; ' +
-            'omitted keeps the column default.',
+            'omitted keeps the column default. `repo` registers an existing code repository (see `repositoryUrl`) ' +
+            'and never provisions a website template, a provider repository or a deployment.',
         enum: [...USER_SELECTABLE_WORK_KINDS, 'default'],
     })
     @IsOptional()
@@ -157,6 +158,20 @@ export class CreateWorkDto {
     @IsIn([...USER_SELECTABLE_WORK_KINDS, 'default'])
     @Transform(({ value }) => normalizeCreateWorkKind(value))
     kind?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Repository Work only (`kind: "repo"`) — the existing code repository this Work wraps, e.g. ' +
+            '`https://github.com/ever-works/ever-works`. Becomes the data repository of the Work verbatim, so ' +
+            'Tasks, Goals and fleet runs attach to it. Required when `kind` is `repo`; ignored otherwise.',
+        example: 'https://github.com/ever-works/ever-works',
+        maxLength: 400,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(400)
+    @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+    repositoryUrl?: string;
 
     @ApiPropertyOptional({
         description: 'Custom README configuration',

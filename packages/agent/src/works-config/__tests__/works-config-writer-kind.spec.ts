@@ -48,7 +48,7 @@ describe('WorksConfigWriterService — kind', () => {
         expect(yaml.parse(raw).kind).toBe('blog');
     });
 
-    it.each(['website', 'landing-page', 'directory', 'awesome-repo', 'company'])(
+    it.each(['website', 'landing-page', 'directory', 'awesome-repo', 'repo', 'company'])(
         'writes the %s kind',
         async (kind) => {
             const repoDir = await tmpRepo();

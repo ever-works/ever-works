@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
 
 /**
  * Teams & Prebuilt Companies (spec §6.2) — web BFF proxy for
@@ -10,13 +9,13 @@ import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
  * Forwards `{ templateSlug, name? }` verbatim with the user's bearer
  * token. Upstream statuses pass through (404 unknown slug, 503 catalog
  * unavailable, 409 slug conflict) so the modal renders the right copy.
+ *
+ * Auth and workspace scope come from {@link bffProxy}: no auth cookie is
+ * `401 Unauthorized`, a missing or malformed per-tab selector is
+ * `400 Invalid workspace scope`, and the handler is handed headers that
+ * already carry the bearer and the Organization scope.
  */
-export async function POST(request: NextRequest) {
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export const POST = bffProxy(async ({ request, headers }) => {
     let body: unknown;
     try {
         body = await request.json();
@@ -24,15 +23,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
+    headers.set('Content-Type', 'application/json');
 
     try {
         // Generous deadline: an import materializes up to ~100 files + rows.
@@ -49,4 +40,4 @@ export async function POST(request: NextRequest) {
         console.error('Failed to proxy /api/organizations/import-company:', error);
         return NextResponse.json({ error: 'Failed to import company template' }, { status: 500 });
     }
-}
+});

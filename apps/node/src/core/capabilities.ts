@@ -1,6 +1,8 @@
 import { FLEET_BROWSER_CAPABILITY, FLEET_GPU_CAPABILITY } from '@ever-works/contracts';
 import type { BrowserProbeIo } from './browser-probe';
+import type { ModelCliPaths } from './executors/model-cli';
 import { detectGpu } from './gpu-probe';
+import type { WorkerHealth } from './worker-health';
 import {
 	MAX_CAPABILITY_TAG_LENGTH,
 	MAX_CAPABILITY_TAGS,
@@ -43,6 +45,16 @@ export interface CapabilityEnvironment {
 	 * the executor can never disagree about what is installed.
 	 */
 	browserPath?: string | null;
+	/**
+	 * Absolute paths of the model CLIs this machine can drive for an
+	 * `agent-task` (agent execution v2), resolved once at startup by
+	 * `resolveModelCliPaths`. A resolved path is what turns the
+	 * `claude-code` / `codex` tag on — the SAME path the model step
+	 * spawns, so the tag and the executor can never disagree.
+	 */
+	modelCli?: ModelCliPaths;
+	/** Startup log lines explaining each model-CLI decision. */
+	modelCliNotes?: string[];
 }
 
 /**
@@ -177,6 +189,9 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 	]);
 	const major = nodeMajor(environment.nodeVersion);
 	const hasBrowser = typeof environment.browserPath === 'string' && environment.browserPath.length > 0;
+	const hasClaude =
+		typeof environment.modelCli?.['claude-code'] === 'string' && environment.modelCli['claude-code'].length > 0;
+	const hasCodex = typeof environment.modelCli?.codex === 'string' && environment.modelCli.codex.length > 0;
 
 	return normalizeCapabilities([
 		`os:${environment.platform}`,
@@ -187,6 +202,10 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		git ? 'git' : null,
 		environment.hasDisplay ? 'display' : null,
 		hasBrowser ? FLEET_BROWSER_CAPABILITY : null,
+		// Agent execution v2 — a model CLI the node can actually spawn.
+		// Same rule as `browser`: the tag is backed by a resolved path.
+		hasClaude ? 'claude-code' : null,
+		hasCodex ? 'codex' : null,
 		gpu ? FLEET_GPU_CAPABILITY : null,
 		// Vendor is a second, narrower tag rather than a replacement:
 		// a job that needs "any accelerator" must not have to enumerate
@@ -268,6 +287,23 @@ export interface SelfDescriptionTelemetry {
 	cliVersion?: () => Promise<string | null> | string | null;
 	/** Free-disk probe for the node's workspace volume. */
 	diskFreeBytes?: () => Promise<number | null> | number | null;
+	/**
+	 * Which account / seat the agent CLI is logged in as (fleet cost
+	 * accounting, EW-777), e.g. `detectModelIdentity(runner, paths)`. A
+	 * display label, never a credential.
+	 */
+	modelIdentity?: () => Promise<string | null> | string | null;
+	/**
+	 * What the worker loop is doing (fleet health signals, EW-776), via
+	 * `describeWorkerHealth(worker.getState())`.
+	 *
+	 * A probe like the others — absent on a visibility-only node that has
+	 * no worker at all, and a null return is an ABSENT field rather than a
+	 * reported "unknown". That matters: the server treats an absent field
+	 * as "leave the stored value alone", so a probe that momentarily fails
+	 * does not wipe the quarantine an operator is currently reading.
+	 */
+	workerHealth?: () => Promise<WorkerHealth | null> | WorkerHealth | null;
 }
 
 /**
@@ -304,6 +340,21 @@ export async function describeSelf(
 	const diskFreeBytes = await resolveTelemetry(telemetry.diskFreeBytes);
 	if (typeof diskFreeBytes === 'number' && Number.isFinite(diskFreeBytes) && diskFreeBytes >= 0) {
 		description.diskFreeBytes = diskFreeBytes;
+	}
+	const modelIdentity = await resolveTelemetry(telemetry.modelIdentity);
+	if (typeof modelIdentity === 'string' && modelIdentity) {
+		description.modelIdentity = modelIdentity;
+	}
+	// Fleet health signals (EW-776). Both halves land together or neither
+	// does: a reason without a state has nothing to caption, and a state
+	// the probe could not produce must stay ABSENT so the server keeps the
+	// last one it was told.
+	const workerHealth = await resolveTelemetry(telemetry.workerHealth);
+	if (workerHealth && typeof workerHealth.workerState === 'string') {
+		description.workerState = workerHealth.workerState;
+		if (workerHealth.workerStateReason) {
+			description.workerStateReason = workerHealth.workerStateReason;
+		}
 	}
 	return description;
 }

@@ -14,6 +14,7 @@ import {
     Boxes,
     Cpu,
     Plug,
+    Package,
     Building2,
     CreditCard,
     BarChart3,
@@ -142,6 +143,15 @@ export function SettingsLayoutClient({
                     label: t('tabs.connections'),
                     icon: Plug,
                     href: `${baseSettingsPath}/connections`,
+                },
+                // Agent Plugins sits directly after Connections: a connection
+                // is one MCP server added by hand, a package can bring several
+                // plus the skills that use them.
+                {
+                    id: 'agent-plugins',
+                    label: t('tabs.agentPlugins'),
+                    icon: Package,
+                    href: `${baseSettingsPath}/agent-plugins`,
                 },
                 // Digest briefings — the personal cadence AND the org-scoped
                 // one live on one page, since they are two records of the

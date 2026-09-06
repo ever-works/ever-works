@@ -7,6 +7,10 @@ export * from './kb-mirror-document.task';
 export * from './kb-org-overlay-fanout.task';
 export * from './kb-reconcile.task';
 export * from './agent-run-sweeper.task';
+// Judgment layer G5 — backstop for `workflow_runs` rows abandoned by a
+// worker that died without reaching a terminal write. Paired with the
+// `onFailure` hook on `workflow-run.task.ts`, which is the primary path.
+export * from './workflow-run-sweeper.task';
 export * from './terminal-session.task';
 // Streaming-terminal M9 / D1 — nightly plan-tier retention sweep over
 // persisted terminal transcripts.

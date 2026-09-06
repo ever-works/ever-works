@@ -71,6 +71,11 @@ async function loginOauth(
             await setAuthCookies(authResponse.access_token);
         }
     } catch (error) {
+        // Surface the cause. This catch used to swallow it, and a failure thrown
+        // before the API was even called (`Invalid workspace scope`) left every
+        // social login at `/auth/error?error=oauth_callback` with no log line on
+        // either tier.
+        console.error(`OAuth login callback failed for ${provider}:`, error);
         const errorCode = getOAuthRouteErrorCode(error, 'oauth_callback');
         href = ROUTES.AUTH_ERROR + `?error=${errorCode}`;
     }

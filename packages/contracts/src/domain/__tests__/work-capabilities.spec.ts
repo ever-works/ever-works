@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { getWorkCapabilities, WORK_KIND_CAPABILITIES, workKindHasItems } from '../work-capabilities.js';
-import { normalizeWorkKind, WORK_KINDS, USER_SELECTABLE_WORK_KINDS } from '../work-kind.js';
+import {
+	isRepositoryWorkKind,
+	isUserSelectableWorkKind,
+	normalizeWorkKind,
+	WORK_KINDS,
+	USER_SELECTABLE_WORK_KINDS
+} from '../work-kind.js';
 import { WORK_METRIC_DEFINITIONS } from '../work-metrics.js';
 
 describe('normalizeWorkKind', () => {
@@ -97,9 +103,26 @@ describe('WORK_KIND_CAPABILITIES', () => {
 		}
 	});
 
-	it('every user-selectable kind is deployable', () => {
+	it('every user-selectable kind that provisions a website repository is deployable', () => {
 		for (const kind of USER_SELECTABLE_WORK_KINDS) {
-			expect(WORK_KIND_CAPABILITIES[kind].deploy).toBe(true);
+			const caps = WORK_KIND_CAPABILITIES[kind];
+			if (caps.repos.website) {
+				expect(caps.deploy, `kind "${kind}" has a website repo but no deploy`).toBe(true);
+			}
+		}
+	});
+
+	it('keeps "repo" the only user-selectable kind without a website repository', () => {
+		const withoutWebsite = USER_SELECTABLE_WORK_KINDS.filter((kind) => !WORK_KIND_CAPABILITIES[kind].repos.website);
+		expect(withoutWebsite).toEqual(['repo']);
+	});
+
+	it('never deploys a kind that has no website repository to deploy', () => {
+		for (const kind of WORK_KINDS) {
+			const caps = WORK_KIND_CAPABILITIES[kind];
+			if (!caps.repos.website) {
+				expect(caps.deploy, `kind "${kind}" deploys without a website repo`).toBe(false);
+			}
 		}
 	});
 });
@@ -130,6 +153,7 @@ describe('workKindHasItems', () => {
 		expect(workKindHasItems('landing-page')).toBe(false);
 		expect(workKindHasItems('company')).toBe(false);
 		expect(workKindHasItems('campaign')).toBe(false);
+		expect(workKindHasItems('repo')).toBe(false);
 	});
 
 	it('defaults to true for an unknown kind, so nothing is hidden by accident', () => {
@@ -165,5 +189,63 @@ describe('the campaign work kind', () => {
 
 	it('maps to metrics that describe campaign effort and outcome', () => {
 		expect(WORK_KIND_CAPABILITIES.campaign.metrics).toEqual(['agents', 'open-tasks', 'conversions', 'days-active']);
+	});
+});
+
+/**
+ * The Repository kind (self-build slice D, EW-766) — an existing code
+ * repository registered as a first-class Work so Tasks, Goals and fleet
+ * runs can attach to it. The data repository IS the code repository.
+ */
+describe('the repo work kind', () => {
+	it('is a known, user-selectable kind that no longer degrades to "default"', () => {
+		expect(normalizeWorkKind('repo')).toBe('repo');
+		expect(normalizeWorkKind('  REPO ')).toBe('repo');
+		expect(isUserSelectableWorkKind('repo')).toBe(true);
+		expect(isUserSelectableWorkKind(' Repo ')).toBe(true);
+		expect(USER_SELECTABLE_WORK_KINDS as readonly string[]).toContain('repo');
+		expect(WORK_KINDS as readonly string[]).toContain('repo');
+	});
+
+	it('does not collide with the awesome-repo kind', () => {
+		expect(normalizeWorkKind('awesome-repo')).toBe('awesome-repo');
+		expect(WORK_KIND_CAPABILITIES.repo).not.toEqual(WORK_KIND_CAPABILITIES['awesome-repo']);
+	});
+
+	it('has no items, taxonomy, deploy or generated repositories — only the data (code) repo and the KB', () => {
+		const caps = WORK_KIND_CAPABILITIES.repo;
+		expect(caps.items.enabled).toBe(false);
+		expect(caps.taxonomy).toBe(false);
+		expect(caps.comparisons).toBe(false);
+		expect(caps.communityPr).toBe(false);
+		expect(caps.itemImportExport).toBe(false);
+		expect(caps.sourceValidation).toBe(false);
+		expect(caps.deploy).toBe(false);
+		expect(caps.kb).toBe(true);
+		expect(caps.repos).toEqual({ data: true, work: false, website: false });
+	});
+
+	it('maps to metrics that describe the work happening on the repository', () => {
+		expect(WORK_KIND_CAPABILITIES.repo.metrics).toEqual(['agents', 'open-tasks', 'days-active']);
+	});
+
+	it('resolves through getWorkCapabilities like every other kind', () => {
+		expect(getWorkCapabilities('repo')).toBe(WORK_KIND_CAPABILITIES.repo);
+		expect(getWorkCapabilities('REPO')).toBe(WORK_KIND_CAPABILITIES.repo);
+	});
+
+	it('isRepositoryWorkKind recognises only the repo kind, with the same loose input as normalizeWorkKind', () => {
+		expect(isRepositoryWorkKind('repo')).toBe(true);
+		expect(isRepositoryWorkKind('  REPO ')).toBe(true);
+		// The kind that merely contains the word must not match — its data
+		// repository is platform-generated and the pipelines are welcome there.
+		expect(isRepositoryWorkKind('awesome-repo')).toBe(false);
+		for (const kind of WORK_KINDS.filter((k) => k !== 'repo')) {
+			expect(isRepositoryWorkKind(kind), `kind "${kind}"`).toBe(false);
+		}
+		expect(isRepositoryWorkKind(undefined)).toBe(false);
+		expect(isRepositoryWorkKind(null)).toBe(false);
+		expect(isRepositoryWorkKind('')).toBe(false);
+		expect(isRepositoryWorkKind('repository')).toBe(false);
 	});
 });

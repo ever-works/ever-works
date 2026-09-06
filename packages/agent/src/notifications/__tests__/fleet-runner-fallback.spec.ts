@@ -121,6 +121,98 @@ describe('NotificationService.notifyFleetRunnerFallback', () => {
         expect(new Set(keys).size).toBe(2);
     });
 
+    describe('eligibility-aware reasons (self-build slice S)', () => {
+        const NODE = '22222222-2222-4222-8222-222222222222';
+
+        it.each([
+            ['pinned-runner-offline', 'the runner this Agent is pinned to is offline'],
+            ['no-eligible-runners', 'none of your 6 enrolled runner(s) can take this job'],
+        ])('explains the %s reason in plain language', async (reason, expected) => {
+            await build().notifyFleetRunnerFallback({
+                userId: 'user-1',
+                taskId: 'task-1',
+                reason,
+                runnerCount: reason === 'pinned-runner-offline' ? 1 : 0,
+                fleetRunnerCount: 6,
+                pinnedNodeId: reason === 'pinned-runner-offline' ? NODE : null,
+            });
+
+            expect(repository.create.mock.calls[0][0].message).toContain(expected);
+        });
+
+        it('stores the PRECISE eligible count next to the whole fleet and the pinned node', async () => {
+            // The follow-up this closes: `runnerCount` used to be the
+            // fleet-wide total, so an Agent pinned to one of six machines
+            // read "6" for a decision that was about exactly one of them.
+            await build().notifyFleetRunnerFallback({
+                userId: 'user-1',
+                taskId: 'task-1',
+                reason: 'pinned-runner-offline',
+                runnerCount: 1,
+                fleetRunnerCount: 6,
+                pinnedNodeId: NODE,
+            });
+
+            expect(repository.create.mock.calls[0][0].metadata).toMatchObject({
+                reason: 'pinned-runner-offline',
+                runnerCount: 1,
+                fleetRunnerCount: 6,
+                pinnedNodeId: NODE,
+            });
+        });
+
+        it('reports the fleet count as the runner count when no subset was involved', async () => {
+            await build().notifyFleetRunnerFallback({
+                userId: 'user-1',
+                taskId: 'task-1',
+                reason: 'runners-busy',
+                runnerCount: 4,
+            });
+
+            expect(repository.create.mock.calls[0][0].metadata).toMatchObject({
+                runnerCount: 4,
+                fleetRunnerCount: 4,
+                pinnedNodeId: null,
+            });
+        });
+
+        it('sanitizes the pinned node id like every other interpolated value', async () => {
+            await build().notifyFleetRunnerFallback({
+                userId: 'user-1',
+                taskId: 'task-1',
+                reason: 'pinned-runner-offline',
+                runnerCount: 1,
+                pinnedNodeId: '<b>node</b>',
+            });
+
+            const stored = repository.create.mock.calls[0][0].metadata.pinnedNodeId as string;
+            expect(stored).not.toContain('<');
+            expect(stored).not.toContain('>');
+        });
+
+        it('keeps the per-(task, reason) dedup so the new reasons are news too', async () => {
+            const service = build();
+            await service.notifyFleetRunnerFallback({
+                userId: 'user-1',
+                taskId: 'task-1',
+                reason: 'runners-busy',
+                runnerCount: 1,
+            });
+            await service.notifyFleetRunnerFallback({
+                userId: 'user-1',
+                taskId: 'task-1',
+                reason: 'pinned-runner-offline',
+                runnerCount: 1,
+            });
+
+            const keys = repository.create.mock.calls.map((call) => call[0].deduplicationKey);
+            expect(keys).toEqual([
+                'fleet_runner_fallback_task-1_runners-busy',
+                'fleet_runner_fallback_task-1_pinned-runner-offline',
+            ]);
+        });
+    });
+
     it('sanitizes the reason token before it reaches the message or the key', async () => {
         // The reason is platform-written today, but it is INTERPOLATED
         // into rendered text, so it goes through the same label sanitizer

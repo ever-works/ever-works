@@ -64,6 +64,19 @@ describe('FleetController runner status + execution preferences', () => {
             { loadByNodeForUser: jest.fn(async () => ({})) } as never,
             runners as never,
             preferences as never,
+            // Fleet cost accounting (EW-777) — the ceiling routes have
+            // their own cases in `fleet.controller.spec.ts`; stubbed here
+            // so this suite keeps asserting only what it was written for.
+            {
+                describeForUser: jest.fn(async () => null),
+                setFleetCeilingForUser: jest.fn(async () => null),
+            } as never,
+            { drainNodeForUser: jest.fn(async () => null) } as never,
+            // EW-799 — the audit reader behind GET /nodes/:id/audit. Stubbed
+            // here for the same reason as the ceiling service above: this
+            // suite exists to assert owner scoping on the runner routes, and
+            // the audit route has its own cases in `fleet.controller.spec.ts`.
+            { recentForOwnerNode: jest.fn(async () => []) } as never,
         );
     });
 

@@ -289,6 +289,7 @@ describe('AgentsSkillsTasksExportService.exportTail', () => {
                     isolationMode: 'on',
                     acceptanceChecks: checks,
                     maxGateAttempts: 4,
+                    extraRepos: [{ repoConnectionId: 'conn-1', mountDir: 'docs', writable: true }],
                     branchRef: 'task/t-1-9f3c1a2b',
                     branchState: 'pr-open',
                     baseSha: 'a'.repeat(40),
@@ -311,6 +312,13 @@ describe('AgentsSkillsTasksExportService.exportTail', () => {
         expect(task.isolationMode).toBe('on');
         expect(task.acceptanceChecks).toEqual(checks);
         expect(task.maxGateAttempts).toBe(4);
+        // "Also work in" repositories are user-authored configuration, so
+        // they round-trip like the settings above rather than being silently
+        // reset. Whether an entry may be RESTORED is decided on import, where
+        // the receiving account's ownership of the connection is known.
+        expect(task.extraRepos).toEqual([
+            { repoConnectionId: 'conn-1', mountDir: 'docs', writable: true },
+        ]);
 
         const serialized = JSON.stringify(task);
         for (const excluded of [

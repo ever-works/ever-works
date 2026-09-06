@@ -22,6 +22,13 @@ import { MAX_CREDENTIAL_LENGTH, MIN_CREDENTIAL_LENGTH } from './types';
  * echoes a server body into an error message, so nothing about which
  * check failed can leak into a node's logs.
  *
+ * The one differentiated answer is `409` (suspend-safe leases): the
+ * `leaseGeneration` the node echoes on heartbeat/complete is no longer
+ * the job's current one, so the claim it holds is void. It is mapped to
+ * `FleetClientError('stale-lease')` from the STATUS alone — the body is
+ * never read — and it is thrown rather than collapsed to null, because
+ * the worker needs the reason to abort the run without reporting.
+ *
  * Wire shapes come from `@ever-works/contracts`, not a local mirror:
  * this is the one part of the node↔platform contract that carries
  * executable work, and a silent drift here would mean a node running
@@ -111,10 +118,18 @@ export class FleetJobClient {
 	 * revoked credential). A lost lease is a protocol outcome rather than a
 	 * transport exception; the worker aborts the shared task signal before the
 	 * platform can offer that job elsewhere.
+	 *
+	 * `leaseGeneration` is the claim identity the lease came with. Sent
+	 * only when the lease carried one (an older API neither issues nor
+	 * accepts the field), and a `409` answer — the platform re-issued the
+	 * claim while this run kept going — THROWS `stale-lease` rather than
+	 * returning null, so the worker can tell "abort, and do not report"
+	 * from "abort, and report".
 	 */
-	async heartbeat(jobId: string, leaseTtlSec?: number): Promise<FleetJobView | null> {
+	async heartbeat(jobId: string, leaseTtlSec?: number, leaseGeneration?: number): Promise<FleetJobView | null> {
 		const body: Record<string, unknown> = { nodeId: this.nodeId, secret: this.secret };
 		if (leaseTtlSec !== undefined) body.leaseTtlSec = leaseTtlSec;
+		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
 		try {
 			const payload = (await this.post(
 				`api/fleet/jobs/${encodeURIComponent(jobId)}/heartbeat`,
@@ -133,10 +148,15 @@ export class FleetJobClient {
 		}
 	}
 
-	/** Report the terminal outcome of a job. */
+	/**
+	 * Report the terminal outcome of a job. `leaseGeneration` as for
+	 * {@link heartbeat}; a `409` throws `stale-lease` — the platform wrote
+	 * nothing, and the worker must not retry with a failure report either.
+	 */
 	async complete(
 		jobId: string,
-		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null }
+		outcome: { success: boolean; result?: Record<string, unknown> | null; error?: string | null },
+		leaseGeneration?: number
 	): Promise<boolean> {
 		const body: Record<string, unknown> = {
 			nodeId: this.nodeId,
@@ -145,6 +165,7 @@ export class FleetJobClient {
 		};
 		if (outcome.success && outcome.result) body.result = outcome.result;
 		if (!outcome.success && outcome.error) body.error = outcome.error;
+		if (leaseGeneration !== undefined) body.leaseGeneration = leaseGeneration;
 
 		const payload = (await this.post(
 			`api/fleet/jobs/${encodeURIComponent(jobId)}/complete`,
@@ -228,6 +249,16 @@ export function errorForJobStatus(status: number, operation: string): FleetClien
 	}
 	if (status === 429) {
 		return new FleetClientError('rate-limited', 'Rate limited by the API — backing off', status);
+	}
+	if (status === 409) {
+		// Keyed on the status, never on the body: the reason token in the
+		// 409 is stable by contract (`FLEET_JOB_STALE_LEASE_REASON`) but the
+		// posture of this client is to surface nothing the server wrote.
+		return new FleetClientError(
+			'stale-lease',
+			'The platform holds a newer lease on this job (stale-lease); the claim this node is renewing or finalizing is void',
+			status
+		);
 	}
 	if (status >= 400 && status < 500) {
 		return new FleetClientError('invalid-request', `Request rejected by the API (HTTP ${status})`, status);

@@ -6,6 +6,8 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Logger,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -22,18 +24,31 @@ import type {
     FleetEnrollmentTokenView,
 } from '@ever-works/agent/fleet';
 import {
+    FleetAuditService,
+    FleetCostCeilingService,
     FleetExecutionPreferenceService,
     FleetJobService,
     FleetService,
 } from '@ever-works/agent/fleet';
 import type {
+    FleetAuditView,
+    FleetCostCeilingView,
     FleetEnrollResponse,
     FleetExecutionPreferenceView,
     FleetHeartbeatResponse,
+    FleetNodeRotateCredentialResponse,
     FleetNodeView,
     FleetRunnerStatusView,
 } from '@ever-works/contracts';
+import { AgentRunRepository } from '@ever-works/agent/database';
+import { FLEET_AUDIT_DEFAULT_LIMIT } from '@ever-works/contracts';
+import { FleetPanicService } from './fleet-panic.service';
 import { FleetRunnerStatusService } from './fleet-runner-status.service';
+import {
+    buildNodeJobHistory,
+    isFailedNodeHistoryEntry,
+    nodeHistoryRunIds,
+} from './fleet-node-history';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -46,9 +61,12 @@ import {
     FleetHeartbeatDto,
     FleetNodePauseDto,
     FleetUnenrollDto,
+    RotateFleetNodeCredentialDto,
+    SetFleetCostCeilingDto,
     SetFleetExecutionPreferenceDto,
     UpdateFleetNodeDto,
 } from './dto/fleet.dto';
+import { FleetAuditQueryDto } from './dto/fleet-kill-switch.dto';
 import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
 
 /** How much of a node's job history the detail drawer reads. */
@@ -68,6 +86,7 @@ const NODE_HISTORY_LIMIT = 25;
  *                                             edit capability tags
  *   POST   /api/fleet/nodes/:id/rotate        re-key: new one-time token,
  *                                             old secret dies immediately
+ *   GET    /api/fleet/nodes/:id/audit         this node's lifecycle trail
  *   POST   /api/fleet/nodes/:id/drain         drain: disable AND requeue
  *                                             the node's in-flight claims
  *   PATCH  /api/fleet/nodes/:id               rename / pause / disable
@@ -79,6 +98,22 @@ const NODE_HISTORY_LIMIT = 25;
  *   GET    /api/fleet/execution-preferences   local-vs-cloud routing rows
  *   PUT    /api/fleet/execution-preference    set one scope's routing
  *   DELETE /api/fleet/execution-preference    clear one scope's routing
+ *   GET    /api/fleet/cost-ceiling            fleet-wide daily model-spend
+ *                                             ceiling + today's spend
+ *   PUT    /api/fleet/cost-ceiling            set / clear that ceiling
+ *
+ * Panic controls (EW-778), on their own controllers:
+ *   POST   /api/fleet/drain-all               drain EVERY node I own
+ *   POST   /api/fleet/cancel-in-flight        cancel my running fleet work
+ *                                             (explicit second step)
+ *   POST   /api/fleet/rotate-all              QUEUE a credential rotation
+ *                                             on every node I own; each
+ *                                             machine re-keys itself on
+ *                                             its next beat
+ *   GET    /api/fleet/kill-switch             is the global stop flag set?
+ *   POST   /api/fleet/kill-switch/stop        platform admin: set it
+ *   POST   /api/fleet/kill-switch/clear       platform admin: clear it
+ *   GET    /api/fleet/kill-switch/audit       platform admin: audit trail
  *
  * Public, self-authenticating (called by the node apps — throttled,
  * fail-closed: any invalid credential path is one undifferentiated
@@ -98,17 +133,60 @@ const NODE_HISTORY_LIMIT = 25;
  * registry and the node work channel go dark together.
  *   POST   /api/fleet/pause                   node drains/resumes itself
  *   POST   /api/fleet/unenroll                node retires itself
+ *   POST   /api/fleet/rotate-credential       node re-keys itself; both
+ *                                             credentials work for a
+ *                                             bounded overlap
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
 @UseGuards(FleetEnabledGuard)
 export class FleetController {
+    private readonly logger = new Logger(FleetController.name);
+
     constructor(
         private readonly service: FleetService,
         private readonly jobs: FleetJobService,
         private readonly runners: FleetRunnerStatusService,
         private readonly preferences: FleetExecutionPreferenceService,
+        private readonly costCeiling: FleetCostCeilingService,
+        // EW-778 — owns the per-node drain so that drain-all reuses it.
+        private readonly panic: FleetPanicService,
+        // EW-776 — the reconciled run outcome behind each history row.
+        // Appended LAST and @Optional() so every positional construction
+        // (the controller spec's included) keeps working, and so a missing
+        // binding degrades to `reconciled: null` instead of a 500 on the
+        // node drawer.
+        @Optional() private readonly runs?: AgentRunRepository,
+        // EW-799 — the one `fleet_audit` reader. @Optional() for the same
+        // reason as `runs` above: every positional construction in the
+        // specs keeps working, and a missing binding degrades to an empty
+        // audit list rather than a 500 on the drawer.
+        @Optional() private readonly audit?: FleetAuditService,
     ) {}
+
+    @Get('cost-ceiling')
+    @ApiOperation({
+        summary:
+            "This account's FLEET-WIDE daily (UTC) model-spend ceiling — the owner's value, the deployment default it falls back to, the day it last drained the fleet, and today's spend across every node. Sums only what the owner's own machines reported, never cloud spend.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async getCostCeiling(@CurrentUser() auth: AuthenticatedUser): Promise<FleetCostCeilingView> {
+        return this.costCeiling.describeForUser(auth.userId);
+    }
+
+    @Put('cost-ceiling')
+    @ApiOperation({
+        summary:
+            'Set (or clear, with null) the fleet-wide daily model-spend ceiling. Crossing it drains every node of the account until they are re-enabled — a stop, not a rate limit.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async setCostCeiling(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: SetFleetCostCeilingDto,
+    ): Promise<FleetCostCeilingView> {
+        return this.costCeiling.setFleetCeilingForUser(auth.userId, body.dailyCeilingCents);
+    }
 
     @Get('runner-status')
     @ApiOperation({
@@ -222,12 +300,53 @@ export class FleetController {
             historyUnavailable = true;
         }
 
+        // The RECONCILED outcome (EW-776): a fleet job and the Agent run it
+        // carried settle separately, so a job the node called `done` can
+        // sit in front of a run that failed. One bulk read, owner-scoped in
+        // the query, and strictly best-effort — a run-table hiccup leaves
+        // `reconciled: null` ("not known") rather than taking the drawer
+        // down or, worse, inventing an outcome.
+        const runs = await this.readReconciledRuns(auth.userId, recentJobs);
+        // `buildNodeJobHistory` also strips `payload` from every row. A
+        // node's job payload is executor input composed from user content;
+        // a settings endpoint has no reason to ship it.
+        const history = buildNodeJobHistory(recentJobs, runs);
+
         return {
             node,
-            recentJobs,
-            failures: recentJobs.filter((job) => job.status === 'failed'),
+            recentJobs: history,
+            // Reconciled-aware, so the subset agrees with the badge each
+            // row renders: a job the node called `done` whose run failed
+            // belongs here, and one it called `failed` whose run the
+            // reconciler settled `completed` does not.
+            failures: history.filter(isFailedNodeHistoryEntry),
             historyUnavailable,
         };
+    }
+
+    /** Runs behind a page of node history, by id. Never throws. */
+    private async readReconciledRuns(
+        userId: string,
+        jobs: Awaited<ReturnType<FleetJobService['historyForNode']>>,
+    ): Promise<
+        Map<
+            string,
+            { id: string; status: string; summary?: string | null; errorMessage?: string | null }
+        >
+    > {
+        const runIds = nodeHistoryRunIds(jobs);
+        if (!this.runs || runIds.length === 0) return new Map();
+        try {
+            const rows = await this.runs.findByIds(runIds, userId);
+            return new Map(rows.map((run) => [run.id, run]));
+        } catch (error) {
+            this.logger.debug(
+                `Node history degraded to job outcomes only: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return new Map();
+        }
     }
 
     @Get('enrollment-tokens')
@@ -270,6 +389,32 @@ export class FleetController {
         return this.service.rotateCredentialForUser(auth.userId, id);
     }
 
+    @Get('nodes/:id/audit')
+    @ApiOperation({
+        summary:
+            'This node’s lifecycle audit trail (newest first): every enroll, rotation, rename, capability edit, pause, disable, drain and delete, with the actor, the time and a before/after. Never contains a credential. Owner-scoped: another account’s node id answers 404, exactly like an unknown one.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async nodeAudit(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query() query: FleetAuditQueryDto,
+    ): Promise<FleetAuditView[]> {
+        // Ownership is settled FIRST and by the registry — a foreign id
+        // throws 404 here and nothing else runs, so the trail can never be
+        // read for a node the caller does not own. The audit read is then
+        // owner-scoped a SECOND time in `recentForOwnerNode`: the
+        // platform-wide `recent()` stays admin-only on the kill-switch
+        // controller, because one method whose scoping depends on which
+        // arguments happen to be passed is how a leak gets shipped.
+        await this.service.getForUser(auth.userId, id);
+        return this.audit.recentForOwnerNode(
+            auth.userId,
+            id,
+            query.limit ?? FLEET_AUDIT_DEFAULT_LIMIT,
+        );
+    }
+
     @Post('nodes/:id/drain')
     @ApiOperation({
         summary:
@@ -282,12 +427,10 @@ export class FleetController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: DrainFleetNodeDto,
     ): Promise<FleetNodeDrainResult> {
-        // Order matters: disable FIRST. The node stops being able to
-        // lease the instant its status flips, so a claim requeued after
-        // that cannot be re-claimed by the machine being drained.
-        const node = await this.service.setDisabledForUser(auth.userId, id, body.drain);
-        const releasedJobs = body.drain ? await this.jobs.releaseClaimsForNode(auth.userId, id) : 0;
-        return { node, releasedJobs };
+        // The drain itself (disable FIRST, then requeue — the order is
+        // load-bearing) lives in FleetPanicService so that drain-all
+        // (EW-778) performs exactly this, once per node.
+        return this.panic.drainNodeForUser(auth.userId, id, body.drain);
     }
 
     @Post('nodes/enrollment-token')
@@ -317,19 +460,31 @@ export class FleetController {
         @Body() body: UpdateFleetNodeDto,
     ): Promise<FleetNodeView> {
         // Reject only when NOTHING actionable arrived. Each field is an
-        // independent edit, so the guard has to name all four — dropping
+        // independent edit, so the guard has to name all five — dropping
         // one here would 400 a perfectly valid single-field PATCH.
         if (
             typeof body.name !== 'string' &&
             typeof body.disabled !== 'boolean' &&
             typeof body.paused !== 'boolean' &&
-            !Array.isArray(body.capabilities)
+            !Array.isArray(body.capabilities) &&
+            body.dailyCostCeilingCents === undefined
         ) {
-            throw new BadRequestException('Provide name, disabled, paused and/or capabilities');
+            throw new BadRequestException(
+                'Provide name, disabled, paused, capabilities and/or dailyCostCeilingCents',
+            );
         }
         let view: FleetNodeView | null = null;
         if (typeof body.name === 'string') {
             view = await this.service.renameForUser(auth.userId, id, body.name);
+        }
+        // Fleet cost accounting (EW-777): `null` is a value here (clear the
+        // ceiling), so the test is on `undefined`, never on truthiness.
+        if (body.dailyCostCeilingCents !== undefined) {
+            view = await this.service.setDailyCostCeilingForUser(
+                auth.userId,
+                id,
+                body.dailyCostCeilingCents,
+            );
         }
         if (Array.isArray(body.capabilities)) {
             // Writing tags pins them by default: an admin edit the
@@ -383,6 +538,9 @@ export class FleetController {
             capabilities: body.capabilities,
             cliVersion: body.cliVersion,
             diskFreeBytes: body.diskFreeBytes,
+            modelIdentity: body.modelIdentity,
+            workerState: body.workerState,
+            workerStateReason: body.workerStateReason,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -407,11 +565,64 @@ export class FleetController {
             capabilities: body.capabilities,
             cliVersion: body.cliVersion,
             diskFreeBytes: body.diskFreeBytes,
+            modelIdentity: body.modelIdentity,
+            workerState: body.workerState,
+            workerStateReason: body.workerStateReason,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');
         }
-        return { ok: true, node: result.node };
+        // Self-build slice S — an eligible runner is back: clear
+        // `waiting-for-runner` on the owner's queued jobs this node can
+        // take, so the Fleet UI stops saying "waiting" the moment it is
+        // no longer true (the node's own lease poll claims them next).
+        // Only for a beat that left the node ONLINE — a paused/disabled
+        // node keeps beating but will not lease — and never able to fail
+        // or refuse the beat: the service re-reads the node row itself
+        // and swallows its own errors; this guard is the belt.
+        if (result.node.status === 'online') {
+            try {
+                await this.jobs.promoteWaitingForNode(result.node.id);
+            } catch (err) {
+                this.logger.debug(
+                    `waiting-job promotion skipped for node ${result.node.id}: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+        return { ok: true, node: result.node, rotationRequested: result.rotationRequested };
+    }
+
+    @Public()
+    @Post('rotate-credential')
+    @ApiOperation({
+        summary:
+            'Node self-rotation (public, node-secret-authenticated). Mints a NEW node secret — returned exactly once — while the credential presented here keeps working for a bounded overlap, so the machine can finish its in-flight job and persist the new secret before the old one dies. The old credential expires on a clock, not on a callback. Requires the CURRENT credential: a previous-window one, a still-enrolling node, or a second rotation while a window is open are all refused.',
+    })
+    @HttpCode(HttpStatus.OK)
+    // Tighter than `pause` (30/min): rotation mints 32 random bytes and
+    // writes on every call, and six machines beating every 30s need
+    // nothing like ten a minute between them.
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async rotateCredential(
+        @Body() body: RotateFleetNodeCredentialDto,
+    ): Promise<FleetNodeRotateCredentialResponse> {
+        const result = await this.service.rotateCredentialByCredential(body.nodeId, body.secret);
+        if (!result) {
+            // The SAME message every refused node credential gets — never
+            // say which check failed, or this becomes a probe for which
+            // node ids exist and which are mid-rotation.
+            throw new UnauthorizedException('Invalid node credential');
+        }
+        return {
+            ok: true,
+            nodeId: result.nodeId,
+            secret: result.secret,
+            previousCredentialExpiresAt: result.previousCredentialExpiresAt.toISOString(),
+            overlapSec: result.overlapSec,
+            node: result.node,
+        };
     }
 
     @Public()

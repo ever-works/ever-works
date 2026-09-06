@@ -17,7 +17,10 @@ import {
     Upload,
     X,
 } from 'lucide-react';
+import { browserApiFetch } from '@/lib/api/browser-api';
+import { memoryFileDownloadUrl } from '@/lib/api/memory-files-url';
 import { cn } from '@/lib/utils/cn';
+import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
 import { UploadDropZone } from '@/components/kb/workbench/UploadDropZone';
 import { MemoryFilePreview } from './MemoryFilePreview';
 import type {
@@ -39,6 +42,21 @@ import type {
  * agent-owner badge on agent-private folders, and a Global/Agents scope
  * toggle. Additive beside the existing memory panels; talks to the
  * same-origin BFF proxies under `/api/memory/files`.
+ *
+ * **Transport (EW-786).** Every request here goes through
+ * `browserApiFetch`, never a raw `fetch()`. Three of those proxies —
+ * the unified list, `move`, and `folders/:id/sync` — now mint the API's
+ * `X-Scope-Slug` from the per-tab `x-ever-workspace` selector and answer
+ * 400 without it; a raw `fetch()` left them in personal scope, where the
+ * API returns a 200 with the org's Memory originals silently missing.
+ * The tree / upload / folder-CRUD proxies are per-user and deliberately
+ * unscoped (see their route files), but they share the panel's transport
+ * so a later scoping change cannot half-land: the `refresh()` pair fires
+ * tree and list together, and only one of the two is scope-sensitive.
+ *
+ * The Download anchor is a document navigation, so it carries the
+ * selector as `?scope=` (`memoryFileDownloadUrl`) instead of a header —
+ * see `[id]/download/route.ts` for the carrier contract.
  */
 
 type ScopeFilter = 'all' | 'global' | 'agents';
@@ -58,6 +76,8 @@ function formatDate(iso: string): string {
 
 export function MemoryFilesPanel() {
     const t = useTranslations('dashboard.memoryPage.files');
+    // Download is a navigation, so the tab's workspace rides on the href.
+    const workspace = useWorkspaceScope();
 
     const [folders, setFolders] = useState<MemoryFolderNode[]>([]);
     const [files, setFiles] = useState<MemoryFileRow[]>([]);
@@ -94,8 +114,10 @@ export function MemoryFilesPanel() {
             }
             const query = params.toString();
             const [treeRes, listRes] = await Promise.all([
-                fetch('/api/memory/files/tree', { cache: 'no-store' }),
-                fetch(`/api/memory/files${query ? `?${query}` : ''}`, { cache: 'no-store' }),
+                browserApiFetch('/api/memory/files/tree', { cache: 'no-store' }),
+                browserApiFetch(`/api/memory/files${query ? `?${query}` : ''}`, {
+                    cache: 'no-store',
+                }),
             ]);
             if (treeRes.ok) {
                 const body = (await treeRes.json()) as MemoryFolderTreeResponse;
@@ -177,7 +199,7 @@ export function MemoryFilesPanel() {
         setIsSubmittingFolder(true);
         setError(null);
         try {
-            const res = await fetch('/api/memory/files/folders', {
+            const res = await browserApiFetch('/api/memory/files/folders', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -209,7 +231,7 @@ export function MemoryFilesPanel() {
                     const form = new FormData();
                     form.append('file', file);
                     if (currentFolderId) form.append('folderId', currentFolderId);
-                    const res = await fetch('/api/memory/files/upload', {
+                    const res = await browserApiFetch('/api/memory/files/upload', {
                         method: 'POST',
                         body: form,
                     });
@@ -229,7 +251,7 @@ export function MemoryFilesPanel() {
         async (row: MemoryFileRow, folderId: string | null) => {
             setError(null);
             try {
-                const res = await fetch('/api/memory/files/move', {
+                const res = await browserApiFetch('/api/memory/files/move', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -253,14 +275,14 @@ export function MemoryFilesPanel() {
         async (folder: MemoryFolderNode) => {
             setError(null);
             try {
-                const res = await fetch(
+                const res = await browserApiFetch(
                     `/api/memory/files/folders/${encodeURIComponent(folder.id)}`,
                     { method: 'DELETE' },
                 );
                 if (res.status === 422) {
                     const confirmed = window.confirm(t('deleteRecursiveConfirm'));
                     if (!confirmed) return;
-                    const forced = await fetch(
+                    const forced = await browserApiFetch(
                         `/api/memory/files/folders/${encodeURIComponent(folder.id)}?recursive=true`,
                         { method: 'DELETE' },
                     );
@@ -290,7 +312,7 @@ export function MemoryFilesPanel() {
             setError(null);
             setNotice(null);
             try {
-                const res = await fetch(
+                const res = await browserApiFetch(
                     `/api/memory/files/folders/${encodeURIComponent(folder.id)}/sync`,
                     { method: 'POST' },
                 );
@@ -322,7 +344,7 @@ export function MemoryFilesPanel() {
         async (folder: MemoryFolderNode, syncRepo: MemoryFolderSyncRepo | null) => {
             setError(null);
             try {
-                const res = await fetch(
+                const res = await browserApiFetch(
                     `/api/memory/files/folders/${encodeURIComponent(folder.id)}`,
                     {
                         method: 'PATCH',
@@ -764,7 +786,7 @@ export function MemoryFilesPanel() {
                                                     ))}
                                                 </select>
                                                 <a
-                                                    href={`/api/memory/files/${encodeURIComponent(row.id)}/download?source=${row.source}`}
+                                                    href={memoryFileDownloadUrl(row, workspace)}
                                                     data-testid={`memory-files-download-${row.id}`}
                                                     title={t('download')}
                                                     className="p-1 rounded text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"

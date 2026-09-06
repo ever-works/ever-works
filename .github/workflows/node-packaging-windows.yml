@@ -1,0 +1,155 @@
+name: Node Packaging (Windows)
+
+# The install/uninstall scripts under apps/node/packaging/windows decide which
+# ACCOUNT a fleet node runs as. Getting that wrong fails silently: the node
+# starts, cannot read the enrolling user's credential, reports "not enrolled",
+# and is restarted every 10 seconds forever. Those decisions are covered by
+# apps/node/packaging/windows/test-install-service-logic.ps1, which needs a
+# Windows runner - apps/node/packaging/** is reachable by no other Windows job
+# (windows-job-launcher.yml is path-filtered to native/windows-job-launcher and
+# its TypeScript adapters, and packaging-contract.internal.spec.ts asserts that
+# workflow never grows a step for these scripts).
+#
+# Nothing here installs, registers, or starts anything. The scripts under test
+# configure Windows services; the only one this job executes is exercised
+# through its -DryRun path, and windows-service-contract.internal.spec.ts pins
+# that.
+
+on:
+  pull_request:
+    paths:
+      - 'apps/node/packaging/**'
+      - 'apps/node/src/core/packaging/**'
+      - '.github/workflows/node-packaging-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    # Pinned for the same reason windows-job-launcher.yml pins it: an explicit
+    # image rather than whatever `windows-latest` has migrated to.
+    runs-on: windows-2022
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      # Parsing is a real test for these files, not a formality. Windows
+      # PowerShell 5.1 decodes a BOM-less script as the system ANSI codepage,
+      # so a UTF-8 em dash arrives as three CP1252 characters ending in a curly
+      # double quote - which PowerShell accepts as a string terminator. One em
+      # dash inside a double-quoted string is a parse error on exactly the
+      # hosts these scripts target, and it is invisible to any Linux check.
+      - name: Parse the packaging scripts under Windows PowerShell 5.1
+        shell: powershell
+        working-directory: apps/node/packaging/windows
+        run: |
+          $failed = $false
+          foreach ($script in Get-ChildItem -Filter '*.ps1' | Sort-Object Name) {
+            $errors = $null
+            $tokens = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors -and $errors.Count -gt 0) {
+              $failed = $true
+              foreach ($parseError in $errors) {
+                Write-Host "$($script.Name)($($parseError.Extent.StartLineNumber)): $($parseError.Message)"
+              }
+            }
+            else {
+              Write-Host "$($script.Name): parsed"
+            }
+          }
+          if ($failed) { throw 'a packaging script failed to parse under Windows PowerShell 5.1' }
+
+      - name: Test the service-install decision logic
+        shell: powershell
+        working-directory: apps/node/packaging/windows
+        run: |
+          $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          & $windowsPowerShell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned `
+            -File .\test-install-service-logic.ps1
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) {
+            throw "install-service logic test process exited $testExitCode"
+          }
+
+      # Proves the installer RUNS, not merely that it parses: dot-sourcing
+      # resolves, the preflight executes, and the refusal happens before
+      # anything is registered. This runner has no enrolled node, so a correct
+      # script must refuse - and must still have printed the plan first.
+      - name: Prove the dry run refuses without touching the machine
+        shell: powershell
+        working-directory: apps/node/packaging/windows
+        run: |
+          # GitHub prepends $ErrorActionPreference = 'stop' to this shell, which
+          # turns a native command's stderr into a terminating NativeCommandError
+          # before the exit code can be read. The refusal below is expected, so
+          # capture it as output instead.
+          $ErrorActionPreference = 'Continue'
+          $placeholderCli = Join-Path $env:RUNNER_TEMP 'cli.js'
+          Set-Content -LiteralPath $placeholderCli -Value '// placeholder for the dry run' -Encoding utf8
+          $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          $output = & $windowsPowerShell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned `
+            -File .\install-service.ps1 -DryRun -CliPath $placeholderCli 2>&1 | Out-String
+          $dryRunExitCode = $LASTEXITCODE
+          # The child is EXPECTED to exit non-zero: this runner has no enrolled
+          # node, so a correct preflight refuses. GitHub appends
+          # `if (Test-Path variable:\LASTEXITCODE) { exit $LASTEXITCODE }` to
+          # every `shell: powershell` step, and no cmdlet below resets it - so
+          # without this line the step fails on its own success and the job is
+          # red by construction.
+          $global:LASTEXITCODE = 0
+          Write-Host $output
+          if ($dryRunExitCode -eq 0) {
+            throw 'the dry run succeeded, but this runner has no enrolled node and the preflight had to refuse'
+          }
+          if ($output -notmatch 'DRY RUN') {
+            throw 'the dry run did not print the commands it would have run'
+          }
+          if ($output -notmatch 'Preflight:') {
+            throw 'the dry run did not report a preflight verdict'
+          }
+          # The account the node runs as has to be able to write its own logs;
+          # that grant is part of the plan, not an afterthought.
+          if ($output -notmatch 'icacls') {
+            throw 'the dry run did not plan the state-directory ACL grant'
+          }
+          if ($null -ne (Get-Service -Name 'EverWorksNode' -ErrorAction SilentlyContinue)) {
+            throw 'the dry run registered a Windows service'
+          }
+          if ($null -ne (Get-ScheduledTask -TaskName 'EverWorksNode' -ErrorAction SilentlyContinue)) {
+            throw 'the dry run registered a scheduled task'
+          }
+          if (Test-Path -LiteralPath (Join-Path $env:ProgramData 'ever-works-node')) {
+            throw 'the dry run created the state directory'
+          }
+          Write-Host 'dry run refused and changed nothing'
+
+      # -WhatIf is the same decision by its PowerShell name. Exercised so the
+      # two names cannot drift apart unnoticed.
+      - name: Prove -WhatIf is the same decision as -DryRun
+        shell: powershell
+        working-directory: apps/node/packaging/windows
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $placeholderCli = Join-Path $env:RUNNER_TEMP 'cli.js'
+          $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          $output = & $windowsPowerShell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned `
+            -File .\install-service.ps1 -WhatIf -CliPath $placeholderCli 2>&1 | Out-String
+          $global:LASTEXITCODE = 0
+          if ($output -notmatch 'DRY RUN') {
+            throw '-WhatIf did not take the same path as -DryRun'
+          }
+          if ($null -ne (Get-ScheduledTask -TaskName 'EverWorksNode' -ErrorAction SilentlyContinue)) {
+            throw '-WhatIf registered a scheduled task'
+          }
+          Write-Host '-WhatIf and -DryRun agree'

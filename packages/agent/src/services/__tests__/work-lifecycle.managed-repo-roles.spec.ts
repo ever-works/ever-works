@@ -118,6 +118,9 @@ function makeService() {
         { emit: jest.fn() } as never,
         { emit: jest.fn(), emitAsync: jest.fn().mockResolvedValue([]) } as never,
         {} as never,
+        // gitFacade (self-build slice D, EW-766) — only the Repository Work
+        // create path touches it; the managed-storage path under test does not.
+        {} as never,
     );
 
     return { service, workRepo, everWorksGit };

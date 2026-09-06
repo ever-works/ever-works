@@ -6,17 +6,30 @@ import { Link } from '@/i18n/navigation';
 import { cn } from '@/lib/utils/cn';
 import { StatusPill } from '@/components/work-agent';
 import type { Goal } from '@/lib/api/goals';
-import { COMPARATOR_GLYPH, OutcomeBadge, formatMetricValue, formatDateTime } from './goal-ui';
+import {
+    COMPARATOR_GLYPH,
+    GoalKindBadge,
+    OutcomeBadge,
+    formatMetricValue,
+    formatDateTime,
+} from './goal-ui';
+import { DodProgressBar, DodRollup } from './goal-loop-ui';
 
 /**
  * Goals & Metrics — PR-8. Read-only summary card for a single Goal in
  * the `/goals` list grid. Whole card links to the Goal detail page.
- * Surfaces the current-vs-target progress with a comparator glyph
- * (≥/≤), the lifecycle status pill, the terminal outcome badge when
- * set, and the next scheduled check for active Goals.
+ *
+ * A METRIC Goal surfaces the current-vs-target progress with a comparator
+ * glyph (≥/≤) and its aggregation window; a DELIVERY Goal (self-build
+ * slice AG) has no metric, so the same slot carries the Definition-of-Done
+ * rollup instead and the window line is dropped. Both show the lifecycle
+ * status pill, the kind badge, the terminal outcome badge when set, and
+ * the next scheduled check for active Goals.
  */
 export function GoalCard({ goal }: { goal: Goal }) {
     const t = useTranslations('dashboard.goalsPage.card');
+    const isDelivery = goal.goalKind === 'delivery';
+    const unit = goal.unit ?? undefined;
 
     return (
         <Link
@@ -47,25 +60,36 @@ export function GoalCard({ goal }: { goal: Goal }) {
                 <ChevronRight className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
 
-            {/* Current vs target with comparator glyph */}
-            <div className="mb-3 flex items-center gap-2 rounded-lg border border-border/50 dark:border-border-dark/50 bg-surface/40 dark:bg-surface-dark/30 px-3 py-2">
-                <span className="text-sm font-semibold text-text dark:text-text-dark tabular-nums truncate">
-                    {formatMetricValue(goal.currentValue, goal.unit)}
-                </span>
-                <span
-                    className="text-sm font-semibold text-info shrink-0"
-                    aria-label={t(`comparator.${goal.comparator}`)}
-                    title={t(`comparator.${goal.comparator}`)}
-                >
-                    {COMPARATOR_GLYPH[goal.comparator]}
-                </span>
-                <span className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark tabular-nums truncate">
-                    {formatMetricValue(goal.targetValue, goal.unit)}
-                </span>
-            </div>
+            {isDelivery ? (
+                /* Delivery: the Definition of Done IS the progress. */
+                <div className="mb-3 space-y-2 rounded-lg border border-border/50 dark:border-border-dark/50 bg-surface/40 dark:bg-surface-dark/30 px-3 py-2">
+                    <DodRollup summary={goal.dodSummary} />
+                    <DodProgressBar summary={goal.dodSummary} />
+                </div>
+            ) : (
+                /* Metric: current vs target with comparator glyph. */
+                <div className="mb-3 flex items-center gap-2 rounded-lg border border-border/50 dark:border-border-dark/50 bg-surface/40 dark:bg-surface-dark/30 px-3 py-2">
+                    <span className="text-sm font-semibold text-text dark:text-text-dark tabular-nums truncate">
+                        {formatMetricValue(goal.currentValue, unit)}
+                    </span>
+                    <span
+                        className="text-sm font-semibold text-info shrink-0"
+                        aria-label={
+                            goal.comparator ? t(`comparator.${goal.comparator}`) : undefined
+                        }
+                        title={goal.comparator ? t(`comparator.${goal.comparator}`) : undefined}
+                    >
+                        {goal.comparator ? COMPARATOR_GLYPH[goal.comparator] : '—'}
+                    </span>
+                    <span className="text-sm font-medium text-text-secondary dark:text-text-secondary-dark tabular-nums truncate">
+                        {formatMetricValue(goal.targetValue, unit)}
+                    </span>
+                </div>
+            )}
 
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <StatusPill status={goal.status} />
+                <GoalKindBadge kind={goal.goalKind} />
                 {goal.outcome ? <OutcomeBadge outcome={goal.outcome} /> : null}
             </div>
 
@@ -80,14 +104,14 @@ export function GoalCard({ goal }: { goal: Goal }) {
                             {formatDateTime(goal.nextCheckAt)}
                         </time>
                     </div>
-                ) : (
+                ) : !isDelivery ? (
                     <div>
                         <span className="font-medium text-text-secondary dark:text-text-secondary-dark">
                             {t('windowPrefix')}
                         </span>{' '}
                         {t(`window.${goal.window}`)}
                     </div>
-                )}
+                ) : null}
             </div>
         </Link>
     );

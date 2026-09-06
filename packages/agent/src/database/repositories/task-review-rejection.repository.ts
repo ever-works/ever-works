@@ -4,6 +4,8 @@ import { IsNull, Repository } from 'typeorm';
 import {
     TASK_REVIEW_REJECTION_MAX_FEEDBACK_CHARS,
     TaskReviewRejection,
+    type TaskReviewRejectionReviewerKind,
+    type TaskReviewRejectionSeverity,
     type TaskReviewRejectionSource,
 } from '../../entities/task-review-rejection.entity';
 
@@ -18,6 +20,10 @@ export interface RecordTaskReviewRejectionInput {
     prNumber?: number | null;
     prUrl?: string | null;
     organizationId?: string | null;
+    /** R16 — set by the GitHub bridge for reviewer-bot findings. */
+    severity?: TaskReviewRejectionSeverity | null;
+    /** R16 — `human` | `bot`; absent = not stated (legacy / gate). */
+    reviewerKind?: TaskReviewRejectionReviewerKind | null;
 }
 
 /**
@@ -59,6 +65,8 @@ export class TaskReviewRejectionRepository {
             reviewerLabel: input.reviewerLabel ?? null,
             prNumber: input.prNumber ?? null,
             prUrl: input.prUrl ?? null,
+            severity: input.severity ?? null,
+            reviewerKind: input.reviewerKind ?? null,
             ...(input.organizationId !== undefined ? { organizationId: input.organizationId } : {}),
         });
         return this.repository.save(row);

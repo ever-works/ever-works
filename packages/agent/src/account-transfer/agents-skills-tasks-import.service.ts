@@ -4,7 +4,8 @@ import { SkillsService } from '../skills/skills.service';
 import { SkillFilesService } from '../skills/skill-files.service';
 import { TasksService } from '../tasks-domain/tasks.service';
 import { UserUploadRepository } from '../database/repositories/user-upload.repository';
-import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
+import type { TaskAcceptanceCheck, TaskExtraRepo } from '@ever-works/contracts';
 import {
     type AccountExportV2Tail,
     type AgentsSkillsTasksImportOptions,
@@ -39,6 +40,55 @@ function normalizeImportedAcceptanceChecks(
  * only. `null` = inherit the Work's value and is preserved; out-of-range
  * values are dropped, never clamped.
  */
+/**
+ * Keep only the extra-repo entries the IMPORTING account can actually use.
+ *
+ * `repoConnectionId` is a uuid in the EXPORTING account's registry. Passing
+ * one straight to `TasksService.create` is not merely useless, it is
+ * destructive: `normalizeExtraRepos` THROWS `BadRequestException` on a
+ * connection it cannot resolve, and the importer's per-Task catch would turn
+ * that into a skipped Task — so a Task that merely mentioned a repository
+ * would fail to import at all, losing its title, labels and chat too.
+ *
+ * Resolving here instead means a cross-account transfer drops the mounts and
+ * keeps the Task, and a same-account restore keeps both. Mirrors the
+ * skill-files rule: recreate a reference ONLY when the receiving account owns
+ * the thing referenced.
+ */
+async function resolveImportedExtraRepos(
+    raw: unknown,
+    ownerId: string,
+    repoConnections?: RepoConnectionRepository,
+): Promise<TaskExtraRepo[] | undefined> {
+    if (!Array.isArray(raw) || raw.length === 0) return undefined;
+    if (!repoConnections) return undefined;
+
+    const kept: TaskExtraRepo[] = [];
+    for (const entry of raw) {
+        const id =
+            entry && typeof (entry as TaskExtraRepo).repoConnectionId === 'string'
+                ? (entry as TaskExtraRepo).repoConnectionId.trim()
+                : '';
+        if (!id) continue;
+        const connection = await repoConnections.findByIdAndUser(id, ownerId);
+        // Disabled is dropped as well as missing: `normalizeExtraRepos`
+        // refuses a disabled connection on the write path too, so keeping
+        // one here would only move the failure to the next edit.
+        if (!connection || !connection.enabled) continue;
+        kept.push({
+            repoConnectionId: id,
+            mountDir:
+                typeof (entry as TaskExtraRepo).mountDir === 'string'
+                    ? (entry as TaskExtraRepo).mountDir
+                    : null,
+            ...(typeof (entry as TaskExtraRepo).writable === 'boolean'
+                ? { writable: (entry as TaskExtraRepo).writable }
+                : {}),
+        });
+    }
+    return kept.length > 0 ? kept : undefined;
+}
+
 function normalizeImportedMaxGateAttempts(value: unknown): number | null | undefined {
     if (value === null) return null;
     return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5
@@ -84,6 +134,14 @@ export class AgentsSkillsTasksImportService {
         // would create a dangling reference into someone else's storage.
         @Optional() private readonly skillFilesService?: SkillFilesService,
         @Optional() private readonly userUploads?: UserUploadRepository,
+        // Task "Also work in" repositories — the same ownership gate as
+        // `userUploads` above, for the same reason. An `extraRepos` entry
+        // names a connection by an ACCOUNT-LOCAL id, so it is restored only
+        // when the importing account owns an enabled connection with that
+        // id. Trailing + @Optional() so existing positional constructor
+        // calls keep working; unbound → extraRepos import as absent, which
+        // is exactly what happened before this field round-tripped at all.
+        @Optional() private readonly repoConnections?: RepoConnectionRepository,
     ) {}
 
     async importTail(
@@ -196,6 +254,11 @@ export class AgentsSkillsTasksImportService {
                         task.acceptanceChecks,
                     );
                     const maxGateAttempts = normalizeImportedMaxGateAttempts(task.maxGateAttempts);
+                    const extraRepos = await resolveImportedExtraRepos(
+                        task.extraRepos,
+                        userId,
+                        this.repoConnections,
+                    );
                     await this.tasksService.create(userId, {
                         title: task.title,
                         description: task.description ?? null,
@@ -211,6 +274,7 @@ export class AgentsSkillsTasksImportService {
                         ...(isolationMode !== undefined ? { isolationMode } : {}),
                         ...(acceptanceChecks !== undefined ? { acceptanceChecks } : {}),
                         ...(maxGateAttempts !== undefined ? { maxGateAttempts } : {}),
+                        ...(extraRepos !== undefined ? { extraRepos } : {}),
                     });
                     summary.tasks.imported += 1;
                 } catch (err) {

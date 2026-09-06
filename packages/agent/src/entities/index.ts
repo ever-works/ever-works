@@ -160,9 +160,15 @@ export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
 export * from './fleet-agent-node-affinity.entity';
+// Panic controls (EW-778) — the global stop flag + the fleet audit trail.
+export * from './fleet-kill-switch.entity';
+export * from './fleet-audit.entity';
 // Fleet local-runner routing — per Work / Goal / account execution
 // preference (local runner vs cloud) read by the fleet run router.
 export * from './fleet-execution-preference.entity';
+// Fleet cost accounting (EW-777) — the owner's fleet-wide daily
+// model-spend ceiling and its one-notice trip marker.
+export * from './fleet-cost-policy.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
 // Agent Plugins MCP slice — external MCP server connections + per-agent
@@ -179,5 +185,7 @@ export * from './environment.entity';
 // Memory Files — user-defined folders organizing uploads on /memory.
 export * from './memory-folder.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
+export * from './agent-plugin-package.entity';
+export * from './agent-plugin-package-allowlist.entity';
 export * from './repo-connection.entity';
 export * from './agent-repo-attachment.entity';

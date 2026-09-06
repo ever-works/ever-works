@@ -1,12 +1,13 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, parse, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
+	FLEET_TASK_WORKSPACE_EXCLUDE_RULES,
 	FleetTaskWorkspaceError,
 	FleetTaskWorkspaceProvisioner,
 	type FleetWorkspacePlugin
@@ -133,6 +134,84 @@ describe.sequential('FleetTaskWorkspaceProvisioner — real Git worktrees', { ti
 		expect(healed.reused).toBe(false);
 		expect(existsSync(join(healed.path, 'stale.txt'))).toBe(false);
 		expect(git(healed.path, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('task/fleet-new');
+	});
+
+	it('keeps the owner-question directory out of the single-repository worktree (self-build slice Q)', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const descriptor = await provisioner.provision('task-0006', workspace('task/fleet-0006'));
+		mkdirSync(join(descriptor.path, '.ever-works'), { recursive: true });
+		writeFileSync(join(descriptor.path, '.ever-works', 'QUESTION.md'), '# Which database?\n');
+
+		// Git never sees the file: not untracked, not stageable by `add -A`.
+		expect(git(descriptor.path, 'status', '--porcelain')).toBe('');
+		git(descriptor.path, 'add', '-A');
+		expect(git(descriptor.path, 'diff', '--cached', '--name-only')).toBe('');
+
+		// A file written from a package directory — a model that `cd`-ed into
+		// one and wrote the path relative to its cwd — is just as invisible:
+		// the unanchored rule (review SR-5) matches at any depth.
+		mkdirSync(join(descriptor.path, 'packages', 'api', '.ever-works'), { recursive: true });
+		writeFileSync(join(descriptor.path, 'packages', 'api', '.ever-works', 'QUESTION.md'), '# Nested?\n');
+		expect(git(descriptor.path, 'status', '--porcelain')).toBe('');
+		git(descriptor.path, 'add', '-A');
+		expect(git(descriptor.path, 'diff', '--cached', '--name-only')).toBe('');
+
+		// Every fleet rule lives in the repository's shared exclude file...
+		const commonDir = git(descriptor.path, 'rev-parse', '--path-format=absolute', '--git-common-dir');
+		const excludeLines = (await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8'))
+			.split(/\r?\n/)
+			.map((line) => line.trim());
+		expect(excludeLines).toContain('/.mounts');
+		expect(excludeLines).toContain('/.ever-works');
+		expect(excludeLines).toContain('.ever-works');
+		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
+			expect(excludeLines.filter((line) => line === rule)).toHaveLength(1);
+		}
+
+		// ...and a second provision of the same task adds nothing twice.
+		await provisioner.provision('task-0006', workspace('task/fleet-0006'));
+		const again = (await fs.readFile(join(commonDir, 'info', 'exclude'), 'utf8'))
+			.split(/\r?\n/)
+			.map((line) => line.trim());
+		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
+			expect(again.filter((line) => line === rule)).toHaveLength(1);
+		}
+	});
+
+	/**
+	 * CI 2026-09-04, `lint-and-test` on #2297: provisioning a workspace with
+	 * NO mounts failed on Linux because `.mounts` existed as a symlink left by
+	 * an earlier run. Git treats a symlink as a FILE, so the then
+	 * slash-terminated `/​.mounts/` rule did not ignore it, `git check-ignore`
+	 * reported the rule ineffective and the provision threw. It passed on
+	 * Windows only because a junction reports as a directory there.
+	 *
+	 * A plain file reproduces the same condition on every platform, which is
+	 * what this pins — no symlink privilege required.
+	 */
+	it('ignores the fleet paths when they exist as a file, not a directory', async () => {
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: workspaceRoot });
+		const descriptor = await provisioner.provision('task-0007', workspace('task/fleet-0007'));
+
+		for (const name of ['.mounts', '.ever-works']) {
+			writeFileSync(join(descriptor.path, name), 'not a directory\n');
+		}
+
+		// The rules must cover the file form, or the finalize's `git add -A`
+		// would commit whatever was left behind.
+		expect(git(descriptor.path, 'status', '--porcelain')).toBe('');
+		// And a re-provision, which re-verifies the rules, must still succeed.
+		await expect(provisioner.provision('task-0007', workspace('task/fleet-0007'))).resolves.toMatchObject({
+			path: descriptor.path
+		});
+	});
+
+	it('never writes a slash-terminated exclude rule', () => {
+		// The probes keep their slashes; the rules must not have them, or the
+		// file/symlink form above stops being covered.
+		for (const rule of FLEET_TASK_WORKSPACE_EXCLUDE_RULES) {
+			expect(rule.endsWith('/')).toBe(false);
+		}
 	});
 
 	it.runIf(process.platform === 'win32')(
@@ -419,5 +498,149 @@ describe('FleetTaskWorkspaceProvisioner — refusal and diagnostics', () => {
 		await expect(pending).rejects.toMatchObject({ code: 'cancelled' });
 		expect(receivedSignal).toBe(controller.signal);
 		expect(observedAbort).toBe(true);
+	});
+});
+
+describe('FleetTaskWorkspaceProvisioner.finalize — cancellation (agent execution v2 review follow-up)', () => {
+	it('forwards the abort signal to the provider and maps an abort into a cancelled error', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
+		const worktree = join(root, 'repositories', 'r', 'worktrees', 'w');
+		mkdirSync(worktree, { recursive: true });
+		const controller = new AbortController();
+		const finalize = vi.fn(async (_handle: unknown, opts: { signal?: AbortSignal }) => {
+			expect(opts.signal).toBe(controller.signal);
+			controller.abort(new Error('lease lost'));
+			const error = new Error('lease lost');
+			error.name = 'AbortError';
+			throw error;
+		});
+		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		const descriptor = {
+			path: worktree,
+			repositoryId: 'ever/repository',
+			baseRef: 'main',
+			branch: 'task/cancel',
+			baseSha: SHA,
+			headSha: SHA,
+			reused: false
+		};
+		try {
+			await expect(
+				provisioner.finalize(
+					'task-0001',
+					descriptor,
+					{ commitMessage: 'agent: x', push: true },
+					controller.signal
+				)
+			).rejects.toMatchObject({ code: 'cancelled' });
+			expect(finalize).toHaveBeenCalledTimes(1);
+			expect(finalize.mock.calls[0][1]).toMatchObject({ commitMessage: 'agent: x', push: true });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('forwards the publish fence to the provider and surfaces a withheld publish verbatim', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
+		const worktree = join(root, 'repositories', 'r', 'worktrees', 'fenced');
+		mkdirSync(worktree, { recursive: true });
+		const withheld = 'the lease on this work expired 12s ago';
+		const finalize = vi.fn(async (_handle: unknown, _opts: Record<string, unknown>) => ({
+			pushed: false,
+			headSha: SHA,
+			empty: false,
+			changedFiles: 4,
+			publishWithheld: withheld
+		}));
+		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		const publishFence = { deadlineAt: Date.parse('2026-09-04T15:00:00.000Z'), marginMs: 60_000 };
+		try {
+			const result = await provisioner.finalize(
+				'task-0001',
+				{
+					path: worktree,
+					repositoryId: 'ever/repository',
+					baseRef: 'main',
+					branch: 'task/fenced',
+					baseSha: SHA,
+					headSha: SHA,
+					reused: false
+				},
+				{ commitMessage: 'agent: fenced', push: true, publishFence }
+			);
+			expect(finalize.mock.calls[0][1]).toMatchObject({ publishFence });
+			expect(result).toEqual({
+				pushed: false,
+				headSha: SHA,
+				empty: false,
+				changedFiles: 4,
+				publishWithheld: withheld
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('omits the publish fence entirely when the caller holds no lease', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
+		const worktree = join(root, 'repositories', 'r', 'worktrees', 'unfenced');
+		mkdirSync(worktree, { recursive: true });
+		const finalize = vi.fn(async (_handle: unknown, _opts: Record<string, unknown>) => ({
+			pushed: true,
+			headSha: SHA,
+			empty: false
+		}));
+		const plugin = { provision: vi.fn(), finalize } as unknown as FleetWorkspacePlugin;
+		const provisioner = new FleetTaskWorkspaceProvisioner({ rootPath: root, plugin });
+		try {
+			const result = await provisioner.finalize(
+				'task-0001',
+				{
+					path: worktree,
+					repositoryId: 'ever/repository',
+					baseRef: 'main',
+					branch: 'task/unfenced',
+					baseSha: SHA,
+					headSha: SHA,
+					reused: false
+				},
+				{ commitMessage: 'agent: unfenced', push: true }
+			);
+			// No `publishFence` key at all, not an undefined one: the provider
+			// must take the same path a lease-free caller has always taken.
+			expect(Object.keys(finalize.mock.calls[0][1]).sort()).toEqual(['commitMessage', 'push']);
+			expect(result).toEqual({ pushed: true, headSha: SHA, empty: false });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	it('reports a provider without commit support instead of pretending to push', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-fleet-finalize-'));
+		try {
+			const provisioner = new FleetTaskWorkspaceProvisioner({
+				rootPath: root,
+				plugin: { provision: vi.fn() } as unknown as FleetWorkspacePlugin
+			});
+			await expect(
+				provisioner.finalize(
+					'task-0001',
+					{
+						path: root,
+						repositoryId: 'ever/repository',
+						baseRef: 'main',
+						branch: 'b',
+						baseSha: SHA,
+						headSha: SHA,
+						reused: false
+					},
+					{ commitMessage: 'x', push: false }
+				)
+			).rejects.toMatchObject({ code: 'git-failed' });
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
 	});
 });

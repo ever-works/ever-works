@@ -60,6 +60,15 @@ export function AgentReposCard({ agentId, repos: initialRepos }: AgentReposCardP
             <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
                 {t('subtitle')}
             </p>
+            {/* Multi-repo Task workspaces (slice C): attaching a repository now
+                changes what a fleet run checks out AND pushes — the operator
+                must learn that here, where the toggle is. */}
+            <p
+                className="mt-1 text-xs text-text-muted dark:text-text-muted-dark"
+                data-testid="agent-repos-fleet-hint"
+            >
+                {t('fleetHint')}
+            </p>
 
             {repos.length === 0 ? (
                 <p className="mt-4 text-sm text-text-muted dark:text-text-muted-dark">

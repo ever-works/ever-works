@@ -1,7 +1,8 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { KbMemoryHealth } from '@ever-works/contracts';
+import { BROWSER_WORKSPACE_SCOPE_HEADER } from '@/lib/workspace-scope';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string, values?: Record<string, unknown>) =>
@@ -116,5 +117,72 @@ describe('KbMemoryHealthPanel', () => {
         render(<KbMemoryHealthPanel initialHealth={health({ windowDays: 7 })} />);
 
         expect(screen.getByTestId('kb-memory-health-window').textContent).toContain('7');
+    });
+});
+
+/**
+ * EW-786 — the client half of the health-panel fix.
+ *
+ * `GET /api/memory/health` now translates the per-tab `x-ever-workspace`
+ * selector into the API's `x-scope-slug` and answers 400 without it, so this
+ * panel has to reach it through `browserApiFetch`. A raw `fetch()` sent no
+ * selector at all: the API resolved no Organization, returned `emptyHealth()`
+ * — measurable zeroes, not `null`s — and the panel rendered "0% recall, 0
+ * backlog" over an Organization with real retrieval history. That is the one
+ * failure the tests above exist to prevent, arriving by a route they cannot
+ * see — every one of them injects `initialHealth` and so never touches the
+ * transport. It is pinned here instead: the selector must be derived from the
+ * visible URL on the request the panel actually makes.
+ */
+describe('KbMemoryHealthPanel workspace scope', () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+
+    function selectorOf(index: number): string | null {
+        const init = fetchMock.mock.calls[index][1] as RequestInit | undefined;
+        return new Headers(init?.headers).get(BROWSER_WORKSPACE_SCOPE_HEADER);
+    }
+
+    beforeEach(() => {
+        fetchMock = vi.fn(
+            async () =>
+                new Response(JSON.stringify(health()), {
+                    status: 200,
+                    headers: { 'content-type': 'application/json' },
+                }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+    });
+
+    afterEach(() => {
+        cleanup();
+        vi.clearAllMocks();
+        vi.unstubAllGlobals();
+        window.history.replaceState({}, '', '/');
+    });
+
+    it.each([
+        ['/org/ever/works/w1/kb/review', 'org:ever'],
+        ['/works/w1/kb/review', 'personal'],
+    ])(
+        'loads health from %s with the selector derived from the visible URL',
+        async (pathname, selector) => {
+            window.history.replaceState({}, '', pathname);
+
+            render(<KbMemoryHealthPanel />);
+
+            await waitFor(() => expect(screen.getByTestId('kb-memory-health')).toBeTruthy());
+            expect(String(fetchMock.mock.calls[0][0])).toBe('/api/memory/health');
+            expect(selectorOf(0)).toBe(selector);
+        },
+    );
+
+    it('keeps the window query and still scopes the request', async () => {
+        window.history.replaceState({}, '', '/org/ever/works/w1/kb/review');
+
+        render(<KbMemoryHealthPanel windowDays={7} />);
+
+        await waitFor(() => expect(screen.getByTestId('kb-memory-health')).toBeTruthy());
+        expect(String(fetchMock.mock.calls[0][0])).toBe('/api/memory/health?windowDays=7');
+        expect(selectorOf(0)).toBe('org:ever');
     });
 });

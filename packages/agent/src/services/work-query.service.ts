@@ -8,6 +8,7 @@ import { Work } from '@src/entities/work.entity';
 import { WorkMemberRole, GenerateStatusType, WorkScheduleStatus } from '@src/entities/types';
 import { WorkOwnershipService } from './work-ownership.service';
 import { normalizeGeneratorError, rethrowAsNormalized } from './utils/error.utils';
+import { isRepositoryWork } from '@src/works/repository-work-guard';
 import {
     WorkGenerationHistoryDto,
     WorkGenerationHistoryListDto,
@@ -391,6 +392,14 @@ export class WorkQueryService {
     async workItems(workId: string, user: User) {
         // Any access level can view items
         const { work } = await this.ownershipService.ensureCanView(workId, user.id);
+
+        // A Repository Work has no items by definition, and `getItems`
+        // would clone the wrapped code repository into the shared checkout
+        // to discover that. Answer the read without the clone — a read is
+        // not refused, it is simply empty.
+        if (isRepositoryWork(work)) {
+            return { status: 'success', items: [] };
+        }
 
         try {
             const items = await this.dataGenerator.getItems(work, user);

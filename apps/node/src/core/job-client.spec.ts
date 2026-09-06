@@ -58,6 +58,93 @@ describe('FleetJobClient heartbeat lease proof', () => {
 	});
 });
 
+describe('FleetJobClient lease generation (suspend-safe leases)', () => {
+	function capturing(status: number, body: unknown): { fetchFn: FetchLike; bodies: Array<Record<string, unknown>> } {
+		const bodies: Array<Record<string, unknown>> = [];
+		const fetchFn: FetchLike = async (_url, init) => {
+			bodies.push(JSON.parse(init.body) as Record<string, unknown>);
+			return { ok: status < 400, status, text: async () => JSON.stringify(body) };
+		};
+		return { fetchFn, bodies };
+	}
+
+	it('sends the generation on heartbeat and complete when the lease carried one', async () => {
+		const { fetchFn, bodies } = capturing(200, { ok: true, job: job('2026-08-23T00:30:45.123Z') });
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+
+		await client.heartbeat('job-1', 30, 4);
+		await client.complete('job-1', { success: true, result: { ok: true } }, 4);
+
+		expect(bodies[0]).toMatchObject({ nodeId: NODE_ID, leaseTtlSec: 30, leaseGeneration: 4 });
+		expect(bodies[1]).toMatchObject({ nodeId: NODE_ID, success: true, leaseGeneration: 4 });
+	});
+
+	it('omits the field entirely when the lease carried none (an older API would 400 an unknown field)', async () => {
+		const { fetchFn, bodies } = capturing(200, { ok: true, job: job('2026-08-23T00:30:45.123Z') });
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn,
+			timeoutMs: 0
+		});
+
+		await client.heartbeat('job-1', 30);
+		await client.complete('job-1', { success: false, error: 'exit 1' });
+
+		expect(bodies[0]).not.toHaveProperty('leaseGeneration');
+		expect(bodies[1]).not.toHaveProperty('leaseGeneration');
+	});
+
+	it('THROWS stale-lease on a 409 from heartbeat rather than collapsing it to null', async () => {
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn: response(409, { statusCode: 409, reason: 'stale-lease', message: 'private detail' }),
+			timeoutMs: 0
+		});
+
+		const error: unknown = await client.heartbeat('job-1', 30, 1).catch((e: unknown) => e);
+		expect(error).toMatchObject({ name: 'FleetClientError', kind: 'stale-lease', status: 409 });
+		// The posture holds: nothing the server wrote reaches the message.
+		expect((error as Error).message).not.toContain('private detail');
+	});
+
+	it('THROWS stale-lease on a 409 from complete', async () => {
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn: response(409, { statusCode: 409, reason: 'stale-lease', message: 'private detail' }),
+			timeoutMs: 0
+		});
+
+		await expect(client.complete('job-1', { success: true }, 1)).rejects.toMatchObject({
+			kind: 'stale-lease',
+			status: 409
+		});
+	});
+
+	it('still maps every other 4xx to invalid-request', async () => {
+		const client = new FleetJobClient({
+			apiUrl: 'https://api.ever.works',
+			nodeId: NODE_ID,
+			secret: SECRET,
+			fetchFn: response(400, { message: ['leaseGeneration must be an integer'] }),
+			timeoutMs: 0
+		});
+
+		await expect(client.heartbeat('job-1', 30, 1)).rejects.toMatchObject({ kind: 'invalid-request', status: 400 });
+	});
+});
+
 describe('FleetJobClient lease cancellation', () => {
 	it('composes the worker AbortSignal with the request timeout for a real lease fetch', async () => {
 		let observedSignal: AbortSignal | undefined;

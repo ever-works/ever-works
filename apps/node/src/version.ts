@@ -6,4 +6,4 @@
  * outside `rootDir`, and importing it would drag the whole file into `dist/`.
  * Keep this in sync with `package.json`'s `version`.
  */
-export const NODE_APP_VERSION = '0.1.0';
+export const NODE_APP_VERSION = '0.2.0';

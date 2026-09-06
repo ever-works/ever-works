@@ -28,6 +28,14 @@ export interface LinkExternalIssueInput {
     url?: string | null;
     tenantId?: string | null;
     organizationId?: string | null;
+    /**
+     * Freshness breadcrumbs a server-side filer stamps in the SAME write
+     * that binds the issue (the triage intake files a Task and links it
+     * in one step, then uses `lastIngestedEventId` as its idempotency
+     * marker when the drain retries the row). Omitted = left untouched.
+     */
+    lastIngestedEventId?: string | null;
+    lastSeenAt?: Date | null;
 }
 
 /**
@@ -99,7 +107,20 @@ export class ExternalIssueLinkService {
             url: input.url ?? null,
             tenantId: input.tenantId ?? null,
             organizationId: input.organizationId ?? null,
+            ...(input.lastIngestedEventId !== undefined
+                ? { lastIngestedEventId: input.lastIngestedEventId }
+                : {}),
+            ...(input.lastSeenAt !== undefined ? { lastSeenAt: input.lastSeenAt } : {}),
         });
+    }
+
+    /** The full link row for an owner-scoped external issue, or null. */
+    async find(
+        userId: string,
+        source: string,
+        externalIssueId: string,
+    ): Promise<ExternalIssueLink | null> {
+        return this.links.findByExternal(userId, source, externalIssueId);
     }
 
     /** Remove a binding, owner-scoped. True when a row went. */

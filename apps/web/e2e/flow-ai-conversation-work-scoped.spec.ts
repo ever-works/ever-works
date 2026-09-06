@@ -26,10 +26,11 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  * ── Verified API contracts (conversation entity vs. works) ───────────────────
  *
  * The Conversation entity (packages/agent/.../conversation.entity.ts) has NO
- * `workId` column. `CreateConversationDto` whitelists ONLY { title, providerId };
- * `UpdateConversationDto` whitelists ONLY { title } — both under the hardened
- * global ValidationPipe (`forbidNonWhitelisted:true`, apps/api/src/main.ts). So
- * the ONLY durable conversation⇄work linkage today is the TITLE ENCODING
+ * `workId` column. `CreateConversationDto` whitelists ONLY
+ * { title, providerId, model }; `UpdateConversationDto` whitelists ONLY
+ * { title, model } — both under the hardened global ValidationPipe
+ * (`forbidNonWhitelisted:true`, apps/api/src/main.ts). So the ONLY durable
+ * conversation⇄work linkage today is the TITLE ENCODING
  * (`work:<workId>` convention). The contracts that govern that linkage:
  *
  * GET /api/conversations?limit&offset[&workId]   (conversation.controller.list)
@@ -39,11 +40,13 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *   NO native server-side work filter. Clients filter by the `work:<id>` title
  *   prefix on the projection. `limit` is clamped to [1,200] (DoS cap).
  *
- * POST /api/conversations { title?, providerId? } → 201 row (no `messages`).
+ * POST /api/conversations { title?, providerId?, model? } → 201 row (no `messages`).
  *   title>200 → 400 maxLength; providerId>100 → 400 maxLength.
  *
- * PATCH /api/conversations/:id { title } → 204 (re-scopes the title linkage).
- *   title is REQUIRED + maxLength 200; a non-whitelisted `workId` in the body →
+ * PATCH /api/conversations/:id { title?, model? } → 204 (re-scopes the title
+ *   linkage). Since #2103 this is a PARTIAL update: BOTH fields are optional and
+ *   each write is guarded independently, so an EMPTY body is a valid 204 no-op.
+ *   title keeps its maxLength 200; a non-whitelisted `workId` in the body →
  *   400 ["property workId should not exist"] (forbidNonWhitelisted on UPDATE too).
  *
  * POST /api/conversations/:id/messages { messages } → 201 { success:true }.
@@ -326,7 +329,7 @@ test.describe('AI conversation entity — work-scoping linkage (title-encoded; n
         ).toEqual([]);
     });
 
-    test('Flow 4: PATCH is title-only — a smuggled `workId` is rejected (forbidNonWhitelisted on UPDATE), proving there is no FK re-link path', async ({
+    test('Flow 4: PATCH is whitelist-only — a smuggled `workId` is rejected (forbidNonWhitelisted on UPDATE), proving there is no FK re-link path', async ({
         request,
     }) => {
         test.setTimeout(60_000);
@@ -356,13 +359,24 @@ test.describe('AI conversation entity — work-scoping linkage (title-encoded; n
             'rejected smuggle did not change the title',
         ).toBe(`work:${fakeWorkId(4)}`);
 
-        // title is REQUIRED on update (an empty body is rejected, not a no-op).
+        // CONTRAST — the whitelist rejects, but it does not make any member of
+        // it mandatory. Since #2103 made PATCH a partial update (`title` and
+        // `model` both optional, each write guarded by `!== undefined`), an
+        // empty body is a valid no-op, NOT a 400. The point that matters for
+        // the work linkage: a body carrying nothing cannot re-scope anything.
         const empty = await request.patch(`${API_BASE}/api/conversations/${conv.id}`, {
             headers: authedHeaders(token),
             data: {},
         });
-        expect(empty.status(), 'PATCH with no title → 400 (title required)').toBe(400);
-        expect(flatMessage((await empty.json()) as ValidationError)).toContain('title');
+        expect(empty.status(), 'PATCH with an empty body → 204 (partial-update no-op)').toBe(204);
+
+        const afterNoOp = await request.get(`${API_BASE}/api/conversations/${conv.id}`, {
+            headers: authedHeaders(token),
+        });
+        expect(
+            ((await afterNoOp.json()) as ConversationRow).title,
+            'the empty no-op PATCH left the work linkage untouched',
+        ).toBe(`work:${fakeWorkId(4)}`);
     });
 
     test('Flow 5: conversation title/providerId length caps bound the work-linkage payload (create + update)', async ({

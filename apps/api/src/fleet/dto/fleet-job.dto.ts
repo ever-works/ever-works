@@ -32,6 +32,14 @@ import {
  * The global `ValidationPipe` runs `forbidNonWhitelisted`, so adding a
  * field here is a wire-contract change: the corresponding `apps/web/e2e`
  * rejection specs must be reconciled in the same PR.
+ *
+ * Suspend-safe leases (self-build finding R7): the heartbeat and complete
+ * bodies REQUIRE `leaseGeneration`, the claim identity handed out with
+ * the lease. It is the one thing in this channel that is not a
+ * credential yet still decides whether a write lands, so it is validated
+ * as strictly as one: integer, at least 1, no default. A node built
+ * before this field existed is refused at the edge (400) rather than
+ * quietly accepted against whichever claim happens to be current.
  */
 
 /** Shared credential fields for every node-authenticated job call. */
@@ -100,6 +108,15 @@ export class FleetJobHeartbeatDto extends FleetJobNodeCredentialDto {
     @Min(FLEET_JOB_MIN_LEASE_TTL_SEC)
     @Max(FLEET_JOB_MAX_LEASE_TTL_SEC)
     leaseTtlSec?: number;
+
+    @ApiProperty({
+        minimum: 1,
+        description:
+            'Lease generation returned with the claim. A generation that is not the current one is refused with 409 stale-lease.',
+    })
+    @IsInt()
+    @Min(1)
+    leaseGeneration: number;
 }
 
 /** Request body for the PUBLIC `POST /api/fleet/jobs/:id/complete`. */
@@ -107,6 +124,15 @@ export class CompleteFleetJobDto extends FleetJobNodeCredentialDto {
     @ApiProperty({ description: 'false records a failure; the sweeper may still retry it.' })
     @IsBoolean()
     success: boolean;
+
+    @ApiProperty({
+        minimum: 1,
+        description:
+            'Lease generation returned with the claim. A generation that is not the current one is refused with 409 stale-lease and writes nothing.',
+    })
+    @IsInt()
+    @Min(1)
+    leaseGeneration: number;
 
     @ApiProperty({
         required: false,

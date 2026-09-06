@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
 
 /**
  * EW-662 (Tenants & Organizations Phase 10) — web BFF proxy for
@@ -13,13 +12,13 @@ import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
  * `OrganizationResponse` so the dialog can hand off to the
  * `<UpgradeOrCreateDialog>` (for first-Org users) or navigate to
  * `/${org.slug}/dashboard`.
+ *
+ * NOTE on ordering: {@link bffProxy} settles auth and scope before this
+ * handler runs, so a request that is BOTH unparseable and missing a valid
+ * selector now answers `Invalid workspace scope` where it previously
+ * answered `Invalid JSON body`. Both are 400; only the message differs.
  */
-export async function POST(request: NextRequest) {
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
+export const POST = bffProxy(async ({ request, headers }) => {
     let body: unknown;
     try {
         body = await request.json();
@@ -27,15 +26,10 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
+    // Previously folded into the base headers handed to
+    // `applyBffWorkspaceScope`; the wrapper's base is `Authorization` only,
+    // and it returns a fresh `Headers`, so setting it here is equivalent.
+    headers.set('Content-Type', 'application/json');
 
     try {
         const upstream = await fetch(`${API_URL}/organizations/register-company`, {
@@ -65,7 +59,7 @@ export async function POST(request: NextRequest) {
         console.error('Failed to proxy POST /api/organizations/register-company:', error);
         return NextResponse.json({ error: 'Failed to register company' }, { status: 500 });
     }
-}
+});
 
 function safeParse(text: string): unknown {
     try {

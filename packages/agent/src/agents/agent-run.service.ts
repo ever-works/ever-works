@@ -4,6 +4,7 @@ import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
+import { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 import {
     SkillBindingRepository,
     type ResolvedSkill,
@@ -115,7 +116,12 @@ export interface AgentRunContext {
 
 export interface AgentRunBudgetCheck {
     allowed: boolean;
-    reason: 'ok' | 'over-cap' | 'unlimited' | 'no-budget';
+    /**
+     * `unevaluable` (fleet cost accounting, EW-777): a cap is set but the
+     * spend behind it could not be read. Refused, like `over-cap` — a cap
+     * that permits whenever it cannot count is not a cap.
+     */
+    reason: 'ok' | 'over-cap' | 'unlimited' | 'no-budget' | 'unevaluable';
     currentSpendCents: number;
     capCents: number | null;
     periodStart: Date;
@@ -230,6 +236,12 @@ export class AgentRunService {
         // ACTIVE SKILLS block. Both resolve via the SkillsModule import.
         @Optional() private readonly skillRepo?: SkillRepository,
         @Optional() private readonly skillFiles?: SkillFileRepository,
+        // Fleet cost accounting (EW-777) — the per-Agent budget precheck's
+        // spend source. Trailing + `@Optional()` so every positional
+        // constructor call keeps working; production DI provides it via
+        // `DatabaseModule`. Absent, a capped budget is UNEVALUABLE and the
+        // run is refused (see `checkBudget`) — never silently "0 spent".
+        @Optional() private readonly pluginUsage?: PluginUsageRepository,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -696,7 +708,41 @@ export class AgentRunService {
         }
     }
 
-    private async runToolLoop(
+    /**
+     * The tool loop, with the MCP tool source released on EVERY exit path
+     * (AP-14 prerequisite). Tool resolution happens before the loop's own
+     * try/catch, so a throw from it would escape the inner `finally`; this
+     * wrapper is what makes the release unconditional — a launched stdio
+     * server must never outlive its run, whether the run completed, errored,
+     * was cancelled, was interrupted, or never got its tools at all.
+     */
+    private async runToolLoop(context: AgentRunContext, agent: Agent, prompt: AssembledPrompt) {
+        try {
+            return await this.runToolLoopInner(context, agent, prompt);
+        } finally {
+            await this.releaseRunTools(context.runId);
+        }
+    }
+
+    /**
+     * Best-effort by construction: the run's outcome is already decided by
+     * the time this runs, and a cleanup failure must not rewrite it.
+     */
+    private async releaseRunTools(runId: string): Promise<void> {
+        const release = this.toolService?.releaseMcpRun;
+        if (typeof release !== 'function') return;
+        try {
+            await release.call(this.toolService, runId);
+        } catch (err) {
+            this.logger.warn(
+                `Run ${runId}: releasing MCP run resources failed: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+    }
+
+    private async runToolLoopInner(
         context: AgentRunContext,
         agent: Agent,
         prompt: AssembledPrompt,
@@ -1649,13 +1695,18 @@ export class AgentRunService {
     /**
      * Polymorphic budget check for an Agent's current period. Reads
      * the Agent's `AgentBudget` row (if any), aggregates this user's
-     * `PluginUsageEvent` spend over the period, returns an
-     * allow/deny + spend metadata.
+     * `PluginUsageEvent` spend attributed to the Agent over the period,
+     * returns an allow/deny + spend metadata.
      *
-     * Phase 7 v1 returns synthetic `currentSpendCents=0` until the
-     * `PluginUsageEvent` aggregator is wired up (Phase 7.5 follow-up).
-     * The shape is stable so callers don't need to re-do their
-     * handling once that lands.
+     * Fleet cost accounting (EW-777): the aggregation is real now. It
+     * reads `plugin_usage_events` by `(userId, agentId, occurredAt)`, so a
+     * FLEET run's model spend — recorded by the fleet reconciler as a
+     * `fleet-node:*` row with the same `agentId` — counts exactly like a
+     * cloud run's facade rows. No second accounting.
+     *
+     * Fail closed: a capped budget whose spend cannot be read (no usage
+     * repository bound, or the query threw) is refused with
+     * `reason: 'unevaluable'` rather than waved through as "0 spent".
      */
     async checkBudget(agent: Agent): Promise<AgentRunBudgetCheck> {
         const budget = await this.budgets.findByAgentId(agent.id).catch(() => null);
@@ -1697,13 +1748,36 @@ export class AgentRunService {
             };
         }
 
-        // TODO Phase 7.5 follow-up: aggregate from PluginUsageEvent
-        // joined by (userId, agentId, occurredAt BETWEEN periodStart
-        // AND periodEnd). For now we synthesize 0 spend so the
-        // allow/deny contract is stable; callers that genuinely care
-        // about enforcement today should consult BudgetGuardService
-        // directly with ownerType='agent'.
-        const currentSpendCents = 0;
+        let currentSpendCents: number;
+        try {
+            if (!this.pluginUsage) {
+                throw new Error('no usage repository bound');
+            }
+            currentSpendCents = await this.pluginUsage.getTotalSpendCentsForAgent(
+                agent.userId,
+                agent.id,
+                periodStart,
+                periodEnd,
+                (budget as { currency?: string }).currency ?? 'usd',
+            );
+            if (!Number.isFinite(currentSpendCents)) {
+                throw new Error(`spend sum is not a number: ${String(currentSpendCents)}`);
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Agent ${agent.id}: budget spend could not be evaluated (refusing the run): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return {
+                allowed: false,
+                reason: 'unevaluable',
+                currentSpendCents: 0,
+                capCents,
+                periodStart,
+                periodEnd,
+            };
+        }
         return {
             allowed: currentSpendCents < capCents,
             reason: currentSpendCents < capCents ? 'ok' : 'over-cap',

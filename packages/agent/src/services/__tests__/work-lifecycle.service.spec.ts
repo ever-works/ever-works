@@ -139,6 +139,9 @@ describe('WorkLifecycleService', () => {
             funnel,
             eventEmitter as never,
             organizationRepository,
+            // Self-build slice D (EW-766): the git facade is only touched by
+            // the Repository Work create path, which this spec never takes.
+            {} as never,
         );
     });
 

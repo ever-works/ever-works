@@ -397,6 +397,15 @@ export class JiraConnectorPlugin implements IConnectorPlugin, IEventSourcePlugin
 			defaultIssueKey: {
 				type: 'string',
 				title: 'Default issue key for outbound comments (e.g. ENG-42)'
+			},
+			webhookSecret: {
+				type: 'string',
+				title: 'Webhook secret',
+				description:
+					'Secret set on the Jira Cloud webhook that points at the platform ingest receiver (POST /api/ingest/jira/events). Jira signs every delivery with it (X-Hub-Signature, HMAC SHA-256); deliveries with a missing or mismatched signature are rejected, so a webhook created without a secret never files anything. Leave blank to keep the inbound receiver disabled for your account.',
+				'x-secret': true,
+				'x-scope': 'user',
+				'x-widget': 'password'
 			}
 		}
 	};

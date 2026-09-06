@@ -9,6 +9,7 @@ import {
     INBOX_MAX_REPLY_CHARS,
     INBOX_POLL_INTERVAL_MS,
     isAwaitingReply,
+    isFleetQuestion,
     type InboxItem,
     type InboxItemKind,
     type InboxItemSourceType,
@@ -35,7 +36,16 @@ describe('inbox.shared — contract parity', () => {
         const sourceTypes: InboxItemSourceType[] = [...INBOX_ITEM_SOURCE_TYPES];
         expect(kinds).toEqual(['question', 'approval', 'escalation', 'notice']);
         expect(statuses).toEqual(['open', 'answered', 'archived']);
-        expect(sourceTypes).toEqual(['agent-run', 'escalation', 'proposal', 'system', 'work']);
+        // `fleet-run` (self-build slice Q) is appended LAST — the contracts
+        // list is ordered by the release each source shipped in.
+        expect(sourceTypes).toEqual([
+            'agent-run',
+            'escalation',
+            'proposal',
+            'system',
+            'work',
+            'fleet-run',
+        ]);
     });
 
     it('polls at the notification bell cadence', () => {
@@ -76,5 +86,25 @@ describe('isAwaitingReply', () => {
         expect(isAwaitingReply(item({ kind: 'approval' }))).toBe(false);
         expect(isAwaitingReply(item({ kind: 'escalation' }))).toBe(false);
         expect(isAwaitingReply(item({ kind: 'notice' }))).toBe(false);
+    });
+
+    it('flags fleet-run questions by source type alone, whatever sourceMeta says', () => {
+        // Slice Q: the source type is the signal; `sourceMeta` is decoration
+        // that an older API omits and a degraded producer may leave null.
+        expect(isFleetQuestion(item({ sourceType: 'fleet-run' }))).toBe(true);
+        expect(isFleetQuestion(item({ sourceType: 'fleet-run', sourceMeta: null }))).toBe(true);
+        expect(
+            isFleetQuestion(
+                item({
+                    sourceType: 'fleet-run',
+                    sourceMeta: { nodeName: 'everdesk2', branch: 'task/tsk-1-fix' },
+                }),
+            ),
+        ).toBe(true);
+        expect(isFleetQuestion(item({}))).toBe(false);
+        expect(
+            isFleetQuestion(item({ sourceType: 'agent-run', sourceMeta: { nodeName: 'x' } })),
+        ).toBe(false);
+        expect(isFleetQuestion(item({ sourceType: 'system', kind: 'notice' }))).toBe(false);
     });
 });

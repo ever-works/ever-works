@@ -48,7 +48,39 @@ export interface GitHubWebhookDispatchResult {
     readonly errors: {
         readonly sync?: unknown;
         readonly review?: unknown;
+        /**
+         * First failure among the REGISTERED intake consumers (issues,
+         * Dependabot alerts — see {@link GitHubWebhookConsumer}). The
+         * canonical route rethrows it like `review`; the legacy App route
+         * only logs it.
+         */
+        readonly intake?: unknown;
     };
+}
+
+/**
+ * A downstream consumer of VERIFIED, owner-attributed GitHub deliveries
+ * that is not the PR-review bridge — the issue / Dependabot intake.
+ *
+ * Registered at boot (`registerConsumer`) by the feature service that
+ * owns it, the same way kind processors register on the ingest spine:
+ * the dispatcher stays dependency-free of the intakes it feeds, its
+ * constructor arity (pinned by `ingest.module.spec.ts`) is untouched,
+ * and the PR-review bridge — owned by a sibling change — is never
+ * edited to learn about new event names.
+ *
+ * Consumers see a delivery only after the signature verified and the
+ * binding resolved; they are skipped for `ping` and for unattributable
+ * App deliveries, exactly like the review leg.
+ */
+export interface GitHubWebhookConsumer {
+    /** `x-github-event` names this consumer handles (e.g. `issues`). */
+    readonly events: readonly string[];
+    handle(
+        binding: GitHubEventsBinding,
+        eventName: string,
+        body: GitHubWebhookBody,
+    ): Promise<unknown>;
 }
 
 /**
@@ -107,12 +139,24 @@ export interface GitHubWebhookDispatchResult {
 export class GitHubWebhookDispatcherService {
     private readonly logger = new Logger(GitHubWebhookDispatcherService.name);
 
+    /** Intake consumers registered at boot — see {@link GitHubWebhookConsumer}. */
+    private readonly consumers: GitHubWebhookConsumer[] = [];
+
     constructor(
         private readonly bridge: GitHubPrReviewBridgeService,
         private readonly appSync: GitHubAppSyncService,
         private readonly installations: GitHubAppInstallationRepository,
         private readonly userLinks: GitHubAppUserLinkRepository,
     ) {}
+
+    /**
+     * Register an intake consumer for specific `x-github-event` names.
+     * Feature services call this from `onModuleInit` (the dispatcher is a
+     * process singleton, so both receiver routes see it).
+     */
+    registerConsumer(consumer: GitHubWebhookConsumer): void {
+        this.consumers.push(consumer);
+    }
 
     /**
      * Verify one delivery and fan it out to every consumer.
@@ -194,7 +238,7 @@ export class GitHubWebhookDispatcherService {
         }
 
         // ---- Fan out to every consumer -------------------------------
-        const errors: { sync?: unknown; review?: unknown } = {};
+        const errors: { sync?: unknown; review?: unknown; intake?: unknown } = {};
 
         // 1. GitHub App sync (installation / installation_repositories).
         //    Ran on every verified delivery of the legacy route before;
@@ -230,6 +274,24 @@ export class GitHubWebhookDispatcherService {
                     workspace?.keys[0] ?? 'the installation'
                 }; skipping the review leg`,
             );
+        }
+
+        // 3. Registered intake consumers (issues, Dependabot alerts, …).
+        //    Same verified delivery, same owner binding as the review
+        //    leg; a failure is isolated into `errors.intake` so neither
+        //    route grows a new way to fail on the legs it already had.
+        if (eventName !== 'ping' && binding) {
+            for (const consumer of this.consumers) {
+                if (!consumer.events.includes(eventName)) continue;
+                try {
+                    await consumer.handle(binding, eventName, body);
+                } catch (error) {
+                    errors.intake ??= error;
+                    this.logger.warn(
+                        `GitHub intake consumer failed for '${eventName}': ${this.messageOf(error)}`,
+                    );
+                }
+            }
         }
 
         return {

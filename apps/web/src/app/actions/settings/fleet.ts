@@ -7,9 +7,16 @@ import { getAuthFromCookie } from '@/lib/auth';
 import { ApiResponseError } from '@/lib/api/server-api';
 import {
     fleetAPI,
+    type CancelFleetInFlightPayload,
     type CreateFleetEnrollmentTokenPayload,
     type CreateFleetEnrollmentTokenResponse,
+    type FleetAgentNodeAffinityView,
+    type FleetCostCeilingView,
+    type FleetCancelInFlightResult,
+    type FleetDrainAllResult,
     type FleetEnrollmentTokenView,
+    type FleetKillSwitchChangeResult,
+    type FleetKillSwitchState,
     type FleetNodeDetailView,
     type FleetNodeDrainResult,
     type FleetExecutionPreferenceView,
@@ -33,6 +40,17 @@ import {
  */
 
 const SETTINGS_PAGE_PATTERN = '/[locale]/(dashboard)/settings/fleet';
+
+/**
+ * The Agent's Capabilities tab, where the preferred-node picker lives.
+ *
+ * The ROUTE pattern with `'page'`, like `SETTINGS_PAGE_PATTERN` above,
+ * rather than a literal `/agents/:id/capabilities`: the page is served
+ * under a locale prefix and, in an Organization workspace (the only
+ * place the picker is enabled), under `/org/<slug>` too, so a literal
+ * path would match nothing the moment the page became cacheable.
+ */
+const AGENT_CAPABILITIES_PAGE_PATTERN = '/[locale]/(dashboard)/agents/[id]/capabilities';
 
 async function ensureAuth() {
     const user = await getAuthFromCookie();
@@ -196,6 +214,141 @@ export async function drainFleetNodeAction(
     }
 }
 
+/** Fleet cost accounting (EW-777) — the fleet-wide daily model-spend ceiling. */
+export async function getFleetCostCeilingAction(): Promise<
+    FleetActionResult<FleetCostCeilingView>
+> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.getCostCeiling();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to load the fleet cost ceiling'),
+        };
+    }
+}
+
+/** Set (or clear, with null) the fleet-wide daily model-spend ceiling. */
+export async function setFleetCostCeilingAction(
+    dailyCeilingCents: number | null,
+): Promise<FleetActionResult<FleetCostCeilingView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setCostCeiling(dailyCeilingCents);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to update the fleet cost ceiling'),
+        };
+    }
+}
+
+/**
+ * Panic controls (EW-778) — drain EVERY node the caller owns. Nothing is
+ * cancelled; that is `cancelFleetInFlightAction`, a separate decision.
+ */
+export async function drainAllFleetNodesAction(): Promise<FleetActionResult<FleetDrainAllResult>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.drainAll();
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to drain the fleet'),
+        };
+    }
+}
+
+/**
+ * Panic controls (EW-778) — cancel the caller's running fleet work and
+ * the agent runs behind it. Explicit and separate from draining and from
+ * the stop flag, on purpose.
+ */
+export async function cancelFleetInFlightAction(
+    payload: CancelFleetInFlightPayload = {},
+): Promise<FleetActionResult<FleetCancelInFlightResult>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.cancelInFlight(payload);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to cancel in-flight work'),
+        };
+    }
+}
+
+/**
+ * Panic controls (EW-778) — is the platform-wide stop flag set? Polled by
+ * the fleet page banner, so like runner status it deliberately does NOT
+ * `revalidatePath`.
+ */
+export async function getFleetKillSwitchAction(): Promise<FleetActionResult<FleetKillSwitchState>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.killSwitchState();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to read the stop flag'),
+        };
+    }
+}
+
+/**
+ * Panic controls (EW-778) — set the platform-wide stop flag. Platform
+ * admins only: the API answers 403 for everyone else and this action
+ * simply surfaces that message.
+ */
+export async function stopFleetKillSwitchAction(
+    reason?: string | null,
+): Promise<FleetActionResult<FleetKillSwitchChangeResult>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.stopKillSwitch(reason ?? null);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to set the stop flag'),
+        };
+    }
+}
+
+/** Panic controls (EW-778) — clear the platform-wide stop flag (platform admins only). */
+export async function clearFleetKillSwitchAction(): Promise<
+    FleetActionResult<FleetKillSwitchChangeResult>
+> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.clearKillSwitch();
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to clear the stop flag'),
+        };
+    }
+}
+
 /**
  * Runner status for the always-visible sidebar pill.
  *
@@ -251,6 +404,52 @@ export async function setFleetExecutionPreferenceAction(
             success: false,
             data: null,
             error: errorMessage(error, 'Failed to save the execution preference'),
+        };
+    }
+}
+
+/**
+ * Pin an Agent's `agent-task` jobs to ONE of the owner's nodes.
+ *
+ * Invalidates the Agent's Capabilities tab (where the picker lives)
+ * rather than the Fleet settings page: the binding is a property of the
+ * Agent, and nothing on the settings page renders it.
+ */
+export async function setFleetAgentAffinityAction(
+    agentId: string,
+    nodeId: string,
+): Promise<FleetActionResult<FleetAgentNodeAffinityView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setAgentAffinity(agentId, nodeId);
+        revalidatePath(AGENT_CAPABILITIES_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to set the preferred node'),
+        };
+    }
+}
+
+/**
+ * Return an Agent to "any of my nodes". Jobs already queued keep the node
+ * they were enqueued for; only future jobs become unbound.
+ */
+export async function clearFleetAgentAffinityAction(
+    agentId: string,
+): Promise<FleetActionResult<{ cleared: true }>> {
+    await ensureAuth();
+    try {
+        await fleetAPI.clearAgentAffinity(agentId);
+        revalidatePath(AGENT_CAPABILITIES_PAGE_PATTERN, 'page');
+        return { success: true, data: { cleared: true }, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to clear the preferred node'),
         };
     }
 }

@@ -1,0 +1,705 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { FleetJobView, FleetTaskWorkspaceDescriptor } from '@ever-works/contracts';
+import { mkdtempSync, promises as realFs } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+	AgentTaskPayloadError,
+	defaultScratchFs,
+	runAgentTaskJob,
+	type AgentTaskIo,
+	type AgentTaskScratchFs
+} from './agent-task';
+import { ownerQuestionPath, type AgentTaskQuestionFs } from './agent-task-question';
+import { MODEL_CLI_MAX_OUTPUT_BYTES } from './model-cli';
+
+/**
+ * `agent-task` with an `execution` block — agent execution v2.
+ *
+ * What these prove, in order of how much it would hurt to lose:
+ *
+ *   1. The model runs FIRST, in the provisioned worktree, with the
+ *      instructions on stdin (a scratch file the node writes) and the
+ *      CLI's output captured from a scratch file — never argv.
+ *   2. The verdict is honest: a model that failed, a red check, or a
+ *      failed push each make the job `failed` and say why, even when
+ *      the other parts went fine.
+ *   3. A node without the requested CLI refuses the job naming the knob,
+ *      rather than pretending to have run it.
+ */
+
+const ABSOLUTE = process.platform === 'win32' ? 'C:\\workspace' : '/workspace';
+const CLAUDE = process.platform === 'win32' ? 'C:\\npm\\claude.cmd' : '/usr/local/bin/claude';
+const SCRATCH = process.platform === 'win32' ? 'C:\\scratch' : '/scratch';
+
+const descriptor: FleetTaskWorkspaceDescriptor = {
+	path: ABSOLUTE,
+	repositoryId: 'ever-works/ever-works',
+	baseRef: 'develop',
+	branch: 'task/t1-fix',
+	baseSha: 'a'.repeat(40),
+	headSha: 'a'.repeat(40),
+	reused: false
+};
+
+function job(payload: unknown): FleetJobView {
+	return {
+		id: 'job-77',
+		kind: 'agent-task',
+		status: 'leased',
+		nodeId: 'node-1',
+		requiredCapabilities: [],
+		payload: payload as Record<string, unknown>,
+		leaseExpiresAt: null,
+		attempts: 1,
+		maxAttempts: 3,
+		createdAt: null,
+		startedAt: null,
+		completedAt: null
+	};
+}
+
+const claudeEnvelope = JSON.stringify({
+	type: 'result',
+	subtype: 'success',
+	is_error: false,
+	result: 'Implemented the change.',
+	total_cost_usd: 0.5,
+	num_turns: 3,
+	session_id: 'sess-1'
+});
+
+/** In-memory scratch filesystem; records what the model step wrote. */
+function scratchFs(modelOutput: string | null): AgentTaskScratchFs & { files: Map<string, string>; removed: string[] } {
+	const files = new Map<string, string>();
+	const removed: string[] = [];
+	return {
+		files,
+		removed,
+		createScratchDir: async (root, prefix) => join(root, `${prefix}-scratch`),
+		writeFile: async (path, content) => {
+			files.set(path, content);
+		},
+		readFile: async (path) => (path.endsWith('model-output.json') ? modelOutput : (files.get(path) ?? null)),
+		remove: async (path) => {
+			removed.push(path);
+		}
+	};
+}
+
+/**
+ * In-memory owner-question filesystem (self-build slice Q). Records every
+ * removal in `events` so ordering against the spawn and the finalizers can
+ * be asserted; `readHead` is null for an absent path, so a test that never
+ * seeds a file never touches the real filesystem.
+ */
+function questionFs(seed: Record<string, string> = {}, events: string[] = []) {
+	const files = new Map<string, string>(Object.entries(seed));
+	const fs: AgentTaskQuestionFs & { files: Map<string, string>; events: string[] } = {
+		files,
+		events,
+		readHead: async (path, maxBytes) => {
+			const content = files.get(path);
+			if (content === undefined) return null;
+			return Buffer.from(content, 'utf8').subarray(0, maxBytes).toString('utf8');
+		},
+		remove: async (path) => {
+			events.push(`remove:${path}`);
+			files.delete(path);
+		},
+		removeDirIfEmpty: async () => undefined
+	};
+	return fs;
+}
+
+/** Spawn double that records every command and scripts exit codes by substring. */
+function recordingSpawn(exitCodes: Array<[match: string, code: number | null]>, onCommand?: (command: string) => void) {
+	const commands: string[] = [];
+	const spawnFn = ((command: string) => {
+		commands.push(command);
+		onCommand?.(command);
+		const handlers = new Map<string, (arg?: unknown) => void>();
+		queueMicrotask(() => {
+			const hit = exitCodes.find(([match]) => command.includes(match));
+			handlers.get('close')?.(hit ? hit[1] : 0);
+		});
+		return {
+			stdout: { on: () => undefined, destroy: () => undefined },
+			stderr: { on: () => undefined, destroy: () => undefined },
+			on: (event: string, handler: (arg?: unknown) => void) => {
+				handlers.set(event, handler);
+			},
+			kill: () => undefined
+		};
+	}) as never;
+	return { commands, spawnFn };
+}
+
+function baseIo(over: Partial<AgentTaskIo> = {}): AgentTaskIo {
+	return {
+		directoryExists: () => true,
+		provisionWorkspace: vi.fn(async () => descriptor),
+		finalizeWorkspace: vi.fn(async () => ({
+			pushed: true,
+			headSha: 'b'.repeat(40),
+			empty: false,
+			changedFiles: 3
+		})),
+		modelCli: { 'claude-code': CLAUDE, codex: null },
+		scratchRoot: SCRATCH,
+		scratchFs: scratchFs(claudeEnvelope),
+		questionFs: questionFs(),
+		...over
+	};
+}
+
+const payload = {
+	taskId: 't1',
+	runId: 'run-1',
+	agentId: 'agent-1',
+	workspace: {
+		repositoryId: 'ever-works/ever-works',
+		repoUrl: 'https://github.com/ever-works/ever-works.git',
+		baseRef: 'develop',
+		branch: 'task/t1-fix'
+	},
+	execution: {
+		provider: 'claude-code',
+		instructions: '# Task\nFix the thing.',
+		model: 'claude-opus-5',
+		effort: 'high',
+		envPassthrough: ['CLAUDE_CODE_OAUTH_TOKEN']
+	},
+	acceptanceChecks: [{ id: 'unit', name: 'Unit', kind: 'test', command: 'pnpm test' }]
+};
+
+describe('runAgentTaskJob — model-cli execution', () => {
+	it('runs the model in the worktree, grades the checks, commits and pushes, and reports success', async () => {
+		const { commands, spawnFn } = recordingSpawn([]);
+		const fs = scratchFs(claudeEnvelope);
+		const io = baseIo({ spawnFn, scratchFs: fs });
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		expect(io.provisionWorkspace).toHaveBeenCalledWith('t1', payload.workspace, undefined);
+		// The model command came FIRST, then the acceptance check.
+		expect(commands).toHaveLength(2);
+		expect(commands[0]).toContain(CLAUDE);
+		expect(commands[0]).toContain('-p --output-format json --permission-mode acceptEdits');
+		expect(commands[0]).toContain('--model claude-opus-5');
+		expect(commands[0]).toContain('--effort high');
+		expect(commands[0]).toContain('instructions.md');
+		expect(commands[0]).not.toContain('Fix the thing');
+		expect(commands[1]).toBe('pnpm test');
+		// Instructions were written verbatim to scratch, and scratch was removed.
+		const written = [...fs.files.entries()].find(([path]) => path.endsWith('instructions.md'));
+		expect(written?.[1]).toBe('# Task\nFix the thing.');
+		expect(fs.removed).toHaveLength(1);
+		expect(fs.removed[0]).toContain('job-77');
+		expect(fs.removed[0]).toContain('-scratch');
+
+		expect(io.finalizeWorkspace).toHaveBeenCalledWith(
+			't1',
+			descriptor,
+			{ commitMessage: 'feat(task): t1 agent run output', push: true },
+			undefined
+		);
+		expect(outcome).toEqual({
+			status: 'succeeded',
+			taskId: 't1',
+			runId: 'run-1',
+			workspace: descriptor,
+			steps: [],
+			model: {
+				provider: 'claude-code',
+				status: 'succeeded',
+				exitCode: 0,
+				durationMs: expect.any(Number),
+				summary: 'Implemented the change.',
+				costUsd: 0.5,
+				turns: 3,
+				sessionId: 'sess-1'
+			},
+			checks: [{ id: 'unit', status: 'green', exitCode: 0, durationMs: expect.any(Number) }],
+			gateStatus: 'green',
+			git: {
+				branch: 'task/t1-fix',
+				baseSha: 'a'.repeat(40),
+				headSha: 'b'.repeat(40),
+				empty: false,
+				pushed: true,
+				changedFiles: 3
+			}
+		});
+	});
+
+	it('honours the git policy: custom subject, no push', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		const io = baseIo({ spawnFn });
+		await runAgentTaskJob(job({ ...payload, git: { push: false, commitMessage: 'chore: wip' } }), io);
+		expect(io.finalizeWorkspace).toHaveBeenCalledWith(
+			't1',
+			descriptor,
+			{ commitMessage: 'chore: wip', push: false },
+			undefined
+		);
+	});
+
+	it('passes the lease fence into finalize and names a withheld publish in the run report', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		const fence = { deadlineAt: Date.parse('2026-09-04T13:00:00.000Z'), marginMs: 60_000 };
+		const withheld = 'the lease on this work expired 12s ago';
+		const onPublishWithheld = vi.fn();
+		const io = baseIo({
+			spawnFn,
+			// Async on purpose: resolving the fence re-asks the platform
+			// whether this node still holds the claim.
+			publishFence: async () => fence,
+			onPublishWithheld,
+			finalizeWorkspace: vi.fn(async () => ({
+				pushed: false,
+				headSha: 'c'.repeat(40),
+				empty: false,
+				changedFiles: 2,
+				publishWithheld: withheld
+			}))
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		expect(io.finalizeWorkspace).toHaveBeenCalledWith(
+			't1',
+			descriptor,
+			{ commitMessage: 'feat(task): t1 agent run output', push: true, publishFence: fence },
+			undefined
+		);
+		// The run FAILS — the branch never reached the remote — but the reason
+		// reads "publish withheld", not "git finalize failed": nothing is broken
+		// in Git, and headSha names the commit the next attempt resumes from.
+		expect(outcome.status).toBe('failed');
+		expect(outcome.failureReason).toBe(`publish withheld: ${withheld}`);
+		// And the caller is TOLD, so it can decide the job was never run to a
+		// verdict rather than settling it terminally with no branch pushed.
+		expect(onPublishWithheld).toHaveBeenCalledExactlyOnceWith(withheld);
+		expect(outcome.git).toEqual({
+			branch: 'task/t1-fix',
+			baseSha: 'a'.repeat(40),
+			headSha: 'c'.repeat(40),
+			empty: false,
+			pushed: false,
+			changedFiles: 2,
+			publishWithheld: withheld
+		});
+	});
+
+	it('reads the lease deadline AFTER the model step, not when the job was leased', async () => {
+		const { commands, spawnFn } = recordingSpawn([]);
+		const commandsAtFenceTime: string[] = [];
+		const publishFence = vi.fn(() => {
+			commandsAtFenceTime.push(...commands);
+			return { deadlineAt: Date.parse('2026-09-04T14:00:00.000Z'), marginMs: 60_000 };
+		});
+		const onPublishWithheld = vi.fn();
+		const io = baseIo({ spawnFn, publishFence, onPublishWithheld });
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		expect(publishFence).toHaveBeenCalledTimes(1);
+		// A push that LANDED is an ordinary success: nothing was withheld, so
+		// the job settles exactly as it did before the fence existed.
+		expect(onPublishWithheld).not.toHaveBeenCalled();
+		expect(outcome.status).toBe('succeeded');
+		// The model and the acceptance check had both already run, so the
+		// deadline read is the one the keep-alive has since renewed — reading
+		// it at job start would fence against a value four renewals stale.
+		expect(commandsAtFenceTime).toEqual(commands);
+		expect(commandsAtFenceTime).toHaveLength(2);
+	});
+
+	it('skips the commit entirely when the policy says so', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		const io = baseIo({ spawnFn });
+		const outcome = await runAgentTaskJob(job({ ...payload, git: { commit: false } }), io);
+		expect(io.finalizeWorkspace).not.toHaveBeenCalled();
+		expect(outcome.git).toBeUndefined();
+		expect(outcome.status).toBe('succeeded');
+	});
+
+	it('fails the job when the CLI reports an error, and still grades the checks', async () => {
+		const { commands, spawnFn } = recordingSpawn([]);
+		const io = baseIo({
+			spawnFn,
+			scratchFs: scratchFs(
+				JSON.stringify({ type: 'result', is_error: true, subtype: 'error_during_execution', result: 'blew up' })
+			)
+		});
+		const outcome = await runAgentTaskJob(job(payload), io);
+		expect(commands).toHaveLength(2);
+		expect(outcome.status).toBe('failed');
+		expect(outcome.model?.status).toBe('failed');
+		expect(outcome.failureReason).toContain('claude-code reported an error: blew up');
+		expect(outcome.gateStatus).toBe('green');
+	});
+
+	it('fails the job on a red required check even when the model succeeded', async () => {
+		const { spawnFn } = recordingSpawn([['pnpm test', 1]]);
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn }));
+		expect(outcome.status).toBe('failed');
+		expect(outcome.gateStatus).toBe('red');
+		expect(outcome.checks?.[0].status).toBe('red');
+		expect(outcome.failureReason).toBe('a required acceptance check did not pass');
+	});
+
+	it('fails the job when the push fails, and names the git error', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		const io = baseIo({
+			spawnFn,
+			finalizeWorkspace: vi.fn(async () => {
+				throw new Error('git push failed: remote rejected');
+			})
+		});
+		const outcome = await runAgentTaskJob(job(payload), io);
+		expect(outcome.status).toBe('failed');
+		expect(outcome.git?.error).toBe('git push failed: remote rejected');
+		expect(outcome.failureReason).toContain('git finalize failed');
+	});
+
+	it('reports a node without a finalizer honestly', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn, finalizeWorkspace: undefined }));
+		expect(outcome.status).toBe('failed');
+		expect(outcome.git?.error).toContain('no workspace finalizer');
+	});
+
+	it('refuses a job for a CLI this node does not have, naming the knob', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		await expect(
+			runAgentTaskJob(
+				job({ ...payload, execution: { ...payload.execution, provider: 'codex' } }),
+				baseIo({ spawnFn })
+			)
+		).rejects.toThrowError(/EVER_WORKS_NODE_CODEX_PATH/);
+	});
+
+	it('refuses a malformed execution block naming the field', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		await expect(
+			runAgentTaskJob(
+				job({ ...payload, execution: { ...payload.execution, model: 'x; rm -rf /' } }),
+				baseIo({ spawnFn })
+			)
+		).rejects.toBeInstanceOf(AgentTaskPayloadError);
+	});
+
+	it('runs the model without a repository workspace when only a path is given, and does not commit', async () => {
+		const { commands, spawnFn } = recordingSpawn([]);
+		const io = baseIo({ spawnFn });
+		const { workspace: _workspace, acceptanceChecks: _checks, ...rest } = payload;
+		const outcome = await runAgentTaskJob(job({ ...rest, workspacePath: ABSOLUTE }), io);
+		expect(commands).toHaveLength(1);
+		expect(io.finalizeWorkspace).not.toHaveBeenCalled();
+		expect(outcome.workspace).toBeNull();
+		expect(outcome.gateStatus).toBe('none');
+		expect(outcome.status).toBe('succeeded');
+	});
+
+	it('still runs legacy steps after the model when both are present', async () => {
+		const { commands, spawnFn } = recordingSpawn([]);
+		const outcome = await runAgentTaskJob(
+			job({ ...payload, steps: [{ id: 'lint', command: 'pnpm lint' }] }),
+			baseIo({ spawnFn })
+		);
+		expect(commands.map((c) => (c.includes(CLAUDE) ? 'model' : c))).toEqual(['model', 'pnpm lint', 'pnpm test']);
+		expect(outcome.steps).toEqual([{ id: 'lint', status: 'green', exitCode: 0, durationMs: expect.any(Number) }]);
+	});
+
+	it('stops at a cancellation between phases', async () => {
+		const controller = new AbortController();
+		const { spawnFn } = recordingSpawn([]);
+		const io = baseIo({
+			spawnFn,
+			provisionWorkspace: vi.fn(async () => {
+				controller.abort(new Error('lease lost'));
+				return descriptor;
+			})
+		});
+		await expect(runAgentTaskJob(job(payload), io, controller.signal)).rejects.toThrowError(/lease lost/);
+		expect(io.finalizeWorkspace).not.toHaveBeenCalled();
+	});
+});
+
+describe('runAgentTaskJob — owner question (self-build slice Q)', () => {
+	const QUESTION_PATH = ownerQuestionPath(ABSOLUTE);
+	const QUESTION_MD = '# Use Postgres?\n\nSQLite would be simpler, but the brief says production.';
+
+	/** A spawn double that writes the question file when the MODEL command runs, and logs phases. */
+	function questionRun(qfs: ReturnType<typeof questionFs>, events: string[], markdown: string | null) {
+		return recordingSpawn([], (command) => {
+			if (command.includes(CLAUDE)) {
+				events.push('spawn:model');
+				if (markdown !== null) qfs.files.set(QUESTION_PATH, markdown);
+			} else {
+				events.push('spawn:check');
+			}
+		});
+	}
+
+	it('reports the question the model wrote, removes the file, and still finalizes the partial work', async () => {
+		const events: string[] = [];
+		const qfs = questionFs({}, events);
+		const { spawnFn } = questionRun(qfs, events, QUESTION_MD);
+		const io = baseIo({
+			spawnFn,
+			questionFs: qfs,
+			finalizeWorkspace: vi.fn(async () => {
+				events.push('finalize:primary');
+				return { pushed: true, headSha: 'b'.repeat(40), empty: false, changedFiles: 1 };
+			})
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		expect(outcome.question).toEqual({
+			text: 'Use Postgres?',
+			context: 'SQLite would be simpler, but the brief says production.',
+			truncated: false,
+			mountDir: null
+		});
+		// A question is not a failure: the model, the check and the push all
+		// report exactly as they did, and the partial work is on the branch.
+		expect(outcome.status).toBe('succeeded');
+		expect(outcome.git).toMatchObject({ pushed: true, headSha: 'b'.repeat(40) });
+		expect(qfs.files.size).toBe(0);
+		// Ordering: the stale-file discard BEFORE the model, the collect
+		// (its removal) AFTER the model and BEFORE the check and the finalize.
+		expect(events).toEqual([
+			`remove:${QUESTION_PATH}`,
+			'spawn:model',
+			`remove:${QUESTION_PATH}`,
+			'spawn:check',
+			'finalize:primary'
+		]);
+	});
+
+	it('discards a stale file from an earlier attempt before the model runs and reports no question', async () => {
+		const events: string[] = [];
+		const qfs = questionFs({ [QUESTION_PATH]: '# Stale question from a crashed attempt?' }, events);
+		let staleVisibleToModel: boolean | null = null;
+		const { spawnFn } = recordingSpawn([], (command) => {
+			if (command.includes(CLAUDE)) staleVisibleToModel = qfs.files.has(QUESTION_PATH);
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn, questionFs: qfs }));
+
+		expect(staleVisibleToModel).toBe(false);
+		expect('question' in outcome).toBe(false);
+		expect(outcome.status).toBe('succeeded');
+		expect(events[0]).toBe(`remove:${QUESTION_PATH}`);
+	});
+
+	it('reports no question key at all when the model wrote no file', async () => {
+		const { spawnFn } = recordingSpawn([]);
+		const outcome = await runAgentTaskJob(job(payload), baseIo({ spawnFn }));
+		expect('question' in outcome).toBe(false);
+	});
+
+	it('keeps the honest failure verdict AND the question when the model failed and a check is red', async () => {
+		const events: string[] = [];
+		const qfs = questionFs({}, events);
+		const { spawnFn } = recordingSpawn(
+			[
+				[CLAUDE, 1],
+				['pnpm test', 1]
+			],
+			(command) => {
+				if (command.includes(CLAUDE)) qfs.files.set(QUESTION_PATH, QUESTION_MD);
+			}
+		);
+		const io = baseIo({
+			spawnFn,
+			questionFs: qfs,
+			scratchFs: scratchFs(
+				JSON.stringify({ type: 'result', is_error: true, subtype: 'error_during_execution', result: 'blew up' })
+			)
+		});
+
+		const outcome = await runAgentTaskJob(job(payload), io);
+
+		// The platform decides what a paused run means; the node never
+		// launders a red verdict into a green one because a question exists.
+		expect(outcome.status).toBe('failed');
+		expect(outcome.failureReason).toContain('claude-code reported an error: blew up');
+		expect(outcome.failureReason).toContain('a required acceptance check did not pass');
+		expect(outcome.question?.text).toBe('Use Postgres?');
+	});
+
+	it('leaves the run untouched when the question file cannot be read', async () => {
+		const qfs = questionFs();
+		qfs.readHead = async () => {
+			throw Object.assign(new Error('permission denied'), { code: 'EACCES' });
+		};
+		const { spawnFn } = recordingSpawn([]);
+		const io = baseIo({ spawnFn, questionFs: qfs });
+		const outcome = await runAgentTaskJob(job(payload), io);
+		expect('question' in outcome).toBe(false);
+		expect(outcome.status).toBe('succeeded');
+		expect(io.finalizeWorkspace).toHaveBeenCalledTimes(1);
+	});
+
+	it('still reports the question and still finalizes when the file cannot be removed', async () => {
+		const events: string[] = [];
+		const qfs = questionFs({}, events);
+		qfs.remove = async () => {
+			throw Object.assign(new Error('operation not permitted'), { code: 'EPERM' });
+		};
+		const { spawnFn } = questionRun(qfs, events, QUESTION_MD);
+		const io = baseIo({ spawnFn, questionFs: qfs });
+		const outcome = await runAgentTaskJob(job(payload), io);
+		expect(outcome.question?.text).toBe('Use Postgres?');
+		expect(io.finalizeWorkspace).toHaveBeenCalledTimes(1);
+		expect(outcome.status).toBe('succeeded');
+	});
+
+	it('never looks for a question when the job has no model execution', async () => {
+		const qfs = questionFs({ [QUESTION_PATH]: '# Not a question — legacy steps run here' });
+		const { spawnFn } = recordingSpawn([]);
+		const { execution: _execution, acceptanceChecks: _checks, workspace: _workspace, ...rest } = payload;
+		const outcome = await runAgentTaskJob(
+			job({ ...rest, workspacePath: ABSOLUTE, steps: [{ id: 'lint', command: 'pnpm lint' }] }),
+			baseIo({ spawnFn, questionFs: qfs })
+		);
+		expect('question' in outcome).toBe(false);
+		expect(qfs.files.has(QUESTION_PATH)).toBe(true);
+		expect(qfs.events).toEqual([]);
+	});
+});
+
+describe('defaultScratchFs — scratch directories cannot be pre-planted (review follow-up)', () => {
+	it('creates a unique directory under the root even when the predictable name is a symlink elsewhere', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-scratch-root-'));
+		const elsewhere = mkdtempSync(join(tmpdir(), 'ew-scratch-elsewhere-'));
+		// An attacker pre-creates a link at the predictable path.
+		await realFs.symlink(elsewhere, join(root, 'job-77'), process.platform === 'win32' ? 'junction' : 'dir');
+
+		const created = await defaultScratchFs.createScratchDir(root, 'job-77');
+		try {
+			// The created directory is unique (never the planted name) and a
+			// real directory under the root, not the link's target.
+			expect(created).not.toBe(join(root, 'job-77'));
+			expect(created.startsWith(root)).toBe(true);
+			const stat = await realFs.lstat(created);
+			expect(stat.isDirectory()).toBe(true);
+			expect(stat.isSymbolicLink()).toBe(false);
+			await defaultScratchFs.writeFile(join(created, 'instructions.md'), 'secret');
+			expect(await realFs.readdir(elsewhere)).toEqual([]);
+			expect(await defaultScratchFs.readFile(join(created, 'instructions.md'))).toBe('secret');
+			expect(await defaultScratchFs.readFile(join(created, 'missing.json'))).toBeNull();
+		} finally {
+			await defaultScratchFs.remove(created);
+			await realFs.rm(root, { recursive: true, force: true });
+			await realFs.rm(elsewhere, { recursive: true, force: true });
+		}
+	});
+});
+
+describe('defaultScratchFs — the model output read is bounded', () => {
+	/**
+	 * `buildModelCliCommand` redirects the CLI's stdout to this file with the
+	 * shell's `>`, so it never passes through Node's stdout capture and
+	 * nothing upstream bounds it. `MODEL_CLI_OUTPUT_TAIL_BYTES` trims for
+	 * DISPLAY, but only after the whole file is already a string in memory —
+	 * by which point a looping or compromised CLI has exhausted the process
+	 * and taken every other job on the node with it.
+	 */
+	it('refuses a scratch file larger than the ceiling instead of loading it', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-scratch-big-'));
+		const created = await defaultScratchFs.createScratchDir(root, 'job-big');
+		const target = join(created, 'model-output.json');
+		try {
+			await realFs.writeFile(target, 'x'.repeat(MODEL_CLI_MAX_OUTPUT_BYTES + 1));
+
+			await expect(defaultScratchFs.readFile(target)).rejects.toThrowError(/Refusing to load it/);
+		} finally {
+			await defaultScratchFs.remove(created);
+			await realFs.rm(root, { recursive: true, force: true });
+		}
+	});
+
+	it('still reads a file at the ceiling', async () => {
+		const root = mkdtempSync(join(tmpdir(), 'ew-scratch-ok-'));
+		const created = await defaultScratchFs.createScratchDir(root, 'job-ok');
+		const target = join(created, 'model-output.json');
+		try {
+			// Exactly at the bound is allowed — the check is a ceiling, not a
+			// budget, so an ordinary chatty run is never refused.
+			await realFs.writeFile(target, 'y'.repeat(MODEL_CLI_MAX_OUTPUT_BYTES));
+			const read = await defaultScratchFs.readFile(target);
+			expect(read).toHaveLength(MODEL_CLI_MAX_OUTPUT_BYTES);
+		} finally {
+			await defaultScratchFs.remove(created);
+			await realFs.rm(root, { recursive: true, force: true });
+		}
+	});
+});
+
+describe('defaultScratchFs — the scratch ROOT cannot be pre-planted either (review round 2)', () => {
+	const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+
+	it('refuses a root that is itself a symlink or junction to somewhere else', async () => {
+		const base = mkdtempSync(join(tmpdir(), 'ew-scratch-base-'));
+		const elsewhere = join(base, 'elsewhere');
+		await realFs.mkdir(elsewhere);
+		// An attacker pre-plants the predictable root name as a link they control.
+		const root = join(base, 'agent-tasks');
+		await realFs.symlink(elsewhere, root, linkType);
+		try {
+			await expect(defaultScratchFs.createScratchDir(root, 'job-1')).rejects.toThrowError(/not a real directory/);
+			// No job directory appeared where the link points.
+			expect(await realFs.readdir(elsewhere)).toEqual([]);
+		} finally {
+			await realFs.rm(base, { recursive: true, force: true });
+		}
+	});
+
+	it('refuses a root whose parent below the OS temp dir is a symlink or junction', async () => {
+		const base = mkdtempSync(join(tmpdir(), 'ew-scratch-base-'));
+		const elsewhere = join(base, 'elsewhere');
+		await realFs.mkdir(elsewhere);
+		// `<temp>/<base>/ever-works-node` is the link; `agent-tasks` below it
+		// is what `mkdir -p` would happily create on the far side.
+		const parent = join(base, 'ever-works-node');
+		await realFs.symlink(elsewhere, parent, linkType);
+		const root = join(parent, 'agent-tasks');
+		try {
+			await expect(defaultScratchFs.createScratchDir(root, 'job-2')).rejects.toThrowError(/not a real directory/);
+			const leaked = await realFs.readdir(join(elsewhere, 'agent-tasks')).catch(() => [] as string[]);
+			expect(leaked).toEqual([]);
+		} finally {
+			await realFs.rm(base, { recursive: true, force: true });
+		}
+	});
+
+	it('still accepts a real root and creates the job directory inside it', async () => {
+		const base = mkdtempSync(join(tmpdir(), 'ew-scratch-base-'));
+		const root = join(base, 'ever-works-node', 'agent-tasks');
+		try {
+			const created = await defaultScratchFs.createScratchDir(root, 'job-3');
+			expect(created.startsWith(root)).toBe(true);
+			expect((await realFs.lstat(created)).isDirectory()).toBe(true);
+		} finally {
+			await realFs.rm(base, { recursive: true, force: true });
+		}
+	});
+
+	it.skipIf(process.platform === 'win32')('tightens a group/other-accessible pre-existing root to 0700', async () => {
+		const base = mkdtempSync(join(tmpdir(), 'ew-scratch-base-'));
+		const root = join(base, 'agent-tasks');
+		await realFs.mkdir(root, { mode: 0o755 });
+		try {
+			await defaultScratchFs.createScratchDir(root, 'job-4');
+			expect((await realFs.stat(root)).mode & 0o777).toBe(0o700);
+		} finally {
+			await realFs.rm(base, { recursive: true, force: true });
+		}
+	});
+});

@@ -232,6 +232,83 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleet.getNodeOfflineNoticeAfterMs (health signals, EW-776)', () => {
+        it('defaults to 30 minutes', () => {
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(30 * 60_000);
+        });
+
+        it('honours an operator override', () => {
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = String(2 * 3600_000);
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(2 * 3600_000);
+        });
+
+        it('is floored at the offline sweep window it escalates', () => {
+            // A "still offline after N" notice that could fire before the
+            // node is even considered offline would be two notices for one
+            // event — so the floor is the sweep window, not a constant.
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = '1000';
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(
+                config.fleet.getNodeOfflineAfterMs(),
+            );
+        });
+
+        it('tracks a RAISED offline window, so the pair can never invert', () => {
+            process.env.FLEET_NODE_OFFLINE_AFTER_MS = String(45 * 60_000);
+            process.env.FLEET_NODE_OFFLINE_NOTICE_AFTER_MS = String(10 * 60_000);
+            expect(config.fleet.getNodeOfflineNoticeAfterMs()).toBe(45 * 60_000);
+        });
+    });
+
+    describe('config.fleet (FLEET_* operator knobs)', () => {
+        describe('getEnrollmentTokenTtlMs', () => {
+            it('defaults to 15 minutes', () => {
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(15 * 60_000);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = String(3 * 60_000);
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(3 * 60_000);
+            });
+
+            it('floors a value that would make a token unredeemable', () => {
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = '0';
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(30_000);
+            });
+
+            it('degrades a nonsense value to the default rather than NaN', () => {
+                // NaN here silently expires every token ever minted.
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS = 'soon';
+                expect(config.fleet.getEnrollmentTokenTtlMs()).toBe(15 * 60_000);
+            });
+        });
+
+        describe('getCredentialRotationOverlapMs (EW-799)', () => {
+            it('defaults to 15 minutes of dual-accept', () => {
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+
+            it('honours the operator override', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = String(2 * 60_000);
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(2 * 60_000);
+            });
+
+            it('floors a window too short to finish a round-trip and a disk write', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = '1';
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(30_000);
+            });
+
+            it('caps the window at 24h — past that it is a second permanent credential', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = String(30 * 86_400_000);
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(86_400_000);
+            });
+
+            it('degrades a nonsense value to the default', () => {
+                process.env.FLEET_CREDENTIAL_ROTATION_OVERLAP_MS = 'a while';
+                expect(config.fleet.getCredentialRotationOverlapMs()).toBe(15 * 60_000);
+            });
+        });
+    });
+
     describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {
         describe('getApiUrl', () => {
             it('returns undefined when unset', () => {
@@ -264,6 +341,49 @@ describe('agent/config', () => {
                 (raw) => {
                     process.env.FLEET_NODE_LEASE_TTL_SECONDS = raw;
                     expect(config.fleetNode.getLeaseTtlSeconds()).toBeUndefined();
+                },
+            );
+        });
+
+        describe('getQueuedMaxAgeSeconds (queue SLA, self-build slice S)', () => {
+            const KINDS = ['agent-task', 'acceptance-checks', 'browser-check'] as const;
+
+            it('defaults per kind — a day for agent-task, two hours for the checks — never "forever"', () => {
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(24 * 3600);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('acceptance-checks')).toBe(2 * 3600);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(2 * 3600);
+            });
+
+            it('applies FLEET_NODE_QUEUE_MAX_AGE_SECONDS to every kind', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '3600';
+                for (const kind of KINDS) {
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds(kind)).toBe(3600);
+                }
+            });
+
+            it('lets the per-kind variable win over the all-kinds one', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '3600';
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_AGENT_TASK = '7200';
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_ACCEPTANCE_CHECKS = '900';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(7200);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('acceptance-checks')).toBe(900);
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(3600);
+            });
+
+            it('clamps into [60s, 7d] rather than honouring an absurd value', () => {
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '5';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(60);
+                process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = '999999999';
+                expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(7 * 86400);
+            });
+
+            it.each(['0', '-5', 'soon', ''])(
+                "falls back to the kind default for nonsense value '%s' (fail closed)",
+                (raw) => {
+                    process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS = raw;
+                    process.env.FLEET_NODE_QUEUE_MAX_AGE_SECONDS_BROWSER_CHECK = raw;
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds('agent-task')).toBe(24 * 3600);
+                    expect(config.fleetNode.getQueuedMaxAgeSeconds('browser-check')).toBe(2 * 3600);
                 },
             );
         });
@@ -341,6 +461,85 @@ describe('agent/config', () => {
             it('replaces rather than extends the defaults', () => {
                 process.env.FLEET_NODE_AGENT_TASK_ENV_PASSTHROUGH = 'ONLY_THIS';
                 expect(config.fleetNode.getAgentTaskEnvPassthrough()).toEqual(['ONLY_THIS']);
+            });
+        });
+
+        describe('agent execution v2 (model CLIs on the node)', () => {
+            beforeEach(() => {
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_MODE;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_MODEL;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_EFFORT;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD;
+                delete process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS;
+            });
+
+            it('defaults to the legacy command mode so existing installs are untouched', () => {
+                expect(config.fleetNode.getAgentExecutionMode()).toBe('command');
+                expect(config.fleetNode.getAgentExecutionProvider()).toBe('claude-code');
+                expect(config.fleetNode.getAgentExecutionModel()).toBeUndefined();
+                expect(config.fleetNode.getAgentExecutionEffort()).toBeUndefined();
+                expect(config.fleetNode.getAgentExecutionPermissionMode()).toBe('acceptEdits');
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(1200);
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBeUndefined();
+                expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(false);
+            });
+
+            it('reads the vocabulary values and ignores typos', () => {
+                process.env.FLEET_NODE_AGENT_EXECUTION_MODE = ' model-cli ';
+                process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'codex';
+                process.env.FLEET_NODE_AGENT_EXECUTION_EFFORT = 'xhigh';
+                process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE = 'plan';
+                expect(config.fleetNode.getAgentExecutionMode()).toBe('model-cli');
+                expect(config.fleetNode.getAgentExecutionProvider()).toBe('codex');
+                expect(config.fleetNode.getAgentExecutionEffort()).toBe('xhigh');
+                expect(config.fleetNode.getAgentExecutionPermissionMode()).toBe('plan');
+
+                process.env.FLEET_NODE_AGENT_EXECUTION_MODE = 'shell';
+                process.env.FLEET_NODE_AGENT_EXECUTION_PROVIDER = 'gemini';
+                process.env.FLEET_NODE_AGENT_EXECUTION_EFFORT = 'ludicrous';
+                process.env.FLEET_NODE_AGENT_EXECUTION_PERMISSION_MODE = 'bypassPermissions';
+                expect(config.fleetNode.getAgentExecutionMode()).toBe('command');
+                expect(config.fleetNode.getAgentExecutionProvider()).toBe('claude-code');
+                expect(config.fleetNode.getAgentExecutionEffort()).toBeUndefined();
+                expect(config.fleetNode.getAgentExecutionPermissionMode()).toBe('acceptEdits');
+            });
+
+            it('accepts an opaque model id and refuses anything a shell could interpret', () => {
+                process.env.FLEET_NODE_AGENT_EXECUTION_MODEL = 'claude-opus-5';
+                expect(config.fleetNode.getAgentExecutionModel()).toBe('claude-opus-5');
+                process.env.FLEET_NODE_AGENT_EXECUTION_MODEL = 'opus; rm -rf /';
+                expect(config.fleetNode.getAgentExecutionModel()).toBeUndefined();
+            });
+
+            it('clamps the timeout into the node-supported range', () => {
+                process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS = '10';
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(60);
+                process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS = '99999';
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(1800);
+                process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS = '900';
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(900);
+                process.env.FLEET_NODE_AGENT_EXECUTION_TIMEOUT_SECONDS = 'soon';
+                expect(config.fleetNode.getAgentExecutionTimeoutSeconds()).toBe(1200);
+            });
+
+            it('parses the budget and the skip-permissions switch', () => {
+                process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '12.5';
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBe(12.5);
+                process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '-3';
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBeUndefined();
+                // Above the wire-contract ceiling → refused here rather than
+                // planned and then rejected by the node.
+                process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '501';
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBeUndefined();
+                process.env.FLEET_NODE_AGENT_EXECUTION_MAX_BUDGET_USD = '500';
+                expect(config.fleetNode.getAgentExecutionMaxBudgetUsd()).toBe(500);
+                process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS = 'true';
+                expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(true);
+                process.env.FLEET_NODE_AGENT_EXECUTION_SKIP_PERMISSIONS = 'yes';
+                expect(config.fleetNode.isAgentExecutionSkipPermissionsEnabled()).toBe(false);
             });
         });
     });
@@ -909,6 +1108,7 @@ describe('agent/config', () => {
                 // PR #1019 — Agents/Skills/Tasks feature added `agents.*`
                 // config group (heartbeat dispatcher gates, stuck-timeout,
                 // max batch size, etc.). Pinned alphabetically here.
+                'agentPlugins',
                 'agents',
                 'billing',
                 'branding',
@@ -973,7 +1173,119 @@ describe('agent/config', () => {
                 'terminal',
                 'trigger',
                 'websiteTemplate',
+                // Judgment layer G5 — `workflows.*` group adds the
+                // `workflow_runs` stuck-row sweeper knobs
+                // (WORKFLOW_RUN_SWEEPER_ENABLED,
+                // WORKFLOW_RUN_STUCK_TIMEOUT_MINUTES,
+                // WORKFLOW_RUN_SWEEPER_MAX_BATCH). The cutoff is clamped
+                // above the `workflow-run` task's own 60-minute
+                // `maxDuration`, so a misconfigured value cannot reap a
+                // healthy walk. Pinned alphabetically, last.
+                'workflows',
             ]);
+        });
+    });
+
+    describe('agentPlugins', () => {
+        describe('isEnabled', () => {
+            it('is false when unset, so every existing deployment is unaffected', () => {
+                expect(config.agentPlugins.isEnabled()).toBe(false);
+            });
+
+            it('is true only for an explicit "true", case-insensitively', () => {
+                process.env.FEATURE_AGENT_PLUGINS = 'true';
+                expect(config.agentPlugins.isEnabled()).toBe(true);
+                process.env.FEATURE_AGENT_PLUGINS = 'TRUE';
+                expect(config.agentPlugins.isEnabled()).toBe(true);
+                process.env.FEATURE_AGENT_PLUGINS = 'True';
+                expect(config.agentPlugins.isEnabled()).toBe(true);
+            });
+
+            it.each(['false', '1', 'yes', 'on', '', '  '])(
+                'is false for %j, which is not the word true',
+                (value) => {
+                    process.env.FEATURE_AGENT_PLUGINS = value;
+                    expect(config.agentPlugins.isEnabled()).toBe(false);
+                },
+            );
+        });
+
+        describe('getPackageDirs', () => {
+            it('defaults to a path of its own, never /app/plugins', () => {
+                // /app/plugins holds the native plugins baked into the image.
+                // Pointing this there — or mounting a volume over it — once
+                // took out every AI, search and deploy capability in
+                // production, because the loader then discovered zero plugins.
+                expect(config.agentPlugins.getPackageDirs()).toBe('/app/agent-plugins');
+                expect(config.agentPlugins.getPackageDirs()).not.toBe('/app/plugins');
+            });
+
+            it('returns an explicitly configured value', () => {
+                process.env.AGENT_PLUGINS_DIR = '/srv/packages';
+                expect(config.agentPlugins.getPackageDirs()).toBe('/srv/packages');
+            });
+
+            it('falls back to the default for an EMPTY value, not through it', () => {
+                // This is why the getter uses `||` rather than `??`. envsubst
+                // renders a variable that a manifest references but the deploy
+                // workflow never exports as an empty string, and `??` would
+                // pass that straight through as if an operator had chosen it.
+                process.env.AGENT_PLUGINS_DIR = '';
+                expect(config.agentPlugins.getPackageDirs()).toBe('/app/agent-plugins');
+            });
+        });
+    });
+
+    /**
+     * Task-graph fan-out (self-build slice AH). These two knobs govern
+     * the ONE driver on the platform that starts work nobody clicked, and
+     * the zero on the first one reads the OPPOSITE way round from the
+     * concurrency valves next to it — which is exactly the kind of thing
+     * an operator gets backwards, so it is pinned here.
+     */
+    describe('agents — task-graph fan-out', () => {
+        describe('getTaskFanoutMaxStartsPerOwner', () => {
+            it('defaults to 0, which means the driver is OFF', () => {
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+            });
+
+            it('returns an explicitly configured bound', () => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = '3';
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(3);
+            });
+
+            it.each(['', '  ', 'lots'])('falls back to OFF for %j', (value) => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = value;
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+            });
+
+            it('reads 0 as "no starts", NOT as "no ceiling" like the concurrency valves', () => {
+                process.env.TASK_FANOUT_MAX_STARTS_PER_OWNER = '0';
+                process.env.AGENT_MAX_CONCURRENT_RUNS_PER_WORK = '0';
+                // Same literal, opposite meanings — the driver stops, the
+                // valve stops bounding.
+                expect(config.agents.getTaskFanoutMaxStartsPerOwner()).toBe(0);
+                expect(config.agents.getMaxConcurrentRunsPerWork()).toBe(0);
+            });
+        });
+
+        describe('getTaskFanoutScanLimit', () => {
+            it('defaults to 50', () => {
+                expect(config.agents.getTaskFanoutScanLimit()).toBe(50);
+            });
+
+            it('returns an explicitly configured limit', () => {
+                process.env.TASK_FANOUT_SCAN_LIMIT = '120';
+                expect(config.agents.getTaskFanoutScanLimit()).toBe(120);
+            });
+
+            it.each(['0', '-5', 'many', ''])(
+                'refuses %j and keeps the default — a scan of nothing is a broken tick, not a valve',
+                (value) => {
+                    process.env.TASK_FANOUT_SCAN_LIMIT = value;
+                    expect(config.agents.getTaskFanoutScanLimit()).toBe(50);
+                },
+            );
         });
     });
 });

@@ -51,8 +51,12 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *       unauthenticated            → 401 { message:'Unauthorized', statusCode:401 }
  *
  *   - Web Next.js route GET /api/works/:id/deploy/status reads the SAME work and projects
- *     { deploymentState, deploymentStartedAt, website, deployProvider }; unauth → 500 { error:'Unauthorized' }
- *     (the route wraps the upstream 401 as 500). With the seeded session cookie it returns the projection.
+ *     { deploymentState, deploymentStartedAt, website, deployProvider }; unauth → 401 { error:'Unauthorized' }
+ *     (its own cookie guard, before any upstream call). It reaches the platform through `serverFetch`,
+ *     which since 8f28edca0 fails closed — 500 { error:'failed_to_load_deploy_status' } — unless the
+ *     request carries the browser's per-tab `x-ever-workspace` selector ('personal' | 'org:<slug>');
+ *     the real client sends it via `browserApiFetch`. With the seeded session cookie AND that selector
+ *     it returns the projection.
  *
  * ADAPTIVITY: these flows assert the UNCONFIGURED branch (the CI reality) as the primary path
  * but tolerate a configured stack (a real Vercel/k8s token) by widening the accepted status set
@@ -72,6 +76,15 @@ const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
 /** Status classes accepted for a deploy POST: the CI-real 400 refusal, OR a configured success. */
 const DEPLOY_OUTCOMES = [200, 201, 202, 400, 401, 403, 409, 422, 500];
+
+/**
+ * The per-tab workspace selector the real client attaches to every BFF call via
+ * `browserApiFetch` (apps/web/src/lib/api/browser-api.ts), derived from the visible URL.
+ * Web route handlers reach the platform through `serverFetch`, which fails closed without
+ * it. Works here are created with `organization:false`, so the URL a real client would be
+ * on is unprefixed and the selector it serializes is `personal`.
+ */
+const BROWSER_PERSONAL_SCOPE_HEADERS = { 'x-ever-workspace': 'personal' };
 
 interface WorkDeployFields {
     id: string;
@@ -488,13 +501,16 @@ test.describe('Work deploy state machine (deep integration)', () => {
 
         const origin = baseURL ?? 'http://localhost:3000';
 
-        // The page-fixture `request` here carries the storageState session cookie, so the web route
+        // The page-fixture `request` here carries the storageState session cookie, and the GET
+        // below adds the workspace selector the browser sends for itself, so the web route
         // resolves the work. Poll it (next-dev cold compile of the route handler can be slow).
         let body: Record<string, unknown> | null = null;
         await expect
             .poll(
                 async () => {
-                    const res = await request.get(`${origin}/api/works/${workId}/deploy/status`);
+                    const res = await request.get(`${origin}/api/works/${workId}/deploy/status`, {
+                        headers: BROWSER_PERSONAL_SCOPE_HEADERS,
+                    });
                     if (res.status() === 200) {
                         body = (await res.json()) as Record<string, unknown>;
                         return 200;

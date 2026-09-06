@@ -215,6 +215,7 @@ const sidebars: SidebarsConfig = {
 				// features that produce the uploads.
 				'features/storage-backends',
 				'features/mcp-server',
+				'features/agent-plugins',
 				'features/data-management'
 			]
 		},

@@ -6,9 +6,10 @@ import { PortableDateColumn } from './_types';
  *
  * - `task-review`  — a platform reviewer moved a `task_reviewers` row to
  *                    `requested-changes` and typed feedback.
- * - `pull-request` — a human rejected the agent's PR on the git provider
- *                    (`changes_requested` review, or a `@ever-works` reply
- *                    asking for changes).
+ * - `pull-request` — a human OR an allow-listed reviewer bot rejected the
+ *                    agent's PR on the git provider (`changes_requested`
+ *                    review, an inline finding, or a summary comment).
+ *                    `reviewerKind` tells the two apart.
  * - `gate`         — a quality gate exhausted its attempts; the machine
  *                    feedback is recorded so a later resume replays it.
  */
@@ -19,6 +20,30 @@ export const TASK_REVIEW_REJECTION_SOURCES: readonly TaskReviewRejectionSource[]
     'pull-request',
     'gate',
 ];
+
+/**
+ * Trusted review bots (self-build fleet, finding R16) — the severity a
+ * reviewer bot tagged a finding with, folded onto one scale: CodeRabbit's
+ * `Critical | Major | Minor`, and Codex / Greptile `P1 | P2 | P3`. The
+ * house rule "fix P2+ before the PR is clean" is exactly
+ * `critical | major`. NULL = not stated (every human rejection, and a bot
+ * body with no recognisable marker). Readers MUST treat NULL on a bot row
+ * as `major`: an unrecognised marker is not evidence of a nit, and the
+ * seeded prompt says so.
+ */
+export type TaskReviewRejectionSeverity = 'critical' | 'major' | 'minor';
+
+export const TASK_REVIEW_REJECTION_SEVERITIES: readonly TaskReviewRejectionSeverity[] = [
+    'critical',
+    'major',
+    'minor',
+];
+
+/**
+ * Who rejected: a person, or an allow-listed reviewer bot. NULL on rows
+ * written before the column existed, which were all human or gate.
+ */
+export type TaskReviewRejectionReviewerKind = 'human' | 'bot';
 
 /** Hard cap on stored feedback. Applied by the writer before persisting. */
 export const TASK_REVIEW_REJECTION_MAX_FEEDBACK_CHARS = 8000;
@@ -94,6 +119,21 @@ export class TaskReviewRejection {
 
     @Column({ type: 'varchar', length: 500, nullable: true })
     prUrl?: string | null;
+
+    /**
+     * Severity the reviewer bot attached to this finding (R16). NULL for
+     * human rejections and for bot bodies with no marker — the seeded
+     * prompt then states no severity rather than inventing one.
+     */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    severity?: TaskReviewRejectionSeverity | null;
+
+    /**
+     * `human` | `bot` (R16). Lets the resumed run read an automated
+     * finding as a reviewer bot's opinion, not the owner's instruction.
+     */
+    @Column({ type: 'varchar', length: 8, nullable: true })
+    reviewerKind?: TaskReviewRejectionReviewerKind | null;
 
     /**
      * The resumed run this rejection was seeded into. NULL = still

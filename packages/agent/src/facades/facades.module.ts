@@ -3,6 +3,7 @@ import { DatabaseModule } from '../database/database.module';
 import { UsageModule } from '../usage/usage.module';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { PolicyModule } from '../policy/policy.module';
+import { AgentPluginsModule } from '../agent-plugins/agent-plugins.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
@@ -84,7 +85,11 @@ const FACADES = [
     // importing it here cannot cycle. It binds MERGE_POLICY_ENFORCER,
     // which GitFacadeService consumes @Optional() to enforce the
     // merge-policy matrix on agent-driven merges (Wave 3, D4).
-    imports: [DatabaseModule, UsageModule, BudgetsModule, PolicyModule],
+    // AgentPluginsModule is also a leaf (two entities, no facade imports), so
+    // importing it here cannot cycle. It binds AGENT_PLUGIN_SKILL_SOURCE,
+    // which SkillsFacadeService consumes @Optional() to merge Agent Plugins
+    // package skills into the catalog as an additive last source.
+    imports: [DatabaseModule, UsageModule, BudgetsModule, PolicyModule, AgentPluginsModule],
     providers: FACADES,
     exports: FACADES,
 })

@@ -665,18 +665,38 @@ export class NotificationService {
     async notifyFleetRunnerFallback(args: {
         userId: string;
         taskId?: string | null;
-        /** Machine token: `no-runners` | `runners-offline` | `runners-busy`. */
+        /**
+         * Machine token — one of `FLEET_FALLBACK_REASONS`: `no-runners` |
+         * `runners-offline` | `runners-busy` | `no-eligible-runners` |
+         * `pinned-runner-offline`.
+         */
         reason: string;
-        /** Enrolled runners at decision time (0 when none). */
+        /**
+         * Runners that could have taken THIS job at decision time (0 when
+         * none). Since self-build slice S this is the ELIGIBLE count —
+         * the pinned node, or the nodes advertising the required tags —
+         * which is the precise figure the copy can stand behind.
+         */
         runnerCount: number;
+        /** Every enrolled runner, when the count above is a subset of them. */
+        fleetRunnerCount?: number;
+        /** The node the Agent is pinned to, when the decision was taken against one. */
+        pinnedNodeId?: string | null;
     }): Promise<void> {
         const safeReason = this.sanitizeLabel(args.reason);
+        const fleetRunnerCount =
+            typeof args.fleetRunnerCount === 'number' ? args.fleetRunnerCount : args.runnerCount;
+        const safePinnedNodeId = args.pinnedNodeId ? this.sanitizeLabel(args.pinnedNodeId) : null;
         const detail =
             args.reason === 'no-runners'
                 ? 'no local runner is enrolled'
                 : args.reason === 'runners-offline'
                   ? 'your local runner is offline'
-                  : 'your local runner was busy';
+                  : args.reason === 'pinned-runner-offline'
+                    ? 'the runner this Agent is pinned to is offline'
+                    : args.reason === 'no-eligible-runners'
+                      ? `none of your ${fleetRunnerCount} enrolled runner(s) can take this job (its pinned runner is gone, or no runner advertises the tools it requires)`
+                      : 'your local runner was busy';
         const title = 'Local runner fallback → cloud';
         const message =
             `A run that preferred your local runner ran in the cloud instead because ${detail}. ` +
@@ -694,6 +714,8 @@ export class NotificationService {
                 taskId: args.taskId ?? null,
                 reason: safeReason,
                 runnerCount: args.runnerCount,
+                fleetRunnerCount,
+                pinnedNodeId: safePinnedNodeId,
             },
             deduplicationKey: `fleet_runner_fallback_${args.taskId ?? 'unknown'}_${safeReason}`,
         });

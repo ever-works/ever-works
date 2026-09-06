@@ -20,7 +20,8 @@
 		"@ever-works/cli-shared",
 		"@ever-works/email-templates",
 		"@ever-works/monitoring",
-		"@ever-works/trigger-tasks"
+		"@ever-works/trigger-tasks",
+		"@ever-works/agent-plugins"
 	],
 	"___ew693_notes": [
 		"EW-693 — Dynamic plugin distribution.",
@@ -36,6 +37,15 @@
 		"",
 		"ignore: internal apps + cross-cutting packages NOT meant for",
 		"public/private npm publication. They version with the platform.",
+		"",
+		"@ever-works/agent-plugins is ignored FOR NOW. It is designed to be",
+		"publishable on its own merit (a TypeScript reference loader for the",
+		"Agent Plugins standard) and its package.json declares MIT per",
+		"ADR-018, which diverges from the AGPL-3.0 the rest of the repo uses.",
+		"Publishing is therefore a deliberate decision -- license + public vs",
+		"restricted -- that has not been taken yet. Ignoring it keeps a stray",
+		"changeset from publishing it before that call is made; remove this",
+		"entry when it is.",
 		"@ever-works/plugin is intentionally NOT in ignore — it ships to npm",
 		"as the SDK consumed by 3rd-party plugin authors."
 	]

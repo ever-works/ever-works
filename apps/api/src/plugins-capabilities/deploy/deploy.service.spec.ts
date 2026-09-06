@@ -70,11 +70,15 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
         website?: string;
         /** Whether the Work owner is a platform admin — gates `k8s-works`. */
         isPlatformAdmin?: boolean;
+        /** Work kind. Defaults to `default`; `repo` (self-build slice D,
+         *  EW-766) is the one kind `deploy()` refuses outright. */
+        kind?: string;
     }) => {
         const websiteOwner = overrides.websiteOwner ?? 'acme';
         const work = {
             id: 'work-1',
             slug: 'my-site',
+            kind: overrides.kind ?? 'default',
             website: overrides.website,
             deployProvider: overrides.deployProvider ?? 'k8s',
             gitProvider: 'github',
@@ -1108,6 +1112,53 @@ describe('DeployService — plugin-driven dispatch + secrets', () => {
             const { secrets, variables } = captureCalls(githubPlugin);
             expect(secrets.map((s: any) => s.key)).not.toContain('SITE_URL');
             expect(variables.map((v: any) => v.key)).not.toContain('SITE_URL');
+        });
+    });
+
+    describe('Repository Work kind (self-build slice D, EW-766)', () => {
+        // A `repo` Work wraps the user's own code repository and has no
+        // website repository. Its deployProvider is persisted as null, so in
+        // production `DeployFacade.resolvePluginAndTokenWithWork` throws
+        // `NoDeployProviderError` the moment it is asked — the kind check has
+        // to run BEFORE the facade, off the Work row, or the caller only ever
+        // sees "no deployment provider configured".
+        it('refuses to deploy a repo Work before the facade, git or the deploy plugin are touched', async () => {
+            const { service, deployFacade, gitFacade, githubPlugin } = buildService({
+                kind: 'repo',
+                deployProvider: '',
+                plugin: {
+                    id: 'ever-works',
+                    getWorkflowFilenames: () => ['deploy_ever_works.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+            // Mimic the production facade for a null-provider row: if the
+            // service asked it first, THIS is the error the caller would get.
+            deployFacade.getPluginAndTokenAndSettings.mockRejectedValue(
+                new Error('No deployment provider configured or available'),
+            );
+
+            await expect(service.deploy('work-1', 'user-1', {})).rejects.toThrow(/Repository Work/);
+
+            expect(deployFacade.getPluginAndTokenAndSettings).not.toHaveBeenCalled();
+            expect(gitFacade.getAccessToken).not.toHaveBeenCalled();
+            expect(githubPlugin.dispatchWorkflow).not.toHaveBeenCalled();
+            expect(githubPlugin.setActionSecret).not.toHaveBeenCalled();
+        });
+
+        it('leaves every other kind on the existing path (awesome-repo is not a Repository Work)', async () => {
+            const { service, githubPlugin } = buildService({
+                kind: 'awesome-repo',
+                plugin: {
+                    id: 'vercel',
+                    getWorkflowFilenames: () => ['deploy_vercel.yaml'],
+                    getDeploymentSecrets: jest.fn().mockResolvedValue({}),
+                },
+            });
+
+            await service.deploy('work-1', 'user-1', {});
+
+            expect(githubPlugin.dispatchWorkflow).toHaveBeenCalled();
         });
     });
 

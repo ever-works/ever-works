@@ -39,6 +39,7 @@ import {
     setInboxItemArchivedAction,
     setInboxItemReadAction,
 } from '@/app/actions/dashboard/inbox';
+import { InboxFleetSource } from './InboxFleetSource';
 
 export type InboxView = 'active' | 'archived';
 
@@ -347,6 +348,9 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
                                         >
                                             {t(`kind.${item.kind}`)}
                                         </span>
+                                        {/* Slice Q — "From your fleet" chip on a question
+                                            a run on the owner's own machine asked. */}
+                                        <InboxFleetSource item={item} compact />
                                         <ShowDateTime value={item.createdAt} />
                                     </div>
                                 </button>
@@ -417,6 +421,11 @@ export function InboxClient({ items, unreadCount, view, selectedId, loadError }:
                                     {t(`kind.${active.kind}`)} ·{' '}
                                     <ShowDateTime value={active.createdAt} />
                                 </p>
+                                {/* Slice Q — node / Task / branch a fleet question came
+                                    from. The reply box below is the same one a cloud
+                                    question uses: the answer resumes the parked run on
+                                    that branch. */}
+                                <InboxFleetSource item={active} />
                             </div>
 
                             {isAwaitingReply(active) && (

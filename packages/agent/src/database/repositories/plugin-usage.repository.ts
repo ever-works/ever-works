@@ -174,6 +174,35 @@ export class PluginUsageRepository {
     }
 
     /**
+     * Fleet cost accounting (EW-777) — the per-Agent budget precheck's
+     * input: one user's spend attributed to ONE Agent inside a period,
+     * whatever executed it. A cloud run's facade rows and a fleet run's
+     * `fleet-node:*` row are the same column, so the precheck sees both
+     * without a second accounting. Uses
+     * `idx_plugin_usage_events_user_agent_occurred`.
+     */
+    async getTotalSpendCentsForAgent(
+        userId: string,
+        agentId: string,
+        periodStart: Date,
+        periodEnd: Date,
+        currency?: string,
+    ): Promise<number> {
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .select('COALESCE(SUM(e.costCents), 0)', 'total')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.agentId = :agentId', { agentId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+        if (currency) {
+            qb.andWhere('e.currency = :currency', { currency });
+        }
+        const row = await qb.getRawOne<{ total: string }>();
+        return Number(row?.total ?? 0);
+    }
+
+    /**
      * Tasks feature — Phase 15.7. Per-Task spend rollup. Caller
      * filters by `since` (defaults to "all-time") + optional
      * `currency`. Returns the total cost in cents for usage events
@@ -447,13 +476,13 @@ export class PluginUsageRepository {
             const occurredAt =
                 row.occurredAt instanceof Date ? row.occurredAt : new Date(row.occurredAt);
             const day = occurredAt.toISOString().slice(0, 10);
-            const key = `${day} ${row.agentId ?? ''}`;
+            const key = `${day}\0${row.agentId ?? ''}`;
             byDayAgent.set(key, (byDayAgent.get(key) ?? 0) + Number(row.costCents ?? 0));
         }
 
         return Array.from(byDayAgent.entries())
             .map(([key, costCents]) => {
-                const [day, agentId] = key.split(' ');
+                const [day, agentId] = key.split('\0');
                 return { day, agentId: agentId === '' ? null : agentId, costCents };
             })
             .sort((a, b) => a.day.localeCompare(b.day));

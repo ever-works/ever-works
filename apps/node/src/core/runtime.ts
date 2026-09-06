@@ -5,21 +5,30 @@ import {
 	type CommandRunner,
 	type SelfDescriptionTelemetry
 } from './capabilities';
-import { detectAgentCliVersion, detectDiskFreeBytes, type DiskProbeIo } from './telemetry-probe';
+import {
+	cacheProbe,
+	detectAgentCliVersion,
+	detectDiskFreeBytes,
+	detectModelIdentity,
+	type DiskProbeIo
+} from './telemetry-probe';
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
 import type { ResourceProbe } from './resource-limits';
+import { describeWorkerHealth } from './worker-health';
 import { WorkerLoop } from './worker-loop';
 import type { WorkerSafetyGate } from './worker-safety-store';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
+import type { ModelCliPaths } from './executors/model-cli';
 import { defaultFleetTaskWorkspaceRoot, FleetTaskWorkspaceProvisioner } from './workspaces/fleet-task-workspace';
 import type { Logger } from './logger';
 import {
 	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
+	effectiveMinFreeDiskBytes,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
 	type FleetEnrollableNodeKind,
@@ -47,6 +56,12 @@ export interface NodeIo {
 	scheduler?: Scheduler;
 	now?: () => number;
 	/**
+	 * Monotonic milliseconds, paired with `now`. The worker uses it to bound
+	 * a server-issued lease against a wall clock that may drift or be
+	 * stepped; absent, it reads the process clock directly.
+	 */
+	monotonicNow?: () => number;
+	/**
 	 * Free-disk probe for the node's workspace volume. Optional: without
 	 * it the node simply reports no disk figure, exactly as it did before
 	 * the field existed. `node-io.ts` supplies the real `node:fs`-backed
@@ -67,10 +82,16 @@ export interface NodeIo {
  * absent field as "leave the stored reading alone". So a machine with no
  * agent CLI, or an unreadable volume, keeps heartbeating with everything
  * else intact.
+ *
+ * The model-identity probe (fleet cost accounting, EW-777) asks the SAME
+ * CLI binaries the `agent-task` step spawns (`io.environment.modelCli`)
+ * which account they are logged in as, and is cached for a few minutes:
+ * a login changes once a month, a beat happens twice a minute.
  */
 export function buildSelfDescriptionTelemetry(io: NodeIo): SelfDescriptionTelemetry {
 	const telemetry: SelfDescriptionTelemetry = {
-		cliVersion: () => detectAgentCliVersion(io.runner)
+		cliVersion: () => detectAgentCliVersion(io.runner),
+		modelIdentity: cacheProbe(() => detectModelIdentity(io.runner, io.environment.modelCli ?? {}))
 	};
 	if (io.diskProbe) {
 		const probe = io.diskProbe;
@@ -218,7 +239,19 @@ export interface NodeRuntime {
 	 */
 	worker?: WorkerLoop;
 	jobClient?: FleetJobClient;
+	/** The workspace root the worker provisions under; present with `worker`. */
+	workspaceRoot?: string;
+	/**
+	 * The provisioner behind `agent-task`, present with `worker`. Exposed so
+	 * the shell can hand the workspace reaper the set of bindings this
+	 * process is using right now (belt and braces over the on-disk lease).
+	 */
+	workspaceProvisioner?: FleetWorkspaceProvisionerLike;
 }
+
+/** The provisioner surface the runtime composes over; the real one and every test double satisfy it. */
+export type FleetWorkspaceProvisionerLike = Pick<FleetTaskWorkspaceProvisioner, 'provision'> &
+	Partial<Pick<FleetTaskWorkspaceProvisioner, 'finalize' | 'finalizeMounts' | 'release' | 'activeBindingKeys'>>;
 
 export interface CreateNodeRuntimeOptions {
 	/**
@@ -242,6 +275,12 @@ export interface CreateNodeRuntimeOptions {
 	leaseTtlSec?: number;
 	idlePollMs?: number;
 	/**
+	 * Lease an `agent-task` must have left before it may start pushing.
+	 * Absent uses the fleet default; raise it on a machine whose uplink
+	 * makes a first push of an agent's diff take longer than that.
+	 */
+	publishFenceMarginMs?: number;
+	/**
 	 * Directory `agent-task` steps run in when the job itself carries no
 	 * `workspacePath`. Absent lets the executor fall back to the node
 	 * service's own working directory.
@@ -250,7 +289,16 @@ export interface CreateNodeRuntimeOptions {
 	/** Persistent bare-cache/worktree root for repository-backed agent Tasks. */
 	agentTaskWorkspaceRoot?: string;
 	/** Test/embedding seam; ordinary runtimes use the local-workspace provider. */
-	workspaceProvisioner?: Pick<FleetTaskWorkspaceProvisioner, 'provision'>;
+	workspaceProvisioner?: FleetWorkspaceProvisionerLike;
+	/**
+	 * Agent execution v2 — the model CLIs the `agent-task` executor may
+	 * spawn. Defaults to what `io.environment.modelCli` resolved at
+	 * startup; an explicit value (the `--claude-path` / `--codex-path`
+	 * flags) overrides it for this process only.
+	 */
+	modelCli?: ModelCliPaths;
+	/** Scratch root for the model step's instructions / output files. */
+	agentTaskScratchRoot?: string;
 	/** Persist a fail-closed worker quarantine into the node config. */
 	persistUnsafe?: (state: { since: string; reason: string }) => Promise<void> | void;
 	/** Durable write-ahead crash guard; acquired before the first job lease. */
@@ -283,7 +331,11 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// Re-detection stays intersected with the operator's opt-in, so a tool
 	// installed after enrollment never silently widens what this node offers.
 	const selection = config.capabilitySelection ?? null;
-	const telemetry = buildSelfDescriptionTelemetry(io);
+	// The disk figure the heartbeat carries is measured on the volume that
+	// holds the WORKSPACES — the one that fills up — not on whatever volume
+	// the service manager's cwd happens to be on (OPS-12).
+	const workspaceRoot = options.agentTaskWorkspaceRoot ?? defaultFleetTaskWorkspaceRoot();
+	const telemetry = buildSelfDescriptionTelemetry({ ...io, workspacePath: io.workspacePath ?? workspaceRoot });
 	const loopOptions = {
 		client,
 		nodeId: config.nodeId,
@@ -321,19 +373,40 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			logger: io.logger,
 			limits,
 			...(options.resourceProbe ? { resourceProbe: options.resourceProbe } : {}),
+			// The disk floor at the LEASE: measured on the workspace root's
+			// volume, and re-checked by the provisioner right before it
+			// writes anything there (disk can drop between the two).
+			...(io.diskProbe ? { diskProbe: io.diskProbe } : {}),
+			workspacePath: workspaceRoot,
 			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
 			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
+			...(options.publishFenceMarginMs !== undefined
+				? { publishFenceMarginMs: options.publishFenceMarginMs }
+				: {}),
 			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
 			...(config.unsafe ? { startUnsafe: config.unsafe } : {}),
 			...(options.persistUnsafe ? { onUnsafe: options.persistUnsafe } : {}),
 			...(options.workerSafetyGate ? { safetyGate: options.workerSafetyGate } : {}),
 			...(io.scheduler ? { scheduler: io.scheduler } : {}),
-			...(io.now ? { now: io.now } : {})
+			...(io.now ? { now: io.now } : {}),
+			...(io.monotonicNow ? { monotonicNow: io.monotonicNow } : {})
 		});
-		const workspaceProvisioner =
+		// Fleet health signals (EW-776). Wired onto the SAME telemetry
+		// object `describe` already closed over above, so the heartbeat
+		// starts reporting worker state without the loop having to be
+		// constructed before the beat — the two are built in this order for
+		// good reasons and this must not change that.
+		//
+		// Only when the worker exists: a visibility-only node has nothing
+		// to report, and the platform shows "unknown" rather than a
+		// fabricated `idle`.
+		telemetry.workerHealth = () => describeWorkerHealth(worker.getState());
+		const workspaceProvisioner: FleetWorkspaceProvisionerLike =
 			options.workspaceProvisioner ??
 			new FleetTaskWorkspaceProvisioner({
-				rootPath: options.agentTaskWorkspaceRoot ?? defaultFleetTaskWorkspaceRoot()
+				rootPath: workspaceRoot,
+				...(io.diskProbe ? { diskProbe: io.diskProbe } : {}),
+				minFreeDiskBytes: effectiveMinFreeDiskBytes(limits)
 			});
 		// The executor seam: a job kind is one more `register` call
 		// against the same protocol — no new endpoint, no new credential.
@@ -342,12 +415,67 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// score a gate; with it a Task's run can actually EXECUTE here when
 		// the owner's resolved job runtime is the fleet. Same seam, same
 		// protocol, same credential — exactly as the header above promised.
-		worker.register('agent-task', (job, signal) =>
+		// Agent execution v2 — the model CLIs resolved at startup (or pinned
+		// by the operator for this process). Absent on a machine without
+		// either CLI: a job that asks for model execution then fails naming
+		// the missing CLI rather than pretending to have run it.
+		const modelCli = options.modelCli ?? io.environment.modelCli ?? {};
+		worker.register('agent-task', (job, signal, lease) =>
 			runAgentTaskJob(
 				job,
 				{
 					provisionWorkspace: (taskId, spec, provisionSignal) =>
 						workspaceProvisioner.provision(taskId, spec, provisionSignal),
+					...(workspaceProvisioner.finalize
+						? {
+								finalizeWorkspace: (taskId, descriptor, opts, finalizeSignal) =>
+									workspaceProvisioner.finalize!(taskId, descriptor, opts, finalizeSignal)
+							}
+						: {}),
+					...(workspaceProvisioner.finalizeMounts
+						? {
+								finalizeMounts: (taskId, descriptor, opts, finalizeSignal) =>
+									workspaceProvisioner.finalizeMounts!(taskId, descriptor, opts, finalizeSignal)
+							}
+						: {}),
+					// Drops the on-disk lease the provisioner took on the worktree
+					// (and its mounts) so the workspace reaper can tell "a job is
+					// in here" from "a job WAS in here".
+					...(workspaceProvisioner.release
+						? {
+								releaseWorkspace: (taskId, descriptor) =>
+									workspaceProvisioner.release!(taskId, descriptor)
+							}
+						: {}),
+					// `agent-task` is the only kind that writes to a remote, so
+					// it is the only kind that has to know when this node stops
+					// being allowed to. Resolved through the handle, never
+					// captured: the deadline moves with every renewal, and
+					// `confirmDeadline` re-asks the platform at the moment of
+					// the write — which is the only way to see a claim that was
+					// taken away (an operator drained this node) while its
+					// deadline was still minutes in the future.
+					...(lease
+						? {
+								publishFence: async () => ({
+									deadlineAt: await lease.confirmDeadline(),
+									marginMs: lease.publishMarginMs
+								}),
+								// A withheld publish is not a verdict about the
+								// work — nothing ran to a conclusion — so the
+								// job goes back unsettled rather than terminal.
+								onPublishWithheld: (reason: string) => lease.defer(reason),
+								// A provision the node declined before writing a byte
+								// (below the disk floor, or the reaper mid-removal of
+								// that very worktree) is about this machine, not the
+								// work: hand the job back so a node with room takes it.
+								onProvisionDeclined: (reason: string) => lease.defer(reason)
+							}
+						: {}),
+					modelCli,
+					...(options.agentTaskScratchRoot !== undefined
+						? { scratchRoot: options.agentTaskScratchRoot }
+						: {}),
 					...(options.agentTaskWorkspacePath !== undefined
 						? { defaultWorkspacePath: options.agentTaskWorkspacePath }
 						: {})
@@ -371,6 +499,8 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		}
 		runtime.worker = worker;
 		runtime.jobClient = jobClient;
+		runtime.workspaceRoot = workspaceRoot;
+		runtime.workspaceProvisioner = workspaceProvisioner;
 	}
 
 	return runtime;

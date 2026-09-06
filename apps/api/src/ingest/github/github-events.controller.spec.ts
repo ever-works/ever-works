@@ -67,7 +67,7 @@ describe('GitHubEventsController (POST /api/ingest/github/events)', () => {
             { findByGithubUserId: jest.fn().mockResolvedValue(null) } as never,
         );
         const controller = new GitHubEventsController(dispatcher);
-        return { controller, bridge, appSync };
+        return { controller, bridge, appSync, dispatcher };
     }
 
     /** Build a signed request for `bodyObj`. */
@@ -240,6 +240,48 @@ describe('GitHubEventsController (POST /api/ingest/github/events)', () => {
             await expect(
                 controller.receiveEvents(req as never, signature, 'pull_request'),
             ).rejects.toThrow('ingest exploded');
+        });
+
+        /**
+         * Issue / Dependabot intake (self-build §6, R2) is a sibling of
+         * the review leg on THIS route: same verified delivery, same
+         * owner, same failure contract — GitHub redelivers and the
+         * spine's dedupe makes the retry free.
+         */
+        it('surfaces an intake-consumer failure the same way as a review failure', async () => {
+            const { controller, dispatcher } = createController();
+            dispatcher.registerConsumer({
+                events: ['issues'],
+                handle: jest.fn().mockRejectedValue(new Error('intake exploded')),
+            });
+            const { req, signature } = signedRequest({
+                action: 'opened',
+                repository: { full_name: 'octo/site' },
+                issue: { number: 42, title: 'Login broken' },
+            });
+
+            await expect(
+                controller.receiveEvents(req as never, signature, 'issues'),
+            ).rejects.toThrow('intake exploded');
+        });
+
+        it('delivers a verified issues event to a registered intake consumer', async () => {
+            const { controller, dispatcher } = createController();
+            const handle = jest.fn().mockResolvedValue(undefined);
+            dispatcher.registerConsumer({ events: ['issues'], handle });
+            const body = {
+                action: 'opened',
+                repository: { full_name: 'octo/site' },
+                issue: { number: 42, title: 'Login broken' },
+            };
+            const { req, signature } = signedRequest(body);
+
+            await expect(
+                controller.receiveEvents(req as never, signature, 'issues'),
+            ).resolves.toEqual({
+                ok: true,
+            });
+            expect(handle).toHaveBeenCalledWith(BINDING, 'issues', body);
         });
     });
 });

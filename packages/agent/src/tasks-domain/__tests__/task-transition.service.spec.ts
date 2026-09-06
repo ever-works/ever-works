@@ -137,3 +137,96 @@ describe('TaskTransitionService', () => {
         });
     });
 });
+
+/**
+ * Slice AH made two internals public so the task-graph fan-out driver
+ * asks the SAME questions the transition path asks. These cases pin that
+ * shared behaviour — if the driver and the gate ever disagree about what
+ * "open blocker" or "the agents of this Task" means, the fan-out starts
+ * work the gate then refuses.
+ */
+describe('TaskTransitionService — the predicates the fan-out shares', () => {
+    let tasks: any;
+    let blocks: any;
+    let approvers: any;
+    let assignees: any;
+    let svc: TaskTransitionService;
+
+    beforeEach(() => {
+        tasks = { casUpdateStatus: jest.fn().mockResolvedValue(true), findById: jest.fn() };
+        blocks = { findByTaskId: jest.fn().mockResolvedValue([]) };
+        approvers = { allApproved: jest.fn().mockResolvedValue(true) };
+        assignees = { findAgentAssignees: jest.fn().mockResolvedValue([]) };
+        svc = new TaskTransitionService(tasks, blocks, approvers, assignees);
+    });
+
+    describe('listOpenBlockerIds', () => {
+        it('counts a blocker open until it is DONE or CANCELLED', async () => {
+            blocks.findByTaskId.mockResolvedValue([
+                { blockedByTaskId: 'b-todo' },
+                { blockedByTaskId: 'b-progress' },
+                { blockedByTaskId: 'b-done' },
+                { blockedByTaskId: 'b-cancelled' },
+            ]);
+            tasks.findById.mockImplementation(
+                async (id: string) =>
+                    ({
+                        'b-todo': { id, status: TaskStatus.TODO },
+                        'b-progress': { id, status: TaskStatus.IN_PROGRESS },
+                        'b-done': { id, status: TaskStatus.DONE },
+                        'b-cancelled': { id, status: TaskStatus.CANCELLED },
+                    })[id],
+            );
+
+            expect(await svc.listOpenBlockerIds('t1')).toEqual(['b-todo', 'b-progress']);
+        });
+
+        it('treats a vanished blocker as closed and no rows as unblocked', async () => {
+            blocks.findByTaskId.mockResolvedValueOnce([{ blockedByTaskId: 'gone' }]);
+            tasks.findById.mockResolvedValueOnce(null);
+            expect(await svc.listOpenBlockerIds('t1')).toEqual([]);
+
+            blocks.findByTaskId.mockResolvedValueOnce([]);
+            expect(await svc.listOpenBlockerIds('t2')).toEqual([]);
+        });
+
+        it('is the SAME predicate the blocker gate enforces', async () => {
+            const task = makeTask({ status: TaskStatus.TODO });
+            blocks.findByTaskId.mockResolvedValue([{ blockedByTaskId: 'b1' }]);
+            tasks.findById.mockResolvedValue({ id: 'b1', status: TaskStatus.IN_REVIEW });
+
+            expect(await svc.listOpenBlockerIds(task.id)).toEqual(['b1']);
+            await expect(svc.transition(task, TaskStatus.IN_PROGRESS)).rejects.toThrow(
+                ConflictException,
+            );
+        });
+    });
+
+    describe('resolveDispatchAgentIds', () => {
+        it('prefers agent assignee rows, one entry per agent', async () => {
+            assignees.findAgentAssignees.mockResolvedValue([
+                { assigneeId: 'a1' },
+                { assigneeId: 'a2' },
+            ]);
+            expect(await svc.resolveDispatchAgentIds(makeTask({ agentId: 'owner' }))).toEqual([
+                'a1',
+                'a2',
+            ]);
+        });
+
+        it("falls back to the Task's own agentId when there are no assignee rows", async () => {
+            expect(await svc.resolveDispatchAgentIds(makeTask({ agentId: 'owner' }))).toEqual([
+                'owner',
+            ]);
+        });
+
+        it('returns nothing for a Task no agent is bound to', async () => {
+            expect(await svc.resolveDispatchAgentIds(makeTask({ agentId: null }))).toEqual([]);
+        });
+
+        it('propagates a repository failure rather than reporting "no agent"', async () => {
+            assignees.findAgentAssignees.mockRejectedValue(new Error('db down'));
+            await expect(svc.resolveDispatchAgentIds(makeTask())).rejects.toThrow('db down');
+        });
+    });
+});

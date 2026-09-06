@@ -22,6 +22,14 @@ const node = (overrides: Partial<FleetNode> = {}): FleetNode =>
         capabilities: [],
         platform: null,
         version: null,
+        // Credential lifecycle (EW-799): the dual-accept columns are
+        // spelled out because `as FleetNode` silences their absence — a
+        // rotation test built on an unwidened fixture reads `undefined`,
+        // takes the fail-closed branch, and passes for the wrong reason.
+        previousCredentialHash: null,
+        previousCredentialExpiresAt: null,
+        rotationRequestedAt: null,
+        rotationRequestedByUserId: null,
         createdAt: new Date(),
         ...overrides,
     }) as FleetNode;

@@ -1,6 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import type { FleetJobView } from '@ever-works/contracts';
+import { FLEET_JOB_STALE_LEASE_REASON } from '@ever-works/contracts';
 import { FleetJobsController } from './fleet-jobs.controller';
+import { FleetJobStaleLeaseError } from '@ever-works/agent/fleet';
 import type { FleetJobService } from '@ever-works/agent/fleet';
 
 /**
@@ -20,6 +22,8 @@ import type { FleetJobService } from '@ever-works/agent/fleet';
 const NODE_ID = '11111111-1111-4111-8111-111111111111';
 const JOB_ID = '22222222-2222-4222-8222-222222222222';
 const SECRET = 'a'.repeat(43);
+/** The claim identity every heartbeat/complete body must carry (suspend-safe leases). */
+const GENERATION = 3;
 // Frozen: `jobView()` is called on both sides of several assertions, and a
 // fresh `new Date()` per call would make them differ by a millisecond.
 const LEASE_EXPIRES_AT = '2026-07-26T00:00:00.000Z';
@@ -102,6 +106,7 @@ describe('FleetJobsController', () => {
             const result = await controller.heartbeat(JOB_ID, {
                 nodeId: NODE_ID,
                 secret: SECRET,
+                leaseGeneration: GENERATION,
             });
             expect(result).toEqual({ ok: true, job: jobView({ status: 'running' }) });
         });
@@ -109,19 +114,41 @@ describe('FleetJobsController', () => {
         it('maps a foreign or finished job to the SAME 401 as a bad credential', async () => {
             const controller = makeController({ heartbeatJob: jest.fn(async () => null) });
             await expect(
-                controller.heartbeat(JOB_ID, { nodeId: NODE_ID, secret: SECRET }),
+                controller.heartbeat(JOB_ID, {
+                    nodeId: NODE_ID,
+                    secret: SECRET,
+                    leaseGeneration: GENERATION,
+                }),
             ).rejects.toBeInstanceOf(UnauthorizedException);
         });
 
-        it('threads the requested lease extension through', async () => {
+        it('threads the requested lease extension and the lease generation through', async () => {
             const heartbeatJob = jest.fn(async () => jobView());
             const controller = makeController({ heartbeatJob });
             await controller.heartbeat(JOB_ID, {
                 nodeId: NODE_ID,
                 secret: SECRET,
                 leaseTtlSec: 90,
+                leaseGeneration: GENERATION,
             });
-            expect(heartbeatJob).toHaveBeenCalledWith(NODE_ID, SECRET, JOB_ID, 90);
+            expect(heartbeatJob).toHaveBeenCalledWith(NODE_ID, SECRET, JOB_ID, 90, GENERATION);
+        });
+
+        it('surfaces a stale generation as 409 with the stable stale-lease reason', async () => {
+            const controller = makeController({
+                heartbeatJob: jest.fn(async () => {
+                    throw new FleetJobStaleLeaseError();
+                }),
+            });
+            const error: unknown = await controller
+                .heartbeat(JOB_ID, { nodeId: NODE_ID, secret: SECRET, leaseGeneration: 1 })
+                .catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(ConflictException);
+            expect((error as ConflictException).getStatus()).toBe(409);
+            expect((error as ConflictException).getResponse()).toMatchObject({
+                statusCode: 409,
+                reason: FLEET_JOB_STALE_LEASE_REASON,
+            });
         });
     });
 
@@ -134,6 +161,7 @@ describe('FleetJobsController', () => {
                 secret: SECRET,
                 success: true,
                 result: { gateStatus: 'green' },
+                leaseGeneration: GENERATION,
             });
             expect(result.job.status).toBe('done');
             expect(completeJob).toHaveBeenCalledWith(
@@ -142,6 +170,7 @@ describe('FleetJobsController', () => {
                     success: true,
                     result: { gateStatus: 'green' },
                     error: null,
+                    leaseGeneration: GENERATION,
                 }),
             );
         });
@@ -154,9 +183,15 @@ describe('FleetJobsController', () => {
                 secret: SECRET,
                 success: false,
                 error: 'exit 1',
+                leaseGeneration: GENERATION,
             });
             expect(completeJob).toHaveBeenCalledWith(
-                expect.objectContaining({ success: false, error: 'exit 1', result: null }),
+                expect.objectContaining({
+                    success: false,
+                    error: 'exit 1',
+                    result: null,
+                    leaseGeneration: GENERATION,
+                }),
             );
         });
 
@@ -167,8 +202,31 @@ describe('FleetJobsController', () => {
                     nodeId: NODE_ID,
                     secret: SECRET,
                     success: true,
+                    leaseGeneration: GENERATION,
                 }),
             ).rejects.toBeInstanceOf(UnauthorizedException);
+        });
+
+        it('surfaces a stale generation as 409 with the stable stale-lease reason', async () => {
+            const controller = makeController({
+                completeJob: jest.fn(async () => {
+                    throw new FleetJobStaleLeaseError();
+                }),
+            });
+            const error: unknown = await controller
+                .complete(JOB_ID, {
+                    nodeId: NODE_ID,
+                    secret: SECRET,
+                    success: true,
+                    leaseGeneration: 1,
+                })
+                .catch((e: unknown) => e);
+            expect(error).toBeInstanceOf(ConflictException);
+            expect((error as ConflictException).getStatus()).toBe(409);
+            expect((error as ConflictException).getResponse()).toMatchObject({
+                statusCode: 409,
+                reason: FLEET_JOB_STALE_LEASE_REASON,
+            });
         });
     });
 
@@ -182,12 +240,18 @@ describe('FleetJobsController', () => {
         const messages: string[] = [];
         for (const call of [
             () => controller.lease({ nodeId: NODE_ID, secret: SECRET }),
-            () => controller.heartbeat(JOB_ID, { nodeId: NODE_ID, secret: SECRET }),
+            () =>
+                controller.heartbeat(JOB_ID, {
+                    nodeId: NODE_ID,
+                    secret: SECRET,
+                    leaseGeneration: GENERATION,
+                }),
             () =>
                 controller.complete(JOB_ID, {
                     nodeId: NODE_ID,
                     secret: SECRET,
                     success: true,
+                    leaseGeneration: GENERATION,
                 }),
         ]) {
             await call().catch((error: Error) => messages.push(error.message));

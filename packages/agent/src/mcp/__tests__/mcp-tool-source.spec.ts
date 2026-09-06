@@ -57,6 +57,7 @@ function makeSource(options: {
     connections: McpServerConnection[];
     bindings: AgentMcpServerBinding[];
     toolsByConnection?: Record<string, McpToolInfo[] | Error>;
+    usage?: { record: jest.Mock };
 }) {
     const connectionsRepo = {
         findEnabledByUser: jest
@@ -96,8 +97,15 @@ function makeSource(options: {
         { findByIdAndUser: jest.fn() } as never,
         undefined,
     );
-    return { source: new McpToolSource(connections, client), client };
+    const usage = options.usage;
+    return {
+        source: new McpToolSource(connections, client, usage as never),
+        client,
+        usage,
+    };
 }
+
+const RUN = { runId: 'r1' };
 
 describe('McpToolSource', () => {
     describe('binding resolution matrix', () => {
@@ -106,7 +114,7 @@ describe('McpToolSource', () => {
                 connections: [makeConnection()],
                 bindings: [makeBinding({ targetType: 'tenant', targetId: null, enabled: true })],
             });
-            const tools = await source.buildTools(makeAgent());
+            const tools = await source.buildTools(makeAgent(), RUN);
             expect(tools.map((t) => t.name)).toEqual(['mcp__github__search_issues']);
         });
 
@@ -123,7 +131,7 @@ describe('McpToolSource', () => {
                     }),
                 ],
             });
-            const tools = await source.buildTools(makeAgent());
+            const tools = await source.buildTools(makeAgent(), RUN);
             expect(tools).toEqual([]);
         });
 
@@ -134,7 +142,7 @@ describe('McpToolSource', () => {
                     makeBinding({ targetType: 'agent', targetId: 'agent-1', enabled: true }),
                 ],
             });
-            const tools = await source.buildTools(makeAgent());
+            const tools = await source.buildTools(makeAgent(), RUN);
             expect(tools.map((t) => t.name)).toEqual(['mcp__github__search_issues']);
         });
 
@@ -143,14 +151,14 @@ describe('McpToolSource', () => {
                 connections: [makeConnection({ enabled: false })],
                 bindings: [makeBinding({ targetType: 'tenant', targetId: null, enabled: true })],
             });
-            const tools = await source.buildTools(makeAgent());
+            const tools = await source.buildTools(makeAgent(), RUN);
             expect(tools).toEqual([]);
             expect(client.listTools).not.toHaveBeenCalled();
         });
 
         it('no bindings at all → no tools', async () => {
             const { source } = makeSource({ connections: [makeConnection()], bindings: [] });
-            expect(await source.buildTools(makeAgent())).toEqual([]);
+            expect(await source.buildTools(makeAgent(), RUN)).toEqual([]);
         });
     });
 
@@ -161,7 +169,7 @@ describe('McpToolSource', () => {
                 bindings: [makeBinding()],
             });
             const agent = makeAgent({ permissions: { canCallExternalTools: false } as never });
-            expect(await source.buildTools(agent)).toEqual([]);
+            expect(await source.buildTools(agent, RUN)).toEqual([]);
             expect(client.listTools).not.toHaveBeenCalled();
         });
 
@@ -180,7 +188,7 @@ describe('McpToolSource', () => {
                     c2: [{ name: 'ping', description: 'Ping', inputSchema: {} }],
                 },
             });
-            const tools = await source.buildTools(makeAgent());
+            const tools = await source.buildTools(makeAgent(), RUN);
             expect(tools.map((t) => t.name)).toEqual(['mcp__alive__ping']);
         });
     });
@@ -191,7 +199,7 @@ describe('McpToolSource', () => {
                 connections: [makeConnection()],
                 bindings: [makeBinding()],
             });
-            const [tool] = await source.buildTools(makeAgent());
+            const [tool] = await source.buildTools(makeAgent(), RUN);
             expect(tool.description).toBe('[github] Search issues');
             expect(tool.parameters).toEqual({
                 type: 'object',
@@ -214,7 +222,7 @@ describe('McpToolSource', () => {
                     ],
                 },
             });
-            const [tool] = await source.buildTools(makeAgent());
+            const [tool] = await source.buildTools(makeAgent(), RUN);
             expect(tool.name).toBe('mcp__github__evil_name__x');
             expect(tool.name).toMatch(/^[A-Za-z0-9_-]+$/);
             expect(tool.description).toBe('[github] line1  line2');
@@ -225,7 +233,7 @@ describe('McpToolSource', () => {
                 connections: [makeConnection()],
                 bindings: [makeBinding()],
             });
-            const [tool] = await source.buildTools(makeAgent());
+            const [tool] = await source.buildTools(makeAgent(), RUN);
             await tool.invoke({ q: 'bug' });
             expect(client.callTool).toHaveBeenCalledWith(
                 expect.objectContaining({ id: 'c1' }),
@@ -233,5 +241,166 @@ describe('McpToolSource', () => {
                 { q: 'bug' },
             );
         });
+    });
+});
+
+/**
+ * Usage accounting is deliberately NOT awaited by `invoke`, so an assertion
+ * made immediately after would be racing a microtask. Flushing makes these
+ * tests deterministic rather than dependent on how fast the stub resolves.
+ */
+const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+describe('usage accounting (T28)', () => {
+    it('records one event per successful tool invocation', async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }), RUN);
+        await tools[0].invoke({ q: 'x' });
+        await flush();
+
+        expect(usage.record).toHaveBeenCalledTimes(1);
+        expect(usage.record).toHaveBeenCalledWith(
+            expect.objectContaining({
+                workId: 'work-1',
+                userId: 'u1',
+                capability: 'mcp',
+                units: 1,
+            }),
+        );
+    });
+
+    it('does NOT record a failed tool call', async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source, client } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+        (client.callTool as jest.Mock).mockRejectedValue(new Error('server down'));
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }), RUN);
+        await expect(tools[0].invoke({ q: 'x' })).rejects.toThrow('server down');
+        await flush();
+
+        // Recording after the call is what makes this true: a failed
+        // invocation consumed nothing, so counting it would overstate spend.
+        expect(usage.record).not.toHaveBeenCalled();
+    });
+
+    it('NEVER breaks a tool call when accounting fails', async () => {
+        const usage = { record: jest.fn().mockRejectedValue(new Error('db down')) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }), RUN);
+
+        // Trading a working tool for a complete ledger is the wrong way round.
+        await expect(tools[0].invoke({ q: 'x' })).resolves.toEqual({ ok: true });
+    });
+
+    it('skips an agent with no workId rather than inventing one', async () => {
+        const usage = { record: jest.fn().mockResolvedValue({}) };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        // `plugin_usage_events.workId` is NOT NULL, and an agent scoped to a
+        // Mission or Idea has none. Making that column nullable is a migration
+        // on a table five other capabilities write to — a larger change than
+        // this feature should make alone, so such agents are simply not
+        // counted, and the gap is stated rather than hidden.
+        const tools = await source.buildTools(makeAgent({ workId: null }), RUN);
+        await tools[0].invoke({ q: 'x' });
+        await flush();
+
+        expect(usage.record).not.toHaveBeenCalled();
+    });
+
+    it('returns the tool result WITHOUT waiting for accounting to finish', async () => {
+        let settle!: () => void;
+        const usage = {
+            record: jest.fn(
+                () =>
+                    new Promise<void>((resolve) => {
+                        settle = resolve;
+                    }),
+            ),
+        };
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+            usage,
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }), RUN);
+
+        // The write never settles. If `invoke` awaited it, this would hang —
+        // a stalled accounting write would hold every successful tool
+        // response open, making the ledger a latency dependency of the run.
+        await expect(tools[0].invoke({ q: 'x' })).resolves.toEqual({ ok: true });
+
+        settle();
+    });
+
+    it('works with no usage repository bound at all', async () => {
+        const { source } = makeSource({
+            connections: [makeConnection()],
+            bindings: [makeBinding()],
+        });
+
+        const tools = await source.buildTools(makeAgent({ workId: 'work-1' }), RUN);
+        await expect(tools[0].invoke({ q: 'x' })).resolves.toEqual({ ok: true });
+    });
+});
+
+describe('McpToolSource — releaseRun (AP-14 prerequisite)', () => {
+    type Registrable = {
+        registerRunResource(runId: string, resource: { close(): Promise<void> }): void;
+    };
+
+    it('is a no-op for a run that acquired nothing', async () => {
+        const { source } = makeSource({ connections: [], bindings: [] });
+
+        await expect(source.releaseRun('r-none')).resolves.toBeUndefined();
+    });
+
+    it('closes every registered resource exactly once, tolerating a closer that rejects', async () => {
+        const { source } = makeSource({ connections: [], bindings: [] });
+        const ok = { close: jest.fn().mockResolvedValue(undefined) };
+        const bad = { close: jest.fn().mockRejectedValue(new Error('already gone')) };
+        (source as unknown as Registrable).registerRunResource('r1', ok);
+        (source as unknown as Registrable).registerRunResource('r1', bad);
+
+        await expect(source.releaseRun('r1')).resolves.toBeUndefined();
+        expect(ok.close).toHaveBeenCalledTimes(1);
+        expect(bad.close).toHaveBeenCalledTimes(1);
+
+        // Idempotent: the second release finds nothing left to close.
+        await source.releaseRun('r1');
+        expect(ok.close).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps runs apart — releasing one run leaves another run’s resources alone', async () => {
+        const { source } = makeSource({ connections: [], bindings: [] });
+        const mine = { close: jest.fn().mockResolvedValue(undefined) };
+        const theirs = { close: jest.fn().mockResolvedValue(undefined) };
+        (source as unknown as Registrable).registerRunResource('r1', mine);
+        (source as unknown as Registrable).registerRunResource('r2', theirs);
+
+        await source.releaseRun('r1');
+
+        expect(mine.close).toHaveBeenCalledTimes(1);
+        expect(theirs.close).not.toHaveBeenCalled();
     });
 });

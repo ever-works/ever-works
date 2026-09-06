@@ -4,6 +4,7 @@ import {
     Files,
     FolderClosed,
     FolderOpen,
+    GitBranch,
     Globe,
     Megaphone,
     Star,
@@ -27,8 +28,10 @@ import { WORK_KINDS, normalizeWorkKind, type WorkKind } from '@ever-works/contra
  * does a badge use?" — so every read-only surface (cards, headers, info
  * blocks, filters) renders a kind identically.
  *
- * Every member of `WorkKind` is represented, including the three that are
- * never user-selectable at creation time:
+ * Every member of `WorkKind` is represented — including `repo`, the
+ * Repository kind that wraps an existing code repository (self-build slice
+ * D, EW-766) — and the three that are never user-selectable at creation
+ * time:
  *   - `default` — the column default, carried by every Work that predates
  *     the kind-aware create path. Presented as the generic "Work".
  *   - `company` — minted only by the Register-Company flow
@@ -70,6 +73,10 @@ export const WORK_KIND_PRESENTATION: Record<WorkKindValue, WorkKindPresentation>
     'awesome-repo': {
         icon: Star,
         tone: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+    },
+    repo: {
+        icon: GitBranch,
+        tone: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
     },
     company: {
         icon: Building2,

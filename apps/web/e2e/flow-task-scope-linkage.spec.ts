@@ -1,5 +1,11 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from './helpers/api';
+import {
+    API_BASE,
+    authedHeaders,
+    orgScopedHeaders,
+    registerUserViaAPI,
+    createWorkViaAPI,
+} from './helpers/api';
 import { createTaskViaAPI } from './helpers/agents-tasks';
 import { createOrganizationViaAPI } from './helpers/organizations';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
@@ -34,6 +40,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *       user-scoped first; the scope filter narrows within the caller's own
  *       Tasks. An orphan (unscoped) Task appears in NONE of the three.
  *       An unknown scope id → 200 with an empty page (never 4xx/5xx).
+ *       The list is additionally filtered by the REQUEST's active scope
+ *       (personal vs Organization) and drops rows whose referenced Work is
+ *       unreachable in it — see the tenant-stamping section below.
  *   PATCH /api/tasks/:id                                              → 200
  *       `UpdateTaskDto` whitelists the six owner keys alongside the mutable
  *       fields, so owners are RE-FILEABLE: one PATCH may detach an owner
@@ -49,12 +58,26 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *     - A fresh user's Tasks are born tenantId:null, organizationId:null.
  *     - Creating the user's FIRST org lazily mints a Tenant and
  *       RETROACTIVELY backfills that tenantId onto the user's pre-existing
- *       Task rows — but leaves their organizationId null (the org is the
- *       active scope for NEW writes, not a retro membership). [The isolation
- *       spec only verified this backfill for WORKS; here we pin it for the
- *       TASK row, and additionally for a SCOPE-linked task.]
- *     - Every subsequent scoped write carries the org's tenantId AND
- *       organizationId SIMULTANEOUSLY with its own missionId/ideaId/workId.
+ *       Task rows — but leaves their organizationId null: the backfill covers
+ *       tenantId only, and nothing is retro-joined to an Organization. [The
+ *       isolation spec only verified this backfill for WORKS; here we pin it
+ *       for the TASK row, and additionally for a SCOPE-linked task.]
+ *     - A later write lands INSIDE the Organization only when the REQUEST
+ *       carries that Org's scope — `X-Scope-Slug: <org-slug>` (see
+ *       `orgScopedHeaders`) or an `/api/<slug>/…` path. An unprefixed
+ *       bare-Bearer call is the PERSONAL contract: tenantId stamped,
+ *       organizationId null. The API deliberately refuses to infer the scope
+ *       from the user's last-active Organization preference, and that refusal
+ *       is what keeps two tabs on different Orgs isolated. See
+ *       `apps/api/src/scope/session-scope.guard.ts`.
+ *     - An org-scoped write carries the org's tenantId AND organizationId
+ *       SIMULTANEOUSLY with its own missionId/ideaId/workId.
+ *     - Scope linkage and request scope must AGREE: `TasksService.getOne`
+ *       (and the list's `filterTasksByReachableWork`) re-checks the referenced
+ *       Work against the active scope, and `assertScopeReachable` does the
+ *       same at create time via `ownershipScopeMatches`. So a Work-scoped Task
+ *       inside an Organization requires its Work to live in that same
+ *       Organization, and both are written and read under that Org's scope.
  *
  * AI/build/research linkage (Idea→Mission auto-link, agent dispatch) needs a
  * provider + Trigger.dev — absent on the e2e stack — so it is out of scope.
@@ -125,14 +148,52 @@ async function createIdea(
     return (await res.json()).id;
 }
 
-/** Page through the full task list filtered by one scope param; return ids. */
+/**
+ * Create a Work that lands INSIDE the given Organization.
+ *
+ * The shared `createWorkViaAPI` helper sends a bare Bearer, which is the
+ * personal contract — the row would be stamped `organizationId: null`. An
+ * Organization write has to name its Org, so this posts the identical body
+ * with {@link orgScopedHeaders}. Same shape as the sibling org-scoped create
+ * in `flow-multi-tenant-isolation.spec.ts`.
+ */
+async function createWorkInOrgViaAPI(
+    request: APIRequestContext,
+    token: string,
+    orgSlug: string,
+    payload: { name: string; slug: string },
+): Promise<string> {
+    const res = await request.post(`${API_BASE}/api/works`, {
+        headers: orgScopedHeaders(token, orgSlug),
+        data: {
+            name: payload.name,
+            slug: payload.slug,
+            description: `e2e ${payload.name}`,
+            organization: false,
+        },
+    });
+    expect(res.status(), `org-scoped work create body=${await res.text()}`).toBe(200);
+    const body = await res.json();
+    const id = body?.work?.id ?? body?.id ?? '';
+    expect(id).toMatch(UUID_RE);
+    return id as string;
+}
+
+/**
+ * Page through the full task list filtered by one scope param; return ids.
+ *
+ * `scopeSlug` pins the request to an Organization (`X-Scope-Slug`); omitting it
+ * is the PERSONAL contract, which is what every pre-org test below wants. An
+ * Organization-stamped Task is deliberately invisible to the personal list.
+ */
 async function listTaskIds(
     request: APIRequestContext,
     token: string,
     query: string,
+    scopeSlug?: string,
 ): Promise<{ ids: string[]; total: number }> {
     const res = await request.get(`${API_BASE}/api/tasks?${query}`, {
-        headers: authedHeaders(token),
+        headers: scopeSlug ? orgScopedHeaders(token, scopeSlug) : authedHeaders(token),
     });
     expect(res.status(), `list ${query} body=${await res.text().catch(() => '')}`).toBe(200);
     const body = await res.json();
@@ -501,33 +562,57 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         expect(preAfter.workId).toBe(preWorkId); // scope preserved through backfill
 
         // ── POST-org: a NEW work + a work-scoped Task carry the org's tenant
-        //    AND organizationId SIMULTANEOUSLY with their own scope id. ─────
-        const { id: postWorkId } = await createWorkViaAPI(request, token, {
+        //    AND organizationId SIMULTANEOUSLY with their own scope id.
+        //
+        //    Both writes must NAME the org: an unprefixed bare-Bearer call is
+        //    the personal contract and would stamp organizationId:null. The
+        //    Work is org-scoped too because scope linkage and request scope
+        //    have to agree — `assertScopeReachable` re-checks the referenced
+        //    Work through `ownershipScopeMatches`, so an org-scoped Task
+        //    pinned to a PERSONAL Work is a 400 "Work <id> not found." ──────
+        const orgHeaders = orgScopedHeaders(token, org.slug);
+        const postWorkId = await createWorkInOrgViaAPI(request, token, org.slug, {
             name: `Post Work ${s}`,
             slug: `post-work-${s}`,
         });
-        const postScopedTask = await createTaskViaAPI(request, token, {
-            title: `Post-org scoped ${s}`,
-            workId: postWorkId,
-        });
+        const postScopedTask = await createTaskViaAPI(
+            request,
+            token,
+            {
+                title: `Post-org scoped ${s}`,
+                workId: postWorkId,
+            },
+            org.slug,
+        );
         expect(asScoped(postScopedTask).tenantId).toBe(tenantId);
         expect(asScoped(postScopedTask).organizationId).toBe(org.id);
         expect(asScoped(postScopedTask).workId).toBe(postWorkId);
 
         // tenantId is one shared namespace across the org row, the work, and
-        // both scoped tasks.
+        // both scoped tasks. Read the work back under the SAME org scope it
+        // was written in.
         const postWorkBody = await (
-            await request.get(`${API_BASE}/api/works/${postWorkId}`, { headers })
+            await request.get(`${API_BASE}/api/works/${postWorkId}`, { headers: orgHeaders })
         ).json();
         const postWork = postWorkBody.work ?? postWorkBody;
+        expect(postWork.organizationId).toBe(org.id);
         expect(
             new Set([org.tenantId, postWork.tenantId, asScoped(postScopedTask).tenantId]).size,
         ).toBe(1);
 
         // The work filter still finds the post-org scoped task even though it
         // is now tenant+org-stamped — stamping is orthogonal to scope linkage.
-        const byPostWork = await listTaskIds(request, token, `workId=${postWorkId}`);
+        // The list is scope-filtered like every other read, so it runs under
+        // the org the row belongs to.
+        const byPostWork = await listTaskIds(request, token, `workId=${postWorkId}`, org.slug);
         expect(byPostWork.ids).toContain(postScopedTask.id);
+
+        // …and the SAME filter under the personal scope returns nothing: an
+        // Organization row is invisible to a bare-Bearer call. That isolation
+        // is the point of the explicit-scope contract, so pin it here rather
+        // than leaving the org read as the only evidence.
+        const byPostWorkPersonal = await listTaskIds(request, token, `workId=${postWorkId}`);
+        expect(byPostWorkPersonal.ids).not.toContain(postScopedTask.id);
     });
 
     test('UI: a Work-scoped Task renders on the work /tasks tab (filtered by workId)', async ({

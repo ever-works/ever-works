@@ -198,7 +198,9 @@ export class CampaignActivationService {
                     id: goal.id,
                     title: goal.title,
                     metricId,
-                    targetValue: goal.targetValue,
+                    // A campaign Goal is always a metric Goal, so the value is
+                    // set; the fallback only satisfies the now-nullable DTO.
+                    targetValue: goal.targetValue ?? targetValue,
                 },
                 agents,
                 tasks,

@@ -21,8 +21,8 @@
  *     configured provider projects synthesized=1 in the dry-run PLAN, but the
  *     APPLY path downgrades a failing/keyless provider to a note and reports 0;
  *     assertions tolerate synthesized ∈ {0, 1}
- *   • no active Organization ⇒ an empty report (never a cross-tenant scan); the
- *     Organization is resolved from the request SCOPE CONTEXT, not a param
+ *   • no active Organization ⇒ an empty report (never a cross-tenant scan); an
+ *     unprefixed bare-Bearer call IS that case — see the scope contract below
  *   • validation: `apply` must be boolean (400), unknown body props rejected (400)
  *   • auth gating (401) on both /api/memory and /api/memory/consolidate
  *   • org isolation: a second user's active org is never consolidated against the
@@ -35,12 +35,31 @@
  *    to the inheritable classes (legal / style / seo); those are what the pass
  *    scans here (org docs carry workId === null in the feed).
  *
+ * ── Scope contract (8f28edca0). Both routes resolve their Organization from the
+ *    request SCOPE CONTEXT, never from a param — and that context is only ever
+ *    established by an explicit `X-Scope-Slug: <org-slug>` header or an
+ *    `/api/<slug>/…` path. `SessionScopeGuard` deliberately refuses to infer one
+ *    from the user's mutable last-active-Org preference (that refusal is what
+ *    keeps two tabs on two different Orgs isolated), so an unprefixed
+ *    bare-Bearer request runs in the PERSONAL scope, where both handlers
+ *    early-return their canned EMPTY payload with HTTP 200 — an org-stamped row
+ *    is simply invisible to it. Every test that means "act inside this org"
+ *    therefore builds its headers with `orgScopedHeaders(token, org.slug)`; the
+ *    two places that mean "personal scope / no active Organization" keep the
+ *    bare `authedHeaders` set on purpose.
+ *
  * Isolation discipline: every test builds a FRESH registerUserViaAPI() owner and
  * a lazily-minted org. Fully API-orchestrated (safe `flow-` prefix, not matched
  * by the no-auth testIgnore regex), so it never contends on the UI.
  */
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI, type RegisteredUser } from './helpers/api';
+import {
+    API_BASE,
+    authedHeaders,
+    orgScopedHeaders,
+    registerUserViaAPI,
+    type RegisteredUser,
+} from './helpers/api';
 import { createOrganizationViaAPI } from './helpers/organizations';
 
 const CONSOLIDATE_URL = `${API_BASE}/api/memory/consolidate`;
@@ -51,12 +70,18 @@ function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-/** A fresh owner + their lazily-minted org, with pre-built auth headers. */
+/**
+ * A fresh owner + their lazily-minted org, with pre-built headers PINNED to
+ * that org's slug. The pin is what puts the request in this Organization's
+ * scope; without it the same bearer is a personal-scope caller that cannot see
+ * a single one of the rows seeded below.
+ */
 interface OrgCtx {
     user: RegisteredUser;
     token: string;
-    headers: { Authorization: string };
+    headers: { Authorization: string; 'X-Scope-Slug': string };
     orgId: string;
+    orgSlug: string;
 }
 
 async function buildOrgCtx(request: APIRequestContext): Promise<OrgCtx> {
@@ -65,8 +90,9 @@ async function buildOrgCtx(request: APIRequestContext): Promise<OrgCtx> {
     return {
         user,
         token: user.access_token,
-        headers: authedHeaders(user.access_token),
+        headers: orgScopedHeaders(user.access_token, org.slug),
         orgId: org.id,
+        orgSlug: org.slug,
     };
 }
 
@@ -106,7 +132,7 @@ interface ConsolidationReport {
 
 async function consolidate(
     request: APIRequestContext,
-    headers: { Authorization: string },
+    headers: Record<string, string>,
     apply?: boolean,
 ): Promise<ConsolidationReport> {
     const res = await request.post(CONSOLIDATE_URL, {
@@ -119,7 +145,7 @@ async function consolidate(
 
 async function getMemory(
     request: APIRequestContext,
-    headers: { Authorization: string },
+    headers: Record<string, string>,
     qs = '',
 ): Promise<{
     documents: Array<{ id: string; class: string; workId: string | null; consolidation: unknown }>;
@@ -179,7 +205,10 @@ test.describe('Memory Consolidation — dry-run preview (writes nothing)', () =>
     });
 
     test('no active Organization ⇒ an empty report with the no-org note', async ({ request }) => {
-        const user = await registerUserViaAPI(request); // never creates an org
+        // DELIBERATELY bare `authedHeaders` — this test pins the PERSONAL-scope
+        // contract, so it must NOT carry an X-Scope-Slug. The user also never
+        // creates an org, so there is nothing a slug could resolve to anyway.
+        const user = await registerUserViaAPI(request);
         const report = await consolidate(request, authedHeaders(user.access_token), true);
         expect(report).toMatchObject({ scanned: 0, promoted: 0, synthesized: 0, superseded: 0 });
         expect(report.details.promotedIds).toEqual([]);
@@ -188,12 +217,19 @@ test.describe('Memory Consolidation — dry-run preview (writes nothing)', () =>
     });
 
     test('an org with zero documents scans nothing', async ({ request }) => {
+        // The scope pin matters here even though every count is 0: it is the
+        // difference between "the org really is empty" and "the request never
+        // reached an org", which the no-org branch above answers with the same
+        // zeros. Only the pinned call asserts the former.
         const ctx = await buildOrgCtx(request);
         const report = await consolidate(request, ctx.headers);
         expect(report.scanned).toBe(0);
         expect(report.promoted).toBe(0);
         expect(report.superseded).toBe(0);
         expect(report.dryRun).toBe(true);
+        // …and it is NOT the no-org early return: that branch always emits its
+        // own note, which a genuinely-empty org never does.
+        expect(report.notes.some((n) => /no active organization/i.test(n))).toBe(false);
     });
 
     test('two distinct documents → nothing superseded, both promoted', async ({ request }) => {
@@ -453,6 +489,11 @@ test.describe('Memory Consolidation — validation & auth', () => {
     });
 });
 
+// Each ctx below pins ITS OWN org slug. Sharing one slug between the two users
+// would collapse the very boundary these tests exist to prove — and a spoofed
+// slug is not the attack under test either (`ScopeOwnershipGuard` 403s that;
+// see flow-org-memory-page-deep.spec.ts). What is under test is that a caller
+// legitimately scoped to org B never sees org A's rows.
 test.describe('Memory Consolidation — org isolation (scope-context bound)', () => {
     test("a second user's org is never consolidated against the first user's documents", async ({
         request,
@@ -474,7 +515,8 @@ test.describe('Memory Consolidation — org isolation (scope-context bound)', ()
         expect(aliceReport.superseded).toBe(1);
         const aliceSurvivor = aliceReport.details.supersededPairs[0][1];
 
-        // Bob's own active org sees only his own (empty) memory — never Alice's docs.
+        // Bob's own org, pinned by Bob's OWN slug, sees only his own (empty)
+        // memory — never Alice's docs.
         const bob = await buildOrgCtx(request);
         const bobReport = await consolidate(request, bob.headers, true);
         expect(bobReport.scanned).toBe(0);

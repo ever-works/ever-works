@@ -8,7 +8,7 @@ import { FLEET_NODE_KINDS } from '../fleet-node.types.js';
 import { FLEET_RUNNER_STATUS_REFRESH_SEC } from '../fleet-runner-status.types.js';
 
 /**
- * The fleet barrel declares nothing of its own (five `export *` lines), but
+ * The fleet barrel declares nothing of its own (six `export *` lines), but
  * it IS how `@ever-works/contracts` reaches every fleet symbol. A dropped or
  * mistyped re-export line still compiles here and only breaks at the call
  * site in another package — a build-time failure no test would otherwise
@@ -32,7 +32,8 @@ const EXECUTION_PREFERENCE_EXPORTS = [
 	'FLEET_EXECUTION_SCOPE_TYPES',
 	'QUEUED_REASON_WAITING_FOR_RUNNER',
 	'resolveFleetExecutionMode',
-	'decideFleetRouting'
+	'decideFleetRouting',
+	'FLEET_FALLBACK_REASONS'
 ] as const;
 
 const JOB_EXPORTS = [
@@ -59,7 +60,16 @@ const JOB_EXPORTS = [
 	'clampMaxAttempts',
 	'nodeSatisfiesCapabilities',
 	'FLEET_AGENT_TASK_MAX_STEPS',
-	'isNodeBusy'
+	'isNodeBusy',
+	'FLEET_JOB_DEFAULT_QUEUED_MAX_AGE_SEC',
+	'FLEET_JOB_MIN_QUEUED_MAX_AGE_SEC',
+	'FLEET_JOB_MAX_QUEUED_MAX_AGE_SEC',
+	'clampQueuedMaxAgeSec',
+	'FLEET_JOB_QUEUE_EXPIRED_REASON',
+	'isQueueExpiredError',
+	// Suspend-safe leases (self-build finding R7).
+	'FLEET_JOB_STALE_LEASE_REASON',
+	'FLEET_JOB_LEASE_LAPSED_WHILE_SUSPENDED_REASON'
 ] as const;
 
 const NODE_EXPORTS = [
@@ -72,6 +82,10 @@ const NODE_EXPORTS = [
 	'FLEET_MAX_VERSION_LENGTH',
 	'FLEET_MAX_CLI_VERSION_LENGTH',
 	'FLEET_MAX_DISK_FREE_BYTES',
+	// Fleet cost accounting (EW-777): the billing-identity label cap and
+	// the daily-ceiling cap. Covered in `fleet-node.spec.ts`.
+	'FLEET_MAX_MODEL_IDENTITY_LENGTH',
+	'FLEET_MAX_DAILY_COST_CEILING_CENTS',
 	'FLEET_MIN_NODE_NAME_LENGTH',
 	'FLEET_MAX_NODE_NAME_LENGTH',
 	'FLEET_CREDENTIAL_MIN_LENGTH',
@@ -83,7 +97,50 @@ const NODE_EXPORTS = [
 	'FLEET_MAX_CAPABILITY_TAGS_CEILING',
 	'FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING',
 	'FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS',
-	'FLEET_MIN_NODE_OFFLINE_AFTER_MS'
+	'FLEET_MIN_NODE_OFFLINE_AFTER_MS',
+	// Health signals (EW-776): the worker-state vocabulary, its
+	// normaliser, the reason cap and the long-offline notice window.
+	// Covered in `fleet-node.spec.ts`.
+	'FLEET_NODE_WORKER_STATES',
+	'normalizeFleetNodeWorkerState',
+	'FLEET_MAX_WORKER_STATE_REASON_LENGTH',
+	'FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS',
+	// Credential lifecycle (EW-799): the dual-accept rotation window.
+	// Covered in `fleet-node.spec.ts`.
+	'FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS',
+	'FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS',
+	'FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS'
+] as const;
+
+/** Agent execution v2 — model CLIs on the node (`fleet-jobs.types.js`). */
+const AGENT_EXECUTION_EXPORTS = [
+	'FLEET_AGENT_EXECUTION_PROVIDERS',
+	'DEFAULT_FLEET_AGENT_EXECUTION_PROVIDER',
+	'isFleetAgentExecutionProvider',
+	'fleetAgentExecutionProviderSupportsMountGrants',
+	'FLEET_AGENT_EXECUTION_MODES',
+	'DEFAULT_FLEET_AGENT_EXECUTION_MODE',
+	'isFleetAgentExecutionMode',
+	'FLEET_AGENT_EXECUTION_EFFORTS',
+	'isFleetAgentExecutionEffort',
+	'FLEET_AGENT_EXECUTION_PERMISSION_MODES',
+	'DEFAULT_FLEET_AGENT_EXECUTION_PERMISSION_MODE',
+	'isFleetAgentExecutionPermissionMode',
+	'FLEET_AGENT_EXECUTION_DEFAULT_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MIN_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MAX_TIMEOUT_SEC',
+	'FLEET_AGENT_EXECUTION_MAX_INSTRUCTIONS_BYTES',
+	'FLEET_AGENT_EXECUTION_MAX_BUDGET_USD',
+	'FLEET_AGENT_EXECUTION_MODEL_PATTERN',
+	'FleetAgentExecutionError',
+	'normalizeFleetAgentModelExecution',
+	// Fleet cost accounting (EW-777): the one dollar → cents conversion
+	// and the bring-your-own usage-row tag. Covered in
+	// `fleet-agent-execution.spec.ts`.
+	'FLEET_BYO_MODEL_PLUGIN_ID_PREFIX',
+	'fleetModelCostUsdToCents',
+	'fleetModelPluginId',
+	'isFleetModelPluginId'
 ] as const;
 
 const RUNNER_STATUS_EXPORTS = [
@@ -93,12 +150,43 @@ const RUNNER_STATUS_EXPORTS = [
 	'summarizeRunnerStatus'
 ] as const;
 
+/** Multi-repo Task workspaces (self-build slice C, `fleet-task-workspace.types.js`). */
+const WORKSPACE_EXPORTS = [
+	'FLEET_TASK_WORKSPACE_MAX_MOUNTS',
+	'FLEET_TASK_WORKSPACE_MOUNT_DIR_PATTERN',
+	'FleetTaskWorkspaceMountError',
+	'normalizeFleetTaskWorkspaceMounts',
+	'isReservedMountDir'
+] as const;
+
+/** Owner question from a fleet run (self-build slice Q, `fleet-jobs.types.js`). */
+const QUESTION_EXPORTS = [
+	'FLEET_AGENT_TASK_META_DIR',
+	'FLEET_AGENT_TASK_QUESTION_FILE',
+	'FLEET_AGENT_TASK_QUESTION_MAX_FILE_BYTES',
+	'FLEET_AGENT_TASK_QUESTION_MAX_TEXT_CHARS',
+	'FLEET_AGENT_TASK_QUESTION_MAX_CONTEXT_BYTES',
+	'parseFleetAgentTaskQuestionMarkdown',
+	'normalizeFleetAgentTaskQuestion',
+	// Panic controls (EW-778) — fleet-panic.types.ts
+	'FLEET_AUDIT_ACTIONS',
+	'FLEET_AUDIT_DEFAULT_LIMIT',
+	'FLEET_AUDIT_MAX_LIMIT',
+	'FLEET_CANCEL_IN_FLIGHT_MAX_IDS',
+	'FLEET_JOB_CANCEL_STATES',
+	'FLEET_KILL_SWITCH_ID',
+	'FLEET_KILL_SWITCH_REASON_MAX_LENGTH'
+] as const;
+
 const ALL_EXPORTS = [
 	...CREDENTIAL_EXPORTS,
 	...EXECUTION_PREFERENCE_EXPORTS,
 	...JOB_EXPORTS,
+	...AGENT_EXECUTION_EXPORTS,
 	...NODE_EXPORTS,
-	...RUNNER_STATUS_EXPORTS
+	...RUNNER_STATUS_EXPORTS,
+	...WORKSPACE_EXPORTS,
+	...QUESTION_EXPORTS
 ];
 
 const FUNCTION_EXPORTS = [
@@ -112,10 +200,27 @@ const FUNCTION_EXPORTS = [
 	'isFleetJobKind',
 	'clampLeaseTtlSec',
 	'clampMaxAttempts',
+	'clampQueuedMaxAgeSec',
+	'isQueueExpiredError',
 	'nodeSatisfiesCapabilities',
 	'isNodeBusy',
 	'isFleetEnrollableNodeKind',
-	'summarizeRunnerStatus'
+	'summarizeRunnerStatus',
+	'isFleetAgentExecutionProvider',
+	'fleetAgentExecutionProviderSupportsMountGrants',
+	'isFleetAgentExecutionMode',
+	'isFleetAgentExecutionEffort',
+	'isFleetAgentExecutionPermissionMode',
+	'normalizeFleetAgentModelExecution',
+	'fleetModelCostUsdToCents',
+	'fleetModelPluginId',
+	'isFleetModelPluginId',
+	'FleetTaskWorkspaceMountError',
+	'normalizeFleetTaskWorkspaceMounts',
+	'isReservedMountDir',
+	'parseFleetAgentTaskQuestionMarkdown',
+	'normalizeFleetAgentTaskQuestion',
+	'normalizeFleetNodeWorkerState'
 ] as const;
 
 const bag = fleet as unknown as Record<string, unknown>;
@@ -130,12 +235,19 @@ describe('fleet barrel', () => {
 		expect(typeof bag[name]).toBe('function');
 	});
 
-	it('exposes exactly these 60 runtime symbols', () => {
+	it('exposes exactly these 121 runtime symbols', () => {
 		// Regression guard in BOTH directions: an `export *` line deleted from
 		// index.ts fails here, and a NEW runtime export added without a spec
 		// also fails here — which forces the author back to cover it.
+		// 92 → 98 with fleet cost accounting (EW-777): two node bounds and
+		// four cost-accounting helpers, each pinned in its own spec.
+		// 114 → 118 with fleet health signals (EW-776): the worker-state
+		// list, its normaliser, the reason cap and the long-offline window.
+		// → 121 with the credential lifecycle (EW-799): the three rotation-
+		// overlap bounds. Both groups live in `fleet-node.types.ts`, an
+		// existing module, so the witness table below needs no new row.
 		expect(Object.keys(fleet).sort()).toEqual([...ALL_EXPORTS].sort());
-		expect(Object.keys(fleet)).toHaveLength(60);
+		expect(Object.keys(fleet)).toHaveLength(121);
 	});
 
 	it.each([
@@ -143,7 +255,9 @@ describe('fleet barrel', () => {
 		['fleet-execution-preference.types.js', 'FLEET_EXECUTION_MODES'],
 		['fleet-jobs.types.js', 'FLEET_JOB_STATUSES'],
 		['fleet-node.types.js', 'FLEET_NODE_KINDS'],
-		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC']
+		['fleet-panic.types.js', 'FLEET_KILL_SWITCH_ID'],
+		['fleet-runner-status.types.js', 'FLEET_RUNNER_STATUS_REFRESH_SEC'],
+		['fleet-task-workspace.types.js', 'FLEET_TASK_WORKSPACE_MAX_MOUNTS']
 	])('keeps the %s module represented via %s', (_module, sentinel) => {
 		// One distinctive symbol per source module, so a whole missing
 		// `export * from` line is named in the failure rather than showing up

@@ -10,6 +10,7 @@ export function toInboxItemDto(row: InboxItem): InboxItemDto {
         body: row.body,
         options: Array.isArray(row.options) && row.options.length > 0 ? row.options : null,
         sourceType: row.sourceType,
+        sourceMeta: row.sourceMeta ?? null,
         agentId: row.agentId ?? null,
         agentRunId: row.agentRunId ?? null,
         taskId: row.taskId ?? null,

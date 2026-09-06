@@ -7,7 +7,7 @@ import { useTranslations } from 'next-intl';
 import { usePathname } from '@/i18n/navigation';
 import { Work } from '@/lib/api';
 import { useWorkDetail, useWorkPermissions } from './WorkDetailContext';
-import { getWorkCapabilities } from '@ever-works/contracts';
+import { getWorkCapabilities, isRepositoryWorkKind } from '@ever-works/contracts';
 
 interface WorkTabsProps {
     work: Work;
@@ -162,7 +162,12 @@ export function WorkTabs({ work }: WorkTabsProps) {
             name: t('generator'),
             tooltip: tTooltip('generator'),
             href: `${ROUTES.DASHBOARD_WORK(work.id)}/generator`,
-            visible: permissions.canGenerate,
+            // A Repository Work has no content pipeline: every generator
+            // action (and every schedule tick) ends in the API's 400 for
+            // the kind, so the tab is not offered. A kind test rather than
+            // `items.enabled` — a Landing Page has no Items tab but still
+            // generates its pages.
+            visible: permissions.canGenerate && !isRepositoryWorkKind(work.kind),
             icon: (
                 <svg
                     className="w-4 h-4 shrink-0"

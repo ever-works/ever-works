@@ -1,7 +1,16 @@
 'use client';
 
 import { useMemo, useState, useTransition } from 'react';
-import { BookOpen, Files, FolderInput, FolderOpen, Globe, PenLine, Star } from 'lucide-react';
+import {
+    BookOpen,
+    Files,
+    FolderInput,
+    FolderOpen,
+    GitBranch,
+    Globe,
+    PenLine,
+    Star,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -12,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
+import { canonicalRepositoryUrl } from '@/lib/work-kinds/repository-url';
 
 /**
  * Dashboard polish (2026-05-27) — Work-specific composer mounted at
@@ -28,7 +38,7 @@ import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
  *     → `/works/new?mode=import`. We do NOT introduce a second
  *     creation surface — the canvas pages are the same.
  */
-type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo';
+type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awesome-repo' | 'repo';
 
 const WORK_KIND_ORDER: InitialWorkKind[] = [
     'website',
@@ -36,6 +46,8 @@ const WORK_KIND_ORDER: InitialWorkKind[] = [
     'blog',
     'directory',
     'awesome-repo',
+    // Self-build slice D (EW-766) — an existing code repository as a Work.
+    'repo',
 ];
 
 const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
@@ -44,6 +56,7 @@ const WORK_KIND_ICONS: Record<InitialWorkKind, LucideIcon> = {
     blog: BookOpen,
     directory: FolderOpen,
     'awesome-repo': Star,
+    repo: GitBranch,
 };
 
 const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
@@ -77,6 +90,12 @@ const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
         'e.g. "Awesome list of self-hostable open-source SaaS alternatives — categorized + docker-ready"',
         'e.g. "Awesome list of agent frameworks (LangChain, AutoGen, CrewAI…) with pros/cons"',
     ],
+    repo: [
+        'e.g. "https://github.com/ever-works/ever-works — the platform monorepo"',
+        'e.g. "https://github.com/ever-works/directory-web-template — the directory template"',
+        'e.g. "https://github.com/my-org/my-service — a service repo agents should work in"',
+        'e.g. "https://github.com/my-org/.github — any GitHub repository you can access"',
+    ],
 };
 
 const PROMPT_INPUT_ID = 'works-quick-add';
@@ -87,6 +106,7 @@ const KIND_INTENT_LABEL: Record<InitialWorkKind, string> = {
     blog: 'blog',
     directory: 'directory',
     'awesome-repo': 'awesome list repo',
+    repo: 'code repository',
 };
 
 export function WorksCreateComposer() {
@@ -124,6 +144,24 @@ export function WorksCreateComposer() {
             return;
         }
         startSubmit(() => {
+            // A Repository Work has nothing to generate — hand the text
+            // (a repo URL, typically) to the Repository form, no chat turn.
+            if (selectedKind === 'repo') {
+                // Only canonical coordinates may ride in the query string:
+                // pasted remotes routinely carry a token in the user-info
+                // section, and a query parameter reaches browser history,
+                // the referrer of every later request and any proxy log.
+                // Anything that does not reduce to owner/repo routes with
+                // no seed at all, and the user types it into the form.
+                const canonical = canonicalRepositoryUrl(description);
+                const params = new URLSearchParams({
+                    mode: 'manual',
+                    kind: 'repo',
+                    ...(canonical ? { prompt: canonical } : {}),
+                });
+                router.push(`${ROUTES.DASHBOARD_WORKS_NEW}?${params.toString()}`);
+                return;
+            }
             // Send the prompt into chat so the AI can iterate while the
             // user lands on the AI form. `/works/new?mode=ai&kind=…`
             // skips the entry view and renders the form directly.

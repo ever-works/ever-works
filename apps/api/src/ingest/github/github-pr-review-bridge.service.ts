@@ -11,6 +11,15 @@ import { PluginSettingsService, UserPluginRepository } from '@ever-works/agent/p
 import { TaskGitLinkService, TaskReviewRejectionService } from '@ever-works/agent/tasks-domain';
 import type { TaskGitLink } from '@ever-works/agent/tasks-domain';
 import type { IngestBindingMatch, IngestBindingResolution } from '../install-binding.types';
+import { config } from '../../config/constants';
+import {
+    classifyReviewer,
+    formatInlineFinding,
+    isReviewBotNoise,
+    parseReviewBotSeverity,
+    stripReviewBotMarkup,
+    type ReviewBotPolicy,
+} from './github-review-bots';
 
 export const GITHUB_PLUGIN_ID = 'github';
 
@@ -177,6 +186,17 @@ export interface GitHubWebhookBody {
         body?: string;
         html_url?: string;
         user?: { login?: string; type?: string };
+        /**
+         * Trusted review bots (R16) — `pull_request_review_comment` only.
+         * The diff anchor of an inline finding: `line` on the current
+         * diff, `original_line` when the line has since moved. Recorded
+         * as `path:line` in front of the finding so the resumed run can
+         * open the file the reviewer bot meant.
+         */
+        path?: string;
+        line?: number | null;
+        original_line?: number | null;
+        pull_request_review_id?: number;
     };
     /**
      * Orchestration M9 - `pull_request_review` deliveries. A human
@@ -300,8 +320,17 @@ function taskFields(link: TaskGitLink | null): Record<string, unknown> {
  *    not awaited: webhooks need a fast 200, and the review is
  *    best-effort (failures are logged, never thrown).
  *
- * Bot-authored comments (including our own review replies) are never
- * ingested — the loop must not echo its own output.
+ * ## Reviewer bots (self-build fleet, finding R16)
+ *
+ * The platform's OWN replies (`<GITHUB_APP_SLUG>[bot]`) and any bot that
+ * is not on the trusted allow-list are never ingested — the loop must not
+ * echo its own output, and an unknown automation must not steer a Task.
+ * Reviews, inline findings and summary comments from the TRUSTED reviewer
+ * bots (`config.githubReviewBots`; CodeRabbit, Copilot, Codex and Greptile
+ * by default) become Task rejection feedback carrying the bot's own
+ * severity, so the next resumed run fixes P2+ first. They are recorded,
+ * never reviewed: a bot comment does not enter the mention loop even when
+ * it happens to say `@ever-works`.
  *
  * ## Git activity (audit item j)
  *
@@ -518,6 +547,21 @@ export class GitHubPrReviewBridgeService {
             return { ingested: null };
         }
 
+        // Trusted review bots (R16) - an inline finding or a summary
+        // comment from an allow-listed reviewer bot is rejection feedback
+        // for the Task, on the same footing as a human's. It is handled
+        // here, BEFORE normalize(), for the same reason a review is: the
+        // loop must never review its reviewers, so the comment cannot
+        // become a `github.mention` no matter what it says.
+        if (
+            (eventName === 'issue_comment' || eventName === 'pull_request_review_comment') &&
+            body.action === 'created' &&
+            classifyReviewer(body.comment?.user, this.reviewBotPolicy()) === 'trusted-bot'
+        ) {
+            await this.recordBotCommentFeedback(binding, eventName, body);
+            return { ingested: null };
+        }
+
         // Git activity ingestion (audit item j) - pushes, the commits
         // inside them and merged pull requests. They take the SAME path
         // every other kind takes (envelope -> dedupe-insert -> spine
@@ -558,10 +602,16 @@ export class GitHubPrReviewBridgeService {
      * durable rejection feedback for the Task the PR belongs to.
      *
      * Best-effort throughout: a webhook must answer 200 fast, and every
-     * miss here (not a rejection, a bot reviewer, an empty body, a PR
+     * miss here (not a rejection, a dropped reviewer, an empty body, a PR
      * that maps to no Work/Task) is an ORDINARY outcome, not an error.
-     * Bot reviewers are excluded for the same reason bot comments are:
-     * the loop must never treat its own output as human feedback.
+     *
+     * Trusted review bots (R16): the platform's own identity and any bot
+     * NOT on the allow-list are dropped — the loop must never treat its
+     * own output as reviewer feedback. An allow-listed reviewer bot in
+     * "request changes" mode is a rejection exactly like a human's, with
+     * the bot's own severity marker carried along; its `COMMENTED`
+     * summaries are not (their findings arrive as inline comments and are
+     * recorded by {@link recordBotCommentFeedback}).
      */
     private async recordReviewRejection(
         binding: GitHubEventsBinding,
@@ -569,8 +619,11 @@ export class GitHubPrReviewBridgeService {
     ): Promise<void> {
         const review = body.review;
         if (!review || review.state?.toLowerCase() !== 'changes_requested') return;
-        if (review.user?.type === 'Bot') return;
-        const feedback = (review.body ?? '').trim();
+        const who = classifyReviewer(review.user, this.reviewBotPolicy());
+        if (who === 'self' || who === 'untrusted-bot') return;
+        const raw = review.body ?? '';
+        if (who === 'trusted-bot' && isReviewBotNoise(raw)) return;
+        const feedback = (who === 'trusted-bot' ? stripReviewBotMarkup(raw) : raw).trim();
         if (feedback.length === 0) return;
 
         const fullName = body.repository?.full_name ?? '';
@@ -587,6 +640,8 @@ export class GitHubPrReviewBridgeService {
                 feedback: feedback.slice(0, GITHUB_EVENT_TEXT_MAX_CHARS),
                 reviewerLabel: review.user?.login ?? null,
                 prUrl: body.pull_request?.html_url ?? review.html_url ?? null,
+                reviewerKind: who === 'trusted-bot' ? 'bot' : 'human',
+                severity: who === 'trusted-bot' ? parseReviewBotSeverity(raw) : null,
             });
         } catch (error) {
             this.logger.warn(
@@ -595,6 +650,84 @@ export class GitHubPrReviewBridgeService {
                 }`,
             );
         }
+    }
+
+    /**
+     * Trusted review bots (R16) — persist one inline finding
+     * (`pull_request_review_comment`) or summary comment (`issue_comment`)
+     * from an allow-listed reviewer bot as rejection feedback for the
+     * Task the PR belongs to. The caller has already classified the
+     * author as `trusted-bot` and checked `action === 'created'`.
+     *
+     * Status chatter (rate limits, "too many files", usage caps) is
+     * dropped: it carries nothing to fix. Presentation markup — HTML
+     * comments, collapsed static-analysis dumps, badges — is stripped
+     * BEFORE the text cap so the finding itself survives the budget, and
+     * an inline finding is prefixed with its `path:line` anchor. Same
+     * best-effort posture as {@link recordReviewRejection}.
+     */
+    private async recordBotCommentFeedback(
+        binding: GitHubEventsBinding,
+        eventName: string,
+        body: GitHubWebhookBody,
+    ): Promise<void> {
+        const comment = body.comment;
+        if (!comment || typeof comment.id !== 'number') return;
+        const raw = comment.body ?? '';
+        if (isReviewBotNoise(raw)) return;
+        // issue_comment fires for plain issues too — only PR threads carry
+        // review feedback.
+        const prNumber =
+            eventName === 'issue_comment'
+                ? body.issue?.pull_request
+                    ? body.issue?.number
+                    : undefined
+                : body.pull_request?.number;
+        if (typeof prNumber !== 'number') return;
+
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        if (!owner || !repo) return;
+
+        const stripped = stripReviewBotMarkup(raw);
+        const feedback =
+            eventName === 'pull_request_review_comment'
+                ? formatInlineFinding(comment, stripped)
+                : stripped;
+        if (feedback.length === 0) return;
+
+        try {
+            await this.rejections.recordPullRequestRejection({
+                userId: binding.userId,
+                owner,
+                repo,
+                prNumber,
+                feedback: feedback.slice(0, GITHUB_EVENT_TEXT_MAX_CHARS),
+                reviewerLabel: comment.user?.login ?? null,
+                prUrl:
+                    comment.html_url ?? body.pull_request?.html_url ?? body.issue?.html_url ?? null,
+                reviewerKind: 'bot',
+                severity: parseReviewBotSeverity(raw),
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Reviewer-bot feedback record failed for ${fullName}#${prNumber}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * The allow-list and the self identity, resolved per delivery so an
+     * operator's env change (and a spec's) takes effect without a restart.
+     * Both sets hold canonical (lower-case) logins.
+     */
+    private reviewBotPolicy(): ReviewBotPolicy {
+        return {
+            trusted: new Set(config.githubReviewBots.trustedLogins()),
+            self: new Set(config.githubReviewBots.selfLogins()),
+        };
     }
 
     /**
@@ -861,7 +994,10 @@ export class GitHubPrReviewBridgeService {
                 return null;
             }
             // Never ingest bot-authored comments (incl. our own review
-            // replies) — the loop must not echo its own output.
+            // replies) — the loop must not echo its own output. Trusted
+            // reviewer bots (R16) were intercepted in handleEvent() and
+            // recorded as feedback; whatever bot reaches this line is
+            // either the platform itself or one nobody vouched for.
             if (comment.user?.type === 'Bot') {
                 return null;
             }

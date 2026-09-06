@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     Stops and removes whichever registration `install-service.ps1`
-    created. It does NOT unenroll the node — the credential and the
+    created. It does NOT unenroll the node - the credential and the
     platform-side registration are separate concerns, and deleting a
     service should never silently revoke a machine's identity.
 

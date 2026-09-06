@@ -16,6 +16,10 @@ import { BudgetOwnerType } from './_types';
 
 export enum PluginUsageCapability {
     AI = 'ai',
+    // Agent Plugins (EW-772) — one event per MCP tool invocation. Additive
+    // enum value, no migration needed (the column is varchar), matching every
+    // other addition to this enum.
+    MCP = 'mcp',
     SEARCH = 'search',
     SCREENSHOT = 'screenshot',
     EXTRACTOR = 'extractor',

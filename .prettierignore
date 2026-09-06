@@ -33,3 +33,17 @@ packages/agent/src/works-config/schema/works.v2.schema.json
 
 # Generated OpenAPI artifact (pnpm generate:openapi)
 apps/api/openapi.json
+
+# Agent Plugins conformance fixtures. These are deliberately malformed
+# packages — invalid JSON, broken YAML frontmatter, over-length fields — and
+# they ARE the test cases. The root format glob covers
+# `**/*.{ts,tsx,jsx,json,css,md}`, so without this entry `format:check` fails
+# on them in CI and `pnpm format` silently repairs them into valid documents,
+# deleting the coverage. See packages/agent-plugins/fixtures/README.md.
+packages/agent-plugins/fixtures
+
+# Vendored canonical JSON Schemas for the Agent Plugins standard, copied
+# verbatim from github.com/agentplugins/agent-plugins-spec so a diff here
+# always means the upstream artifact changed. Reformatting them would make
+# that comparison lie.
+packages/agent-plugins/src/schemas

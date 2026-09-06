@@ -260,6 +260,13 @@ export const authAPI = {
         const params = new URLSearchParams({ code, state });
         return serverFetch<AuthResponse>(`/oauth/${providerId}/callback?${params.toString()}`, {
             headers: { cookie: `ew_oauth_state=${state}` },
+            // The provider redirects the browser to `/api/oauth/:p/callback` as a
+            // top-level navigation. `/api/*` sits outside the proxy matcher, so this
+            // request never carries the proxy-injected workspace selector that
+            // `serverFetch` otherwise fails closed on. A login is never
+            // Organization-scoped, so select personal scope explicitly — the same
+            // exemption the email callbacks already use.
+            publicRouteScope: 'personal',
         });
     },
 

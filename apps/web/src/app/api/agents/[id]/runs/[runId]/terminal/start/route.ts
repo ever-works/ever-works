@@ -1,7 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { API_URL } from '@/lib/constants';
-import { getAuthAccessCookie } from '@/lib/auth/cookies';
-import { applyBffWorkspaceScope } from '@/lib/api/bff-scope';
+import { bffProxy } from '@/lib/api/bff-proxy';
 
 type RouteContext = { params: Promise<{ id: string; runId: string }> };
 
@@ -19,27 +18,22 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  *
  * No request body is forwarded: the session argv is operator configuration
  * resolved server-side, never something the browser gets to choose.
+ *
+ * Auth and workspace scope come from {@link bffProxy}: no session cookie is
+ * `401 Unauthorized`, a missing or malformed per-tab selector is
+ * `400 Invalid workspace scope`, and the handler is handed headers that
+ * already carry the session bearer and the Organization scope.
  */
-export async function POST(request: NextRequest, ctx: RouteContext) {
+export const POST = bffProxy<RouteContext>(async ({ headers }, ctx) => {
+    // Runs inside the wrapper, so auth and scope are already settled here.
     const { id, runId } = await ctx.params;
     if (!UUID.test(id) || !UUID.test(runId)) {
         return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
     }
 
-    const token = await getAuthAccessCookie();
-    if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let headers: Headers;
-    try {
-        headers = applyBffWorkspaceScope(request, {
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`,
-        });
-    } catch {
-        return NextResponse.json({ error: 'Invalid workspace scope' }, { status: 400 });
-    }
+    // bffProxy supplies the bearer and the scope header; the JSON `Accept`
+    // this proxy has always sent upstream is added on top of them.
+    headers.set('Accept', 'application/json');
 
     const upstream = await fetch(`${API_URL}/agents/${id}/runs/${runId}/terminal/start`, {
         method: 'POST',
@@ -52,4 +46,4 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
         status: upstream.status,
         headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
     });
-}
+});

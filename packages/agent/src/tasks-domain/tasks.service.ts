@@ -9,7 +9,8 @@ import {
 import type { TaskIsolationMode } from './task-isolation';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { GateStatus, TaskAcceptanceCheck, TaskExtraRepo } from '@ever-works/contracts';
+import { normalizeTaskExtraRepos } from './task-extra-repos';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
 import type { TaskApprover } from '../entities/task-approver.entity';
 import { Mission } from '../entities/mission.entity';
@@ -44,6 +45,7 @@ import type { AgentRunStatus } from '../entities/agent-run.entity';
 import { TaskNotificationService } from './task-notification.service';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { RepoConnectionRepository } from '../database/repositories/repo-connection.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import {
     ownershipRelationScopeOf,
@@ -78,6 +80,8 @@ export interface CreateTaskInput {
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     /** Quality gates: `null` = inherit the Work's budget (clamped 1..5 at resolve). */
     maxGateAttempts?: number | null;
+    /** Multi-repo (slice C, PR C2): extra repositories by registry connection. `null` = none. */
+    extraRepos?: TaskExtraRepo[] | null;
     /**
      * Judgment layer G9 — sub-agent delegation depth.
      *
@@ -116,6 +120,8 @@ export interface UpdateTaskInput {
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     /** Quality gates: `null` reverts to inheriting the Work's budget. */
     maxGateAttempts?: number | null;
+    /** Multi-repo (slice C, PR C2): extra repositories by registry connection. `null` = none. */
+    extraRepos?: TaskExtraRepo[] | null;
     /**
      * Schedule mode "Scheduled": run once at this instant (must be in the
      * future). `null` clears the schedule — the same effect as
@@ -300,6 +306,11 @@ export class TasksService {
         @Optional() private readonly users?: UserRepository,
         @Optional() private readonly organizationMembers?: OrganizationMemberRepository,
         @Optional() private readonly tenants?: TenantRepository,
+        // Multi-repo Task workspaces (slice C, PR C2) — ownership check of
+        // `extraRepos` connections. Appended LAST + @Optional per the
+        // positional-spec arity rule; absent means extra repositories are
+        // refused (never silently accepted unchecked).
+        @Optional() private readonly repoConnections?: RepoConnectionRepository,
     ) {}
 
     /**
@@ -571,6 +582,31 @@ export class TasksService {
         };
     }
 
+    /**
+     * Multi-repo Task workspaces (slice C, PR C2) — validate and normalize
+     * the Task's extra repositories.
+     *
+     * Slice AH moved the rules themselves into
+     * {@link normalizeTaskExtraRepos} (`task-extra-repos.ts`) so a Task
+     * Template step, which may now carry its own `extraRepos`, is
+     * validated by THE SAME code rather than a second implementation that
+     * would drift. This method stays as the Task-path entry point: every
+     * caller, every error string and every rule is unchanged, which is
+     * what `tasks.service.extra-repos.spec.ts` (untouched) proves.
+     */
+    private async normalizeExtraRepos(
+        ownerId: string,
+        raw: TaskExtraRepo[] | null | undefined,
+        editorId: string = ownerId,
+    ): Promise<TaskExtraRepo[] | null> {
+        return normalizeTaskExtraRepos(
+            { repoConnections: this.repoConnections },
+            ownerId,
+            raw,
+            editorId,
+        );
+    }
+
     async create(
         userId: string,
         input: CreateTaskInput,
@@ -665,6 +701,7 @@ export class TasksService {
             requireAllApprovers: input.requireAllApprovers ?? true,
             acceptanceChecks: input.acceptanceChecks ?? null,
             maxGateAttempts: input.maxGateAttempts ?? null,
+            extraRepos: await this.normalizeExtraRepos(userId, input.extraRepos),
             delegationDepth: input.delegationDepth ?? null,
             scheduledAt: input.scheduledAt ?? null,
             scheduleClaimedAt: null,
@@ -702,6 +739,16 @@ export class TasksService {
         if (input.isolationMode !== undefined) patch.isolationMode = input.isolationMode;
         if (input.acceptanceChecks !== undefined) patch.acceptanceChecks = input.acceptanceChecks;
         if (input.maxGateAttempts !== undefined) patch.maxGateAttempts = input.maxGateAttempts;
+        if (input.extraRepos !== undefined) {
+            // Validated under the Task OWNER: the fleet plan resolves the
+            // connections under `task.userId`, so an org member's own
+            // connection would be accepted here and refused on every run.
+            patch.extraRepos = await this.normalizeExtraRepos(
+                task.userId,
+                input.extraRepos,
+                userId,
+            );
+        }
         if (input.requireAllApprovers !== undefined)
             patch.requireAllApprovers = input.requireAllApprovers;
         // Schedule mode "Scheduled" via the generic PATCH. Same rules as

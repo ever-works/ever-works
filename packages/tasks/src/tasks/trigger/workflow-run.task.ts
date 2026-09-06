@@ -1,8 +1,10 @@
 import { logger, task } from '@trigger.dev/sdk';
 import type { WorkflowRunPayload } from '@ever-works/agent/tasks';
+import { WorkflowRunRepository } from '@ever-works/agent/database';
 import { WorkflowRunExecutorService } from '@ever-works/agent/services';
 import { withWorkerContext } from '../../trigger/worker/utils/worker-context.utils';
 import { TriggerWorkflowRunModule } from '../../trigger/worker/modules/trigger-workflow-run.module';
+import { TriggerWorkflowRunSweeperModule } from '../../trigger/worker/modules/trigger-workflow-run-sweeper.module';
 import { TriggerPluginHydratorService } from '../../trigger/worker/services/trigger-plugin-hydrator.service';
 // Security: validate payload ids before any DB access (defence in depth,
 // mirrors every other task that takes ids off a queue payload).
@@ -52,6 +54,26 @@ import { assertUuid } from '../../trigger/worker/utils/task-context.utils';
  * understands the graph. `WorkflowRunExecutorService` is nonetheless
  * idempotent — it returns early on a row already in a terminal state —
  * so a runtime-level redelivery cannot double-walk.
+ *
+ * ## Who lands the row when the walk does not
+ *
+ * Because there is no retry, nothing re-enters `run` to finish the row. The
+ * executor writes the terminal status on both of its own outcomes, but a
+ * failure BEFORE or AROUND it — `assertUuid` rejecting a payload id, the Nest
+ * context failing to boot, `TriggerPluginHydratorService.initialize()`
+ * throwing, an unexpected error out of the executor, or `maxDuration` expiry
+ * — left the row `queued`/`running` forever, with `finishedAt` and
+ * `durationMs` NULL and no cancel route to clear it.
+ *
+ * Two layers now cover that, the same pair `agent_runs` has:
+ *
+ *   1. `onFailure` below — the PRIMARY path, for every failure the runtime
+ *      reports.
+ *   2. `workflow-run-sweeper.task.ts` — the BACKSTOP, for the failures it
+ *      cannot report: a hard OOM, a node eviction, a deploy landing mid-walk.
+ *
+ * In that order deliberately. `agent-heartbeat.task.ts` states the rule: "the
+ * stuck-row sweep in the dispatcher is a backstop, not a primary path."
  */
 export const workflowRunTask = task<'workflow-run', WorkflowRunPayload>({
     id: 'workflow-run',
@@ -59,6 +81,44 @@ export const workflowRunTask = task<'workflow-run', WorkflowRunPayload>({
     // the 10-minute ceiling), with room for the AI calls between them.
     maxDuration: 60 * 60,
     retry: { maxAttempts: 1 },
+    /**
+     * Land the row when the run did not.
+     *
+     * `markFailed` CASes on `queued | running`, so this cannot stomp a walk
+     * that already wrote its own terminal status — the normal `failed` path
+     * keeps its `failureCode` and `failedNodeId`, and this no-ops.
+     *
+     * Boots `TriggerWorkflowRunSweeperModule`, NOT the task's own module: this
+     * hook runs after the task has already failed, sometimes because the
+     * machine is out of memory, and the walk module hydrates the plugin
+     * registry over the network. A recovery path must not be able to fail for
+     * the same reason as the thing it is recovering.
+     *
+     * Best-effort by design. If even this cannot run, the row is still
+     * reachable by `workflow-run-sweeper`.
+     */
+    onFailure: async ({ payload, error }: { payload?: WorkflowRunPayload; error?: unknown }) => {
+        if (!payload?.workflowRunId) return;
+        try {
+            // Security: validate the id before any DB access, mirroring `run`.
+            assertUuid(payload.workflowRunId, 'payload.workflowRunId');
+            await withWorkerContext(
+                'WorkflowRun:Failure',
+                async (appContext) => {
+                    const runs = appContext.get(WorkflowRunRepository);
+                    const message = error instanceof Error ? error.message : String(error);
+                    await runs.markFailed(
+                        payload.workflowRunId,
+                        `workflow-run task failed before the walk could record an outcome: ${message}`,
+                        { failureCode: 'task-failed' },
+                    );
+                },
+                TriggerWorkflowRunSweeperModule,
+            );
+        } catch {
+            // Best-effort — `workflow-run-sweeper` is the backstop.
+        }
+    },
     run: async (payload: WorkflowRunPayload, { ctx }: { ctx?: { run?: { id?: string } } } = {}) => {
         assertUuid(payload.workflowRunId, 'payload.workflowRunId');
         assertUuid(payload.workflowId, 'payload.workflowId');

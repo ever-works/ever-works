@@ -280,6 +280,46 @@ describe('CommunityPrProcessorService', () => {
         });
     });
 
+    describe('Repository Work kind (self-build slice D, EW-766)', () => {
+        // A Repository Work's "main repo" resolves — via the entity's
+        // `<slug>` fallback — to the wrapped code repository itself. Listing,
+        // commenting on and closing pull requests THERE is not community
+        // intake, so the kind is refused on the API path and skipped on the
+        // schedule, before any lock or provider call.
+        it('processWork refuses a Repository Work with a 400 before taking the lock or listing PRs', async () => {
+            const { service, gitFacade, ...rest } = makeService();
+            const taskLockService = rest.taskLockService as { runExclusive: jest.Mock };
+
+            await expect(
+                service.processWork(makeWork({ kind: 'repo', name: 'Platform' } as any) as any),
+            ).rejects.toThrow(/is a Repository Work/);
+
+            expect(taskLockService.runExclusive).not.toHaveBeenCalled();
+            expect(gitFacade.listPullRequests).not.toHaveBeenCalled();
+        });
+
+        it('processAllWorks skips a Repository Work quietly — no error row, other Works still processed', async () => {
+            const workRepository = {
+                findWithCommunityPrEnabled: jest
+                    .fn()
+                    .mockResolvedValue([
+                        makeWork({ id: 'w-repo', kind: 'repo' } as any),
+                        makeWork({ id: 'w-dir' }),
+                    ]),
+                update: jest.fn().mockResolvedValue(undefined),
+                increment: jest.fn().mockResolvedValue(undefined),
+            };
+            const { service, gitFacade } = makeService({ workRepository });
+
+            const result = await service.processAllWorks();
+
+            expect(result.errors).toEqual([]);
+            // Only the directory Work reached the provider.
+            expect(gitFacade.listPullRequests).toHaveBeenCalledTimes(1);
+            expect(gitFacade.listPullRequests.mock.calls[0][0]).toBe('acme');
+        });
+    });
+
     describe('processWork — locking and short-circuit branches', () => {
         it('returns 0 (NOT a {acquired:false} envelope) when the lock could not be acquired', async () => {
             const taskLockService = {

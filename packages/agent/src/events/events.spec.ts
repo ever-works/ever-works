@@ -295,6 +295,9 @@ describe('agent/events submodule', () => {
                     'DeploymentCompletedEvent',
                     'DeploymentDispatchedEvent',
                     'DeploymentFailedEvent',
+                    // Agent execution v2 (slice B) — fleet job lifecycle.
+                    'FleetJobCompletedEvent',
+                    'FleetJobLeasedEvent',
                     'WorkCreatedEvent',
                     'WorkStatusChangedEvent',
                     'WorkGenerationCompletedEvent',

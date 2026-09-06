@@ -72,6 +72,7 @@ export function TaskAttachmentsSection({ taskId, workId, initial, initialError =
         }
         const form = new FormData();
         form.append('file', file);
+        // eslint-disable-next-line no-restricted-syntax -- EW-790 ok
         const resp = await fetch(`/api/works/${workId}/kb/uploads`, {
             method: 'POST',
             body: form,

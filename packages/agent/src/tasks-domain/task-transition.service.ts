@@ -297,27 +297,44 @@ export class TaskTransitionService {
 
     private async fanOutAgentExecutions(task: Task): Promise<void> {
         if (!this.dispatcher || !this.assignees) return;
-        const agentAssignees = await this.assignees.findAgentAssignees(task.id);
         const generation = (task.recurrenceOccurredCount ?? 0) + 1;
+        for (const agentId of await this.resolveDispatchAgentIds(task)) {
+            await this.dispatchAgentRun(task, agentId, { generation });
+        }
+    }
 
-        // No task_assignees rows does NOT mean no agent. The Task detail page
-        // assigns an Agent by writing `task.agentId` (the owner column, indexed
-        // as idx_tasks_agent) without creating an assignee row — and the
-        // run-candidates API already models it as its own source ('task',
-        // tasks.service.ts). This fan-out only iterated assignee rows, so the
-        // PRIMARY human flow — pick an Agent on the detail page, move the Task
-        // to In Progress — dispatched nothing, silently: the card moved and no
-        // run ever started. Fall back to the Task's own agent, mirroring the
-        // candidates API's precedence (assignee rows first, owner column next).
-        if (agentAssignees.length === 0) {
-            if (task.agentId) {
-                await this.dispatchAgentRun(task, task.agentId, { generation });
-            }
-            return;
+    /**
+     * THE agent-resolution ladder for a Task about to be run: agent
+     * assignee rows first (one run per agent), else the Task's own
+     * `agentId` column, else nothing.
+     *
+     * No task_assignees rows does NOT mean no agent. The Task detail page
+     * assigns an Agent by writing `task.agentId` (the owner column, indexed
+     * as idx_tasks_agent) without creating an assignee row — and the
+     * run-candidates API already models it as its own source ('task',
+     * tasks.service.ts). The fan-out once iterated assignee rows only, so the
+     * PRIMARY human flow — pick an Agent on the detail page, move the Task
+     * to In Progress — dispatched nothing, silently: the card moved and no
+     * run ever started. The fallback mirrors the candidates API's precedence
+     * (assignee rows first, owner column next).
+     *
+     * Public since slice AH: `TaskGraphFanoutService` must skip a Task with
+     * no resolvable agent (a human's TODO never auto-starts) and must answer
+     * that question exactly the way the dispatch that follows will — a
+     * second ladder would drift.
+     *
+     * Deliberately NOT error-swallowing: a repository failure propagates to
+     * the caller, so a driver that cannot tell whether a Task has an agent
+     * refuses to start it rather than guessing.
+     */
+    async resolveDispatchAgentIds(task: Task): Promise<string[]> {
+        const agentAssignees = this.assignees
+            ? await this.assignees.findAgentAssignees(task.id)
+            : [];
+        if (agentAssignees.length > 0) {
+            return agentAssignees.map((assignee) => assignee.assigneeId);
         }
-        for (const assignee of agentAssignees) {
-            await this.dispatchAgentRun(task, assignee.assigneeId, { generation });
-        }
+        return task.agentId ? [task.agentId] : [];
     }
 
     /**
@@ -609,7 +626,25 @@ export class TaskTransitionService {
         return gateStatus === 'red' || gateStatus === 'skipped' ? gateStatus : null;
     }
 
-    private async findOpenBlockers(taskId: string): Promise<string[]> {
+    /**
+     * THE definition of "this Task still has an open blocker".
+     *
+     * A `task_blocks` row is OPEN while its `blockedByTaskId` Task is
+     * neither DONE nor CANCELLED — a cancelled blocker holds nothing
+     * back. `TaskRelation` rows are navigation only and are deliberately
+     * NOT consulted (see `task-relation.entity.ts`).
+     *
+     * Public since slice AH: `TaskGraphFanoutService` decides which TODO
+     * Tasks are startable and MUST use the same predicate the blocker
+     * gate in {@link transition} enforces, or the driver would start work
+     * the gate then refuses (or, worse, quietly disagree about what
+     * "blocked" means). One implementation, two callers.
+     *
+     * N+1 by construction (one `findById` per blocker row) and therefore
+     * only ever run over bounded sets: a single transition's blockers, or
+     * one bounded fan-out tick.
+     */
+    async listOpenBlockerIds(taskId: string): Promise<string[]> {
         const rows = await this.blocks.findByTaskId(taskId);
         if (rows.length === 0) return [];
         const ids = rows.map((r) => r.blockedByTaskId);
@@ -621,6 +656,11 @@ export class TaskTransitionService {
             }
         }
         return open;
+    }
+
+    /** Internal alias kept so every pre-existing call site is untouched. */
+    private async findOpenBlockers(taskId: string): Promise<string[]> {
+        return this.listOpenBlockerIds(taskId);
     }
 
     /** Pure helper for tests + UI affordance check — no DB I/O. */
@@ -664,6 +704,20 @@ export class TaskTransitionService {
         return this.tryUnblockSingleTask(taskId);
     }
 
+    /**
+     * Restores a Task that is literally in `blocked` status. The narrow
+     * scope is deliberate and stays: `blocked → previousStatus` is a
+     * STATUS RESTORE, and TODO → TODO is not a legal edge of the state
+     * machine, so widening this to TODO Tasks would only produce refused
+     * transitions and warning noise.
+     *
+     * The gap that scope leaves — a TODO sub-task whose last blocker just
+     * finished, which nothing here restarts — is closed by
+     * `TaskGraphFanoutService` (slice AH): it walks TODO Tasks with zero
+     * OPEN blockers (same predicate, {@link listOpenBlockerIds}) and
+     * starts them through the ordinary gated dispatch path, bounded per
+     * owner and off by default.
+     */
     private async tryUnblockSingleTask(taskId: string): Promise<boolean> {
         const blocked = await this.tasks.findById(taskId).catch(() => null);
         if (!blocked || blocked.status !== TaskStatus.BLOCKED) return false;

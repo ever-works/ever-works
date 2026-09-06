@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Download, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useWorkspaceScope } from '@/lib/hooks/use-workspace-scope';
+import { memoryFileDownloadUrl } from '@/lib/api/memory-files-url';
 import { pickKbViewer } from '@/components/works/detail/kb/viewers/pick-viewer';
 import { KbPdfViewer } from '@/components/works/detail/kb/viewers/KbPdfViewer';
 import { KbDocxViewer } from '@/components/works/detail/kb/viewers/KbDocxViewer';
@@ -27,6 +29,15 @@ import type { MemoryFileRow } from '@/lib/api/memory-files-types';
  * Unlike the KB (which stores a rendered body to show instead), Files
  * has only bytes, so this component fetches small text payloads itself
  * and renders them; anything else falls back to a download card.
+ *
+ * **Transport.** `url` is the download route with the tab's workspace
+ * carried as `?scope=` (`memoryFileDownloadUrl`), because the binary
+ * viewers put the very same `url` on an `<img>`/`<video>`/`<iframe>`
+ * and the overlay's own Download control is an `<a href>` — none can
+ * carry a header. The text preview below therefore stays on a raw
+ * `fetch()` too: the scope is already on the URL, and sending it a
+ * second time as a header would give the route two carriers to
+ * reconcile. See `app/api/memory/files/[id]/download/route.ts`.
  */
 
 /** Text payloads above this are not fetched for inline display. */
@@ -51,7 +62,8 @@ export interface MemoryFilePreviewProps {
 
 export function MemoryFilePreview({ row, onClose }: MemoryFilePreviewProps) {
     const t = useTranslations('dashboard.memoryPage.files');
-    const url = `/api/memory/files/${encodeURIComponent(row.id)}/download?source=${row.source}`;
+    const scope = useWorkspaceScope();
+    const url = memoryFileDownloadUrl(row, scope);
     const kind = pickKbViewer(row.mime);
     const sizeBytes = row.size ?? 0;
 

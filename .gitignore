@@ -15,6 +15,8 @@
 
 # compiled output
 dist
+# apps/node publishable bundle staged by apps/node/build.js
+dist-bundle
 tmp
 /out-tsc
 /out

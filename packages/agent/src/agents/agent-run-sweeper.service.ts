@@ -6,7 +6,7 @@ import {
     AgentRunRepository,
     STALE_PARK_SUMMARY_PREFIX,
 } from '../database/repositories/agent-run.repository';
-import { RunDispatchGateService } from './run-dispatch-gate.service';
+import { QUEUED_REASON_KILL_SWITCH, RunDispatchGateService } from './run-dispatch-gate.service';
 import { AgentEscalationService } from './agent-escalation.service';
 import { NotificationService } from '../notifications/notification.service';
 import type { AgentRun } from '../entities/agent-run.entity';
@@ -135,7 +135,12 @@ export class AgentRunSweeperService {
         const now = Date.now();
         const cutoff = new Date(now - cutoffMinutes * 60_000);
 
-        const scanned = await this.runs.findStuckNonTerminal(cutoff, limit);
+        // Panic controls (EW-778) — a run the global stop flag parked is
+        // waiting for an operator, not stuck. Excluded in the SQL AND
+        // re-asserted below, exactly like `awaitingInput`.
+        const scanned = await this.runs.findStuckNonTerminal(cutoff, limit, [
+            QUEUED_REASON_KILL_SWITCH,
+        ]);
         // Run steering (Wave 4 M5) — THE hard rule of this plan: a run parked
         // on a human question must NEVER be reaped by a TTL sweep. It is not
         // stuck, it is waiting, possibly for days, and killing it destroys
@@ -144,11 +149,20 @@ export class AgentRunSweeperService {
         // this service is the last gate before `markStuckFailed`, and an
         // older API replica (or a future second caller) handing back an
         // awaiting row must still not reap it.
-        const stuck = scanned.filter((row) => row.awaitingInput !== true);
-        const skippedAwaiting = scanned.length - stuck.length;
+        const notAwaiting = scanned.filter((row) => row.awaitingInput !== true);
+        const skippedAwaiting = scanned.length - notAwaiting.length;
         if (skippedAwaiting > 0) {
             this.logger.log(
                 `AgentRun sweep: skipped ${skippedAwaiting} run(s) awaiting human input (never reaped).`,
+            );
+        }
+        const stuck = notAwaiting.filter(
+            (row) => !(row.status === 'queued' && row.queuedReason === QUEUED_REASON_KILL_SWITCH),
+        );
+        const skippedKillSwitch = notAwaiting.length - stuck.length;
+        if (skippedKillSwitch > 0) {
+            this.logger.log(
+                `AgentRun sweep: skipped ${skippedKillSwitch} run(s) parked by the global stop flag (never reaped).`,
             );
         }
         if (stuck.length === 0) {

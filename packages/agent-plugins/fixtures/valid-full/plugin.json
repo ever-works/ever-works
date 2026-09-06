@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "full-plugin",
+  "version": "1.2.0",
+  "description": "Every metadata field the manifest schema permits.",
+  "author": {
+    "name": "Author Name",
+    "email": "author@example.com",
+    "url": "https://example.com"
+  },
+  "homepage": "https://docs.example.com/plugin",
+  "repository": "https://github.com/example/plugin",
+  "license": "MIT",
+  "keywords": [
+    "keyword1",
+    "keyword2"
+  ],
+  "extensions": {
+    "works.ever": {
+      "catalogTier": "community"
+    },
+    "com.example.client": {
+      "setting": true
+    }
+  }
+}

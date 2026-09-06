@@ -13,7 +13,7 @@
   canonical schemas `https://agent-plugins.org/schemas/1.0.0/plugin.schema.json` and
   `https://agent-plugins.org/schemas/1.0.0/mcp.schema.json`.
 - **Agent Skills** — <https://agentskills.io/specification> (authoritative for `SKILL.md`
-  format, delegated to by Agent Plugins §6.1). Reference validator:
+  format, delegated to by Agent Plugins §7.1). Reference validator:
   [`skills-ref`](https://github.com/agentskills/agentskills/tree/main/skills-ref).
 - **Model Context Protocol (MCP)** — <https://modelcontextprotocol.io/specification>
   (wire behavior for the MCP servers component type).
@@ -59,10 +59,10 @@ These are different species and MUST stay separate:
 
 |              | Native Ever Works plugin                                 | Agent Plugins package                                                                              |
 | ------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| Manifest     | `everworks.plugin` block in `package.json` (open schema) | `plugin.json` (closed schema, spec §4)                                                             |
+| Manifest     | `everworks.plugin` block in `package.json` (open schema) | `plugin.json` (closed schema, spec §5)                                                             |
 | Content      | Executable JS/TS (`dist/index.js`)                       | Data: `skills/*/SKILL.md`, `mcp.json`, assets                                                      |
 | Loaded by    | `PluginLoaderService` (`import()`)                       | New spec-package reader (fs reads only)                                                            |
-| Validated by | `PluginManifestValidator` (unchanged)                    | New closed-schema validator (parallel, per spec §4)                                                |
+| Validated by | `PluginManifestValidator` (unchanged)                    | New closed-schema validator (parallel, per spec §5)                                                |
 | Trust        | First-party / ADR-016 allowlist; code runs in-process    | Data is safe to parse; **only** stdio MCP servers execute anything, behind an explicit gate (§4.4) |
 
 The bridge between the two worlds is a **new platform module**
@@ -76,7 +76,7 @@ tenant-scoped DB state — a plugin could neither query it nor scope it.
 The existing validator MUST NOT be reused for spec manifests and MUST NOT be relaxed:
 the two schemas disagree by design (spec `name` allows dots and 1-char names and
 requires nothing but `$schema`+`name`; ours requires `id/name/version/category` and
-rejects non-semver versions — which the spec forbids a client to reject, §4.4).
+rejects non-semver versions — which the spec forbids a client to reject, spec §5.4).
 
 ---
 
@@ -98,8 +98,9 @@ rejects non-semver versions — which the spec forbids a client to reject, §4.4
    Agent Plugins package (`plugin.json` + `skills/`), and the Ever Works MCP server can
    be described as a conformant package (`mcp.json`, `streamable-http`), so other
    ecosystems' agents can consume what our users build.
-4. **Full client conformance** — we target the complete §10.1 client checklist, not
-   the §10.2 skills-only subset. A conformance fixture suite (valid + malformed
+4. **Full client conformance** — we target the complete §11.1 client requirements
+   and every row of the spec's Appendix A checklist, not the §11.2
+   incremental-adoption subset. A conformance fixture suite (valid + malformed
    packages) proves every MUST.
 
 **Non-goals** (v1): hosting a public registry of Agent Plugins packages; converting
@@ -161,7 +162,7 @@ a marketplace UI beyond the sources/install surface described here.
   servers to the Agent. On the Agent's next run, the platform connects to bound servers
   (per declared transport) and exposes their tools to the model, namespaced
   `mcp__<server>__<tool>`, subject to the same allowed-tools policy that gates skills.
-- **US-8 (secrets)**: Packages cannot ship credentials (spec §6.2.1). When a server
+- **US-8 (secrets)**: Packages cannot ship credentials (spec §7.2.1). When a server
   needs auth, the user provides it in Ever Works per-server settings (encrypted at
   rest like plugin `x-secret` settings). At connect time Ever Works injects them as
   _client-generated_ headers/env — which the spec explicitly permits and gives
@@ -223,7 +224,7 @@ configuration, not code paths.
 Every requirement below is testable and MUST be covered by the conformance fixture
 suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
 
-### 4.1 Manifest loading (spec §4)
+### 4.1 Manifest loading (spec §5)
 
 - **AP-1**: Load `plugin.json` from the package root; it MUST be a JSON object.
 - **AP-2**: Permitted top-level fields only: `$schema`, `name`, `version`,
@@ -243,7 +244,7 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
 - **AP-6**: `extensions` namespaces we don't implement are ignored **without
   validating their contents**. We implement only `works.ever`.
 
-### 4.2 Component discovery (spec §5, §6.1 + Agent Skills spec)
+### 4.2 Component discovery (spec §6, §7.1 + Agent Skills spec)
 
 - **AP-7**: Skills discovered ONLY from `skills/`: each **immediate** child directory
   whose `SKILL.md` resolves to a regular file is one skill. No recursion. Missing
@@ -265,7 +266,7 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
   `command`/`cwd` → that server invalid; any other escaped path → access denied to
   that path.
 
-### 4.3 MCP configuration (spec §6.2)
+### 4.3 MCP configuration (spec §7.2)
 
 - **AP-11**: MCP config loaded ONLY from `mcp.json` at package root. Closed schema:
   `$schema` (canonical mcp id) + `mcpServers` map, nothing else. Empty map is valid.
@@ -295,7 +296,7 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
   cross-origin at all. This is runtime client behavior and MUST have its own
   implementation + test task, not just static validation.
 
-### 4.4 Subprocess environment (spec §8) — stdio only
+### 4.4 Subprocess environment (spec §9) — stdio only
 
 - **AP-16**: Every spawned server process gets `PLUGIN_ROOT` (absolute package root)
   and `PLUGIN_DATA` (absolute per-installed-package writable data dir that persists
@@ -311,10 +312,10 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
 - **AP-19**: `stdio` execution is gated (US-9). When the gate is off, `stdio` entries
   are surfaced as "present but disabled by policy" and handled as skip + report +
   continue — **our interpretation**, consistent with the spec's failure-isolation
-  rules for unsupported transports (§6.2.2); the spec itself does not define a
+  rules for unsupported transports (spec §7.2.2); the spec itself does not define a
   policy-disabled state.
 
-### 4.5 Versioning & updates (spec §9)
+### 4.5 Versioning & updates (spec §10)
 
 - **AP-20**: We use the manifest `$schema` id to select the targeted spec version;
   v1.0.0 is the only supported version at launch (unknown → reject with a clear
@@ -374,7 +375,8 @@ new UI tabs/pages, new env vars, new capability interface — enumerated in plan
 ## 6. Resolved decisions (founder, 2026-08-09)
 
 1. **Both component types** — Skills AND MCP servers; all three transports; full
-   §10.1 conformance, not §10.2 skills-only.
+   §11.1 conformance plus the full Appendix A checklist, not the §11.2
+   skills-only subset.
 2. **All three source kinds** — local directory AND git AND npm, availability
    governed by deployment mode + operator policy.
 3. **Strictly additive** — nothing existing is dropped or changed in behavior.

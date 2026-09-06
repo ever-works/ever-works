@@ -50,7 +50,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
         with:
           version: 10.33.3
 
@@ -77,26 +77,82 @@ jobs:
         shell: bash
         run: |
           set +e
-          output="$(pnpm audit --prod --audit-level=high 2>&1)"
-          code=$?
+          # Retry the whole audit, not just the request. pnpm already retries
+          # the HTTP call three times internally (immediate, +10s, +1min) and
+          # STILL returns ERR_SOCKET_TIMEOUT when npm's audit endpoint is
+          # having a bad few minutes: observed four times in a row on one PR
+          # while `develop` passed in the same window. That is an outage, not
+          # a finding, and it was hard-failing unrelated PRs.
+          #
+          # This does NOT weaken the gate: a genuine HIGH/CRITICAL result is
+          # deterministic, so it reproduces on every attempt and still fails
+          # below. Only a transient transport error benefits from a retry.
+          attempt=1
+          max_attempts=3
+          while :; do
+            output="$(pnpm audit --prod --audit-level=high 2>&1)"
+            code=$?
+            if [ "$code" -eq 0 ]; then
+              printf '%s\n' "$output"
+              exit 0
+            fi
+            # Retry ONLY on a transport-level failure. A real advisory, and the
+            # retired-endpoint response handled below, are both reproducible,
+            # so retrying either just spends minutes reaching the same answer.
+            if [ "$attempt" -ge "$max_attempts" ] || ! printf '%s' "$output" | grep -qE 'ERR_SOCKET_TIMEOUT|ECONNRESET|ETIMEDOUT|EAI_AGAIN'; then
+              break
+            fi
+            echo "::notice title=Retrying dependency audit::Transport error on attempt ${attempt}/${max_attempts}; retrying in $((attempt * 15))s."
+            sleep "$((attempt * 15))"
+            attempt=$((attempt + 1))
+          done
           printf '%s\n' "$output"
-          if [ "$code" -eq 0 ]; then
-            exit 0
-          fi
           # Detect the endpoint outage by pnpm's OWN error CODE only — not by
           # human-language phrases like "410"/"retired", which could legitimately
           # appear inside a real CVE advisory description and wrongly soft-pass a
           # run that has actual vulnerabilities. `ERR_PNPM_AUDIT_BAD_RESPONSE` is
           # emitted only when the audit endpoint returns an unusable response; a
           # genuine high/critical finding never prints this token, so it still
-          # hard-fails below. Any other non-endpoint error (e.g. a network blip)
-          # also hard-fails — the conservative default.
+          # hard-fails below. A transport error has already been retried above
+          # and still hard-fails here if it never succeeded: retrying changes
+          # how often we ask, never what counts as a finding.
           if printf '%s' "$output" | grep -qF 'ERR_PNPM_AUDIT_BAD_RESPONSE'; then
             echo "::warning title=Dependency audit skipped::npm's audit endpoint is unavailable (ERR_PNPM_AUDIT_BAD_RESPONSE — legacy audit API retired, HTTP 410). The high/critical audit gate is soft for this run and re-arms automatically once a working endpoint is restored."
             exit 0
           fi
           echo "::error title=Dependency audit failed::pnpm audit reported HIGH/CRITICAL production vulnerabilities (or an unexpected error). See the output above."
           exit "$code"
+
+  # T9 — an ORACLE, not a gate. `skills-ref` is the reference library for
+  # Agent Skills; running it over our fixture corpus answers a question our own
+  # tests cannot: does our reading of the specification match somebody else's?
+  #
+  # `continue-on-error` is the whole point. The two tools do not answer the same
+  # question — ours validates a PACKAGE and reports per-skill findings without
+  # rejecting the package, theirs validates one skill — so a difference is
+  # information, not a defect. And `skills-ref` is at 0.1.1; pinning merges to a
+  # young external tool's opinion would hand it a veto.
+  skills-oracle:
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install the reference library
+        run: pip install --quiet skills-ref==0.1.1
+
+      - name: Cross-check the fixture corpus
+        run: python packages/agent-plugins/scripts/oracle-check.py packages/agent-plugins/fixtures
+
 
   lint-and-test:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
@@ -112,7 +168,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
         with:
           version: 10.33.3
 
@@ -181,6 +237,25 @@ jobs:
       - name: Build all packages
         if: steps.scope.outputs.code == 'true'
         run: pnpm build --filter=!./apps/docs
+
+      # Lint runs AFTER the build, and that ordering is load-bearing.
+      # `apps/mcp` lints with `recommendedTypeChecked` + `projectService`, so
+      # its rules need REAL types. With `@ever-works/contracts` unbuilt, every
+      # value crossing that import is `error`-typed and `no-unsafe-assignment`
+      # fires on correct code. Placing this next to `format:check` — where it
+      # only needs the install and reports sooner — failed exactly that way.
+      #
+      # Nothing ran ESLint at all before this. The job has been named
+      # `lint-and-test` since it was written and did format:check, build and
+      # test, which is how 42 errors accumulated on develop unnoticed and would
+      # have made the rule banning unscoped BFF calls decorative. The four
+      # rules with an existing backlog are demoted to warnings in
+      # `apps/web/eslint.config.mjs` (see EW-789) so the gate can switch on
+      # today rather than behind a large refactor; everything else is enforced
+      # from now on.
+      - name: Lint
+        if: steps.scope.outputs.code == 'true'
+        run: pnpm lint
 
       # --- Regression guard: the /login locale-rewrite defect class -----------
       #
@@ -437,7 +512,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
         with:
           version: 10.33.3
 
@@ -543,7 +618,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
         with:
           version: 10.33.3
 
@@ -681,7 +756,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86  # v3
         with:
           version: 10.33.3
 

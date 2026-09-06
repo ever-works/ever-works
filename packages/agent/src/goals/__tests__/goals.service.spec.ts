@@ -101,6 +101,7 @@ function makeGoalRow(overrides: Partial<Goal> = {}): AnyRow {
         userId: 'u1',
         title: 'seed goal',
         description: null,
+        goalKind: 'metric',
         metricSource: { pluginId: 'stripe', metricId: 'income' },
         comparator: 'gte',
         targetValue: 1000,
@@ -128,6 +129,21 @@ function validInput(overrides: Partial<CreateGoalInput> = {}): CreateGoalInput {
         targetValue: 1000,
         unit: 'usd',
         window: 'month',
+        ...overrides,
+    };
+}
+
+/** A delivery Goal (self-build slice AG): no metric, an approved DoD. */
+const DELIVERY_DOD = [
+    { id: 'api', text: 'API endpoint merged', status: 'open' as const },
+    { id: 'web', text: 'Web form merged', status: 'open' as const },
+];
+
+function deliveryInput(overrides: Partial<CreateGoalInput> = {}): CreateGoalInput {
+    return {
+        title: 'Ship feature X across three repos',
+        goalKind: 'delivery',
+        dodCriteria: DELIVERY_DOD,
         ...overrides,
     };
 }
@@ -520,6 +536,234 @@ describe('GoalsService', () => {
             expect(missionGoalsRepo._rows[0]).toMatchObject(everScope);
             expect(linked).toMatchObject(everScope);
             expect(linked.goal).toMatchObject(everScope);
+        });
+    });
+
+    // ── Self-build slice AG (EW-795): the delivery kind ────────────────
+
+    describe('create — delivery kind', () => {
+        it('persists a DRAFT delivery Goal with NULL metric fields, a total window and the normalized DoD', async () => {
+            const dto = await service.create('u1', deliveryInput());
+
+            expect(dto.goalKind).toBe('delivery');
+            expect(dto.status).toBe(GoalStatus.DRAFT);
+            expect(dto.nextCheckAt).toBeNull();
+            expect(dto.metricSource).toBeNull();
+            expect(dto.comparator).toBeNull();
+            expect(dto.targetValue).toBeNull();
+            expect(dto.unit).toBeNull();
+            expect(dto.window).toBe('total');
+            expect(dto.baselineValue).toBeNull();
+            expect(dto.dodCriteria).toHaveLength(2);
+            expect(dto.dodCriteria?.[0]).toMatchObject({
+                id: 'api',
+                text: 'API endpoint merged',
+                status: 'open',
+                source: 'operator',
+            });
+            expect(dto.dodSummary).toMatchObject({ total: 2, open: 2, complete: false });
+            // The row really carries NULLs (what the nullable columns store),
+            // not a missing key.
+            expect(goalsRepo._rows[0]).toMatchObject({
+                goalKind: 'delivery',
+                metricSource: null,
+                comparator: null,
+                targetValue: null,
+                unit: null,
+                criteria: null,
+                constraints: null,
+            });
+        });
+
+        it('accepts explicit nulls for the metric fields (absent-or-null is the wire contract)', async () => {
+            const dto = await service.create(
+                'u1',
+                deliveryInput({
+                    metricSource: null,
+                    comparator: null,
+                    targetValue: null,
+                    unit: null,
+                    window: null,
+                }),
+            );
+            expect(dto.goalKind).toBe('delivery');
+        });
+
+        it('rejects a delivery Goal without a Definition of Done', async () => {
+            for (const dodCriteria of [undefined, null, []]) {
+                await expect(
+                    service.create('u1', deliveryInput({ dodCriteria })),
+                ).rejects.toBeInstanceOf(BadRequestException);
+            }
+            expect(goalsRepo._rows).toHaveLength(0);
+        });
+
+        it.each([
+            ['targetValue', { targetValue: 1000 }],
+            ['metricSource', { metricSource: { pluginId: 'stripe', metricId: 'income' } }],
+            ['comparator', { comparator: 'gte' }],
+            ['unit', { unit: 'usd' }],
+            ['window', { window: 'month' }],
+            ['baselineValue', { baselineValue: 5 }],
+            ['criteria', { criteria: [] }],
+            ['constraints', { constraints: [] }],
+        ] as Array<[string, Partial<CreateGoalInput>]>)(
+            'rejects a delivery Goal that carries the metric-only field %s',
+            async (_field, extra) => {
+                await expect(service.create('u1', deliveryInput(extra))).rejects.toBeInstanceOf(
+                    BadRequestException,
+                );
+                expect(goalsRepo._rows).toHaveLength(0);
+            },
+        );
+
+        it('rejects a delivery Goal born with proposed (unapproved) criteria', async () => {
+            await expect(
+                service.create(
+                    'u1',
+                    deliveryInput({
+                        dodCriteria: [{ id: 'a', text: 'x', status: 'open', proposed: true }],
+                    }),
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('rejects a malformed Definition of Done', async () => {
+            await expect(
+                service.create(
+                    'u1',
+                    deliveryInput({
+                        dodCriteria: [{ id: '', text: 'x', status: 'open' }] as never,
+                    }),
+                ),
+            ).rejects.toBeInstanceOf(BadRequestException);
+        });
+
+        it('rejects an unknown goalKind without coercing it', async () => {
+            await expect(
+                service.create('u1', validInput({ goalKind: 'outcome' as never })),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(goalsRepo._rows).toHaveLength(0);
+        });
+
+        it('still requires every metric field for an explicit metric kind', async () => {
+            await expect(
+                service.create('u1', validInput({ goalKind: 'metric', targetValue: undefined })),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.create('u1', validInput({ goalKind: 'metric', unit: undefined })),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.create('u1', validInput({ goalKind: 'metric', comparator: undefined })),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            // The e2e validation matrix pins this exact message for a missing source.
+            await expect(
+                service.create('u1', validInput({ goalKind: 'metric', metricSource: undefined })),
+            ).rejects.toThrow('metricSource must be an object.');
+        });
+
+        it('defaults an omitted goalKind to metric and keeps an optional seed checklist', async () => {
+            const bare = await service.create('u1', validInput());
+            expect(bare.goalKind).toBe('metric');
+            expect(bare.dodCriteria).toBeNull();
+
+            const seeded = await service.create(
+                'u1',
+                validInput({
+                    dodCriteria: [{ id: 'docs', text: 'Write the docs', status: 'open' }],
+                }),
+            );
+            expect(seeded.goalKind).toBe('metric');
+            expect(seeded.targetValue).toBe(1000);
+            expect(seeded.dodCriteria).toHaveLength(1);
+        });
+    });
+
+    describe('activate / update — delivery kind', () => {
+        it('activates a delivery Goal with no metric source at all and schedules the first check', async () => {
+            const created = await service.create('u1', deliveryInput());
+            const dto = await service.activate('u1', created.id);
+            expect(dto.status).toBe(GoalStatus.ACTIVE);
+            expect(dto.outcome).toBeNull();
+            // Scheduled like a metric Goal so deadline → MISSED still works
+            // without a plugin; the tick itself reads no provider.
+            expect(dto.nextCheckAt).not.toBeNull();
+        });
+
+        it('refuses to activate a delivery Goal whose criteria are all still proposed', async () => {
+            goalsRepo._rows.push(
+                makeGoalRow({
+                    id: 'gdel',
+                    goalKind: 'delivery',
+                    metricSource: null,
+                    comparator: null,
+                    targetValue: null,
+                    unit: null,
+                    window: 'total',
+                    dodCriteria: [{ id: 'a', text: 'x', status: 'open', proposed: true }],
+                }),
+            );
+            await expect(service.activate('u1', 'gdel')).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+            expect(goalsRepo._rows[0].status).toBe(GoalStatus.DRAFT);
+        });
+
+        it('refuses to activate a delivery Goal with no Definition of Done at all', async () => {
+            goalsRepo._rows.push(
+                makeGoalRow({
+                    id: 'gdel',
+                    goalKind: 'delivery',
+                    metricSource: null,
+                    comparator: null,
+                    targetValue: null,
+                    unit: null,
+                    window: 'total',
+                    dodCriteria: null,
+                }),
+            );
+            await expect(service.activate('u1', 'gdel')).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+        });
+
+        it('refuses to give a delivery Goal a metric target — even as a null "clear"', async () => {
+            const created = await service.create('u1', deliveryInput());
+            await expect(
+                service.update('u1', created.id, { targetValue: 5 }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.update('u1', created.id, {
+                    metricSource: { pluginId: 'stripe', metricId: 'income' },
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.update('u1', created.id, { comparator: 'gte' }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            await expect(
+                service.update('u1', created.id, { baselineValue: null }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(goalsRepo._rows[0]).toMatchObject({ targetValue: null, metricSource: null });
+        });
+
+        it('still lets a delivery Goal change its title and take a human outcome override', async () => {
+            const created = await service.create('u1', deliveryInput());
+            const renamed = await service.update('u1', created.id, { title: '  Ship it  ' });
+            expect(renamed.title).toBe('Ship it');
+
+            await service.activate('u1', created.id);
+            const abandoned = await service.update('u1', created.id, {
+                outcome: GoalOutcome.ABANDONED,
+            });
+            expect(abandoned.outcome).toBe(GoalOutcome.ABANDONED);
+            expect(abandoned.status).toBe(GoalStatus.COMPLETED);
+            expect(abandoned.nextCheckAt).toBeNull();
+        });
+
+        it('metric Goals keep their metric-field updates', async () => {
+            const created = await service.create('u1', validInput());
+            const updated = await service.update('u1', created.id, { targetValue: 2500 });
+            expect(updated.targetValue).toBe(2500);
         });
     });
 });

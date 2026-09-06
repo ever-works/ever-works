@@ -1,5 +1,6 @@
 import { Injectable, Inject, Logger } from '@nestjs/common';
 import { McpRegistryService } from '@rekog/mcp-nest';
+import type { z } from 'zod';
 import { OpenApiLoaderService, type OpenApiOperation } from './openapi-loader.service.js';
 import { SchemaConverterService } from './schema-converter.service.js';
 import { ApiClientService } from '../api-client/api-client.service.js';
@@ -82,10 +83,9 @@ export class ToolRegistrationService {
 				entry.description ||
 				(specDescription ? sanitizeSpecDescription(specDescription) : '') ||
 				`${entry.method} ${entry.path}`;
-			const parameters = this.converter.buildToolParameters(
-				operation.pathParams,
-				operation.queryParams,
-				operation.requestBody
+			const parameters = this.withoutOmittedArgs(
+				this.converter.buildToolParameters(operation.pathParams, operation.queryParams, operation.requestBody),
+				entry
 			);
 
 			this.registry.registerTool({
@@ -101,9 +101,36 @@ export class ToolRegistrationService {
 		this.logger.log(`Registered ${count} MCP tools from OpenAPI spec`);
 	}
 
+	/**
+	 * Cut `entry.omitArgs` out of the generated schema. Security: the
+	 * transport validates every call with `parameters.safeParse`, and a Zod
+	 * object strips keys it does not know, so an omitted flag never reaches
+	 * the handler — and the LLM never sees it offered. Names absent from
+	 * the schema are ignored (zod's `omit` would throw on them, and a
+	 * whitelist typo must not take the tool down with it).
+	 */
+	private withoutOmittedArgs(
+		parameters: z.ZodObject<Record<string, z.ZodTypeAny>>,
+		entry: WhitelistEntry
+	): z.ZodObject<Record<string, z.ZodTypeAny>> {
+		const present = (entry.omitArgs ?? []).filter((name) => name in parameters.shape);
+		if (present.length === 0) {
+			return parameters;
+		}
+		// The keys were just filtered against the shape, so the mask is exactly
+		// what zod's `omit` wants; the cast only satisfies its stricter typing.
+		const mask = Object.fromEntries(present.map((name) => [name, true as const])) as Parameters<
+			typeof parameters.omit
+		>[0];
+		return parameters.omit(mask) as z.ZodObject<Record<string, z.ZodTypeAny>>;
+	}
+
 	private createHandler(entry: WhitelistEntry, operation: OpenApiOperation) {
 		const pathParamNames = new Set(operation.pathParams.map((p) => p.name));
 		const queryParamNames = new Set(operation.queryParams.map((p) => p.name));
+		// Belt and braces for the schema-level omit above: if a transport ever
+		// hands us unvalidated arguments, the flag still must not go upstream.
+		const omittedArgNames = new Set(entry.omitArgs ?? []);
 		const apiClient = this.apiClient;
 
 		return async (args: Record<string, unknown>) => {
@@ -113,6 +140,9 @@ export class ToolRegistrationService {
 				const bodyParams: Record<string, unknown> = {};
 
 				for (const [key, value] of Object.entries(args)) {
+					if (omittedArgNames.has(key)) {
+						continue;
+					}
 					if (pathParamNames.has(key)) {
 						apiPath = apiPath.replace(`{${key}}`, encodeURIComponent(`${value as string | number}`));
 					} else if (queryParamNames.has(key)) {

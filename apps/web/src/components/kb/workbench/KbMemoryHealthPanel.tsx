@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Activity, HelpCircle, Inbox, Milestone, Search } from 'lucide-react';
 import type { KbMemoryHealth } from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
+import { browserApiFetch } from '@/lib/api/browser-api';
 
 /**
  * Memory health panel (memory upgrades M10).
@@ -21,8 +22,19 @@ import { cn } from '@/lib/utils/cn';
  * is how a health panel starts lying to its reader.
  *
  * Org-scoped: the API resolves the Organization from the request scope
- * context, so there is nothing to pass — a session with no active org
+ * context, so there is no org id to pass — a session with no active org
  * gets the empty payload and the panel says so.
+ *
+ * EW-786 — but the scope context has to be told which workspace this tab
+ * is looking at. `browserApiFetch` (not a bare `fetch`) is what stamps
+ * the per-tab `x-ever-workspace` selector the BFF route turns into the
+ * API's `x-scope-slug`. Without it the request reached the API unscoped,
+ * `getMemoryHealth` fell to its org-less branch, and this panel rendered
+ * a fully populated wall of zeroes for an Organization with real
+ * retrieval history — a lie the `null` handling above cannot catch,
+ * because `emptyHealth()` reports measurable zeroes rather than `null`.
+ * The route now answers 400 without that selector, so the two halves are
+ * a matched pair: a raw `fetch` here would surface as the error state.
  */
 
 export interface KbMemoryHealthPanelProps {
@@ -55,7 +67,7 @@ export function KbMemoryHealthPanel({
         if (initialHealth) return;
         let cancelled = false;
         const query = windowDays ? `?windowDays=${windowDays}` : '';
-        fetch(`/api/memory/health${query}`, { cache: 'no-store' })
+        browserApiFetch(`/api/memory/health${query}`, { cache: 'no-store' })
             .then(async (res) => {
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return (await res.json()) as KbMemoryHealth;

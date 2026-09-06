@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { InboxService } from '../inbox.service';
+import { composeFleetAnswerMessage, InboxService } from '../inbox.service';
 import type { InboxItem } from '../../entities/inbox-item.entity';
 import type { CreateInboxItemInput } from '../../database/repositories/inbox-item.repository';
 
@@ -75,9 +75,22 @@ function makeStore(seed: InboxItem[] = []) {
         findByProposalId: jest.fn(async (proposalId: string) => {
             return [...rows.values()].find((row) => row.proposalId === proposalId) ?? null;
         }),
-        listForUser: jest.fn(async (userId: string) => {
+        findOpenQuestionByRunId: jest.fn(async (agentRunId: string) => {
+            return (
+                [...rows.values()].find(
+                    (row) =>
+                        row.agentRunId === agentRunId &&
+                        row.kind === 'question' &&
+                        row.status === 'open',
+                ) ?? null
+            );
+        }),
+        listForUser: jest.fn(async (userId: string, options: { taskId?: string } = {}) => {
             const owned = [...rows.values()].filter(
-                (row) => row.userId === userId && row.status !== 'archived',
+                (row) =>
+                    row.userId === userId &&
+                    row.status !== 'archived' &&
+                    (!options.taskId || row.taskId === options.taskId),
             );
             return { rows: owned, total: owned.length };
         }),
@@ -293,6 +306,99 @@ describe('InboxService', () => {
         });
     });
 
+    describe('questionRaised (fleet run, slice Q)', () => {
+        const fleetInput = () => ({
+            userId: 'u1',
+            agentRunId: 'run-1',
+            question: 'Use Postgres?\nOr SQLite?',
+            context: 'Work so far: pushed on branch `task/x`.',
+            sourceMeta: {
+                nodeId: 'node-1',
+                nodeName: 'everdesk2',
+                branch: 'task/x',
+                taskTitle: 'Fix the thing',
+            },
+        });
+
+        it('files a fleet-run question with links from the OWNED run row, parks the run and keeps the provenance', async () => {
+            const runs = makeRuns({
+                id: 'run-1',
+                userId: 'u1',
+                agentId: 'a1',
+                taskId: 't1',
+                workId: 'w1',
+                organizationId: 'o1',
+            });
+            const notifications = { notifyInboxItem: jest.fn(async () => undefined) };
+            const { service, store } = build({ runs, notifications });
+
+            await service.questionRaised(fleetInput());
+
+            const created = store.create.mock.calls[0][0];
+            expect(created).toMatchObject({
+                userId: 'u1',
+                kind: 'question',
+                sourceType: 'fleet-run',
+                // No caller-supplied agent id → the run row's.
+                agentId: 'a1',
+                agentRunId: 'run-1',
+                taskId: 't1',
+                workId: 'w1',
+                organizationId: 'o1',
+                sourceMeta: {
+                    nodeId: 'node-1',
+                    nodeName: 'everdesk2',
+                    branch: 'task/x',
+                    taskTitle: 'Fix the thing',
+                },
+            });
+            expect(created.title).toBe('Use Postgres?');
+            expect(created.body).toBe(
+                'Use Postgres?\nOr SQLite?\n\nWork so far: pushed on branch `task/x`.',
+            );
+            expect(runs.setAwaitingInput).toHaveBeenCalledWith('run-1', true);
+            expect(notifications.notifyInboxItem).toHaveBeenCalledTimes(1);
+            expect(notifications.notifyInboxItem).toHaveBeenCalledWith(
+                expect.objectContaining({ kind: 'question', title: 'Use Postgres?' }),
+            );
+        });
+
+        it('is idempotent per run — a second call while the question is open files nothing', async () => {
+            const runs = makeRuns({ id: 'run-1', userId: 'u1', taskId: 't1' });
+            const { service, store } = build({ runs });
+
+            await service.questionRaised(fleetInput());
+            await service.questionRaised(fleetInput());
+
+            expect(store.create).toHaveBeenCalledTimes(1);
+            expect(runs.setAwaitingInput).toHaveBeenCalledTimes(1);
+        });
+
+        it('files the item WITHOUT run links and does not park when the run belongs to someone else', async () => {
+            const runs = makeRuns({ id: 'run-1', userId: 'someone-else', taskId: 't1' });
+            const { service, store } = build({ runs });
+
+            await service.questionRaised({ ...fleetInput(), agentId: 'a9' });
+
+            expect(store.create.mock.calls[0][0]).toMatchObject({
+                sourceType: 'fleet-run',
+                agentId: 'a9',
+                agentRunId: null,
+                taskId: null,
+            });
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+        });
+
+        it('files nothing for a blank question (best-effort by the port contract)', async () => {
+            const { service, store, runs } = build({});
+            await expect(
+                service.questionRaised({ ...fleetInput(), question: '   ' }),
+            ).resolves.toBeUndefined();
+            expect(store.create).not.toHaveBeenCalled();
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+        });
+    });
+
     describe('escalationRaised / proposalPending producers', () => {
         it('mirrors an escalation into an item carrying the escalationId', async () => {
             const { service, store } = build({});
@@ -490,6 +596,78 @@ describe('InboxService', () => {
                 expect.objectContaining({ message: 'Postgres — managed, not self-hosted' }),
             );
             expect(outcome.item.answerOptionId).toBe('pg');
+        });
+
+        it('resumes a parked FLEET run with the question folded into the answer (slice Q)', async () => {
+            // The node that executes the answer has no session that
+            // remembers the question, so the resume message restates it;
+            // the item itself records only the human's words.
+            const store = makeStore([
+                makeRow({
+                    id: 'i1',
+                    agentRunId: 'run-1',
+                    sourceType: 'fleet-run',
+                    title: 'Which DB?',
+                }),
+            ]);
+            const runs = makeRuns({
+                id: 'run-1',
+                userId: 'u1',
+                status: 'completed',
+                awaitingInput: true,
+                taskId: 't1',
+            });
+            const steering = makeSteering();
+            const { service } = build({ store, runs, steering });
+
+            const outcome = await service.reply('u1', 'i1', { text: 'Use Postgres' });
+
+            expect(steering.steer).not.toHaveBeenCalled();
+            expect(steering.resume).toHaveBeenCalledWith(
+                'run-1',
+                'u1',
+                composeFleetAnswerMessage('Which DB?', 'Use Postgres'),
+            );
+            const [, , resumeMessage] = steering.resume.mock.calls[0] as unknown as [
+                string,
+                string,
+                string,
+            ];
+            expect(resumeMessage).toBe(
+                "Your question from the previous run: Which DB?\n\nOwner's answer: Use Postgres",
+            );
+            expect(outcome.routed).toBe('resumed');
+            expect(outcome.runId).toBe('run-2');
+            expect(outcome.item.answerText).toBe('Use Postgres');
+        });
+
+        it('reopens the item and leaves the fleet run parked when the resume throws (slice Q)', async () => {
+            // The planner can refuse (done / cancelled Task, no repository)
+            // or the runtime can be off; the owner must be able to answer
+            // again or archive, so neither the claim nor the parked flag
+            // may be consumed.
+            const store = makeStore([
+                makeRow({ id: 'i1', agentRunId: 'run-1', sourceType: 'fleet-run' }),
+            ]);
+            const runs = makeRuns({
+                id: 'run-1',
+                userId: 'u1',
+                status: 'completed',
+                awaitingInput: true,
+                taskId: 't1',
+            });
+            const steering = makeSteering();
+            steering.resume.mockRejectedValue(
+                new ConflictException('Resume could not be dispatched — dispatch-failed'),
+            );
+            const { service } = build({ store, runs, steering });
+
+            await expect(
+                service.reply('u1', 'i1', { text: 'Use Postgres' }),
+            ).rejects.toBeInstanceOf(ConflictException);
+
+            expect(store.rows.get('i1')?.status).toBe('open');
+            expect(runs.setAwaitingInput).not.toHaveBeenCalled();
         });
 
         it('records the answer and clears the park flag when nothing can be routed', async () => {
@@ -823,6 +1001,23 @@ describe('InboxService', () => {
             expect(result.unreadCount).toBe(1);
         });
 
+        it('forwards the Task filter to the store (the Task page open-question lookup, slice Q)', async () => {
+            const store = makeStore([
+                makeRow({ id: 'i1', taskId: 't1', sourceType: 'fleet-run' }),
+                makeRow({ id: 'i2', taskId: 't2' }),
+            ]);
+            const { service } = build({ store });
+
+            const result = await service.list('u1', { taskId: 't1', status: 'open' });
+
+            expect(store.listForUser).toHaveBeenCalledWith(
+                'u1',
+                expect.objectContaining({ taskId: 't1', status: 'open' }),
+            );
+            expect(result.items.map((item) => item.id)).toEqual(['i1']);
+            expect(result.items[0].sourceType).toBe('fleet-run');
+        });
+
         it('marks read and unread again', async () => {
             const store = makeStore([makeRow({ id: 'i1' })]);
             const { service } = build({ store });
@@ -880,6 +1075,93 @@ describe('InboxService', () => {
                 NotFoundException,
             );
             await expect(service.getForUser('i1', 'u1')).resolves.toBeNull();
+        });
+
+        describe('dismissing a parked FLEET run (slice Q)', () => {
+            // A run parked on a fleet question has no other exit: cancel
+            // refuses terminal rows and the sweeper never reaps an
+            // awaiting row. Archiving / deleting the OPEN question is the
+            // owner's "drop this run".
+            const fleetQuestion = () =>
+                makeRow({ id: 'i1', sourceType: 'fleet-run', agentRunId: 'run-1', taskId: 't1' });
+
+            it('archiving an open fleet question clears the parked run', async () => {
+                const store = makeStore([fleetQuestion()]);
+                const runs = makeRuns();
+                const { service } = build({ store, runs });
+
+                expect((await service.setArchived('i1', 'u1', true)).status).toBe('archived');
+
+                expect(runs.setAwaitingInput).toHaveBeenCalledTimes(1);
+                expect(runs.setAwaitingInput).toHaveBeenCalledWith('run-1', false);
+            });
+
+            it('un-archiving it re-parks the run', async () => {
+                const store = makeStore([fleetQuestion()]);
+                const runs = makeRuns();
+                const { service } = build({ store, runs });
+
+                await service.setArchived('i1', 'u1', true);
+                expect((await service.setArchived('i1', 'u1', false)).status).toBe('open');
+
+                expect(runs.setAwaitingInput).toHaveBeenLastCalledWith('run-1', true);
+                expect(runs.setAwaitingInput).toHaveBeenCalledTimes(2);
+            });
+
+            it('deleting an open fleet question clears the parked run', async () => {
+                const store = makeStore([fleetQuestion()]);
+                const runs = makeRuns();
+                const { service } = build({ store, runs });
+
+                await service.delete('i1', 'u1');
+
+                expect(store.rows.has('i1')).toBe(false);
+                expect(runs.setAwaitingInput).toHaveBeenCalledWith('run-1', false);
+            });
+
+            it('archiving a cloud (agent-run) question leaves its run untouched', async () => {
+                const store = makeStore([makeRow({ id: 'i1', agentRunId: 'run-1' })]);
+                const runs = makeRuns();
+                const { service } = build({ store, runs });
+
+                await service.setArchived('i1', 'u1', true);
+                await service.setArchived('i1', 'u1', false);
+                await service.delete('i1', 'u1');
+
+                expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+            });
+
+            it('archiving an already-ANSWERED fleet question leaves the run untouched', async () => {
+                // The reply already resumed (or cleared) the run; there is
+                // nothing parked to drop.
+                const store = makeStore([
+                    makeRow({
+                        id: 'i1',
+                        sourceType: 'fleet-run',
+                        agentRunId: 'run-1',
+                        status: 'answered',
+                        answeredAt: new Date('2026-08-02'),
+                    }),
+                ]);
+                const runs = makeRuns();
+                const { service } = build({ store, runs });
+
+                await service.setArchived('i1', 'u1', true);
+                expect((await service.setArchived('i1', 'u1', false)).status).toBe('answered');
+
+                expect(runs.setAwaitingInput).not.toHaveBeenCalled();
+            });
+
+            it('a failing un-park never fails the archive', async () => {
+                const store = makeStore([fleetQuestion()]);
+                const runs = makeRuns();
+                runs.setAwaitingInput.mockRejectedValue(new Error('db down'));
+                const { service } = build({ store, runs });
+
+                await expect(service.setArchived('i1', 'u1', true)).resolves.toMatchObject({
+                    status: 'archived',
+                });
+            });
         });
     });
 

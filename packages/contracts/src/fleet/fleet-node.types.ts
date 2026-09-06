@@ -102,6 +102,62 @@ export const FLEET_NODE_STATUSES: readonly FleetNodeStatus[] = ['enrolling', 'on
 export const FLEET_NODE_NON_LEASABLE_STATUSES: readonly FleetNodeStatus[] = ['enrolling', 'paused', 'disabled'];
 
 /**
+ * What the node's WORKER is doing, as opposed to {@link FleetNodeStatus},
+ * which is only what the platform can infer from heartbeats.
+ *
+ * The distinction is the whole point of this field (self-build finding
+ * OPS-02). A machine that has self-quarantined — the durable worker
+ * safety marker, set when a process tree could not be proven dead and
+ * clearable only at that keyboard — keeps beating and therefore keeps
+ * reporting `online`, while refusing every job it is offered. Status
+ * said "healthy", the queue said "nothing is running", and nothing
+ * anywhere said why. These five values are the node's own answer:
+ *
+ * - `idle`        — polling, ready to take work.
+ * - `working`     — at least one job in flight.
+ * - `paused`      — drained on purpose (operator pause, or draining
+ *                   the last in-flight jobs before a stop).
+ * - `quarantined` — fail-closed stop the node imposed on ITSELF; only
+ *                   an operator at that machine can clear it.
+ * - `throttled`   — over a resource ceiling (CPU/memory, disk floor):
+ *                   the loop runs and keeps its jobs, it just does not
+ *                   lease more.
+ *
+ * Stored in a plain `varchar(16)` with no enum/check constraint, like
+ * {@link FleetNodeStatus}, so adding a value stays a code change.
+ */
+export type FleetNodeWorkerState = 'idle' | 'working' | 'paused' | 'quarantined' | 'throttled';
+
+/** Canonical worker-state list — one source of truth for the server and the UI. */
+export const FLEET_NODE_WORKER_STATES: readonly FleetNodeWorkerState[] = [
+	'idle',
+	'working',
+	'paused',
+	'quarantined',
+	'throttled'
+];
+
+/**
+ * Normalize a worker state arriving off the wire.
+ *
+ * Returns `null` — meaning "unknown", rendered as such — for ANY value
+ * that is not an exact member: a non-string, a node-internal state name
+ * that is not part of this contract (`unsafe`, `draining`, `polling`),
+ * or a value a NEWER node build invented. Deliberately not a fallback to
+ * `idle`: a fabricated "idle" for a machine whose real state we do not
+ * understand is precisely the lie this whole field exists to stop.
+ *
+ * The wire itself stays permissive on purpose (the heartbeat DTO bounds
+ * `workerState` as a plain string, not an enum), so a future value can
+ * never make a beat fail and turn a live node offline. It is normalized
+ * here, once, before it is ever stored or shown.
+ */
+export function normalizeFleetNodeWorkerState(value: unknown): FleetNodeWorkerState | null {
+	if (typeof value !== 'string') return null;
+	return (FLEET_NODE_WORKER_STATES as readonly string[]).includes(value) ? (value as FleetNodeWorkerState) : null;
+}
+
+/**
  * Self-description a node sends on enroll and refreshes on every
  * heartbeat. Every field is optional: a node that reports nothing is
  * still a valid node, just an undescribed one.
@@ -139,6 +195,45 @@ export interface FleetNodeSelfDescription {
 	 * server-side rather than stored.
 	 */
 	diskFreeBytes?: number;
+	/**
+	 * Fleet cost accounting (EW-777) — which account / seat the agent CLI
+	 * on this machine is logged in as, so the spend a run reports can be
+	 * attributed to the subscription that actually paid for it. A display
+	 * label only, e.g. `claude-code: user@example.com (Acme, max)` or
+	 * `codex: chatgpt`; NEVER a token or a credential.
+	 *
+	 * The platform records it and shows it. It does NOT decide whether a
+	 * PC should run under a dedicated seat or its owner's own login —
+	 * that is the founder's call, recorded as such in
+	 * `docs/internal/feat-fleet-cost-accounting-notes.md`.
+	 *
+	 * Same additive contract as {@link FleetNodeSelfDescription.cliVersion}.
+	 * Capped at {@link FLEET_MAX_MODEL_IDENTITY_LENGTH}.
+	 */
+	modelIdentity?: string;
+	/**
+	 * What the node's WORKER is doing right now — one of
+	 * {@link FLEET_NODE_WORKER_STATES}.
+	 *
+	 * Typed as a plain `string` rather than the union ON PURPOSE: this is
+	 * the WIRE, and a node built after this API must be able to report a
+	 * value this API has never heard of without its heartbeat being
+	 * rejected (a rejected beat is a failed beat, and a node that cannot
+	 * beat goes offline). The server runs every incoming value through
+	 * {@link normalizeFleetNodeWorkerState}, which maps anything
+	 * unrecognised to "unknown" rather than trusting it verbatim.
+	 *
+	 * Same additive contract as {@link cliVersion}: absent leaves the
+	 * stored value alone, so an older daemon never blanks it.
+	 */
+	workerState?: string;
+	/**
+	 * Why the worker is in that state, when there is a reason worth
+	 * reading: the quarantine's own message, the resource ceiling that
+	 * throttled the lease. Free text from the machine, so the server
+	 * sanitizes and caps it at {@link FLEET_MAX_WORKER_STATE_REASON_LENGTH}.
+	 */
+	workerStateReason?: string;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -178,6 +273,76 @@ export interface FleetNodeView {
 	cliVersion?: string | null;
 	/** Free bytes last reported for the node's workspace volume, or null. */
 	diskFreeBytes?: number | null;
+	/**
+	 * Which account / seat the node's agent CLI last reported being logged
+	 * in as, or null when it never reported one. See
+	 * {@link FleetNodeSelfDescription.modelIdentity}.
+	 */
+	modelIdentity?: string | null;
+	/**
+	 * Per-node DAILY (UTC day) model-spend ceiling in cents, or null when
+	 * the node inherits the deployment default (`FLEET_NODE_DAILY_COST_CEILING_USD`,
+	 * itself unset by default = no ceiling). Crossing it drains the node.
+	 */
+	dailyCostCeilingCents?: number | null;
+	/**
+	 * The UTC day (`YYYY-MM-DD`) on which this node was last drained by
+	 * its daily ceiling, or null. A drained node stays `disabled` until
+	 * its owner re-enables it — a ceiling is a stop, not a rate limit.
+	 */
+	dailyCostTrippedOn?: string | null;
+	/**
+	 * What the node's worker last reported doing, or null when it has
+	 * never reported one (an older daemon, or a visibility-only node with
+	 * its worker disabled). Null renders as "unknown", which is the
+	 * honest answer — never as `idle`.
+	 */
+	workerState?: FleetNodeWorkerState | null;
+	/** Why the worker is in that state (quarantine / throttle reason), or null. */
+	workerStateReason?: string | null;
+	/**
+	 * ISO timestamp the worker state last CHANGED, or null. Stamped only
+	 * on a transition, so "quarantined since 03:14" stays true across the
+	 * hundreds of beats that follow rather than resetting every 30s.
+	 */
+	workerStateChangedAt?: string | null;
+	/**
+	 * ISO instant at which the owner QUEUED a credential rotation for this
+	 * node (`POST /api/fleet/rotate-all`), or null when none is pending.
+	 *
+	 * A flag, not an instruction the platform can carry out: only the
+	 * machine can rotate its own credential, so this is what its next
+	 * heartbeat reads to decide to call `POST /api/fleet/rotate-credential`.
+	 * Cleared by the rotation that satisfies it.
+	 */
+	rotationRequestedAt?: string | null;
+}
+
+/**
+ * `GET /api/fleet/cost-ceiling` — the owner's FLEET-WIDE daily model-spend
+ * ceiling (every enrolled node of the account, summed per UTC day).
+ *
+ * Sums `fleet_jobs.costCents` only — the spend the owner's own machines
+ * reported — never the account's cloud spend or BYOK usage rows. Those
+ * have their own budgets; folding them in here would make one ceiling
+ * drain a fleet for money spent elsewhere.
+ */
+export interface FleetCostCeilingView {
+	/** Owner-set ceiling in cents; null = inherit the deployment default. */
+	dailyCeilingCents: number | null;
+	/**
+	 * The ceiling actually in force: the owner's, else the deployment
+	 * default (`FLEET_DAILY_COST_CEILING_USD`), else null (no ceiling).
+	 */
+	effectiveDailyCeilingCents: number | null;
+	/** Where the effective ceiling came from. */
+	source: 'owner' | 'default' | 'none';
+	/** The UTC day the fleet was last drained by this ceiling, or null. */
+	trippedOn: string | null;
+	/** Cents the fleet reported so far today (UTC), across every node. */
+	todaySpendCents: number;
+	/** The UTC day `todaySpendCents` covers (`YYYY-MM-DD`). */
+	day: string;
 }
 
 /** Request body for `POST /api/fleet/enroll`. */
@@ -204,6 +369,18 @@ export interface FleetHeartbeatRequest extends FleetNodeSelfDescription {
 export interface FleetHeartbeatResponse {
 	ok: true;
 	node: FleetNodeView;
+	/**
+	 * True when the owner has QUEUED a credential rotation for this node
+	 * (`POST /api/fleet/rotate-all`). The daemon answers by calling
+	 * `POST /api/fleet/rotate-credential` with the credential it is
+	 * holding; until it does, nothing changes and the node keeps working.
+	 *
+	 * Optional and additive on purpose: a daemon built before this field
+	 * existed ignores it and simply never self-rotates — its owner can
+	 * still re-key it the old way. Nothing breaks, which is the only way
+	 * to ship a protocol field to machines nobody can redeploy at once.
+	 */
+	rotationRequested?: boolean;
 }
 
 // ─── Protocol bounds (fixed) ────────────────────────────────────────────────
@@ -220,6 +397,33 @@ export const FLEET_MAX_VERSION_LENGTH = 32;
  * `1.2.3 (Claude Code)` rather than a bare semver.
  */
 export const FLEET_MAX_CLI_VERSION_LENGTH = 64;
+
+/**
+ * `sanitizeText(modelIdentity, 200)` server-side. Wide enough for
+ * `<provider>: <email> (<organization>, <plan>)`; the node builds the
+ * label from whitelisted fields, so nothing longer is ever legitimate.
+ */
+export const FLEET_MAX_MODEL_IDENTITY_LENGTH = 200;
+
+/**
+ * `sanitizeText(workerStateReason, 500)` server-side.
+ *
+ * Wide enough for a real quarantine message ("process tree for job X
+ * could not be proven terminated after N attempts: ..."), and hard
+ * enough that a machine cannot use a heartbeat field as unbounded
+ * storage. The node truncates to the same bound so what it shows locally
+ * matches what Fleet stores.
+ */
+export const FLEET_MAX_WORKER_STATE_REASON_LENGTH = 500;
+
+/**
+ * Ceiling on a daily cost ceiling: $100,000 per UTC day, in cents. Not a
+ * plausible fleet spend — it is the point past which a figure is a typo
+ * (dollars entered as cents, or the reverse) rather than a decision, and
+ * the DTO / service refuse it so a mis-typed ceiling cannot silently be
+ * "no ceiling at all".
+ */
+export const FLEET_MAX_DAILY_COST_CEILING_CENTS = 100_000 * 100;
 
 /**
  * Ceiling on a reported `diskFreeBytes`, ~1 EiB. Not a real disk size —
@@ -251,6 +455,21 @@ export const FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS = 15 * 60_000;
 /** Default silence after which an `online` node sweeps to `offline` (5 minutes). */
 export const FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS = 5 * 60_000;
 
+/**
+ * Default silence after which an already-`offline` node earns a SECOND,
+ * louder Inbox notice — "this machine has now been gone for half an
+ * hour" (30 minutes).
+ *
+ * Separate from {@link FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS} because the
+ * two answer different questions. Five minutes of silence is routine (a
+ * reboot, a lid closed, a flaky Wi-Fi minute) and the first notice says
+ * so. Half an hour is somebody's PC that is not coming back on its own,
+ * and under the runbook's recommended `local-wait` there is no cloud
+ * fallback to quietly cover for it. Filed exactly once per outage; the
+ * marker re-arms when the node beats again.
+ */
+export const FLEET_DEFAULT_NODE_OFFLINE_NOTICE_AFTER_MS = 30 * 60_000;
+
 /** Default cap on how many capability tags one node may advertise. */
 export const FLEET_DEFAULT_MAX_CAPABILITY_TAGS = 16;
 
@@ -272,11 +491,129 @@ export const FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING = 128;
 export const FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS = 30_000;
 
 /**
+ * Default DUAL-ACCEPT window for a node-initiated credential rotation
+ * (15 minutes, `FLEET_CREDENTIAL_ROTATION_OVERLAP_MS`).
+ *
+ * For this long after a node rotates itself, BOTH the new credential and
+ * the one it replaced authenticate. That overlap is what makes rotation
+ * survivable on a real machine: the daemon can finish the job it is
+ * holding, write the new secret to disk, restart, and only then stop
+ * needing the old one. A zero-overlap re-key (the operator-side
+ * `POST /api/fleet/nodes/:id/rotate`) kills the old secret instantly and
+ * therefore requires a human at the keyboard — which is exactly why
+ * credentials never rotated.
+ *
+ * The window closes on a CLOCK, not on a callback: the old credential
+ * stops being accepted when `previousCredentialExpiresAt` passes, whether
+ * or not the node ever confirms it stored the new one.
+ */
+export const FLEET_DEFAULT_CREDENTIAL_ROTATION_OVERLAP_MS = 15 * 60_000;
+
+/**
+ * Floor for the rotation overlap. Below this a node could not finish a
+ * single HTTP round-trip plus a disk write inside the window, so the
+ * "bounded overlap" would be a re-key with extra steps.
+ */
+export const FLEET_MIN_CREDENTIAL_ROTATION_OVERLAP_MS = 30_000;
+
+/**
+ * Ceiling on the rotation overlap: 24 hours. Not a recommendation — it is
+ * the point past which "the old credential still works" stops being a
+ * handover window and becomes a second, permanent credential, which is
+ * the property rotation exists to remove.
+ */
+export const FLEET_MAX_CREDENTIAL_ROTATION_OVERLAP_MS = 24 * 60 * 60_000;
+
+/** Request body for the PUBLIC `POST /api/fleet/rotate-credential`. */
+export interface FleetNodeRotateCredentialRequest extends FleetNodeSelfDescription {
+	nodeId: string;
+	/** The node's CURRENT secret. A previous-window secret is refused. */
+	secret: string;
+}
+
+/**
+ * Response body for `POST /api/fleet/rotate-credential`.
+ *
+ * `secret` is the NEW credential and is returned exactly once — only its
+ * sha256 is stored, the same contract enroll has always had. The node
+ * must persist it before {@link FleetNodeRotateCredentialResponse.previousCredentialExpiresAt},
+ * after which the credential it presented here stops working.
+ */
+export interface FleetNodeRotateCredentialResponse {
+	ok: true;
+	nodeId: string;
+	/** The new node secret, returned exactly once. */
+	secret: string;
+	/** ISO instant the OLD credential stops being accepted. */
+	previousCredentialExpiresAt: string | null;
+	/** Seconds the old credential remains valid, for a node that cannot parse dates. */
+	overlapSec: number;
+	node: FleetNodeView;
+}
+
+/**
  * Floor for the offline sweep window. Below the node's own minimum
  * heartbeat cadence every healthy node would flap to `offline` between
  * beats, so the window can be shortened but not to nonsense.
  */
 export const FLEET_MIN_NODE_OFFLINE_AFTER_MS = 30_000;
+
+/**
+ * The RECONCILED outcome of the platform run a fleet job carried.
+ *
+ * The job row and the run row settle separately: the node reports a
+ * verdict on the job, then the api-side reconciler decides what that
+ * meant for the Agent run (completed with a summary, failed with a
+ * reason, parked on a question). Showing only the job status is how the
+ * drawer ended up saying "done" for a job whose run had failed — the
+ * exact question an operator opens the drawer to answer.
+ */
+export interface FleetJobReconciledOutcome {
+	/** The Agent run this job carried. */
+	runId: string;
+	status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+	/** The run's own summary, or null. */
+	summary: string | null;
+	/** The run's error message, or null. Length-capped server-side. */
+	error: string | null;
+}
+
+/**
+ * IDs-ONLY summary of what a job was for.
+ *
+ * Deliberately not the payload: `FleetJobView.payload` is executor input
+ * — instructions, mount grants, repo coordinates — and the drawer has no
+ * business rendering it (see `FLEET_JOB_MAX_PAYLOAD_BYTES` for how big
+ * it can get, and note that it is composed from user content). The
+ * identities below are what an operator actually needs to follow the
+ * trail from a node row to the Task and the run.
+ */
+export interface FleetJobHistorySummary {
+	kind: string;
+	taskId?: string | null;
+	runId?: string | null;
+	agentId?: string | null;
+}
+
+/**
+ * One row of the node drawer's job history: a {@link FleetJobView} plus
+ * the facts that were on the server and never reached the drawer — the
+ * job's own error text, the reconciled run outcome, and a payload-free
+ * summary.
+ *
+ * `payload` is inherited from {@link FleetJobView} and is always sent as
+ * `null` on this endpoint. Keeping the field (rather than omitting it)
+ * keeps the type a structural superset, so every existing consumer of
+ * the detail view still compiles.
+ */
+export interface FleetNodeJobHistoryEntry extends FleetJobView {
+	/** The verdict text the node reported, or null. Capped server-side. */
+	error?: string | null;
+	/** IDs-only description of the work, never the payload. */
+	summary?: FleetJobHistorySummary | null;
+	/** The reconciled run outcome, or null for a job that carried no run. */
+	reconciled?: FleetJobReconciledOutcome | null;
+}
 
 /**
  * `GET /api/fleet/nodes/:id` — one node plus what it has been doing.
@@ -288,13 +625,13 @@ export const FLEET_MIN_NODE_OFFLINE_AFTER_MS = 30_000;
 export interface FleetNodeDetailView {
 	node: FleetNodeView;
 	/** Newest-first job history for this node (all outcomes). */
-	recentJobs: FleetJobView[];
+	recentJobs: FleetNodeJobHistoryEntry[];
 	/**
 	 * The failed subset of {@link recentJobs}, newest first — pulled out
 	 * so the drawer can lead with "why is this machine unhappy" instead
 	 * of making the operator filter a mixed list by eye.
 	 */
-	failures: FleetJobView[];
+	failures: FleetNodeJobHistoryEntry[];
 	/**
 	 * True when the job history could not be read at all (job tables
 	 * unavailable). The node itself still renders — a job-runtime hiccup

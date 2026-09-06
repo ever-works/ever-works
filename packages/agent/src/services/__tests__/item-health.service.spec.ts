@@ -150,6 +150,25 @@ describe('ItemHealthService', () => {
             );
         });
 
+        it('refuses a Repository Work with a 400 before the cache, the clone or any health write', async () => {
+            // Self-build slice D (EW-766): the check clones the data
+            // repository and commits health metadata back — neither belongs
+            // in a wrapped code repository.
+            ownershipService.ensureCanEdit.mockResolvedValue({
+                work: buildWork({ kind: 'repo', name: 'Platform' } as Partial<Work>),
+                isCreator: true,
+                role: 'OWNER',
+            });
+
+            const service = buildService();
+            await expect(service.checkItem('work-1', 'item-a', buildUser())).rejects.toThrow(
+                /is a Repository Work/,
+            );
+
+            expect(cacheManager.get).not.toHaveBeenCalled();
+            expect(gitFacade.cloneOrPull).not.toHaveBeenCalled();
+        });
+
         it('returns cached response and skips ensureCanEdit-after-cache work when cache hits', async () => {
             // Order pinned: ensureCanEdit ALWAYS runs before the cache lookup
             // (cache must not be readable without an access check), but the
