@@ -140,8 +140,8 @@ The **Source URL is mandatory**, which is the sharpest edge of using the items w
 This is the step people skip and then regret. The [Knowledge Base](../features/knowledge-base.md) is what makes the difference between a run that produces generic copy and a run that sounds like you — and it is read on **every** run, including every scheduled one. Seed it **before** the first generation, not after.
 
 1. Open the **Memory** tab — `/works/:id/kb`.
-2. Click **+ Add**. The **Create a new document** dialog opens: pick a **Class**, give it a **Title** (the placeholder suggests _"e.g. brand voice principles"_), add an optional **Description** and **Tags**, then click **Create document**. The editor opens on the new document.
-3. Write the document and let it autosave — the editor status line moves through **Unsaved changes…** → **Saving…** → **Saved**.
+2. Write the document as a `.md` file in your editor, then drag it anywhere onto the workbench — or use **Browse files**. The **Classify upload** dialog asks for the **Document class**, an optional description and tags before anything is written. Markdown is passed through verbatim; HTML, PDF, DOCX, XLSX, CSV/TSV and PPTX are extracted automatically. The original is stored in the Work's storage plugin; Agents read the clean extract, never the binary.
+3. Prefer to dictate it? Ask the chat rail on any page of that Work: _"create a KB document at `brand/voice` in the brand class titled Brand voice"_ — it calls `create_kb_document`. Include the word "knowledge" or "document" so the KB tools are gated into that turn. Either way, open the document from the tree to edit it and let it autosave — the editor status line moves through **Unsaved changes…** → **Saving…** → **Saved**.
 4. Repeat for each class you care about. For a blog, four documents are usually enough to change the output noticeably.
 5. Lock anything that must not drift. The **Lock** control offers `full` (nothing may change it) or `additions-only` (appending is fine; edits and deletions to existing lines are rejected by the server) — this protects a document from scheduled regeneration and from Agent runs.
 
@@ -158,7 +158,7 @@ The classes that matter most for a blog, and how the runtime treats each:
 
 `brand`, `legal`, `glossary`, `style`, `personas` and page-matched `seo` documents are **deterministically injected** into every relevant run under a token budget with class-precedence truncation; `research`, `freeform` and `output` documents are retrieved by similarity, and every use is recorded as a citation you can audit afterwards.
 
-Already have a style guide as a file? Drag it anywhere onto the workbench, or use **Browse files** — Markdown, HTML, PDF, DOCX, XLSX, CSV/TSV and PPTX are extracted automatically. The **Classify upload** dialog then asks for the **Document class**, an optional description and tags before anything is written. The original is stored verbatim in the Work's storage plugin; Agents read the clean extract, never the binary.
+There is no "new document" button in the workbench today. Uploading and the chat rail are the two browser paths; from a script, MCP `kb.create` and `POST /api/works/:id/kb/documents` do the same job — see [How to: create a document without uploading a file](knowledge-base-and-memory.md#how-to-create-a-document-without-uploading-a-file).
 
 Everything you write here is committed to `.content/kb/` in the Work's data repository as a `<slug>.md` + `<slug>.yml` pair, so it is diffable and portable, and nothing is locked in. If you run an [Organization](../features/organizations.md), publish `legal`, `style` and `seo` once at the org level and every Work inherits them, with per-Work override.
 
